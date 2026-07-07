@@ -3,7 +3,7 @@
 @interface TGTDLibClient : NSObject
 
 - (BOOL)loadLibraryWithError:(NSError **)error;
-- (NSString *)tdlibVersionWithError:(NSError **)error;
+- (NSString *)tdlibProbeSummaryWithError:(NSError **)error;
 - (NSString *)loadedLibraryPath;
 
 @end

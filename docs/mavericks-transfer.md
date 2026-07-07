@@ -44,7 +44,8 @@ TELEGRAPHICA_TDJSON_PATH=/path/to/libtdjson.dylib ./build_legacy.sh
 open build-legacy/Release/Telegraphica.app
 ```
 
-Click "Check TDLib". A successful spike should show the loaded TDLib version.
+Click "Check TDLib". A successful spike should show that TDLib was loaded and
+that the synchronous JSON probe completed.
 
 You can also test an explicit dylib path without bundling:
 
@@ -135,7 +136,7 @@ open build-legacy/Release/Telegraphica.app
 Click "Check TDLib". Expected success:
 
 - the status changes to `TDLib status: loaded`;
-- the details include `Loaded:` and `TDLib version: ...`.
+- the details include `Loaded:` and `TDLib probe: sync execute OK ...`.
 
 ## Important
 

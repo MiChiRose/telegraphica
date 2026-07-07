@@ -104,15 +104,15 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         TGTDLibClient *client = [[[TGTDLibClient alloc] init] autorelease];
         NSError *error = nil;
-        NSString *version = [client tdlibVersionWithError:&error];
+        NSString *probeSummary = [client tdlibProbeSummaryWithError:&error];
         NSString *loadedPath = [client loadedLibraryPath];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (version) {
-                [self.statusField setStringValue:[NSString stringWithFormat:@"TDLib status: loaded %@", version]];
+            if (probeSummary) {
+                [self.statusField setStringValue:@"TDLib status: loaded"];
                 [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPath ? loadedPath : @"unknown path"]];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib version: %@", version]];
-                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", version]];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummary]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
             } else {
                 NSString *message = [error localizedDescription] ? [error localizedDescription] : @"Unknown TDLib error.";
                 [self.statusField setStringValue:@"TDLib status: unavailable"];
