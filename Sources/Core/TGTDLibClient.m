@@ -572,10 +572,31 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         return nil;
     }
 
-    NSString *authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+    NSString *authorizationState = nil;
+    NSDate *stateDeadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while ([[NSDate date] compare:stateDeadline] == NSOrderedAscending) {
+        NSTimeInterval remaining = [stateDeadline timeIntervalSinceNow];
+        NSTimeInterval stateTimeout = remaining < 1.0 ? remaining : 1.0;
+        NSError *stateError = nil;
+        authorizationState = [self authorizationStateSummaryWithTimeout:stateTimeout error:&stateError];
+        if ([authorizationState isEqualToString:@"waitEncryptionKey"]) {
+            break;
+        }
+        if ([authorizationState length] > 0 && ![authorizationState isEqualToString:@"waitTdlibParameters"]) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+    }
+
     if (![authorizationState isEqualToString:@"waitEncryptionKey"]) {
         if ([authorizationState length] > 0) {
-            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+            if (error) {
+                NSString *message = [NSString stringWithFormat:@"TDLib did not reach waitEncryptionKey before the probe timed out. Last auth state: %@", authorizationState];
+                *error = [self errorWithDescription:message code:23];
+            }
+            return nil;
+        }
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib did not reach waitEncryptionKey before the probe timed out." code:23];
         }
         return nil;
     }
@@ -606,8 +627,8 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     _sendFunction(_client, [requestJSON UTF8String]);
 
     BOOL receivedOK = NO;
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+    NSDate *ackDeadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while ([[NSDate date] compare:ackDeadline] == NSOrderedAscending) {
         const char *raw = _receiveFunction(_client, 0.25);
         if (!raw) {
             continue;
