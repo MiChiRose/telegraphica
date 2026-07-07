@@ -42,15 +42,6 @@ binary_contains_arch() {
     file "$binary_path" | grep -q "$expected_arch"
 }
 
-codesign_supports_strict() {
-    local strict_probe=""
-    strict_probe="$(codesign --verify --strict /System/Library/CoreServices/Finder.app 2>&1 || true)"
-    if echo "$strict_probe" | grep -E -i -q "unrecognized option|unknown option|invalid option|Usage:"; then
-        return 1
-    fi
-    return 0
-}
-
 PYTHON_BIN=""
 if command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="$(command -v python3)"
@@ -196,12 +187,7 @@ fi
 xattr -cr "$APP_NAME" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --deep --sign - "$APP_NAME"
-    if codesign_supports_strict; then
-        codesign --verify --deep --strict "$APP_NAME"
-    else
-        echo "codesign does not support --strict; using legacy verification."
-        codesign --verify --deep "$APP_NAME"
-    fi
+    codesign --verify --deep "$APP_NAME"
 fi
 
 mkdir -p "$DIST_DIR"
