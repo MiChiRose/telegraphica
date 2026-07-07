@@ -675,4 +675,168 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     return nil;
 }
 
+- (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+    if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
+        if (![self setLocalTDLibParametersWithTimeout:timeout error:error]) {
+            return nil;
+        }
+        authorizationState = [self authorizationStateSummaryWithTimeout:1.0 error:NULL];
+        if ([authorizationState length] == 0) {
+            authorizationState = @"waitTdlibParameters";
+        }
+    }
+
+    if ([authorizationState isEqualToString:@"waitTdlibParameters"] || [authorizationState isEqualToString:@"waitEncryptionKey"]) {
+        if (![self checkDatabaseEncryptionKeyWithTimeout:timeout error:error]) {
+            return nil;
+        }
+        authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+    }
+
+    return authorizationState;
+}
+
+- (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    BOOL receivedOK = NO;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        const char *raw = _receiveFunction(_client, 0.25);
+        if (!raw) {
+            continue;
+        }
+
+        NSString *jsonString = [NSString stringWithUTF8String:raw];
+        NSError *jsonError = nil;
+        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
+        if (![object isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSDictionary *dictionary = (NSDictionary *)object;
+        id type = [dictionary objectForKey:@"@type"];
+        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"ok"]) {
+            receivedOK = YES;
+            continue;
+        }
+
+        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
+        if ([summary length] > 0) {
+            if ([summary hasPrefix:@"error"]) {
+                if (error) {
+                    NSString *message = [NSString stringWithFormat:@"TDLib rejected %@: %@", actionName, summary];
+                    *error = [self errorWithDescription:message code:errorCode];
+                }
+                return nil;
+            }
+            if (![summary isEqualToString:waitingState]) {
+                if (receivedOK) {
+                    return [NSString stringWithFormat:@"%@ accepted; auth state: %@", actionName, summary];
+                }
+                return [NSString stringWithFormat:@"auth state: %@", summary];
+            }
+        }
+    }
+
+    if (receivedOK) {
+        return [NSString stringWithFormat:@"%@ accepted; waiting for next auth state", actionName];
+    }
+
+    if (error) {
+        NSString *message = [NSString stringWithFormat:@"TDLib did not acknowledge %@ before the probe timed out.", actionName];
+        *error = [self errorWithDescription:message code:errorCode];
+    }
+    return nil;
+}
+
+- (NSString *)sendAuthorizationRequest:(NSDictionary *)request actionName:(NSString *)actionName waitingState:(NSString *)waitingState timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    NSString *requestJSON = [self JSONStringFromObject:request error:error];
+    if (!requestJSON) {
+        return nil;
+    }
+
+    _sendFunction(_client, [requestJSON UTF8String]);
+    return [self receiveAuthorizationResultForAction:actionName waitingState:waitingState timeout:timeout errorCode:errorCode error:error];
+}
+
+- (NSString *)prepareAuthorizationFlowWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if ([authorizationState length] == 0) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"auth state: %@", authorizationState];
+}
+
+- (NSString *)submitAuthenticationPhoneNumber:(NSString *)phoneNumber timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedPhone = [phoneNumber stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedPhone length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Phone number is empty." code:24];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPhoneNumber"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"setAuthenticationPhoneNumber" forKey:@"@type"];
+    [request setObject:[NSString stringWithFormat:@"telegraphica-auth-phone-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:trimmedPhone forKey:@"phone_number"];
+    [request setObject:[NSNull null] forKey:@"settings"];
+    return [self sendAuthorizationRequest:request actionName:@"phone number" waitingState:@"waitPhoneNumber" timeout:timeout errorCode:25 error:error];
+}
+
+- (NSString *)submitAuthenticationCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedCode = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedCode length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Authentication code is empty." code:26];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitCode"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"checkAuthenticationCode" forKey:@"@type"];
+    [request setObject:[NSString stringWithFormat:@"telegraphica-auth-code-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:trimmedCode forKey:@"code"];
+    return [self sendAuthorizationRequest:request actionName:@"authentication code" waitingState:@"waitCode" timeout:timeout errorCode:27 error:error];
+}
+
+- (NSString *)submitAuthenticationPassword:(NSString *)password timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if ([password length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Authentication password is empty." code:28];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPassword"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"checkAuthenticationPassword" forKey:@"@type"];
+    [request setObject:[NSString stringWithFormat:@"telegraphica-auth-password-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:password forKey:@"password"];
+    return [self sendAuthorizationRequest:request actionName:@"authentication password" waitingState:@"waitPassword" timeout:timeout errorCode:29 error:error];
+}
+
 @end
