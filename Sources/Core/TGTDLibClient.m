@@ -60,7 +60,7 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 }
 
 - (BOOL)loadLibraryWithError:(NSError **)error {
-    if (_libraryHandle && _executeFunction) {
+    if (_libraryHandle && _createFunction && _executeFunction) {
         return YES;
     }
 
@@ -97,9 +97,16 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
     _executeFunction = (TGTDJsonClientExecuteFunction)dlsym(_libraryHandle, "td_json_client_execute");
     _destroyFunction = (TGTDJsonClientDestroyFunction)dlsym(_libraryHandle, "td_json_client_destroy");
 
+    if (!_createFunction) {
+        if (error) {
+            *error = [self errorWithDescription:@"Loaded TDLib, but td_json_client_create was not exported." code:2];
+        }
+        return NO;
+    }
+
     if (!_executeFunction) {
         if (error) {
-            *error = [self errorWithDescription:@"Loaded TDLib, but td_json_client_execute was not exported." code:2];
+            *error = [self errorWithDescription:@"Loaded TDLib, but td_json_client_execute was not exported." code:3];
         }
         return NO;
     }
@@ -107,20 +114,27 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
     return YES;
 }
 
-- (NSString *)tdlibVersionWithError:(NSError **)error {
+- (NSString *)tdlibProbeSummaryWithError:(NSError **)error {
     if (![self loadLibraryWithError:error]) {
         return nil;
     }
 
-    if (!_client && _createFunction) {
+    if (!_client) {
         _client = _createFunction();
     }
 
-    const char *request = "{\"@type\":\"getOption\",\"name\":\"version\"}";
+    if (!_client) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib did not create a JSON client." code:4];
+        }
+        return nil;
+    }
+
+    const char *request = "{\"@type\":\"getTextEntities\",\"text\":\"Telegraphica TDLib smoke https://telegram.org @telegraphica\"}";
     const char *result = _executeFunction(_client, request);
     if (!result) {
         if (error) {
-            *error = [self errorWithDescription:@"TDLib returned no response for getOption/version." code:3];
+            *error = [self errorWithDescription:@"TDLib returned no response for synchronous getTextEntities probe." code:5];
         }
         return nil;
     }
@@ -132,18 +146,26 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
     if (!object || ![object isKindOfClass:[NSDictionary class]]) {
         if (error) {
             NSString *message = [NSString stringWithFormat:@"TDLib returned an unparseable response: %@", jsonString];
-            *error = [self errorWithDescription:message code:4];
+            *error = [self errorWithDescription:message code:6];
         }
         return nil;
     }
 
     NSDictionary *dictionary = (NSDictionary *)object;
-    id value = [dictionary objectForKey:@"value"];
-    if ([value isKindOfClass:[NSString class]]) {
-        return value;
+    id type = [dictionary objectForKey:@"@type"];
+    if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"textEntities"]) {
+        id entities = [dictionary objectForKey:@"entities"];
+        if ([entities isKindOfClass:[NSArray class]]) {
+            return [NSString stringWithFormat:@"sync execute OK (%lu text entities)", (unsigned long)[entities count]];
+        }
+        return @"sync execute OK";
     }
 
-    return jsonString;
+    if (error) {
+        NSString *message = [NSString stringWithFormat:@"TDLib synchronous probe returned unexpected response: %@", jsonString];
+        *error = [self errorWithDescription:message code:7];
+    }
+    return nil;
 }
 
 @end

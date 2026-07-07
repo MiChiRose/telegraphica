@@ -75,9 +75,9 @@ The build script copies the dylib to
 `Telegraphica.app/Contents/Frameworks/libtdjson.dylib`, runs
 `scripts/check_tdjson_legacy.sh`, signs the bundle, and creates the zip.
 
-The minimal spike action calls TDLib's JSON interface and attempts to read the
-`version` option. The next milestone is to replace this probe with the real
-authorization-state loop.
+The minimal spike action loads TDLib's JSON interface and executes a synchronous
+`getTextEntities` request. The next milestone is to replace this probe with the
+real authorization-state loop.
 
 ## Secrets
 
