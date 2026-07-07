@@ -24,6 +24,24 @@ if [ -z "$XCODEBUILD" ]; then
     exit 1
 fi
 
+binary_contains_arch() {
+    local binary_path="$1"
+    local expected_arch="$2"
+    local lipo_output=""
+
+    if command -v lipo >/dev/null 2>&1; then
+        lipo_output="$(lipo -archs "$binary_path" 2>/dev/null || true)"
+        if [ -z "$lipo_output" ]; then
+            lipo_output="$(lipo -info "$binary_path" 2>/dev/null || true)"
+        fi
+        if [ -n "$lipo_output" ] && echo "$lipo_output" | tr ' :' '\n\n' | grep -qx "$expected_arch"; then
+            return 0
+        fi
+    fi
+
+    file "$binary_path" | grep -q "$expected_arch"
+}
+
 PYTHON_BIN=""
 if command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="$(command -v python3)"
@@ -134,12 +152,13 @@ if ! file "$BINARY_PATH" | grep -q "$ARCH"; then
     exit 1
 fi
 
-if command -v lipo >/dev/null 2>&1; then
-    if ! lipo -archs "$BINARY_PATH" | tr ' ' '\n' | grep -qx "$ARCH"; then
-        echo "lipo did not find $ARCH in the release binary."
-        lipo -archs "$BINARY_PATH"
-        exit 1
+if ! binary_contains_arch "$BINARY_PATH" "$ARCH"; then
+    echo "Release binary does not appear to contain $ARCH."
+    file "$BINARY_PATH"
+    if command -v lipo >/dev/null 2>&1; then
+        lipo -info "$BINARY_PATH" 2>/dev/null || true
     fi
+    exit 1
 fi
 
 MIN_MACHO=$(otool -l "$BINARY_PATH" | awk '/LC_VERSION_MIN_MACOSX/{found=1} found && /version /{print $2; exit}')
