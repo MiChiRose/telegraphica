@@ -79,6 +79,17 @@ that key in Keychain. The key value must never be copied into screenshots, logs,
 shell commands, or transfer archives. Re-run the app after this step to confirm
 the Keychain key is reused and TDLib advances past `waitEncryptionKey` again.
 
+For the next auth milestone, the window exposes one auth input row at a time:
+
+- `Phone` when TDLib reports `waitPhoneNumber`;
+- `Code` when TDLib reports `waitCode`;
+- `Password` when TDLib reports `waitPassword`;
+- no input when TDLib reports `ready`.
+
+Do not include the real phone number, login code, or 2FA password in screenshots,
+logs, shell history, or transfer archives. The details view should show only
+generic submit results and TDLib auth states.
+
 You can also test an explicit dylib path without bundling:
 
 ```sh
@@ -173,12 +184,13 @@ Click "Check TDLib". Expected success:
 - the details include `TDLib auth state: ...`;
 - if local TDLib config exists, the details include `TDLib parameters: ...`;
 - if TDLib reaches `waitEncryptionKey`, the details include `TDLib encryption key: ...`.
+- if TDLib reaches `waitPhoneNumber`, the auth row allows submitting phone,
+  then code, then 2FA password if required.
 
 ## Important
 
 Do not enter or save real Telegram `api_id`, `api_hash`, phone numbers, login
-codes, or TDLib session data in this repository. Real login flow has not been
-implemented yet.
+codes, 2FA passwords, or TDLib session data in this repository.
 
 Builds produced by modern Xcode on a modern Mac are smoke tests only. The useful
 compatibility result comes from running `./build_legacy.sh` on OS X 10.9.5 /

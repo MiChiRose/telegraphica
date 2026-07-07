@@ -195,7 +195,8 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
    deletion behavior.
 7. Handle `authorizationStateWaitPhoneNumber`,
    `authorizationStateWaitCode`, `authorizationStateWaitPassword`, and
-   `authorizationStateReady`.
+   `authorizationStateReady` with one state-driven auth input row and no
+   persistence/logging of phone numbers, login codes, or 2FA passwords.
 8. Only after auth state is proven, build chat list and message transcript UI.
 
 ## Primary Sources

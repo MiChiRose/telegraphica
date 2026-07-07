@@ -80,7 +80,9 @@ The minimal spike action loads TDLib's JSON interface, executes a synchronous
 authorization state, and can send local `setTdlibParameters` when TDLib reaches
 `waitTdlibParameters`. When TDLib reaches `waitEncryptionKey`, Telegraphica
 generates or reuses a Keychain-backed database encryption key and sends
-`checkDatabaseEncryptionKey`.
+`checkDatabaseEncryptionKey`. The spike window can then submit the phone number,
+login code, and 2FA password needed to move through `waitPhoneNumber`,
+`waitCode`, `waitPassword`, and eventually `ready`.
 
 Local TDLib parameters are read from:
 
@@ -95,6 +97,6 @@ real values into logs.
 
 ## Secrets
 
-Do not commit `api_id`, `api_hash`, phone numbers, login codes, TDLib databases,
-session files, generated encryption keys, or local credentials. Use local
-untracked configuration and Keychain-backed storage during development.
+Do not commit `api_id`, `api_hash`, phone numbers, login codes, 2FA passwords,
+TDLib databases, session files, generated encryption keys, or local credentials.
+Use local untracked configuration and Keychain-backed storage during development.
