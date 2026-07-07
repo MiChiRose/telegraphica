@@ -19,6 +19,7 @@ GPERF_BIN="${GPERF:-gperf}"
 JOBS=""
 CLEAN=0
 ALLOW_UNKNOWN_TAG=0
+PATCH_LEGACY_LINKER=1
 
 usage() {
     cat <<EOF
@@ -36,6 +37,8 @@ Options:
   --gperf PATH            default: gperf
   --jobs N                default: host CPU count, fallback 2
   --clean                 remove BUILD_DIR before configuring
+  --no-patch-legacy-linker
+                          keep TDLib's Apple linker strip flags unchanged
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
   -h, --help              show this help
 
@@ -166,6 +169,37 @@ check_prefix_library() {
     fi
 }
 
+patch_tdlib_for_legacy_linker() {
+    local source_root="$1"
+    local compiler_file="$source_root/CMake/TdSetUpCompiler.cmake"
+    local marker_file="$BUILD_DIR/legacy-linker-patch.txt"
+
+    if [ "$PATCH_LEGACY_LINKER" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$compiler_file" ]; then
+        fail "Could not find TDLib compiler setup file: $compiler_file"
+    fi
+
+    if ! grep -q 'set(TD_LINKER_FLAGS "-Wl,-dead_strip")' "$compiler_file"; then
+        echo "Warning: TDLib Apple linker strip flags were not found; skipping legacy linker patch."
+        return 0
+    fi
+
+    cp "$compiler_file" "$compiler_file.telegraphica-backup"
+    sed \
+        -e 's/set(TD_LINKER_FLAGS "-Wl,-dead_strip")/set(TD_LINKER_FLAGS "") # Telegraphica legacy Xcode 6 linker workaround/' \
+        -e 's/set(TD_LINKER_FLAGS "${TD_LINKER_FLAGS},-x,-S")/set(TD_LINKER_FLAGS "${TD_LINKER_FLAGS}") # Telegraphica legacy Xcode 6 linker workaround/' \
+        "$compiler_file.telegraphica-backup" > "$compiler_file"
+    {
+        echo "Patched TDLib Apple linker strip flags for Xcode 6.2 compatibility."
+        echo "File: $compiler_file"
+        echo "Removed: -Wl,-dead_strip,-x,-S"
+    } > "$marker_file"
+    echo "Patched TDLib Apple linker strip flags for Xcode 6.2 compatibility."
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --source)
@@ -220,6 +254,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --clean)
             CLEAN=1
+            shift
+            ;;
+        --no-patch-legacy-linker)
+            PATCH_LEGACY_LINKER=0
             shift
             ;;
         --allow-unknown-tag)
@@ -300,6 +338,8 @@ fi
 if [ -z "$SOURCE_ROOT" ] || [ ! -f "$SOURCE_ROOT/CMakeLists.txt" ] || [ ! -d "$SOURCE_ROOT/td/telegram" ]; then
     fail "TDLib source root was not found or does not look like TDLib."
 fi
+
+patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
     if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then

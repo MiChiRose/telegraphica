@@ -99,8 +99,16 @@ Useful options:
 --clean                 remove the previous TDLib build directory first
 --jobs 2                lower parallelism if the old Mac is memory constrained
 --zlib-root /path       use a custom zlib prefix
+--no-patch-legacy-linker
+                        keep TDLib's Apple linker strip flags unchanged
 --allow-unknown-tag     continue if the script cannot prove the TDLib tag
 ```
+
+On Xcode 6.2, TDLib's default Apple linker strip flags can trigger an internal
+`ld` error while building helper tools such as `generate_mime_types_gperf`. The
+script patches those flags out of the extracted TDLib source by default before
+running CMake. The original archive is not modified. If you are testing a newer
+toolchain and want the upstream flags untouched, pass `--no-patch-legacy-linker`.
 
 Expected output:
 
