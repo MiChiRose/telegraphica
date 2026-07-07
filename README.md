@@ -28,6 +28,8 @@ Sources/UI/                    Minimal status window
 docs/feasibility.md            TDLib/Mavericks feasibility report
 docs/security.md               Threat model and local data handling notes
 scripts/check_legacy_compat.py Static legacy compatibility checks
+scripts/build_tdlib_legacy.sh  TDLib tdjson build helper for Mavericks
+scripts/check_tdjson_legacy.sh TDLib dylib compatibility checker
 build_legacy.sh                Mavericks/x86_64 build script
 ```
 
@@ -53,9 +55,25 @@ legacy build lane.
 The app currently loads TDLib dynamically. Build or place `libtdjson.dylib` at
 one of these locations:
 
-- `Telegraphica.app/Contents/Frameworks/libtdjson.dylib`
 - a path provided by `TELEGRAPHICA_TDJSON_PATH`
+- `Telegraphica.app/Contents/Frameworks/libtdjson.dylib`
 - `/usr/local/lib/libtdjson.dylib`
+- `/opt/homebrew/lib/libtdjson.dylib`
+- `libtdjson.dylib`
+
+The first Mavericks target is TDLib `v1.8.0`; `v1.3.0` is the fallback if the
+newer tag cannot be built on Xcode 6.2. See `docs/mavericks-transfer.md` for the
+hands-on old-Mac flow.
+
+To bundle a built TDLib dylib into the app package:
+
+```sh
+TELEGRAPHICA_TDJSON_PATH=/path/to/libtdjson.dylib ./build_legacy.sh
+```
+
+The build script copies the dylib to
+`Telegraphica.app/Contents/Frameworks/libtdjson.dylib`, runs
+`scripts/check_tdjson_legacy.sh`, signs the bundle, and creates the zip.
 
 The minimal spike action calls TDLib's JSON interface and attempts to read the
 `version` option. The next milestone is to replace this probe with the real
