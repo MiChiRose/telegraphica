@@ -80,10 +80,16 @@ COMMON_SETTINGS=(
 echo "Building Telegraphica for OS X $DEPLOYMENT_TARGET ($ARCH)."
 echo "Using $("$XCODEBUILD" -version | tr '\n' ' ') with SDK $SDK_NAME."
 
+BUILD_SELECTOR=(-scheme "$SCHEME")
+if ! "$XCODEBUILD" -list -project "$PROJECT" 2>/dev/null | sed 's/^[[:space:]]*//' | grep -Fx -q "$SCHEME"; then
+    echo "Scheme '$SCHEME' was not found; falling back to target '$TARGET'."
+    BUILD_SELECTOR=(-target "$TARGET")
+fi
+
 set +e
 "$XCODEBUILD" \
     -project "$PROJECT" \
-    -scheme "$SCHEME" \
+    "${BUILD_SELECTOR[@]}" \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     "${SDK_ARGS[@]}" \
