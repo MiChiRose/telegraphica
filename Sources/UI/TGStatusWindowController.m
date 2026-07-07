@@ -105,6 +105,10 @@
         TGTDLibClient *client = [[[TGTDLibClient alloc] init] autorelease];
         NSError *error = nil;
         NSString *probeSummary = [client tdlibProbeSummaryWithError:&error];
+        NSString *authorizationState = nil;
+        if (probeSummary) {
+            authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&error];
+        }
         NSString *loadedPath = [client loadedLibraryPath];
 
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -112,6 +116,12 @@
                 [self.statusField setStringValue:@"TDLib status: loaded"];
                 [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPath ? loadedPath : @"unknown path"]];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummary]];
+                if (authorizationState) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", authorizationState]];
+                } else {
+                    NSString *message = [error localizedDescription] ? [error localizedDescription] : @"Authorization state probe did not return a result.";
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", message]];
+                }
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
             } else {
                 NSString *message = [error localizedDescription] ? [error localizedDescription] : @"Unknown TDLib error.";

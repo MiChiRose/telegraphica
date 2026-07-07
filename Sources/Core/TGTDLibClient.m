@@ -2,6 +2,8 @@
 #import <dlfcn.h>
 
 typedef void *(*TGTDJsonClientCreateFunction)(void);
+typedef void (*TGTDJsonClientSendFunction)(void *, const char *);
+typedef const char *(*TGTDJsonClientReceiveFunction)(void *, double);
 typedef const char *(*TGTDJsonClientExecuteFunction)(void *, const char *);
 typedef void (*TGTDJsonClientDestroyFunction)(void *);
 
@@ -11,6 +13,8 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
     void *_libraryHandle;
     void *_client;
     TGTDJsonClientCreateFunction _createFunction;
+    TGTDJsonClientSendFunction _sendFunction;
+    TGTDJsonClientReceiveFunction _receiveFunction;
     TGTDJsonClientExecuteFunction _executeFunction;
     TGTDJsonClientDestroyFunction _destroyFunction;
 }
@@ -60,7 +64,7 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 }
 
 - (BOOL)loadLibraryWithError:(NSError **)error {
-    if (_libraryHandle && _createFunction && _executeFunction) {
+    if (_libraryHandle && _createFunction && _sendFunction && _receiveFunction && _executeFunction) {
         return YES;
     }
 
@@ -94,6 +98,8 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
     }
 
     _createFunction = (TGTDJsonClientCreateFunction)dlsym(_libraryHandle, "td_json_client_create");
+    _sendFunction = (TGTDJsonClientSendFunction)dlsym(_libraryHandle, "td_json_client_send");
+    _receiveFunction = (TGTDJsonClientReceiveFunction)dlsym(_libraryHandle, "td_json_client_receive");
     _executeFunction = (TGTDJsonClientExecuteFunction)dlsym(_libraryHandle, "td_json_client_execute");
     _destroyFunction = (TGTDJsonClientDestroyFunction)dlsym(_libraryHandle, "td_json_client_destroy");
 
@@ -111,12 +117,26 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
         return NO;
     }
 
+    if (!_sendFunction) {
+        if (error) {
+            *error = [self errorWithDescription:@"Loaded TDLib, but td_json_client_send was not exported." code:4];
+        }
+        return NO;
+    }
+
+    if (!_receiveFunction) {
+        if (error) {
+            *error = [self errorWithDescription:@"Loaded TDLib, but td_json_client_receive was not exported." code:5];
+        }
+        return NO;
+    }
+
     return YES;
 }
 
-- (NSString *)tdlibProbeSummaryWithError:(NSError **)error {
+- (BOOL)ensureClientWithError:(NSError **)error {
     if (![self loadLibraryWithError:error]) {
-        return nil;
+        return NO;
     }
 
     if (!_client) {
@@ -125,8 +145,64 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 
     if (!_client) {
         if (error) {
-            *error = [self errorWithDescription:@"TDLib did not create a JSON client." code:4];
+            *error = [self errorWithDescription:@"TDLib did not create a JSON client." code:6];
         }
+        return NO;
+    }
+
+    return YES;
+}
+
+- (id)JSONObjectFromJSONString:(NSString *)jsonString error:(NSError **)error {
+    NSData *data = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
+    NSError *jsonError = nil;
+    id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+    if (!object) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib returned unparseable JSON: %@", jsonString];
+            *error = [self errorWithDescription:message code:7];
+        }
+        return nil;
+    }
+    return object;
+}
+
+- (NSString *)summaryForAuthorizationStateObject:(id)object {
+    if (![object isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *dictionary = (NSDictionary *)object;
+    id type = [dictionary objectForKey:@"@type"];
+    if ([type isKindOfClass:[NSString class]]) {
+        if ([type isEqualToString:@"updateAuthorizationState"]) {
+            id state = [dictionary objectForKey:@"authorization_state"];
+            return [self summaryForAuthorizationStateObject:state];
+        }
+        if ([type hasPrefix:@"authorizationState"]) {
+            NSString *prefix = @"authorizationState";
+            if ([type length] > [prefix length]) {
+                NSString *shortName = [type substringFromIndex:[prefix length]];
+                NSString *first = [[shortName substringToIndex:1] lowercaseString];
+                NSString *rest = [shortName substringFromIndex:1];
+                return [first stringByAppendingString:rest];
+            }
+            return type;
+        }
+        if ([type isEqualToString:@"error"]) {
+            id message = [dictionary objectForKey:@"message"];
+            if ([message isKindOfClass:[NSString class]]) {
+                return [NSString stringWithFormat:@"error: %@", message];
+            }
+            return @"error";
+        }
+    }
+
+    return nil;
+}
+
+- (NSString *)tdlibProbeSummaryWithError:(NSError **)error {
+    if (![self ensureClientWithError:error]) {
         return nil;
     }
 
@@ -134,19 +210,17 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
     const char *result = _executeFunction(_client, request);
     if (!result) {
         if (error) {
-            *error = [self errorWithDescription:@"TDLib returned no response for synchronous getTextEntities probe." code:5];
+            *error = [self errorWithDescription:@"TDLib returned no response for synchronous getTextEntities probe." code:8];
         }
         return nil;
     }
 
     NSString *jsonString = [NSString stringWithUTF8String:result];
-    NSData *data = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
-    NSError *jsonError = nil;
-    id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+    id object = [self JSONObjectFromJSONString:jsonString error:error];
     if (!object || ![object isKindOfClass:[NSDictionary class]]) {
         if (error) {
             NSString *message = [NSString stringWithFormat:@"TDLib returned an unparseable response: %@", jsonString];
-            *error = [self errorWithDescription:message code:6];
+            *error = [self errorWithDescription:message code:9];
         }
         return nil;
     }
@@ -163,7 +237,42 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 
     if (error) {
         NSString *message = [NSString stringWithFormat:@"TDLib synchronous probe returned unexpected response: %@", jsonString];
-        *error = [self errorWithDescription:message code:7];
+        *error = [self errorWithDescription:message code:10];
+    }
+    return nil;
+}
+
+- (NSString *)authorizationStateSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self ensureClientWithError:error]) {
+        return nil;
+    }
+
+    NSString *extra = [NSString stringWithFormat:@"telegraphica-auth-state-%.0f", [[NSDate date] timeIntervalSince1970]];
+    NSString *request = [NSString stringWithFormat:@"{\"@type\":\"getAuthorizationState\",\"@extra\":\"%@\"}", extra];
+    _sendFunction(_client, [request UTF8String]);
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        const char *raw = _receiveFunction(_client, 0.25);
+        if (!raw) {
+            continue;
+        }
+
+        NSString *jsonString = [NSString stringWithUTF8String:raw];
+        NSError *jsonError = nil;
+        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
+        if (!object) {
+            continue;
+        }
+
+        NSString *summary = [self summaryForAuthorizationStateObject:object];
+        if ([summary length] > 0) {
+            return summary;
+        }
+    }
+
+    if (error) {
+        *error = [self errorWithDescription:@"TDLib did not return authorization state before the probe timed out." code:11];
     }
     return nil;
 }

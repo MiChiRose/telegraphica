@@ -9,7 +9,7 @@ This archive is intended for OS X 10.9.5 Mavericks / Intel x86_64 validation.
 3. Go into the unzipped folder:
 
 ```sh
-cd Telegraphica-develop
+cd Telegraphica-develop-<commit>
 ```
 
 4. Build the legacy AppKit spike:
@@ -44,8 +44,13 @@ TELEGRAPHICA_TDJSON_PATH=/path/to/libtdjson.dylib ./build_legacy.sh
 open build-legacy/Release/Telegraphica.app
 ```
 
-Click "Check TDLib". A successful spike should show that TDLib was loaded and
-that the synchronous JSON probe completed.
+When bundling TDLib, `build_legacy.sh` treats unresolved non-system dylib
+dependencies as an error. If this fails, rebuild TDLib with static OpenSSL/zlib
+or copy and rewrite the dependent dylibs before sharing the app bundle.
+
+Click "Check TDLib". A successful spike should show that TDLib was loaded, that
+the synchronous JSON probe completed, and that the async authorization-state
+probe returned a TDLib state.
 
 You can also test an explicit dylib path without bundling:
 
@@ -136,7 +141,9 @@ open build-legacy/Release/Telegraphica.app
 Click "Check TDLib". Expected success:
 
 - the status changes to `TDLib status: loaded`;
-- the details include `Loaded:` and `TDLib probe: sync execute OK ...`.
+- the details include `Loaded:`;
+- the details include `TDLib probe: sync execute OK ...`;
+- the details include `TDLib auth state: ...`.
 
 ## Important
 
