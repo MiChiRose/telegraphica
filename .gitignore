@@ -29,6 +29,7 @@ xcuserdata/
 .env.*
 local.env
 Secrets.plist
+tdlib-config.plist
 secrets/
 credentials/
 tdlib/

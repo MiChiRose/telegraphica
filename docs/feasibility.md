@@ -18,6 +18,7 @@ The recommended spike order is:
 2. If v1.8.0 fails on the Mavericks lane, test TDLib v1.3.0 as a compatibility fallback.
 3. Treat current TDLib `master` as a future-track option, not the first Mavericks target.
 4. Load `libtdjson.dylib` dynamically from the AppKit app, run a synchronous JSON probe, and read the current async authorization state.
+5. Supply `setTdlibParameters` from a local config outside the repository and keep TDLib database/files under explicit user directories.
 
 ## TDLib Findings
 
@@ -51,6 +52,7 @@ AppDelegate
   TGTDLibClient
     dynamic loading of libtdjson.dylib
     JSON request/response boundary
+    local setTdlibParameters bridge
   TGKeychainHelper
     future TDLib database encryption key storage
   TGLogger
@@ -187,10 +189,12 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
 5. Send `setTdlibParameters` with explicit database/files directories, local
    language, app version, device model, `api_id`, and `api_hash` loaded from
    local untracked config/Keychain.
-6. Handle `authorizationStateWaitPhoneNumber`,
+6. Handle `authorizationStateWaitEncryptionKey` with a generated Keychain-backed
+   database encryption key.
+7. Handle `authorizationStateWaitPhoneNumber`,
    `authorizationStateWaitCode`, `authorizationStateWaitPassword`, and
    `authorizationStateReady`.
-7. Only after auth state is proven, build chat list and message transcript UI.
+8. Only after auth state is proven, build chat list and message transcript UI.
 
 ## Primary Sources
 

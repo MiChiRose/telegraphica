@@ -76,9 +76,20 @@ The build script copies the dylib to
 `scripts/check_tdjson_legacy.sh`, signs the bundle, and creates the zip.
 
 The minimal spike action loads TDLib's JSON interface, executes a synchronous
-`getTextEntities` request, and asks the async JSON loop for the current
-authorization state. The next milestone is to supply local TDLib parameters
-without committing credentials or session data.
+`getTextEntities` request, asks the async JSON loop for the current
+authorization state, and can send local `setTdlibParameters` when TDLib reaches
+`waitTdlibParameters`.
+
+Local TDLib parameters are read from:
+
+```text
+~/Library/Application Support/Telegraphica/tdlib-config.plist
+```
+
+Start from `docs/local-tdlib-config.example.plist`, copy it outside the
+repository, and edit the copy with credentials from `my.telegram.org`. Do not
+commit the real `api_id`/`api_hash` file, put it in transfer archives, or paste
+real values into logs.
 
 ## Secrets
 
