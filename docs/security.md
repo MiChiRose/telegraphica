@@ -140,4 +140,5 @@ Low:
 - TDLib README: https://github.com/tdlib/td
 - TDLib JSON API: https://core.telegram.org/tdlib/docs/td__json__client_8h.html
 - TDLib `setTdlibParameters`: https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_tdlib_parameters.html
+- TDLib `checkDatabaseEncryptionKey`: https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1check_database_encryption_key.html
 - TDLib `setDatabaseEncryptionKey`: https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_database_encryption_key.html

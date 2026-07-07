@@ -71,7 +71,13 @@ After the config exists, run the app again and click "Check TDLib". Expected
 result for this milestone:
 
 - `TDLib auth state: waitTdlibParameters`;
-- `TDLib parameters: set OK; auth state: waitEncryptionKey`.
+- `TDLib parameters: ... waitEncryptionKey`;
+- `TDLib encryption key: ... waitPhoneNumber`.
+
+Telegraphica generates the TDLib database encryption key locally and stores only
+that key in Keychain. The key value must never be copied into screenshots, logs,
+shell commands, or transfer archives. Re-run the app after this step to confirm
+the Keychain key is reused and TDLib advances past `waitEncryptionKey` again.
 
 You can also test an explicit dylib path without bundling:
 
@@ -165,7 +171,8 @@ Click "Check TDLib". Expected success:
 - the details include `Loaded:`;
 - the details include `TDLib probe: sync execute OK ...`;
 - the details include `TDLib auth state: ...`;
-- if local TDLib config exists, the details include `TDLib parameters: ...`.
+- if local TDLib config exists, the details include `TDLib parameters: ...`;
+- if TDLib reaches `waitEncryptionKey`, the details include `TDLib encryption key: ...`.
 
 ## Important
 
