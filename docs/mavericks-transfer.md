@@ -101,6 +101,7 @@ Useful options:
 --zlib-root /path       use a custom zlib prefix
 --no-patch-legacy-linker
                         keep TDLib's Apple linker strip flags unchanged
+--no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
 --allow-unknown-tag     continue if the script cannot prove the TDLib tag
 ```
 
@@ -109,6 +110,12 @@ On Xcode 6.2, TDLib's default Apple linker strip flags can trigger an internal
 script patches those flags out of the extracted TDLib source by default before
 running CMake. The original archive is not modified. If you are testing a newer
 toolchain and want the upstream flags untouched, pass `--no-patch-legacy-linker`.
+
+The OS X 10.9 SDK also does not declare `fdopendir`, which TDLib v1.8.0 uses in
+its POSIX directory walk helper. The script patches the extracted source to close
+the already-open file descriptor and use TDLib's existing path-based `opendir`
+fallback. This is a Mavericks compatibility shim for the spike, not a general
+upstream replacement.
 
 Expected output:
 

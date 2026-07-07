@@ -20,6 +20,7 @@ JOBS=""
 CLEAN=0
 ALLOW_UNKNOWN_TAG=0
 PATCH_LEGACY_LINKER=1
+PATCH_MAVERICKS_FDOPENDIR=1
 
 usage() {
     cat <<EOF
@@ -39,6 +40,7 @@ Options:
   --clean                 remove BUILD_DIR before configuring
   --no-patch-legacy-linker
                           keep TDLib's Apple linker strip flags unchanged
+  --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
   -h, --help              show this help
 
@@ -200,6 +202,39 @@ patch_tdlib_for_legacy_linker() {
     echo "Patched TDLib Apple linker strip flags for Xcode 6.2 compatibility."
 }
 
+patch_tdlib_for_mavericks_fdopendir() {
+    local source_root="$1"
+    local path_file="$source_root/tdutils/td/utils/port/path.cpp"
+    local marker_file="$BUILD_DIR/mavericks-fdopendir-patch.txt"
+
+    if [ "$PATCH_MAVERICKS_FDOPENDIR" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$path_file" ]; then
+        fail "Could not find TDLib path source file: $path_file"
+    fi
+
+    if ! grep -q 'fdopendir(native_fd.fd())' "$path_file"; then
+        echo "Warning: TDLib fdopendir call was not found; skipping Mavericks fdopendir patch."
+        return 0
+    fi
+
+    cp "$path_file" "$path_file.telegraphica-backup"
+    perl -0pi -e 's#Result<bool> walk_path_dir\(string &path, FileFd fd, const WalkFunction &func\) \{\n  auto native_fd = fd\.move_as_native_fd\(\);\n  auto \*subdir = fdopendir\(native_fd\.fd\(\)\);\n  if \(subdir == nullptr\) \{\n    return OS_ERROR\("fdopendir"\);\n  \}\n  native_fd\.release\(\);\n  return walk_path_dir\(path, subdir, func\);\n\}#Result<bool> walk_path_dir(string \&path, FileFd fd, const WalkFunction \&func) {\n  fd.close();\n  return walk_path_dir(path, func);\n}#s' "$path_file"
+
+    if grep -q 'fdopendir(native_fd.fd())' "$path_file"; then
+        fail "Failed to patch TDLib fdopendir usage in $path_file"
+    fi
+
+    {
+        echo "Patched TDLib fdopendir directory walk for OS X 10.9 SDK compatibility."
+        echo "File: $path_file"
+        echo "Replacement: close FileFd and use path-based opendir fallback."
+    } > "$marker_file"
+    echo "Patched TDLib fdopendir directory walk for OS X 10.9 SDK compatibility."
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --source)
@@ -260,6 +295,10 @@ while [ "$#" -gt 0 ]; do
             PATCH_LEGACY_LINKER=0
             shift
             ;;
+        --no-patch-fdopendir)
+            PATCH_MAVERICKS_FDOPENDIR=0
+            shift
+            ;;
         --allow-unknown-tag)
             ALLOW_UNKNOWN_TAG=1
             shift
@@ -311,6 +350,9 @@ require_command make
 require_command xcrun
 require_command file
 require_command otool
+if [ "$PATCH_MAVERICKS_FDOPENDIR" -eq 1 ]; then
+    require_command perl
+fi
 
 if ! xcrun --find clang++ >/dev/null 2>&1; then
     fail "clang++ was not found through xcrun."
@@ -340,6 +382,7 @@ if [ -z "$SOURCE_ROOT" ] || [ ! -f "$SOURCE_ROOT/CMakeLists.txt" ] || [ ! -d "$S
 fi
 
 patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
+patch_tdlib_for_mavericks_fdopendir "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
     if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
