@@ -28,7 +28,13 @@ SECRET_VALUE_RE = re.compile(r"(api_hash|authentication_code|phone_number|databa
 
 
 def iter_files():
-    ignored_dirs = set([".git", "build", "build-legacy", "DerivedData"])
+    ignored_dirs = set([
+        ".git",
+        "build",
+        "build-legacy",
+        "build-tdlib-legacy",
+        "DerivedData",
+    ])
     for base, dirs, files in os.walk(ROOT):
         dirs[:] = [d for d in dirs if d not in ignored_dirs]
         for name in files:
