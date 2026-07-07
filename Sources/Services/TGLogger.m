@@ -27,7 +27,7 @@ static NSString *TGLoggerThreadLabel(void) {
 static NSString *TGLoggerRedactedMessage(NSString *message) {
     if (!message) return @"";
     NSString *lowercase = [message lowercaseString];
-    NSArray *sensitiveMarkers = [NSArray arrayWithObjects:@"api_hash", @"authentication_code", @"phone_number", @"database_encryption_key", @"password", nil];
+    NSArray *sensitiveMarkers = [NSArray arrayWithObjects:@"api_hash", @"authentication_code", @"phone_number", @"database_encryption_key", @"encryption_key", @"password", nil];
     NSUInteger index = 0;
     for (index = 0; index < [sensitiveMarkers count]; index++) {
         if ([lowercase rangeOfString:[sensitiveMarkers objectAtIndex:index]].location != NSNotFound) {

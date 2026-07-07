@@ -106,13 +106,18 @@
         NSError *probeError = nil;
         NSError *authorizationError = nil;
         NSError *parametersError = nil;
+        NSError *encryptionKeyError = nil;
         NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
         NSString *parametersSummary = nil;
+        NSString *encryptionKeySummary = nil;
         if (probeSummary) {
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
                 parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
+            }
+            if ([authorizationState isEqualToString:@"waitEncryptionKey"] || [parametersSummary length] > 0) {
+                encryptionKeySummary = [client checkDatabaseEncryptionKeyWithTimeout:4.0 error:&encryptionKeyError];
             }
         }
         NSString *loadedPath = [client loadedLibraryPath];
@@ -132,6 +137,11 @@
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummary]];
                 } else if (parametersError) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", [parametersError localizedDescription]]];
+                }
+                if (encryptionKeySummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummary]];
+                } else if (encryptionKeyError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", [encryptionKeyError localizedDescription]]];
                 }
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
             } else {

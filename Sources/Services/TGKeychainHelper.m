@@ -14,7 +14,7 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     return shared;
 }
 
-- (BOOL)saveString:(NSString *)value forAccount:(NSString *)account {
+- (BOOL)saveData:(NSData *)value forAccount:(NSString *)account {
     if ([account length] == 0) {
         return NO;
     }
@@ -23,23 +23,24 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         return YES;
     }
 
-    NSData *valueData = [value dataUsingEncoding:NSUTF8StringEncoding];
-    [self deleteForAccount:account];
-
     NSMutableDictionary *query = [NSMutableDictionary dictionary];
     [query setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
     [query setObject:TGKeychainServiceName forKey:(__bridge id)kSecAttrService];
     [query setObject:account forKey:(__bridge id)kSecAttrAccount];
-    [query setObject:valueData forKey:(__bridge id)kSecValueData];
-#if defined(kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
-    [query setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly forKey:(__bridge id)kSecAttrAccessible];
-#endif
 
-    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)query, NULL);
+    NSMutableDictionary *attributes = [NSMutableDictionary dictionary];
+    [attributes setObject:value forKey:(__bridge id)kSecValueData];
+
+    OSStatus status = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)attributes);
+    if (status == errSecItemNotFound) {
+        NSMutableDictionary *item = [NSMutableDictionary dictionaryWithDictionary:query];
+        [item addEntriesFromDictionary:attributes];
+        status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+    }
     return (status == errSecSuccess);
 }
 
-- (NSString *)readStringForAccount:(NSString *)account {
+- (NSData *)readDataForAccount:(NSString *)account {
     if ([account length] == 0) {
         return nil;
     }
@@ -55,14 +56,32 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
     if (status == errSecSuccess && result != NULL) {
 #if __has_feature(objc_arc)
-        NSData *data = CFBridgingRelease(result);
-        return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        return CFBridgingRelease(result);
 #else
-        NSData *data = [(NSData *)result autorelease];
-        return [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+        return [(NSData *)result autorelease];
 #endif
     }
     return nil;
+}
+
+- (BOOL)saveString:(NSString *)value forAccount:(NSString *)account {
+    if (!value) {
+        return [self saveData:nil forAccount:account];
+    }
+    NSData *valueData = [value dataUsingEncoding:NSUTF8StringEncoding];
+    return [self saveData:valueData forAccount:account];
+}
+
+- (NSString *)readStringForAccount:(NSString *)account {
+    NSData *data = [self readDataForAccount:account];
+    if (!data) {
+        return nil;
+    }
+#if __has_feature(objc_arc)
+    return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+#else
+    return [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+#endif
 }
 
 - (void)deleteForAccount:(NSString *)account {

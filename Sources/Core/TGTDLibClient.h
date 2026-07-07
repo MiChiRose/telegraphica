@@ -6,6 +6,7 @@
 - (NSString *)tdlibProbeSummaryWithError:(NSError **)error;
 - (NSString *)authorizationStateSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)setLocalTDLibParametersWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)checkDatabaseEncryptionKeyWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)loadedLibraryPath;
 
 @end

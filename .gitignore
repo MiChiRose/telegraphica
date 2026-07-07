@@ -23,6 +23,7 @@ xcuserdata/
 *.profraw
 *.gcda
 *.gcno
+outputs/
 
 # Local secrets and Telegram/TDLib state
 .env
