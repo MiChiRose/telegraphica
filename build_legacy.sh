@@ -184,11 +184,27 @@ if strings -a "$BINARY_PATH" | grep -E -q "__llvm_prf|libclang_rt\\.profile|defa
     exit 1
 fi
 
+if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_TDJSON_PATH" ]; then
+        echo "TELEGRAPHICA_TDJSON_PATH does not point to a file: $TELEGRAPHICA_TDJSON_PATH"
+        exit 1
+    fi
+
+    FRAMEWORKS_DIR="$APP_NAME/Contents/Frameworks"
+    TDJSON_DEST="$FRAMEWORKS_DIR/libtdjson.dylib"
+
+    mkdir -p "$FRAMEWORKS_DIR"
+    ditto "$TELEGRAPHICA_TDJSON_PATH" "$TDJSON_DEST"
+    scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
+fi
+
 xattr -cr "$APP_NAME" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --deep --sign - "$APP_NAME"
     codesign --verify --deep "$APP_NAME"
 fi
+
+ditto "$APP_NAME" "$APP_PATH"
 
 mkdir -p "$DIST_DIR"
 rm -f "$DIST_ZIP"

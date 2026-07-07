@@ -174,6 +174,9 @@ Development can happen on Apple Silicon, but release confidence requires:
 6. Verify login, restart/session reuse, logout, local data deletion, and a text
    send/receive loop.
 
+For the hands-on Mavericks TDLib build, package, and probe recipe, see
+`docs/mavericks-transfer.md`.
+
 ## Minimal Spike Plan
 
 1. Build `tdjson` from TDLib v1.8.0.

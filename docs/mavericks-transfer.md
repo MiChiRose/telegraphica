@@ -30,22 +30,97 @@ loaded. That is OK for the first UI/core-shell smoke test.
 
 ## If You Have libtdjson.dylib
 
-If a Mavericks-compatible `libtdjson.dylib` has already been built, test it with:
+If a Mavericks-compatible `libtdjson.dylib` has already been built, test it with
+the project checker:
 
 ```sh
-file /path/to/libtdjson.dylib
-lipo -archs /path/to/libtdjson.dylib
-otool -l /path/to/libtdjson.dylib | grep -A3 LC_VERSION_MIN_MACOSX
-otool -L /path/to/libtdjson.dylib
+./scripts/check_tdjson_legacy.sh /path/to/libtdjson.dylib
 ```
 
-Then launch Telegraphica with:
+Then rebuild Telegraphica and bundle the dylib into the app:
+
+```sh
+TELEGRAPHICA_TDJSON_PATH=/path/to/libtdjson.dylib ./build_legacy.sh
+open build-legacy/Release/Telegraphica.app
+```
+
+Click "Check TDLib". A successful spike should show the loaded TDLib version.
+
+You can also test an explicit dylib path without bundling:
 
 ```sh
 TELEGRAPHICA_TDJSON_PATH=/path/to/libtdjson.dylib build-legacy/Release/Telegraphica.app/Contents/MacOS/Telegraphica
 ```
 
-Click "Check TDLib". A successful spike should show the loaded TDLib version.
+## Building TDLib On Mavericks
+
+Start with TDLib `v1.8.0`. If that tag cannot be built with Xcode 6.2, use
+TDLib `v1.3.0` as the compatibility fallback.
+
+Prerequisites on the old Mac:
+
+- OS X 10.9.5 on Intel x86_64.
+- Xcode 6.2 or the closest legacy build lane.
+- CMake, `gperf`, `make`, and command line tools.
+- OpenSSL headers/libs built for x86_64 and OS X 10.9.
+- zlib from the system SDK, or a custom zlib prefix built for x86_64 and 10.9.
+
+Use a local TDLib source checkout or archive. The script intentionally does not
+download source code, because old TLS/network support on Mavericks is often the
+least reproducible part of the process.
+
+From a TDLib checkout:
+
+```sh
+./scripts/build_tdlib_legacy.sh \
+  --source /path/to/td \
+  --openssl-root /path/to/openssl-prefix
+```
+
+From a TDLib release archive:
+
+```sh
+./scripts/build_tdlib_legacy.sh \
+  --archive /path/to/td-v1.8.0.tar.gz \
+  --openssl-root /path/to/openssl-prefix
+```
+
+Fallback attempt with TDLib `v1.3.0`:
+
+```sh
+TDLIB_VERSION=v1.3.0 ./scripts/build_tdlib_legacy.sh \
+  --archive /path/to/td-v1.3.0.tar.gz \
+  --openssl-root /path/to/openssl-prefix
+```
+
+Useful options:
+
+```sh
+--clean                 remove the previous TDLib build directory first
+--jobs 2                lower parallelism if the old Mac is memory constrained
+--zlib-root /path       use a custom zlib prefix
+--allow-unknown-tag     continue if the script cannot prove the TDLib tag
+```
+
+Expected output:
+
+```text
+build-tdlib-legacy/stage/Frameworks/libtdjson.dylib
+build-tdlib-legacy/build.log
+build-tdlib-legacy/validation.txt
+```
+
+Then bundle that output into Telegraphica:
+
+```sh
+TELEGRAPHICA_TDJSON_PATH=build-tdlib-legacy/stage/Frameworks/libtdjson.dylib ./build_legacy.sh
+open build-legacy/Release/Telegraphica.app
+```
+
+Click "Check TDLib". Expected success:
+
+- the status changes to `TDLib status: loaded`;
+- the details include `Loaded:` and `TDLib version: ...`.
 
 ## Important
 
@@ -56,3 +131,11 @@ implemented yet.
 Builds produced by modern Xcode on a modern Mac are smoke tests only. The useful
 compatibility result comes from running `./build_legacy.sh` on OS X 10.9.5 /
 Intel with Xcode 6.2 or the closest available legacy lane.
+
+A dylib built on a modern Mac can still be wrong for Mavericks even if it is
+x86_64. Reject builds that contain `LC_BUILD_VERSION` or require a minimum
+macOS newer than 10.9. If `otool -L` or `scripts/check_tdjson_legacy.sh` reports
+non-system dependencies, treat that as unresolved packaging work before sharing
+a portable app bundle. Prefer rebuilding TDLib with static OpenSSL/zlib;
+otherwise copy those dylibs into `Contents/Frameworks` and rewrite their
+references with `install_name_tool` to `@loader_path/...`.
