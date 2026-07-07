@@ -103,11 +103,17 @@
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         TGTDLibClient *client = [[[TGTDLibClient alloc] init] autorelease];
-        NSError *error = nil;
-        NSString *probeSummary = [client tdlibProbeSummaryWithError:&error];
+        NSError *probeError = nil;
+        NSError *authorizationError = nil;
+        NSError *parametersError = nil;
+        NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
+        NSString *parametersSummary = nil;
         if (probeSummary) {
-            authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&error];
+            authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
+            if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
+                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
+            }
         }
         NSString *loadedPath = [client loadedLibraryPath];
 
@@ -119,12 +125,17 @@
                 if (authorizationState) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", authorizationState]];
                 } else {
-                    NSString *message = [error localizedDescription] ? [error localizedDescription] : @"Authorization state probe did not return a result.";
+                    NSString *message = [authorizationError localizedDescription] ? [authorizationError localizedDescription] : @"Authorization state probe did not return a result.";
                     [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", message]];
+                }
+                if (parametersSummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummary]];
+                } else if (parametersError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", [parametersError localizedDescription]]];
                 }
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
             } else {
-                NSString *message = [error localizedDescription] ? [error localizedDescription] : @"Unknown TDLib error.";
+                NSString *message = [probeError localizedDescription] ? [probeError localizedDescription] : @"Unknown TDLib error.";
                 [self.statusField setStringValue:@"TDLib status: unavailable"];
                 [self appendDetail:message];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe failed: %@", message]];

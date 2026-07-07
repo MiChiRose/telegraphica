@@ -52,6 +52,27 @@ Click "Check TDLib". A successful spike should show that TDLib was loaded, that
 the synchronous JSON probe completed, and that the async authorization-state
 probe returned a TDLib state.
 
+## Local TDLib Parameters
+
+To advance past `authorizationStateWaitTdlibParameters`, copy the example
+configuration outside the repository and edit the copy:
+
+```sh
+mkdir -p "$HOME/Library/Application Support/Telegraphica"
+cp docs/local-tdlib-config.example.plist "$HOME/Library/Application Support/Telegraphica/tdlib-config.plist"
+open -e "$HOME/Library/Application Support/Telegraphica/tdlib-config.plist"
+```
+
+Replace the placeholder `api_id` and `api_hash` with values from
+`my.telegram.org`. Do not save real credentials in the repository, screenshots,
+transfer archives, or shell history.
+
+After the config exists, run the app again and click "Check TDLib". Expected
+result for this milestone:
+
+- `TDLib auth state: waitTdlibParameters`;
+- `TDLib parameters: set OK; auth state: waitEncryptionKey`.
+
 You can also test an explicit dylib path without bundling:
 
 ```sh
@@ -143,7 +164,8 @@ Click "Check TDLib". Expected success:
 - the status changes to `TDLib status: loaded`;
 - the details include `Loaded:`;
 - the details include `TDLib probe: sync execute OK ...`;
-- the details include `TDLib auth state: ...`.
+- the details include `TDLib auth state: ...`;
+- if local TDLib config exists, the details include `TDLib parameters: ...`.
 
 ## Important
 
