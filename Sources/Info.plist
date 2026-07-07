@@ -6,6 +6,8 @@
 	<string>en</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key>
+	<string>Telegraphica</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.michirose.Telegraphica</string>
 	<key>CFBundleInfoDictionaryVersion</key>
