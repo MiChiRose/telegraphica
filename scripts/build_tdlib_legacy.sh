@@ -93,6 +93,58 @@ default_jobs() {
     echo "$count"
 }
 
+resolve_symlink_once() {
+    local path="$1"
+    local target=""
+    local dir=""
+
+    if [ -L "$path" ]; then
+        target="$(readlink "$path" || true)"
+        if [ -n "$target" ]; then
+            case "$target" in
+                /*)
+                    path="$target"
+                    ;;
+                *)
+                    dir="$(dirname "$path")"
+                    path="$dir/$target"
+                    ;;
+            esac
+        fi
+    fi
+
+    echo "$path"
+}
+
+find_tdjson_dylib() {
+    local root="$1"
+    local exact=""
+    local resolved=""
+    local versioned=""
+
+    exact="$(find "$root" -name libtdjson.dylib -print | head -n 1)"
+    if [ -n "$exact" ]; then
+        resolved="$(resolve_symlink_once "$exact")"
+        if [ -f "$resolved" ]; then
+            echo "$resolved"
+            return 0
+        fi
+    fi
+
+    versioned="$(find "$root" -name 'libtdjson*.dylib' -type f -print | sort | head -n 1)"
+    if [ -n "$versioned" ]; then
+        echo "$versioned"
+        return 0
+    fi
+
+    return 1
+}
+
+print_tdjson_candidates() {
+    local root="$1"
+    find "$root" \( -name '*tdjson*' -o -name 'libtd*.dylib' \) -print | sed -n '1,80p'
+}
+
 extract_archive() {
     local archive="$1"
     local dest="$2"
@@ -458,8 +510,11 @@ if [ "$BUILD_STATUS" -ne 0 ]; then
     fail "TDLib build failed. Check $BUILD_DIR/build.log"
 fi
 
-TDJSON_BUILT="$(find "$CONFIGURE_DIR" -name libtdjson.dylib -type f | head -n 1)"
+TDJSON_BUILT="$(find_tdjson_dylib "$CONFIGURE_DIR" || true)"
 if [ -z "$TDJSON_BUILT" ]; then
+    echo "Build succeeded, but no libtdjson dylib candidate was found under $CONFIGURE_DIR."
+    echo "TDLib-related outputs found under the build directory:"
+    print_tdjson_candidates "$CONFIGURE_DIR"
     fail "Build succeeded, but libtdjson.dylib was not found under $CONFIGURE_DIR."
 fi
 
