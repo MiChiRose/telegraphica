@@ -17,7 +17,7 @@ The recommended spike order is:
 1. Build TDLib v1.8.0 `tdjson` for x86_64 with `CMAKE_OSX_DEPLOYMENT_TARGET=10.9`.
 2. If v1.8.0 fails on the Mavericks lane, test TDLib v1.3.0 as a compatibility fallback.
 3. Treat current TDLib `master` as a future-track option, not the first Mavericks target.
-4. Load `libtdjson.dylib` dynamically from the AppKit app and run a synchronous JSON probe.
+4. Load `libtdjson.dylib` dynamically from the AppKit app, run a synchronous JSON probe, and read the current async authorization state.
 
 ## TDLib Findings
 

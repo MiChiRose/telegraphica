@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.9}"
 TDJSON_PATH="${1:-${TELEGRAPHICA_TDJSON_PATH:-}}"
+REQUIRE_PORTABLE_DEPS="${TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON:-0}"
 
 usage() {
     echo "Usage: $0 /path/to/libtdjson.dylib"
@@ -123,6 +124,14 @@ if ! echo "$NM_SYMBOLS" | grep -E -q '(^|[[:space:]])_?td_json_client_create$'; 
     echo "libtdjson.dylib does not export td_json_client_create."
     exit 1
 fi
+if ! echo "$NM_SYMBOLS" | grep -E -q '(^|[[:space:]])_?td_json_client_send$'; then
+    echo "libtdjson.dylib does not export td_json_client_send."
+    exit 1
+fi
+if ! echo "$NM_SYMBOLS" | grep -E -q '(^|[[:space:]])_?td_json_client_receive$'; then
+    echo "libtdjson.dylib does not export td_json_client_receive."
+    exit 1
+fi
 if ! echo "$NM_SYMBOLS" | grep -E -q '(^|[[:space:]])_?td_json_client_destroy$'; then
     echo "libtdjson.dylib does not export td_json_client_destroy."
     exit 1
@@ -139,9 +148,13 @@ echo "$OTOOL_LINKED_LIBS"
 NON_SYSTEM_DEPS="$(echo "$OTOOL_LINKED_LIBS" | awk 'NR > 2 {print $1}' | grep -E -v '^(/usr/lib/|/System/Library/|@loader_path/|@executable_path/)' || true)"
 if [ -n "$NON_SYSTEM_DEPS" ]; then
     echo
-    echo "Warning: libtdjson.dylib has non-system dependencies:"
+    echo "libtdjson.dylib has non-system dependencies:"
     echo "$NON_SYSTEM_DEPS"
     echo "For the portable app bundle, prefer static OpenSSL/zlib or rewrite/copy these dylibs into Contents/Frameworks."
+    if [ "$REQUIRE_PORTABLE_DEPS" = "1" ]; then
+        echo "Portable TDLib dependency check failed."
+        exit 1
+    fi
 fi
 
 echo "TDLib JSON dylib check passed."

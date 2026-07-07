@@ -195,7 +195,7 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
 
     mkdir -p "$FRAMEWORKS_DIR"
     ditto "$TELEGRAPHICA_TDJSON_PATH" "$TDJSON_DEST"
-    scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
+    TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
 fi
 
 xattr -cr "$APP_NAME" 2>/dev/null || true
