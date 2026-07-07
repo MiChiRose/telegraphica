@@ -1,5 +1,7 @@
 #import "TGTDLibClient.h"
+#import "../Services/TGKeychainHelper.h"
 #import <dlfcn.h>
+#import <Security/Security.h>
 
 typedef void *(*TGTDJsonClientCreateFunction)(void);
 typedef void (*TGTDJsonClientSendFunction)(void *, const char *);
@@ -8,6 +10,7 @@ typedef const char *(*TGTDJsonClientExecuteFunction)(void *, const char *);
 typedef void (*TGTDJsonClientDestroyFunction)(void *);
 
 static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
+static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_encryption_key";
 
 @interface TGTDLibClient () {
     void *_libraryHandle;
@@ -243,6 +246,32 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
         return nil;
     }
     return [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+}
+
+- (NSData *)databaseEncryptionKeyDataWithError:(NSError **)error {
+    TGKeychainHelper *keychain = [TGKeychainHelper sharedHelper];
+    NSData *existingKey = [keychain readDataForAccount:TGTDLibDatabaseEncryptionKeyAccount];
+    if ([existingKey length] > 0) {
+        return existingKey;
+    }
+
+    NSMutableData *keyData = [NSMutableData dataWithLength:32];
+    OSStatus randomStatus = SecRandomCopyBytes(kSecRandomDefault, [keyData length], [keyData mutableBytes]);
+    if (randomStatus != errSecSuccess) {
+        if (error) {
+            *error = [self errorWithDescription:@"Could not generate TDLib database encryption key." code:18];
+        }
+        return nil;
+    }
+
+    if (![keychain saveData:keyData forAccount:TGTDLibDatabaseEncryptionKeyAccount]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Could not store TDLib database encryption key in Keychain." code:19];
+        }
+        return nil;
+    }
+
+    return keyData;
 }
 
 - (BOOL)loadLibraryWithError:(NSError **)error {
@@ -534,6 +563,93 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 
     if (error) {
         *error = [self errorWithDescription:@"TDLib did not acknowledge local parameters before the probe timed out." code:17];
+    }
+    return nil;
+}
+
+- (NSString *)checkDatabaseEncryptionKeyWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self ensureClientWithError:error]) {
+        return nil;
+    }
+
+    NSString *authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitEncryptionKey"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+
+    NSData *encryptionKeyData = [self databaseEncryptionKeyDataWithError:error];
+    if ([encryptionKeyData length] == 0) {
+        return nil;
+    }
+
+    NSString *encryptionKey = [encryptionKeyData base64EncodedStringWithOptions:0];
+    if ([encryptionKey length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Could not encode TDLib database encryption key." code:20];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"checkDatabaseEncryptionKey" forKey:@"@type"];
+    [request setObject:[NSString stringWithFormat:@"telegraphica-db-key-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:encryptionKey forKey:@"encryption_key"];
+
+    NSString *requestJSON = [self JSONStringFromObject:request error:error];
+    if (!requestJSON) {
+        return nil;
+    }
+
+    _sendFunction(_client, [requestJSON UTF8String]);
+
+    BOOL receivedOK = NO;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        const char *raw = _receiveFunction(_client, 0.25);
+        if (!raw) {
+            continue;
+        }
+
+        NSString *jsonString = [NSString stringWithUTF8String:raw];
+        NSError *jsonError = nil;
+        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
+        if (![object isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSDictionary *dictionary = (NSDictionary *)object;
+        id type = [dictionary objectForKey:@"@type"];
+        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"ok"]) {
+            receivedOK = YES;
+            continue;
+        }
+
+        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
+        if ([summary length] > 0) {
+            if ([summary hasPrefix:@"error"]) {
+                if (error) {
+                    *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected database encryption key: %@", summary] code:21];
+                }
+                return nil;
+            }
+            if (![summary isEqualToString:@"waitEncryptionKey"]) {
+                if (receivedOK) {
+                    return [NSString stringWithFormat:@"check OK; auth state: %@", summary];
+                }
+                return [NSString stringWithFormat:@"auth state: %@", summary];
+            }
+        }
+    }
+
+    if (receivedOK) {
+        return @"check OK; waiting for next auth state";
+    }
+
+    if (error) {
+        *error = [self errorWithDescription:@"TDLib did not acknowledge database encryption key before the probe timed out." code:22];
     }
     return nil;
 }

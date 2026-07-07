@@ -24,7 +24,7 @@ FORBIDDEN_TEXT = [
 ]
 
 GENERIC_RE = re.compile(r"\b(NSArray|NSMutableArray|NSDictionary|NSMutableDictionary|NSSet|NSMutableSet)\s*<")
-SECRET_VALUE_RE = re.compile(r"(api_hash|authentication_code|phone_number|database_encryption_key)\s*[:=]\s*@?\"[^\"]{6,}\"", re.I)
+SECRET_VALUE_RE = re.compile(r"(api_hash|authentication_code|phone_number|database_encryption_key|encryption_key)\s*[:=]\s*@?\"[^\"]{6,}\"", re.I)
 
 
 def iter_files():

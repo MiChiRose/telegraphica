@@ -54,7 +54,7 @@ AppDelegate
     JSON request/response boundary
     local setTdlibParameters bridge
   TGKeychainHelper
-    future TDLib database encryption key storage
+    TDLib database encryption key storage
   TGLogger
     redacted, opt-in diagnostics
 ```
@@ -190,7 +190,9 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
    language, app version, device model, `api_id`, and `api_hash` loaded from
    local untracked config/Keychain.
 6. Handle `authorizationStateWaitEncryptionKey` with a generated Keychain-backed
-   database encryption key.
+   database encryption key: first-run key generation, Keychain reuse after
+   restart, TDLib transition to the next auth state, and later logout/reset
+   deletion behavior.
 7. Handle `authorizationStateWaitPhoneNumber`,
    `authorizationStateWaitCode`, `authorizationStateWaitPassword`, and
    `authorizationStateReady`.
