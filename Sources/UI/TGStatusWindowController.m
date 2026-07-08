@@ -781,7 +781,7 @@
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *chatError = nil;
-        NSArray *items = [client mainChatPreviewItemsWithLimit:100 timeout:10.0 error:&chatError];
+        NSArray *items = [client mainChatPreviewItemsWithLimit:40 timeout:10.0 error:&chatError];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *chatErrorMessage = [[chatError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];

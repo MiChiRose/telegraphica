@@ -1314,7 +1314,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSArray *)mainChatIDsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSUInteger safeLimit = limit;
     if (safeLimit == 0) {
-        safeLimit = 100;
+        safeLimit = 40;
     } else if (safeLimit > 200) {
         safeLimit = 200;
     }
@@ -1327,8 +1327,8 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     [loadChatsRequest setObject:chatList forKey:@"chat_list"];
     [loadChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
     NSTimeInterval loadChatsTimeout = timeout;
-    if (loadChatsTimeout > 2.0) {
-        loadChatsTimeout = 2.0;
+    if (loadChatsTimeout > 1.0) {
+        loadChatsTimeout = 1.0;
     }
     [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
                               extraPrefix:@"telegraphica-load-main-chats"
