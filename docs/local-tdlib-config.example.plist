@@ -12,6 +12,8 @@
     <string>Mac</string>
     <key>application_version</key>
     <string>0.1.0</string>
+    <key>tdlib_parameters_schema</key>
+    <string>auto</string>
     <key>use_test_dc</key>
     <false/>
 </dict>

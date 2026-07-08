@@ -78,7 +78,11 @@ The build script copies the dylib to
 The minimal spike action loads TDLib's JSON interface, executes a synchronous
 `getTextEntities` request, asks the async JSON loop for the current
 authorization state, and can send local `setTdlibParameters` when TDLib reaches
-`waitTdlibParameters`. When TDLib reaches `waitEncryptionKey`, Telegraphica
+`waitTdlibParameters`. Telegraphica supports both the TDLib 1.8.0 nested
+`setTdlibParameters` shape and the current TDLib flat shape; set
+`tdlib_parameters_schema` in the local plist to `auto`, `current`, or `legacy`
+when you need to force one lane. When TDLib reaches `waitEncryptionKey`,
+Telegraphica
 generates or reuses a Keychain-backed database encryption key and sends
 `checkDatabaseEncryptionKey`. The spike window can then submit the phone number,
 login code, and 2FA password needed to move through `waitPhoneNumber`,
