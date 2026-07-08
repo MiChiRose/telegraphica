@@ -6,6 +6,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TDLIB_VERSION="${TDLIB_VERSION:-v1.8.0}"
 TDLIB_LABEL="${TDLIB_LABEL:-$TDLIB_VERSION}"
+COMPILER_CC="${CC:-}"
+COMPILER_CXX="${CXX:-}"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.9}"
 BUILD_DIR="$ROOT_DIR/build-tdlib-legacy"
@@ -45,6 +47,10 @@ Options:
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
   --allow-snapshot        alias for --allow-unknown-tag for TDLib snapshots
   -h, --help              show this help
+
+Environment:
+  CC/CXX                  optional compiler override for snapshot experiments
+                          such as /opt/local/bin/clang-mp-17 and clang++-mp-17
 
 The script builds TDLib tdjson for OS X ${DEPLOYMENT_TARGET} / ${ARCH}, stages
 libtdjson.dylib into STAGE_DIR/Frameworks, and validates it for Telegraphica.
@@ -536,6 +542,12 @@ CMAKE_ARGS=(
 if [ -n "$SDK_PATH" ]; then
     CMAKE_ARGS+=("-DCMAKE_OSX_SYSROOT=$SDK_PATH")
 fi
+if [ -n "$COMPILER_CC" ]; then
+    CMAKE_ARGS+=("-DCMAKE_C_COMPILER=$COMPILER_CC")
+fi
+if [ -n "$COMPILER_CXX" ]; then
+    CMAKE_ARGS+=("-DCMAKE_CXX_COMPILER=$COMPILER_CXX")
+fi
 if [ -n "$OPENSSL_ROOT" ]; then
     CMAKE_ARGS+=("-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT")
 fi
@@ -549,9 +561,16 @@ echo "Building TDLib $TDLIB_LABEL tdjson for OS X $DEPLOYMENT_TARGET ($ARCH)."
 echo "Source: $SOURCE_ROOT"
 echo "Build:  $CONFIGURE_DIR"
 echo "Stage:  $STAGE_DIR/Frameworks"
+if [ -n "$COMPILER_CC" ]; then
+    echo "C compiler:   $COMPILER_CC"
+fi
+if [ -n "$COMPILER_CXX" ]; then
+    echo "C++ compiler: $COMPILER_CXX"
+fi
 
 set +e
 (
+    set -e
     cd "$CONFIGURE_DIR"
     "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
     "$CMAKE_BIN" --build . --target tdjson -- -j "$JOBS"

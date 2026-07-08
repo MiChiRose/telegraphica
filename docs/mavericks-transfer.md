@@ -161,6 +161,42 @@ TDLIB_VERSION=master-snapshot ./scripts/build_tdlib_legacy.sh \
   --allow-snapshot
 ```
 
+If CMake reports `No C++17 support in the compiler`, Xcode 6.2's AppleClang is
+too old for the current TDLib snapshot. Install a newer compiler through
+MacPorts and retry with `CC`/`CXX` pointing at that compiler:
+
+```sh
+sudo port selfupdate
+sudo port install clang-17
+ls /opt/local/bin/clang*mp-17
+```
+
+Then rebuild the snapshot from a clean build directory:
+
+```sh
+CC=/opt/local/bin/clang-mp-17 \
+CXX=/opt/local/bin/clang++-mp-17 \
+TDLIB_VERSION=master-snapshot \
+./scripts/build_tdlib_legacy.sh \
+  --archive ~/Desktop/td-master.tar.gz \
+  --openssl-root /opt/local \
+  --build-dir build-tdlib-master-legacy \
+  --clean \
+  --allow-snapshot
+```
+
+Use `--clean` or a new `--build-dir` whenever changing compilers, because CMake
+caches the compiler selected during the first configure. Run the script as
+`./scripts/build_tdlib_legacy.sh` or `bash ./scripts/build_tdlib_legacy.sh`, not
+with `sh`.
+
+If `clang-17` is unavailable on that MacPorts installation, try `clang-16` or
+`clang-15` and adjust the `CC`/`CXX` paths accordingly. A newer compiler can get
+past TDLib's C++17 configure check, but the old Mavericks SDK/libc++ may still
+fail later if current TDLib uses newer library features. The resulting dylib
+still must pass `scripts/check_tdjson_legacy.sh`; otherwise it is not safe to
+bundle for Mavericks.
+
 If this succeeds, bundle the resulting dylib exactly like the v1.8.0 build:
 
 ```sh
