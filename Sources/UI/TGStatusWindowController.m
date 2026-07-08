@@ -235,11 +235,13 @@
         NSError *parametersError = nil;
         NSError *encryptionKeyError = nil;
         NSError *finalAuthorizationError = nil;
+        NSError *postLoginProbeError = nil;
         NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
         NSString *parametersSummary = nil;
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
+        NSString *postLoginProbeSummary = nil;
         if (probeSummary) {
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
@@ -249,6 +251,9 @@
                 encryptionKeySummary = [client checkDatabaseEncryptionKeyWithTimeout:4.0 error:&encryptionKeyError];
             }
             finalAuthorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&finalAuthorizationError];
+            if ([finalAuthorizationState isEqualToString:@"ready"]) {
+                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
+            }
         }
         NSString *loadedPath = [client loadedLibraryPath];
 
@@ -277,6 +282,11 @@
                     [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationState]];
                 } else if (finalAuthorizationError) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", [finalAuthorizationError localizedDescription]]];
+                }
+                if (postLoginProbeSummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummary]];
+                } else if (postLoginProbeError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", [postLoginProbeError localizedDescription]]];
                 }
                 [self updateAuthControlsForState:finalAuthorizationState];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
@@ -328,7 +338,9 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *authError = nil;
         NSError *stateError = nil;
+        NSError *postLoginProbeError = nil;
         NSString *authSummary = nil;
+        NSString *postLoginProbeSummary = nil;
         if ([state isEqualToString:@"waitPhoneNumber"]) {
             authSummary = [client submitAuthenticationPhoneNumber:input timeout:8.0 error:&authError];
         } else if ([state isEqualToString:@"waitCode"]) {
@@ -337,6 +349,9 @@
             authSummary = [client submitAuthenticationPassword:input timeout:8.0 error:&authError];
         }
         NSString *finalAuthorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&stateError];
+        if ([finalAuthorizationState isEqualToString:@"ready"]) {
+            postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
+        }
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (authSummary) {
@@ -349,6 +364,11 @@
             }
             if (finalAuthorizationState) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationState]];
+                if (postLoginProbeSummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummary]];
+                } else if (postLoginProbeError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", [postLoginProbeError localizedDescription]]];
+                }
                 [self updateAuthControlsForState:finalAuthorizationState];
             } else if (stateError) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", [stateError localizedDescription]]];
