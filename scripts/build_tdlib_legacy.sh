@@ -24,6 +24,7 @@ CLEAN=0
 ALLOW_UNKNOWN_TAG=0
 PATCH_LEGACY_LINKER=1
 PATCH_MAVERICKS_FDOPENDIR=1
+PATCH_MAVERICKS_CLOCK_GETTIME=1
 
 usage() {
     cat <<EOF
@@ -44,6 +45,8 @@ Options:
   --no-patch-legacy-linker
                           keep TDLib's Apple linker strip flags unchanged
   --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
+  --no-patch-clock-gettime
+                          keep TDLib's clock_gettime debug clock code unchanged
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
   --allow-snapshot        alias for --allow-unknown-tag for TDLib snapshots
   -h, --help              show this help
@@ -334,6 +337,43 @@ patch_tdlib_for_mavericks_fdopendir() {
     echo "Patched TDLib fdopendir directory walk for OS X 10.9 SDK compatibility."
 }
 
+patch_tdlib_for_mavericks_clock_gettime() {
+    local source_root="$1"
+    local clocks_file="$source_root/tdutils/td/utils/port/Clocks.cpp"
+    local marker_file="$BUILD_DIR/mavericks-clock-gettime-patch.txt"
+
+    if [ "$PATCH_MAVERICKS_CLOCK_GETTIME" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$clocks_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib clocks source file; skipping clock_gettime patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib clocks source file: $clocks_file"
+    fi
+
+    if ! grep -q 'clockid_t clock_id' "$clocks_file"; then
+        echo "Warning: TDLib clock_gettime debug block was not found; skipping Mavericks clock_gettime patch."
+        return 0
+    fi
+
+    cp "$clocks_file" "$clocks_file.telegraphica-backup"
+    perl -0pi -e 's@string result;\n#if TD_PORT_POSIX\n  auto add_clock =@string result;\n#if TD_PORT_POSIX \&\& !defined(__APPLE__)\n  auto add_clock =@' "$clocks_file"
+
+    if ! perl -0ne '$found = /string result;\n#if TD_PORT_POSIX && !defined\(__APPLE__\)\n  auto add_clock =/ ? 1 : 0; END { exit($found ? 0 : 1) }' "$clocks_file"; then
+        fail "Failed to patch TDLib clock_gettime debug block in $clocks_file"
+    fi
+
+    {
+        echo "Patched TDLib clock_gettime debug clock block for OS X 10.9 SDK compatibility."
+        echo "File: $clocks_file"
+        echo "Replacement: skip POSIX clock_gettime debug enumeration on Apple legacy builds."
+    } > "$marker_file"
+    echo "Patched TDLib clock_gettime debug clock block for OS X 10.9 SDK compatibility."
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --source)
@@ -398,6 +438,10 @@ while [ "$#" -gt 0 ]; do
             PATCH_MAVERICKS_FDOPENDIR=0
             shift
             ;;
+        --no-patch-clock-gettime)
+            PATCH_MAVERICKS_CLOCK_GETTIME=0
+            shift
+            ;;
         --allow-unknown-tag|--allow-snapshot)
             ALLOW_UNKNOWN_TAG=1
             shift
@@ -449,7 +493,7 @@ require_command make
 require_command xcrun
 require_command file
 require_command otool
-if [ "$PATCH_MAVERICKS_FDOPENDIR" -eq 1 ]; then
+if [ "$PATCH_MAVERICKS_FDOPENDIR" -eq 1 ] || [ "$PATCH_MAVERICKS_CLOCK_GETTIME" -eq 1 ]; then
     require_command perl
 fi
 
@@ -494,6 +538,7 @@ fi
 
 patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_fdopendir "$SOURCE_ROOT"
+patch_tdlib_for_mavericks_clock_gettime "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
     if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then

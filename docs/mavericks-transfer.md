@@ -218,6 +218,8 @@ Useful options:
 --no-patch-legacy-linker
                         keep TDLib's Apple linker strip flags unchanged
 --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
+--no-patch-clock-gettime
+                        keep TDLib's POSIX clock_gettime debug code unchanged
 --allow-unknown-tag     continue if the script cannot prove the TDLib tag
 ```
 
@@ -232,6 +234,11 @@ its POSIX directory walk helper. The script patches the extracted source to clos
 the already-open file descriptor and use TDLib's existing path-based `opendir`
 fallback. This is a Mavericks compatibility shim for the spike, not a general
 upstream replacement.
+
+Current TDLib snapshots can also use `clock_gettime` and `clockid_t` while
+building debug clock output. OS X 10.9 SDK does not provide those symbols, so
+the script skips that TDLib debug clock enumeration on Apple legacy builds and
+leaves TDLib's existing `std::chrono::steady_clock` fallback in place.
 
 Expected output:
 
