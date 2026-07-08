@@ -34,9 +34,14 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     NSThread *_receiverThread;
     BOOL _receiverRunning;
     BOOL _receiverShouldStop;
+    BOOL _shutdownStarted;
+    NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
 - (void)stopReceiverThread;
+- (BOOL)beginActiveRequestWithError:(NSError **)error;
+- (void)endActiveRequest;
+- (BOOL)isShutdownStarted;
 - (BOOL)startReceiverThreadIfNeededWithError:(NSError **)error;
 - (void)receiverThreadMain;
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
@@ -66,7 +71,84 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     return self;
 }
 
+- (BOOL)isShutdownStarted {
+    [_responseCondition lock];
+    BOOL shuttingDown = _shutdownStarted;
+    [_responseCondition unlock];
+    return shuttingDown;
+}
+
+- (BOOL)beginActiveRequestWithError:(NSError **)error {
+    [_responseCondition lock];
+    if (_shutdownStarted) {
+        [_responseCondition unlock];
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib client is shutting down." code:50];
+        }
+        return NO;
+    }
+
+    _activeRequestCount++;
+    [_responseCondition unlock];
+    return YES;
+}
+
+- (void)endActiveRequest {
+    [_responseCondition lock];
+    if (_activeRequestCount > 0) {
+        _activeRequestCount--;
+    }
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+}
+
+- (void)shutdownWithTimeout:(NSTimeInterval)timeout {
+    if (timeout < 0.0) {
+        timeout = 0.0;
+    }
+
+    void *client = NULL;
+    TGTDJsonClientSendFunction sendFunction = NULL;
+
+    [_responseCondition lock];
+    if (!_shutdownStarted) {
+        _shutdownStarted = YES;
+        [_pendingResponsesByExtra removeAllObjects];
+        [_pendingResponseExtras removeAllObjects];
+        [_waitingResponseExtras removeAllObjects];
+        [_pendingUpdateSummaries removeAllObjects];
+        [_responseCondition broadcast];
+    }
+    [_responseCondition unlock];
+
+    [_sendLock lock];
+    client = _client;
+    sendFunction = _sendFunction;
+    if (client && sendFunction) {
+        sendFunction(client, "{\"@type\":\"close\"}");
+    }
+    [_sendLock unlock];
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    [_responseCondition lock];
+    while (_activeRequestCount > 0 && [[NSDate date] compare:deadline] == NSOrderedAscending) {
+        [_responseCondition waitUntilDate:deadline];
+    }
+    [_responseCondition unlock];
+
+    [self destroyTDLibClient];
+}
+
 - (void)destroyTDLibClient {
+    [_responseCondition lock];
+    _shutdownStarted = YES;
+    [_pendingResponsesByExtra removeAllObjects];
+    [_pendingResponseExtras removeAllObjects];
+    [_waitingResponseExtras removeAllObjects];
+    [_pendingUpdateSummaries removeAllObjects];
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+
     [self stopReceiverThread];
     [_responseCondition lock];
     [_pendingResponsesByExtra removeAllObjects];
@@ -87,7 +169,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (void)dealloc {
-    [self destroyTDLibClient];
+    [self shutdownWithTimeout:1.0];
     if (_libraryHandle) {
         dlclose(_libraryHandle);
         _libraryHandle = NULL;
@@ -173,6 +255,14 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     (void)error;
 
     [_responseCondition lock];
+    if (_shutdownStarted) {
+        [_responseCondition unlock];
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib client is shutting down." code:50];
+        }
+        return NO;
+    }
+
     if (_receiverRunning || _receiverThread) {
         [_responseCondition unlock];
         return YES;
@@ -373,6 +463,17 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
     [_responseCondition lock];
     while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        if (_shutdownStarted) {
+            [_pendingResponsesByExtra removeObjectForKey:extra];
+            [_pendingResponseExtras removeObject:extra];
+            [_waitingResponseExtras removeObject:extra];
+            [_responseCondition unlock];
+            if (error) {
+                *error = [self errorWithDescription:@"TDLib client is shutting down." code:errorCode];
+            }
+            return nil;
+        }
+
         NSDictionary *response = [_pendingResponsesByExtra objectForKey:extra];
         if (response) {
             NSDictionary *retainedResponse = [response retain];
@@ -413,48 +514,57 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
-    if (![self ensureClientWithError:error]) {
+    if (![self beginActiveRequestWithError:error]) {
         return nil;
     }
 
-    if (timeout < 0.5) {
-        timeout = 0.5;
-    } else if (timeout > 15.0) {
-        timeout = 15.0;
-    }
-
-    [self beginWaitingForExtra:extra];
-
-    NSString *requestJSON = [self JSONStringFromObject:request error:error];
-    if (!requestJSON) {
-        [_responseCondition lock];
-        [_waitingResponseExtras removeObject:extra];
-        [_responseCondition unlock];
-        return nil;
-    }
-
-    [_sendLock lock];
-    if (_client && _sendFunction) {
-        _sendFunction(_client, [requestJSON UTF8String]);
-    }
-    [_sendLock unlock];
-
-    NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
-    if (!response) {
-        return nil;
-    }
-
-    id type = [response objectForKey:@"@type"];
-    if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"error"]) {
-        if (error) {
-            NSString *summary = [self summaryForAuthorizationStateObject:response];
-            NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
-            *error = [self errorWithDescription:message code:errorCode];
+    @try {
+        if (![self ensureClientWithError:error]) {
+            return nil;
         }
-        return nil;
-    }
 
-    return response;
+        if (timeout < 0.5) {
+            timeout = 0.5;
+        } else if (timeout > 15.0) {
+            timeout = 15.0;
+        }
+
+        [self beginWaitingForExtra:extra];
+
+        NSString *requestJSON = [self JSONStringFromObject:request error:error];
+        if (!requestJSON) {
+            [_responseCondition lock];
+            [_waitingResponseExtras removeObject:extra];
+            [_responseCondition unlock];
+            return nil;
+        }
+
+        [_sendLock lock];
+        if (_client && _sendFunction && ![self isShutdownStarted]) {
+            _sendFunction(_client, [requestJSON UTF8String]);
+        }
+        [_sendLock unlock];
+
+        NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
+        if (!response) {
+            return nil;
+        }
+
+        id type = [response objectForKey:@"@type"];
+        if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"error"]) {
+            if (error) {
+                NSString *summary = [self summaryForAuthorizationStateObject:response];
+                NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
+                *error = [self errorWithDescription:message code:errorCode];
+            }
+            return nil;
+        }
+
+        return response;
+    }
+    @finally {
+        [self endActiveRequest];
+    }
 }
 
 - (NSArray *)candidateLibraryPaths {
@@ -801,6 +911,13 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (BOOL)ensureClientWithError:(NSError **)error {
+    if ([self isShutdownStarted]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib client is shutting down." code:50];
+        }
+        return NO;
+    }
+
     if (![self loadLibraryWithError:error]) {
         return NO;
     }
