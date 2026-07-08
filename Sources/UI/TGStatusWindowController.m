@@ -58,7 +58,9 @@
 @property (nonatomic, retain) NSTextView *detailsView;
 @property (nonatomic, retain) NSButton *checkButton;
 @property (nonatomic, retain) NSButton *loadChatsButton;
+@property (nonatomic, retain) NSButton *loadMoreChatsButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
+@property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSButton *quitButton;
 @property (nonatomic, retain) NSTextField *sendLabel;
 @property (nonatomic, retain) NSTextField *sendTextField;
@@ -87,6 +89,8 @@
 @property (nonatomic, assign) BOOL backgroundMessageRefreshInFlight;
 @property (nonatomic, assign) BOOL pendingLiveChatRefresh;
 @property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
+@property (nonatomic, assign) NSUInteger chatPreviewLimit;
+@property (nonatomic, assign) BOOL olderMessagesExhausted;
 @end
 
 @implementation TGStatusWindowController
@@ -102,7 +106,9 @@
 @synthesize detailsView = _detailsView;
 @synthesize checkButton = _checkButton;
 @synthesize loadChatsButton = _loadChatsButton;
+@synthesize loadMoreChatsButton = _loadMoreChatsButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
+@synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize quitButton = _quitButton;
 @synthesize sendLabel = _sendLabel;
 @synthesize sendTextField = _sendTextField;
@@ -131,6 +137,8 @@
 @synthesize backgroundMessageRefreshInFlight = _backgroundMessageRefreshInFlight;
 @synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
 @synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
+@synthesize chatPreviewLimit = _chatPreviewLimit;
+@synthesize olderMessagesExhausted = _olderMessagesExhausted;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -148,6 +156,8 @@
         self.client = [[[TGTDLibClient alloc] init] autorelease];
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.chatPreviewLimit = 40;
+        self.olderMessagesExhausted = NO;
         [self buildContentView];
         [self startLiveUpdateTimerIfNeeded];
     }
@@ -265,6 +275,15 @@
     [self.loadChatsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadChatsButton];
 
+    self.loadMoreChatsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(224, 332, 80, 32)] autorelease];
+    [self.loadMoreChatsButton setTitle:@"More"];
+    [self.loadMoreChatsButton setBezelStyle:NSRoundedBezelStyle];
+    [self.loadMoreChatsButton setTarget:self];
+    [self.loadMoreChatsButton setAction:@selector(loadMoreChats:)];
+    [self.loadMoreChatsButton setEnabled:NO];
+    [self.loadMoreChatsButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.loadMoreChatsButton];
+
     self.chatScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 232, 712, 96)] autorelease];
     [self.chatScrollView setBorderType:NSBezelBorder];
     [self.chatScrollView setHasVerticalScroller:YES];
@@ -309,6 +328,15 @@
     [self.loadMessagesButton setEnabled:NO];
     [self.loadMessagesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadMessagesButton];
+
+    self.loadOlderMessagesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(264, 192, 112, 32)] autorelease];
+    [self.loadOlderMessagesButton setTitle:@"Older"];
+    [self.loadOlderMessagesButton setBezelStyle:NSRoundedBezelStyle];
+    [self.loadOlderMessagesButton setTarget:self];
+    [self.loadOlderMessagesButton setAction:@selector(loadOlderMessages:)];
+    [self.loadOlderMessagesButton setEnabled:NO];
+    [self.loadOlderMessagesButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.loadOlderMessagesButton];
 
     self.selectedChatField = [self labelWithFrame:NSMakeRect(264, 198, 472, 22)
                                              text:@"select a chat"
@@ -429,7 +457,8 @@
     [self.authButton setFrame:NSMakeRect(margin + 332.0, authY, 116.0, 32.0)];
 
     [self.chatsLabel setFrame:NSMakeRect(margin + 14.0, bodyTop - 30.0, 90.0, 22.0)];
-    [self.loadChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 126.0, bodyTop - 36.0, 108.0, 30.0)];
+    [self.loadChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 176.0, bodyTop - 36.0, 108.0, 30.0)];
+    [self.loadMoreChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 62.0, bodyTop - 36.0, 44.0, 30.0)];
     [self.chatScrollView setFrame:NSMakeRect(margin + 12.0, bodyY + 12.0, sidebarWidth - 24.0, bodyHeight - 56.0)];
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"title"];
     if (chatColumn) {
@@ -441,8 +470,9 @@
     }
 
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 14.0, bodyTop - 30.0, 94.0, 22.0)];
-    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 152.0, bodyTop - 36.0, 136.0, 30.0)];
-    [self.selectedChatField setFrame:NSMakeRect(conversationX + 112.0, bodyTop - 30.0, conversationWidth - 276.0, 22.0)];
+    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 236.0, bodyTop - 36.0, 136.0, 30.0)];
+    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 94.0, bodyTop - 36.0, 78.0, 30.0)];
+    [self.selectedChatField setFrame:NSMakeRect(conversationX + 112.0, bodyTop - 30.0, conversationWidth - 360.0, 22.0)];
 
     CGFloat composerHeight = 38.0;
     CGFloat composerY = bodyY + 14.0;
@@ -517,7 +547,9 @@
     [self.authTextField setStringValue:@""];
     [self.authSecureField setStringValue:@""];
     [self.loadChatsButton setEnabled:NO];
+    [self.loadMoreChatsButton setEnabled:NO];
     [self.loadMessagesButton setEnabled:NO];
+    [self.loadOlderMessagesButton setEnabled:NO];
     [self.sendMessageButton setEnabled:NO];
     if (![state isEqualToString:@"ready"] && ([self.chatItems count] > 0 || [self.messageItems count] > 0 || self.selectedChatID != nil)) {
         [self.chatItems removeAllObjects];
@@ -527,6 +559,7 @@
         [self.messageTableView reloadData];
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
+        self.olderMessagesExhausted = NO;
         [self.selectedChatField setStringValue:@"select a chat"];
         [self.sendTextField setStringValue:@""];
     }
@@ -598,7 +631,9 @@
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
+    [self.loadMoreChatsButton setEnabled:([state isEqualToString:@"ready"] && [self.chatItems count] > 0 && self.chatPreviewLimit < 200)];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
+    [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self updateSendControls];
 
     [previousState release];
@@ -608,7 +643,9 @@
     _controlsBusy = busy;
     [self.checkButton setEnabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
+    [self.loadMoreChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && [self.chatItems count] > 0 && self.chatPreviewLimit < 200)];
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
+    [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
     [self.sendMessageButton setEnabled:NO];
     if (busy) {
@@ -616,7 +653,9 @@
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:NO];
         [self.loadChatsButton setEnabled:NO];
+        [self.loadMoreChatsButton setEnabled:NO];
         [self.loadMessagesButton setEnabled:NO];
+        [self.loadOlderMessagesButton setEnabled:NO];
         [self.chatTableView setEnabled:NO];
         [self.messageTableView setEnabled:NO];
         [self.sendTextField setEnabled:NO];
@@ -689,6 +728,7 @@
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
+        self.olderMessagesExhausted = NO;
         [self updateAuthControlsForState:self.currentAuthState];
         [previousChatID release];
         return;
@@ -711,6 +751,7 @@
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
+        self.olderMessagesExhausted = NO;
     }
     [self updateAuthControlsForState:self.currentAuthState];
     if (newChatID && (selectionChanged || [self.messageItems count] == 0)) {
@@ -752,10 +793,98 @@
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
     [self.sendTextField setStringValue:@""];
+    self.olderMessagesExhausted = NO;
     [self updateAuthControlsForState:self.currentAuthState];
 }
 
+- (NSNumber *)oldestLoadedMessageID {
+    NSInteger index = (NSInteger)[self.messageItems count] - 1;
+    while (index >= 0) {
+        NSDictionary *item = [self.messageItems objectAtIndex:(NSUInteger)index];
+        id messageID = [item objectForKey:@"message_id"];
+        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
+            return [NSNumber numberWithLongLong:[messageID longLongValue]];
+        }
+        index--;
+    }
+    return nil;
+}
+
+- (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
+    if (!preserveOlder || [self.messageItems count] == 0) {
+        [self.messageItems removeAllObjects];
+        [self.messageItems addObjectsFromArray:items];
+        self.olderMessagesExhausted = NO;
+        [self.messageTableView reloadData];
+        if ([self.messageItems count] > 0) {
+            [self.messageTableView scrollRowToVisible:0];
+        }
+        return;
+    }
+
+    NSMutableSet *messageIDs = [NSMutableSet set];
+    NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:items];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        id messageID = [[items objectAtIndex:index] objectForKey:@"message_id"];
+        if (messageID) {
+            [messageIDs addObject:messageID];
+        }
+    }
+
+    for (index = 0; index < [self.messageItems count]; index++) {
+        NSDictionary *item = [self.messageItems objectAtIndex:index];
+        id messageID = [item objectForKey:@"message_id"];
+        if (messageID && [messageIDs containsObject:messageID]) {
+            continue;
+        }
+        if (messageID) {
+            [messageIDs addObject:messageID];
+        }
+        [mergedItems addObject:item];
+    }
+
+    [self.messageItems removeAllObjects];
+    [self.messageItems addObjectsFromArray:mergedItems];
+    [self.messageTableView reloadData];
+}
+
+- (NSUInteger)appendOlderMessageItems:(NSArray *)items {
+    NSMutableSet *messageIDs = [NSMutableSet set];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        id messageID = [[self.messageItems objectAtIndex:index] objectForKey:@"message_id"];
+        if (messageID) {
+            [messageIDs addObject:messageID];
+        }
+    }
+
+    NSUInteger added = 0;
+    for (index = 0; index < [items count]; index++) {
+        NSDictionary *item = [items objectAtIndex:index];
+        id messageID = [item objectForKey:@"message_id"];
+        if (messageID && [messageIDs containsObject:messageID]) {
+            continue;
+        }
+        if (messageID) {
+            [messageIDs addObject:messageID];
+        }
+        [self.messageItems addObject:item];
+        added++;
+    }
+
+    [self.messageTableView reloadData];
+    if (added > 0) {
+        [self.messageTableView scrollRowToVisible:([self.messageItems count] - 1)];
+    }
+    return added;
+}
+
 - (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection {
+    [self reloadChatsInteractive:interactive preserveSelection:preserveSelection requestedLimit:self.chatPreviewLimit];
+}
+
+- (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection requestedLimit:(NSUInteger)requestedLimit {
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         if (interactive) {
             [self appendDetail:@"Chats are available only after TDLib auth state is ready."];
@@ -777,21 +906,28 @@
         self.backgroundChatRefreshInFlight = YES;
     }
 
+    if (requestedLimit == 0) {
+        requestedLimit = 40;
+    } else if (requestedLimit > 200) {
+        requestedLimit = 200;
+    }
+
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *chatError = nil;
-        NSArray *items = [client mainChatPreviewItemsWithLimit:40 timeout:10.0 error:&chatError];
+        NSArray *items = [client mainChatPreviewItemsWithLimit:requestedLimit timeout:10.0 error:&chatError];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *chatErrorMessage = [[chatError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (itemsCopy) {
+                self.chatPreviewLimit = requestedLimit;
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
                 if (interactive) {
                     [self.statusField setStringValue:@"TDLib chats: loaded"];
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews", (unsigned long)[itemsCopy count]]];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews (limit %lu)", (unsigned long)[itemsCopy count], (unsigned long)requestedLimit]];
                     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
                 }
             } else {
@@ -862,9 +998,8 @@
                     [self appendDetail:@"TDLib messages: ignored stale result for previous chat selection."];
                 }
             } else if (itemsCopy) {
-                [self.messageItems removeAllObjects];
-                [self.messageItems addObjectsFromArray:itemsCopy];
-                [self.messageTableView reloadData];
+                BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
+                [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
                 if (interactive) {
                     [self.statusField setStringValue:@"TDLib messages: loaded"];
                     [self appendDetail:[NSString stringWithFormat:@"TDLib messages: loaded %lu previews for selected chat", (unsigned long)[itemsCopy count]]];
@@ -893,6 +1028,73 @@
             [messageErrorMessage release];
             [authorizationState release];
             [chatIDCopy release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
+- (void)reloadOlderMessagesInteractive {
+    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
+        [self appendDetail:@"Select a chat after TDLib auth state is ready."];
+        return;
+    }
+
+    if (self.backgroundMessageRefreshInFlight) {
+        [self appendDetail:@"TDLib messages: wait for the current message load to finish."];
+        return;
+    }
+
+    NSNumber *anchorMessageID = [[self oldestLoadedMessageID] retain];
+    if (!anchorMessageID) {
+        [self appendDetail:@"TDLib messages: load recent messages before requesting older history."];
+        [anchorMessageID release];
+        return;
+    }
+
+    NSNumber *chatIDCopy = [self.selectedChatID retain];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"TDLib messages: loading older..."];
+    [self appendDetail:@"Loading older message previews from TDLib..."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *messageError = nil;
+        NSArray *items = [client messagePreviewItemsForChatID:chatIDCopy fromMessageID:anchorMessageID limit:20 timeout:8.0 error:&messageError];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
+        NSString *messageErrorMessage = [[messageError localizedDescription] copy];
+        NSArray *itemsCopy = [items copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+            if (!selectionStillCurrent) {
+                [self appendDetail:@"TDLib messages: ignored stale older-history result for previous chat selection."];
+            } else if (itemsCopy) {
+                NSUInteger added = [self appendOlderMessageItems:itemsCopy];
+                if (added == 0 || [itemsCopy count] < 20) {
+                    self.olderMessagesExhausted = YES;
+                }
+                [self.statusField setStringValue:(added > 0) ? @"TDLib messages: older loaded" : @"TDLib messages: no older items"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib messages: appended %lu older previews", (unsigned long)added]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib older message previews appended: %lu", (unsigned long)added]];
+            } else {
+                [self.statusField setStringValue:@"TDLib messages: older unavailable"];
+                NSString *message = messageErrorMessage ? messageErrorMessage : @"Older message history did not return a result.";
+                [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
+                [[TGLogger sharedLogger] log:@"TDLib older message preview load failed."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            [self setControlsBusy:NO];
+            [self handlePendingLiveRefreshesIfPossible];
+            [itemsCopy release];
+            [messageErrorMessage release];
+            [authorizationState release];
+            [chatIDCopy release];
+            [anchorMessageID release];
         });
 
         [client release];
@@ -1159,9 +1361,28 @@
     [self reloadChatsInteractive:YES preserveSelection:YES];
 }
 
+- (void)loadMoreChats:(id)sender {
+    (void)sender;
+    NSUInteger nextLimit = self.chatPreviewLimit + 40;
+    if (nextLimit > 200) {
+        nextLimit = 200;
+    }
+    if (nextLimit == self.chatPreviewLimit) {
+        [self appendDetail:@"TDLib chats: maximum preview limit reached for this build."];
+        return;
+    }
+    [self reloadChatsInteractive:YES preserveSelection:YES requestedLimit:nextLimit];
+}
+
 - (void)loadMessages:(id)sender {
     (void)sender;
+    self.olderMessagesExhausted = NO;
     [self reloadMessagesForChatID:self.selectedChatID interactive:YES];
+}
+
+- (void)loadOlderMessages:(id)sender {
+    (void)sender;
+    [self reloadOlderMessagesInteractive];
 }
 
 - (void)sendMessage:(id)sender {
@@ -1264,7 +1485,9 @@
     [_detailsView release];
     [_checkButton release];
     [_loadChatsButton release];
+    [_loadMoreChatsButton release];
     [_loadMessagesButton release];
+    [_loadOlderMessagesButton release];
     [_quitButton release];
     [_sendLabel release];
     [_sendTextField release];
