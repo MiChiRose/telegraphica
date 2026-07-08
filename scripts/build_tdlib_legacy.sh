@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TDLIB_VERSION="${TDLIB_VERSION:-v1.8.0}"
+TDLIB_LABEL="${TDLIB_LABEL:-$TDLIB_VERSION}"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.9}"
 BUILD_DIR="$ROOT_DIR/build-tdlib-legacy"
@@ -42,6 +43,7 @@ Options:
                           keep TDLib's Apple linker strip flags unchanged
   --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
+  --allow-snapshot        alias for --allow-unknown-tag for TDLib snapshots
   -h, --help              show this help
 
 The script builds TDLib tdjson for OS X ${DEPLOYMENT_TARGET} / ${ARCH}, stages
@@ -205,6 +207,37 @@ prove_tdlib_version() {
     return 1
 }
 
+tdlib_project_version() {
+    local source_root="$1"
+    awk '
+        /project\(TDLib VERSION/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "VERSION" && (i + 1) <= NF) {
+                    version = $(i + 1);
+                    gsub(/[^0-9.].*/, "", version);
+                    print version;
+                    exit;
+                }
+            }
+        }
+    ' "$source_root/CMakeLists.txt" 2>/dev/null || true
+}
+
+tdlib_mtproto_layer() {
+    local source_root="$1"
+    awk '
+        /MTPROTO_LAYER/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /^[0-9]+;?$/) {
+                    gsub(/;/, "", $i);
+                    print $i;
+                    exit;
+                }
+            }
+        }
+    ' "$source_root/td/telegram/Version.h" 2>/dev/null || true
+}
+
 check_prefix_file() {
     local root="$1"
     local rel="$2"
@@ -233,6 +266,10 @@ patch_tdlib_for_legacy_linker() {
     fi
 
     if [ ! -f "$compiler_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib compiler setup file; skipping legacy linker patch for snapshot source."
+            return 0
+        fi
         fail "Could not find TDLib compiler setup file: $compiler_file"
     fi
 
@@ -264,6 +301,10 @@ patch_tdlib_for_mavericks_fdopendir() {
     fi
 
     if [ ! -f "$path_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib path source file; skipping fdopendir patch for snapshot source."
+            return 0
+        fi
         fail "Could not find TDLib path source file: $path_file"
     fi
 
@@ -351,7 +392,7 @@ while [ "$#" -gt 0 ]; do
             PATCH_MAVERICKS_FDOPENDIR=0
             shift
             ;;
-        --allow-unknown-tag)
+        --allow-unknown-tag|--allow-snapshot)
             ALLOW_UNKNOWN_TAG=1
             shift
             ;;
@@ -433,6 +474,18 @@ if [ -z "$SOURCE_ROOT" ] || [ ! -f "$SOURCE_ROOT/CMakeLists.txt" ] || [ ! -d "$S
     fail "TDLib source root was not found or does not look like TDLib."
 fi
 
+TDLIB_PROJECT_VERSION="$(tdlib_project_version "$SOURCE_ROOT")"
+TDLIB_MTPROTO_LAYER="$(tdlib_mtproto_layer "$SOURCE_ROOT")"
+if [ -n "$TDLIB_PROJECT_VERSION" ]; then
+    echo "Detected TDLib project version: $TDLIB_PROJECT_VERSION"
+fi
+if [ -n "$TDLIB_MTPROTO_LAYER" ]; then
+    echo "Detected TDLib MTProto layer: $TDLIB_MTPROTO_LAYER"
+    if [ "$TDLIB_MTPROTO_LAYER" -lt 170 ]; then
+        echo "Warning: this TDLib API layer is old and may be rejected by Telegram login with UPDATE_APP_TO_LOGIN."
+    fi
+fi
+
 patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_fdopendir "$SOURCE_ROOT"
 
@@ -492,7 +545,7 @@ fi
 
 export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
 
-echo "Building TDLib $TDLIB_VERSION tdjson for OS X $DEPLOYMENT_TARGET ($ARCH)."
+echo "Building TDLib $TDLIB_LABEL tdjson for OS X $DEPLOYMENT_TARGET ($ARCH)."
 echo "Source: $SOURCE_ROOT"
 echo "Build:  $CONFIGURE_DIR"
 echo "Stage:  $STAGE_DIR/Frameworks"

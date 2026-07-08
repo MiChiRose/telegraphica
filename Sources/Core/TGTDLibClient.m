@@ -66,6 +66,14 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     return [NSError errorWithDomain:TGTDLibErrorDomain code:code userInfo:info];
 }
 
+- (NSString *)authorizationErrorDescriptionForSummary:(NSString *)summary actionName:(NSString *)actionName {
+    NSString *message = [NSString stringWithFormat:@"TDLib rejected %@: %@", actionName, summary];
+    if ([summary rangeOfString:@"UPDATE_APP_TO_LOGIN"].location != NSNotFound) {
+        message = [message stringByAppendingString:@". Telegram requires a newer client for login; try rebuilding with a newer TDLib/API layer."];
+    }
+    return message;
+}
+
 - (NSString *)applicationSupportPathWithError:(NSError **)error {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
     NSString *basePath = ([paths count] > 0) ? [paths objectAtIndex:0] : [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support"];
@@ -724,7 +732,7 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         if ([summary length] > 0) {
             if ([summary hasPrefix:@"error"]) {
                 if (error) {
-                    NSString *message = [NSString stringWithFormat:@"TDLib rejected %@: %@", actionName, summary];
+                    NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
                     *error = [self errorWithDescription:message code:errorCode];
                 }
                 return nil;
