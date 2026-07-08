@@ -1566,6 +1566,10 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (NSArray *)recentMessagePreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self messagePreviewItemsForChatID:chatID fromMessageID:nil limit:limit timeout:timeout error:error];
+}
+
+- (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID fromMessageID:(NSNumber *)fromMessageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:38];
@@ -1589,10 +1593,15 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         safeLimit = 50;
     }
 
+    long long anchorMessageID = 0;
+    if ([fromMessageID respondsToSelector:@selector(longLongValue)]) {
+        anchorMessageID = [fromMessageID longLongValue];
+    }
+
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"getChatHistory" forKey:@"@type"];
     [request setObject:chatID forKey:@"chat_id"];
-    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"from_message_id"];
+    [request setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
     [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
     [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
     [request setObject:[NSNumber numberWithBool:NO] forKey:@"only_local"];
@@ -1639,6 +1648,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         }
 
         NSMutableDictionary *item = [NSMutableDictionary dictionary];
+        [item setObject:chatID forKey:@"chat_id"];
         if (messageID) {
             [item setObject:messageID forKey:@"message_id"];
         }
@@ -1646,6 +1656,9 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
             [item setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
         } else {
             [item setObject:[NSNumber numberWithInteger:0] forKey:@"date"];
+        }
+        if ([isOutgoing respondsToSelector:@selector(boolValue)]) {
+            [item setObject:[NSNumber numberWithBool:[isOutgoing boolValue]] forKey:@"is_outgoing"];
         }
         [item setObject:direction forKey:@"direction"];
         [item setObject:preview forKey:@"preview"];
