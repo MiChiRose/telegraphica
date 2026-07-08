@@ -7,6 +7,7 @@
 @property (nonatomic, retain) NSTextView *detailsView;
 @property (nonatomic, retain) NSButton *checkButton;
 @property (nonatomic, retain) NSTextField *authLabel;
+@property (nonatomic, retain) NSTextField *authStateField;
 @property (nonatomic, retain) NSTextField *authTextField;
 @property (nonatomic, retain) NSSecureTextField *authSecureField;
 @property (nonatomic, retain) NSButton *authButton;
@@ -20,6 +21,7 @@
 @synthesize detailsView = _detailsView;
 @synthesize checkButton = _checkButton;
 @synthesize authLabel = _authLabel;
+@synthesize authStateField = _authStateField;
 @synthesize authTextField = _authTextField;
 @synthesize authSecureField = _authSecureField;
 @synthesize authButton = _authButton;
@@ -87,8 +89,15 @@
                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.authLabel];
 
+    self.authStateField = [self labelWithFrame:NSMakeRect(104, 88, 432, 22)
+                                          text:@"not checked"
+                                          font:[NSFont systemFontOfSize:13.0]];
+    [[self.authStateField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [contentView addSubview:self.authStateField];
+
     self.authTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(104, 84, 240, 24)] autorelease];
     [self.authTextField setEnabled:NO];
+    [self.authTextField setHidden:YES];
     [self.authTextField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authTextField];
 
@@ -104,6 +113,7 @@
     [self.authButton setTarget:self];
     [self.authButton setAction:@selector(submitAuthInput:)];
     [self.authButton setEnabled:NO];
+    [self.authButton setHidden:YES];
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
@@ -137,50 +147,59 @@
 
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self.authLabel setStringValue:@"Phone:"];
+        [self.authStateField setHidden:YES];
         [self.authTextField setHidden:NO];
         [self.authSecureField setHidden:YES];
         [self.authTextField setEnabled:YES];
         [self.authSecureField setEnabled:NO];
         [self.authButton setTitle:@"Send Phone"];
         [self.authButton setEnabled:YES];
+        [self.authButton setHidden:NO];
         return;
     }
 
     if ([state isEqualToString:@"waitCode"]) {
         [self.authLabel setStringValue:@"Code:"];
+        [self.authStateField setHidden:YES];
         [self.authTextField setHidden:YES];
         [self.authSecureField setHidden:NO];
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:YES];
         [self.authButton setTitle:@"Verify"];
         [self.authButton setEnabled:YES];
+        [self.authButton setHidden:NO];
         return;
     }
 
     if ([state isEqualToString:@"waitPassword"]) {
         [self.authLabel setStringValue:@"Password:"];
+        [self.authStateField setHidden:YES];
         [self.authTextField setHidden:YES];
         [self.authSecureField setHidden:NO];
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:YES];
         [self.authButton setTitle:@"Unlock"];
         [self.authButton setEnabled:YES];
+        [self.authButton setHidden:NO];
         return;
     }
 
+    [self.authLabel setStringValue:@"Auth:"];
     if ([state isEqualToString:@"ready"]) {
-        [self.authLabel setStringValue:@"Auth: ready"];
+        [self.authStateField setStringValue:@"ready"];
     } else if ([state length] > 0) {
-        [self.authLabel setStringValue:[NSString stringWithFormat:@"Auth: %@", state]];
+        [self.authStateField setStringValue:state];
     } else {
-        [self.authLabel setStringValue:@"Auth:"];
+        [self.authStateField setStringValue:@"not checked"];
     }
-    [self.authTextField setHidden:NO];
+    [self.authStateField setHidden:NO];
+    [self.authTextField setHidden:YES];
     [self.authSecureField setHidden:YES];
     [self.authTextField setEnabled:NO];
     [self.authSecureField setEnabled:NO];
     [self.authButton setTitle:@"Send"];
     [self.authButton setEnabled:NO];
+    [self.authButton setHidden:YES];
 }
 
 - (void)setControlsBusy:(BOOL)busy {
@@ -352,6 +371,7 @@
     [_detailsView release];
     [_checkButton release];
     [_authLabel release];
+    [_authStateField release];
     [_authTextField release];
     [_authSecureField release];
     [_authButton release];
