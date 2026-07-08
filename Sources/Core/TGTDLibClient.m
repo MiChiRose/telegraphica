@@ -128,6 +128,18 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     return summary;
 }
 
+- (NSArray *)drainSafeUpdateSummaries {
+    [_responseCondition lock];
+    NSArray *updates = [_pendingUpdateSummaries copy];
+    [_pendingUpdateSummaries removeAllObjects];
+    [_responseCondition unlock];
+
+    if (!updates) {
+        return [NSArray array];
+    }
+    return [updates autorelease];
+}
+
 - (void)stopReceiverThread {
     NSThread *thread = nil;
 
@@ -199,6 +211,11 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"new_message" forKey:@"kind"];
 
+        id chatID = [message objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        }
+
         id date = [message objectForKey:@"date"];
         if ([date respondsToSelector:@selector(integerValue)]) {
             [summary setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
@@ -213,7 +230,13 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 
     if ([type hasPrefix:@"update"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
-        [summary setObject:@"update" forKey:@"kind"];
+        id chatID = [dictionary objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:@"chat_update" forKey:@"kind"];
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        } else {
+            [summary setObject:@"update" forKey:@"kind"];
+        }
         [summary setObject:type forKey:@"type"];
         return summary;
     }

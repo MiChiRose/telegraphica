@@ -81,6 +81,12 @@
 @property (nonatomic, copy) NSString *selectedChatTitle;
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, copy) NSString *currentAuthState;
+@property (nonatomic, retain) NSTimer *liveUpdateTimer;
+@property (nonatomic, assign) BOOL controlsBusy;
+@property (nonatomic, assign) BOOL backgroundChatRefreshInFlight;
+@property (nonatomic, assign) BOOL backgroundMessageRefreshInFlight;
+@property (nonatomic, assign) BOOL pendingLiveChatRefresh;
+@property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
 @end
 
 @implementation TGStatusWindowController
@@ -119,6 +125,12 @@
 @synthesize selectedChatTitle = _selectedChatTitle;
 @synthesize client = _client;
 @synthesize currentAuthState = _currentAuthState;
+@synthesize liveUpdateTimer = _liveUpdateTimer;
+@synthesize controlsBusy = _controlsBusy;
+@synthesize backgroundChatRefreshInFlight = _backgroundChatRefreshInFlight;
+@synthesize backgroundMessageRefreshInFlight = _backgroundMessageRefreshInFlight;
+@synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
+@synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -137,6 +149,7 @@
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         [self buildContentView];
+        [self startLiveUpdateTimerIfNeeded];
     }
     return self;
 }
@@ -462,6 +475,28 @@
     [self layoutContentView];
 }
 
+- (void)startLiveUpdateTimerIfNeeded {
+    if (self.liveUpdateTimer) {
+        return;
+    }
+
+    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                      target:self
+                                                    selector:@selector(pollLiveUpdates:)
+                                                    userInfo:nil
+                                                     repeats:YES];
+    self.liveUpdateTimer = timer;
+}
+
+- (void)stopLiveUpdateTimer {
+    if (!self.liveUpdateTimer) {
+        return;
+    }
+
+    [self.liveUpdateTimer invalidate];
+    self.liveUpdateTimer = nil;
+}
+
 - (BOOL)isAuthInputState:(NSString *)state {
     return [state isEqualToString:@"waitPhoneNumber"] ||
            [state isEqualToString:@"waitCode"] ||
@@ -477,6 +512,7 @@
 }
 
 - (void)updateAuthControlsForState:(NSString *)state {
+    NSString *previousState = [self.currentAuthState copy];
     self.currentAuthState = state;
     [self.authTextField setStringValue:@""];
     [self.authSecureField setStringValue:@""];
@@ -553,9 +589,20 @@
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
     [self updateSendControls];
+
+    if (![state isEqualToString:@"ready"]) {
+        self.pendingLiveChatRefresh = NO;
+        self.pendingLiveMessageRefresh = NO;
+    } else if (![previousState isEqualToString:@"ready"] && [self.chatItems count] == 0) {
+        self.pendingLiveChatRefresh = YES;
+        [self handlePendingLiveRefreshesIfPossible];
+    }
+
+    [previousState release];
 }
 
 - (void)setControlsBusy:(BOOL)busy {
+    self.controlsBusy = busy;
     [self.checkButton setEnabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
@@ -575,6 +622,7 @@
         [self.chatTableView setEnabled:YES];
         [self.messageTableView setEnabled:YES];
         [self updateAuthControlsForState:self.currentAuthState];
+        [self handlePendingLiveRefreshesIfPossible];
     }
 }
 
@@ -629,6 +677,7 @@
         return;
     }
 
+    NSNumber *previousChatID = [self.selectedChatID retain];
     NSInteger row = [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
         self.selectedChatID = nil;
@@ -638,23 +687,286 @@
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
         [self updateAuthControlsForState:self.currentAuthState];
+        [previousChatID release];
         return;
     }
 
     NSDictionary *item = [self.chatItems objectAtIndex:(NSUInteger)row];
     id chatID = [item objectForKey:@"chat_id"];
     id title = [item objectForKey:@"title"];
+    NSNumber *newChatID = nil;
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
-        self.selectedChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
+        newChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
+        self.selectedChatID = newChatID;
     } else {
         self.selectedChatID = nil;
     }
+    BOOL selectionChanged = !((previousChatID && newChatID) && ([previousChatID longLongValue] == [newChatID longLongValue]));
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"selected chat";
     [self.selectedChatField setStringValue:self.selectedChatTitle ? self.selectedChatTitle : @"selected chat"];
+    if (selectionChanged) {
+        [self.messageItems removeAllObjects];
+        [self.messageTableView reloadData];
+        [self.sendTextField setStringValue:@""];
+    }
+    [self updateAuthControlsForState:self.currentAuthState];
+    [previousChatID release];
+}
+
+- (void)applyChatItems:(NSArray *)items preserveSelection:(BOOL)preserveSelection preferredChatID:(NSNumber *)preferredChatID {
+    NSUInteger selectedIndex = NSNotFound;
+
+    if (preserveSelection && preferredChatID) {
+        NSUInteger index = 0;
+        for (index = 0; index < [items count]; index++) {
+            NSDictionary *item = [items objectAtIndex:index];
+            id chatID = [item objectForKey:@"chat_id"];
+            if ([chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [preferredChatID longLongValue]) {
+                selectedIndex = index;
+                break;
+            }
+        }
+    }
+
+    [self.chatItems removeAllObjects];
+    [self.chatItems addObjectsFromArray:items];
+    [self.chatTableView reloadData];
+
+    if (selectedIndex != NSNotFound) {
+        NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
+        [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
+        [self.chatTableView scrollRowToVisible:selectedIndex];
+        return;
+    }
+
+    [self.chatTableView deselectAll:nil];
+    self.selectedChatID = nil;
+    self.selectedChatTitle = nil;
+    [self.selectedChatField setStringValue:@"select a chat"];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
     [self.sendTextField setStringValue:@""];
     [self updateAuthControlsForState:self.currentAuthState];
+}
+
+- (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection {
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        if (interactive) {
+            [self appendDetail:@"Chats are available only after TDLib auth state is ready."];
+        }
+        return;
+    }
+
+    if (!interactive && self.backgroundChatRefreshInFlight) {
+        self.pendingLiveChatRefresh = YES;
+        return;
+    }
+
+    NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
+    if (interactive) {
+        [self setControlsBusy:YES];
+        [self.statusField setStringValue:@"TDLib chats: loading..."];
+        [self appendDetail:@"Loading main chat previews from TDLib..."];
+    } else {
+        self.backgroundChatRefreshInFlight = YES;
+    }
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *chatError = nil;
+        NSArray *items = [client mainChatPreviewItemsWithLimit:10 timeout:5.0 error:&chatError];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
+        NSString *chatErrorMessage = [[chatError localizedDescription] copy];
+        NSArray *itemsCopy = [items copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (itemsCopy) {
+                [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
+                if (interactive) {
+                    [self.statusField setStringValue:@"TDLib chats: loaded"];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews", (unsigned long)[itemsCopy count]]];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
+                }
+            } else {
+                if (interactive) {
+                    NSString *message = chatErrorMessage ? @"Chat preview request failed. Check TDLib state and try again." : @"Chat list did not return a result.";
+                    [self.statusField setStringValue:@"TDLib chats: unavailable"];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: %@", message]];
+                } else {
+                    [self appendDetail:@"TDLib live refresh: chat preview refresh failed."];
+                }
+                [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            if (interactive) {
+                [self setControlsBusy:NO];
+            } else {
+                self.backgroundChatRefreshInFlight = NO;
+                [self handlePendingLiveRefreshesIfPossible];
+            }
+            [itemsCopy release];
+            [chatErrorMessage release];
+            [authorizationState release];
+            [preferredChatID release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
+- (void)reloadMessagesForChatID:(NSNumber *)chatID interactive:(BOOL)interactive {
+    if (![self.currentAuthState isEqualToString:@"ready"] || !chatID) {
+        if (interactive) {
+            [self appendDetail:@"Select a chat after TDLib auth state is ready."];
+        }
+        return;
+    }
+
+    if (!interactive && self.backgroundMessageRefreshInFlight) {
+        self.pendingLiveMessageRefresh = YES;
+        return;
+    }
+
+    NSNumber *chatIDCopy = [chatID retain];
+    if (interactive) {
+        [self setControlsBusy:YES];
+        [self.statusField setStringValue:@"TDLib messages: loading..."];
+        [self appendDetail:@"Loading recent message previews from TDLib..."];
+    } else {
+        self.backgroundMessageRefreshInFlight = YES;
+    }
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *messageError = nil;
+        NSArray *items = [client recentMessagePreviewItemsForChatID:chatIDCopy limit:20 timeout:8.0 error:&messageError];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
+        NSString *messageErrorMessage = [[messageError localizedDescription] copy];
+        NSArray *itemsCopy = [items copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+            if (!selectionStillCurrent) {
+                if (interactive) {
+                    [self appendDetail:@"TDLib messages: ignored stale result for previous chat selection."];
+                }
+            } else if (itemsCopy) {
+                [self.messageItems removeAllObjects];
+                [self.messageItems addObjectsFromArray:itemsCopy];
+                [self.messageTableView reloadData];
+                if (interactive) {
+                    [self.statusField setStringValue:@"TDLib messages: loaded"];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib messages: loaded %lu previews for selected chat", (unsigned long)[itemsCopy count]]];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib message previews loaded: %lu", (unsigned long)[itemsCopy count]]];
+                }
+            } else {
+                if (interactive) {
+                    NSString *message = messageErrorMessage ? @"Message preview request failed. Check TDLib state and try again." : @"Message history did not return a result.";
+                    [self.statusField setStringValue:@"TDLib messages: unavailable"];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
+                } else {
+                    [self appendDetail:@"TDLib live refresh: selected chat refresh failed."];
+                }
+                [[TGLogger sharedLogger] log:@"TDLib message preview load failed."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            if (interactive) {
+                [self setControlsBusy:NO];
+            } else {
+                self.backgroundMessageRefreshInFlight = NO;
+                [self handlePendingLiveRefreshesIfPossible];
+            }
+            [itemsCopy release];
+            [messageErrorMessage release];
+            [authorizationState release];
+            [chatIDCopy release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
+- (void)handlePendingLiveRefreshesIfPossible {
+    if (self.controlsBusy || ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    if (self.pendingLiveChatRefresh && !self.backgroundChatRefreshInFlight) {
+        self.pendingLiveChatRefresh = NO;
+        [self reloadChatsInteractive:NO preserveSelection:YES];
+        return;
+    }
+
+    if (self.pendingLiveMessageRefresh && !self.backgroundChatRefreshInFlight && !self.backgroundMessageRefreshInFlight && self.selectedChatID) {
+        NSNumber *chatID = [self.selectedChatID retain];
+        self.pendingLiveMessageRefresh = NO;
+        [self reloadMessagesForChatID:chatID interactive:NO];
+        [chatID release];
+    }
+}
+
+- (void)pollLiveUpdates:(NSTimer *)timer {
+    (void)timer;
+    if (!self.client) {
+        return;
+    }
+
+    NSArray *updates = [self.client drainSafeUpdateSummaries];
+    if ([updates count] == 0) {
+        return;
+    }
+
+    NSNumber *selectedChatID = [self.selectedChatID retain];
+    NSString *latestAuthorizationState = nil;
+    BOOL needsChatRefresh = NO;
+    BOOL needsMessageRefresh = NO;
+
+    NSUInteger index = 0;
+    for (index = 0; index < [updates count]; index++) {
+        NSDictionary *summary = [updates objectAtIndex:index];
+        if (![summary isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSString *kind = [summary objectForKey:@"kind"];
+        if ([kind isEqualToString:@"authorization"]) {
+            NSString *state = [summary objectForKey:@"state"];
+            if ([state length] > 0) {
+                latestAuthorizationState = state;
+            }
+            continue;
+        }
+
+        if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"]) {
+            needsChatRefresh = YES;
+            id chatID = [summary objectForKey:@"chat_id"];
+            if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
+                needsMessageRefresh = YES;
+            }
+        }
+    }
+
+    if ([latestAuthorizationState length] > 0 && ![latestAuthorizationState isEqualToString:self.currentAuthState]) {
+        [self updateAuthControlsForState:latestAuthorizationState];
+    }
+
+    if (needsChatRefresh) {
+        self.pendingLiveChatRefresh = YES;
+    }
+    if (needsMessageRefresh) {
+        self.pendingLiveMessageRefresh = YES;
+    }
+
+    [selectedChatID release];
+    [self handlePendingLiveRefreshesIfPossible];
 }
 
 - (void)checkTDLib:(id)sender {
@@ -838,110 +1150,12 @@
 
 - (void)loadChats:(id)sender {
     (void)sender;
-    if (![self.currentAuthState isEqualToString:@"ready"]) {
-        [self appendDetail:@"Chats are available only after TDLib auth state is ready."];
-        return;
-    }
-
-    [self setControlsBusy:YES];
-    [self.statusField setStringValue:@"TDLib chats: loading..."];
-    [self appendDetail:@"Loading main chat previews from TDLib..."];
-
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *chatError = nil;
-        NSArray *items = [client mainChatPreviewItemsWithLimit:10 timeout:5.0 error:&chatError];
-        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
-        NSString *chatErrorMessage = [[chatError localizedDescription] copy];
-        NSArray *itemsCopy = [items copy];
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (itemsCopy) {
-                [self.chatItems removeAllObjects];
-                [self.chatItems addObjectsFromArray:itemsCopy];
-                [self.chatTableView deselectAll:nil];
-                [self.chatTableView reloadData];
-                self.selectedChatID = nil;
-                self.selectedChatTitle = nil;
-                [self.selectedChatField setStringValue:@"select a chat"];
-                [self.messageItems removeAllObjects];
-                [self.messageTableView reloadData];
-                [self.sendTextField setStringValue:@""];
-                [self.statusField setStringValue:@"TDLib chats: loaded"];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews", (unsigned long)[itemsCopy count]]];
-                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
-            } else {
-                NSString *message = chatErrorMessage ? @"Chat preview request failed. Check TDLib state and try again." : @"Chat list did not return a result.";
-                [self.statusField setStringValue:@"TDLib chats: unavailable"];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib chats: %@", message]];
-                [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
-            }
-            if ([authorizationState length] > 0) {
-                [self updateAuthControlsForState:authorizationState];
-            }
-            [self setControlsBusy:NO];
-            [itemsCopy release];
-            [chatErrorMessage release];
-            [authorizationState release];
-        });
-
-        [client release];
-        [pool drain];
-    });
+    [self reloadChatsInteractive:YES preserveSelection:YES];
 }
 
 - (void)loadMessages:(id)sender {
     (void)sender;
-    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
-        [self appendDetail:@"Select a chat after TDLib auth state is ready."];
-        return;
-    }
-
-    NSNumber *chatID = [self.selectedChatID retain];
-    [self setControlsBusy:YES];
-    [self.statusField setStringValue:@"TDLib messages: loading..."];
-    [self appendDetail:@"Loading recent message previews from TDLib..."];
-
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *messageError = nil;
-        NSArray *items = [client recentMessagePreviewItemsForChatID:chatID limit:20 timeout:8.0 error:&messageError];
-        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
-        NSString *messageErrorMessage = [[messageError localizedDescription] copy];
-        NSArray *itemsCopy = [items copy];
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]);
-            if (!selectionStillCurrent) {
-                [self appendDetail:@"TDLib messages: ignored stale result for previous chat selection."];
-            } else if (itemsCopy) {
-                [self.messageItems removeAllObjects];
-                [self.messageItems addObjectsFromArray:itemsCopy];
-                [self.messageTableView reloadData];
-                [self.statusField setStringValue:@"TDLib messages: loaded"];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib messages: loaded %lu previews for selected chat", (unsigned long)[itemsCopy count]]];
-                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib message previews loaded: %lu", (unsigned long)[itemsCopy count]]];
-            } else {
-                NSString *message = messageErrorMessage ? @"Message preview request failed. Check TDLib state and try again." : @"Message history did not return a result.";
-                [self.statusField setStringValue:@"TDLib messages: unavailable"];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
-                [[TGLogger sharedLogger] log:@"TDLib message preview load failed."];
-            }
-            if ([authorizationState length] > 0) {
-                [self updateAuthControlsForState:authorizationState];
-            }
-            [self setControlsBusy:NO];
-            [itemsCopy release];
-            [messageErrorMessage release];
-            [authorizationState release];
-            [chatID release];
-        });
-
-        [client release];
-        [pool drain];
-    });
+    [self reloadMessagesForChatID:self.selectedChatID interactive:YES];
 }
 
 - (void)sendMessage:(id)sender {
@@ -1011,7 +1225,9 @@
             }
             [self setControlsBusy:NO];
             if (sendSucceeded && selectionStillCurrent) {
-                [self loadMessages:nil];
+                self.pendingLiveChatRefresh = YES;
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
             }
             [authorizationState release];
             [chatID release];
@@ -1024,6 +1240,7 @@
 }
 
 - (void)dealloc {
+    [self stopLiveUpdateTimer];
     [[self window] setDelegate:nil];
     [_chatTableView setDataSource:nil];
     [_chatTableView setDelegate:nil];
@@ -1064,6 +1281,7 @@
     [_selectedChatTitle release];
     [_client release];
     [_currentAuthState release];
+    [_liveUpdateTimer release];
     [super dealloc];
 }
 
