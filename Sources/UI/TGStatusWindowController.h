@@ -2,4 +2,6 @@
 
 @interface TGStatusWindowController : NSWindowController
 
+- (void)prepareForApplicationTermination;
+
 @end

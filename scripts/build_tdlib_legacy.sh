@@ -25,6 +25,7 @@ ALLOW_UNKNOWN_TAG=0
 PATCH_LEGACY_LINKER=1
 PATCH_MAVERICKS_FDOPENDIR=1
 PATCH_MAVERICKS_CLOCK_GETTIME=1
+PATCH_WEBPAGES_MANAGER_STACK_ADDRESS_WARNING=1
 
 usage() {
     cat <<EOF
@@ -47,6 +48,8 @@ Options:
   --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
   --no-patch-clock-gettime
                           keep TDLib's clock_gettime debug clock code unchanged
+  --no-patch-webpages-warning
+                          keep TDLib WebPagesManager lambda warning unchanged
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
   --allow-snapshot        alias for --allow-unknown-tag for TDLib snapshots
   -h, --help              show this help
@@ -374,6 +377,43 @@ patch_tdlib_for_mavericks_clock_gettime() {
     echo "Patched TDLib clock_gettime debug clock block for OS X 10.9 SDK compatibility."
 }
 
+patch_tdlib_for_webpages_manager_stack_address_warning() {
+    local source_root="$1"
+    local webpages_file="$source_root/td/telegram/WebPagesManager.cpp"
+    local marker_file="$BUILD_DIR/webpages-manager-warning-patch.txt"
+
+    if [ "$PATCH_WEBPAGES_MANAGER_STACK_ADDRESS_WARNING" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$webpages_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib WebPagesManager.cpp; skipping stack-address warning patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib WebPagesManager.cpp: $webpages_file"
+    fi
+
+    if ! grep -q 'auto get_map = \[&\](Document::Type document_type) {' "$webpages_file"; then
+        echo "Warning: TDLib WebPagesManager get_map lambda was not found; skipping stack-address warning patch."
+        return 0
+    fi
+
+    cp "$webpages_file" "$webpages_file.telegraphica-backup"
+    perl -0pi -e 's/auto get_map = \[\&\]\(Document::Type document_type\) \{/auto get_map = [\&](Document::Type document_type) -> decltype(\&animations) {/' "$webpages_file"
+
+    if ! grep -q 'auto get_map = \[&\](Document::Type document_type) -> decltype(&animations) {' "$webpages_file"; then
+        fail "Failed to patch TDLib WebPagesManager get_map lambda in $webpages_file"
+    fi
+
+    {
+        echo "Patched TDLib WebPagesManager get_map lambda to silence false return-stack-address warnings."
+        echo "File: $webpages_file"
+        echo "Replacement: explicit lambda return type decltype(&animations)."
+    } > "$marker_file"
+    echo "Patched TDLib WebPagesManager stack-address warning."
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --source)
@@ -440,6 +480,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-patch-clock-gettime)
             PATCH_MAVERICKS_CLOCK_GETTIME=0
+            shift
+            ;;
+        --no-patch-webpages-warning)
+            PATCH_WEBPAGES_MANAGER_STACK_ADDRESS_WARNING=0
             shift
             ;;
         --allow-unknown-tag|--allow-snapshot)
@@ -539,6 +583,7 @@ fi
 patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_fdopendir "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_clock_gettime "$SOURCE_ROOT"
+patch_tdlib_for_webpages_manager_stack_address_warning "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
     if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then

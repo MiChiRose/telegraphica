@@ -34,9 +34,14 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     NSThread *_receiverThread;
     BOOL _receiverRunning;
     BOOL _receiverShouldStop;
+    BOOL _shutdownStarted;
+    NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
 - (void)stopReceiverThread;
+- (BOOL)beginActiveRequestWithError:(NSError **)error;
+- (void)endActiveRequest;
+- (BOOL)isShutdownStarted;
 - (BOOL)startReceiverThreadIfNeededWithError:(NSError **)error;
 - (void)receiverThreadMain;
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
@@ -66,7 +71,84 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     return self;
 }
 
+- (BOOL)isShutdownStarted {
+    [_responseCondition lock];
+    BOOL shuttingDown = _shutdownStarted;
+    [_responseCondition unlock];
+    return shuttingDown;
+}
+
+- (BOOL)beginActiveRequestWithError:(NSError **)error {
+    [_responseCondition lock];
+    if (_shutdownStarted) {
+        [_responseCondition unlock];
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib client is shutting down." code:50];
+        }
+        return NO;
+    }
+
+    _activeRequestCount++;
+    [_responseCondition unlock];
+    return YES;
+}
+
+- (void)endActiveRequest {
+    [_responseCondition lock];
+    if (_activeRequestCount > 0) {
+        _activeRequestCount--;
+    }
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+}
+
+- (void)shutdownWithTimeout:(NSTimeInterval)timeout {
+    if (timeout < 0.0) {
+        timeout = 0.0;
+    }
+
+    void *client = NULL;
+    TGTDJsonClientSendFunction sendFunction = NULL;
+
+    [_responseCondition lock];
+    if (!_shutdownStarted) {
+        _shutdownStarted = YES;
+        [_pendingResponsesByExtra removeAllObjects];
+        [_pendingResponseExtras removeAllObjects];
+        [_waitingResponseExtras removeAllObjects];
+        [_pendingUpdateSummaries removeAllObjects];
+        [_responseCondition broadcast];
+    }
+    [_responseCondition unlock];
+
+    [_sendLock lock];
+    client = _client;
+    sendFunction = _sendFunction;
+    if (client && sendFunction) {
+        sendFunction(client, "{\"@type\":\"close\"}");
+    }
+    [_sendLock unlock];
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    [_responseCondition lock];
+    while (_activeRequestCount > 0 && [[NSDate date] compare:deadline] == NSOrderedAscending) {
+        [_responseCondition waitUntilDate:deadline];
+    }
+    [_responseCondition unlock];
+
+    [self destroyTDLibClient];
+}
+
 - (void)destroyTDLibClient {
+    [_responseCondition lock];
+    _shutdownStarted = YES;
+    [_pendingResponsesByExtra removeAllObjects];
+    [_pendingResponseExtras removeAllObjects];
+    [_waitingResponseExtras removeAllObjects];
+    [_pendingUpdateSummaries removeAllObjects];
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+
     [self stopReceiverThread];
     [_responseCondition lock];
     [_pendingResponsesByExtra removeAllObjects];
@@ -87,7 +169,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (void)dealloc {
-    [self destroyTDLibClient];
+    [self shutdownWithTimeout:1.0];
     if (_libraryHandle) {
         dlclose(_libraryHandle);
         _libraryHandle = NULL;
@@ -128,6 +210,18 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     return summary;
 }
 
+- (NSArray *)drainSafeUpdateSummaries {
+    [_responseCondition lock];
+    NSArray *updates = [_pendingUpdateSummaries copy];
+    [_pendingUpdateSummaries removeAllObjects];
+    [_responseCondition unlock];
+
+    if (!updates) {
+        return [NSArray array];
+    }
+    return [updates autorelease];
+}
+
 - (void)stopReceiverThread {
     NSThread *thread = nil;
 
@@ -161,6 +255,14 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     (void)error;
 
     [_responseCondition lock];
+    if (_shutdownStarted) {
+        [_responseCondition unlock];
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib client is shutting down." code:50];
+        }
+        return NO;
+    }
+
     if (_receiverRunning || _receiverThread) {
         [_responseCondition unlock];
         return YES;
@@ -199,6 +301,11 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"new_message" forKey:@"kind"];
 
+        id chatID = [message objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        }
+
         id date = [message objectForKey:@"date"];
         if ([date respondsToSelector:@selector(integerValue)]) {
             [summary setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
@@ -213,7 +320,13 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 
     if ([type hasPrefix:@"update"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
-        [summary setObject:@"update" forKey:@"kind"];
+        id chatID = [dictionary objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:@"chat_update" forKey:@"kind"];
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        } else {
+            [summary setObject:@"update" forKey:@"kind"];
+        }
         [summary setObject:type forKey:@"type"];
         return summary;
     }
@@ -350,6 +463,17 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
     [_responseCondition lock];
     while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        if (_shutdownStarted) {
+            [_pendingResponsesByExtra removeObjectForKey:extra];
+            [_pendingResponseExtras removeObject:extra];
+            [_waitingResponseExtras removeObject:extra];
+            [_responseCondition unlock];
+            if (error) {
+                *error = [self errorWithDescription:@"TDLib client is shutting down." code:errorCode];
+            }
+            return nil;
+        }
+
         NSDictionary *response = [_pendingResponsesByExtra objectForKey:extra];
         if (response) {
             NSDictionary *retainedResponse = [response retain];
@@ -390,48 +514,57 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
-    if (![self ensureClientWithError:error]) {
+    if (![self beginActiveRequestWithError:error]) {
         return nil;
     }
 
-    if (timeout < 0.5) {
-        timeout = 0.5;
-    } else if (timeout > 15.0) {
-        timeout = 15.0;
-    }
-
-    [self beginWaitingForExtra:extra];
-
-    NSString *requestJSON = [self JSONStringFromObject:request error:error];
-    if (!requestJSON) {
-        [_responseCondition lock];
-        [_waitingResponseExtras removeObject:extra];
-        [_responseCondition unlock];
-        return nil;
-    }
-
-    [_sendLock lock];
-    if (_client && _sendFunction) {
-        _sendFunction(_client, [requestJSON UTF8String]);
-    }
-    [_sendLock unlock];
-
-    NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
-    if (!response) {
-        return nil;
-    }
-
-    id type = [response objectForKey:@"@type"];
-    if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"error"]) {
-        if (error) {
-            NSString *summary = [self summaryForAuthorizationStateObject:response];
-            NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
-            *error = [self errorWithDescription:message code:errorCode];
+    @try {
+        if (![self ensureClientWithError:error]) {
+            return nil;
         }
-        return nil;
-    }
 
-    return response;
+        if (timeout < 0.5) {
+            timeout = 0.5;
+        } else if (timeout > 15.0) {
+            timeout = 15.0;
+        }
+
+        [self beginWaitingForExtra:extra];
+
+        NSString *requestJSON = [self JSONStringFromObject:request error:error];
+        if (!requestJSON) {
+            [_responseCondition lock];
+            [_waitingResponseExtras removeObject:extra];
+            [_responseCondition unlock];
+            return nil;
+        }
+
+        [_sendLock lock];
+        if (_client && _sendFunction && ![self isShutdownStarted]) {
+            _sendFunction(_client, [requestJSON UTF8String]);
+        }
+        [_sendLock unlock];
+
+        NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
+        if (!response) {
+            return nil;
+        }
+
+        id type = [response objectForKey:@"@type"];
+        if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"error"]) {
+            if (error) {
+                NSString *summary = [self summaryForAuthorizationStateObject:response];
+                NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
+                *error = [self errorWithDescription:message code:errorCode];
+            }
+            return nil;
+        }
+
+        return response;
+    }
+    @finally {
+        [self endActiveRequest];
+    }
 }
 
 - (NSArray *)candidateLibraryPaths {
@@ -569,7 +702,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSString *)tdlibParametersSchemaFromConfiguration:(NSDictionary *)configuration {
     NSString *schema = [self stringValueForKey:@"tdlib_parameters_schema" inConfiguration:configuration required:NO error:NULL];
     if ([schema length] == 0) {
-        return @"auto";
+        return @"legacy";
     }
 
     NSString *lowercaseSchema = [schema lowercaseString];
@@ -778,6 +911,13 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (BOOL)ensureClientWithError:(NSError **)error {
+    if ([self isShutdownStarted]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib client is shutting down." code:50];
+        }
+        return NO;
+    }
+
     if (![self loadLibraryWithError:error]) {
         return NO;
     }
@@ -1046,6 +1186,9 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     }
 
     NSString *stateAfterCurrentError = [self authorizationStateSummaryWithTimeout:1.0 error:NULL];
+    if ([stateAfterCurrentError length] == 0 || [stateAfterCurrentError hasPrefix:@"error"]) {
+        stateAfterCurrentError = [self cachedAuthorizationStateSummary];
+    }
     if (![stateAfterCurrentError isEqualToString:@"waitTdlibParameters"]) {
         if (error) {
             *error = currentError;
@@ -1288,13 +1431,27 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSArray *)mainChatIDsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSUInteger safeLimit = limit;
     if (safeLimit == 0) {
-        safeLimit = 20;
-    } else if (safeLimit > 100) {
-        safeLimit = 100;
+        safeLimit = 40;
+    } else if (safeLimit > 200) {
+        safeLimit = 200;
     }
 
     NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
     [chatList setObject:@"chatListMain" forKey:@"@type"];
+
+    NSMutableDictionary *loadChatsRequest = [NSMutableDictionary dictionary];
+    [loadChatsRequest setObject:@"loadChats" forKey:@"@type"];
+    [loadChatsRequest setObject:chatList forKey:@"chat_list"];
+    [loadChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+    NSTimeInterval loadChatsTimeout = timeout;
+    if (loadChatsTimeout > 1.0) {
+        loadChatsTimeout = 1.0;
+    }
+    [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
+                              extraPrefix:@"telegraphica-load-main-chats"
+                                  timeout:loadChatsTimeout
+                                errorCode:32
+                                    error:NULL];
 
     NSMutableDictionary *getChatsRequest = [NSMutableDictionary dictionary];
     [getChatsRequest setObject:@"getChats" forKey:@"@type"];
@@ -1526,6 +1683,10 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (NSArray *)recentMessagePreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self messagePreviewItemsForChatID:chatID fromMessageID:nil limit:limit timeout:timeout error:error];
+}
+
+- (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID fromMessageID:(NSNumber *)fromMessageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:38];
@@ -1549,10 +1710,15 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         safeLimit = 50;
     }
 
+    long long anchorMessageID = 0;
+    if ([fromMessageID respondsToSelector:@selector(longLongValue)]) {
+        anchorMessageID = [fromMessageID longLongValue];
+    }
+
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"getChatHistory" forKey:@"@type"];
     [request setObject:chatID forKey:@"chat_id"];
-    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"from_message_id"];
+    [request setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
     [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
     [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
     [request setObject:[NSNumber numberWithBool:NO] forKey:@"only_local"];
@@ -1599,6 +1765,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         }
 
         NSMutableDictionary *item = [NSMutableDictionary dictionary];
+        [item setObject:chatID forKey:@"chat_id"];
         if (messageID) {
             [item setObject:messageID forKey:@"message_id"];
         }
@@ -1606,6 +1773,9 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
             [item setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
         } else {
             [item setObject:[NSNumber numberWithInteger:0] forKey:@"date"];
+        }
+        if ([isOutgoing respondsToSelector:@selector(boolValue)]) {
+            [item setObject:[NSNumber numberWithBool:[isOutgoing boolValue]] forKey:@"is_outgoing"];
         }
         [item setObject:direction forKey:@"direction"];
         [item setObject:preview forKey:@"preview"];
