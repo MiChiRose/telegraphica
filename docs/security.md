@@ -87,6 +87,13 @@ file when `TELEGRAPHICA_DEBUG`, `TELEGRAPHICA_DEV_LOGS`, or the
 to `NSLog`, so Console output must follow the same redaction rules as file logs:
 counts and state names are acceptable, raw TDLib JSON and message text are not.
 
+The TDLib receiver keeps raw responses only for currently waiting `@extra`
+requests and drops late or unknown correlated responses. Non-response updates
+must be reduced to bounded safe summaries before queuing; current summaries omit
+message text and captions. Do not add a general raw-update queue or debug dump;
+raw TDLib updates can contain phone numbers, titles, usernames, message text,
+captions, file paths, and media metadata.
+
 ### Media And Cache
 
 Downloaded media, thumbnails, profile images, and filenames are sensitive. Keep

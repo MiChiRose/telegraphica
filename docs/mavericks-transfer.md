@@ -94,6 +94,15 @@ When TDLib reports `ready`, "Check TDLib" should run a redacted `getMe`/`getChat
 probe and report only generic success plus chat count, not raw account or chat
 JSON.
 
+After clicking "Check TDLib", the details view should include a line like:
+
+```text
+TDLib receiver: receiver active; pending responses: 0; waiting responses: 0; queued safe updates: ...
+```
+
+The counts are diagnostic only. They must not include raw TDLib JSON, chat
+titles, phone numbers, message text, or IDs.
+
 After TDLib reports `ready`, click "Load Chats". Expected result:
 
 - the status changes to `TDLib chats: loaded`;
