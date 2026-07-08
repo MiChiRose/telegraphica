@@ -928,10 +928,13 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (NSDictionary *)legacyTDLibParametersRequestWithParameters:(NSDictionary *)parameters {
+    NSMutableDictionary *typedParameters = [NSMutableDictionary dictionaryWithDictionary:parameters];
+    [typedParameters setObject:@"tdlibParameters" forKey:@"@type"];
+
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"setTdlibParameters" forKey:@"@type"];
     [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-tdlib-parameters-legacy"] forKey:@"@extra"];
-    [request setObject:parameters forKey:@"parameters"];
+    [request setObject:typedParameters forKey:@"parameters"];
     return request;
 }
 
@@ -1069,6 +1072,9 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     }
 
     NSString *stateAfterCurrentError = [self authorizationStateSummaryWithTimeout:1.0 error:NULL];
+    if ([stateAfterCurrentError length] == 0 || [stateAfterCurrentError hasPrefix:@"error"]) {
+        stateAfterCurrentError = [self cachedAuthorizationStateSummary];
+    }
     if (![stateAfterCurrentError isEqualToString:@"waitTdlibParameters"]) {
         if (error) {
             *error = currentError;
