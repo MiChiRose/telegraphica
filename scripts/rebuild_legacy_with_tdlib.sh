@@ -12,6 +12,9 @@ GPERF_BIN=""
 JOBS=""
 OPEN_AFTER_BUILD=0
 TDLIB_BUILD_DIR="$ROOT_DIR/build-tdlib-legacy"
+ALLOW_SNAPSHOT=0
+TDLIB_VERSION_VALUE=""
+TDLIB_LABEL_VALUE=""
 
 usage() {
     cat <<EOF
@@ -24,6 +27,9 @@ Options:
   --cmake PATH            optional cmake binary
   --gperf PATH            optional gperf binary
   --jobs N                optional build job count
+  --tdlib-version VALUE   optional TDLib version/tag label for validation
+  --tdlib-label VALUE     optional human-readable TDLib build label
+  --allow-snapshot        allow a TDLib snapshot/master archive
   --open                  open Telegraphica.app after a successful rebuild
   -h, --help              show this help
 
@@ -151,6 +157,20 @@ while [ "$#" -gt 0 ]; do
             JOBS="$2"
             shift 2
             ;;
+        --tdlib-version)
+            require_option_value "$@"
+            TDLIB_VERSION_VALUE="$2"
+            shift 2
+            ;;
+        --tdlib-label)
+            require_option_value "$@"
+            TDLIB_LABEL_VALUE="$2"
+            shift 2
+            ;;
+        --allow-snapshot)
+            ALLOW_SNAPSHOT=1
+            shift
+            ;;
         --tdlib-build-dir)
             require_option_value "$@"
             TDLIB_BUILD_DIR="$(abs_path "$2")"
@@ -207,8 +227,20 @@ if [ -n "$JOBS" ]; then
     TDLIB_ARGS+=("--jobs" "$JOBS")
 fi
 
+if [ "$ALLOW_SNAPSHOT" -eq 1 ]; then
+    TDLIB_ARGS+=("--allow-snapshot")
+fi
+
 echo "Rebuilding TDLib for Telegraphica..."
-"$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+if [ -n "$TDLIB_VERSION_VALUE" ] && [ -n "$TDLIB_LABEL_VALUE" ]; then
+    TDLIB_VERSION="$TDLIB_VERSION_VALUE" TDLIB_LABEL="$TDLIB_LABEL_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+elif [ -n "$TDLIB_VERSION_VALUE" ]; then
+    TDLIB_VERSION="$TDLIB_VERSION_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+elif [ -n "$TDLIB_LABEL_VALUE" ]; then
+    TDLIB_LABEL="$TDLIB_LABEL_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+else
+    "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+fi
 
 TDJSON_PATH="$(find_tdjson_dylib "$TDLIB_BUILD_DIR" || true)"
 if [ -z "$TDJSON_PATH" ]; then
