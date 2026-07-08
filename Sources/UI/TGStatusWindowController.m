@@ -602,7 +602,7 @@
 }
 
 - (void)setControlsBusy:(BOOL)busy {
-    self.controlsBusy = busy;
+    _controlsBusy = busy;
     [self.checkButton setEnabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
