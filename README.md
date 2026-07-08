@@ -86,7 +86,10 @@ Telegraphica
 generates or reuses a Keychain-backed database encryption key and sends
 `checkDatabaseEncryptionKey`. The spike window can then submit the phone number,
 login code, and 2FA password needed to move through `waitPhoneNumber`,
-`waitCode`, `waitPassword`, and eventually `ready`.
+`waitCode`, `waitPassword`, and eventually `ready`. After authorization reaches
+`ready`, the spike can run a redacted `getMe`/`getChats` probe to confirm the
+session can read basic account and chat-list metadata; this is still a smoke
+test, not the chat UI.
 
 Local TDLib parameters are read from:
 
@@ -103,4 +106,6 @@ real values into logs.
 
 Do not commit `api_id`, `api_hash`, phone numbers, login codes, 2FA passwords,
 TDLib databases, session files, generated encryption keys, or local credentials.
-Use local untracked configuration and Keychain-backed storage during development.
+Do not paste raw TDLib responses from authorization, `getMe`, or `getChats`
+into logs, screenshots, issues, or transfer notes. Use local untracked
+configuration and Keychain-backed storage during development.

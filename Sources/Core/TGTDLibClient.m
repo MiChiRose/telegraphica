@@ -2,6 +2,7 @@
 #import "../Services/TGKeychainHelper.h"
 #import <dlfcn.h>
 #import <Security/Security.h>
+#import <stdlib.h>
 
 typedef void *(*TGTDJsonClientCreateFunction)(void);
 typedef void (*TGTDJsonClientSendFunction)(void *, const char *);
@@ -869,12 +870,155 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     return [self receiveAuthorizationResultForAction:actionName waitingState:waitingState timeout:timeout errorCode:errorCode error:error];
 }
 
+- (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    if (![self ensureClientWithError:error]) {
+        return nil;
+    }
+
+    if (timeout < 0.5) {
+        timeout = 0.5;
+    } else if (timeout > 15.0) {
+        timeout = 15.0;
+    }
+
+    NSMutableDictionary *taggedRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+    NSString *extra = [NSString stringWithFormat:@"%@-%@-%u",
+                       extraPrefix ? extraPrefix : @"telegraphica-request",
+                       [[NSProcessInfo processInfo] globallyUniqueString],
+                       (unsigned int)arc4random()];
+    [taggedRequest setObject:extra forKey:@"@extra"];
+
+    NSString *requestJSON = [self JSONStringFromObject:taggedRequest error:error];
+    if (!requestJSON) {
+        return nil;
+    }
+
+    _sendFunction(_client, [requestJSON UTF8String]);
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        const char *raw = _receiveFunction(_client, 0.25);
+        if (!raw) {
+            continue;
+        }
+
+        NSString *jsonString = [NSString stringWithUTF8String:raw];
+        NSError *jsonError = nil;
+        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
+        if (![object isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSDictionary *dictionary = (NSDictionary *)object;
+        id responseExtra = [dictionary objectForKey:@"@extra"];
+        if (![responseExtra isKindOfClass:[NSString class]] || ![(NSString *)responseExtra isEqualToString:extra]) {
+            continue;
+        }
+
+        id type = [dictionary objectForKey:@"@type"];
+        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"error"]) {
+            if (error) {
+                NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
+                NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
+                *error = [self errorWithDescription:message code:errorCode];
+            }
+            return nil;
+        }
+
+        return dictionary;
+    }
+
+    if (error) {
+        *error = [self errorWithDescription:@"TDLib did not return the requested response before the probe timed out." code:errorCode];
+    }
+    return nil;
+}
+
 - (NSString *)prepareAuthorizationFlowWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if ([authorizationState length] == 0) {
         return nil;
     }
     return [NSString stringWithFormat:@"auth state: %@", authorizationState];
+}
+
+- (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready for post-login probe. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:30];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *getMeRequest = [NSMutableDictionary dictionary];
+    [getMeRequest setObject:@"getMe" forKey:@"@type"];
+    NSDictionary *userResponse = [self sendTDLibRequestAndWaitForExtra:getMeRequest
+                                                           extraPrefix:@"telegraphica-get-me"
+                                                               timeout:timeout
+                                                             errorCode:31
+                                                                 error:error];
+    if (!userResponse) {
+        return nil;
+    }
+
+    id userType = [userResponse objectForKey:@"@type"];
+    if (![userType isKindOfClass:[NSString class]] || ![(NSString *)userType isEqualToString:@"user"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib getMe returned an unexpected response." code:32];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
+    [chatList setObject:@"chatListMain" forKey:@"@type"];
+
+    NSMutableDictionary *getChatsRequest = [NSMutableDictionary dictionary];
+    [getChatsRequest setObject:@"getChats" forKey:@"@type"];
+    [getChatsRequest setObject:chatList forKey:@"chat_list"];
+    [getChatsRequest setObject:[NSNumber numberWithInt:20] forKey:@"limit"];
+
+    NSError *currentChatsError = nil;
+    NSDictionary *chatsResponse = [self sendTDLibRequestAndWaitForExtra:getChatsRequest
+                                                            extraPrefix:@"telegraphica-get-chats"
+                                                                timeout:timeout
+                                                              errorCode:33
+                                                                  error:&currentChatsError];
+    if (!chatsResponse) {
+        NSError *legacyChatsError = nil;
+        NSMutableDictionary *legacyGetChatsRequest = [NSMutableDictionary dictionary];
+        [legacyGetChatsRequest setObject:@"getChats" forKey:@"@type"];
+        [legacyGetChatsRequest setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_order"];
+        [legacyGetChatsRequest setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_chat_id"];
+        [legacyGetChatsRequest setObject:[NSNumber numberWithInt:20] forKey:@"limit"];
+
+        chatsResponse = [self sendTDLibRequestAndWaitForExtra:legacyGetChatsRequest
+                                                          extraPrefix:@"telegraphica-get-chats-legacy"
+                                                              timeout:timeout
+                                                            errorCode:33
+                                                                 error:&legacyChatsError];
+        if (!chatsResponse && error) {
+            NSString *currentMessage = currentChatsError ? [currentChatsError localizedDescription] : @"current getChats schema failed";
+            NSString *legacyMessage = legacyChatsError ? [legacyChatsError localizedDescription] : @"legacy getChats schema failed";
+            NSString *message = [NSString stringWithFormat:@"%@; fallback also failed: %@", currentMessage, legacyMessage];
+            *error = [self errorWithDescription:message code:33];
+        }
+    }
+    if (!chatsResponse) {
+        return nil;
+    }
+
+    id chatsType = [chatsResponse objectForKey:@"@type"];
+    id chatIDs = [chatsResponse objectForKey:@"chat_ids"];
+    if (![chatsType isKindOfClass:[NSString class]] || ![(NSString *)chatsType isEqualToString:@"chats"] || ![chatIDs isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib getChats returned an unexpected response." code:34];
+        }
+        return nil;
+    }
+
+    return [NSString stringWithFormat:@"getMe OK (authorized user object received); getChats OK (%lu chat ids received)", (unsigned long)[(NSArray *)chatIDs count]];
 }
 
 - (NSString *)submitAuthenticationPhoneNumber:(NSString *)phoneNumber timeout:(NSTimeInterval)timeout error:(NSError **)error {

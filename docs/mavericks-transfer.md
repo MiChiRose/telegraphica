@@ -90,6 +90,10 @@ For the next auth milestone, the window exposes one auth input row at a time:
 - `Password` when TDLib reports `waitPassword`;
 - no input when TDLib reports `ready`.
 
+When TDLib reports `ready`, "Check TDLib" should run a redacted `getMe`/`getChats`
+probe and report only generic success plus chat count, not raw account or chat
+JSON.
+
 Do not include the real phone number, login code, or 2FA password in screenshots,
 logs, shell history, or transfer archives. The details view should show only
 generic submit results and TDLib auth states.
@@ -269,6 +273,8 @@ Click "Check TDLib". Expected success:
 - if TDLib reaches `waitEncryptionKey`, the details include `TDLib encryption key: ...`.
 - if TDLib reaches `waitPhoneNumber`, the auth row allows submitting phone,
   then code, then 2FA password if required.
+- if TDLib reaches `ready`, the details include a redacted `getMe`/`getChats`
+  probe result with account-probe success and chat count.
 
 ## Important
 
