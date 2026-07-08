@@ -6,7 +6,8 @@ Telegraphica is an experimental unofficial Telegram client for OS X 10.9.5
 Mavericks, Intel x86_64, Objective-C/Cocoa/AppKit, and Xcode 6.2 where
 possible. This first milestone is about proving the Telegram core, local
 chat-list reads, selected-chat history preview reads, a routed TDLib receive
-loop, and a guarded plain-text send path, not building a polished chat UI.
+loop, a guarded plain-text send path, and the first legacy AppKit chat shell,
+not building the full Telegram feature set.
 
 ## Recommendation
 
@@ -93,13 +94,22 @@ generics, nullability annotations, Swift, SwiftUI, `@available`, and macOS
 
 ## Minimal UI Scope
 
-For the first spike, keep one `NSWindowController` with a status label, log
-output, and a "Check TDLib" action. Do not build the full Telegram UI yet.
+The first TDLib spike used one `NSWindowController` with a status label, log
+output, and a "Check TDLib" action. After login, chat-list, history, receiver,
+and text-send HITL succeeded, the UI can move to a small two-pane chat shell
+while still keeping diagnostics visible and redacted.
+
+The current shell should stay intentionally narrow:
+
+- left pane: chat previews and manual "Load Chats";
+- right pane: selected-chat history and manual "Load Messages";
+- bottom composer: plain-text send with explicit confirmation;
+- compact diagnostics: TDLib status and redacted counts/errors only.
 
 The eventual Mavericks-safe layout should use:
 
 - `NSWindow`, `NSWindowController`, `NSView`
-- `NSSplitView` owned manually, not `NSSplitViewController`
+- frame-based layout or `NSSplitView` owned manually, not `NSSplitViewController`
 - `NSTableView` for chat list
 - read-only `NSTextView` or table-backed transcript for messages
 - `NSTextView` composer plus `NSButton`

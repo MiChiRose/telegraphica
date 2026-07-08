@@ -3,10 +3,10 @@
 Telegraphica is an experimental unofficial Telegram client.
 
 Telegraphica targets OS X 10.9.5 Mavericks on Intel x86_64 and is written in
-Objective-C with Cocoa/AppKit. The first milestone is a feasibility report and
-a TDLib/Telegram-core spike with local chat-list reads, selected-chat
-message-history previews, and a guarded plain-text send path, not a complete
-chat UI.
+Objective-C with Cocoa/AppKit. The current milestone is turning the proven
+TDLib/Telegram-core spike into a small legacy-Mac chat shell with local
+chat-list reads, selected-chat message-history previews, and a guarded
+plain-text send path.
 
 ## Current Status
 
@@ -21,6 +21,8 @@ This repository contains an initial legacy AppKit skeleton:
 - A selected-chat message preview table backed by `getChatHistory`.
 - A guarded selected-chat plain-text send spike with an explicit confirmation
   dialog and redacted diagnostics.
+- A two-pane AppKit chat shell with restrained skeuomorphic panels, standard
+  AppKit controls, and a compact diagnostics area.
 - Mavericks-oriented build and compatibility checks.
 - Feasibility and security notes for the first milestone.
 
@@ -33,7 +35,8 @@ Telegraphica.xcodeproj/        Xcode project, kept Xcode 6.x-compatible
 Sources/                       Objective-C/AppKit source
 Sources/Core/                  Telegram core / TDLib boundary
 Sources/Services/              Logger and Keychain helpers
-Sources/UI/                    Minimal status window
+Sources/UI/                    Legacy AppKit chat shell
+PRODUCT.md                     Product/design direction for UI work
 docs/feasibility.md            TDLib/Mavericks feasibility report
 docs/security.md               Threat model and local data handling notes
 scripts/check_legacy_compat.py Static legacy compatibility checks
