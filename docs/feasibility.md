@@ -4,8 +4,8 @@ Date: 2026-07-07
 
 Telegraphica is an experimental unofficial Telegram client for OS X 10.9.5
 Mavericks, Intel x86_64, Objective-C/Cocoa/AppKit, and Xcode 6.2 where
-possible. This first milestone is about proving the Telegram core, not building
-a polished chat UI.
+possible. This first milestone is about proving the Telegram core and the first
+local chat-list read path, not building a polished chat UI.
 
 ## Recommendation
 
@@ -200,8 +200,10 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
 8. After `authorizationStateReady`, run a redacted non-UI `getMe`/`getChats`
    probe to verify the authorized session can read account and chat-list
    metadata.
-9. Only after auth state and post-login read access are proven, build chat list
-   and message transcript UI.
+9. Build a minimal chat-list preview with `getChats` + `getChat`, keeping chat
+   titles local to the UI and out of diagnostics.
+10. After the chat list is proven, move to a real receive loop and a selected
+    chat transcript.
 
 ## Primary Sources
 

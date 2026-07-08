@@ -2,15 +2,18 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 
-@interface TGStatusWindowController ()
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextView *detailsView;
 @property (nonatomic, retain) NSButton *checkButton;
+@property (nonatomic, retain) NSButton *loadChatsButton;
 @property (nonatomic, retain) NSTextField *authLabel;
 @property (nonatomic, retain) NSTextField *authStateField;
 @property (nonatomic, retain) NSTextField *authTextField;
 @property (nonatomic, retain) NSSecureTextField *authSecureField;
 @property (nonatomic, retain) NSButton *authButton;
+@property (nonatomic, retain) NSTableView *chatTableView;
+@property (nonatomic, retain) NSMutableArray *chatItems;
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, copy) NSString *currentAuthState;
 @end
@@ -20,16 +23,19 @@
 @synthesize statusField = _statusField;
 @synthesize detailsView = _detailsView;
 @synthesize checkButton = _checkButton;
+@synthesize loadChatsButton = _loadChatsButton;
 @synthesize authLabel = _authLabel;
 @synthesize authStateField = _authStateField;
 @synthesize authTextField = _authTextField;
 @synthesize authSecureField = _authSecureField;
 @synthesize authButton = _authButton;
+@synthesize chatTableView = _chatTableView;
+@synthesize chatItems = _chatItems;
 @synthesize client = _client;
 @synthesize currentAuthState = _currentAuthState;
 
 - (instancetype)init {
-    NSRect frame = NSMakeRect(0, 0, 640, 420);
+    NSRect frame = NSMakeRect(0, 0, 760, 560);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -40,6 +46,7 @@
     self = [super initWithWindow:window];
     if (self) {
         self.client = [[[TGTDLibClient alloc] init] autorelease];
+        self.chatItems = [NSMutableArray array];
         [self buildContentView];
     }
     return self;
@@ -61,17 +68,17 @@
     NSView *contentView = [[self window] contentView];
     [contentView setAutoresizesSubviews:YES];
 
-    NSTextField *title = [self labelWithFrame:NSMakeRect(24, 368, 592, 28)
+    NSTextField *title = [self labelWithFrame:NSMakeRect(24, 508, 712, 28)
                                          text:@"Telegraphica core spike"
                                          font:[NSFont boldSystemFontOfSize:18.0]];
     [contentView addSubview:title];
 
-    self.statusField = [self labelWithFrame:NSMakeRect(24, 336, 592, 22)
+    self.statusField = [self labelWithFrame:NSMakeRect(24, 476, 712, 22)
                                        text:@"TDLib status: not checked"
                                        font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.statusField];
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 132, 592, 188)] autorelease];
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 252, 712, 208)] autorelease];
     [scrollView setBorderType:NSBezelBorder];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -84,30 +91,30 @@
     [scrollView setDocumentView:self.detailsView];
     [contentView addSubview:scrollView];
 
-    self.authLabel = [self labelWithFrame:NSMakeRect(24, 88, 76, 22)
+    self.authLabel = [self labelWithFrame:NSMakeRect(24, 212, 76, 22)
                                      text:@"Auth:"
                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.authLabel];
 
-    self.authStateField = [self labelWithFrame:NSMakeRect(104, 88, 432, 22)
+    self.authStateField = [self labelWithFrame:NSMakeRect(104, 212, 560, 22)
                                           text:@"not checked"
                                           font:[NSFont systemFontOfSize:13.0]];
     [[self.authStateField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [contentView addSubview:self.authStateField];
 
-    self.authTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(104, 84, 240, 24)] autorelease];
+    self.authTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(104, 208, 240, 24)] autorelease];
     [self.authTextField setEnabled:NO];
     [self.authTextField setHidden:YES];
     [self.authTextField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authTextField];
 
-    self.authSecureField = [[[NSSecureTextField alloc] initWithFrame:NSMakeRect(104, 84, 240, 24)] autorelease];
+    self.authSecureField = [[[NSSecureTextField alloc] initWithFrame:NSMakeRect(104, 208, 240, 24)] autorelease];
     [self.authSecureField setEnabled:NO];
     [self.authSecureField setHidden:YES];
     [self.authSecureField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authSecureField];
 
-    self.authButton = [[[NSButton alloc] initWithFrame:NSMakeRect(356, 80, 116, 32)] autorelease];
+    self.authButton = [[[NSButton alloc] initWithFrame:NSMakeRect(356, 204, 116, 32)] autorelease];
     [self.authButton setTitle:@"Send"];
     [self.authButton setBezelStyle:NSRoundedBezelStyle];
     [self.authButton setTarget:self];
@@ -116,6 +123,49 @@
     [self.authButton setHidden:YES];
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
+
+    NSTextField *chatsLabel = [self labelWithFrame:NSMakeRect(24, 178, 76, 22)
+                                              text:@"Chats:"
+                                              font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:chatsLabel];
+
+    self.loadChatsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(104, 172, 112, 32)] autorelease];
+    [self.loadChatsButton setTitle:@"Load Chats"];
+    [self.loadChatsButton setBezelStyle:NSRoundedBezelStyle];
+    [self.loadChatsButton setTarget:self];
+    [self.loadChatsButton setAction:@selector(loadChats:)];
+    [self.loadChatsButton setEnabled:NO];
+    [self.loadChatsButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.loadChatsButton];
+
+    NSScrollView *chatScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 72, 712, 96)] autorelease];
+    [chatScrollView setBorderType:NSBezelBorder];
+    [chatScrollView setHasVerticalScroller:YES];
+    [chatScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+
+    self.chatTableView = [[[NSTableView alloc] initWithFrame:[[chatScrollView contentView] bounds]] autorelease];
+    [self.chatTableView setDataSource:self];
+    [self.chatTableView setDelegate:self];
+    [self.chatTableView setAllowsColumnReordering:NO];
+    [self.chatTableView setAllowsMultipleSelection:NO];
+
+    NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"title"] autorelease];
+    [[chatColumn headerCell] setStringValue:@"Chat"];
+    [chatColumn setWidth:470.0];
+    [self.chatTableView addTableColumn:chatColumn];
+
+    NSTableColumn *typeColumn = [[[NSTableColumn alloc] initWithIdentifier:@"type"] autorelease];
+    [[typeColumn headerCell] setStringValue:@"Type"];
+    [typeColumn setWidth:130.0];
+    [self.chatTableView addTableColumn:typeColumn];
+
+    NSTableColumn *unreadColumn = [[[NSTableColumn alloc] initWithIdentifier:@"unread_count"] autorelease];
+    [[unreadColumn headerCell] setStringValue:@"Unread"];
+    [unreadColumn setWidth:80.0];
+    [self.chatTableView addTableColumn:unreadColumn];
+
+    [chatScrollView setDocumentView:self.chatTableView];
+    [contentView addSubview:chatScrollView];
 
     self.checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 28, 140, 32)] autorelease];
     [self.checkButton setTitle:@"Check TDLib"];
@@ -144,6 +194,7 @@
     self.currentAuthState = state;
     [self.authTextField setStringValue:@""];
     [self.authSecureField setStringValue:@""];
+    [self.loadChatsButton setEnabled:NO];
 
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self.authLabel setStringValue:@"Phone:"];
@@ -200,10 +251,12 @@
     [self.authButton setTitle:@"Send"];
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
+    [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
 }
 
 - (void)setControlsBusy:(BOOL)busy {
     [self.checkButton setEnabled:!busy];
+    [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     if (busy) {
         [self.authButton setEnabled:NO];
         [self.authTextField setEnabled:NO];
@@ -219,6 +272,26 @@
     [self.detailsView setString:[current stringByAppendingString:line]];
     NSRange endRange = NSMakeRange([[self.detailsView string] length], 0);
     [self.detailsView scrollRangeToVisible:endRange];
+}
+
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    (void)tableView;
+    return (NSInteger)[self.chatItems count];
+}
+
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    (void)tableView;
+    if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
+        return @"";
+    }
+
+    NSDictionary *item = [self.chatItems objectAtIndex:(NSUInteger)row];
+    id identifier = [tableColumn identifier];
+    id value = [item objectForKey:identifier];
+    if ([identifier isEqual:@"unread_count"] && [value respondsToSelector:@selector(integerValue)] && [value integerValue] == 0) {
+        return @"";
+    }
+    return value ? value : @"";
 }
 
 - (void)checkTDLib:(id)sender {
@@ -395,15 +468,68 @@
     });
 }
 
+- (void)loadChats:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Chats are available only after TDLib auth state is ready."];
+        return;
+    }
+
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"TDLib chats: loading..."];
+    [self appendDetail:@"Loading main chat previews from TDLib..."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *chatError = nil;
+        NSArray *items = [client mainChatPreviewItemsWithLimit:10 timeout:5.0 error:&chatError];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
+        NSString *chatErrorMessage = [[chatError localizedDescription] copy];
+        NSArray *itemsCopy = [items copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (itemsCopy) {
+                [self.chatItems removeAllObjects];
+                [self.chatItems addObjectsFromArray:itemsCopy];
+                [self.chatTableView reloadData];
+                [self.statusField setStringValue:@"TDLib chats: loaded"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews", (unsigned long)[itemsCopy count]]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
+            } else {
+                NSString *message = chatErrorMessage ? @"Chat preview request failed. Check TDLib state and try again." : @"Chat list did not return a result.";
+                [self.statusField setStringValue:@"TDLib chats: unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib chats: %@", message]];
+                [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            [self setControlsBusy:NO];
+            [itemsCopy release];
+            [chatErrorMessage release];
+            [authorizationState release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
 - (void)dealloc {
+    [_chatTableView setDataSource:nil];
+    [_chatTableView setDelegate:nil];
     [_statusField release];
     [_detailsView release];
     [_checkButton release];
+    [_loadChatsButton release];
     [_authLabel release];
     [_authStateField release];
     [_authTextField release];
     [_authSecureField release];
     [_authButton release];
+    [_chatTableView release];
+    [_chatItems release];
     [_client release];
     [_currentAuthState release];
     [super dealloc];
