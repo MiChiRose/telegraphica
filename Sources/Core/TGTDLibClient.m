@@ -592,7 +592,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSString *)tdlibParametersSchemaFromConfiguration:(NSDictionary *)configuration {
     NSString *schema = [self stringValueForKey:@"tdlib_parameters_schema" inConfiguration:configuration required:NO error:NULL];
     if ([schema length] == 0) {
-        return @"auto";
+        return @"legacy";
     }
 
     NSString *lowercaseSchema = [schema lowercaseString];
@@ -928,13 +928,10 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 }
 
 - (NSDictionary *)legacyTDLibParametersRequestWithParameters:(NSDictionary *)parameters {
-    NSMutableDictionary *typedParameters = [NSMutableDictionary dictionaryWithDictionary:parameters];
-    [typedParameters setObject:@"tdlibParameters" forKey:@"@type"];
-
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"setTdlibParameters" forKey:@"@type"];
     [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-tdlib-parameters-legacy"] forKey:@"@extra"];
-    [request setObject:typedParameters forKey:@"parameters"];
+    [request setObject:parameters forKey:@"parameters"];
     return request;
 }
 
