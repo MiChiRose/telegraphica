@@ -4,8 +4,9 @@ Telegraphica is an experimental unofficial Telegram client.
 
 Telegraphica targets OS X 10.9.5 Mavericks on Intel x86_64 and is written in
 Objective-C with Cocoa/AppKit. The first milestone is a feasibility report and
-a TDLib/Telegram-core spike with the first local chat-list and message-history
-previews, not a complete chat UI.
+a TDLib/Telegram-core spike with local chat-list reads, selected-chat
+message-history previews, and a guarded plain-text send path, not a complete
+chat UI.
 
 ## Current Status
 
@@ -18,6 +19,8 @@ This repository contains an initial legacy AppKit skeleton:
 - A state-driven TDLib authorization row and a local chat preview table once
   authorization reaches `ready`.
 - A selected-chat message preview table backed by `getChatHistory`.
+- A guarded selected-chat plain-text send spike with an explicit confirmation
+  dialog and redacted diagnostics.
 - Mavericks-oriented build and compatibility checks.
 - Feasibility and security notes for the first milestone.
 
@@ -101,9 +104,11 @@ cached state summary, and other updates are reduced to bounded in-memory safe
 summaries instead of being logged or dumped. The "Load Chats" button then reads
 the main chat list and shows a minimal local table with chat title, type, and
 unread count. Selecting a chat and clicking "Load Messages" reads recent history
-through TDLib and shows local message previews. The spike still does not send
-messages, download media, mark messages as read intentionally, or persist chat
-UI state.
+through TDLib and shows local message previews. Selecting a chat, entering text,
+and clicking "Send Message" can send a real plain-text Telegram message after an
+explicit confirmation dialog. The spike does not auto-retry unconfirmed sends,
+send media, edit/delete messages, download media, mark messages as read
+intentionally, or persist chat UI state.
 
 Local TDLib parameters are read from:
 

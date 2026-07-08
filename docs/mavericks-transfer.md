@@ -117,6 +117,31 @@ Select a row in the chat table and click "Load Messages". Expected result:
 - the details view reports only the number of loaded previews, not message text
   or raw TDLib JSON.
 
+To test the text-send spike, choose a harmless destination first, preferably
+Saved Messages or a private test chat:
+
+1. Select the chat.
+2. Type a short harmless message in the `Send` field.
+3. Click "Send Message".
+4. Read the confirmation dialog carefully. It is a real Telegram send, not a
+   dry run.
+5. Click "Send" only if the selected chat is correct. Do not use Return/Enter
+   to confirm the send dialog during this spike.
+
+Expected result:
+
+- the status changes to `TDLib send: accepted`;
+- the send field clears;
+- the message table reloads and should show the new message if TDLib returns it
+  in recent history;
+- the details view reports only generic send status, not the message text or raw
+  TDLib JSON.
+
+If the status changes to `TDLib send: not confirmed`, do not immediately press
+"Send Message" again. TDLib may have sent the message even if the synchronous
+confirmation timed out. Check the selected chat from another Telegram client or
+reload messages first.
+
 The tables display local account data. Do not post screenshots of real chat
 titles, unread counts, message previews, or account metadata outside the private
 validation loop.

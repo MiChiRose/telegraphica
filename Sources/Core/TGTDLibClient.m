@@ -1615,6 +1615,82 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     return items;
 }
 
+- (NSString *)sendTextMessageToChatID:(NSNumber *)chatID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:42];
+        }
+        return nil;
+    }
+
+    if (![text isKindOfClass:[NSString class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message text is missing." code:43];
+        }
+        return nil;
+    }
+
+    NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedText length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message text is empty." code:43];
+        }
+        return nil;
+    }
+    if ([text length] > 4096) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message text is too long for this spike." code:44];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to send messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:45];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
+    [formattedText setObject:@"formattedText" forKey:@"@type"];
+    [formattedText setObject:text forKey:@"text"];
+    [formattedText setObject:[NSArray array] forKey:@"entities"];
+
+    NSMutableDictionary *content = [NSMutableDictionary dictionary];
+    [content setObject:@"inputMessageText" forKey:@"@type"];
+    [content setObject:formattedText forKey:@"text"];
+    [content setObject:[NSNumber numberWithBool:YES] forKey:@"clear_draft"];
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"sendMessage" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:content forKey:@"input_message_content"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-send-text"
+                                                           timeout:timeout
+                                                         errorCode:46
+                                                             error:error];
+    if (!response) {
+        if (error && !*error) {
+            *error = [self errorWithDescription:@"TDLib did not confirm sendMessage before timeout. The message may or may not have been sent." code:46];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib sendMessage returned an unexpected response." code:47];
+        }
+        return nil;
+    }
+
+    return @"message submitted";
+}
+
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {

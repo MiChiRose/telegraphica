@@ -10,6 +10,9 @@
 @property (nonatomic, retain) NSButton *checkButton;
 @property (nonatomic, retain) NSButton *loadChatsButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
+@property (nonatomic, retain) NSTextField *sendLabel;
+@property (nonatomic, retain) NSTextField *sendTextField;
+@property (nonatomic, retain) NSButton *sendMessageButton;
 @property (nonatomic, retain) NSTextField *authLabel;
 @property (nonatomic, retain) NSTextField *authStateField;
 @property (nonatomic, retain) NSTextField *authTextField;
@@ -39,6 +42,9 @@
 @synthesize checkButton = _checkButton;
 @synthesize loadChatsButton = _loadChatsButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
+@synthesize sendLabel = _sendLabel;
+@synthesize sendTextField = _sendTextField;
+@synthesize sendMessageButton = _sendMessageButton;
 @synthesize authLabel = _authLabel;
 @synthesize authStateField = _authStateField;
 @synthesize authTextField = _authTextField;
@@ -243,6 +249,26 @@
     [self.messageScrollView setDocumentView:self.messageTableView];
     [contentView addSubview:self.messageScrollView];
 
+    self.sendLabel = [self labelWithFrame:NSMakeRect(24, 58, 48, 22)
+                                     text:@"Send:"
+                                     font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.sendLabel];
+
+    self.sendTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
+    [self.sendTextField setEnabled:NO];
+    [self.sendTextField setDelegate:(id)self];
+    [self.sendTextField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.sendTextField];
+
+    self.sendMessageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(588, 50, 148, 32)] autorelease];
+    [self.sendMessageButton setTitle:@"Send Message"];
+    [self.sendMessageButton setBezelStyle:NSRoundedBezelStyle];
+    [self.sendMessageButton setTarget:self];
+    [self.sendMessageButton setAction:@selector(sendMessage:)];
+    [self.sendMessageButton setEnabled:NO];
+    [self.sendMessageButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.sendMessageButton];
+
     self.checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 28, 140, 32)] autorelease];
     [self.checkButton setTitle:@"Check TDLib"];
     [self.checkButton setBezelStyle:NSRoundedBezelStyle];
@@ -300,12 +326,13 @@
     [self.loadMessagesButton setFrame:NSMakeRect(margin + 92.0, messagesY - 6.0, 136.0, 32.0)];
     [self.selectedChatField setFrame:NSMakeRect(margin + 240.0, messagesY, contentWidth - 240.0, 22.0)];
 
-    CGFloat bottomButtonsTop = 64.0;
-    CGFloat messageHeight = messagesY - bottomButtonsTop - 10.0;
-    if (messageHeight < 110.0) {
-        messageHeight = 110.0;
+    CGFloat composerY = 58.0;
+    CGFloat messageBottom = composerY + 36.0;
+    CGFloat messageHeight = messagesY - messageBottom - 10.0;
+    if (messageHeight < 82.0) {
+        messageHeight = 82.0;
     }
-    [self.messageScrollView setFrame:NSMakeRect(margin, bottomButtonsTop, contentWidth, messageHeight)];
+    [self.messageScrollView setFrame:NSMakeRect(margin, messageBottom, contentWidth, messageHeight)];
     NSTableColumn *previewColumn = [self.messageTableView tableColumnWithIdentifier:@"preview"];
     if (previewColumn) {
         CGFloat previewWidth = contentWidth - 200.0;
@@ -315,6 +342,9 @@
         [previewColumn setWidth:previewWidth];
     }
 
+    [self.sendLabel setFrame:NSMakeRect(margin, composerY + 4.0, 48.0, 22.0)];
+    [self.sendTextField setFrame:NSMakeRect(margin + 52.0, composerY, contentWidth - 212.0, 24.0)];
+    [self.sendMessageButton setFrame:NSMakeRect(width - margin - 148.0, composerY - 4.0, 148.0, 32.0)];
     [self.checkButton setFrame:NSMakeRect(margin, 20.0, 140.0, 32.0)];
 }
 
@@ -329,12 +359,21 @@
            [state isEqualToString:@"waitPassword"];
 }
 
+- (void)updateSendControls {
+    BOOL canTargetChat = [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil;
+    NSString *text = [self.sendTextField stringValue];
+    NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    [self.sendTextField setEnabled:canTargetChat];
+    [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
+}
+
 - (void)updateAuthControlsForState:(NSString *)state {
     self.currentAuthState = state;
     [self.authTextField setStringValue:@""];
     [self.authSecureField setStringValue:@""];
     [self.loadChatsButton setEnabled:NO];
     [self.loadMessagesButton setEnabled:NO];
+    [self.sendMessageButton setEnabled:NO];
     if (![state isEqualToString:@"ready"] && ([self.chatItems count] > 0 || [self.messageItems count] > 0 || self.selectedChatID != nil)) {
         [self.chatItems removeAllObjects];
         [self.messageItems removeAllObjects];
@@ -344,6 +383,7 @@
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
         [self.selectedChatField setStringValue:@"select a chat"];
+        [self.sendTextField setStringValue:@""];
     }
 
     if ([state isEqualToString:@"waitPhoneNumber"]) {
@@ -403,20 +443,35 @@
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
+    [self updateSendControls];
 }
 
 - (void)setControlsBusy:(BOOL)busy {
     [self.checkButton setEnabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
+    [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
+    [self.sendMessageButton setEnabled:NO];
     if (busy) {
         [self.authButton setEnabled:NO];
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:NO];
         [self.loadChatsButton setEnabled:NO];
         [self.loadMessagesButton setEnabled:NO];
+        [self.chatTableView setEnabled:NO];
+        [self.messageTableView setEnabled:NO];
+        [self.sendTextField setEnabled:NO];
+        [self.sendMessageButton setEnabled:NO];
     } else {
+        [self.chatTableView setEnabled:YES];
+        [self.messageTableView setEnabled:YES];
         [self updateAuthControlsForState:self.currentAuthState];
+    }
+}
+
+- (void)controlTextDidChange:(NSNotification *)notification {
+    if ([notification object] == self.sendTextField) {
+        [self updateSendControls];
     }
 }
 
@@ -472,6 +527,7 @@
         [self.selectedChatField setStringValue:@"select a chat"];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
+        [self.sendTextField setStringValue:@""];
         [self updateAuthControlsForState:self.currentAuthState];
         return;
     }
@@ -488,6 +544,7 @@
     [self.selectedChatField setStringValue:self.selectedChatTitle ? self.selectedChatTitle : @"selected chat"];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
+    [self.sendTextField setStringValue:@""];
     [self updateAuthControlsForState:self.currentAuthState];
 }
 
@@ -701,6 +758,7 @@
                 [self.selectedChatField setStringValue:@"select a chat"];
                 [self.messageItems removeAllObjects];
                 [self.messageTableView reloadData];
+                [self.sendTextField setStringValue:@""];
                 [self.statusField setStringValue:@"TDLib chats: loaded"];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews", (unsigned long)[itemsCopy count]]];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
@@ -777,12 +835,92 @@
     });
 }
 
+- (void)sendMessage:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
+        [self appendDetail:@"Select a chat after TDLib auth state is ready before sending."];
+        return;
+    }
+
+    NSString *text = [self.sendTextField stringValue];
+    NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedText length] == 0) {
+        [self appendDetail:@"Message text is empty."];
+        [self updateSendControls];
+        return;
+    }
+    if ([text length] > 4096) {
+        [self appendDetail:@"Message text is too long for this spike."];
+        [self updateSendControls];
+        return;
+    }
+
+    NSString *chatTitle = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"selected chat";
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setAlertStyle:NSWarningAlertStyle];
+    [alert setMessageText:@"Send real Telegram message?"];
+    [alert setInformativeText:[NSString stringWithFormat:@"This will send the current text field contents to \"%@\". This is not a dry run.", chatTitle]];
+    [alert addButtonWithTitle:@"Cancel"];
+    [alert addButtonWithTitle:@"Send"];
+    NSInteger result = [alert runModal];
+    if (result != NSAlertSecondButtonReturn) {
+        return;
+    }
+
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSString *messageText = [text copy];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"TDLib send: sending..."];
+    [self appendDetail:@"Submitting text message to TDLib..."];
+    [[TGLogger sharedLogger] log:@"TDLib text message send requested."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSError *stateError = nil;
+        NSString *sendSummary = [client sendTextMessageToChatID:chatID text:messageText timeout:8.0 error:&sendError];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
+        BOOL sendSucceeded = ([sendSummary length] > 0);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]);
+            if (sendSucceeded) {
+                [self.statusField setStringValue:@"TDLib send: accepted"];
+                [self appendDetail:@"TDLib send: text message accepted by TDLib."];
+                [[TGLogger sharedLogger] log:@"TDLib text message send accepted."];
+                if (selectionStillCurrent) {
+                    [self.sendTextField setStringValue:@""];
+                }
+            } else {
+                [self.statusField setStringValue:@"TDLib send: not confirmed"];
+                [self appendDetail:@"TDLib send: text message was not confirmed. Do not retry automatically; it may or may not have been sent."];
+                [[TGLogger sharedLogger] log:@"TDLib text message send not confirmed."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            [self setControlsBusy:NO];
+            if (sendSucceeded && selectionStillCurrent) {
+                [self loadMessages:nil];
+            }
+            [authorizationState release];
+            [chatID release];
+            [messageText release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
 - (void)dealloc {
     [[self window] setDelegate:nil];
     [_chatTableView setDataSource:nil];
     [_chatTableView setDelegate:nil];
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
+    [_sendTextField setDelegate:nil];
     [_titleField release];
     [_statusField release];
     [_detailsScrollView release];
@@ -790,6 +928,9 @@
     [_checkButton release];
     [_loadChatsButton release];
     [_loadMessagesButton release];
+    [_sendLabel release];
+    [_sendTextField release];
+    [_sendMessageButton release];
     [_authLabel release];
     [_authStateField release];
     [_authTextField release];

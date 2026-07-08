@@ -94,6 +94,22 @@ message text and captions. Do not add a general raw-update queue or debug dump;
 raw TDLib updates can contain phone numbers, titles, usernames, message text,
 captions, file paths, and media metadata.
 
+### Sending Messages
+
+Any message-send path must require a visible user action and a confirmation that
+names the selected chat. Do not send messages from background probes, timers, or
+Enter-key shortcuts during this spike. Do not auto-retry an unconfirmed send,
+because TDLib may have delivered it even if the local request timed out.
+
+The first send milestone is plain text only. Do not add media, captions,
+formatting entities, reply targets, link-preview toggles, scheduling, delete, or
+edit actions until each action has its own consent and redaction review.
+
+Do not log sent text, chat IDs, message IDs, raw `sendMessage` responses, TDLib
+errors containing account data, or selected-chat metadata. Local message bodies
+may appear in the UI for the signed-in user, but screenshots after sending are
+sensitive validation artifacts.
+
 ### Media And Cache
 
 Downloaded media, thumbnails, profile images, and filenames are sensitive. Keep
