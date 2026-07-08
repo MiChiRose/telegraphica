@@ -5,8 +5,8 @@ Date: 2026-07-07
 Telegraphica is an experimental unofficial Telegram client for OS X 10.9.5
 Mavericks, Intel x86_64, Objective-C/Cocoa/AppKit, and Xcode 6.2 where
 possible. This first milestone is about proving the Telegram core, local
-chat-list reads, and selected-chat history preview reads, not building a
-polished chat UI.
+chat-list reads, selected-chat history preview reads, and a routed TDLib receive
+loop, not building a polished chat UI.
 
 ## Recommendation
 
@@ -26,7 +26,9 @@ but Telegram rejects current login with `UPDATE_APP_TO_LOGIN`. The active path i
 therefore a newer TDLib snapshot built for Mavericks with a newer MacPorts
 compiler/CMake lane, then loaded by the same Objective-C `tdjson` wrapper. That
 path has now reached `ready`, read basic account/chat metadata, and read selected
-chat history previews.
+chat history previews. The next core stabilizer is a single receiver loop so
+future message-send and live-update work does not race independent synchronous
+request probes.
 
 ## TDLib Findings
 
@@ -217,8 +219,11 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
    titles local to the UI and out of diagnostics.
 10. Add a selected-chat read-only history preview with `getChatHistory`, keeping
     message previews local to the UI and out of diagnostics.
-11. After history preview is proven, move to a real receive loop before sending
-    messages.
+11. Replace one-off receive loops with a single background TDLib receiver that
+    routes responses by `@extra`, caches auth-state summaries, and keeps only
+    bounded safe summaries for non-response updates.
+12. After the receiver loop is proven on Mavericks, add an explicit text-send
+    spike for a selected chat.
 
 ## Primary Sources
 

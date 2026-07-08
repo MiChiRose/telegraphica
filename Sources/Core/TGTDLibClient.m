@@ -12,6 +12,8 @@ typedef void (*TGTDJsonClientDestroyFunction)(void *);
 
 static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_encryption_key";
+static NSUInteger const TGTDLibMaxPendingResponses = 64;
+static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 
 @interface TGTDLibClient () {
     void *_libraryHandle;
@@ -21,19 +23,67 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     TGTDJsonClientReceiveFunction _receiveFunction;
     TGTDJsonClientExecuteFunction _executeFunction;
     TGTDJsonClientDestroyFunction _destroyFunction;
+    NSCondition *_responseCondition;
+    NSMutableDictionary *_pendingResponsesByExtra;
+    NSMutableArray *_pendingResponseExtras;
+    NSMutableSet *_waitingResponseExtras;
+    NSMutableArray *_pendingUpdateSummaries;
+    NSString *_latestAuthorizationStateSummary;
+    NSUInteger _authorizationStateGeneration;
+    NSLock *_sendLock;
+    NSThread *_receiverThread;
+    BOOL _receiverRunning;
+    BOOL _receiverShouldStop;
 }
 @property (nonatomic, copy) NSString *loadedPath;
+- (void)stopReceiverThread;
+- (BOOL)startReceiverThreadIfNeededWithError:(NSError **)error;
+- (void)receiverThreadMain;
+- (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
+- (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
+- (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSString *)cachedAuthorizationStateSummary;
+- (NSUInteger)authorizationStateGeneration;
+- (NSString *)uniqueExtraWithPrefix:(NSString *)prefix;
 @end
 
 @implementation TGTDLibClient
 
 @synthesize loadedPath = _loadedPath;
 
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _responseCondition = [[NSCondition alloc] init];
+        _pendingResponsesByExtra = [[NSMutableDictionary alloc] init];
+        _pendingResponseExtras = [[NSMutableArray alloc] init];
+        _waitingResponseExtras = [[NSMutableSet alloc] init];
+        _pendingUpdateSummaries = [[NSMutableArray alloc] init];
+        _sendLock = [[NSLock alloc] init];
+    }
+    return self;
+}
+
 - (void)destroyTDLibClient {
+    [self stopReceiverThread];
+    [_responseCondition lock];
+    [_pendingResponsesByExtra removeAllObjects];
+    [_pendingResponseExtras removeAllObjects];
+    [_waitingResponseExtras removeAllObjects];
+    [_pendingUpdateSummaries removeAllObjects];
+    [_latestAuthorizationStateSummary release];
+    _latestAuthorizationStateSummary = nil;
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+
+    [_sendLock lock];
     if (_client && _destroyFunction) {
         _destroyFunction(_client);
     }
     _client = NULL;
+    [_sendLock unlock];
 }
 
 - (void)dealloc {
@@ -42,12 +92,346 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         dlclose(_libraryHandle);
         _libraryHandle = NULL;
     }
+    [_responseCondition release];
+    [_pendingResponsesByExtra release];
+    [_pendingResponseExtras release];
+    [_waitingResponseExtras release];
+    [_pendingUpdateSummaries release];
+    [_latestAuthorizationStateSummary release];
+    [_sendLock release];
+    [_receiverThread release];
     [_loadedPath release];
     [super dealloc];
 }
 
 - (NSString *)loadedLibraryPath {
     return _loadedPath;
+}
+
+- (NSString *)receiverStatusSummary {
+    [_responseCondition lock];
+    BOOL active = _receiverRunning;
+    NSUInteger pendingResponses = [_pendingResponsesByExtra count];
+    NSUInteger waitingResponses = [_waitingResponseExtras count];
+    NSUInteger pendingUpdates = [_pendingUpdateSummaries count];
+    NSString *state = [_latestAuthorizationStateSummary copy];
+    [_responseCondition unlock];
+
+    NSString *summary = [NSString stringWithFormat:@"receiver %@; pending responses: %lu; waiting responses: %lu; queued safe updates: %lu%@%@",
+                         active ? @"active" : @"idle",
+                         (unsigned long)pendingResponses,
+                         (unsigned long)waitingResponses,
+                         (unsigned long)pendingUpdates,
+                         [state length] > 0 ? @"; auth state: " : @"",
+                         [state length] > 0 ? state : @""];
+    [state release];
+    return summary;
+}
+
+- (void)stopReceiverThread {
+    NSThread *thread = nil;
+
+    [_responseCondition lock];
+    _receiverShouldStop = YES;
+    thread = [_receiverThread retain];
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+
+    if (thread && [NSThread currentThread] != thread) {
+        while (![thread isFinished]) {
+            [NSThread sleepForTimeInterval:0.05];
+        }
+    }
+
+    [_responseCondition lock];
+    if (_receiverThread == thread && (!thread || [thread isFinished])) {
+        [_receiverThread release];
+        _receiverThread = nil;
+    }
+    if (!_receiverThread) {
+        _receiverRunning = NO;
+        _receiverShouldStop = NO;
+    }
+    [_responseCondition unlock];
+
+    [thread release];
+}
+
+- (BOOL)startReceiverThreadIfNeededWithError:(NSError **)error {
+    (void)error;
+
+    [_responseCondition lock];
+    if (_receiverRunning || _receiverThread) {
+        [_responseCondition unlock];
+        return YES;
+    }
+
+    _receiverShouldStop = NO;
+    _receiverRunning = YES;
+    _receiverThread = [[NSThread alloc] initWithTarget:self selector:@selector(receiverThreadMain) object:nil];
+    [_receiverThread start];
+    [_responseCondition unlock];
+    return YES;
+}
+
+- (NSDictionary *)safeUpdateSummaryForObject:(NSDictionary *)dictionary {
+    id typeObject = [dictionary objectForKey:@"@type"];
+    if (![typeObject isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    NSString *type = (NSString *)typeObject;
+    NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
+    if ([authorizationSummary length] > 0) {
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"authorization" forKey:@"kind"];
+        [summary setObject:authorizationSummary forKey:@"state"];
+        return summary;
+    }
+
+    if ([type isEqualToString:@"updateNewMessage"]) {
+        id messageObject = [dictionary objectForKey:@"message"];
+        if (![messageObject isKindOfClass:[NSDictionary class]]) {
+            return nil;
+        }
+
+        NSDictionary *message = (NSDictionary *)messageObject;
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"new_message" forKey:@"kind"];
+
+        id date = [message objectForKey:@"date"];
+        if ([date respondsToSelector:@selector(integerValue)]) {
+            [summary setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
+        }
+
+        id isOutgoing = [message objectForKey:@"is_outgoing"];
+        NSString *direction = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]) ? @"Me" : @"In";
+        [summary setObject:direction forKey:@"direction"];
+
+        return summary;
+    }
+
+    if ([type hasPrefix:@"update"]) {
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"update" forKey:@"kind"];
+        [summary setObject:type forKey:@"type"];
+        return summary;
+    }
+
+    return nil;
+}
+
+- (void)enqueueSafeUpdateSummaryLocked:(NSDictionary *)summary {
+    if (!summary) {
+        return;
+    }
+
+    [_pendingUpdateSummaries addObject:summary];
+    while ([_pendingUpdateSummaries count] > TGTDLibMaxPendingUpdateSummaries) {
+        [_pendingUpdateSummaries removeObjectAtIndex:0];
+    }
+}
+
+- (void)handleReceivedTDLibObject:(NSDictionary *)dictionary {
+    NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
+    id extraObject = [dictionary objectForKey:@"@extra"];
+    NSDictionary *updateSummary = nil;
+    if (![extraObject isKindOfClass:[NSString class]]) {
+        updateSummary = [self safeUpdateSummaryForObject:dictionary];
+    }
+
+    [_responseCondition lock];
+    if ([authorizationSummary length] > 0) {
+        [_latestAuthorizationStateSummary release];
+        _latestAuthorizationStateSummary = [authorizationSummary copy];
+        _authorizationStateGeneration++;
+    }
+
+    if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
+        NSString *extra = (NSString *)extraObject;
+        if (![_pendingResponsesByExtra objectForKey:extra]) {
+            [_pendingResponseExtras addObject:extra];
+        }
+        [_pendingResponsesByExtra setObject:dictionary forKey:extra];
+        while ([_pendingResponseExtras count] > TGTDLibMaxPendingResponses) {
+            NSString *oldExtra = [[_pendingResponseExtras objectAtIndex:0] retain];
+            [_pendingResponseExtras removeObjectAtIndex:0];
+            [_pendingResponsesByExtra removeObjectForKey:oldExtra];
+            [_waitingResponseExtras removeObject:oldExtra];
+            [oldExtra release];
+        }
+    } else if (updateSummary) {
+        [self enqueueSafeUpdateSummaryLocked:updateSummary];
+    }
+
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+}
+
+- (void)receiverThreadMain {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+    for (;;) {
+        [_responseCondition lock];
+        BOOL shouldStop = _receiverShouldStop;
+        [_responseCondition unlock];
+        if (shouldStop) {
+            break;
+        }
+
+        NSAutoreleasePool *loopPool = [[NSAutoreleasePool alloc] init];
+        if (!_client || !_receiveFunction) {
+            [NSThread sleepForTimeInterval:0.05];
+            [loopPool drain];
+            continue;
+        }
+
+        const char *raw = _receiveFunction(_client, 0.25);
+        if (raw) {
+            NSString *jsonString = [NSString stringWithUTF8String:raw];
+            NSError *jsonError = nil;
+            id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
+            if ([object isKindOfClass:[NSDictionary class]]) {
+                [self handleReceivedTDLibObject:(NSDictionary *)object];
+            }
+        }
+        [loopPool drain];
+    }
+
+    [_responseCondition lock];
+    _receiverRunning = NO;
+    [_responseCondition broadcast];
+    [_responseCondition unlock];
+
+    [pool drain];
+}
+
+- (NSString *)cachedAuthorizationStateSummary {
+    [_responseCondition lock];
+    NSString *summary = [_latestAuthorizationStateSummary copy];
+    [_responseCondition unlock];
+    return [summary autorelease];
+}
+
+- (NSUInteger)authorizationStateGeneration {
+    [_responseCondition lock];
+    NSUInteger generation = _authorizationStateGeneration;
+    [_responseCondition unlock];
+    return generation;
+}
+
+- (NSString *)uniqueExtraWithPrefix:(NSString *)prefix {
+    return [NSString stringWithFormat:@"%@-%@-%u",
+            prefix ? prefix : @"telegraphica-request",
+            [[NSProcessInfo processInfo] globallyUniqueString],
+            (unsigned int)arc4random()];
+}
+
+- (void)beginWaitingForExtra:(NSString *)extra {
+    if ([extra length] == 0) {
+        return;
+    }
+
+    [_responseCondition lock];
+    [_pendingResponsesByExtra removeObjectForKey:extra];
+    [_pendingResponseExtras removeObject:extra];
+    [_waitingResponseExtras addObject:extra];
+    [_responseCondition unlock];
+}
+
+- (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    if ([extra length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib request is missing an @extra correlation id." code:errorCode];
+        }
+        return nil;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    [_responseCondition lock];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        NSDictionary *response = [_pendingResponsesByExtra objectForKey:extra];
+        if (response) {
+            NSDictionary *retainedResponse = [response retain];
+            [_pendingResponsesByExtra removeObjectForKey:extra];
+            [_pendingResponseExtras removeObject:extra];
+            [_waitingResponseExtras removeObject:extra];
+            [_responseCondition unlock];
+            return [retainedResponse autorelease];
+        }
+
+        [_responseCondition waitUntilDate:deadline];
+    }
+
+    [_pendingResponsesByExtra removeObjectForKey:extra];
+    [_pendingResponseExtras removeObject:extra];
+    [_waitingResponseExtras removeObject:extra];
+    [_responseCondition unlock];
+
+    if (error) {
+        *error = [self errorWithDescription:@"TDLib did not return the requested response before the probe timed out." code:errorCode];
+    }
+    return nil;
+}
+
+- (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout {
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    [_responseCondition lock];
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        if (_authorizationStateGeneration > generation && [_latestAuthorizationStateSummary length] > 0 && ![_latestAuthorizationStateSummary isEqualToString:state]) {
+            NSString *summary = [_latestAuthorizationStateSummary copy];
+            [_responseCondition unlock];
+            return [summary autorelease];
+        }
+        [_responseCondition waitUntilDate:deadline];
+    }
+    [_responseCondition unlock];
+    return nil;
+}
+
+- (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    if (![self ensureClientWithError:error]) {
+        return nil;
+    }
+
+    if (timeout < 0.5) {
+        timeout = 0.5;
+    } else if (timeout > 15.0) {
+        timeout = 15.0;
+    }
+
+    [self beginWaitingForExtra:extra];
+
+    NSString *requestJSON = [self JSONStringFromObject:request error:error];
+    if (!requestJSON) {
+        [_responseCondition lock];
+        [_waitingResponseExtras removeObject:extra];
+        [_responseCondition unlock];
+        return nil;
+    }
+
+    [_sendLock lock];
+    if (_client && _sendFunction) {
+        _sendFunction(_client, [requestJSON UTF8String]);
+    }
+    [_sendLock unlock];
+
+    NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
+    if (!response) {
+        return nil;
+    }
+
+    id type = [response objectForKey:@"@type"];
+    if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"error"]) {
+        if (error) {
+            NSString *summary = [self summaryForAuthorizationStateObject:response];
+            NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
+            *error = [self errorWithDescription:message code:errorCode];
+        }
+        return nil;
+    }
+
+    return response;
 }
 
 - (NSArray *)candidateLibraryPaths {
@@ -409,6 +793,10 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         return NO;
     }
 
+    if (![self startReceiverThreadIfNeededWithError:error]) {
+        return NO;
+    }
+
     return YES;
 }
 
@@ -509,7 +897,7 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
     NSMutableDictionary *request = [NSMutableDictionary dictionaryWithDictionary:parameters];
     [request setObject:@"setTdlibParameters" forKey:@"@type"];
-    [request setObject:[NSString stringWithFormat:@"telegraphica-tdlib-parameters-current-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-tdlib-parameters-current"] forKey:@"@extra"];
     [request setObject:encryptionKey forKey:@"database_encryption_key"];
     [request removeObjectForKey:@"enable_storage_optimizer"];
     [request removeObjectForKey:@"ignore_file_names"];
@@ -519,57 +907,55 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 - (NSDictionary *)legacyTDLibParametersRequestWithParameters:(NSDictionary *)parameters {
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"setTdlibParameters" forKey:@"@type"];
-    [request setObject:[NSString stringWithFormat:@"telegraphica-tdlib-parameters-legacy-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-tdlib-parameters-legacy"] forKey:@"@extra"];
     [request setObject:parameters forKey:@"parameters"];
     return request;
 }
 
 - (NSString *)sendTDLibParametersRequest:(NSDictionary *)request schemaName:(NSString *)schemaName timeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSString *requestJSON = [self JSONStringFromObject:request error:error];
-    if (!requestJSON) {
+    id extraObject = [request objectForKey:@"@extra"];
+    if (![extraObject isKindOfClass:[NSString class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib parameters request is missing an @extra correlation id." code:16];
+        }
         return nil;
     }
 
-    _sendFunction(_client, [requestJSON UTF8String]);
-
-    BOOL receivedOK = NO;
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
-        const char *raw = _receiveFunction(_client, 0.25);
-        if (!raw) {
-            continue;
+    NSUInteger generation = [self authorizationStateGeneration];
+    NSError *responseError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:(NSString *)extraObject timeout:timeout errorCode:16 error:&responseError];
+    if (!response) {
+        if (error) {
+            NSString *message = responseError ? [responseError localizedDescription] : [NSString stringWithFormat:@"TDLib did not acknowledge %@ local parameters before the probe timed out.", schemaName];
+            *error = [self errorWithDescription:message code:16];
         }
+        return nil;
+    }
 
-        NSString *jsonString = [NSString stringWithUTF8String:raw];
-        NSError *jsonError = nil;
-        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
-        if (![object isKindOfClass:[NSDictionary class]]) {
-            continue;
+    id responseType = [response objectForKey:@"@type"];
+    BOOL receivedOK = ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]);
+    NSString *summary = [self summaryForAuthorizationStateObject:response];
+    if ([summary hasPrefix:@"error"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, summary];
+            *error = [self errorWithDescription:message code:16];
         }
+        return nil;
+    }
+    if ([summary length] > 0 && ![summary isEqualToString:@"waitTdlibParameters"]) {
+        return receivedOK ? [NSString stringWithFormat:@"%@ set OK; auth state: %@", schemaName, summary] : [NSString stringWithFormat:@"%@ auth state: %@", schemaName, summary];
+    }
 
-        NSDictionary *dictionary = (NSDictionary *)object;
-        id type = [dictionary objectForKey:@"@type"];
-        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"ok"]) {
-            receivedOK = YES;
-            continue;
-        }
-
-        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
-        if ([summary length] > 0) {
-            if ([summary hasPrefix:@"error"]) {
-                if (error) {
-                    NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, summary];
-                    *error = [self errorWithDescription:message code:16];
-                }
-                return nil;
+    NSString *nextSummary = [self waitForAuthorizationStateDifferentFromState:@"waitTdlibParameters" afterGeneration:generation timeout:timeout];
+    if ([nextSummary length] > 0) {
+        if ([nextSummary hasPrefix:@"error"]) {
+            if (error) {
+                NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, nextSummary];
+                *error = [self errorWithDescription:message code:16];
             }
-            if (![summary isEqualToString:@"waitTdlibParameters"]) {
-                if (receivedOK) {
-                    return [NSString stringWithFormat:@"%@ set OK; auth state: %@", schemaName, summary];
-                }
-                return [NSString stringWithFormat:@"%@ auth state: %@", schemaName, summary];
-            }
+            return nil;
         }
+        return receivedOK ? [NSString stringWithFormat:@"%@ set OK; auth state: %@", schemaName, nextSummary] : [NSString stringWithFormat:@"%@ auth state: %@", schemaName, nextSummary];
     }
 
     if (receivedOK) {
@@ -588,32 +974,25 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         return nil;
     }
 
-    NSString *extra = [NSString stringWithFormat:@"telegraphica-auth-state-%.0f", [[NSDate date] timeIntervalSince1970]];
-    NSString *request = [NSString stringWithFormat:@"{\"@type\":\"getAuthorizationState\",\"@extra\":\"%@\"}", extra];
-    _sendFunction(_client, [request UTF8String]);
+    NSString *extra = [self uniqueExtraWithPrefix:@"telegraphica-auth-state"];
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getAuthorizationState" forKey:@"@type"];
+    [request setObject:extra forKey:@"@extra"];
 
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
-        const char *raw = _receiveFunction(_client, 0.25);
-        if (!raw) {
-            continue;
-        }
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:extra timeout:timeout errorCode:11 error:&requestError];
+    NSString *summary = [self summaryForAuthorizationStateObject:response];
+    if ([summary length] > 0) {
+        return summary;
+    }
 
-        NSString *jsonString = [NSString stringWithUTF8String:raw];
-        NSError *jsonError = nil;
-        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
-        if (!object) {
-            continue;
-        }
-
-        NSString *summary = [self summaryForAuthorizationStateObject:object];
-        if ([summary length] > 0) {
-            return summary;
-        }
+    NSString *cachedSummary = [self cachedAuthorizationStateSummary];
+    if ([cachedSummary length] > 0) {
+        return cachedSummary;
     }
 
     if (error) {
-        *error = [self errorWithDescription:@"TDLib did not return authorization state before the probe timed out." code:11];
+        *error = requestError ? requestError : [self errorWithDescription:@"TDLib did not return authorization state before the probe timed out." code:11];
     }
     return nil;
 }
@@ -731,53 +1110,42 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"checkDatabaseEncryptionKey" forKey:@"@type"];
-    [request setObject:[NSString stringWithFormat:@"telegraphica-db-key-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-db-key"] forKey:@"@extra"];
     [request setObject:encryptionKey forKey:@"encryption_key"];
 
-    NSString *requestJSON = [self JSONStringFromObject:request error:error];
-    if (!requestJSON) {
+    NSString *extra = [request objectForKey:@"@extra"];
+    NSUInteger generation = [self authorizationStateGeneration];
+    NSError *responseError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:extra timeout:timeout errorCode:21 error:&responseError];
+    if (!response) {
+        if (error) {
+            *error = responseError ? responseError : [self errorWithDescription:@"TDLib did not acknowledge database encryption key before the probe timed out." code:22];
+        }
         return nil;
     }
 
-    _sendFunction(_client, [requestJSON UTF8String]);
-
-    BOOL receivedOK = NO;
-    NSDate *ackDeadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([[NSDate date] compare:ackDeadline] == NSOrderedAscending) {
-        const char *raw = _receiveFunction(_client, 0.25);
-        if (!raw) {
-            continue;
+    id responseType = [response objectForKey:@"@type"];
+    BOOL receivedOK = ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]);
+    NSString *summary = [self summaryForAuthorizationStateObject:response];
+    if ([summary hasPrefix:@"error"]) {
+        if (error) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected database encryption key: %@", summary] code:21];
         }
+        return nil;
+    }
+    if ([summary length] > 0 && ![summary isEqualToString:@"waitEncryptionKey"]) {
+        return receivedOK ? [NSString stringWithFormat:@"check OK; auth state: %@", summary] : [NSString stringWithFormat:@"auth state: %@", summary];
+    }
 
-        NSString *jsonString = [NSString stringWithUTF8String:raw];
-        NSError *jsonError = nil;
-        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
-        if (![object isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-
-        NSDictionary *dictionary = (NSDictionary *)object;
-        id type = [dictionary objectForKey:@"@type"];
-        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"ok"]) {
-            receivedOK = YES;
-            continue;
-        }
-
-        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
-        if ([summary length] > 0) {
-            if ([summary hasPrefix:@"error"]) {
-                if (error) {
-                    *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected database encryption key: %@", summary] code:21];
-                }
-                return nil;
+    NSString *nextSummary = [self waitForAuthorizationStateDifferentFromState:@"waitEncryptionKey" afterGeneration:generation timeout:timeout];
+    if ([nextSummary length] > 0) {
+        if ([nextSummary hasPrefix:@"error"]) {
+            if (error) {
+                *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected database encryption key: %@", nextSummary] code:21];
             }
-            if (![summary isEqualToString:@"waitEncryptionKey"]) {
-                if (receivedOK) {
-                    return [NSString stringWithFormat:@"check OK; auth state: %@", summary];
-                }
-                return [NSString stringWithFormat:@"auth state: %@", summary];
-            }
+            return nil;
         }
+        return receivedOK ? [NSString stringWithFormat:@"check OK; auth state: %@", nextSummary] : [NSString stringWithFormat:@"auth state: %@", nextSummary];
     }
 
     if (receivedOK) {
@@ -817,49 +1185,17 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     return authorizationState;
 }
 
-- (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
-    BOOL receivedOK = NO;
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
-        const char *raw = _receiveFunction(_client, 0.25);
-        if (!raw) {
-            continue;
-        }
-
-        NSString *jsonString = [NSString stringWithUTF8String:raw];
-        NSError *jsonError = nil;
-        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
-        if (![object isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-
-        NSDictionary *dictionary = (NSDictionary *)object;
-        id type = [dictionary objectForKey:@"@type"];
-        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"ok"]) {
-            receivedOK = YES;
-            continue;
-        }
-
-        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
-        if ([summary length] > 0) {
-            if ([summary hasPrefix:@"error"]) {
-                if (error) {
-                    NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
-                    *error = [self errorWithDescription:message code:errorCode];
-                }
-                return nil;
+- (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    NSString *summary = [self waitForAuthorizationStateDifferentFromState:waitingState afterGeneration:generation timeout:timeout];
+    if ([summary length] > 0) {
+        if ([summary hasPrefix:@"error"]) {
+            if (error) {
+                NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
+                *error = [self errorWithDescription:message code:errorCode];
             }
-            if (![summary isEqualToString:waitingState]) {
-                if (receivedOK) {
-                    return [NSString stringWithFormat:@"%@ accepted; auth state: %@", actionName, summary];
-                }
-                return [NSString stringWithFormat:@"auth state: %@", summary];
-            }
+            return nil;
         }
-    }
-
-    if (receivedOK) {
-        return [NSString stringWithFormat:@"%@ accepted; waiting for next auth state", actionName];
+        return [NSString stringWithFormat:@"%@ accepted; auth state: %@", actionName, summary];
     }
 
     if (error) {
@@ -870,13 +1206,43 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 }
 
 - (NSString *)sendAuthorizationRequest:(NSDictionary *)request actionName:(NSString *)actionName waitingState:(NSString *)waitingState timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
-    NSString *requestJSON = [self JSONStringFromObject:request error:error];
-    if (!requestJSON) {
+    id extraObject = [request objectForKey:@"@extra"];
+    if (![extraObject isKindOfClass:[NSString class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib authorization request is missing an @extra correlation id." code:errorCode];
+        }
         return nil;
     }
 
-    _sendFunction(_client, [requestJSON UTF8String]);
-    return [self receiveAuthorizationResultForAction:actionName waitingState:waitingState timeout:timeout errorCode:errorCode error:error];
+    NSUInteger generation = [self authorizationStateGeneration];
+    NSError *responseError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:(NSString *)extraObject timeout:timeout errorCode:errorCode error:&responseError];
+    if (!response) {
+        if (error) {
+            NSString *summary = responseError ? [responseError localizedDescription] : @"TDLib returned no authorization response.";
+            NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
+            *error = [self errorWithDescription:message code:errorCode];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]) {
+        NSString *summary = [self waitForAuthorizationStateDifferentFromState:waitingState afterGeneration:generation timeout:timeout];
+        if ([summary length] > 0) {
+            if ([summary hasPrefix:@"error"]) {
+                if (error) {
+                    NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
+                    *error = [self errorWithDescription:message code:errorCode];
+                }
+                return nil;
+            }
+            return [NSString stringWithFormat:@"%@ accepted; auth state: %@", actionName, summary];
+        }
+        return [NSString stringWithFormat:@"%@ accepted; waiting for next auth state", actionName];
+    }
+
+    return [self receiveAuthorizationResultForAction:actionName waitingState:waitingState afterGeneration:generation timeout:timeout errorCode:errorCode error:error];
 }
 
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
@@ -891,64 +1257,24 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
     }
 
     NSMutableDictionary *taggedRequest = [NSMutableDictionary dictionaryWithDictionary:request];
-    NSString *extra = [NSString stringWithFormat:@"%@-%@-%u",
-                       extraPrefix ? extraPrefix : @"telegraphica-request",
-                       [[NSProcessInfo processInfo] globallyUniqueString],
-                       (unsigned int)arc4random()];
+    NSString *extra = [self uniqueExtraWithPrefix:(extraPrefix ? extraPrefix : @"telegraphica-request")];
     [taggedRequest setObject:extra forKey:@"@extra"];
 
-    NSString *requestJSON = [self JSONStringFromObject:taggedRequest error:error];
-    if (!requestJSON) {
+    NSDictionary *response = [self sendTDLibRequest:taggedRequest waitingForExtra:extra timeout:timeout errorCode:errorCode error:error];
+    if (!response) {
         return nil;
     }
 
-    _sendFunction(_client, [requestJSON UTF8String]);
-
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
-        const char *raw = _receiveFunction(_client, 0.25);
-        if (!raw) {
-            continue;
+    NSString *summary = [self summaryForAuthorizationStateObject:response];
+    if ([summary isEqualToString:@"closed"]) {
+        [self destroyTDLibClient];
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib authorization state closed while waiting for a response." code:errorCode];
         }
-
-        NSString *jsonString = [NSString stringWithUTF8String:raw];
-        NSError *jsonError = nil;
-        id object = [self JSONObjectFromJSONString:jsonString error:&jsonError];
-        if (![object isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-
-        NSDictionary *dictionary = (NSDictionary *)object;
-        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
-        if ([summary isEqualToString:@"closed"]) {
-            [self destroyTDLibClient];
-            if (error) {
-                *error = [self errorWithDescription:@"TDLib authorization state closed while waiting for a response." code:errorCode];
-            }
-            return nil;
-        }
-
-        id responseExtra = [dictionary objectForKey:@"@extra"];
-        if (![responseExtra isKindOfClass:[NSString class]] || ![(NSString *)responseExtra isEqualToString:extra]) {
-            continue;
-        }
-
-        id type = [dictionary objectForKey:@"@type"];
-        if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"error"]) {
-            if (error) {
-                NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
-                *error = [self errorWithDescription:message code:errorCode];
-            }
-            return nil;
-        }
-
-        return dictionary;
+        return nil;
     }
 
-    if (error) {
-        *error = [self errorWithDescription:@"TDLib did not return the requested response before the probe timed out." code:errorCode];
-    }
-    return nil;
+    return response;
 }
 
 - (NSString *)prepareAuthorizationFlowWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -1387,7 +1713,7 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"setAuthenticationPhoneNumber" forKey:@"@type"];
-    [request setObject:[NSString stringWithFormat:@"telegraphica-auth-phone-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-auth-phone"] forKey:@"@extra"];
     [request setObject:trimmedPhone forKey:@"phone_number"];
     [request setObject:[NSNull null] forKey:@"settings"];
     return [self sendAuthorizationRequest:request actionName:@"phone number" waitingState:@"waitPhoneNumber" timeout:timeout errorCode:25 error:error];
@@ -1412,7 +1738,7 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"checkAuthenticationCode" forKey:@"@type"];
-    [request setObject:[NSString stringWithFormat:@"telegraphica-auth-code-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-auth-code"] forKey:@"@extra"];
     [request setObject:trimmedCode forKey:@"code"];
     return [self sendAuthorizationRequest:request actionName:@"authentication code" waitingState:@"waitCode" timeout:timeout errorCode:27 error:error];
 }
@@ -1435,7 +1761,7 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"checkAuthenticationPassword" forKey:@"@type"];
-    [request setObject:[NSString stringWithFormat:@"telegraphica-auth-password-%.0f", [[NSDate date] timeIntervalSince1970]] forKey:@"@extra"];
+    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-auth-password"] forKey:@"@extra"];
     [request setObject:password forKey:@"password"];
     return [self sendAuthorizationRequest:request actionName:@"authentication password" waitingState:@"waitPassword" timeout:timeout errorCode:29 error:error];
 }

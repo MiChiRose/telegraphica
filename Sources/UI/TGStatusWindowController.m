@@ -532,12 +532,16 @@
             }
         }
         NSString *loadedPath = [client loadedLibraryPath];
+        NSString *receiverSummary = [[client receiverStatusSummary] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (probeSummary) {
                 [self.statusField setStringValue:@"TDLib status: loaded"];
                 [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPath ? loadedPath : @"unknown path"]];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummary]];
+                if (receiverSummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib receiver: %@", receiverSummary]];
+                }
                 if (authorizationState) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", authorizationState]];
                 } else {
@@ -576,6 +580,7 @@
         });
 
         [client release];
+        [receiverSummary release];
         [pool drain];
     });
 }
