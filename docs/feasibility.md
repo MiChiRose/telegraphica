@@ -4,21 +4,29 @@ Date: 2026-07-07
 
 Telegraphica is an experimental unofficial Telegram client for OS X 10.9.5
 Mavericks, Intel x86_64, Objective-C/Cocoa/AppKit, and Xcode 6.2 where
-possible. This first milestone is about proving the Telegram core, not building
-a polished chat UI.
+possible. This first milestone is about proving the Telegram core, local
+chat-list reads, and selected-chat history preview reads, not building a
+polished chat UI.
 
 ## Recommendation
 
 Use TDLib through the JSON C API (`tdjson`) as the first backend path. Do not
 write MTProto from scratch.
 
-The recommended spike order is:
+The recommended spike order was:
 
 1. Build TDLib v1.8.0 `tdjson` for x86_64 with `CMAKE_OSX_DEPLOYMENT_TARGET=10.9`.
 2. If v1.8.0 fails on the Mavericks lane, test TDLib v1.3.0 as a compatibility fallback.
-3. Treat current TDLib `master` as a future-track option, not the first Mavericks target.
+3. Treat current TDLib `master` as a future-track option until the older login path is proven insufficient.
 4. Load `libtdjson.dylib` dynamically from the AppKit app, run a synchronous JSON probe, and read the current async authorization state.
 5. Supply `setTdlibParameters` from a local config outside the repository and keep TDLib database/files under explicit user directories.
+
+Local HITL changed the priority: TDLib v1.8.0 can load and pass the JSON probe,
+but Telegram rejects current login with `UPDATE_APP_TO_LOGIN`. The active path is
+therefore a newer TDLib snapshot built for Mavericks with a newer MacPorts
+compiler/CMake lane, then loaded by the same Objective-C `tdjson` wrapper. That
+path has now reached `ready`, read basic account/chat metadata, and read selected
+chat history previews.
 
 ## TDLib Findings
 
@@ -34,6 +42,11 @@ Older tagged TDLib snapshots are more plausible for Xcode 6.2:
 | Current `master` | Official README requires C++17-compatible compiler and CMake 3.10+. | Not a good first target for Xcode 6.2. Try later with a modern cross-build only if the output is proven 10.9-safe. |
 | v1.8.0 | Tagged Dec 29, 2021. README requires C++14, OpenSSL, zlib, gperf, CMake 3.0.2+. CMake builds `tdjson` and `tdjson_static`. | Best first attempt: newest tagged release while still C++14. Must verify compiler, libc++, OpenSSL, and Mach-O min version on Mavericks. |
 | v1.3.0 | Tagged Sep 5, 2018. README also requires C++14, OpenSSL, zlib, gperf, CMake 3.0.2+. | Compatibility fallback if v1.8.0 fails. Higher protocol/API staleness risk. |
+
+The current practical baseline is no longer "oldest buildable TDLib"; it is
+"newest TDLib lane that still produces a Mavericks-loadable `libtdjson.dylib`".
+If that lane stops building or Telegram rejects it again, reassess feasibility
+before spending more time on UI.
 
 The JSON interface is the right boundary for Objective-C. TDLib v1.8.0 exports
 `td_json_client_create`, `td_json_client_send`, `td_json_client_receive`,
@@ -200,8 +213,12 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
 8. After `authorizationStateReady`, run a redacted non-UI `getMe`/`getChats`
    probe to verify the authorized session can read account and chat-list
    metadata.
-9. Only after auth state and post-login read access are proven, build chat list
-   and message transcript UI.
+9. Build a minimal chat-list preview with `getChats` + `getChat`, keeping chat
+   titles local to the UI and out of diagnostics.
+10. Add a selected-chat read-only history preview with `getChatHistory`, keeping
+    message previews local to the UI and out of diagnostics.
+11. After history preview is proven, move to a real receive loop before sending
+    messages.
 
 ## Primary Sources
 

@@ -94,6 +94,24 @@ When TDLib reports `ready`, "Check TDLib" should run a redacted `getMe`/`getChat
 probe and report only generic success plus chat count, not raw account or chat
 JSON.
 
+After TDLib reports `ready`, click "Load Chats". Expected result:
+
+- the status changes to `TDLib chats: loaded`;
+- the lower table fills with up to 10 main chat previews;
+- the details view reports only the number of loaded previews, not chat titles
+  or raw TDLib JSON.
+
+Select a row in the chat table and click "Load Messages". Expected result:
+
+- the status changes to `TDLib messages: loaded`;
+- the message table fills with recent previews for the selected chat;
+- the details view reports only the number of loaded previews, not message text
+  or raw TDLib JSON.
+
+The tables display local account data. Do not post screenshots of real chat
+titles, unread counts, message previews, or account metadata outside the private
+validation loop.
+
 Do not include the real phone number, login code, or 2FA password in screenshots,
 logs, shell history, or transfer archives. The details view should show only
 generic submit results and TDLib auth states.
@@ -275,6 +293,11 @@ Click "Check TDLib". Expected success:
   then code, then 2FA password if required.
 - if TDLib reaches `ready`, the details include a redacted `getMe`/`getChats`
   probe result with account-probe success and chat count.
+- after clicking "Load Chats", the lower table shows local chat previews and the
+  details include only a generic loaded-count line.
+- after selecting a chat and clicking "Load Messages", the message table shows
+  recent previews fetched via TDLib and shown only in the local UI; the details
+  include only a generic loaded-count line.
 
 ## Important
 

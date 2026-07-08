@@ -4,7 +4,8 @@ Telegraphica is an experimental unofficial Telegram client.
 
 Telegraphica targets OS X 10.9.5 Mavericks on Intel x86_64 and is written in
 Objective-C with Cocoa/AppKit. The first milestone is a feasibility report and
-a TDLib/Telegram-core spike, not a complete chat UI.
+a TDLib/Telegram-core spike with the first local chat-list and message-history
+previews, not a complete chat UI.
 
 ## Current Status
 
@@ -12,6 +13,9 @@ This repository contains an initial legacy AppKit skeleton:
 
 - A minimal programmatic AppKit window that can probe a local `libtdjson.dylib`.
 - A dynamic `tdjson` loader so the app can open without vendoring TDLib yet.
+- A state-driven TDLib authorization row and a local chat preview table once
+  authorization reaches `ready`.
+- A selected-chat message preview table backed by `getChatHistory`.
 - Mavericks-oriented build and compatibility checks.
 - Feasibility and security notes for the first milestone.
 
@@ -89,7 +93,11 @@ login code, and 2FA password needed to move through `waitPhoneNumber`,
 `waitCode`, `waitPassword`, and eventually `ready`. After authorization reaches
 `ready`, the spike can run a redacted `getMe`/`getChats` probe to confirm the
 session can read basic account and chat-list metadata; this is still a smoke
-test, not the chat UI.
+test. The "Load Chats" button then reads the main chat list and shows a minimal
+local table with chat title, type, and unread count. Selecting a chat and
+clicking "Load Messages" reads recent history through TDLib and shows local
+message previews. The spike still does not send messages, download media, mark
+messages as read intentionally, or persist chat UI state.
 
 Local TDLib parameters are read from:
 
@@ -106,6 +114,8 @@ real values into logs.
 
 Do not commit `api_id`, `api_hash`, phone numbers, login codes, 2FA passwords,
 TDLib databases, session files, generated encryption keys, or local credentials.
-Do not paste raw TDLib responses from authorization, `getMe`, or `getChats`
-into logs, screenshots, issues, or transfer notes. Use local untracked
+Do not paste raw TDLib responses from authorization, `getMe`, `getChats`,
+`getChat`, or `getChatHistory` into logs, screenshots, issues, or transfer
+notes. Chat titles and message previews are local account data; treat
+screenshots of the chat/message tables as sensitive too. Use local untracked
 configuration and Keychain-backed storage during development.
