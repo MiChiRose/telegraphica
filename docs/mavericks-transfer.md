@@ -137,6 +137,42 @@ TDLIB_VERSION=v1.3.0 ./scripts/build_tdlib_legacy.sh \
   --openssl-root /path/to/openssl-prefix
 ```
 
+If login reaches `waitPhoneNumber` but Telegram rejects the phone submit with
+`UPDATE_APP_TO_LOGIN`, the TDLib/API layer is probably too old for current
+server login policy. In that case, keep Mavericks but try a newer TDLib source
+snapshot. This is experimental: it may require newer CMake/C++ compiler support
+than Xcode 6.2 can provide.
+
+Prepare the archive on a newer Mac if Mavericks cannot download it reliably:
+
+```sh
+curl -L -o ~/Desktop/td-master.tar.gz https://github.com/tdlib/td/archive/refs/heads/master.tar.gz
+```
+
+Then transfer `td-master.tar.gz` to the old Mac and build it from the unzipped
+Telegraphica folder:
+
+```sh
+TDLIB_VERSION=master-snapshot ./scripts/build_tdlib_legacy.sh \
+  --archive ~/Desktop/td-master.tar.gz \
+  --openssl-root /opt/local \
+  --build-dir build-tdlib-master-legacy \
+  --clean \
+  --allow-snapshot
+```
+
+If this succeeds, bundle the resulting dylib exactly like the v1.8.0 build:
+
+```sh
+TELEGRAPHICA_TDJSON_PATH=build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib ./build_legacy.sh
+open build-legacy/Release/Telegraphica.app
+```
+
+If the newer TDLib build fails, keep `build-tdlib-master-legacy/build.log`; that
+log is the next thing to inspect. Do not include Telegram credentials, phone
+numbers, login codes, 2FA passwords, or TDLib database files in any transferred
+archive.
+
 Useful options:
 
 ```sh
