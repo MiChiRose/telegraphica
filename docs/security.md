@@ -73,10 +73,13 @@ Never log:
 - message bodies
 - downloaded media paths unless redacted
 
-Do not log or display raw `getMe`/`getChats` JSON. `getMe` can include
-`phone_number` and profile fields; `getChats` exposes chat IDs, titles, and
-membership metadata. Probe output should omit phone numbers and secret fields
-and prefer generic success/counts.
+Do not log or display raw `getMe`/`getChats`/`getChat` JSON. `getMe` can
+include `phone_number` and profile fields; chat APIs expose chat IDs, titles,
+membership metadata, unread counts, and eventually message previews. Probe and
+diagnostic output should omit phone numbers and secret fields and prefer generic
+success/counts. Showing chat titles in the local UI is allowed for the signed-in
+user, but screenshots of that table are sensitive and should not be shared
+publicly.
 
 Telegraphica's logger currently keeps a bounded in-memory log and only writes a
 file when `TELEGRAPHICA_DEBUG`, `TELEGRAPHICA_DEV_LOGS`, or the
@@ -129,6 +132,8 @@ High:
 Medium:
 
 - Phone number, chat IDs, usernames, or local media paths in logs/crashes.
+- Chat titles or unread metadata in logs/crashes/screenshots shared outside the
+  local validation loop.
 - Stale media cache without deletion controls.
 - Unclear unofficial-client disclosure.
 

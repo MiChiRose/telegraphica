@@ -4,7 +4,8 @@ Telegraphica is an experimental unofficial Telegram client.
 
 Telegraphica targets OS X 10.9.5 Mavericks on Intel x86_64 and is written in
 Objective-C with Cocoa/AppKit. The first milestone is a feasibility report and
-a TDLib/Telegram-core spike, not a complete chat UI.
+a TDLib/Telegram-core spike with the first local chat-list preview, not a
+complete chat UI.
 
 ## Current Status
 
@@ -12,6 +13,8 @@ This repository contains an initial legacy AppKit skeleton:
 
 - A minimal programmatic AppKit window that can probe a local `libtdjson.dylib`.
 - A dynamic `tdjson` loader so the app can open without vendoring TDLib yet.
+- A state-driven TDLib authorization row and a local chat preview table once
+  authorization reaches `ready`.
 - Mavericks-oriented build and compatibility checks.
 - Feasibility and security notes for the first milestone.
 
@@ -89,7 +92,10 @@ login code, and 2FA password needed to move through `waitPhoneNumber`,
 `waitCode`, `waitPassword`, and eventually `ready`. After authorization reaches
 `ready`, the spike can run a redacted `getMe`/`getChats` probe to confirm the
 session can read basic account and chat-list metadata; this is still a smoke
-test, not the chat UI.
+test. The "Load Chats" button then reads the main chat list and shows a minimal
+local table with chat title, type, and unread count. It does not load messages,
+fetch message history, display message previews, send messages, or persist chat
+UI state yet.
 
 Local TDLib parameters are read from:
 
@@ -106,6 +112,7 @@ real values into logs.
 
 Do not commit `api_id`, `api_hash`, phone numbers, login codes, 2FA passwords,
 TDLib databases, session files, generated encryption keys, or local credentials.
-Do not paste raw TDLib responses from authorization, `getMe`, or `getChats`
-into logs, screenshots, issues, or transfer notes. Use local untracked
-configuration and Keychain-backed storage during development.
+Do not paste raw TDLib responses from authorization, `getMe`, `getChats`, or
+`getChat` into logs, screenshots, issues, or transfer notes. Chat titles are
+local account data; treat screenshots of the chat table as sensitive too. Use
+local untracked configuration and Keychain-backed storage during development.
