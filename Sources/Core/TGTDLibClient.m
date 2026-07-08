@@ -29,11 +29,15 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
 @synthesize loadedPath = _loadedPath;
 
-- (void)dealloc {
+- (void)destroyTDLibClient {
     if (_client && _destroyFunction) {
         _destroyFunction(_client);
-        _client = NULL;
     }
+    _client = NULL;
+}
+
+- (void)dealloc {
+    [self destroyTDLibClient];
     if (_libraryHandle) {
         dlclose(_libraryHandle);
         _libraryHandle = NULL;
@@ -788,6 +792,11 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
 
 - (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+    if ([authorizationState isEqualToString:@"closed"]) {
+        [self destroyTDLibClient];
+        authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+    }
+
     if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
         if (![self setLocalTDLibParametersWithTimeout:timeout error:error]) {
             return nil;
@@ -910,6 +919,15 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         }
 
         NSDictionary *dictionary = (NSDictionary *)object;
+        NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
+        if ([summary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            if (error) {
+                *error = [self errorWithDescription:@"TDLib authorization state closed while waiting for a response." code:errorCode];
+            }
+            return nil;
+        }
+
         id responseExtra = [dictionary objectForKey:@"@extra"];
         if (![responseExtra isKindOfClass:[NSString class]] || ![(NSString *)responseExtra isEqualToString:extra]) {
             continue;
@@ -918,7 +936,6 @@ static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_e
         id type = [dictionary objectForKey:@"@type"];
         if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"error"]) {
             if (error) {
-                NSString *summary = [self summaryForAuthorizationStateObject:dictionary];
                 NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
                 *error = [self errorWithDescription:message code:errorCode];
             }
