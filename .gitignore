@@ -30,6 +30,13 @@ outputs/
 .env.*
 local.env
 Secrets.plist
+*.secret.plist
+*.secrets.plist
+*.credentials.plist
+api-credentials.plist
+telegram-credentials.plist
+telegram-api.plist
+local-tdlib-config.plist
 tdlib-config.plist
 secrets/
 credentials/
