@@ -527,6 +527,12 @@
     self.liveUpdateTimer = nil;
 }
 
+- (void)prepareForApplicationTermination {
+    [self stopLiveUpdateTimer];
+    [self setControlsBusy:YES];
+    [self.client shutdownWithTimeout:3.0];
+}
+
 - (BOOL)isAuthInputState:(NSString *)state {
     return [state isEqualToString:@"waitPhoneNumber"] ||
            [state isEqualToString:@"waitCode"] ||

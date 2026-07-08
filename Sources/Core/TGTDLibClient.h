@@ -20,5 +20,6 @@
 - (NSArray *)drainSafeUpdateSummaries;
 - (NSString *)receiverStatusSummary;
 - (NSString *)loadedLibraryPath;
+- (void)shutdownWithTimeout:(NSTimeInterval)timeout;
 
 @end
