@@ -1,4 +1,6 @@
 #import "TGStatusWindowController.h"
+#import "../Core/TGChatItem.h"
+#import "../Core/TGMessageItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 
@@ -701,9 +703,14 @@
         return @"";
     }
 
-    NSDictionary *item = [items objectAtIndex:(NSUInteger)row];
+    id item = [items objectAtIndex:(NSUInteger)row];
     id identifier = [tableColumn identifier];
-    id value = [item objectForKey:identifier];
+    id value = nil;
+    if (tableView == self.messageTableView && [item isKindOfClass:[TGMessageItem class]]) {
+        value = [(TGMessageItem *)item valueForTableColumnIdentifier:identifier];
+    } else if (tableView == self.chatTableView && [item isKindOfClass:[TGChatItem class]]) {
+        value = [(TGChatItem *)item valueForTableColumnIdentifier:identifier];
+    }
     if (tableView == self.messageTableView && [identifier isEqual:@"date"] && [value respondsToSelector:@selector(integerValue)]) {
         NSInteger timestamp = [value integerValue];
         if (timestamp <= 0) {
@@ -740,9 +747,9 @@
         return;
     }
 
-    NSDictionary *item = [self.chatItems objectAtIndex:(NSUInteger)row];
-    id chatID = [item objectForKey:@"chat_id"];
-    id title = [item objectForKey:@"title"];
+    TGChatItem *item = [self.chatItems objectAtIndex:(NSUInteger)row];
+    id chatID = [item chatID];
+    id title = [item title];
     NSNumber *newChatID = nil;
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
         newChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
@@ -772,8 +779,8 @@
     if (preserveSelection && preferredChatID) {
         NSUInteger index = 0;
         for (index = 0; index < [items count]; index++) {
-            NSDictionary *item = [items objectAtIndex:index];
-            id chatID = [item objectForKey:@"chat_id"];
+            TGChatItem *item = [items objectAtIndex:index];
+            id chatID = [item chatID];
             if ([chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [preferredChatID longLongValue]) {
                 selectedIndex = index;
                 break;
@@ -806,8 +813,8 @@
 - (NSNumber *)oldestLoadedMessageID {
     NSInteger index = (NSInteger)[self.messageItems count] - 1;
     while (index >= 0) {
-        NSDictionary *item = [self.messageItems objectAtIndex:(NSUInteger)index];
-        id messageID = [item objectForKey:@"message_id"];
+        TGMessageItem *item = [self.messageItems objectAtIndex:(NSUInteger)index];
+        id messageID = [item messageID];
         if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
             return [NSNumber numberWithLongLong:[messageID longLongValue]];
         }
@@ -832,15 +839,16 @@
     NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:items];
     NSUInteger index = 0;
     for (index = 0; index < [items count]; index++) {
-        id messageID = [[items objectAtIndex:index] objectForKey:@"message_id"];
+        TGMessageItem *item = [items objectAtIndex:index];
+        id messageID = [item messageID];
         if (messageID) {
             [messageIDs addObject:messageID];
         }
     }
 
     for (index = 0; index < [self.messageItems count]; index++) {
-        NSDictionary *item = [self.messageItems objectAtIndex:index];
-        id messageID = [item objectForKey:@"message_id"];
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        id messageID = [item messageID];
         if (messageID && [messageIDs containsObject:messageID]) {
             continue;
         }
@@ -859,7 +867,8 @@
     NSMutableSet *messageIDs = [NSMutableSet set];
     NSUInteger index = 0;
     for (index = 0; index < [self.messageItems count]; index++) {
-        id messageID = [[self.messageItems objectAtIndex:index] objectForKey:@"message_id"];
+        TGMessageItem *existingItem = [self.messageItems objectAtIndex:index];
+        id messageID = [existingItem messageID];
         if (messageID) {
             [messageIDs addObject:messageID];
         }
@@ -867,8 +876,8 @@
 
     NSUInteger added = 0;
     for (index = 0; index < [items count]; index++) {
-        NSDictionary *item = [items objectAtIndex:index];
-        id messageID = [item objectForKey:@"message_id"];
+        TGMessageItem *item = [items objectAtIndex:index];
+        id messageID = [item messageID];
         if (messageID && [messageIDs containsObject:messageID]) {
             continue;
         }

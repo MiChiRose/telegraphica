@@ -1,4 +1,6 @@
 #import "TGTDLibClient.h"
+#import "TGChatItem.h"
+#import "TGMessageItem.h"
 #import "../Services/TGKeychainHelper.h"
 #import <dlfcn.h>
 #import <Security/Security.h>
@@ -1591,11 +1593,10 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
             unreadCount = [NSNumber numberWithInteger:0];
         }
 
-        NSMutableDictionary *item = [NSMutableDictionary dictionary];
-        [item setObject:chatID forKey:@"chat_id"];
-        [item setObject:title forKey:@"title"];
-        [item setObject:typeSummary forKey:@"type"];
-        [item setObject:unreadCount forKey:@"unread_count"];
+        TGChatItem *item = [[[TGChatItem alloc] initWithChatID:chatID
+                                                         title:title
+                                                   typeSummary:typeSummary
+                                                   unreadCount:unreadCount] autorelease];
         [items addObject:item];
     }
 
@@ -1758,27 +1759,28 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         id messageID = [message objectForKey:@"id"];
         id date = [message objectForKey:@"date"];
         id isOutgoing = [message objectForKey:@"is_outgoing"];
-        NSString *direction = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]) ? @"Me" : @"In";
+        BOOL outgoing = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]);
         NSString *preview = [self messageContentPreviewForObject:[message objectForKey:@"content"]];
         if ([preview length] == 0) {
             preview = @"[Message]";
         }
 
-        NSMutableDictionary *item = [NSMutableDictionary dictionary];
-        [item setObject:chatID forKey:@"chat_id"];
-        if (messageID) {
-            [item setObject:messageID forKey:@"message_id"];
+        NSNumber *safeMessageID = nil;
+        if ([messageID respondsToSelector:@selector(longLongValue)]) {
+            safeMessageID = [NSNumber numberWithLongLong:[messageID longLongValue]];
         }
+        NSNumber *safeDate = nil;
         if ([date respondsToSelector:@selector(integerValue)]) {
-            [item setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
+            safeDate = [NSNumber numberWithInteger:[date integerValue]];
         } else {
-            [item setObject:[NSNumber numberWithInteger:0] forKey:@"date"];
+            safeDate = [NSNumber numberWithInteger:0];
         }
-        if ([isOutgoing respondsToSelector:@selector(boolValue)]) {
-            [item setObject:[NSNumber numberWithBool:[isOutgoing boolValue]] forKey:@"is_outgoing"];
-        }
-        [item setObject:direction forKey:@"direction"];
-        [item setObject:preview forKey:@"preview"];
+
+        TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:chatID
+                                                           messageID:safeMessageID
+                                                                date:safeDate
+                                                            outgoing:outgoing
+                                                             preview:preview] autorelease];
         [items addObject:item];
     }
 
