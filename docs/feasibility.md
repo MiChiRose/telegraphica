@@ -5,8 +5,8 @@ Date: 2026-07-07
 Telegraphica is an experimental unofficial Telegram client for OS X 10.9.5
 Mavericks, Intel x86_64, Objective-C/Cocoa/AppKit, and Xcode 6.2 where
 possible. This first milestone is about proving the Telegram core, local
-chat-list reads, selected-chat history preview reads, and a routed TDLib receive
-loop, not building a polished chat UI.
+chat-list reads, selected-chat history preview reads, a routed TDLib receive
+loop, and a guarded plain-text send path, not building a polished chat UI.
 
 ## Recommendation
 
@@ -25,10 +25,12 @@ Local HITL changed the priority: TDLib v1.8.0 can load and pass the JSON probe,
 but Telegram rejects current login with `UPDATE_APP_TO_LOGIN`. The active path is
 therefore a newer TDLib snapshot built for Mavericks with a newer MacPorts
 compiler/CMake lane, then loaded by the same Objective-C `tdjson` wrapper. That
-path has now reached `ready`, read basic account/chat metadata, and read selected
-chat history previews. The next core stabilizer is a single receiver loop so
-future message-send and live-update work does not race independent synchronous
-request probes.
+path has now reached `ready`, read basic account/chat metadata, read selected
+chat history previews, and passed a routed receiver-loop HITL check. The current
+iteration adds the first guarded selected-chat plain-text send spike. If that
+works on Mavericks, the practical feasibility remains positive; the next risk
+areas become delivery-state UX, live updates, logout/reset, and keeping local
+storage/security behavior disciplined.
 
 ## TDLib Findings
 
@@ -224,6 +226,8 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
     bounded safe summaries for non-response updates.
 12. After the receiver loop is proven on Mavericks, add an explicit text-send
     spike for a selected chat.
+13. After text-send HITL, add live message updates and clearer delivery/error
+    state before expanding beyond plain text.
 
 ## Primary Sources
 
