@@ -531,6 +531,14 @@
         [self.sendTextField setStringValue:@""];
     }
 
+    if (![state isEqualToString:@"ready"]) {
+        self.pendingLiveChatRefresh = NO;
+        self.pendingLiveMessageRefresh = NO;
+    } else if (![previousState isEqualToString:@"ready"] && [self.chatItems count] == 0) {
+        self.pendingLiveChatRefresh = YES;
+        [self handlePendingLiveRefreshesIfPossible];
+    }
+
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self.authLabel setStringValue:@"Phone:"];
         [self.authStateField setHidden:YES];
@@ -541,6 +549,7 @@
         [self.authButton setTitle:@"Send Phone"];
         [self.authButton setEnabled:YES];
         [self.authButton setHidden:NO];
+        [previousState release];
         return;
     }
 
@@ -554,6 +563,7 @@
         [self.authButton setTitle:@"Verify"];
         [self.authButton setEnabled:YES];
         [self.authButton setHidden:NO];
+        [previousState release];
         return;
     }
 
@@ -567,6 +577,7 @@
         [self.authButton setTitle:@"Unlock"];
         [self.authButton setEnabled:YES];
         [self.authButton setHidden:NO];
+        [previousState release];
         return;
     }
 
@@ -589,14 +600,6 @@
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
     [self updateSendControls];
-
-    if (![state isEqualToString:@"ready"]) {
-        self.pendingLiveChatRefresh = NO;
-        self.pendingLiveMessageRefresh = NO;
-    } else if (![previousState isEqualToString:@"ready"] && [self.chatItems count] == 0) {
-        self.pendingLiveChatRefresh = YES;
-        [self handlePendingLiveRefreshesIfPossible];
-    }
 
     [previousState release];
 }
