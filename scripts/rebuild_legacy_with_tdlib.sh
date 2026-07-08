@@ -125,6 +125,38 @@ find_tdjson_dylib() {
     return 1
 }
 
+build_tdlib_with_optional_snapshot_compiler() {
+    local cc_path="${CC:-}"
+    local cxx_path="${CXX:-}"
+
+    if [ "$ALLOW_SNAPSHOT" -eq 1 ]; then
+        if [ -z "$cc_path" ] && [ -x "/opt/local/bin/clang-mp-17" ]; then
+            cc_path="/opt/local/bin/clang-mp-17"
+        fi
+        if [ -z "$cxx_path" ] && [ -x "/opt/local/bin/clang++-mp-17" ]; then
+            cxx_path="/opt/local/bin/clang++-mp-17"
+        fi
+
+        if [ -z "$cc_path" ] || [ -z "$cxx_path" ]; then
+            echo "TDLib snapshot/master requires a C++17 compiler."
+            echo "Install MacPorts clang 17, or pass CC and CXX explicitly:"
+            echo "  sudo port install clang-17"
+            echo "  CC=/opt/local/bin/clang-mp-17 CXX=/opt/local/bin/clang++-mp-17 $0 ..."
+            exit 1
+        fi
+    fi
+
+    if [ -n "$TDLIB_VERSION_VALUE" ] && [ -n "$TDLIB_LABEL_VALUE" ]; then
+        CC="$cc_path" CXX="$cxx_path" TDLIB_VERSION="$TDLIB_VERSION_VALUE" TDLIB_LABEL="$TDLIB_LABEL_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+    elif [ -n "$TDLIB_VERSION_VALUE" ]; then
+        CC="$cc_path" CXX="$cxx_path" TDLIB_VERSION="$TDLIB_VERSION_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+    elif [ -n "$TDLIB_LABEL_VALUE" ]; then
+        CC="$cc_path" CXX="$cxx_path" TDLIB_LABEL="$TDLIB_LABEL_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+    else
+        CC="$cc_path" CXX="$cxx_path" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
+    fi
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --archive)
@@ -232,15 +264,7 @@ if [ "$ALLOW_SNAPSHOT" -eq 1 ]; then
 fi
 
 echo "Rebuilding TDLib for Telegraphica..."
-if [ -n "$TDLIB_VERSION_VALUE" ] && [ -n "$TDLIB_LABEL_VALUE" ]; then
-    TDLIB_VERSION="$TDLIB_VERSION_VALUE" TDLIB_LABEL="$TDLIB_LABEL_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
-elif [ -n "$TDLIB_VERSION_VALUE" ]; then
-    TDLIB_VERSION="$TDLIB_VERSION_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
-elif [ -n "$TDLIB_LABEL_VALUE" ]; then
-    TDLIB_LABEL="$TDLIB_LABEL_VALUE" "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
-else
-    "$SCRIPT_DIR/build_tdlib_legacy.sh" "${TDLIB_ARGS[@]}"
-fi
+build_tdlib_with_optional_snapshot_compiler
 
 TDJSON_PATH="$(find_tdjson_dylib "$TDLIB_BUILD_DIR" || true)"
 if [ -z "$TDJSON_PATH" ]; then
