@@ -400,16 +400,16 @@ patch_tdlib_for_webpages_manager_stack_address_warning() {
     fi
 
     cp "$webpages_file" "$webpages_file.telegraphica-backup"
-    perl -0pi -e 's/auto get_map = \[\&\]\(Document::Type document_type\) \{/auto get_map = [\&](Document::Type document_type) -> std::unordered_map<int64, FileId> * {/' "$webpages_file"
+    perl -0pi -e 's/auto get_map = \[\&\]\(Document::Type document_type\) \{/auto get_map = [\&](Document::Type document_type) -> decltype(\&animations) {/' "$webpages_file"
 
-    if ! grep -q 'auto get_map = \[&\](Document::Type document_type) -> std::unordered_map<int64, FileId> \* {' "$webpages_file"; then
+    if ! grep -q 'auto get_map = \[&\](Document::Type document_type) -> decltype(&animations) {' "$webpages_file"; then
         fail "Failed to patch TDLib WebPagesManager get_map lambda in $webpages_file"
     fi
 
     {
         echo "Patched TDLib WebPagesManager get_map lambda to silence false return-stack-address warnings."
         echo "File: $webpages_file"
-        echo "Replacement: explicit lambda return type std::unordered_map<int64, FileId> *."
+        echo "Replacement: explicit lambda return type decltype(&animations)."
     } > "$marker_file"
     echo "Patched TDLib WebPagesManager stack-address warning."
 }
