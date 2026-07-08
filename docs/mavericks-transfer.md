@@ -24,9 +24,10 @@ cd Telegraphica-develop-<commit>
 open build-legacy/Release/Telegraphica.app
 ```
 
-Expected result without TDLib: the app opens, shows the Telegraphica core spike
-window, and the "Check TDLib" button reports that `libtdjson.dylib` cannot be
-loaded. That is OK for the first UI/core-shell smoke test.
+Expected result without TDLib: the app opens, shows the Telegraphica chat shell
+window with a left chat pane, right message pane, compact diagnostics area, and
+the "Check TDLib" button reports that `libtdjson.dylib` cannot be loaded. That
+is OK for a UI/core-shell smoke test.
 
 ## If You Have libtdjson.dylib
 
@@ -106,14 +107,14 @@ titles, phone numbers, message text, or IDs.
 After TDLib reports `ready`, click "Load Chats". Expected result:
 
 - the status changes to `TDLib chats: loaded`;
-- the lower table fills with up to 10 main chat previews;
+- the left chat table fills with up to 10 main chat previews;
 - the details view reports only the number of loaded previews, not chat titles
   or raw TDLib JSON.
 
 Select a row in the chat table and click "Load Messages". Expected result:
 
 - the status changes to `TDLib messages: loaded`;
-- the message table fills with recent previews for the selected chat;
+- the right message table fills with recent previews for the selected chat;
 - the details view reports only the number of loaded previews, not message text
   or raw TDLib JSON.
 

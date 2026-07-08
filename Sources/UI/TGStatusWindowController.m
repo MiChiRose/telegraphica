@@ -2,7 +2,56 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 
+@interface TGChromeView : NSView
+@end
+
+@implementation TGChromeView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedWhite:0.86 alpha:1.0]
+                                                          endingColor:[NSColor colorWithCalibratedWhite:0.74 alpha:1.0]] autorelease];
+    [gradient drawInRect:bounds angle:90.0];
+
+    [[NSColor colorWithCalibratedWhite:0.93 alpha:1.0] set];
+    NSRectFill(NSMakeRect(0.0, NSHeight(bounds) - 1.0, NSWidth(bounds), 1.0));
+}
+
+@end
+
+@interface TGPanelView : NSView
+@end
+
+@implementation TGPanelView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 0.5, 0.5)
+                                                         xRadius:6.0
+                                                         yRadius:6.0];
+    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]
+                                                          endingColor:[NSColor colorWithCalibratedWhite:0.88 alpha:1.0]] autorelease];
+    [gradient drawInBezierPath:path angle:90.0];
+    [[NSColor colorWithCalibratedWhite:0.64 alpha:1.0] set];
+    [path stroke];
+
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.65] set];
+    NSBezierPath *highlight = [NSBezierPath bezierPath];
+    [highlight moveToPoint:NSMakePoint(6.0, NSHeight(bounds) - 1.5)];
+    [highlight lineToPoint:NSMakePoint(NSWidth(bounds) - 6.0, NSHeight(bounds) - 1.5)];
+    [highlight stroke];
+}
+
+@end
+
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
+@property (nonatomic, retain) NSView *topPanelView;
+@property (nonatomic, retain) NSView *sidebarPanelView;
+@property (nonatomic, retain) NSView *conversationPanelView;
+@property (nonatomic, retain) NSView *diagnosticsPanelView;
+@property (nonatomic, retain) NSTextField *diagnosticsLabel;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSScrollView *detailsScrollView;
@@ -10,6 +59,7 @@
 @property (nonatomic, retain) NSButton *checkButton;
 @property (nonatomic, retain) NSButton *loadChatsButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
+@property (nonatomic, retain) NSButton *quitButton;
 @property (nonatomic, retain) NSTextField *sendLabel;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *sendMessageButton;
@@ -35,6 +85,11 @@
 
 @implementation TGStatusWindowController
 
+@synthesize topPanelView = _topPanelView;
+@synthesize sidebarPanelView = _sidebarPanelView;
+@synthesize conversationPanelView = _conversationPanelView;
+@synthesize diagnosticsPanelView = _diagnosticsPanelView;
+@synthesize diagnosticsLabel = _diagnosticsLabel;
 @synthesize statusField = _statusField;
 @synthesize titleField = _titleField;
 @synthesize detailsScrollView = _detailsScrollView;
@@ -42,6 +97,7 @@
 @synthesize checkButton = _checkButton;
 @synthesize loadChatsButton = _loadChatsButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
+@synthesize quitButton = _quitButton;
 @synthesize sendLabel = _sendLabel;
 @synthesize sendTextField = _sendTextField;
 @synthesize sendMessageButton = _sendMessageButton;
@@ -65,13 +121,13 @@
 @synthesize currentAuthState = _currentAuthState;
 
 - (instancetype)init {
-    NSRect frame = NSMakeRect(0, 0, 760, 720);
+    NSRect frame = NSMakeRect(0, 0, 980, 700);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@"Telegraphica"];
-    [window setMinSize:NSMakeSize(700, 720)];
+    [window setMinSize:NSMakeSize(760, 620)];
     [window center];
 
     self = [super initWithWindow:window];
@@ -98,12 +154,30 @@
 }
 
 - (void)buildContentView {
-    NSView *contentView = [[self window] contentView];
+    TGChromeView *contentView = [[[TGChromeView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [[self window] setContentView:contentView];
     [contentView setAutoresizesSubviews:YES];
 
+    self.topPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 628, 948, 56)] autorelease];
+    [self.topPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.topPanelView];
+
+    self.sidebarPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 286, 480)] autorelease];
+    [self.sidebarPanelView setAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
+    [contentView addSubview:self.sidebarPanelView];
+
+    self.conversationPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(314, 132, 650, 480)] autorelease];
+    [self.conversationPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:self.conversationPanelView];
+
+    self.diagnosticsPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 16, 948, 104)] autorelease];
+    [self.diagnosticsPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.diagnosticsPanelView];
+
     self.titleField = [self labelWithFrame:NSMakeRect(24, 668, 712, 28)
-                                      text:@"Telegraphica core spike"
-                                      font:[NSFont boldSystemFontOfSize:18.0]];
+                                      text:@"Telegraphica"
+                                      font:[NSFont boldSystemFontOfSize:20.0]];
     [contentView addSubview:self.titleField];
 
     self.statusField = [self labelWithFrame:NSMakeRect(24, 636, 712, 22)
@@ -120,9 +194,16 @@
     [self.detailsView setEditable:NO];
     [self.detailsView setSelectable:YES];
     [self.detailsView setFont:[NSFont userFixedPitchFontOfSize:11.0]];
+    [self.detailsView setTextColor:[NSColor colorWithCalibratedWhite:0.12 alpha:1.0]];
+    [self.detailsView setBackgroundColor:[NSColor colorWithCalibratedWhite:0.98 alpha:1.0]];
     [self.detailsView setString:@"Ready. Place libtdjson.dylib in Contents/Frameworks or set TELEGRAPHICA_TDJSON_PATH, then check the core.\n"];
     [self.detailsScrollView setDocumentView:self.detailsView];
     [contentView addSubview:self.detailsScrollView];
+
+    self.diagnosticsLabel = [self labelWithFrame:NSMakeRect(24, 104, 112, 18)
+                                            text:@"Diagnostics"
+                                            font:[NSFont boldSystemFontOfSize:11.0]];
+    [contentView addSubview:self.diagnosticsLabel];
 
     self.authLabel = [self labelWithFrame:NSMakeRect(24, 374, 76, 22)
                                      text:@"Auth:"
@@ -181,6 +262,8 @@
     [self.chatTableView setDelegate:self];
     [self.chatTableView setAllowsColumnReordering:NO];
     [self.chatTableView setAllowsMultipleSelection:NO];
+    [self.chatTableView setRowHeight:24.0];
+    [self.chatTableView setUsesAlternatingRowBackgroundColors:YES];
 
     NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"title"] autorelease];
     [[chatColumn headerCell] setStringValue:@"Chat"];
@@ -230,6 +313,8 @@
     [self.messageTableView setDelegate:self];
     [self.messageTableView setAllowsColumnReordering:NO];
     [self.messageTableView setAllowsMultipleSelection:NO];
+    [self.messageTableView setRowHeight:24.0];
+    [self.messageTableView setUsesAlternatingRowBackgroundColors:YES];
 
     NSTableColumn *dateColumn = [[[NSTableColumn alloc] initWithIdentifier:@"date"] autorelease];
     [[dateColumn headerCell] setStringValue:@"Time"];
@@ -277,13 +362,13 @@
     [self.checkButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.checkButton];
 
-    NSButton *quitButton = [[[NSButton alloc] initWithFrame:NSMakeRect(176, 28, 96, 32)] autorelease];
-    [quitButton setTitle:@"Quit"];
-    [quitButton setBezelStyle:NSRoundedBezelStyle];
-    [quitButton setTarget:NSApp];
-    [quitButton setAction:@selector(terminate:)];
-    [quitButton setAutoresizingMask:NSViewMaxYMargin];
-    [contentView addSubview:quitButton];
+    self.quitButton = [[[NSButton alloc] initWithFrame:NSMakeRect(176, 28, 96, 32)] autorelease];
+    [self.quitButton setTitle:@"Quit"];
+    [self.quitButton setBezelStyle:NSRoundedBezelStyle];
+    [self.quitButton setTarget:NSApp];
+    [self.quitButton setAction:@selector(terminate:)];
+    [self.quitButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.quitButton];
 
     [self layoutContentView];
 }
@@ -293,59 +378,83 @@
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    CGFloat margin = 24.0;
+    CGFloat margin = 16.0;
+    CGFloat gutter = 12.0;
+    CGFloat topPanelHeight = 56.0;
+    CGFloat authHeight = 34.0;
+    CGFloat diagnosticsHeight = 104.0;
+    CGFloat lowerY = margin;
+    CGFloat diagnosticsY = lowerY;
+    CGFloat bodyY = diagnosticsY + diagnosticsHeight + gutter;
+    CGFloat topPanelY = height - margin - topPanelHeight;
+    CGFloat authY = topPanelY - authHeight - 8.0;
+    CGFloat bodyTop = authY - gutter;
+    CGFloat bodyHeight = bodyTop - bodyY;
+    CGFloat sidebarWidth = 286.0;
     CGFloat contentWidth = width - (margin * 2.0);
-    CGFloat top = height - 52.0;
+    CGFloat conversationX = margin + sidebarWidth + gutter;
+    CGFloat conversationWidth = width - conversationX - margin;
 
-    [self.titleField setFrame:NSMakeRect(margin, top, contentWidth, 28.0)];
-    [self.statusField setFrame:NSMakeRect(margin, top - 32.0, contentWidth, 22.0)];
-    [self.detailsScrollView setFrame:NSMakeRect(margin, top - 250.0, contentWidth, 202.0)];
+    if (bodyHeight < 320.0) {
+        bodyHeight = 320.0;
+    }
 
-    CGFloat authY = top - 286.0;
-    [self.authLabel setFrame:NSMakeRect(margin, authY, 76.0, 22.0)];
-    [self.authStateField setFrame:NSMakeRect(margin + 80.0, authY, contentWidth - 120.0, 22.0)];
-    [self.authTextField setFrame:NSMakeRect(margin + 80.0, authY - 4.0, 240.0, 24.0)];
-    [self.authSecureField setFrame:NSMakeRect(margin + 80.0, authY - 4.0, 240.0, 24.0)];
-    [self.authButton setFrame:NSMakeRect(margin + 332.0, authY - 8.0, 116.0, 32.0)];
+    [self.topPanelView setFrame:NSMakeRect(margin, topPanelY, contentWidth, topPanelHeight)];
+    [self.sidebarPanelView setFrame:NSMakeRect(margin, bodyY, sidebarWidth, bodyHeight)];
+    [self.conversationPanelView setFrame:NSMakeRect(conversationX, bodyY, conversationWidth, bodyHeight)];
+    [self.diagnosticsPanelView setFrame:NSMakeRect(margin, diagnosticsY, contentWidth, diagnosticsHeight)];
 
-    CGFloat chatsY = authY - 36.0;
-    [self.chatsLabel setFrame:NSMakeRect(margin, chatsY, 76.0, 22.0)];
-    [self.loadChatsButton setFrame:NSMakeRect(margin + 80.0, chatsY - 6.0, 112.0, 32.0)];
-    [self.chatScrollView setFrame:NSMakeRect(margin, chatsY - 106.0, contentWidth, 96.0)];
+    [self.titleField setFrame:NSMakeRect(margin + 18.0, topPanelY + 24.0, 260.0, 24.0)];
+    [self.statusField setFrame:NSMakeRect(margin + 20.0, topPanelY + 8.0, contentWidth - 360.0, 18.0)];
+    [self.checkButton setFrame:NSMakeRect(width - margin - 248.0, topPanelY + 12.0, 140.0, 32.0)];
+    [self.quitButton setFrame:NSMakeRect(width - margin - 100.0, topPanelY + 12.0, 84.0, 32.0)];
+
+    [self.authLabel setFrame:NSMakeRect(margin + 10.0, authY + 8.0, 62.0, 20.0)];
+    [self.authStateField setFrame:NSMakeRect(margin + 78.0, authY + 8.0, contentWidth - 560.0, 20.0)];
+    [self.authTextField setFrame:NSMakeRect(margin + 78.0, authY + 4.0, 240.0, 24.0)];
+    [self.authSecureField setFrame:NSMakeRect(margin + 78.0, authY + 4.0, 240.0, 24.0)];
+    [self.authButton setFrame:NSMakeRect(margin + 332.0, authY, 116.0, 32.0)];
+
+    [self.chatsLabel setFrame:NSMakeRect(margin + 14.0, bodyTop - 30.0, 90.0, 22.0)];
+    [self.loadChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 126.0, bodyTop - 36.0, 108.0, 30.0)];
+    [self.chatScrollView setFrame:NSMakeRect(margin + 12.0, bodyY + 12.0, sidebarWidth - 24.0, bodyHeight - 56.0)];
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"title"];
     if (chatColumn) {
-        CGFloat chatWidth = contentWidth - 230.0;
-        if (chatWidth < 240.0) {
-            chatWidth = 240.0;
+        CGFloat chatWidth = sidebarWidth - 154.0;
+        if (chatWidth < 132.0) {
+            chatWidth = 132.0;
         }
         [chatColumn setWidth:chatWidth];
     }
 
-    CGFloat messagesY = chatsY - 142.0;
-    [self.messagesLabel setFrame:NSMakeRect(margin, messagesY, 86.0, 22.0)];
-    [self.loadMessagesButton setFrame:NSMakeRect(margin + 92.0, messagesY - 6.0, 136.0, 32.0)];
-    [self.selectedChatField setFrame:NSMakeRect(margin + 240.0, messagesY, contentWidth - 240.0, 22.0)];
+    [self.messagesLabel setFrame:NSMakeRect(conversationX + 14.0, bodyTop - 30.0, 94.0, 22.0)];
+    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 152.0, bodyTop - 36.0, 136.0, 30.0)];
+    [self.selectedChatField setFrame:NSMakeRect(conversationX + 112.0, bodyTop - 30.0, conversationWidth - 276.0, 22.0)];
 
-    CGFloat composerY = 58.0;
-    CGFloat messageBottom = composerY + 36.0;
-    CGFloat messageHeight = messagesY - messageBottom - 10.0;
-    if (messageHeight < 82.0) {
-        messageHeight = 82.0;
+    CGFloat composerHeight = 38.0;
+    CGFloat composerY = bodyY + 14.0;
+    CGFloat messageBottom = composerY + composerHeight + 10.0;
+    CGFloat messageTop = bodyTop - 46.0;
+    CGFloat messageHeight = messageTop - messageBottom;
+    if (messageHeight < 160.0) {
+        messageHeight = 160.0;
     }
-    [self.messageScrollView setFrame:NSMakeRect(margin, messageBottom, contentWidth, messageHeight)];
+    [self.messageScrollView setFrame:NSMakeRect(conversationX + 12.0, messageBottom, conversationWidth - 24.0, messageHeight)];
     NSTableColumn *previewColumn = [self.messageTableView tableColumnWithIdentifier:@"preview"];
     if (previewColumn) {
-        CGFloat previewWidth = contentWidth - 200.0;
-        if (previewWidth < 320.0) {
-            previewWidth = 320.0;
+        CGFloat previewWidth = conversationWidth - 214.0;
+        if (previewWidth < 260.0) {
+            previewWidth = 260.0;
         }
         [previewColumn setWidth:previewWidth];
     }
 
-    [self.sendLabel setFrame:NSMakeRect(margin, composerY + 4.0, 48.0, 22.0)];
-    [self.sendTextField setFrame:NSMakeRect(margin + 52.0, composerY, contentWidth - 212.0, 24.0)];
-    [self.sendMessageButton setFrame:NSMakeRect(width - margin - 148.0, composerY - 4.0, 148.0, 32.0)];
-    [self.checkButton setFrame:NSMakeRect(margin, 20.0, 140.0, 32.0)];
+    [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 46.0, 22.0)];
+    [self.sendTextField setFrame:NSMakeRect(conversationX + 62.0, composerY + 4.0, conversationWidth - 222.0, 24.0)];
+    [self.sendMessageButton setFrame:NSMakeRect(conversationX + conversationWidth - 148.0, composerY, 132.0, 32.0)];
+
+    [self.diagnosticsLabel setFrame:NSMakeRect(margin + 14.0, diagnosticsY + diagnosticsHeight - 26.0, 120.0, 18.0)];
+    [self.detailsScrollView setFrame:NSMakeRect(margin + 12.0, diagnosticsY + 12.0, contentWidth - 24.0, diagnosticsHeight - 42.0)];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -921,6 +1030,11 @@
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
     [_sendTextField setDelegate:nil];
+    [_topPanelView release];
+    [_sidebarPanelView release];
+    [_conversationPanelView release];
+    [_diagnosticsPanelView release];
+    [_diagnosticsLabel release];
     [_titleField release];
     [_statusField release];
     [_detailsScrollView release];
@@ -928,6 +1042,7 @@
     [_checkButton release];
     [_loadChatsButton release];
     [_loadMessagesButton release];
+    [_quitButton release];
     [_sendLabel release];
     [_sendTextField release];
     [_sendMessageButton release];
