@@ -195,8 +195,13 @@ For the hands-on Mavericks TDLib build, package, and probe recipe, see
    deletion behavior.
 7. Handle `authorizationStateWaitPhoneNumber`,
    `authorizationStateWaitCode`, `authorizationStateWaitPassword`, and
-   `authorizationStateReady`.
-8. Only after auth state is proven, build chat list and message transcript UI.
+   `authorizationStateReady` with one state-driven auth input row and no
+   persistence/logging of phone numbers, login codes, or 2FA passwords.
+8. After `authorizationStateReady`, run a redacted non-UI `getMe`/`getChats`
+   probe to verify the authorized session can read account and chat-list
+   metadata.
+9. Only after auth state and post-login read access are proven, build chat list
+   and message transcript UI.
 
 ## Primary Sources
 

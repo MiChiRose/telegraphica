@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TDLIB_VERSION="${TDLIB_VERSION:-v1.8.0}"
+TDLIB_LABEL="${TDLIB_LABEL:-$TDLIB_VERSION}"
+COMPILER_CC="${CC:-}"
+COMPILER_CXX="${CXX:-}"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.9}"
 BUILD_DIR="$ROOT_DIR/build-tdlib-legacy"
@@ -21,6 +24,7 @@ CLEAN=0
 ALLOW_UNKNOWN_TAG=0
 PATCH_LEGACY_LINKER=1
 PATCH_MAVERICKS_FDOPENDIR=1
+PATCH_MAVERICKS_CLOCK_GETTIME=1
 
 usage() {
     cat <<EOF
@@ -41,8 +45,15 @@ Options:
   --no-patch-legacy-linker
                           keep TDLib's Apple linker strip flags unchanged
   --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
+  --no-patch-clock-gettime
+                          keep TDLib's clock_gettime debug clock code unchanged
   --allow-unknown-tag     allow sources that cannot prove ${TDLIB_VERSION}
+  --allow-snapshot        alias for --allow-unknown-tag for TDLib snapshots
   -h, --help              show this help
+
+Environment:
+  CC/CXX                  optional compiler override for snapshot experiments
+                          such as /opt/local/bin/clang-mp-17 and clang++-mp-17
 
 The script builds TDLib tdjson for OS X ${DEPLOYMENT_TARGET} / ${ARCH}, stages
 libtdjson.dylib into STAGE_DIR/Frameworks, and validates it for Telegraphica.
@@ -205,6 +216,37 @@ prove_tdlib_version() {
     return 1
 }
 
+tdlib_project_version() {
+    local source_root="$1"
+    awk '
+        /project\(TDLib VERSION/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "VERSION" && (i + 1) <= NF) {
+                    version = $(i + 1);
+                    gsub(/[^0-9.].*/, "", version);
+                    print version;
+                    exit;
+                }
+            }
+        }
+    ' "$source_root/CMakeLists.txt" 2>/dev/null || true
+}
+
+tdlib_mtproto_layer() {
+    local source_root="$1"
+    awk '
+        /MTPROTO_LAYER/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /^[0-9]+;?$/) {
+                    gsub(/;/, "", $i);
+                    print $i;
+                    exit;
+                }
+            }
+        }
+    ' "$source_root/td/telegram/Version.h" 2>/dev/null || true
+}
+
 check_prefix_file() {
     local root="$1"
     local rel="$2"
@@ -233,6 +275,10 @@ patch_tdlib_for_legacy_linker() {
     fi
 
     if [ ! -f "$compiler_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib compiler setup file; skipping legacy linker patch for snapshot source."
+            return 0
+        fi
         fail "Could not find TDLib compiler setup file: $compiler_file"
     fi
 
@@ -264,6 +310,10 @@ patch_tdlib_for_mavericks_fdopendir() {
     fi
 
     if [ ! -f "$path_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib path source file; skipping fdopendir patch for snapshot source."
+            return 0
+        fi
         fail "Could not find TDLib path source file: $path_file"
     fi
 
@@ -285,6 +335,43 @@ patch_tdlib_for_mavericks_fdopendir() {
         echo "Replacement: close FileFd and use path-based opendir fallback."
     } > "$marker_file"
     echo "Patched TDLib fdopendir directory walk for OS X 10.9 SDK compatibility."
+}
+
+patch_tdlib_for_mavericks_clock_gettime() {
+    local source_root="$1"
+    local clocks_file="$source_root/tdutils/td/utils/port/Clocks.cpp"
+    local marker_file="$BUILD_DIR/mavericks-clock-gettime-patch.txt"
+
+    if [ "$PATCH_MAVERICKS_CLOCK_GETTIME" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$clocks_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib clocks source file; skipping clock_gettime patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib clocks source file: $clocks_file"
+    fi
+
+    if ! grep -q 'clockid_t clock_id' "$clocks_file"; then
+        echo "Warning: TDLib clock_gettime debug block was not found; skipping Mavericks clock_gettime patch."
+        return 0
+    fi
+
+    cp "$clocks_file" "$clocks_file.telegraphica-backup"
+    perl -0pi -e 's@string result;\n#if TD_PORT_POSIX\n  auto add_clock =@string result;\n#if TD_PORT_POSIX \&\& !defined(__APPLE__)\n  auto add_clock =@' "$clocks_file"
+
+    if ! perl -0ne '$found = /string result;\n#if TD_PORT_POSIX && !defined\(__APPLE__\)\n  auto add_clock =/ ? 1 : 0; END { exit($found ? 0 : 1) }' "$clocks_file"; then
+        fail "Failed to patch TDLib clock_gettime debug block in $clocks_file"
+    fi
+
+    {
+        echo "Patched TDLib clock_gettime debug clock block for OS X 10.9 SDK compatibility."
+        echo "File: $clocks_file"
+        echo "Replacement: skip POSIX clock_gettime debug enumeration on Apple legacy builds."
+    } > "$marker_file"
+    echo "Patched TDLib clock_gettime debug clock block for OS X 10.9 SDK compatibility."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -351,7 +438,11 @@ while [ "$#" -gt 0 ]; do
             PATCH_MAVERICKS_FDOPENDIR=0
             shift
             ;;
-        --allow-unknown-tag)
+        --no-patch-clock-gettime)
+            PATCH_MAVERICKS_CLOCK_GETTIME=0
+            shift
+            ;;
+        --allow-unknown-tag|--allow-snapshot)
             ALLOW_UNKNOWN_TAG=1
             shift
             ;;
@@ -402,7 +493,7 @@ require_command make
 require_command xcrun
 require_command file
 require_command otool
-if [ "$PATCH_MAVERICKS_FDOPENDIR" -eq 1 ]; then
+if [ "$PATCH_MAVERICKS_FDOPENDIR" -eq 1 ] || [ "$PATCH_MAVERICKS_CLOCK_GETTIME" -eq 1 ]; then
     require_command perl
 fi
 
@@ -433,8 +524,21 @@ if [ -z "$SOURCE_ROOT" ] || [ ! -f "$SOURCE_ROOT/CMakeLists.txt" ] || [ ! -d "$S
     fail "TDLib source root was not found or does not look like TDLib."
 fi
 
+TDLIB_PROJECT_VERSION="$(tdlib_project_version "$SOURCE_ROOT")"
+TDLIB_MTPROTO_LAYER="$(tdlib_mtproto_layer "$SOURCE_ROOT")"
+if [ -n "$TDLIB_PROJECT_VERSION" ]; then
+    echo "Detected TDLib project version: $TDLIB_PROJECT_VERSION"
+fi
+if [ -n "$TDLIB_MTPROTO_LAYER" ]; then
+    echo "Detected TDLib MTProto layer: $TDLIB_MTPROTO_LAYER"
+    if [ "$TDLIB_MTPROTO_LAYER" -lt 170 ]; then
+        echo "Warning: this TDLib API layer is old and may be rejected by Telegram login with UPDATE_APP_TO_LOGIN."
+    fi
+fi
+
 patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_fdopendir "$SOURCE_ROOT"
+patch_tdlib_for_mavericks_clock_gettime "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
     if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
@@ -483,6 +587,12 @@ CMAKE_ARGS=(
 if [ -n "$SDK_PATH" ]; then
     CMAKE_ARGS+=("-DCMAKE_OSX_SYSROOT=$SDK_PATH")
 fi
+if [ -n "$COMPILER_CC" ]; then
+    CMAKE_ARGS+=("-DCMAKE_C_COMPILER=$COMPILER_CC")
+fi
+if [ -n "$COMPILER_CXX" ]; then
+    CMAKE_ARGS+=("-DCMAKE_CXX_COMPILER=$COMPILER_CXX")
+fi
 if [ -n "$OPENSSL_ROOT" ]; then
     CMAKE_ARGS+=("-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT")
 fi
@@ -492,13 +602,20 @@ fi
 
 export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
 
-echo "Building TDLib $TDLIB_VERSION tdjson for OS X $DEPLOYMENT_TARGET ($ARCH)."
+echo "Building TDLib $TDLIB_LABEL tdjson for OS X $DEPLOYMENT_TARGET ($ARCH)."
 echo "Source: $SOURCE_ROOT"
 echo "Build:  $CONFIGURE_DIR"
 echo "Stage:  $STAGE_DIR/Frameworks"
+if [ -n "$COMPILER_CC" ]; then
+    echo "C compiler:   $COMPILER_CC"
+fi
+if [ -n "$COMPILER_CXX" ]; then
+    echo "C++ compiler: $COMPILER_CXX"
+fi
 
 set +e
 (
+    set -e
     cd "$CONFIGURE_DIR"
     "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
     "$CMAKE_BIN" --build . --target tdjson -- -j "$JOBS"

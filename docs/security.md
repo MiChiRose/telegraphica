@@ -38,9 +38,9 @@ perfectly hidden secret.
 
 ### Login
 
-Never persist login codes or 2FA passwords. Use secure text entry for password
-input when the login UI is added. Redact phone numbers, codes, and auth errors
-from logs and crash messages.
+Never persist login codes or 2FA passwords. Use secure text entry for login code
+and password input. Clear input fields immediately after submission. Redact phone
+numbers, codes, passwords, and auth errors from logs and crash messages.
 
 ### Session And Database
 
@@ -66,11 +66,17 @@ Diagnostics must be opt-in. Release builds should keep TDLib verbosity low.
 Never log:
 
 - `api_hash`
+- phone number
 - login code
 - 2FA password
 - database encryption key
 - message bodies
 - downloaded media paths unless redacted
+
+Do not log or display raw `getMe`/`getChats` JSON. `getMe` can include
+`phone_number` and profile fields; `getChats` exposes chat IDs, titles, and
+membership metadata. Probe output should omit phone numbers and secret fields
+and prefer generic success/counts.
 
 Telegraphica's logger currently keeps a bounded in-memory log and only writes a
 file when `TELEGRAPHICA_DEBUG`, `TELEGRAPHICA_DEV_LOGS`, or the

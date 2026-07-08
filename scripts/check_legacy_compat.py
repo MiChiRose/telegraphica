@@ -21,10 +21,12 @@ FORBIDDEN_TEXT = [
     ("NSSplitViewController", "Use Mavericks-safe manual NSSplitView ownership."),
     ("NSLayoutAnchor", "Use frame/autoresizing or old NSLayoutConstraint APIs."),
     ("activateConstraints:", "Use addConstraints: for Xcode 6.2 compatibility."),
+    ("NSStackView", "Use Mavericks-safe manual AppKit layout."),
+    ("NSLog(", "Use TGLogger redaction instead of direct NSLog."),
 ]
 
 GENERIC_RE = re.compile(r"\b(NSArray|NSMutableArray|NSDictionary|NSMutableDictionary|NSSet|NSMutableSet)\s*<")
-SECRET_VALUE_RE = re.compile(r"(api_hash|authentication_code|phone_number|database_encryption_key|encryption_key)\s*[:=]\s*@?\"[^\"]{6,}\"", re.I)
+SECRET_VALUE_RE = re.compile(r"(@?\"?(api_hash|authentication_code|phone_number|database_encryption_key|encryption_key|password|code)\"?\s*[:=]\s*@?\"[^\"]{6,}\")", re.I)
 
 
 def iter_files():
@@ -36,7 +38,7 @@ def iter_files():
         "DerivedData",
     ])
     for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        dirs[:] = [d for d in dirs if d not in ignored_dirs and not d.startswith("build-tdlib-")]
         for name in files:
             path = os.path.join(base, name)
             rel = os.path.relpath(path, ROOT)
@@ -66,12 +68,17 @@ def check_sources(errors):
 
         text = read_text(path)
         for needle, reason in FORBIDDEN_TEXT:
+            if needle == "NSLog(" and rel == os.path.join("Sources", "Services", "TGLogger.m"):
+                continue
             if needle in text:
                 fail(errors, rel, reason)
         if GENERIC_RE.search(text):
             fail(errors, rel, "Objective-C collection generics are not Xcode 6.2-safe.")
-        if rel.startswith("Sources/") and SECRET_VALUE_RE.search(text):
-            fail(errors, rel, "Possible committed Telegram secret or auth value.")
+        if rel.startswith("Sources/"):
+            for line in text.splitlines():
+                if SECRET_VALUE_RE.search(line):
+                    fail(errors, rel, "Possible committed Telegram secret or auth value.")
+                    break
 
 
 def check_plist(errors):

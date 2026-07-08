@@ -67,6 +67,10 @@ Replace the placeholder `api_id` and `api_hash` with values from
 `my.telegram.org`. Do not save real credentials in the repository, screenshots,
 transfer archives, or shell history.
 
+Keep `tdlib_parameters_schema` set to `auto` unless you are diagnosing a
+specific TDLib build. Use `current` for a current TDLib master dylib and
+`legacy` for TDLib 1.8.0.
+
 After the config exists, run the app again and click "Check TDLib". Expected
 result for this milestone:
 
@@ -78,6 +82,21 @@ Telegraphica generates the TDLib database encryption key locally and stores only
 that key in Keychain. The key value must never be copied into screenshots, logs,
 shell commands, or transfer archives. Re-run the app after this step to confirm
 the Keychain key is reused and TDLib advances past `waitEncryptionKey` again.
+
+For the next auth milestone, the window exposes one auth input row at a time:
+
+- `Phone` when TDLib reports `waitPhoneNumber`;
+- `Code` when TDLib reports `waitCode`;
+- `Password` when TDLib reports `waitPassword`;
+- no input when TDLib reports `ready`.
+
+When TDLib reports `ready`, "Check TDLib" should run a redacted `getMe`/`getChats`
+probe and report only generic success plus chat count, not raw account or chat
+JSON.
+
+Do not include the real phone number, login code, or 2FA password in screenshots,
+logs, shell history, or transfer archives. The details view should show only
+generic submit results and TDLib auth states.
 
 You can also test an explicit dylib path without bundling:
 
@@ -126,6 +145,78 @@ TDLIB_VERSION=v1.3.0 ./scripts/build_tdlib_legacy.sh \
   --openssl-root /path/to/openssl-prefix
 ```
 
+If login reaches `waitPhoneNumber` but Telegram rejects the phone submit with
+`UPDATE_APP_TO_LOGIN`, the TDLib/API layer is probably too old for current
+server login policy. In that case, keep Mavericks but try a newer TDLib source
+snapshot. This is experimental: it may require newer CMake/C++ compiler support
+than Xcode 6.2 can provide.
+
+Prepare the archive on a newer Mac if Mavericks cannot download it reliably:
+
+```sh
+curl -L -o ~/Desktop/td-master.tar.gz https://github.com/tdlib/td/archive/refs/heads/master.tar.gz
+```
+
+Then transfer `td-master.tar.gz` to the old Mac and build it from the unzipped
+Telegraphica folder:
+
+```sh
+TDLIB_VERSION=master-snapshot ./scripts/build_tdlib_legacy.sh \
+  --archive ~/Desktop/td-master.tar.gz \
+  --openssl-root /opt/local \
+  --build-dir build-tdlib-master-legacy \
+  --clean \
+  --allow-snapshot
+```
+
+If CMake reports `No C++17 support in the compiler`, Xcode 6.2's AppleClang is
+too old for the current TDLib snapshot. Install a newer compiler through
+MacPorts and retry with `CC`/`CXX` pointing at that compiler:
+
+```sh
+sudo port selfupdate
+sudo port install clang-17
+ls /opt/local/bin/clang*mp-17
+```
+
+Then rebuild the snapshot from a clean build directory:
+
+```sh
+CC=/opt/local/bin/clang-mp-17 \
+CXX=/opt/local/bin/clang++-mp-17 \
+TDLIB_VERSION=master-snapshot \
+./scripts/build_tdlib_legacy.sh \
+  --archive ~/Desktop/td-master.tar.gz \
+  --openssl-root /opt/local \
+  --build-dir build-tdlib-master-legacy \
+  --clean \
+  --allow-snapshot
+```
+
+Use `--clean` or a new `--build-dir` whenever changing compilers, because CMake
+caches the compiler selected during the first configure. Run the script as
+`./scripts/build_tdlib_legacy.sh` or `bash ./scripts/build_tdlib_legacy.sh`, not
+with `sh`.
+
+If `clang-17` is unavailable on that MacPorts installation, try `clang-16` or
+`clang-15` and adjust the `CC`/`CXX` paths accordingly. A newer compiler can get
+past TDLib's C++17 configure check, but the old Mavericks SDK/libc++ may still
+fail later if current TDLib uses newer library features. The resulting dylib
+still must pass `scripts/check_tdjson_legacy.sh`; otherwise it is not safe to
+bundle for Mavericks.
+
+If this succeeds, bundle the resulting dylib exactly like the v1.8.0 build:
+
+```sh
+TELEGRAPHICA_TDJSON_PATH=build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib ./build_legacy.sh
+open build-legacy/Release/Telegraphica.app
+```
+
+If the newer TDLib build fails, keep `build-tdlib-master-legacy/build.log`; that
+log is the next thing to inspect. Do not include Telegram credentials, phone
+numbers, login codes, 2FA passwords, or TDLib database files in any transferred
+archive.
+
 Useful options:
 
 ```sh
@@ -135,6 +226,8 @@ Useful options:
 --no-patch-legacy-linker
                         keep TDLib's Apple linker strip flags unchanged
 --no-patch-fdopendir    keep TDLib's fdopendir-based directory walk unchanged
+--no-patch-clock-gettime
+                        keep TDLib's POSIX clock_gettime debug code unchanged
 --allow-unknown-tag     continue if the script cannot prove the TDLib tag
 ```
 
@@ -149,6 +242,11 @@ its POSIX directory walk helper. The script patches the extracted source to clos
 the already-open file descriptor and use TDLib's existing path-based `opendir`
 fallback. This is a Mavericks compatibility shim for the spike, not a general
 upstream replacement.
+
+Current TDLib snapshots can also use `clock_gettime` and `clockid_t` while
+building debug clock output. OS X 10.9 SDK does not provide those symbols, so
+the script skips that TDLib debug clock enumeration on Apple legacy builds and
+leaves TDLib's existing `std::chrono::steady_clock` fallback in place.
 
 Expected output:
 
@@ -173,12 +271,15 @@ Click "Check TDLib". Expected success:
 - the details include `TDLib auth state: ...`;
 - if local TDLib config exists, the details include `TDLib parameters: ...`;
 - if TDLib reaches `waitEncryptionKey`, the details include `TDLib encryption key: ...`.
+- if TDLib reaches `waitPhoneNumber`, the auth row allows submitting phone,
+  then code, then 2FA password if required.
+- if TDLib reaches `ready`, the details include a redacted `getMe`/`getChats`
+  probe result with account-probe success and chat count.
 
 ## Important
 
 Do not enter or save real Telegram `api_id`, `api_hash`, phone numbers, login
-codes, or TDLib session data in this repository. Real login flow has not been
-implemented yet.
+codes, 2FA passwords, or TDLib session data in this repository.
 
 Builds produced by modern Xcode on a modern Mac are smoke tests only. The useful
 compatibility result comes from running `./build_legacy.sh` on OS X 10.9.5 /

@@ -30,6 +30,13 @@ outputs/
 .env.*
 local.env
 Secrets.plist
+*.secret.plist
+*.secrets.plist
+*.credentials.plist
+api-credentials.plist
+telegram-credentials.plist
+telegram-api.plist
+local-tdlib-config.plist
 tdlib-config.plist
 secrets/
 credentials/
@@ -45,6 +52,7 @@ telegram-cache/
 
 # Dependencies built locally during spikes
 build-tdlib-legacy/
+build-tdlib-*/
 third_party/td/
 third_party/tdlib-build/
 libtdjson.dylib
