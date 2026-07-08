@@ -38,7 +38,7 @@ def iter_files():
         "DerivedData",
     ])
     for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        dirs[:] = [d for d in dirs if d not in ignored_dirs and not d.startswith("build-tdlib-")]
         for name in files:
             path = os.path.join(base, name)
             rel = os.path.relpath(path, ROOT)
