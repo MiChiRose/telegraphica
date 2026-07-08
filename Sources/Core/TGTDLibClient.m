@@ -1314,13 +1314,27 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSArray *)mainChatIDsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSUInteger safeLimit = limit;
     if (safeLimit == 0) {
-        safeLimit = 20;
-    } else if (safeLimit > 100) {
         safeLimit = 100;
+    } else if (safeLimit > 200) {
+        safeLimit = 200;
     }
 
     NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
     [chatList setObject:@"chatListMain" forKey:@"@type"];
+
+    NSMutableDictionary *loadChatsRequest = [NSMutableDictionary dictionary];
+    [loadChatsRequest setObject:@"loadChats" forKey:@"@type"];
+    [loadChatsRequest setObject:chatList forKey:@"chat_list"];
+    [loadChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+    NSTimeInterval loadChatsTimeout = timeout;
+    if (loadChatsTimeout > 2.0) {
+        loadChatsTimeout = 2.0;
+    }
+    [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
+                              extraPrefix:@"telegraphica-load-main-chats"
+                                  timeout:loadChatsTimeout
+                                errorCode:32
+                                    error:NULL];
 
     NSMutableDictionary *getChatsRequest = [NSMutableDictionary dictionary];
     [getChatsRequest setObject:@"getChats" forKey:@"@type"];
