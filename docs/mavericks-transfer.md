@@ -67,6 +67,10 @@ Replace the placeholder `api_id` and `api_hash` with values from
 `my.telegram.org`. Do not save real credentials in the repository, screenshots,
 transfer archives, or shell history.
 
+Keep `tdlib_parameters_schema` set to `auto` unless you are diagnosing a
+specific TDLib build. Use `current` for a current TDLib master dylib and
+`legacy` for TDLib 1.8.0.
+
 After the config exists, run the app again and click "Check TDLib". Expected
 result for this milestone:
 
