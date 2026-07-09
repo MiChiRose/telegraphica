@@ -834,6 +834,62 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 @end
 
+@interface TGProfileAvatarView : NSView {
+    NSString *_displayName;
+    NSString *_avatarLocalPath;
+}
+@property (nonatomic, copy) NSString *displayName;
+@property (nonatomic, copy) NSString *avatarLocalPath;
+@end
+
+@implementation TGProfileAvatarView
+
+@synthesize displayName = _displayName;
+@synthesize avatarLocalPath = _avatarLocalPath;
+
+- (void)setDisplayName:(NSString *)displayName {
+    if (_displayName == displayName || [_displayName isEqualToString:displayName]) {
+        return;
+    }
+    [_displayName release];
+    _displayName = [displayName copy];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setAvatarLocalPath:(NSString *)avatarLocalPath {
+    if (_avatarLocalPath == avatarLocalPath || [_avatarLocalPath isEqualToString:avatarLocalPath]) {
+        return;
+    }
+    [_avatarLocalPath release];
+    _avatarLocalPath = [avatarLocalPath copy];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    CGFloat avatarSide = floor(MIN(NSWidth(bounds), NSHeight(bounds)));
+    if (avatarSide > 92.0) {
+        avatarSide = 92.0;
+    }
+    if (avatarSide < 38.0) {
+        avatarSide = 38.0;
+    }
+    NSRect avatarRect = NSMakeRect(floor(NSMidX(bounds) - (avatarSide / 2.0)),
+                                   floor(NSMidY(bounds) - (avatarSide / 2.0)),
+                                   avatarSide,
+                                   avatarSide);
+    TGDrawAvatarInRect(self.avatarLocalPath, self.displayName, avatarRect, NO);
+}
+
+- (void)dealloc {
+    [_displayName release];
+    [_avatarLocalPath release];
+    [super dealloc];
+}
+
+@end
+
 @interface TGChatListCell : NSTextFieldCell {
     TGChatItem *_chatItem;
 }
@@ -973,6 +1029,85 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 @end
 
+@interface TGGroupedCardView : NSView
+@end
+
+@implementation TGGroupedCardView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSRect cardRect = NSInsetRect(bounds, 0.5, 0.5);
+    NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect
+                                                             xRadius:14.0
+                                                             yRadius:14.0];
+    [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
+    [cardPath fill];
+    [[NSColor colorWithCalibratedWhite:0.78 alpha:0.62] set];
+    [cardPath setLineWidth:1.0];
+    [cardPath stroke];
+}
+
+@end
+
+static void TGStrokeLine(NSPoint startPoint, NSPoint endPoint, CGFloat width) {
+    NSBezierPath *path = [NSBezierPath bezierPath];
+    [path setLineWidth:width];
+    [path moveToPoint:startPoint];
+    [path lineToPoint:endPoint];
+    [path stroke];
+}
+
+static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *color) {
+    [color set];
+    if ([title isEqualToString:@"Chats"]) {
+        NSRect backBubble = NSMakeRect(NSMinX(iconRect) + 1.0, NSMinY(iconRect) + 5.0, 12.0, 8.0);
+        NSRect frontBubble = NSMakeRect(NSMinX(iconRect) + 5.0, NSMinY(iconRect) + 2.0, 13.0, 9.0);
+        [[NSBezierPath bezierPathWithRoundedRect:backBubble xRadius:3.0 yRadius:3.0] stroke];
+        [[NSBezierPath bezierPathWithRoundedRect:frontBubble xRadius:3.0 yRadius:3.0] fill];
+    } else if ([title isEqualToString:@"Profile"]) {
+        NSRect headRect = NSMakeRect(NSMidX(iconRect) - 4.0, NSMinY(iconRect) + 10.0, 8.0, 8.0);
+        [[NSBezierPath bezierPathWithOvalInRect:headRect] stroke];
+        NSBezierPath *bodyPath = [NSBezierPath bezierPath];
+        [bodyPath setLineWidth:1.4];
+        [bodyPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 4.0, NSMinY(iconRect) + 3.0)];
+        [bodyPath curveToPoint:NSMakePoint(NSMaxX(iconRect) - 4.0, NSMinY(iconRect) + 3.0)
+                 controlPoint1:NSMakePoint(NSMinX(iconRect) + 6.0, NSMinY(iconRect) + 8.0)
+                 controlPoint2:NSMakePoint(NSMaxX(iconRect) - 6.0, NSMinY(iconRect) + 8.0)];
+        [bodyPath stroke];
+    } else if ([title isEqualToString:@"Settings"]) {
+        CGFloat y1 = NSMinY(iconRect) + 14.0;
+        CGFloat y2 = NSMinY(iconRect) + 9.0;
+        CGFloat y3 = NSMinY(iconRect) + 4.0;
+        TGStrokeLine(NSMakePoint(NSMinX(iconRect) + 2.0, y1), NSMakePoint(NSMaxX(iconRect) - 2.0, y1), 1.4);
+        TGStrokeLine(NSMakePoint(NSMinX(iconRect) + 2.0, y2), NSMakePoint(NSMaxX(iconRect) - 2.0, y2), 1.4);
+        TGStrokeLine(NSMakePoint(NSMinX(iconRect) + 2.0, y3), NSMakePoint(NSMaxX(iconRect) - 2.0, y3), 1.4);
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(NSMinX(iconRect) + 5.0, y1 - 2.0, 4.0, 4.0)] fill];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(NSMaxX(iconRect) - 9.0, y2 - 2.0, 4.0, 4.0)] fill];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(NSMidX(iconRect) - 2.0, y3 - 2.0, 4.0, 4.0)] fill];
+    } else if ([title isEqualToString:@"Logs"]) {
+        NSRect pageRect = NSInsetRect(iconRect, 3.0, 2.0);
+        [[NSBezierPath bezierPathWithRoundedRect:pageRect xRadius:2.0 yRadius:2.0] stroke];
+        TGStrokeLine(NSMakePoint(NSMinX(pageRect) + 3.0, NSMaxY(pageRect) - 5.0),
+                     NSMakePoint(NSMaxX(pageRect) - 3.0, NSMaxY(pageRect) - 5.0), 1.1);
+        TGStrokeLine(NSMakePoint(NSMinX(pageRect) + 3.0, NSMaxY(pageRect) - 9.0),
+                     NSMakePoint(NSMaxX(pageRect) - 3.0, NSMaxY(pageRect) - 9.0), 1.1);
+        TGStrokeLine(NSMakePoint(NSMinX(pageRect) + 3.0, NSMaxY(pageRect) - 13.0),
+                     NSMakePoint(NSMaxX(pageRect) - 6.0, NSMaxY(pageRect) - 13.0), 1.1);
+    } else if ([title isEqualToString:@"About"]) {
+        NSRect circleRect = NSInsetRect(iconRect, 2.5, 2.5);
+        [[NSBezierPath bezierPathWithOvalInRect:circleRect] stroke];
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                    color, NSForegroundColorAttributeName,
+                                    nil];
+        NSSize size = [@"i" sizeWithAttributes:attributes];
+        [@"i" drawAtPoint:NSMakePoint(NSMidX(iconRect) - (size.width / 2.0),
+                                      NSMidY(iconRect) - (size.height / 2.0) - 0.5)
+           withAttributes:attributes];
+    }
+}
+
 @interface TGNavigationButtonCell : NSButtonCell
 @end
 
@@ -988,7 +1123,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
     CGFloat alpha = enabled ? 1.0 : 0.46;
-    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 2.0);
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
     NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:6.0 yRadius:6.0];
 
     NSColor *fillColor = nil;
@@ -1011,13 +1146,18 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSString *title = [self title] ? [self title] : @"";
     NSFont *font = selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0];
     NSColor *textColor = selected ? TGClassicNavigationTextColor(alpha) : TGClassicNavigationMutedTextColor(alpha);
+    NSRect iconRect = NSMakeRect(floor(NSMidX(cellFrame) - 9.0),
+                                 NSMaxY(cellFrame) - 24.0,
+                                 18.0,
+                                 18.0);
+    TGDrawNavigationIcon(title, iconRect, textColor);
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 font, NSFontAttributeName,
                                 textColor, NSForegroundColorAttributeName,
                                 nil];
     NSSize titleSize = [title sizeWithAttributes:attributes];
     NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + floor((NSWidth(cellFrame) - titleSize.width) / 2.0),
-                                  NSMinY(cellFrame) + floor((NSHeight(cellFrame) - titleSize.height) / 2.0),
+                                  NSMinY(cellFrame) + 7.0,
                                   titleSize.width,
                                   titleSize.height);
     [title drawInRect:titleRect withAttributes:attributes];
@@ -1205,6 +1345,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, retain) NSView *aboutPanelView;
 @property (nonatomic, retain) NSArray *navigationButtons;
 @property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
+@property (nonatomic, retain) TGGroupedCardView *profileSummaryCardView;
+@property (nonatomic, retain) TGGroupedCardView *profileInfoCardView;
+@property (nonatomic, retain) TGProfileAvatarView *profileAvatarView;
+@property (nonatomic, retain) TGGroupedCardView *settingsAccountCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsThemeCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsSessionCardView;
+@property (nonatomic, retain) TGGroupedCardView *aboutCardView;
+@property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) NSTextField *statusField;
@@ -1289,6 +1437,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize aboutPanelView = _aboutPanelView;
 @synthesize navigationButtons = _navigationButtons;
 @synthesize accountBadgeView = _accountBadgeView;
+@synthesize profileSummaryCardView = _profileSummaryCardView;
+@synthesize profileInfoCardView = _profileInfoCardView;
+@synthesize profileAvatarView = _profileAvatarView;
+@synthesize settingsAccountCardView = _settingsAccountCardView;
+@synthesize settingsThemeCardView = _settingsThemeCardView;
+@synthesize settingsSessionCardView = _settingsSessionCardView;
+@synthesize aboutCardView = _aboutCardView;
+@synthesize logsCardView = _logsCardView;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
 @synthesize statusField = _statusField;
 @synthesize titleField = _titleField;
@@ -1438,6 +1594,23 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     }
 }
 
+- (void)applyDestructiveSettingsButtonStyle:(NSButton *)button {
+    [button setButtonType:NSMomentaryPushInButton];
+    [button setBezelStyle:NSRegularSquareBezelStyle];
+    [button setBordered:NO];
+    [button setImagePosition:NSNoImage];
+    [button setFocusRingType:NSFocusRingTypeExterior];
+    [button setFont:[NSFont systemFontOfSize:14.0]];
+    [[button cell] setAlignment:NSLeftTextAlignment];
+
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont systemFontOfSize:14.0], NSFontAttributeName,
+                                [NSColor colorWithCalibratedRed:0.920 green:0.140 blue:0.140 alpha:1.0], NSForegroundColorAttributeName,
+                                nil];
+    NSAttributedString *title = [[[NSAttributedString alloc] initWithString:@"Logout" attributes:attributes] autorelease];
+    [button setAttributedTitle:title];
+}
+
 - (void)applySkeuomorphicTextFieldStyle:(NSTextField *)textField {
     [textField setBezeled:YES];
     [textField setBordered:YES];
@@ -1514,10 +1687,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self applyMutedLabelStyle:self.profileStateField];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
-    [self applyMutedLabelStyle:self.settingsThemeLabel];
+    [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.aboutVersionField];
     [self applyMutedLabelStyle:self.aboutCopyrightField];
     [self.aboutLinkField setTextColor:TGClassicLinkColor()];
+    [self applyDestructiveSettingsButtonStyle:self.logoutButton];
 
     [self applySkeuomorphicTextFieldStyle:self.authTextField];
     [self applySkeuomorphicTextFieldStyle:self.authSecureField];
@@ -1561,17 +1735,19 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.accountBadgeView setDisplayName:displayName];
     [self.accountBadgeView setAvatarLocalPath:self.profileAvatarLocalPath];
     [self.accountBadgeView setConnected:[self.currentAuthState isEqualToString:@"ready"]];
+    [self.profileAvatarView setDisplayName:displayName];
+    [self.profileAvatarView setAvatarLocalPath:self.profileAvatarLocalPath];
 
     if ([self.profileDisplayName length] > 0) {
-        [self.profileNameField setStringValue:[NSString stringWithFormat:@"Name: %@", self.profileDisplayName]];
-        [self.settingsStateField setStringValue:[NSString stringWithFormat:@"Account: %@", self.profileDisplayName]];
+        [self.profileNameField setStringValue:self.profileDisplayName];
+        [self.settingsStateField setStringValue:self.profileDisplayName];
     } else {
-        [self.profileNameField setStringValue:@"Name"];
-        [self.settingsStateField setStringValue:@"Account"];
+        [self.profileNameField setStringValue:@"Profile"];
+        [self.settingsStateField setStringValue:@"Profile"];
     }
 
     if ([self.profileUsername length] > 0) {
-        NSString *usernameText = [NSString stringWithFormat:@"Username: @%@", self.profileUsername];
+        NSString *usernameText = [NSString stringWithFormat:@"@%@", self.profileUsername];
         [self.profileUsernameField setStringValue:usernameText];
         [self.settingsLibraryField setStringValue:usernameText];
     } else {
@@ -1655,7 +1831,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.statusField setHidden:YES];
     [contentView addSubview:self.statusField];
 
-    NSArray *navigationTitles = [NSArray arrayWithObjects:@"Chats", @"Profile", @"Settings", @"About", @"Logs", nil];
+    NSArray *navigationTitles = [NSArray arrayWithObjects:@"Chats", @"Profile", @"Settings", @"Logs", @"About", nil];
+    NSInteger navigationTags[] = {0, 1, 2, 4, 3};
     NSMutableArray *navigationButtons = [NSMutableArray arrayWithCapacity:[navigationTitles count]];
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [navigationTitles count]; navigationIndex++) {
@@ -1667,7 +1844,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [navigationButton setTitle:buttonTitle];
         [navigationButton setButtonType:NSToggleButton];
         [navigationButton setBordered:NO];
-        [navigationButton setTag:(NSInteger)navigationIndex];
+        [navigationButton setTag:navigationTags[navigationIndex]];
+        [navigationButton setToolTip:buttonTitle];
         [navigationButton setTarget:self];
         [navigationButton setAction:@selector(navigationChanged:)];
         [navigationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
@@ -1675,6 +1853,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [navigationButtons addObject:navigationButton];
     }
     self.navigationButtons = navigationButtons;
+
+    self.logsCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 410, 712, 210)] autorelease];
+    [self.logsCardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:self.logsCardView];
 
     self.detailsScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 410, 712, 210)] autorelease];
     [self.detailsScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
@@ -1902,6 +2084,18 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.checkButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.checkButton];
 
+    self.profileSummaryCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 370, 620, 160)] autorelease];
+    [self.profileSummaryCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.profileSummaryCardView];
+
+    self.profileInfoCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 300, 620, 54)] autorelease];
+    [self.profileInfoCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.profileInfoCardView];
+
+    self.profileAvatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(446, 424, 88, 88)] autorelease];
+    [self.profileAvatarView setAutoresizingMask:NSViewMinYMargin];
+    [contentView addSubview:self.profileAvatarView];
+
     self.profileTitleField = [self labelWithFrame:NSMakeRect(40, 520, 400, 28)
                                              text:@"My Profile"
                                              font:[NSFont boldSystemFontOfSize:18.0]];
@@ -1909,19 +2103,22 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.profileTitleField];
 
     self.profileNameField = [self labelWithFrame:NSMakeRect(64, 458, 620, 24)
-                                            text:@"Name"
-                                            font:[NSFont systemFontOfSize:14.0]];
+                                            text:@"Profile"
+                                            font:[NSFont boldSystemFontOfSize:16.0]];
+    [self.profileNameField setAlignment:NSCenterTextAlignment];
     [contentView addSubview:self.profileNameField];
 
     self.profileUsernameField = [self labelWithFrame:NSMakeRect(64, 424, 620, 24)
                                                 text:@""
                                                 font:[NSFont systemFontOfSize:13.0]];
+    [self.profileUsernameField setAlignment:NSCenterTextAlignment];
     [self applyMutedLabelStyle:self.profileUsernameField];
     [contentView addSubview:self.profileUsernameField];
 
     self.profileIDField = [self labelWithFrame:NSMakeRect(64, 392, 620, 24)
                                            text:@""
                                            font:[NSFont systemFontOfSize:13.0]];
+    [self.profileIDField setAlignment:NSCenterTextAlignment];
     [self applyMutedLabelStyle:self.profileIDField];
     [contentView addSubview:self.profileIDField];
 
@@ -1931,6 +2128,18 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [[self.profileStateField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.profileStateField];
     [contentView addSubview:self.profileStateField];
+
+    self.settingsAccountCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 380, 760, 100)] autorelease];
+    [self.settingsAccountCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsAccountCardView];
+
+    self.settingsThemeCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 316, 760, 54)] autorelease];
+    [self.settingsThemeCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsThemeCardView];
+
+    self.settingsSessionCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 250, 760, 54)] autorelease];
+    [self.settingsSessionCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsSessionCardView];
 
     self.settingsTitleField = [self labelWithFrame:NSMakeRect(40, 520, 400, 28)
                                               text:@"Settings"
@@ -1958,9 +2167,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.settingsStorageField];
 
     self.settingsThemeLabel = [self labelWithFrame:NSMakeRect(64, 332, 88, 24)
-                                              text:@"Theme:"
+                                              text:@"Theme"
                                               font:[NSFont systemFontOfSize:13.0]];
-    [self applyMutedLabelStyle:self.settingsThemeLabel];
     [contentView addSubview:self.settingsThemeLabel];
 
     self.themePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(154, 326, 300, 30) pullsDown:NO] autorelease];
@@ -1981,9 +2189,13 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.logoutButton setTitle:@"Logout"];
     [self.logoutButton setTarget:self];
     [self.logoutButton setAction:@selector(logout:)];
-    [self applySkeuomorphicButtonStyle:self.logoutButton isPrimary:NO];
+    [self applyDestructiveSettingsButtonStyle:self.logoutButton];
     [self.logoutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.logoutButton];
+
+    self.aboutCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(240, 230, 500, 310)] autorelease];
+    [self.aboutCardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:self.aboutCardView];
 
     self.aboutIconView = [[[NSImageView alloc] initWithFrame:NSMakeRect(430, 396, 120, 120)] autorelease];
     NSImage *appIcon = [NSImage imageNamed:@"Telegraphica"];
@@ -2146,15 +2358,25 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self showView:self.sendMessageButton visible:showChats];
 
     BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
+    BOOL hasProfileID = ([[self.profileIDField stringValue] length] > 0);
     [self showView:self.profilePanelView visible:showProfile];
+    [self showView:self.profileSummaryCardView visible:showProfile];
+    [self showView:self.profileInfoCardView visible:(showProfile && hasProfileID)];
+    [self showView:self.profileAvatarView visible:showProfile];
     [self showView:self.profileTitleField visible:showProfile];
     [self showView:self.profileNameField visible:(showProfile && [[self.profileNameField stringValue] length] > 0)];
     [self showView:self.profileUsernameField visible:(showProfile && [[self.profileUsernameField stringValue] length] > 0)];
-    [self showView:self.profileIDField visible:(showProfile && [[self.profileIDField stringValue] length] > 0)];
+    [self showView:self.profileIDField visible:(showProfile && hasProfileID)];
     [self showView:self.profileStateField visible:(showProfile && [[self.profileStateField stringValue] length] > 0)];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
+    BOOL hasSettingsAccount = ([[self.settingsStateField stringValue] length] > 0 ||
+                               [[self.settingsLibraryField stringValue] length] > 0 ||
+                               [[self.settingsStorageField stringValue] length] > 0);
     [self showView:self.settingsPanelView visible:showSettings];
+    [self showView:self.settingsAccountCardView visible:(showSettings && hasSettingsAccount)];
+    [self showView:self.settingsThemeCardView visible:showSettings];
+    [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:(showSettings && [[self.settingsStateField stringValue] length] > 0)];
     [self showView:self.settingsLibraryField visible:(showSettings && [[self.settingsLibraryField stringValue] length] > 0)];
@@ -2165,6 +2387,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     BOOL showAbout = (ready && [section isEqualToString:TGSectionAbout]);
     [self showView:self.aboutPanelView visible:showAbout];
+    [self showView:self.aboutCardView visible:showAbout];
     [self showView:self.aboutIconView visible:showAbout];
     [self showView:self.aboutTitleField visible:showAbout];
     [self showView:self.aboutVersionField visible:showAbout];
@@ -2172,6 +2395,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self showView:self.aboutLinkField visible:showAbout];
 
     [self showView:self.diagnosticsPanelView visible:showLogs];
+    [self showView:self.logsCardView visible:showLogs];
     [self showView:self.diagnosticsLabel visible:showLogs];
     [self showView:self.detailsScrollView visible:showLogs];
     [self showView:self.checkButton visible:showLogs];
@@ -2239,12 +2463,23 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [[self.statusField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self.statusField setFrame:NSMakeRect(railX + 9.0, railTop - 66.0, railWidth - 18.0, 14.0)];
 
-    CGFloat navigationButtonY = railTop - 126.0;
+    CGFloat navigationButtonHeight = 54.0;
+    CGFloat navigationButtonGap = 8.0;
+    CGFloat navigationButtonY = railTop - 134.0;
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
-        [navigationButton setFrame:NSMakeRect(railX + 8.0, navigationButtonY, railWidth - 16.0, 30.0)];
-        navigationButtonY -= 38.0;
+        if (navigationIndex < 3) {
+            [navigationButton setFrame:NSMakeRect(railX + 8.0, navigationButtonY, railWidth - 16.0, navigationButtonHeight)];
+            navigationButtonY -= (navigationButtonHeight + navigationButtonGap);
+        } else if (navigationIndex == 3) {
+            CGFloat aboutButtonY = railY + 16.0;
+            CGFloat logsButtonY = aboutButtonY + navigationButtonHeight + navigationButtonGap;
+            [navigationButton setFrame:NSMakeRect(railX + 8.0, logsButtonY, railWidth - 16.0, navigationButtonHeight)];
+        } else {
+            CGFloat aboutButtonY = railY + 16.0;
+            [navigationButton setFrame:NSMakeRect(railX + 8.0, aboutButtonY, railWidth - 16.0, navigationButtonHeight)];
+        }
     }
     CGFloat loginWidth = mainWidth - 96.0;
     if (loginWidth > 580.0) {
@@ -2326,31 +2561,88 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 3.0, sendButtonWidth, 30.0)];
 
     CGFloat panelTitleY = headerLabelY;
+    CGFloat contentTop = mainTop - TGPanelHeaderHeight;
+    CGFloat groupedWidth = mainWidth - 56.0;
+    if (groupedWidth > 760.0) {
+        groupedWidth = 760.0;
+    }
+    if (groupedWidth < 360.0) {
+        groupedWidth = mainWidth - 32.0;
+    }
+    CGFloat groupedX = mainX + floor((mainWidth - groupedWidth) / 2.0);
+
     [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    [self.profileNameField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
-    [self.profileIDField setFrame:NSMakeRect(mainX + 48.0, mainTop - 168.0, mainWidth - 96.0, 24.0)];
-    [self.profileStateField setFrame:NSMakeRect(mainX + 48.0, mainTop - 226.0, mainWidth - 96.0, 46.0)];
+    CGFloat profileSummaryHeight = 186.0;
+    CGFloat profileSummaryY = contentTop - profileSummaryHeight - 22.0;
+    [self.profileSummaryCardView setFrame:NSMakeRect(groupedX, profileSummaryY, groupedWidth, profileSummaryHeight)];
+    CGFloat profileAvatarSize = 88.0;
+    [self.profileAvatarView setFrame:NSMakeRect(groupedX + floor((groupedWidth - profileAvatarSize) / 2.0),
+                                                profileSummaryY + profileSummaryHeight - profileAvatarSize - 18.0,
+                                                profileAvatarSize,
+                                                profileAvatarSize)];
+    [self.profileNameField setFrame:NSMakeRect(groupedX + 24.0, profileSummaryY + 52.0, groupedWidth - 48.0, 24.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(groupedX + 24.0, profileSummaryY + 28.0, groupedWidth - 48.0, 20.0)];
+    CGFloat profileInfoY = profileSummaryY - 66.0;
+    [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileInfoY, groupedWidth, 54.0)];
+    [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileInfoY + 17.0, groupedWidth - 44.0, 20.0)];
+    [self.profileStateField setFrame:NSMakeRect(groupedX + 22.0, profileInfoY - 66.0, groupedWidth - 44.0, 46.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    [self.settingsStateField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
-    [self.settingsLibraryField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
-    [self.settingsStorageField setFrame:NSMakeRect(mainX + 48.0, mainTop - 190.0, mainWidth - 96.0, 46.0)];
-    [self.settingsThemeLabel setFrame:NSMakeRect(mainX + 48.0, mainTop - 246.0, 82.0, 24.0)];
-    [self.themePopUpButton setFrame:NSMakeRect(mainX + 132.0, mainTop - 252.0, 300.0, 30.0)];
-    [self.logoutButton setFrame:NSMakeRect(mainX + 48.0, mainTop - 308.0, 132.0, 32.0)];
+    CGFloat settingsCardY = contentTop - 128.0;
+    [self.settingsAccountCardView setFrame:NSMakeRect(groupedX, settingsCardY, groupedWidth, 106.0)];
+    [self.settingsStateField setFrame:NSMakeRect(groupedX + 22.0, settingsCardY + 72.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsLibraryField setFrame:NSMakeRect(groupedX + 22.0, settingsCardY + 44.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsStorageField setFrame:NSMakeRect(groupedX + 22.0, settingsCardY + 16.0, groupedWidth - 44.0, 22.0)];
 
+    CGFloat themeCardY = settingsCardY - 68.0;
+    [self.settingsThemeCardView setFrame:NSMakeRect(groupedX, themeCardY, groupedWidth, 54.0)];
+    CGFloat themePopupWidth = 300.0;
+    if (themePopupWidth > groupedWidth - 150.0) {
+        themePopupWidth = groupedWidth - 150.0;
+    }
+    if (themePopupWidth < 180.0) {
+        themePopupWidth = 180.0;
+    }
+    CGFloat themeLabelWidth = 72.0;
+    CGFloat themeClusterWidth = themeLabelWidth + 16.0 + themePopupWidth;
+    CGFloat themeClusterX = groupedX + floor((groupedWidth - themeClusterWidth) / 2.0);
+    if (themeClusterX < groupedX + 22.0) {
+        themeClusterX = groupedX + 22.0;
+    }
+    [self.settingsThemeLabel setFrame:NSMakeRect(themeClusterX, themeCardY + 17.0, themeLabelWidth, 20.0)];
+    [self.themePopUpButton setFrame:NSMakeRect(themeClusterX + themeLabelWidth + 16.0,
+                                               themeCardY + 12.0,
+                                               themePopupWidth,
+                                               30.0)];
+
+    CGFloat sessionCardY = themeCardY - 68.0;
+    [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, sessionCardY, groupedWidth, 54.0)];
+    [self.logoutButton setFrame:NSMakeRect(groupedX + 22.0, sessionCardY + 12.0, groupedWidth - 44.0, 30.0)];
+
+    CGFloat aboutWidth = groupedWidth;
+    if (aboutWidth > 560.0) {
+        aboutWidth = 560.0;
+    }
+    CGFloat aboutX = mainX + floor((mainWidth - aboutWidth) / 2.0);
+    CGFloat aboutHeight = 326.0;
+    CGFloat aboutY = contentTop - aboutHeight - 24.0;
+    [self.aboutCardView setFrame:NSMakeRect(aboutX, aboutY, aboutWidth, aboutHeight)];
     CGFloat aboutIconSize = 118.0;
-    CGFloat aboutCenterX = mainX + (mainWidth / 2.0);
-    [self.aboutIconView setFrame:NSMakeRect(aboutCenterX - (aboutIconSize / 2.0), mainTop - 174.0, aboutIconSize, aboutIconSize)];
-    [self.aboutTitleField setFrame:NSMakeRect(mainX + 90.0, mainTop - 220.0, mainWidth - 180.0, 30.0)];
-    [self.aboutVersionField setFrame:NSMakeRect(mainX + 90.0, mainTop - 252.0, mainWidth - 180.0, 22.0)];
-    [self.aboutCopyrightField setFrame:NSMakeRect(mainX + 90.0, mainTop - 286.0, mainWidth - 180.0, 22.0)];
-    [self.aboutLinkField setFrame:NSMakeRect(mainX + 90.0, mainTop - 320.0, mainWidth - 180.0, 22.0)];
+    CGFloat aboutCenterX = aboutX + (aboutWidth / 2.0);
+    [self.aboutIconView setFrame:NSMakeRect(aboutCenterX - (aboutIconSize / 2.0), aboutY + aboutHeight - aboutIconSize - 26.0, aboutIconSize, aboutIconSize)];
+    [self.aboutTitleField setFrame:NSMakeRect(aboutX + 36.0, aboutY + 134.0, aboutWidth - 72.0, 30.0)];
+    [self.aboutVersionField setFrame:NSMakeRect(aboutX + 36.0, aboutY + 104.0, aboutWidth - 72.0, 22.0)];
+    [self.aboutCopyrightField setFrame:NSMakeRect(aboutX + 36.0, aboutY + 72.0, aboutWidth - 72.0, 22.0)];
+    [self.aboutLinkField setFrame:NSMakeRect(aboutX + 36.0, aboutY + 40.0, aboutWidth - 72.0, 22.0)];
 
-    [self.diagnosticsLabel setFrame:NSMakeRect(mainX + 14.0, mainTop - 30.0, 160.0, 18.0)];
-    [self.checkButton setFrame:NSMakeRect(mainX + mainWidth - 158.0, mainTop - 36.0, 142.0, 30.0)];
-    [self.detailsScrollView setFrame:NSMakeRect(mainX + 12.0, mainY + 12.0, mainWidth - 24.0, mainHeight - 56.0)];
+    [self.diagnosticsLabel setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 160.0, 18.0)];
+    [self.checkButton setFrame:NSMakeRect(mainX + mainWidth - 166.0, headerButtonY, 150.0, headerButtonSize)];
+    CGFloat logsCardX = mainX + 18.0;
+    CGFloat logsCardY = mainY + 18.0;
+    CGFloat logsCardWidth = mainWidth - 36.0;
+    CGFloat logsCardHeight = mainHeight - TGPanelHeaderHeight - 36.0;
+    [self.logsCardView setFrame:NSMakeRect(logsCardX, logsCardY, logsCardWidth, logsCardHeight)];
+    [self.detailsScrollView setFrame:NSMakeRect(logsCardX + 12.0, logsCardY + 12.0, logsCardWidth - 24.0, logsCardHeight - 24.0)];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -4250,6 +4542,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_aboutPanelView release];
     [_navigationButtons release];
     [_accountBadgeView release];
+    [_profileSummaryCardView release];
+    [_profileInfoCardView release];
+    [_profileAvatarView release];
+    [_settingsAccountCardView release];
+    [_settingsThemeCardView release];
+    [_settingsSessionCardView release];
+    [_aboutCardView release];
+    [_logsCardView release];
     [_diagnosticsLabel release];
     [_titleField release];
     [_statusField release];
