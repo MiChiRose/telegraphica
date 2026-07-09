@@ -34,6 +34,28 @@
     return [self.contentType isEqualToString:@"messagePhoto"];
 }
 
+- (BOOL)isVisualMediaMessage {
+    if ([self isPhotoMessage]) {
+        return YES;
+    }
+    return ([self.contentType isEqualToString:@"messageSticker"] ||
+            [self.contentType isEqualToString:@"messageAnimation"] ||
+            [self.contentType isEqualToString:@"messageVideo"]);
+}
+
+- (NSString *)visualMediaPlaceholderTitle {
+    if ([self.contentType isEqualToString:@"messageSticker"]) {
+        return @"Sticker";
+    }
+    if ([self.contentType isEqualToString:@"messageAnimation"]) {
+        return @"GIF";
+    }
+    if ([self.contentType isEqualToString:@"messageVideo"]) {
+        return @"Video";
+    }
+    return @"Photo";
+}
+
 - (NSString *)directionSummary {
     return self.outgoing ? @"Outgoing" : @"Incoming";
 }

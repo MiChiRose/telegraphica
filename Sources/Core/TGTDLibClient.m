@@ -1749,6 +1749,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 }
 
 - (NSString *)textFromFormattedTextObject:(id)object {
+    if ([object isKindOfClass:[NSString class]]) {
+        return [self singleLineTrimmedString:(NSString *)object maximumLength:300];
+    }
     if (![object isKindOfClass:[NSDictionary class]]) {
         return @"";
     }
@@ -1936,6 +1939,83 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                       didRequestDownload:didRequestDownload];
 }
 
+- (NSDictionary *)visualMediaInfoFromContainerObject:(id)containerObject
+                                   downloadMissing:(BOOL)downloadMissing
+                                           timeout:(NSTimeInterval)timeout
+                                didRequestDownload:(BOOL *)didRequestDownload {
+    if (![containerObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *container = (NSDictionary *)containerObject;
+    id widthObject = [container objectForKey:@"width"];
+    id heightObject = [container objectForKey:@"height"];
+    NSNumber *width = [widthObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[widthObject integerValue]] : nil;
+    NSNumber *height = [heightObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[heightObject integerValue]] : nil;
+
+    id thumbnail = [container objectForKey:@"thumbnail"];
+    if ([thumbnail isKindOfClass:[NSDictionary class]]) {
+        id thumbnailFile = [(NSDictionary *)thumbnail objectForKey:@"file"];
+        return [self photoInfoFromFileObject:thumbnailFile
+                                       width:width
+                                      height:height
+                             downloadMissing:downloadMissing
+                                     timeout:timeout
+                          didRequestDownload:didRequestDownload];
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    if (width) {
+        [info setObject:width forKey:@"width"];
+    }
+    if (height) {
+        [info setObject:height forKey:@"height"];
+    }
+    return ([info count] > 0) ? info : nil;
+}
+
+- (NSDictionary *)visualMediaInfoFromMessageContentObject:(id)contentObject
+                                          downloadMissing:(BOOL)downloadMissing
+                                                  timeout:(NSTimeInterval)timeout
+                                       didRequestDownload:(BOOL *)didRequestDownload {
+    if (![contentObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *content = (NSDictionary *)contentObject;
+    id typeObject = [content objectForKey:@"@type"];
+    if (![typeObject isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    NSString *type = (NSString *)typeObject;
+    if ([type isEqualToString:@"messagePhoto"]) {
+        return [self photoInfoFromMessageContentObject:contentObject
+                                       downloadMissing:downloadMissing
+                                               timeout:timeout
+                                    didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageSticker"]) {
+        return [self visualMediaInfoFromContainerObject:[content objectForKey:@"sticker"]
+                                        downloadMissing:downloadMissing
+                                                timeout:timeout
+                                     didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageAnimation"]) {
+        return [self visualMediaInfoFromContainerObject:[content objectForKey:@"animation"]
+                                        downloadMissing:downloadMissing
+                                                timeout:timeout
+                                     didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageVideo"]) {
+        return [self visualMediaInfoFromContainerObject:[content objectForKey:@"video"]
+                                        downloadMissing:downloadMissing
+                                                timeout:timeout
+                                     didRequestDownload:didRequestDownload];
+    }
+    return nil;
+}
+
 - (NSDictionary *)photoInfoFromChatPhotoObject:(id)photoObject
                                downloadMissing:(BOOL)downloadMissing
                                        timeout:(NSTimeInterval)timeout
@@ -1988,6 +2068,16 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     NSString *label = [labels objectForKey:type];
     if ([label length] == 0) {
         label = @"[Service message]";
+    }
+
+    if ([type isEqualToString:@"messageSticker"]) {
+        id sticker = [content objectForKey:@"sticker"];
+        if ([sticker isKindOfClass:[NSDictionary class]]) {
+            id emoji = [(NSDictionary *)sticker objectForKey:@"emoji"];
+            if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0) {
+                label = [NSString stringWithFormat:@"%@ %@", label, emoji];
+            }
+        }
     }
 
     NSString *caption = [self textFromFormattedTextObject:[content objectForKey:@"caption"]];
@@ -2058,7 +2148,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
-    NSUInteger photoDownloadsRemaining = 6;
+    NSUInteger visualMediaDownloadsRemaining = 8;
     for (index = 0; index < [(NSArray *)messages count]; index++) {
         id messageObject = [(NSArray *)messages objectAtIndex:index];
         if (![messageObject isKindOfClass:[NSDictionary class]]) {
@@ -2106,13 +2196,13 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
         [item setSending:([[message objectForKey:@"sending_state"] isKindOfClass:[NSDictionary class]])];
-        BOOL didRequestPhotoDownload = NO;
-        NSDictionary *photoInfo = [self photoInfoFromMessageContentObject:contentObject
-                                                           downloadMissing:(photoDownloadsRemaining > 0)
-                                                                   timeout:1.5
-                                                        didRequestDownload:&didRequestPhotoDownload];
-        if (didRequestPhotoDownload && photoDownloadsRemaining > 0) {
-            photoDownloadsRemaining--;
+        BOOL didRequestMediaDownload = NO;
+        NSDictionary *photoInfo = [self visualMediaInfoFromMessageContentObject:contentObject
+                                                                downloadMissing:(visualMediaDownloadsRemaining > 0)
+                                                                        timeout:1.5
+                                                             didRequestDownload:&didRequestMediaDownload];
+        if (didRequestMediaDownload && visualMediaDownloadsRemaining > 0) {
+            visualMediaDownloadsRemaining--;
         }
         NSString *mediaPath = [photoInfo objectForKey:@"local_path"];
         if ([mediaPath length] > 0) {
@@ -2124,6 +2214,78 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     }
 
     return items;
+}
+
+- (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:57];
+        }
+        return NO;
+    }
+    if (![messageIDs isKindOfClass:[NSArray class]] || [messageIDs count] == 0) {
+        return YES;
+    }
+
+    NSMutableArray *safeMessageIDs = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [messageIDs count]; index++) {
+        id messageID = [messageIDs objectAtIndex:index];
+        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
+            [safeMessageIDs addObject:[NSNumber numberWithLongLong:[messageID longLongValue]]];
+        }
+    }
+    if ([safeMessageIDs count] == 0) {
+        return YES;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to mark messages read. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:58];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"viewMessages" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:safeMessageIDs forKey:@"message_ids"];
+    [request setObject:[NSDictionary dictionaryWithObject:@"messageSourceChatHistory" forKey:@"@type"] forKey:@"source"];
+    [request setObject:[NSNumber numberWithBool:YES] forKey:@"force_read"];
+
+    NSError *currentSchemaError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-view-messages"
+                                                           timeout:timeout
+                                                         errorCode:59
+                                                             error:&currentSchemaError];
+    if (!response) {
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [legacyRequest removeObjectForKey:@"source"];
+        [legacyRequest setObject:[NSNumber numberWithLongLong:0] forKey:@"message_thread_id"];
+        response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
+                                             extraPrefix:@"telegraphica-view-messages-legacy"
+                                                 timeout:timeout
+                                               errorCode:59
+                                                   error:error];
+        if (!response) {
+            if (error && *error == nil) {
+                *error = currentSchemaError;
+            }
+            return NO;
+        }
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib viewMessages returned an unexpected response." code:60];
+        }
+        return NO;
+    }
+    return YES;
 }
 
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -2347,7 +2509,24 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     }
     id userID = [userResponse objectForKey:@"id"];
     if ([userID respondsToSelector:@selector(longLongValue)]) {
-        [summary setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"id"];
+        NSNumber *safeUserID = [NSNumber numberWithLongLong:[userID longLongValue]];
+        [summary setObject:safeUserID forKey:@"id"];
+
+        NSMutableDictionary *fullInfoRequest = [NSMutableDictionary dictionary];
+        [fullInfoRequest setObject:@"getUserFullInfo" forKey:@"@type"];
+        [fullInfoRequest setObject:safeUserID forKey:@"user_id"];
+        NSDictionary *fullInfoResponse = [self sendTDLibRequestAndWaitForExtra:fullInfoRequest
+                                                                    extraPrefix:@"telegraphica-profile-full-info"
+                                                                        timeout:2.0
+                                                                      errorCode:61
+                                                                          error:NULL];
+        id fullInfoType = [fullInfoResponse objectForKey:@"@type"];
+        if ([fullInfoType isKindOfClass:[NSString class]] && [(NSString *)fullInfoType isEqualToString:@"userFullInfo"]) {
+            NSString *bio = [self textFromFormattedTextObject:[fullInfoResponse objectForKey:@"bio"]];
+            if ([bio length] > 0) {
+                [summary setObject:bio forKey:@"bio"];
+            }
+        }
     }
     BOOL didRequestAvatarDownload = NO;
     NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[userResponse objectForKey:@"profile_photo"]
