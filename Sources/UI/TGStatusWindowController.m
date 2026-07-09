@@ -2969,7 +2969,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.drawerFolderButtons = buttons;
     [self updateDrawerFolderButtonStates];
     [self layoutContentView];
-    [self updateVisibleSection];
 }
 
 - (void)reloadChatFiltersIfReady {
@@ -3006,14 +3005,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self rebuildDrawerFolderButtons];
                 if ([self.chatFilterInfos count] > 0) {
                     self.chatFilterRefreshRetryCount = 0;
-                } else if (self.chatFilterRefreshRetryCount < 5) {
-                    self.chatFilterRefreshRetryCount++;
-                    [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                                             selector:@selector(reloadChatFiltersIfReady)
-                                                               object:nil];
-                    [self performSelector:@selector(reloadChatFiltersIfReady)
-                               withObject:nil
-                               afterDelay:2.0];
                 }
                 if (selectedFilterWasCleared) {
                     self.chatsExhausted = NO;
@@ -3344,7 +3335,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     BOOL showLogin = !ready;
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
-    [self showView:self.drawerButton visible:YES];
+    [self showView:self.drawerButton visible:ready];
     [self showView:self.accountBadgeView visible:(ready && self.drawerOpen)];
     [self showView:self.bottomNavigationView visible:ready];
 
@@ -3971,6 +3962,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     if (![state isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
+        self.drawerOpen = NO;
         self.chatsExhausted = NO;
         self.selectedChatFilterID = nil;
         self.chatFilterInfos = [NSArray array];
@@ -3983,13 +3975,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.client invalidateMainChatListExhaustion];
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
-        if (self.drawerButton) {
-            [self rebuildDrawerFolderButtons];
-        }
     } else if (![previousState isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
         self.chatFilterRefreshRetryCount = 0;
-        [self reloadChatFiltersIfReady];
         if ([self.chatItems count] == 0) {
             self.pendingLiveChatRefresh = YES;
             [self handlePendingLiveRefreshesIfPossible];
@@ -5598,6 +5586,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 if (!postLoginProbeSummary) {
                     finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
                 }
+            }
+            if (![finalAuthorizationState length]) {
+                NSError *fallbackAuthorizationError = nil;
+                NSString *fallbackAuthorizationState = [client authorizationStateSummaryWithTimeout:4.0 error:&fallbackAuthorizationError];
+                if ([fallbackAuthorizationState length] > 0) {
+                    finalAuthorizationState = fallbackAuthorizationState;
+                } else if (!finalAuthorizationError && fallbackAuthorizationError) {
+                    finalAuthorizationError = fallbackAuthorizationError;
+                }
+            }
+            if (![finalAuthorizationState length] && [authorizationState length] > 0) {
+                finalAuthorizationState = authorizationState;
             }
         }
         NSString *loadedPath = [client loadedLibraryPath];
