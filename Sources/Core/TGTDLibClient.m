@@ -1972,6 +1972,90 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     return @"message submitted";
 }
 
+- (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to log out. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:51];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"logOut" forKey:@"@type"];
+    NSString *extra = [self uniqueExtraWithPrefix:@"telegraphica-logout"];
+    [request setObject:extra forKey:@"@extra"];
+    NSUInteger generation = [self authorizationStateGeneration];
+    NSError *responseError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request
+                                    waitingForExtra:extra
+                                            timeout:timeout
+                                          errorCode:52
+                                              error:&responseError];
+    if (!response) {
+        if (error) {
+            *error = responseError ? responseError : [self errorWithDescription:@"TDLib did not acknowledge logout before timeout." code:52];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib logOut returned an unexpected response." code:53];
+        }
+        return nil;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSString *waitingState = @"ready";
+    NSUInteger waitingGeneration = generation;
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        NSString *cachedSummary = [self cachedAuthorizationStateSummary];
+        if ([cachedSummary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"logged out; auth state: closed";
+        }
+
+        NSTimeInterval remaining = [deadline timeIntervalSinceNow];
+        if (remaining <= 0.0) {
+            break;
+        }
+
+        NSString *summary = [self waitForAuthorizationStateDifferentFromState:waitingState
+                                                              afterGeneration:waitingGeneration
+                                                                      timeout:remaining];
+        if ([summary length] == 0) {
+            break;
+        }
+        if ([summary hasPrefix:@"error"]) {
+            if (error) {
+                *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected logout: %@", summary] code:54];
+            }
+            return nil;
+        }
+        if ([summary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"logged out; auth state: closed";
+        }
+
+        cachedSummary = [self cachedAuthorizationStateSummary];
+        if ([cachedSummary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"logged out; auth state: closed";
+        }
+
+        waitingState = summary;
+        waitingGeneration = [self authorizationStateGeneration];
+    }
+
+    if (error) {
+        *error = [self errorWithDescription:@"TDLib accepted logout, but did not reach authorizationStateClosed before timeout." code:55];
+    }
+    return nil;
+}
+
 - (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {
