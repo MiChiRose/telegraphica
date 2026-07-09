@@ -1092,11 +1092,30 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSBezierPath *surfacePath = [NSBezierPath bezierPathWithRoundedRect:surfaceRect
                                                                 xRadius:8.0
                                                                 yRadius:8.0];
-    [TGClassicTablePaperColor() set];
+    [TGClassicPanelBottomColor() set];
     [surfacePath fill];
-    [TGClassicPanelStrokeColor() set];
+    [TGClassicTableGridColor() set];
     [surfacePath setLineWidth:1.0];
     [surfacePath stroke];
+}
+
+@end
+
+@interface TGComposerInputBackgroundView : NSView
+@end
+
+@implementation TGComposerInputBackgroundView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSRect inputRect = NSInsetRect(bounds, 0.5, 0.5);
+    NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:7.0 yRadius:7.0];
+    [TGClassicTablePaperColor() set];
+    [inputPath fill];
+    [TGClassicTableGridColor() set];
+    [inputPath setLineWidth:1.0];
+    [inputPath stroke];
 }
 
 @end
@@ -1342,10 +1361,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat alpha = enabled ? 1.0 : 0.48;
     NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
     NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
-    NSColor *fillColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicTableHeaderColor();
-    [fillColor set];
-    [buttonPath fill];
-    [TGClassicPanelStrokeColor() set];
+    NSColor *topColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicNavigationSelectedColor(alpha);
+    NSColor *bottomColor = highlighted ? TGClassicNavigationSelectedColor(alpha) : TGClassicNavigationSelectedStrokeColor(alpha);
+    NSGradient *buttonGradient = [[[NSGradient alloc] initWithStartingColor:topColor
+                                                                endingColor:bottomColor] autorelease];
+    [buttonGradient drawInBezierPath:buttonPath angle:90.0];
+    [TGClassicTableGridColor() set];
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
@@ -1646,6 +1667,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSTextField *sendLabel;
+@property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *sendMessageButton;
 @property (nonatomic, retain) NSTextField *authLabel;
@@ -1731,6 +1753,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL initialConnectStarted;
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
 @property (nonatomic, assign) BOOL drawerOpen;
+@property (nonatomic, assign) BOOL composerRefocusPending;
 @end
 
 @implementation TGStatusWindowController
@@ -1769,6 +1792,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize sendLabel = _sendLabel;
+@synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
 @synthesize sendMessageButton = _sendMessageButton;
 @synthesize authLabel = _authLabel;
@@ -1989,11 +2013,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)applyComposerTextFieldStyle:(NSTextField *)textField {
-    [textField setBezeled:YES];
-    [textField setBordered:YES];
-    [textField setBackgroundColor:TGClassicTablePaperColor()];
+    [textField setBezeled:NO];
+    [textField setBordered:NO];
+    [textField setBackgroundColor:[NSColor clearColor]];
     [textField setTextColor:TGClassicInkColor()];
-    [textField setDrawsBackground:YES];
+    [textField setDrawsBackground:NO];
     [textField setFocusRingType:NSFocusRingTypeNone];
     [textField setFont:[NSFont systemFontOfSize:12.0]];
     if ([[textField cell] isKindOfClass:[NSTextFieldCell class]]) {
@@ -2122,6 +2146,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applySkeuomorphicTextFieldStyle:self.authTextField];
     [self applySkeuomorphicTextFieldStyle:self.authSecureField];
     [self applyComposerTextFieldStyle:self.sendTextField];
+    [self.sendTextFieldBackgroundView setNeedsDisplay:YES];
     [self.settingsAppearanceButton setNeedsDisplay:YES];
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
@@ -2250,7 +2275,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.drawerButton setCell:drawerCell];
     [self.drawerButton setTitle:@""];
     [self.drawerButton setBordered:NO];
-    [self.drawerButton setToolTip:@"Toggle menu"];
+    [self.drawerButton setToolTip:@"Chat folders will appear here when supported"];
     [self.drawerButton setTarget:self];
     [self.drawerButton setAction:@selector(toggleDrawer:)];
     [self.drawerButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
@@ -2325,7 +2350,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     self.navigationButtons = navigationButtons;
 
-    NSArray *drawerFolderTitles = [NSArray arrayWithObjects:@"All", @"Private", @"Groups", nil];
+    NSArray *drawerFolderTitles = [NSArray array];
     NSMutableArray *drawerFolderButtons = [NSMutableArray arrayWithCapacity:[drawerFolderTitles count]];
     for (navigationIndex = 0; navigationIndex < [drawerFolderTitles count]; navigationIndex++) {
         NSString *buttonTitle = [drawerFolderTitles objectAtIndex:navigationIndex];
@@ -2562,6 +2587,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                      text:@""
                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.sendLabel];
+
+    self.sendTextFieldBackgroundView = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
+    [self.sendTextFieldBackgroundView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.sendTextFieldBackgroundView];
 
     self.sendTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextField setEnabled:NO];
@@ -2917,6 +2946,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)toggleDrawer:(id)sender {
     (void)sender;
+    if ([self.drawerFolderButtons count] == 0) {
+        self.drawerOpen = NO;
+        [self layoutContentView];
+        [self updateVisibleSection];
+        return;
+    }
     self.drawerOpen = !self.drawerOpen;
     [self layoutContentView];
     [self updateVisibleSection];
@@ -3194,6 +3229,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.sendLabel visible:NO];
+    [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
 
@@ -3399,7 +3435,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadChatsButton setFrame:NSMakeRect(NSMinX([self.loadMoreChatsButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
-    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 1.0;
+    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
     CGFloat chatListHeight = chatListTop - chatListBottom;
     if (chatListHeight < 128.0) {
         chatListHeight = 128.0;
@@ -3410,10 +3446,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSRect chatSurfaceFrame = NSMakeRect(chatListX, chatListBottom, chatListWidth, chatListHeight);
     [self.chatScrollSurfaceView setFrame:chatSurfaceFrame];
-    [self.chatScrollView setFrame:NSInsetRect(chatSurfaceFrame, 1.0, 1.0)];
+    [self.chatScrollView setFrame:NSInsetRect(chatSurfaceFrame, 5.0, 5.0)];
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"chat"];
     if (chatColumn) {
-        CGFloat chatWidth = NSWidth([self.chatScrollView frame]);
+        [self.chatScrollView tile];
+        CGFloat chatWidth = NSWidth([[self.chatScrollView contentView] bounds]);
         if (chatWidth < 132.0) {
             chatWidth = 132.0;
         }
@@ -3428,7 +3465,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
-    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 1.0;
+    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
@@ -3440,10 +3477,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSRect messageSurfaceFrame = NSMakeRect(messageScrollX, messageBottom, messageScrollWidth, messageHeight);
     [self.messageScrollSurfaceView setFrame:messageSurfaceFrame];
-    [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 1.0, 1.0)];
+    [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 5.0, 5.0)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     if (bubbleColumn) {
-        CGFloat bubbleWidth = NSWidth([self.messageScrollView frame]);
+        [self.messageScrollView tile];
+        CGFloat bubbleWidth = NSWidth([[self.messageScrollView contentView] bounds]);
         if (bubbleWidth < 260.0) {
             bubbleWidth = 260.0;
         }
@@ -3458,7 +3496,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         sendFieldWidth = 160.0;
     }
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
-    [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
+    [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
+    [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerY + 11.0, sendFieldWidth - 16.0, 20.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
 
     CGFloat panelTitleY = headerLabelY;
@@ -3709,6 +3748,45 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     [self.sendTextField setEnabled:canTargetChat];
     [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
+}
+
+- (void)refocusComposerIfPossible {
+    if (![self.currentAuthState isEqualToString:@"ready"] ||
+        !self.selectedChatID ||
+        [self.sendTextField isHidden]) {
+        return;
+    }
+    [self updateSendControls];
+    [self.sendTextField setEnabled:YES];
+    [[self window] makeFirstResponder:self.sendTextField];
+}
+
+- (void)consumePendingComposerRefocus:(id)sender {
+    (void)sender;
+    if (!self.composerRefocusPending) {
+        return;
+    }
+    if (self.controlsBusy || self.backgroundMessageRefreshInFlight) {
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(consumePendingComposerRefocus:)
+                                                   object:nil];
+        [self performSelector:@selector(consumePendingComposerRefocus:)
+                    withObject:nil
+                    afterDelay:0.12];
+        return;
+    }
+    self.composerRefocusPending = NO;
+    [self refocusComposerIfPossible];
+}
+
+- (void)requestComposerRefocus {
+    self.composerRefocusPending = YES;
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(consumePendingComposerRefocus:)
+                                               object:nil];
+    [self performSelector:@selector(consumePendingComposerRefocus:)
+                withObject:nil
+                afterDelay:0.05];
 }
 
 - (BOOL)canLoadMoreChats {
@@ -5118,6 +5196,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             } else if (!interactive) {
                 [self handlePendingLiveRefreshesIfPossible];
             }
+            if (self.composerRefocusPending && selectionStillCurrent) {
+                [self consumePendingComposerRefocus:nil];
+            }
             [itemsCopy release];
             [messageErrorMessage release];
             [authorizationState release];
@@ -5571,10 +5652,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.pendingLiveChatRefresh = YES;
                 self.pendingLiveMessageRefresh = YES;
                 [self handlePendingLiveRefreshesIfPossible];
-                if ([self.currentAuthState isEqualToString:@"ready"]) {
-                    [self.sendTextField setEnabled:YES];
-                    [[self window] makeFirstResponder:self.sendTextField];
-                }
+                [self requestComposerRefocus];
             }
             [authorizationState release];
             [chatID release];
@@ -5657,6 +5735,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)dealloc {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(consumePendingComposerRefocus:)
+                                               object:nil];
     [self stopLiveUpdateTimer];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
@@ -5701,6 +5782,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
     [_sendLabel release];
+    [_sendTextFieldBackgroundView release];
     [_sendTextField release];
     [_sendMessageButton release];
     [_authLabel release];
