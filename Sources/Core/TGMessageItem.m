@@ -28,6 +28,15 @@
     return self.outgoing ? @"Outgoing" : @"Incoming";
 }
 
+- (id)copyWithZone:(NSZone *)zone {
+    TGMessageItem *copy = [[[self class] allocWithZone:zone] initWithChatID:_chatID
+                                                                  messageID:_messageID
+                                                                       date:_date
+                                                                   outgoing:_outgoing
+                                                                    preview:_preview];
+    return copy;
+}
+
 - (id)valueForTableColumnIdentifier:(id)identifier {
     if ([identifier isEqual:@"date"]) {
         return self.date;
