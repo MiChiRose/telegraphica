@@ -343,7 +343,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         }
 
         id isOutgoing = [message objectForKey:@"is_outgoing"];
-        NSString *direction = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]) ? @"Me" : @"In";
+        NSString *direction = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]) ? @"Outgoing" : @"Incoming";
         [summary setObject:direction forKey:@"direction"];
 
         return summary;
@@ -1970,6 +1970,72 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     }
 
     return @"message submitted";
+}
+
+- (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load profile. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:48];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *getMeRequest = [NSMutableDictionary dictionary];
+    [getMeRequest setObject:@"getMe" forKey:@"@type"];
+    NSDictionary *userResponse = [self sendTDLibRequestAndWaitForExtra:getMeRequest
+                                                           extraPrefix:@"telegraphica-profile-get-me"
+                                                               timeout:timeout
+                                                             errorCode:49
+                                                                 error:error];
+    if (!userResponse) {
+        return nil;
+    }
+
+    id userType = [userResponse objectForKey:@"@type"];
+    if (![userType isKindOfClass:[NSString class]] || ![(NSString *)userType isEqualToString:@"user"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib getMe returned an unexpected profile response." code:49];
+        }
+        return nil;
+    }
+
+    id firstName = [userResponse objectForKey:@"first_name"];
+    id lastName = [userResponse objectForKey:@"last_name"];
+    id username = [userResponse objectForKey:@"username"];
+    if (![username isKindOfClass:[NSString class]] || [(NSString *)username length] == 0) {
+        id usernames = [userResponse objectForKey:@"usernames"];
+        if ([usernames isKindOfClass:[NSDictionary class]]) {
+            id activeUsernames = [(NSDictionary *)usernames objectForKey:@"active_usernames"];
+            if ([activeUsernames isKindOfClass:[NSArray class]] && [(NSArray *)activeUsernames count] > 0) {
+                id firstUsername = [(NSArray *)activeUsernames objectAtIndex:0];
+                if ([firstUsername isKindOfClass:[NSString class]]) {
+                    username = firstUsername;
+                }
+            }
+        }
+    }
+
+    NSMutableArray *nameParts = [NSMutableArray array];
+    if ([firstName isKindOfClass:[NSString class]] && [(NSString *)firstName length] > 0) {
+        [nameParts addObject:firstName];
+    }
+    if ([lastName isKindOfClass:[NSString class]] && [(NSString *)lastName length] > 0) {
+        [nameParts addObject:lastName];
+    }
+    NSString *displayName = ([nameParts count] > 0) ? [nameParts componentsJoinedByString:@" "] : @"Telegram account";
+
+    NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+    [summary setObject:displayName forKey:@"display_name"];
+    if ([username isKindOfClass:[NSString class]] && [(NSString *)username length] > 0) {
+        [summary setObject:username forKey:@"username"];
+    }
+    id userID = [userResponse objectForKey:@"id"];
+    if ([userID respondsToSelector:@selector(longLongValue)]) {
+        [summary setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"id"];
+    }
+    return summary;
 }
 
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
