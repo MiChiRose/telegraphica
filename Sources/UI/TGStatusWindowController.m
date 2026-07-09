@@ -451,6 +451,7 @@ static NSColor *TGAvatarColorForTitle(NSString *title) {
 }
 
 static void TGDrawImageInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView) {
+    (void)drawingInFlippedView;
     if (!image || NSIsEmptyRect(rect)) {
         return;
     }
@@ -463,7 +464,7 @@ static void TGDrawImageInRect(NSImage *image, NSRect rect, BOOL drawingInFlipped
              fromRect:sourceRect
             operation:NSCompositeSourceOver
              fraction:1.0
-       respectFlipped:(drawingInFlippedView ? NO : YES)
+       respectFlipped:YES
                 hints:nil];
 }
 
@@ -615,8 +616,12 @@ static NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionar
 }
 
 static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth) {
-    CGFloat width = 220.0;
-    CGFloat height = 160.0;
+    BOOL sticker = [item isStickerMessage];
+    CGFloat maximumSide = sticker ? 128.0 : TGMessagePhotoMaximumSide;
+    CGFloat minimumWidth = sticker ? 88.0 : 140.0;
+    CGFloat minimumHeight = sticker ? 88.0 : 92.0;
+    CGFloat width = sticker ? 112.0 : 220.0;
+    CGFloat height = sticker ? 112.0 : 160.0;
     if ([item.mediaWidth respondsToSelector:@selector(floatValue)] && [item.mediaWidth floatValue] > 0.0) {
         width = [item.mediaWidth floatValue];
     }
@@ -624,31 +629,35 @@ static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maxi
         height = [item.mediaHeight floatValue];
     }
     if (width <= 0.0 || height <= 0.0) {
-        width = 220.0;
-        height = 160.0;
+        width = sticker ? 112.0 : 220.0;
+        height = sticker ? 112.0 : 160.0;
     }
-    CGFloat scale = TGMessagePhotoMaximumSide / ((width > height) ? width : height);
+    if (sticker && [[item mediaLocalPath] length] == 0) {
+        width = 112.0;
+        height = 112.0;
+    }
+    CGFloat scale = maximumSide / ((width > height) ? width : height);
     if (scale < 1.0) {
         width *= scale;
         height *= scale;
     }
-    if (width < 140.0) {
-        CGFloat grow = 140.0 / width;
+    if (width < minimumWidth) {
+        CGFloat grow = minimumWidth / width;
         width *= grow;
         height *= grow;
     }
-    if (height < 92.0) {
-        CGFloat grow = 92.0 / height;
+    if (height < minimumHeight) {
+        CGFloat grow = minimumHeight / height;
         width *= grow;
         height *= grow;
     }
-    if (width > TGMessagePhotoMaximumSide) {
-        CGFloat shrink = TGMessagePhotoMaximumSide / width;
+    if (width > maximumSide) {
+        CGFloat shrink = maximumSide / width;
         width *= shrink;
         height *= shrink;
     }
-    if (height > TGMessagePhotoMaximumSide) {
-        CGFloat shrink = TGMessagePhotoMaximumSide / height;
+    if (height > maximumSide) {
+        CGFloat shrink = maximumSide / height;
         width *= shrink;
         height *= shrink;
     }
@@ -1520,6 +1529,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *drawerButton;
 @property (nonatomic, retain) TGGroupedCardView *profileSummaryCardView;
 @property (nonatomic, retain) TGGroupedCardView *profileInfoCardView;
+@property (nonatomic, retain) TGGroupedCardView *profileDetailsCardView;
+@property (nonatomic, retain) TGGroupedCardView *profileActionsCardView;
 @property (nonatomic, retain) TGProfileAvatarView *profileAvatarView;
 @property (nonatomic, retain) TGGroupedCardView *settingsAccountCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsThemeCardView;
@@ -1560,6 +1571,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *profileUsernameField;
 @property (nonatomic, retain) NSTextField *profileIDField;
 @property (nonatomic, retain) NSTextField *profileStateField;
+@property (nonatomic, retain) NSTextField *profileAboutSectionField;
+@property (nonatomic, retain) NSTextField *profileAccountSectionField;
+@property (nonatomic, retain) NSTextField *profileUsernameRowTitleField;
+@property (nonatomic, retain) NSTextField *profileUsernameRowValueField;
+@property (nonatomic, retain) NSTextField *profilePhoneRowTitleField;
+@property (nonatomic, retain) NSTextField *profilePhoneRowValueField;
+@property (nonatomic, retain) NSTextField *profileIDRowTitleField;
+@property (nonatomic, retain) NSTextField *profileIDRowValueField;
+@property (nonatomic, retain) NSBox *profileDetailsSeparatorOne;
+@property (nonatomic, retain) NSBox *profileDetailsSeparatorTwo;
 @property (nonatomic, retain) NSTextField *settingsTitleField;
 @property (nonatomic, retain) NSTextField *settingsStateField;
 @property (nonatomic, retain) NSTextField *settingsLibraryField;
@@ -1578,7 +1599,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSNumber *selectedChatID;
 @property (nonatomic, copy) NSString *selectedChatTitle;
 @property (nonatomic, copy) NSString *profileDisplayName;
+@property (nonatomic, copy) NSString *profileFirstName;
+@property (nonatomic, copy) NSString *profileLastName;
 @property (nonatomic, copy) NSString *profileUsername;
+@property (nonatomic, copy) NSString *profilePhoneNumber;
 @property (nonatomic, retain) NSNumber *profileUserID;
 @property (nonatomic, copy) NSString *profileAvatarLocalPath;
 @property (nonatomic, copy) NSString *profileBio;
@@ -1624,6 +1648,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize drawerButton = _drawerButton;
 @synthesize profileSummaryCardView = _profileSummaryCardView;
 @synthesize profileInfoCardView = _profileInfoCardView;
+@synthesize profileDetailsCardView = _profileDetailsCardView;
+@synthesize profileActionsCardView = _profileActionsCardView;
 @synthesize profileAvatarView = _profileAvatarView;
 @synthesize settingsAccountCardView = _settingsAccountCardView;
 @synthesize settingsThemeCardView = _settingsThemeCardView;
@@ -1664,6 +1690,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize profileUsernameField = _profileUsernameField;
 @synthesize profileIDField = _profileIDField;
 @synthesize profileStateField = _profileStateField;
+@synthesize profileAboutSectionField = _profileAboutSectionField;
+@synthesize profileAccountSectionField = _profileAccountSectionField;
+@synthesize profileUsernameRowTitleField = _profileUsernameRowTitleField;
+@synthesize profileUsernameRowValueField = _profileUsernameRowValueField;
+@synthesize profilePhoneRowTitleField = _profilePhoneRowTitleField;
+@synthesize profilePhoneRowValueField = _profilePhoneRowValueField;
+@synthesize profileIDRowTitleField = _profileIDRowTitleField;
+@synthesize profileIDRowValueField = _profileIDRowValueField;
+@synthesize profileDetailsSeparatorOne = _profileDetailsSeparatorOne;
+@synthesize profileDetailsSeparatorTwo = _profileDetailsSeparatorTwo;
 @synthesize settingsTitleField = _settingsTitleField;
 @synthesize settingsStateField = _settingsStateField;
 @synthesize settingsLibraryField = _settingsLibraryField;
@@ -1682,7 +1718,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize selectedChatID = _selectedChatID;
 @synthesize selectedChatTitle = _selectedChatTitle;
 @synthesize profileDisplayName = _profileDisplayName;
+@synthesize profileFirstName = _profileFirstName;
+@synthesize profileLastName = _profileLastName;
 @synthesize profileUsername = _profileUsername;
+@synthesize profilePhoneNumber = _profilePhoneNumber;
 @synthesize profileUserID = _profileUserID;
 @synthesize profileAvatarLocalPath = _profileAvatarLocalPath;
 @synthesize profileBio = _profileBio;
@@ -1934,6 +1973,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyMutedLabelStyle:self.profileUsernameField];
     [self applyMutedLabelStyle:self.profileIDField];
     [self applyMutedLabelStyle:self.profileStateField];
+    [self applyMutedLabelStyle:self.profileAboutSectionField];
+    [self applyMutedLabelStyle:self.profileAccountSectionField];
+    [self.profileAboutSectionField setFont:[NSFont systemFontOfSize:11.0]];
+    [self.profileAccountSectionField setFont:[NSFont systemFontOfSize:11.0]];
+    [self.profileUsernameRowTitleField setTextColor:TGClassicInkColor()];
+    [self.profilePhoneRowTitleField setTextColor:TGClassicInkColor()];
+    [self.profileIDRowTitleField setTextColor:TGClassicInkColor()];
+    [self applyMutedLabelStyle:self.profileUsernameRowValueField];
+    [self applyMutedLabelStyle:self.profilePhoneRowValueField];
+    [self applyMutedLabelStyle:self.profileIDRowValueField];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
@@ -1991,25 +2040,41 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileAvatarView setAvatarLocalPath:self.profileAvatarLocalPath];
 
     if ([self.profileDisplayName length] > 0) {
-        [self.profileNameField setStringValue:self.profileDisplayName];
+        NSString *primaryName = ([self.profileFirstName length] > 0) ? self.profileFirstName : self.profileDisplayName;
+        NSString *secondaryName = nil;
+        if ([self.profileLastName length] > 0) {
+            secondaryName = self.profileLastName;
+        }
+        [self.profileNameField setStringValue:primaryName ? primaryName : @"Profile"];
+        [self.profileUsernameField setStringValue:secondaryName ? secondaryName : @""];
     } else {
         [self.profileNameField setStringValue:@"Profile"];
+        [self.profileUsernameField setStringValue:@""];
     }
     [self.settingsStateField setStringValue:@""];
 
     BOOL hasProfileUserID = [self.profileUserID respondsToSelector:@selector(longLongValue)];
-    if ([self.profileUsername length] > 0) {
-        NSString *usernameText = [NSString stringWithFormat:@"@%@", self.profileUsername];
-        if (hasProfileUserID) {
-            usernameText = [NSString stringWithFormat:@"@%@ (%lld)", self.profileUsername, [self.profileUserID longLongValue]];
-        }
-        [self.profileUsernameField setStringValue:usernameText];
-    } else if (hasProfileUserID) {
-        [self.profileUsernameField setStringValue:[NSString stringWithFormat:@"(%lld)", [self.profileUserID longLongValue]]];
-    } else {
-        [self.profileUsernameField setStringValue:@""];
-    }
     [self.settingsLibraryField setStringValue:@""];
+
+    if ([self.profileUsername length] > 0) {
+        [self.profileUsernameRowValueField setStringValue:[NSString stringWithFormat:@"@%@", self.profileUsername]];
+    } else {
+        [self.profileUsernameRowValueField setStringValue:@""];
+    }
+    if ([self.profilePhoneNumber length] > 0) {
+        NSString *phoneText = self.profilePhoneNumber;
+        if (![phoneText hasPrefix:@"+"]) {
+            phoneText = [@"+" stringByAppendingString:phoneText];
+        }
+        [self.profilePhoneRowValueField setStringValue:phoneText];
+    } else {
+        [self.profilePhoneRowValueField setStringValue:@""];
+    }
+    if (hasProfileUserID) {
+        [self.profileIDRowValueField setStringValue:[NSString stringWithFormat:@"%lld", [self.profileUserID longLongValue]]];
+    } else {
+        [self.profileIDRowValueField setStringValue:@""];
+    }
 
     [self.profileIDField setStringValue:@""];
     [self.profileStateField setStringValue:([self.profileBio length] > 0) ? self.profileBio : @""];
@@ -2018,11 +2083,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)clearProfileDisplayCache {
     self.profileDisplayName = nil;
+    self.profileFirstName = nil;
+    self.profileLastName = nil;
     self.profileUsername = nil;
+    self.profilePhoneNumber = nil;
     self.profileUserID = nil;
     self.profileAvatarLocalPath = nil;
     self.profileBio = nil;
     [self.profileStateField setStringValue:@""];
+    [self.profileUsernameRowValueField setStringValue:@""];
+    [self.profilePhoneRowValueField setStringValue:@""];
+    [self.profileIDRowValueField setStringValue:@""];
     [self refreshProfileDisplay];
     [self layoutContentView];
 }
@@ -2361,6 +2432,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileInfoCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.profileInfoCardView];
 
+    self.profileDetailsCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 230, 620, 124)] autorelease];
+    [self.profileDetailsCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.profileDetailsCardView];
+
+    self.profileActionsCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 166, 620, 54)] autorelease];
+    [self.profileActionsCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.profileActionsCardView];
+
     self.profileAvatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(446, 424, 88, 88)] autorelease];
     [self.profileAvatarView setAutoresizingMask:NSViewMinYMargin];
     [contentView addSubview:self.profileAvatarView];
@@ -2374,13 +2453,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.profileNameField = [self labelWithFrame:NSMakeRect(64, 458, 620, 24)
                                             text:@"Profile"
                                             font:[NSFont boldSystemFontOfSize:16.0]];
-    [self.profileNameField setAlignment:NSCenterTextAlignment];
+    [self.profileNameField setAlignment:NSLeftTextAlignment];
+    [[self.profileNameField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [contentView addSubview:self.profileNameField];
 
     self.profileUsernameField = [self labelWithFrame:NSMakeRect(64, 424, 620, 24)
                                                 text:@""
                                                 font:[NSFont systemFontOfSize:13.0]];
-    [self.profileUsernameField setAlignment:NSCenterTextAlignment];
+    [self.profileUsernameField setAlignment:NSLeftTextAlignment];
+    [[self.profileUsernameField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self applyMutedLabelStyle:self.profileUsernameField];
     [contentView addSubview:self.profileUsernameField];
 
@@ -2397,6 +2478,64 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [[self.profileStateField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.profileStateField];
     [contentView addSubview:self.profileStateField];
+
+    self.profileAboutSectionField = [self labelWithFrame:NSMakeRect(64, 320, 620, 18)
+                                                    text:@"About"
+                                                    font:[NSFont systemFontOfSize:11.0]];
+    [self applyMutedLabelStyle:self.profileAboutSectionField];
+    [contentView addSubview:self.profileAboutSectionField];
+
+    self.profileAccountSectionField = [self labelWithFrame:NSMakeRect(64, 250, 620, 18)
+                                                      text:@"Account"
+                                                      font:[NSFont systemFontOfSize:11.0]];
+    [self applyMutedLabelStyle:self.profileAccountSectionField];
+    [contentView addSubview:self.profileAccountSectionField];
+
+    self.profileUsernameRowTitleField = [self labelWithFrame:NSMakeRect(64, 248, 180, 20)
+                                                        text:@"Username"
+                                                        font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.profileUsernameRowTitleField];
+    self.profileUsernameRowValueField = [self labelWithFrame:NSMakeRect(260, 248, 360, 20)
+                                                        text:@""
+                                                        font:[NSFont systemFontOfSize:13.0]];
+    [self.profileUsernameRowValueField setAlignment:NSRightTextAlignment];
+    [[self.profileUsernameRowValueField cell] setLineBreakMode:NSLineBreakByTruncatingHead];
+    [self applyMutedLabelStyle:self.profileUsernameRowValueField];
+    [contentView addSubview:self.profileUsernameRowValueField];
+
+    self.profilePhoneRowTitleField = [self labelWithFrame:NSMakeRect(64, 206, 180, 20)
+                                                     text:@"Phone"
+                                                     font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.profilePhoneRowTitleField];
+    self.profilePhoneRowValueField = [self labelWithFrame:NSMakeRect(260, 206, 360, 20)
+                                                     text:@""
+                                                     font:[NSFont systemFontOfSize:13.0]];
+    [self.profilePhoneRowValueField setAlignment:NSRightTextAlignment];
+    [[self.profilePhoneRowValueField cell] setLineBreakMode:NSLineBreakByTruncatingHead];
+    [self applyMutedLabelStyle:self.profilePhoneRowValueField];
+    [contentView addSubview:self.profilePhoneRowValueField];
+
+    self.profileIDRowTitleField = [self labelWithFrame:NSMakeRect(64, 164, 180, 20)
+                                                  text:@"Telegram ID"
+                                                  font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.profileIDRowTitleField];
+    self.profileIDRowValueField = [self labelWithFrame:NSMakeRect(260, 164, 360, 20)
+                                                  text:@""
+                                                  font:[NSFont systemFontOfSize:13.0]];
+    [self.profileIDRowValueField setAlignment:NSRightTextAlignment];
+    [[self.profileIDRowValueField cell] setLineBreakMode:NSLineBreakByTruncatingHead];
+    [self applyMutedLabelStyle:self.profileIDRowValueField];
+    [contentView addSubview:self.profileIDRowValueField];
+
+    self.profileDetailsSeparatorOne = [[[NSBox alloc] initWithFrame:NSMakeRect(64, 228, 620, 1)] autorelease];
+    [self.profileDetailsSeparatorOne setBoxType:NSBoxSeparator];
+    [self.profileDetailsSeparatorOne setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.profileDetailsSeparatorOne];
+
+    self.profileDetailsSeparatorTwo = [[[NSBox alloc] initWithFrame:NSMakeRect(64, 186, 620, 1)] autorelease];
+    [self.profileDetailsSeparatorTwo setBoxType:NSBoxSeparator];
+    [self.profileDetailsSeparatorTwo setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.profileDetailsSeparatorTwo];
 
     self.settingsAccountCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 380, 760, 100)] autorelease];
     [self.settingsAccountCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
@@ -2876,15 +3015,33 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.sendMessageButton visible:showChats];
 
     BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
+    BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
+    BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
+    BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
+    BOOL profileHasID = ([[self.profileIDRowValueField stringValue] length] > 0);
+    NSUInteger profileDetailRows = (profileHasUsername ? 1 : 0) + (profileHasPhone ? 1 : 0) + (profileHasID ? 1 : 0);
+    BOOL showProfileDetails = (showProfile && profileDetailRows > 0);
     [self showView:self.profilePanelView visible:showProfile];
     [self showView:self.profileSummaryCardView visible:showProfile];
-    [self showView:self.profileInfoCardView visible:showProfile];
+    [self showView:self.profileInfoCardView visible:(showProfile && profileHasBio)];
+    [self showView:self.profileDetailsCardView visible:showProfileDetails];
+    [self showView:self.profileActionsCardView visible:showProfile];
     [self showView:self.profileAvatarView visible:showProfile];
     [self showView:self.profileTitleField visible:showProfile];
     [self showView:self.profileNameField visible:(showProfile && [[self.profileNameField stringValue] length] > 0)];
     [self showView:self.profileUsernameField visible:(showProfile && [[self.profileUsernameField stringValue] length] > 0)];
     [self showView:self.profileIDField visible:NO];
-    [self showView:self.profileStateField visible:(showProfile && [[self.profileStateField stringValue] length] > 0)];
+    [self showView:self.profileStateField visible:(showProfile && profileHasBio)];
+    [self showView:self.profileAboutSectionField visible:(showProfile && profileHasBio)];
+    [self showView:self.profileAccountSectionField visible:showProfileDetails];
+    [self showView:self.profileUsernameRowTitleField visible:(showProfile && profileHasUsername)];
+    [self showView:self.profileUsernameRowValueField visible:(showProfile && profileHasUsername)];
+    [self showView:self.profilePhoneRowTitleField visible:(showProfile && profileHasPhone)];
+    [self showView:self.profilePhoneRowValueField visible:(showProfile && profileHasPhone)];
+    [self showView:self.profileIDRowTitleField visible:(showProfile && profileHasID)];
+    [self showView:self.profileIDRowValueField visible:(showProfile && profileHasID)];
+    [self showView:self.profileDetailsSeparatorOne visible:(showProfileDetails && profileDetailRows > 1)];
+    [self showView:self.profileDetailsSeparatorTwo visible:(showProfileDetails && profileDetailRows > 2)];
     [self showView:self.logoutButton visible:showProfile];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
@@ -3084,26 +3241,137 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat groupedX = mainX + floor((mainWidth - groupedWidth) / 2.0);
 
     [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    CGFloat profileSummaryHeight = 186.0;
+    CGFloat profileSummaryHeight = 124.0;
     CGFloat profileSummaryY = contentTop - profileSummaryHeight - 22.0;
     [self.profileSummaryCardView setFrame:NSMakeRect(groupedX, profileSummaryY, groupedWidth, profileSummaryHeight)];
-    CGFloat profileAvatarSize = 88.0;
-    [self.profileAvatarView setFrame:NSMakeRect(groupedX + floor((groupedWidth - profileAvatarSize) / 2.0),
-                                                profileSummaryY + profileSummaryHeight - profileAvatarSize - 18.0,
+    CGFloat profileAvatarSize = 78.0;
+    CGFloat profileAvatarX = groupedX + 26.0;
+    CGFloat profileAvatarY = profileSummaryY + floor((profileSummaryHeight - profileAvatarSize) / 2.0);
+    [self.profileAvatarView setFrame:NSMakeRect(profileAvatarX,
+                                                profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
-    [self.profileNameField setFrame:NSMakeRect(groupedX + 24.0, profileSummaryY + 52.0, groupedWidth - 48.0, 24.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(groupedX + 24.0, profileSummaryY + 28.0, groupedWidth - 48.0, 20.0)];
-    CGFloat profileInfoHeight = ([self.profileBio length] > 0) ? 122.0 : 54.0;
-    CGFloat profileInfoY = profileSummaryY - profileInfoHeight - 12.0;
-    [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileInfoY, groupedWidth, profileInfoHeight)];
-    [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileInfoY + 17.0, groupedWidth - 44.0, 20.0)];
-    if ([self.profileBio length] > 0) {
-        [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileInfoY + 62.0, groupedWidth - 48.0, 44.0)];
-    } else {
-        [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileInfoY + 62.0, groupedWidth - 48.0, 0.0)];
+    CGFloat profileTextX = NSMaxX([self.profileAvatarView frame]) + 24.0;
+    CGFloat profileTextWidth = groupedWidth - (profileTextX - groupedX) - 26.0;
+    if (profileTextWidth < 180.0) {
+        profileTextWidth = groupedWidth - 52.0;
+        profileTextX = groupedX + 26.0;
     }
-    [self.logoutButton setFrame:NSMakeRect(groupedX + 22.0, profileInfoY + 12.0, groupedWidth - 44.0, 30.0)];
+    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 68.0, profileTextWidth, 24.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 40.0, profileTextWidth, 22.0)];
+
+    BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
+    BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
+    BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
+    BOOL profileHasID = ([[self.profileIDRowValueField stringValue] length] > 0);
+    NSUInteger profileDetailRows = (profileHasUsername ? 1 : 0) + (profileHasPhone ? 1 : 0) + (profileHasID ? 1 : 0);
+    CGFloat profileNextTop = profileSummaryY - 14.0;
+
+    if (profileHasBio) {
+        [self.profileAboutSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop - 18.0, groupedWidth - 40.0, 16.0)];
+        NSDictionary *bioAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                       [NSFont systemFontOfSize:13.0], NSFontAttributeName,
+                                       nil];
+        NSString *bioText = [self.profileStateField stringValue];
+        NSRect bioRect = [bioText boundingRectWithSize:NSMakeSize(groupedWidth - 48.0, 1000.0)
+                                               options:NSStringDrawingUsesLineFragmentOrigin
+                                            attributes:bioAttributes];
+        CGFloat bioTextHeight = ceil(NSHeight(bioRect));
+        CGFloat profileInfoHeight = bioTextHeight + 30.0;
+        if (profileInfoHeight < 58.0) {
+            profileInfoHeight = 58.0;
+        }
+        if (profileInfoHeight > 112.0) {
+            profileInfoHeight = 112.0;
+        }
+        CGFloat profileInfoY = profileNextTop - 18.0 - profileInfoHeight - 8.0;
+        [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileInfoY, groupedWidth, profileInfoHeight)];
+        [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileInfoY + 14.0, groupedWidth - 48.0, profileInfoHeight - 26.0)];
+        profileNextTop = profileInfoY - 14.0;
+    } else {
+        [self.profileAboutSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop, groupedWidth - 40.0, 0.0)];
+        [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileNextTop, groupedWidth, 0.0)];
+        [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, groupedWidth - 48.0, 0.0)];
+    }
+
+    if (profileDetailRows > 0) {
+        CGFloat rowHeight = 42.0;
+        CGFloat detailsHeight = ((CGFloat)profileDetailRows * rowHeight) + 12.0;
+        CGFloat accountSectionY = profileNextTop - 18.0;
+        CGFloat detailsY = accountSectionY - detailsHeight - 8.0;
+        [self.profileAccountSectionField setFrame:NSMakeRect(groupedX + 20.0, accountSectionY, groupedWidth - 40.0, 16.0)];
+        [self.profileDetailsCardView setFrame:NSMakeRect(groupedX, detailsY, groupedWidth, detailsHeight)];
+
+        CGFloat rowTitleX = groupedX + 24.0;
+        CGFloat rowValueX = groupedX + 210.0;
+        CGFloat rowValueWidth = groupedWidth - 234.0;
+        if (rowValueWidth < 160.0) {
+            rowValueX = groupedX + 150.0;
+            rowValueWidth = groupedWidth - 174.0;
+        }
+        CGFloat rowY = detailsY + detailsHeight - 31.0;
+        NSUInteger laidOutRows = 0;
+        CGFloat separatorOneY = 0.0;
+        CGFloat separatorTwoY = 0.0;
+
+        if (profileHasUsername) {
+            [self.profileUsernameRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 150.0, 20.0)];
+            [self.profileUsernameRowValueField setFrame:NSMakeRect(rowValueX, rowY, rowValueWidth, 20.0)];
+            laidOutRows++;
+            separatorOneY = rowY - 11.0;
+            rowY -= rowHeight;
+        } else {
+            [self.profileUsernameRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 0.0, 0.0)];
+            [self.profileUsernameRowValueField setFrame:NSMakeRect(rowValueX, rowY, 0.0, 0.0)];
+        }
+        if (profileHasPhone) {
+            [self.profilePhoneRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 150.0, 20.0)];
+            [self.profilePhoneRowValueField setFrame:NSMakeRect(rowValueX, rowY, rowValueWidth, 20.0)];
+            laidOutRows++;
+            if (laidOutRows == 1) {
+                separatorOneY = rowY - 11.0;
+            } else {
+                separatorTwoY = rowY - 11.0;
+            }
+            rowY -= rowHeight;
+        } else {
+            [self.profilePhoneRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 0.0, 0.0)];
+            [self.profilePhoneRowValueField setFrame:NSMakeRect(rowValueX, rowY, 0.0, 0.0)];
+        }
+        if (profileHasID) {
+            [self.profileIDRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 150.0, 20.0)];
+            [self.profileIDRowValueField setFrame:NSMakeRect(rowValueX, rowY, rowValueWidth, 20.0)];
+            laidOutRows++;
+        } else {
+            [self.profileIDRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 0.0, 0.0)];
+            [self.profileIDRowValueField setFrame:NSMakeRect(rowValueX, rowY, 0.0, 0.0)];
+        }
+        if (profileDetailRows > 1) {
+            [self.profileDetailsSeparatorOne setFrame:NSMakeRect(groupedX + 24.0, separatorOneY, groupedWidth - 48.0, 1.0)];
+        }
+        if (profileDetailRows > 2) {
+            if (separatorTwoY <= 0.0) {
+                separatorTwoY = separatorOneY - rowHeight;
+            }
+            [self.profileDetailsSeparatorTwo setFrame:NSMakeRect(groupedX + 24.0, separatorTwoY, groupedWidth - 48.0, 1.0)];
+        }
+        profileNextTop = detailsY - 14.0;
+    } else {
+        [self.profileAccountSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop, groupedWidth - 40.0, 0.0)];
+        [self.profileDetailsCardView setFrame:NSMakeRect(groupedX, profileNextTop, groupedWidth, 0.0)];
+        [self.profileUsernameRowTitleField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, 0.0, 0.0)];
+        [self.profileUsernameRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
+        [self.profilePhoneRowTitleField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, 0.0, 0.0)];
+        [self.profilePhoneRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
+        [self.profileIDRowTitleField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, 0.0, 0.0)];
+        [self.profileIDRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
+    }
+
+    CGFloat profileActionsHeight = 54.0;
+    CGFloat profileActionsY = profileNextTop - profileActionsHeight;
+    [self.profileActionsCardView setFrame:NSMakeRect(groupedX, profileActionsY, groupedWidth, profileActionsHeight)];
+    [self.logoutButton setFrame:NSMakeRect(groupedX + 22.0, profileActionsY + 12.0, groupedWidth - 44.0, 30.0)];
+    [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileActionsY, 0.0, 0.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
     CGFloat themeCardY = contentTop - 96.0;
@@ -3765,9 +4033,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     BOOL selectionChanged = !((previousChatID && newChatID) && ([previousChatID longLongValue] == [newChatID longLongValue]));
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"Selected chat";
     [self.selectedChatField setStringValue:self.selectedChatTitle ? self.selectedChatTitle : @"Selected chat"];
-    if (newChatID) {
-        [self clearUnreadCountForChatID:newChatID];
-    }
     if (selectionChanged) {
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
@@ -3799,9 +4064,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:items];
-    if (self.selectedChatID) {
-        [self clearUnreadCountForChatID:self.selectedChatID];
-    }
     [self.chatTableView reloadData];
     self.autoChatListLoadArmed = YES;
 
@@ -4392,6 +4654,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (success) {
+                [self clearUnreadCountForChatID:chatIDCopy];
                 [self appendDetail:@"TDLib read state: selected chat messages marked as read."];
             } else if ([readErrorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib read state: %@", readErrorMessage]];
@@ -4427,7 +4690,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
             if (profile) {
                 NSString *displayName = [profile objectForKey:@"display_name"];
+                NSString *firstName = [profile objectForKey:@"first_name"];
+                NSString *lastName = [profile objectForKey:@"last_name"];
                 NSString *username = [profile objectForKey:@"username"];
+                NSString *phoneNumber = [profile objectForKey:@"phone_number"];
                 NSString *bio = [profile objectForKey:@"bio"];
                 id userID = [profile objectForKey:@"id"];
                 if ([userID respondsToSelector:@selector(longLongValue)]) {
@@ -4436,7 +4702,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                     self.profileUserID = nil;
                 }
                 self.profileDisplayName = ([displayName length] > 0) ? displayName : nil;
+                self.profileFirstName = ([firstName length] > 0) ? firstName : nil;
+                self.profileLastName = ([lastName length] > 0) ? lastName : nil;
                 self.profileUsername = ([username length] > 0) ? username : nil;
+                self.profilePhoneNumber = ([phoneNumber length] > 0) ? phoneNumber : nil;
                 self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
                 self.profileBio = ([bio length] > 0) ? bio : nil;
                 [self refreshProfileDisplay];
@@ -4444,6 +4713,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self updateVisibleSection];
                 self.profileSummaryLoaded = YES;
             } else {
+                self.profileFirstName = nil;
+                self.profileLastName = nil;
+                self.profilePhoneNumber = nil;
                 self.profileBio = nil;
                 [self.profileStateField setStringValue:@""];
                 [self refreshProfileDisplay];
@@ -4584,7 +4856,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             } else if (itemsCopy) {
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
-                [self clearUnreadCountForChatID:chatIDCopy];
                 [self markMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
@@ -5054,7 +5325,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 if (selectionStillCurrent) {
                     [self.sendTextField setStringValue:@""];
                     self.forceMessageScrollToNewest = YES;
-                    [[self window] makeFirstResponder:self.sendTextField];
                 }
             } else {
                 [self.statusField setStringValue:@"Send not confirmed"];
@@ -5069,6 +5339,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.pendingLiveChatRefresh = YES;
                 self.pendingLiveMessageRefresh = YES;
                 [self handlePendingLiveRefreshesIfPossible];
+                if ([self.currentAuthState isEqualToString:@"ready"]) {
+                    [self.sendTextField setEnabled:YES];
+                    [[self window] makeFirstResponder:self.sendTextField];
+                }
             }
             [authorizationState release];
             [chatID release];
@@ -5174,6 +5448,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_drawerButton release];
     [_profileSummaryCardView release];
     [_profileInfoCardView release];
+    [_profileDetailsCardView release];
+    [_profileActionsCardView release];
     [_profileAvatarView release];
     [_settingsAccountCardView release];
     [_settingsThemeCardView release];
@@ -5214,6 +5490,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_profileUsernameField release];
     [_profileIDField release];
     [_profileStateField release];
+    [_profileAboutSectionField release];
+    [_profileAccountSectionField release];
+    [_profileUsernameRowTitleField release];
+    [_profileUsernameRowValueField release];
+    [_profilePhoneRowTitleField release];
+    [_profilePhoneRowValueField release];
+    [_profileIDRowTitleField release];
+    [_profileIDRowValueField release];
+    [_profileDetailsSeparatorOne release];
+    [_profileDetailsSeparatorTwo release];
     [_settingsTitleField release];
     [_settingsStateField release];
     [_settingsLibraryField release];
@@ -5236,7 +5522,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_activeSection release];
     [_liveUpdateTimer release];
     [_profileDisplayName release];
+    [_profileFirstName release];
+    [_profileLastName release];
     [_profileUsername release];
+    [_profilePhoneNumber release];
     [_profileUserID release];
     [_profileAvatarLocalPath release];
     [_profileBio release];

@@ -2504,8 +2504,18 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
     NSMutableDictionary *summary = [NSMutableDictionary dictionary];
     [summary setObject:displayName forKey:@"display_name"];
+    if ([firstName isKindOfClass:[NSString class]] && [(NSString *)firstName length] > 0) {
+        [summary setObject:firstName forKey:@"first_name"];
+    }
+    if ([lastName isKindOfClass:[NSString class]] && [(NSString *)lastName length] > 0) {
+        [summary setObject:lastName forKey:@"last_name"];
+    }
     if ([username isKindOfClass:[NSString class]] && [(NSString *)username length] > 0) {
         [summary setObject:username forKey:@"username"];
+    }
+    id phoneNumber = [userResponse objectForKey:@"phone_number"];
+    if ([phoneNumber isKindOfClass:[NSString class]] && [(NSString *)phoneNumber length] > 0) {
+        [summary setObject:phoneNumber forKey:@"phone_number"];
     }
     id userID = [userResponse objectForKey:@"id"];
     if ([userID respondsToSelector:@selector(longLongValue)]) {
