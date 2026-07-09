@@ -1092,30 +1092,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSBezierPath *surfacePath = [NSBezierPath bezierPathWithRoundedRect:surfaceRect
                                                                 xRadius:8.0
                                                                 yRadius:8.0];
-    [TGClassicPanelBottomColor() set];
+    [TGClassicTablePaperColor() set];
     [surfacePath fill];
-    [TGClassicTableGridColor() set];
+    [TGClassicPanelStrokeColor() set];
     [surfacePath setLineWidth:1.0];
     [surfacePath stroke];
-}
-
-@end
-
-@interface TGComposerInputBackgroundView : NSView
-@end
-
-@implementation TGComposerInputBackgroundView
-
-- (void)drawRect:(NSRect)dirtyRect {
-    (void)dirtyRect;
-    NSRect bounds = [self bounds];
-    NSRect inputRect = NSInsetRect(bounds, 0.5, 0.5);
-    NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:7.0 yRadius:7.0];
-    [TGClassicTablePaperColor() set];
-    [inputPath fill];
-    [TGClassicTableGridColor() set];
-    [inputPath setLineWidth:1.0];
-    [inputPath stroke];
 }
 
 @end
@@ -1185,13 +1166,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 5.0, 12.0, 4.0, 4.0, flipped)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 9.0, 7.0, 4.0, 4.0, flipped)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
-    } else if ([title isEqualToString:@"Folder"]) {
+    } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
         NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
         NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
         NSBezierPath *folderPath = [NSBezierPath bezierPath];
         [folderPath appendBezierPathWithRoundedRect:folderBody xRadius:2.0 yRadius:2.0];
         [folderPath appendBezierPathWithRoundedRect:folderTab xRadius:1.5 yRadius:1.5];
         [folderPath fill];
+
+        NSColor *detailColor = TGClassicWindowBottomColor();
+        [detailColor set];
+        if ([title isEqualToString:@"Private"]) {
+            [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 8.0, 4.0, 4.0, flipped)] fill];
+            TGStrokeLine(TGIconPoint(iconRect, 6.0, 6.0, flipped), TGIconPoint(iconRect, 12.0, 6.0, flipped), 1.1);
+        } else if ([title isEqualToString:@"Groups"]) {
+            [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 4.0, 8.0, 3.4, 3.4, flipped)] fill];
+            [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 10.6, 8.0, 3.4, 3.4, flipped)] fill];
+            TGStrokeLine(TGIconPoint(iconRect, 5.0, 6.0, flipped), TGIconPoint(iconRect, 13.0, 6.0, flipped), 1.0);
+        } else {
+            TGStrokeLine(TGIconPoint(iconRect, 5.0, 9.5, flipped), TGIconPoint(iconRect, 13.0, 9.5, flipped), 1.0);
+            TGStrokeLine(TGIconPoint(iconRect, 5.0, 7.0, flipped), TGIconPoint(iconRect, 13.0, 7.0, flipped), 1.0);
+        }
     } else if ([title isEqualToString:@"Logs"]) {
         NSRect pageRect = TGIconRect(iconRect, 3.0, 2.0, 12.0, 14.0, flipped);
         [[NSBezierPath bezierPathWithRoundedRect:pageRect xRadius:2.0 yRadius:2.0] stroke];
@@ -1209,13 +1204,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [@"i" drawAtPoint:NSMakePoint(NSMidX(circleRect) - (size.width / 2.0),
                                       NSMidY(circleRect) - (size.height / 2.0) - 0.5)
            withAttributes:attributes];
-    } else {
-        NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
-        NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
-        NSBezierPath *folderPath = [NSBezierPath bezierPath];
-        [folderPath appendBezierPathWithRoundedRect:folderBody xRadius:2.0 yRadius:2.0];
-        [folderPath appendBezierPathWithRoundedRect:folderTab xRadius:1.5 yRadius:1.5];
-        [folderPath fill];
     }
 }
 
@@ -1263,19 +1251,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                  18.0,
                                  18.0);
     TGDrawNavigationIcon(title, iconRect, textColor, flipped);
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setAlignment:NSCenterTextAlignment];
-    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 font, NSFontAttributeName,
                                 textColor, NSForegroundColorAttributeName,
-                                paragraph, NSParagraphStyleAttributeName,
                                 nil];
     NSSize titleSize = [title sizeWithAttributes:attributes];
     CGFloat titleY = flipped ? (NSMaxY(cellFrame) - titleSize.height - 7.0) : (NSMinY(cellFrame) + 7.0);
-    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + 4.0,
+    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + floor((NSWidth(cellFrame) - titleSize.width) / 2.0),
                                   titleY,
-                                  NSWidth(cellFrame) - 8.0,
+                                  titleSize.width,
                                   titleSize.height);
     [title drawInRect:titleRect withAttributes:attributes];
 }
@@ -1358,12 +1342,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat alpha = enabled ? 1.0 : 0.48;
     NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
     NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
-    NSColor *topColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicNavigationSelectedColor(alpha);
-    NSColor *bottomColor = highlighted ? TGClassicNavigationSelectedColor(alpha) : TGClassicNavigationSelectedStrokeColor(alpha);
-    NSGradient *buttonGradient = [[[NSGradient alloc] initWithStartingColor:topColor
-                                                                endingColor:bottomColor] autorelease];
-    [buttonGradient drawInBezierPath:buttonPath angle:90.0];
-    [TGClassicTableGridColor() set];
+    NSColor *fillColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicTableHeaderColor();
+    [fillColor set];
+    [buttonPath fill];
+    [TGClassicPanelStrokeColor() set];
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
@@ -1643,7 +1625,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSArray *drawerFolderButtons;
 @property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
 @property (nonatomic, retain) NSButton *drawerButton;
-@property (nonatomic, retain) NSMutableArray *chatFilterSummaries;
 @property (nonatomic, retain) TGGroupedCardView *profileSummaryCardView;
 @property (nonatomic, retain) TGGroupedCardView *profileInfoCardView;
 @property (nonatomic, retain) TGGroupedCardView *profileDetailsCardView;
@@ -1665,7 +1646,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSTextField *sendLabel;
-@property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *sendMessageButton;
 @property (nonatomic, retain) NSTextField *authLabel;
@@ -1717,9 +1697,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *aboutCopyrightField;
 @property (nonatomic, retain) NSTextField *aboutLinkField;
 @property (nonatomic, retain) NSNumber *selectedChatID;
-@property (nonatomic, retain) NSNumber *selectedChatFilterID;
 @property (nonatomic, copy) NSString *selectedChatTitle;
-@property (nonatomic, copy) NSString *selectedChatFilterTitle;
 @property (nonatomic, copy) NSString *profileDisplayName;
 @property (nonatomic, copy) NSString *profileFirstName;
 @property (nonatomic, copy) NSString *profileLastName;
@@ -1752,7 +1730,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL forceMessageScrollToNewest;
 @property (nonatomic, assign) BOOL initialConnectStarted;
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
-@property (nonatomic, assign) BOOL chatFiltersLoaded;
 @property (nonatomic, assign) BOOL drawerOpen;
 @end
 
@@ -1771,7 +1748,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize drawerFolderButtons = _drawerFolderButtons;
 @synthesize accountBadgeView = _accountBadgeView;
 @synthesize drawerButton = _drawerButton;
-@synthesize chatFilterSummaries = _chatFilterSummaries;
 @synthesize profileSummaryCardView = _profileSummaryCardView;
 @synthesize profileInfoCardView = _profileInfoCardView;
 @synthesize profileDetailsCardView = _profileDetailsCardView;
@@ -1793,7 +1769,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize sendLabel = _sendLabel;
-@synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
 @synthesize sendMessageButton = _sendMessageButton;
 @synthesize authLabel = _authLabel;
@@ -1845,9 +1820,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize aboutCopyrightField = _aboutCopyrightField;
 @synthesize aboutLinkField = _aboutLinkField;
 @synthesize selectedChatID = _selectedChatID;
-@synthesize selectedChatFilterID = _selectedChatFilterID;
 @synthesize selectedChatTitle = _selectedChatTitle;
-@synthesize selectedChatFilterTitle = _selectedChatFilterTitle;
 @synthesize profileDisplayName = _profileDisplayName;
 @synthesize profileFirstName = _profileFirstName;
 @synthesize profileLastName = _profileLastName;
@@ -1880,7 +1853,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize forceMessageScrollToNewest = _forceMessageScrollToNewest;
 @synthesize initialConnectStarted = _initialConnectStarted;
 @synthesize profileSummaryLoaded = _profileSummaryLoaded;
-@synthesize chatFiltersLoaded = _chatFiltersLoaded;
 @synthesize drawerOpen = _drawerOpen;
 
 - (instancetype)init {
@@ -1900,15 +1872,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
-        self.chatFilterSummaries = [NSMutableArray array];
-        self.selectedChatFilterTitle = @"All chats";
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
         self.autoChatListLoadArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self buildContentView];
-        [self rebuildDrawerFolderButtons];
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
     }
@@ -2020,11 +1989,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)applyComposerTextFieldStyle:(NSTextField *)textField {
-    [textField setBezeled:NO];
-    [textField setBordered:NO];
-    [textField setBackgroundColor:[NSColor clearColor]];
+    [textField setBezeled:YES];
+    [textField setBordered:YES];
+    [textField setBackgroundColor:TGClassicTablePaperColor()];
     [textField setTextColor:TGClassicInkColor()];
-    [textField setDrawsBackground:NO];
+    [textField setDrawsBackground:YES];
     [textField setFocusRingType:NSFocusRingTypeNone];
     [textField setFont:[NSFont systemFontOfSize:12.0]];
     if ([[textField cell] isKindOfClass:[NSTextFieldCell class]]) {
@@ -2159,7 +2128,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.bottomNavigationView setNeedsDisplay:YES];
     [self.chatScrollSurfaceView setNeedsDisplay:YES];
     [self.messageScrollSurfaceView setNeedsDisplay:YES];
-    [self.sendTextFieldBackgroundView setNeedsDisplay:YES];
     [self applySkeuomorphicScrollStyle:self.detailsScrollView];
     [self applySkeuomorphicScrollStyle:self.chatScrollView];
     [self applySkeuomorphicScrollStyle:self.messageScrollView];
@@ -2357,7 +2325,29 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     self.navigationButtons = navigationButtons;
 
-    self.drawerFolderButtons = [NSArray array];
+    NSArray *drawerFolderTitles = [NSArray arrayWithObjects:@"All", @"Private", @"Groups", nil];
+    NSMutableArray *drawerFolderButtons = [NSMutableArray arrayWithCapacity:[drawerFolderTitles count]];
+    for (navigationIndex = 0; navigationIndex < [drawerFolderTitles count]; navigationIndex++) {
+        NSString *buttonTitle = [drawerFolderTitles objectAtIndex:navigationIndex];
+        NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (navigationIndex * 48), 92, 42)] autorelease];
+        TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
+        [folderCell setButtonType:NSToggleButton];
+        [folderButton setCell:folderCell];
+        [folderButton setTitle:buttonTitle];
+        [folderButton setButtonType:NSToggleButton];
+        [folderButton setBordered:NO];
+        [folderButton setTag:(NSInteger)navigationIndex];
+        [folderButton setToolTip:[NSString stringWithFormat:@"%@ folder", buttonTitle]];
+        [folderButton setTarget:self];
+        [folderButton setAction:@selector(folderFilterChanged:)];
+        [folderButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+        if (navigationIndex == 0) {
+            [folderButton setState:NSOnState];
+        }
+        [contentView addSubview:folderButton];
+        [drawerFolderButtons addObject:folderButton];
+    }
+    self.drawerFolderButtons = drawerFolderButtons;
 
     self.logsCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 410, 712, 210)] autorelease];
     [self.logsCardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -2572,10 +2562,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                      text:@""
                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.sendLabel];
-
-    self.sendTextFieldBackgroundView = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
-    [self.sendTextFieldBackgroundView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    [contentView addSubview:self.sendTextFieldBackgroundView];
 
     self.sendTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextField setEnabled:NO];
@@ -2905,13 +2891,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
-        BOOL selectedFilter = ([button tag] == 0 && self.selectedChatFilterID == nil);
-        if ([button tag] > 0 && self.selectedChatFilterID && [button tag] == [self.selectedChatFilterID integerValue]) {
-            selectedFilter = YES;
-        }
         [button setEnabled:(enabled && ready)];
         [button setHidden:(!ready || !self.drawerOpen)];
-        [button setState:selectedFilter ? NSOnState : NSOffState];
     }
 }
 
@@ -2926,134 +2907,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateVisibleSection];
 }
 
-- (void)rebuildDrawerFolderButtons {
-    NSView *contentView = [[self window] contentView];
-    NSUInteger index = 0;
-    for (index = 0; index < [self.drawerFolderButtons count]; index++) {
-        NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
-        [button removeFromSuperview];
-    }
-
-    NSMutableArray *buttons = [NSMutableArray array];
-    NSMutableArray *entries = [NSMutableArray array];
-    NSMutableDictionary *mainEntry = [NSMutableDictionary dictionary];
-    [mainEntry setObject:[NSNumber numberWithInt:0] forKey:@"id"];
-    [mainEntry setObject:@"All chats" forKey:@"title"];
-    [entries addObject:mainEntry];
-
-    for (index = 0; index < [self.chatFilterSummaries count]; index++) {
-        id candidate = [self.chatFilterSummaries objectAtIndex:index];
-        if ([candidate isKindOfClass:[NSDictionary class]]) {
-            [entries addObject:candidate];
-        }
-    }
-
-    for (index = 0; index < [entries count]; index++) {
-        NSDictionary *entry = [entries objectAtIndex:index];
-        id filterID = [entry objectForKey:@"id"];
-        id titleValue = [entry objectForKey:@"title"];
-        if (![filterID respondsToSelector:@selector(integerValue)] || ![titleValue isKindOfClass:[NSString class]] || [(NSString *)titleValue length] == 0) {
-            continue;
-        }
-
-        NSString *buttonTitle = (NSString *)titleValue;
-        NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (index * 48), 92, 42)] autorelease];
-        TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
-        [folderCell setButtonType:NSToggleButton];
-        [folderButton setCell:folderCell];
-        [folderButton setTitle:buttonTitle];
-        [folderButton setButtonType:NSToggleButton];
-        [folderButton setBordered:NO];
-        [folderButton setTag:[filterID integerValue]];
-        [folderButton setToolTip:[NSString stringWithFormat:@"%@ folder", buttonTitle]];
-        [folderButton setTarget:self];
-        [folderButton setAction:@selector(folderFilterChanged:)];
-        [folderButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-
-        BOOL selected = NO;
-        if ([filterID integerValue] == 0) {
-            selected = (self.selectedChatFilterID == nil);
-        } else if (self.selectedChatFilterID && [self.selectedChatFilterID integerValue] == [filterID integerValue]) {
-            selected = YES;
-        }
-        [folderButton setState:selected ? NSOnState : NSOffState];
-        [contentView addSubview:folderButton];
-        [buttons addObject:folderButton];
-    }
-
-    self.drawerFolderButtons = buttons;
-    [self layoutContentView];
-    [self updateVisibleSection];
-}
-
-- (void)applyChatFilterSummaries:(NSArray *)filters {
-    [self.chatFilterSummaries removeAllObjects];
-    if ([filters isKindOfClass:[NSArray class]]) {
-        [self.chatFilterSummaries addObjectsFromArray:filters];
-    }
-
-    if (self.selectedChatFilterID) {
-        BOOL stillExists = NO;
-        NSUInteger index = 0;
-        for (index = 0; index < [self.chatFilterSummaries count]; index++) {
-            NSDictionary *filter = [self.chatFilterSummaries objectAtIndex:index];
-            id filterID = [filter objectForKey:@"id"];
-            if ([filterID respondsToSelector:@selector(integerValue)] && [filterID integerValue] == [self.selectedChatFilterID integerValue]) {
-                stillExists = YES;
-                break;
-            }
-        }
-        if (!stillExists) {
-            self.selectedChatFilterID = nil;
-            self.selectedChatFilterTitle = @"All chats";
-        }
-    }
-
-    [self rebuildDrawerFolderButtons];
-}
-
 - (void)folderFilterChanged:(id)sender {
     NSUInteger index = 0;
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
         [button setState:(button == sender) ? NSOnState : NSOffState];
     }
-
-    if (![sender respondsToSelector:@selector(tag)]) {
-        return;
-    }
-
-    NSInteger filterTag = [sender tag];
-    NSNumber *newFilterID = (filterTag > 0) ? [NSNumber numberWithInteger:filterTag] : nil;
-    BOOL sameFilter = ((self.selectedChatFilterID == nil && newFilterID == nil) ||
-                       (self.selectedChatFilterID && newFilterID && [self.selectedChatFilterID integerValue] == [newFilterID integerValue]));
-    NSString *buttonTitle = [sender respondsToSelector:@selector(title)] ? [sender title] : @"All chats";
-    self.selectedChatFilterID = newFilterID;
-    self.selectedChatFilterTitle = ([buttonTitle length] > 0) ? buttonTitle : @"All chats";
-
-    if (sameFilter) {
-        return;
-    }
-
-    [self.chatTableView deselectAll:nil];
-    [self.chatItems removeAllObjects];
-    [self.messageItems removeAllObjects];
-    [self.chatTableView reloadData];
-    [self.messageTableView reloadData];
-    self.selectedChatID = nil;
-    self.selectedChatTitle = nil;
-    [self.selectedChatField setStringValue:@"Select a chat"];
-    [self.sendTextField setStringValue:@""];
-    self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
-    self.chatsExhausted = NO;
-    self.autoChatListLoadArmed = YES;
-    self.olderMessagesExhausted = NO;
-    self.autoOlderMessagesLoadArmed = YES;
-    if (!self.selectedChatFilterID) {
-        [self.client invalidateMainChatListExhaustion];
-    }
-    [self updateAuthControlsForState:self.currentAuthState];
-    [self reloadChatsInteractive:YES preserveSelection:NO];
 }
 
 - (void)toggleDrawer:(id)sender {
@@ -3335,7 +3194,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.sendLabel visible:NO];
-    [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
 
@@ -3453,7 +3311,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
 
-    [self.drawerButton setFrame:NSMakeRect(railX + floor((railWidth - 34.0) / 2.0), railTop - 43.0, 34.0, 34.0)];
+    [self.drawerButton setFrame:NSMakeRect(railX + 5.0, railTop - 43.0, 34.0, 34.0)];
     CGFloat accountBadgeWidth = railWidth - 48.0;
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
@@ -3541,7 +3399,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadChatsButton setFrame:NSMakeRect(NSMinX([self.loadMoreChatsButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
-    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 1.0;
     CGFloat chatListHeight = chatListTop - chatListBottom;
     if (chatListHeight < 128.0) {
         chatListHeight = 128.0;
@@ -3552,11 +3410,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSRect chatSurfaceFrame = NSMakeRect(chatListX, chatListBottom, chatListWidth, chatListHeight);
     [self.chatScrollSurfaceView setFrame:chatSurfaceFrame];
-    [self.chatScrollView setFrame:NSInsetRect(chatSurfaceFrame, 5.0, 5.0)];
+    [self.chatScrollView setFrame:NSInsetRect(chatSurfaceFrame, 1.0, 1.0)];
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"chat"];
     if (chatColumn) {
-        [self.chatScrollView tile];
-        CGFloat chatWidth = NSWidth([[self.chatScrollView contentView] bounds]);
+        CGFloat chatWidth = NSWidth([self.chatScrollView frame]);
         if (chatWidth < 132.0) {
             chatWidth = 132.0;
         }
@@ -3571,7 +3428,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
-    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 1.0;
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
@@ -3583,11 +3440,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSRect messageSurfaceFrame = NSMakeRect(messageScrollX, messageBottom, messageScrollWidth, messageHeight);
     [self.messageScrollSurfaceView setFrame:messageSurfaceFrame];
-    [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 5.0, 5.0)];
+    [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 1.0, 1.0)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     if (bubbleColumn) {
-        [self.messageScrollView tile];
-        CGFloat bubbleWidth = NSWidth([[self.messageScrollView contentView] bounds]);
+        CGFloat bubbleWidth = NSWidth([self.messageScrollView frame]);
         if (bubbleWidth < 260.0) {
             bubbleWidth = 260.0;
         }
@@ -3602,8 +3458,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         sendFieldWidth = 160.0;
     }
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
-    [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
-    [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerY + 11.0, sendFieldWidth - 16.0, 20.0)];
+    [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
 
     CGFloat panelTitleY = headerLabelY;
@@ -3896,11 +3751,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.activeSection = TGSectionChats;
         self.chatsExhausted = NO;
         self.profileSummaryLoaded = NO;
-        self.chatFiltersLoaded = NO;
-        self.selectedChatFilterID = nil;
-        self.selectedChatFilterTitle = @"All chats";
-        [self.chatFilterSummaries removeAllObjects];
-        [self rebuildDrawerFolderButtons];
         [self clearProfileDisplayCache];
         [self.client invalidateMainChatListExhaustion];
         self.pendingLiveChatRefresh = NO;
@@ -3996,9 +3846,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateVisibleSection];
     if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy) {
         [self reloadProfileSummaryIfReady];
-    }
-    if ([state isEqualToString:@"ready"] && !self.chatFiltersLoaded && !self.controlsBusy) {
-        [self reloadChatFiltersIfReady];
     }
 
     [previousState release];
@@ -5120,46 +4967,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     });
 }
 
-- (void)reloadChatFiltersIfReady {
-    if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy) {
-        return;
-    }
-
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *filterError = nil;
-        NSArray *filters = [[client chatFilterSummariesWithTimeout:5.0 error:&filterError] retain];
-        NSString *filterErrorMessage = [[filterError localizedDescription] copy];
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.client != client || ![self.currentAuthState isEqualToString:@"ready"]) {
-                [filters release];
-                [filterErrorMessage release];
-                return;
-            }
-
-            if (filters) {
-                [self applyChatFilterSummaries:filters];
-                self.chatFiltersLoaded = YES;
-                if ([filters count] > 0) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib filters: loaded %lu chat filters", (unsigned long)[filters count]]];
-                }
-            } else {
-                self.chatFiltersLoaded = YES;
-                if ([filterErrorMessage length] > 0) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib filters: %@", filterErrorMessage]];
-                }
-            }
-            [filters release];
-            [filterErrorMessage release];
-        });
-
-        [client release];
-        [pool drain];
-    });
-}
-
 - (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection requestedLimit:(NSUInteger)requestedLimit {
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         if (interactive) {
@@ -5174,12 +4981,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
-    NSNumber *filterIDCopy = [self.selectedChatFilterID retain];
-    NSString *filterTitleCopy = [self.selectedChatFilterTitle copy];
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading chats..."];
-        [self appendDetail:[NSString stringWithFormat:@"Loading %@ chat previews from TDLib...", [filterTitleCopy length] > 0 ? filterTitleCopy : @"main"]];
+        [self appendDetail:@"Loading main chat previews from TDLib..."];
     } else {
         self.backgroundChatRefreshInFlight = YES;
     }
@@ -5194,15 +4999,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *chatError = nil;
-        NSArray *items = nil;
-        BOOL chatsExhausted = NO;
-        if (filterIDCopy) {
-            items = [client chatPreviewItemsForFilterID:filterIDCopy limit:requestedLimit timeout:10.0 error:&chatError];
-            chatsExhausted = (items && [items count] < requestedLimit);
-        } else {
-            items = [client mainChatPreviewItemsWithLimit:requestedLimit timeout:10.0 error:&chatError];
-            chatsExhausted = [client mainChatListExhausted];
-        }
+        NSArray *items = [client mainChatPreviewItemsWithLimit:requestedLimit timeout:10.0 error:&chatError];
+        BOOL chatsExhausted = [client mainChatListExhausted];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *chatErrorMessage = [[chatError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];
@@ -5214,7 +5012,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu %@ previews (limit %lu)", (unsigned long)[itemsCopy count], [filterTitleCopy length] > 0 ? filterTitleCopy : @"chat", (unsigned long)requestedLimit]];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews (limit %lu)", (unsigned long)[itemsCopy count], (unsigned long)requestedLimit]];
                     if (self.chatsExhausted) {
                         [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
                     }
@@ -5243,8 +5041,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [chatErrorMessage release];
             [authorizationState release];
             [preferredChatID release];
-            [filterIDCopy release];
-            [filterTitleCopy release];
         });
 
         [client release];
@@ -5441,7 +5237,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *latestAuthorizationState = nil;
     BOOL needsChatRefresh = NO;
     BOOL needsMessageRefresh = NO;
-    BOOL needsFilterRefresh = NO;
 
     NSUInteger index = 0;
     for (index = 0; index < [updates count]; index++) {
@@ -5467,11 +5262,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
             }
-        } else if ([kind isEqualToString:@"update"]) {
-            NSString *type = [summary objectForKey:@"type"];
-            if ([type isEqualToString:@"updateChatFilters"]) {
-                needsFilterRefresh = YES;
-            }
         }
     }
 
@@ -5484,10 +5274,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     if (needsMessageRefresh) {
         self.pendingLiveMessageRefresh = YES;
-    }
-    if (needsFilterRefresh) {
-        self.chatFiltersLoaded = NO;
-        [self reloadChatFiltersIfReady];
     }
 
     [selectedChatID release];
@@ -5836,13 +5622,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.client = [[[TGTDLibClient alloc] init] autorelease];
                 self.initialConnectStarted = NO;
                 self.profileSummaryLoaded = NO;
-                self.chatFiltersLoaded = NO;
                 self.pendingLiveChatRefresh = NO;
                 self.pendingLiveMessageRefresh = NO;
-                self.selectedChatFilterID = nil;
-                self.selectedChatFilterTitle = @"All chats";
-                [self.chatFilterSummaries removeAllObjects];
-                [self rebuildDrawerFolderButtons];
                 [self.chatItems removeAllObjects];
                 [self.messageItems removeAllObjects];
                 [self.chatTableView deselectAll:nil];
@@ -5899,7 +5680,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_drawerFolderButtons release];
     [_accountBadgeView release];
     [_drawerButton release];
-    [_chatFilterSummaries release];
     [_profileSummaryCardView release];
     [_profileInfoCardView release];
     [_profileDetailsCardView release];
@@ -5921,7 +5701,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
     [_sendLabel release];
-    [_sendTextFieldBackgroundView release];
     [_sendTextField release];
     [_sendMessageButton release];
     [_authLabel release];
@@ -5973,9 +5752,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_aboutCopyrightField release];
     [_aboutLinkField release];
     [_selectedChatID release];
-    [_selectedChatFilterID release];
     [_selectedChatTitle release];
-    [_selectedChatFilterTitle release];
     [_client release];
     [_currentAuthState release];
     [_activeSection release];
