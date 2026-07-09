@@ -99,33 +99,6 @@ static BOOL TGThemeIdentifierIsValid(NSString *identifier) {
     return (identifier && [TGThemeIdentifiers() containsObject:identifier]);
 }
 
-static NSString *TGAuthorizationStateFromTDLibSummary(NSString *summary) {
-    if ([summary length] == 0) {
-        return nil;
-    }
-
-    NSArray *markers = [NSArray arrayWithObjects:@"auth state: ", @"auth state is ", nil];
-    NSUInteger markerIndex = 0;
-    for (markerIndex = 0; markerIndex < [markers count]; markerIndex++) {
-        NSString *marker = [markers objectAtIndex:markerIndex];
-        NSRange markerRange = [summary rangeOfString:marker options:NSBackwardsSearch];
-        if (markerRange.location == NSNotFound) {
-            continue;
-        }
-
-        NSString *state = [summary substringFromIndex:NSMaxRange(markerRange)];
-        state = [state stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if ([state hasSuffix:@"."]) {
-            state = [state substringToIndex:([state length] - 1)];
-        }
-        if ([state length] > 0) {
-            return state;
-        }
-    }
-
-    return nil;
-}
-
 static NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
     if ([identifier isEqualToString:TGThemeIdentifierCoffee]) {
         return @"Coffee & Brass";
@@ -3345,7 +3318,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.authStateField visible:(showLogin && ![self isAuthInputState:self.currentAuthState])];
     [self showView:self.authTextField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitPhoneNumber"] || [self.currentAuthState isEqualToString:@"waitCode"]))];
     [self showView:self.authSecureField visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPassword"])];
-    [self showView:self.authButton visible:(showLogin && ([self isAuthInputState:self.currentAuthState] || [self isRecoverableConnectionState:self.currentAuthState]))];
+    [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
 
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     [self showView:self.sidebarPanelView visible:showChats];
@@ -3548,6 +3521,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginTitleField setFrame:NSMakeRect(loginX + 36.0, loginY + loginHeight - 70.0, loginWidth - 72.0, 28.0)];
     [self.loginHintField setFrame:NSMakeRect(loginX + 42.0, loginY + loginHeight - 132.0, loginWidth - 84.0, 52.0)];
     [self.authLabel setFrame:NSMakeRect(loginX + 52.0, loginY + 128.0, loginWidth - 104.0, 18.0)];
+    [self.authStateField setFrame:NSMakeRect(loginX + 52.0, loginY + 82.0, loginWidth - 104.0, 48.0)];
     CGFloat loginButtonWidth = 92.0;
     CGFloat loginInputX = loginX + 52.0;
     CGFloat loginButtonX = loginX + loginWidth - 52.0 - loginButtonWidth;
@@ -3555,18 +3529,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (loginInputWidth < 180.0) {
         loginInputWidth = 180.0;
     }
-    if ([self isAuthInputState:self.currentAuthState]) {
-        [self.authStateField setFrame:NSMakeRect(loginX + 52.0, loginY + 82.0, loginWidth - 104.0, 48.0)];
-        [self.authTextField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
-        [self.authSecureField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
-        [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
-    } else {
-        CGFloat retryButtonWidth = 112.0;
-        [self.authStateField setFrame:NSMakeRect(loginX + 52.0, loginY + 92.0, loginWidth - 104.0, 38.0)];
-        [self.authTextField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
-        [self.authSecureField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
-        [self.authButton setFrame:NSMakeRect(loginX + floor((loginWidth - retryButtonWidth) / 2.0), loginY + 54.0, retryButtonWidth, 32.0)];
-    }
+    [self.authTextField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
+    [self.authSecureField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
+    [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
     CGFloat headerButtonSize = 30.0;
     CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0);
@@ -3883,16 +3848,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
            [state isEqualToString:@"waitPassword"];
 }
 
-- (BOOL)isRecoverableConnectionState:(NSString *)state {
-    if ([state length] == 0) {
-        return YES;
-    }
-    return [state isEqualToString:@"closed"] ||
-           [state isEqualToString:@"waitTdlibParameters"] ||
-           [state isEqualToString:@"waitEncryptionKey"] ||
-           [state hasPrefix:@"error"];
-}
-
 - (void)updateSendControls {
     BOOL canTargetChat = [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil;
     NSString *text = [self.sendTextField stringValue];
@@ -3969,8 +3924,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.authTextField setEnabled:YES];
         [self.authSecureField setEnabled:NO];
         [self.authButton setTitle:@"Continue"];
-        [self.authButton setTarget:self];
-        [self.authButton setAction:@selector(submitAuthInput:)];
         [self.authButton setEnabled:YES];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
@@ -3989,8 +3942,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.authTextField setEnabled:YES];
         [self.authSecureField setEnabled:NO];
         [self.authButton setTitle:@"Verify"];
-        [self.authButton setTarget:self];
-        [self.authButton setAction:@selector(submitAuthInput:)];
         [self.authButton setEnabled:YES];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
@@ -4009,8 +3960,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:YES];
         [self.authButton setTitle:@"Unlock"];
-        [self.authButton setTarget:self];
-        [self.authButton setAction:@selector(submitAuthInput:)];
         [self.authButton setEnabled:YES];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
@@ -4023,38 +3972,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.statusField setStringValue:@"Connected"];
         [self.authStateField setStringValue:@"ready"];
     } else if ([state length] > 0) {
-        if ([state isEqualToString:@"waitTdlibParameters"] || [state isEqualToString:@"waitEncryptionKey"]) {
-            [self.statusField setStringValue:@"Preparing connection..."];
-            [self.authStateField setStringValue:@"Preparing local Telegram session..."];
-        } else if ([state isEqualToString:@"closed"] || [state hasPrefix:@"error"]) {
-            [self.statusField setStringValue:@"Connection needs attention"];
-            [self.authStateField setStringValue:@"Could not finish connection setup."];
-        } else {
-            [self.statusField setStringValue:@"Connecting..."];
-            [self.authStateField setStringValue:state];
-        }
+        [self.statusField setStringValue:@"Connecting..."];
+        [self.authStateField setStringValue:state];
     } else {
-        [self.statusField setStringValue:@"Connection needs attention"];
-        [self.authStateField setStringValue:@"Could not finish connection setup."];
+        [self.statusField setStringValue:@"Connecting..."];
+        [self.authStateField setStringValue:@"Preparing connection..."];
     }
     [self.authStateField setHidden:NO];
     [self.authTextField setHidden:YES];
     [self.authSecureField setHidden:YES];
     [self.authTextField setEnabled:NO];
     [self.authSecureField setEnabled:NO];
-    if (![state isEqualToString:@"ready"] && [self isRecoverableConnectionState:state]) {
-        [self.authButton setTitle:@"Try Again"];
-        [self.authButton setTarget:self];
-        [self.authButton setAction:@selector(checkTDLib:)];
-        [self.authButton setEnabled:!self.controlsBusy];
-        [self.authButton setHidden:NO];
-    } else {
-        [self.authButton setTitle:@"Send"];
-        [self.authButton setTarget:self];
-        [self.authButton setAction:@selector(submitAuthInput:)];
-        [self.authButton setEnabled:NO];
-        [self.authButton setHidden:YES];
-    }
+    [self.authButton setTitle:@"Send"];
+    [self.authButton setEnabled:NO];
+    [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
@@ -5597,30 +5528,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
         if (probeSummary) {
-            authorizationState = [client authorizationStateSummaryWithTimeout:8.0 error:&authorizationError];
+            authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
-                authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:8.0 error:&authorizationError];
+                authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
-                parametersSummary = [client setLocalTDLibParametersWithTimeout:8.0 error:&parametersError];
+                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
             }
             if ([authorizationState isEqualToString:@"waitEncryptionKey"] || [parametersSummary length] > 0) {
-                encryptionKeySummary = [client checkDatabaseEncryptionKeyWithTimeout:8.0 error:&encryptionKeyError];
+                encryptionKeySummary = [client checkDatabaseEncryptionKeyWithTimeout:4.0 error:&encryptionKeyError];
             }
-            finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:8.0 error:&finalAuthorizationError];
-            if ([finalAuthorizationState length] == 0) {
-                finalAuthorizationState = TGAuthorizationStateFromTDLibSummary(encryptionKeySummary);
-            }
-            if ([finalAuthorizationState length] == 0) {
-                finalAuthorizationState = TGAuthorizationStateFromTDLibSummary(parametersSummary);
-            }
-            if ([finalAuthorizationState length] == 0 && [authorizationState length] > 0) {
-                finalAuthorizationState = authorizationState;
-            }
+            finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&finalAuthorizationError];
             if ([finalAuthorizationState isEqualToString:@"ready"]) {
-                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:8.0 error:&postLoginProbeError];
+                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
                 if (!postLoginProbeSummary) {
-                    finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:8.0 error:&finalAuthorizationError];
+                    finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
                 }
             }
         }
@@ -5666,10 +5588,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self setControlsBusy:NO];
             } else {
                 NSString *message = [probeError localizedDescription] ? [probeError localizedDescription] : @"Unknown TDLib error.";
-                [self updateAuthControlsForState:nil];
                 [self setControlsBusy:NO];
                 [self.statusField setStringValue:@"Connection unavailable"];
-                [self.authStateField setStringValue:@"Could not connect. Try again."];
+                [self.authStateField setStringValue:@"Connection unavailable. Check local build files and try again."];
                 [self updateVisibleSection];
                 [self appendDetail:message];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe failed: %@", message]];
