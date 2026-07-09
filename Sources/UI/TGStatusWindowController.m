@@ -11,8 +11,9 @@ static NSUInteger const TGMessagePreviewInitialLimit = 20;
 static NSUInteger const TGMessagePrefillMinimumRows = 20;
 static NSUInteger const TGMessagePrefillMaxAttempts = 3;
 static CGFloat const TGPanelCornerRadius = 8.0;
-static CGFloat const TGPanelHeaderHeight = 32.0;
+static CGFloat const TGPanelHeaderHeight = 40.0;
 static CGFloat const TGMessageBubbleMaximumWidth = 420.0;
+static CGFloat const TGMessagePhotoMaximumSide = 300.0;
 static NSString * const TGSectionChats = @"chats";
 static NSString * const TGSectionProfile = @"profile";
 static NSString * const TGSectionSettings = @"settings";
@@ -382,6 +383,78 @@ static NSString *TGCurrentYearString(void) {
     return [NSString stringWithFormat:@"%ld", (long)[components year]];
 }
 
+static NSString *TGInitialsForTitle(NSString *title) {
+    if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
+        return @"T";
+    }
+
+    NSArray *parts = [title componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSMutableString *initials = [NSMutableString string];
+    NSUInteger index = 0;
+    for (index = 0; index < [parts count]; index++) {
+        NSString *part = [parts objectAtIndex:index];
+        if (![part isKindOfClass:[NSString class]] || [part length] == 0) {
+            continue;
+        }
+        NSRange range = [part rangeOfComposedCharacterSequenceAtIndex:0];
+        [initials appendString:[[part substringWithRange:range] uppercaseString]];
+        if ([initials length] >= 2) {
+            break;
+        }
+    }
+    if ([initials length] == 0) {
+        NSRange range = [title rangeOfComposedCharacterSequenceAtIndex:0];
+        [initials appendString:[[title substringWithRange:range] uppercaseString]];
+    }
+    return ([initials length] > 0) ? initials : @"T";
+}
+
+static NSColor *TGAvatarColorForTitle(NSString *title) {
+    static NSUInteger colors[] = {
+        0x4f78a8, 0x7c8f55, 0xa66a4e, 0x8a6a9d,
+        0x4d8a87, 0xa07d42, 0x63738f, 0x9a5969
+    };
+    NSUInteger count = sizeof(colors) / sizeof(colors[0]);
+    NSUInteger index = 0;
+    if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
+        index = [title hash] % count;
+    }
+    return TGColorFromRGB(TGRGBMake(colors[index]));
+}
+
+static void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected) {
+    NSBezierPath *avatarPath = [NSBezierPath bezierPathWithOvalInRect:rect];
+    NSImage *image = nil;
+    if ([imagePath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:imagePath]) {
+        image = [[[NSImage alloc] initWithContentsOfFile:imagePath] autorelease];
+    }
+
+    if (image) {
+        [NSGraphicsContext saveGraphicsState];
+        [avatarPath addClip];
+        [image drawInRect:rect fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:1.0];
+        [NSGraphicsContext restoreGraphicsState];
+    } else {
+        [(selected ? TGClassicSelectedRowTextColor() : TGAvatarColorForTitle(title)) set];
+        [avatarPath fill];
+        NSString *initials = TGInitialsForTitle(title);
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
+                                    [NSColor colorWithCalibratedWhite:1.0 alpha:0.96], NSForegroundColorAttributeName,
+                                    nil];
+        NSSize textSize = [initials sizeWithAttributes:attributes];
+        NSRect textRect = NSMakeRect(NSMidX(rect) - floor(textSize.width / 2.0),
+                                     NSMidY(rect) - floor(textSize.height / 2.0) - 1.0,
+                                     textSize.width,
+                                     textSize.height);
+        [initials drawInRect:textRect withAttributes:attributes];
+    }
+
+    [TGClassicPanelStrokeColor() set];
+    [avatarPath setLineWidth:1.0];
+    [avatarPath stroke];
+}
+
 static NSString *TGShortTimeStringFromDateValue(NSNumber *dateValue) {
     if (![dateValue respondsToSelector:@selector(integerValue)] || [dateValue integerValue] <= 0) {
         return @"";
@@ -389,7 +462,64 @@ static NSString *TGShortTimeStringFromDateValue(NSNumber *dateValue) {
     NSDate *date = [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)[dateValue integerValue]];
     return [NSDateFormatter localizedStringFromDate:date
                                           dateStyle:NSDateFormatterNoStyle
-                                          timeStyle:NSDateFormatterShortStyle];
+                                              timeStyle:NSDateFormatterShortStyle];
+}
+
+static NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
+    if (!item) {
+        return @"";
+    }
+    NSString *preview = ([item.preview length] > 0) ? item.preview : @"";
+    if ([item isPhotoMessage]) {
+        if ([preview isEqualToString:@"[Photo]"]) {
+            return @"";
+        }
+        if ([preview hasPrefix:@"[Photo] "]) {
+            return [preview substringFromIndex:8];
+        }
+    }
+    return preview;
+}
+
+static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item) {
+    CGFloat width = 220.0;
+    CGFloat height = 160.0;
+    if ([item.mediaWidth respondsToSelector:@selector(floatValue)] && [item.mediaWidth floatValue] > 0.0) {
+        width = [item.mediaWidth floatValue];
+    }
+    if ([item.mediaHeight respondsToSelector:@selector(floatValue)] && [item.mediaHeight floatValue] > 0.0) {
+        height = [item.mediaHeight floatValue];
+    }
+    if (width <= 0.0 || height <= 0.0) {
+        width = 220.0;
+        height = 160.0;
+    }
+    CGFloat scale = TGMessagePhotoMaximumSide / ((width > height) ? width : height);
+    if (scale < 1.0) {
+        width *= scale;
+        height *= scale;
+    }
+    if (width < 140.0) {
+        CGFloat grow = 140.0 / width;
+        width *= grow;
+        height *= grow;
+    }
+    if (height < 92.0) {
+        CGFloat grow = 92.0 / height;
+        width *= grow;
+        height *= grow;
+    }
+    if (width > TGMessagePhotoMaximumSide) {
+        CGFloat shrink = TGMessagePhotoMaximumSide / width;
+        width *= shrink;
+        height *= shrink;
+    }
+    if (height > TGMessagePhotoMaximumSide) {
+        CGFloat shrink = TGMessagePhotoMaximumSide / height;
+        width *= shrink;
+        height *= shrink;
+    }
+    return NSMakeSize(ceil(width), ceil(height));
 }
 
 static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth) {
@@ -404,17 +534,26 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
         maximumTextWidth = 180.0;
     }
 
-    NSString *text = ([item.preview length] > 0) ? item.preview : @"[Message]";
+    NSString *text = TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                 paragraph, NSParagraphStyleAttributeName,
                                 nil];
-    NSRect textRect = [text boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 1000.0)
-                                         options:NSStringDrawingUsesLineFragmentOrigin
-                                      attributes:attributes];
-    CGFloat height = ceil(NSHeight(textRect)) + 26.0;
+    CGFloat textHeight = 0.0;
+    if ([text length] > 0) {
+        NSRect textRect = [text boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 1000.0)
+                                             options:NSStringDrawingUsesLineFragmentOrigin
+                                          attributes:attributes];
+        textHeight = ceil(NSHeight(textRect));
+    }
+
+    CGFloat height = textHeight + 26.0;
+    if ([item isPhotoMessage]) {
+        NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item);
+        height = photoSize.height + 24.0 + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
+    }
     if (height < 42.0) {
         height = 42.0;
     }
@@ -490,6 +629,175 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [TGClassicRailStrokeColor() set];
     [railPath setLineWidth:1.0];
     [railPath stroke];
+}
+
+@end
+
+@interface TGAccountBadgeView : NSView {
+    NSString *_displayName;
+    NSString *_avatarLocalPath;
+    BOOL _connected;
+}
+@property (nonatomic, copy) NSString *displayName;
+@property (nonatomic, copy) NSString *avatarLocalPath;
+@property (nonatomic, assign) BOOL connected;
+@end
+
+@implementation TGAccountBadgeView
+
+@synthesize displayName = _displayName;
+@synthesize avatarLocalPath = _avatarLocalPath;
+@synthesize connected = _connected;
+
+- (void)setDisplayName:(NSString *)displayName {
+    if (_displayName == displayName || [_displayName isEqualToString:displayName]) {
+        return;
+    }
+    [_displayName release];
+    _displayName = [displayName copy];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setAvatarLocalPath:(NSString *)avatarLocalPath {
+    if (_avatarLocalPath == avatarLocalPath || [_avatarLocalPath isEqualToString:avatarLocalPath]) {
+        return;
+    }
+    [_avatarLocalPath release];
+    _avatarLocalPath = [avatarLocalPath copy];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setConnected:(BOOL)connected {
+    _connected = connected;
+    [self setNeedsDisplay:YES];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    CGFloat avatarSide = 44.0;
+    NSRect avatarRect = NSMakeRect(floor(NSMidX(bounds) - (avatarSide / 2.0)),
+                                   floor(NSMidY(bounds) - (avatarSide / 2.0)),
+                                   avatarSide,
+                                   avatarSide);
+    TGDrawAvatarInRect(self.avatarLocalPath, self.displayName, avatarRect, NO);
+
+    NSRect statusRect = NSMakeRect(NSMaxX(avatarRect) - 11.0, NSMinY(avatarRect) + 2.0, 12.0, 12.0);
+    NSBezierPath *outerDot = [NSBezierPath bezierPathWithOvalInRect:statusRect];
+    [TGClassicWindowBottomColor() set];
+    [outerDot fill];
+    NSRect innerRect = NSInsetRect(statusRect, 2.0, 2.0);
+    NSBezierPath *innerDot = [NSBezierPath bezierPathWithOvalInRect:innerRect];
+    NSColor *dotColor = self.connected ? [NSColor colorWithCalibratedRed:0.210 green:0.700 blue:0.315 alpha:1.0]
+                                       : TGClassicMutedInkColor();
+    [dotColor set];
+    [innerDot fill];
+}
+
+- (void)dealloc {
+    [_displayName release];
+    [_avatarLocalPath release];
+    [super dealloc];
+}
+
+@end
+
+@interface TGChatListCell : NSTextFieldCell {
+    TGChatItem *_chatItem;
+}
+@property (nonatomic, retain) TGChatItem *chatItem;
+@end
+
+@implementation TGChatListCell
+
+@synthesize chatItem = _chatItem;
+
+- (id)copyWithZone:(NSZone *)zone {
+    TGChatListCell *cell = [super copyWithZone:zone];
+    [cell setChatItem:self.chatItem];
+    return cell;
+}
+
+- (void)setObjectValue:(id)value {
+    if ([value isKindOfClass:[TGChatItem class]]) {
+        self.chatItem = (TGChatItem *)value;
+        [super setObjectValue:@""];
+        return;
+    }
+    self.chatItem = nil;
+    [super setObjectValue:(value ? value : @"")];
+}
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    TGChatItem *item = self.chatItem;
+    if (!item) {
+        id value = [self objectValue];
+        if ([value isKindOfClass:[TGChatItem class]]) {
+            item = (TGChatItem *)value;
+        }
+    }
+    if (!item) {
+        [super drawWithFrame:cellFrame inView:controlView];
+        return;
+    }
+
+    BOOL selected = [self isHighlighted];
+    if (selected) {
+        [TGClassicSelectedRowColor() set];
+        NSRectFill(cellFrame);
+    }
+
+    NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 8.0,
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 26.0) / 2.0),
+                                   26.0,
+                                   26.0);
+    TGDrawAvatarInRect([item avatarLocalPath], [item title], avatarRect, selected);
+
+    NSInteger unreadCount = [[item unreadCount] respondsToSelector:@selector(integerValue)] ? [[item unreadCount] integerValue] : 0;
+    NSString *unreadString = @"";
+    if (unreadCount > 999) {
+        unreadString = @"999+";
+    } else if (unreadCount > 0) {
+        unreadString = [NSString stringWithFormat:@"%ld", (long)unreadCount];
+    }
+
+    NSDictionary *unreadAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
+                                      selected ? TGClassicSelectedRowTextColor() : TGClassicUnreadTextColor(), NSForegroundColorAttributeName,
+                                      nil];
+    NSSize unreadSize = [unreadString sizeWithAttributes:unreadAttributes];
+    CGFloat unreadWidth = ([unreadString length] > 0) ? (unreadSize.width + 10.0) : 0.0;
+    NSRect unreadRect = NSMakeRect(NSMaxX(cellFrame) - unreadWidth - 9.0,
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - unreadSize.height) / 2.0),
+                                   unreadWidth,
+                                   unreadSize.height);
+
+    CGFloat titleX = NSMaxX(avatarRect) + 9.0;
+    CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 8.0) : (NSMaxX(cellFrame) - 9.0);
+    NSRect titleRect = NSMakeRect(titleX,
+                                  NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
+                                  titleRight - titleX,
+                                  16.0);
+    if (NSWidth(titleRect) < 40.0) {
+        titleRect.size.width = 40.0;
+    }
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                     selected ? TGClassicSelectedRowTextColor() : TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     paragraph, NSParagraphStyleAttributeName,
+                                     nil];
+    [[item title] drawInRect:titleRect withAttributes:titleAttributes];
+    if ([unreadString length] > 0) {
+        [unreadString drawInRect:unreadRect withAttributes:unreadAttributes];
+    }
+}
+
+- (void)dealloc {
+    [_chatItem release];
+    [super dealloc];
 }
 
 @end
@@ -633,7 +941,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         maximumBubbleWidth = 180.0;
     }
 
-    NSString *messageText = ([item.preview length] > 0) ? item.preview : @"[Message]";
+    NSString *messageText = TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -641,10 +949,25 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
-    NSRect measuredRect = [messageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
-                                                    options:NSStringDrawingUsesLineFragmentOrigin
-                                                 attributes:textAttributes];
+    NSRect measuredRect = NSZeroRect;
+    if ([messageText length] > 0) {
+        measuredRect = [messageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+                                                 options:NSStringDrawingUsesLineFragmentOrigin
+                                              attributes:textAttributes];
+    }
+    NSSize photoSize = NSZeroSize;
+    BOOL photoMessage = [item isPhotoMessage];
+    if (photoMessage) {
+        photoSize = TGPhotoDisplaySizeForMessageItem(item);
+    }
+
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
+    if (photoMessage) {
+        CGFloat photoBubbleWidth = photoSize.width + 16.0;
+        if (photoBubbleWidth > bubbleWidth) {
+            bubbleWidth = photoBubbleWidth;
+        }
+    }
     if (bubbleWidth < 96.0) {
         bubbleWidth = 96.0;
     }
@@ -652,6 +975,12 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         bubbleWidth = maximumBubbleWidth;
     }
     CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    if (photoMessage) {
+        bubbleHeight = photoSize.height + 24.0;
+        if (NSHeight(measuredRect) > 0.0) {
+            bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
+        }
+    }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
@@ -669,13 +998,52 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
 
-    NSRect textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
-                                 NSMinY(bubbleRect) + 13.0,
-                                 NSWidth(bubbleRect) - 24.0,
-                                 NSHeight(bubbleRect) - 20.0);
-    [messageText drawWithRect:textRect
-                      options:NSStringDrawingUsesLineFragmentOrigin
-                   attributes:textAttributes];
+    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    if (photoMessage) {
+        NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
+                                      contentTop - photoSize.height,
+                                      photoSize.width,
+                                      photoSize.height);
+        NSBezierPath *imagePath = [NSBezierPath bezierPathWithRoundedRect:imageRect xRadius:9.0 yRadius:9.0];
+        NSString *mediaPath = [item mediaLocalPath];
+        NSImage *image = nil;
+        if ([mediaPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:mediaPath]) {
+            image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
+        }
+        if (image) {
+            [NSGraphicsContext saveGraphicsState];
+            [imagePath addClip];
+            [image drawInRect:imageRect fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:1.0];
+            [NSGraphicsContext restoreGraphicsState];
+        } else {
+            [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
+            [imagePath setLineWidth:1.0];
+            [imagePath stroke];
+            NSDictionary *placeholderAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                                   [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                                   TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                                   nil];
+            NSString *placeholder = @"Photo";
+            NSSize placeholderSize = [placeholder sizeWithAttributes:placeholderAttributes];
+            NSRect placeholderRect = NSMakeRect(NSMidX(imageRect) - floor(placeholderSize.width / 2.0),
+                                                NSMidY(imageRect) - floor(placeholderSize.height / 2.0),
+                                                placeholderSize.width,
+                                                placeholderSize.height);
+            [placeholder drawInRect:placeholderRect withAttributes:placeholderAttributes];
+        }
+        contentTop = NSMinY(imageRect) - 8.0;
+    }
+
+    if ([messageText length] > 0) {
+        CGFloat textHeight = ceil(NSHeight(measuredRect));
+        NSRect textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                     contentTop - textHeight,
+                                     NSWidth(bubbleRect) - 24.0,
+                                     textHeight + 2.0);
+        [messageText drawWithRect:textRect
+                          options:NSStringDrawingUsesLineFragmentOrigin
+                       attributes:textAttributes];
+    }
 
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
     if ([timeString length] > 0) {
@@ -709,6 +1077,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, retain) NSView *settingsPanelView;
 @property (nonatomic, retain) NSView *aboutPanelView;
 @property (nonatomic, retain) NSArray *navigationButtons;
+@property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) NSTextField *statusField;
@@ -757,6 +1126,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, retain) NSTextField *aboutLinkField;
 @property (nonatomic, retain) NSNumber *selectedChatID;
 @property (nonatomic, copy) NSString *selectedChatTitle;
+@property (nonatomic, copy) NSString *profileDisplayName;
+@property (nonatomic, copy) NSString *profileUsername;
+@property (nonatomic, retain) NSNumber *profileUserID;
+@property (nonatomic, copy) NSString *profileAvatarLocalPath;
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, copy) NSString *currentAuthState;
 @property (nonatomic, copy) NSString *activeSection;
@@ -787,6 +1160,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize settingsPanelView = _settingsPanelView;
 @synthesize aboutPanelView = _aboutPanelView;
 @synthesize navigationButtons = _navigationButtons;
+@synthesize accountBadgeView = _accountBadgeView;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
 @synthesize statusField = _statusField;
 @synthesize titleField = _titleField;
@@ -835,6 +1209,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize aboutLinkField = _aboutLinkField;
 @synthesize selectedChatID = _selectedChatID;
 @synthesize selectedChatTitle = _selectedChatTitle;
+@synthesize profileDisplayName = _profileDisplayName;
+@synthesize profileUsername = _profileUsername;
+@synthesize profileUserID = _profileUserID;
+@synthesize profileAvatarLocalPath = _profileAvatarLocalPath;
 @synthesize client = _client;
 @synthesize currentAuthState = _currentAuthState;
 @synthesize activeSection = _activeSection;
@@ -1049,6 +1427,48 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.messageTableView reloadData];
 }
 
+- (void)refreshProfileDisplay {
+    NSString *displayName = ([self.profileDisplayName length] > 0) ? self.profileDisplayName : @"Telegraphica";
+    [self.accountBadgeView setDisplayName:displayName];
+    [self.accountBadgeView setAvatarLocalPath:self.profileAvatarLocalPath];
+    [self.accountBadgeView setConnected:[self.currentAuthState isEqualToString:@"ready"]];
+
+    if ([self.profileDisplayName length] > 0) {
+        [self.profileNameField setStringValue:[NSString stringWithFormat:@"Name: %@", self.profileDisplayName]];
+        [self.settingsStateField setStringValue:[NSString stringWithFormat:@"Account: %@", self.profileDisplayName]];
+    } else {
+        [self.profileNameField setStringValue:@"Name"];
+        [self.settingsStateField setStringValue:@"Account"];
+    }
+
+    if ([self.profileUsername length] > 0) {
+        NSString *usernameText = [NSString stringWithFormat:@"Username: @%@", self.profileUsername];
+        [self.profileUsernameField setStringValue:usernameText];
+        [self.settingsLibraryField setStringValue:usernameText];
+    } else {
+        [self.profileUsernameField setStringValue:@""];
+        [self.settingsLibraryField setStringValue:@""];
+    }
+
+    if ([self.profileUserID respondsToSelector:@selector(longLongValue)]) {
+        NSString *idText = [NSString stringWithFormat:@"Telegram ID: %lld", [self.profileUserID longLongValue]];
+        [self.profileIDField setStringValue:idText];
+        [self.settingsStorageField setStringValue:idText];
+    } else {
+        [self.profileIDField setStringValue:@""];
+        [self.settingsStorageField setStringValue:@""];
+    }
+}
+
+- (void)clearProfileDisplayCache {
+    self.profileDisplayName = nil;
+    self.profileUsername = nil;
+    self.profileUserID = nil;
+    self.profileAvatarLocalPath = nil;
+    [self.profileStateField setStringValue:@""];
+    [self refreshProfileDisplay];
+}
+
 - (void)buildContentView {
     TGChromeView *contentView = [[[TGChromeView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -1058,6 +1478,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     self.topPanelView = [[[TGRailView alloc] initWithFrame:NSMakeRect(16, 628, 948, 56)] autorelease];
     [self.topPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.topPanelView];
+
+    self.accountBadgeView = [[[TGAccountBadgeView alloc] initWithFrame:NSMakeRect(30, 626, 60, 60)] autorelease];
+    [self.accountBadgeView setDisplayName:@"Telegraphica"];
+    [self.accountBadgeView setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
+    [contentView addSubview:self.accountBadgeView];
 
     self.sidebarPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 286, 480)] autorelease];
     [self.sidebarPanelView setAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
@@ -1091,12 +1516,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                       text:@"Telegraphica"
                                       font:[NSFont boldSystemFontOfSize:20.0]];
     [self.titleField setTextColor:[NSColor colorWithCalibratedWhite:0.98 alpha:1.0]];
+    [self.titleField setHidden:YES];
     [contentView addSubview:self.titleField];
 
     self.statusField = [self labelWithFrame:NSMakeRect(24, 636, 712, 22)
                                      text:@"Connecting..."
                                      font:[NSFont systemFontOfSize:13.0]];
     [self applyPanelHeaderDetailStyle:self.statusField];
+    [self.statusField setHidden:YES];
     [contentView addSubview:self.statusField];
 
     NSArray *navigationTitles = [NSArray arrayWithObjects:@"Chats", @"Profile", @"Settings", @"About", @"Logs", nil];
@@ -1201,7 +1628,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.chatsLabel];
 
     self.loadChatsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(104, 332, 112, 32)] autorelease];
-    [self.loadChatsButton setTitle:@"Refresh"];
+    [self.loadChatsButton setTitle:@"↻"];
+    [self.loadChatsButton setToolTip:@"Refresh chats"];
     [self.loadChatsButton setTarget:self];
     [self.loadChatsButton setAction:@selector(loadChats:)];
     [self.loadChatsButton setEnabled:NO];
@@ -1210,7 +1638,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.loadChatsButton];
 
     self.loadMoreChatsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(224, 332, 80, 32)] autorelease];
-    [self.loadMoreChatsButton setTitle:@"More"];
+    [self.loadMoreChatsButton setTitle:@"+"];
+    [self.loadMoreChatsButton setToolTip:@"Load more chats"];
     [self.loadMoreChatsButton setTarget:self];
     [self.loadMoreChatsButton setAction:@selector(loadMoreChats:)];
     [self.loadMoreChatsButton setEnabled:NO];
@@ -1227,21 +1656,18 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.chatTableView setDelegate:self];
     [self.chatTableView setAllowsColumnReordering:NO];
     [self.chatTableView setAllowsMultipleSelection:NO];
-    [self.chatTableView setRowHeight:34.0];
+    [self.chatTableView setRowHeight:38.0];
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self.chatTableView setHeaderView:nil];
 
-    NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"title"] autorelease];
-    [[chatColumn headerCell] setStringValue:@"Name"];
-    [self applySkeuomorphicHeaderCellStyle:[chatColumn headerCell]];
+    NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"chat"] autorelease];
+    [[chatColumn headerCell] setStringValue:@"Chat"];
+    TGChatListCell *chatCell = [[[TGChatListCell alloc] initTextCell:@""] autorelease];
+    [chatCell setEditable:NO];
+    [chatCell setSelectable:NO];
+    [chatColumn setDataCell:chatCell];
     [chatColumn setWidth:470.0];
     [self.chatTableView addTableColumn:chatColumn];
-
-    NSTableColumn *unreadColumn = [[[NSTableColumn alloc] initWithIdentifier:@"unread_count"] autorelease];
-    [[unreadColumn headerCell] setStringValue:@"New"];
-    [self applySkeuomorphicHeaderCellStyle:[unreadColumn headerCell]];
-    [unreadColumn setWidth:48.0];
-    [self.chatTableView addTableColumn:unreadColumn];
 
     [self.chatScrollView setDocumentView:self.chatTableView];
     [[self.chatScrollView contentView] setPostsBoundsChangedNotifications:YES];
@@ -1258,7 +1684,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.messagesLabel];
 
     self.loadMessagesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(116, 192, 136, 32)] autorelease];
-    [self.loadMessagesButton setTitle:@"Reload"];
+    [self.loadMessagesButton setTitle:@"↻"];
+    [self.loadMessagesButton setToolTip:@"Reload messages"];
     [self.loadMessagesButton setTarget:self];
     [self.loadMessagesButton setAction:@selector(loadMessages:)];
     [self.loadMessagesButton setEnabled:NO];
@@ -1267,7 +1694,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.loadMessagesButton];
 
     self.loadOlderMessagesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(264, 192, 112, 32)] autorelease];
-    [self.loadOlderMessagesButton setTitle:@"Older"];
+    [self.loadOlderMessagesButton setTitle:@"↑"];
+    [self.loadOlderMessagesButton setToolTip:@"Load older messages"];
     [self.loadOlderMessagesButton setTarget:self];
     [self.loadOlderMessagesButton setAction:@selector(loadOlderMessages:)];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -1350,24 +1778,24 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.profileTitleField];
 
     self.profileNameField = [self labelWithFrame:NSMakeRect(64, 458, 620, 24)
-                                            text:@"Name: not loaded yet"
+                                            text:@"Name"
                                             font:[NSFont systemFontOfSize:14.0]];
     [contentView addSubview:self.profileNameField];
 
     self.profileUsernameField = [self labelWithFrame:NSMakeRect(64, 424, 620, 24)
-                                                text:@"Username: not loaded yet"
+                                                text:@""
                                                 font:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.profileUsernameField];
     [contentView addSubview:self.profileUsernameField];
 
     self.profileIDField = [self labelWithFrame:NSMakeRect(64, 392, 620, 24)
-                                           text:@"Telegram ID: not loaded yet"
+                                           text:@""
                                            font:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.profileIDField];
     [contentView addSubview:self.profileIDField];
 
     self.profileStateField = [self labelWithFrame:NSMakeRect(64, 348, 720, 38)
-                                             text:@"Profile data is loaded from Telegram after authorization. Sensitive values are not written to diagnostics."
+                                             text:@""
                                              font:[NSFont systemFontOfSize:12.0]];
     [[self.profileStateField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.profileStateField];
@@ -1380,19 +1808,19 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.settingsTitleField];
 
     self.settingsStateField = [self labelWithFrame:NSMakeRect(64, 458, 760, 24)
-                                              text:@"Session: waiting for connection"
+                                              text:@"Account"
                                               font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.settingsStateField];
 
     self.settingsLibraryField = [self labelWithFrame:NSMakeRect(64, 424, 760, 24)
-                                                text:@"Engine: not loaded"
+                                                text:@""
                                                 font:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [[self.settingsLibraryField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
     [contentView addSubview:self.settingsLibraryField];
 
     self.settingsStorageField = [self labelWithFrame:NSMakeRect(64, 380, 760, 44)
-                                                text:@"Local session data stays under this Mac user account. Diagnostic logs are available in the Logs tab."
+                                                text:@""
                                                 font:[NSFont systemFontOfSize:12.0]];
     [[self.settingsStorageField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.settingsStorageField];
@@ -1469,6 +1897,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.aboutLinkField];
 
     [self refreshThemeAppearance];
+    [self refreshProfileDisplay];
     [self layoutContentView];
     [self updateVisibleSection];
 }
@@ -1588,17 +2017,17 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
     [self showView:self.profilePanelView visible:showProfile];
     [self showView:self.profileTitleField visible:showProfile];
-    [self showView:self.profileNameField visible:showProfile];
-    [self showView:self.profileUsernameField visible:showProfile];
-    [self showView:self.profileIDField visible:showProfile];
-    [self showView:self.profileStateField visible:showProfile];
+    [self showView:self.profileNameField visible:(showProfile && [[self.profileNameField stringValue] length] > 0)];
+    [self showView:self.profileUsernameField visible:(showProfile && [[self.profileUsernameField stringValue] length] > 0)];
+    [self showView:self.profileIDField visible:(showProfile && [[self.profileIDField stringValue] length] > 0)];
+    [self showView:self.profileStateField visible:(showProfile && [[self.profileStateField stringValue] length] > 0)];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
-    [self showView:self.settingsStateField visible:showSettings];
-    [self showView:self.settingsLibraryField visible:showSettings];
-    [self showView:self.settingsStorageField visible:showSettings];
+    [self showView:self.settingsStateField visible:(showSettings && [[self.settingsStateField stringValue] length] > 0)];
+    [self showView:self.settingsLibraryField visible:(showSettings && [[self.settingsLibraryField stringValue] length] > 0)];
+    [self showView:self.settingsStorageField visible:(showSettings && [[self.settingsStorageField stringValue] length] > 0)];
     [self showView:self.settingsThemeLabel visible:showSettings];
     [self showView:self.themePopUpButton visible:showSettings];
     [self showView:self.logoutButton visible:showSettings];
@@ -1671,6 +2100,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
 
+    [self.accountBadgeView setFrame:NSMakeRect(railX + 14.0, railTop - 72.0, railWidth - 28.0, 60.0)];
     [self.titleField setFont:[NSFont boldSystemFontOfSize:13.0]];
     [[self.titleField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self.titleField setFrame:NSMakeRect(railX + 9.0, railTop - 48.0, railWidth - 18.0, 18.0)];
@@ -1678,7 +2108,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [[self.statusField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self.statusField setFrame:NSMakeRect(railX + 9.0, railTop - 66.0, railWidth - 18.0, 14.0)];
 
-    CGFloat navigationButtonY = railTop - 116.0;
+    CGFloat navigationButtonY = railTop - 126.0;
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
@@ -1714,32 +2144,31 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.authSecureField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
     [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
-    [self.chatsLabel setFrame:NSMakeRect(mainX + 14.0, mainTop - 30.0, 88.0, 22.0)];
-    [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 144.0, mainTop - 36.0, 82.0, 30.0)];
-    [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 56.0, mainTop - 36.0, 44.0, 30.0)];
-    [self.chatScrollView setFrame:NSMakeRect(mainX + 1.0, mainY + 1.0, sidebarWidth - 2.0, mainHeight - 38.0)];
-    NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"title"];
+    CGFloat headerButtonSize = 30.0;
+    CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0);
+    CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0);
+    [self.chatsLabel setFrame:NSMakeRect(mainX + 16.0, headerLabelY, 88.0, 20.0)];
+    [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.loadChatsButton setFrame:NSMakeRect(NSMinX([self.loadMoreChatsButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.chatScrollView setFrame:NSMakeRect(mainX + 1.0, mainY + 1.0, sidebarWidth - 2.0, mainHeight - TGPanelHeaderHeight - 1.0)];
+    NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"chat"];
     if (chatColumn) {
-        CGFloat chatWidth = sidebarWidth - 66.0;
+        CGFloat chatWidth = sidebarWidth - 2.0;
         if (chatWidth < 132.0) {
             chatWidth = 132.0;
         }
         [chatColumn setWidth:chatWidth];
     }
-    NSTableColumn *newColumn = [self.chatTableView tableColumnWithIdentifier:@"unread_count"];
-    if (newColumn) {
-        [newColumn setWidth:46.0];
-    }
 
-    [self.messagesLabel setFrame:NSMakeRect(conversationX + 14.0, mainTop - 30.0, 96.0, 22.0)];
-    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 184.0, mainTop - 36.0, 90.0, 30.0)];
-    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 88.0, mainTop - 36.0, 76.0, 30.0)];
-    [self.selectedChatField setFrame:NSMakeRect(conversationX + 112.0, mainTop - 30.0, conversationWidth - 310.0, 22.0)];
+    [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 96.0, 20.0)];
+    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.loadMessagesButton setFrame:NSMakeRect(NSMinX([self.loadOlderMessagesButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.selectedChatField setFrame:NSMakeRect(conversationX + 116.0, headerLabelY, conversationWidth - 210.0, 20.0)];
 
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 12.0;
     CGFloat messageBottom = composerY + composerHeight + 10.0;
-    CGFloat messageTop = mainTop - 42.0;
+    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 8.0;
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
@@ -1765,7 +2194,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 26.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 3.0, sendButtonWidth, 30.0)];
 
-    CGFloat panelTitleY = mainTop - 30.0;
+    CGFloat panelTitleY = headerLabelY;
     [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
     [self.profileNameField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
     [self.profileUsernameField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
@@ -1882,6 +2311,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         self.activeSection = TGSectionChats;
         self.chatsExhausted = NO;
         self.profileSummaryLoaded = NO;
+        [self clearProfileDisplayCache];
         [self.client invalidateMainChatListExhaustion];
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
@@ -1972,9 +2402,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self.logoutButton setEnabled:([state isEqualToString:@"ready"] && !self.controlsBusy)];
     [self updateSendControls];
-    [self.settingsStateField setStringValue:[NSString stringWithFormat:@"Session: %@", [state isEqualToString:@"ready"] ? @"signed in" : (([state length] > 0) ? state : @"connecting")]];
-    NSString *loadedLibrary = [self.client loadedLibraryPath];
-    [self.settingsLibraryField setStringValue:[NSString stringWithFormat:@"Engine: %@", ([loadedLibrary length] > 0) ? loadedLibrary : @"not loaded"]];
+    [self refreshProfileDisplay];
     [self updateVisibleSection];
     if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy) {
         [self reloadProfileSummaryIfReady];
@@ -2072,6 +2500,17 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     }
     NSTextFieldCell *textCell = (NSTextFieldCell *)cell;
     id identifier = [tableColumn identifier];
+    if (tableView == self.chatTableView && [identifier isEqual:@"chat"] && [cell isKindOfClass:[TGChatListCell class]]) {
+        TGChatItem *chatItem = nil;
+        if (row >= 0 && (NSUInteger)row < [self.chatItems count]) {
+            id item = [self.chatItems objectAtIndex:(NSUInteger)row];
+            if ([item isKindOfClass:[TGChatItem class]]) {
+                chatItem = (TGChatItem *)item;
+            }
+        }
+        [(TGChatListCell *)cell setChatItem:chatItem];
+        return;
+    }
     if (tableView == self.messageTableView && [identifier isEqual:@"bubble"] && [cell isKindOfClass:[TGMessageBubbleCell class]]) {
         TGMessageItem *messageItem = nil;
         if (row >= 0 && (NSUInteger)row < [self.messageItems count]) {
@@ -2140,7 +2579,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
             value = [(TGMessageItem *)item valueForTableColumnIdentifier:identifier];
         }
     } else if (tableView == self.chatTableView && [item isKindOfClass:[TGChatItem class]]) {
-        value = [(TGChatItem *)item valueForTableColumnIdentifier:identifier];
+        if ([identifier isEqual:@"chat"]) {
+            value = item;
+        } else {
+            value = [(TGChatItem *)item valueForTableColumnIdentifier:identifier];
+        }
     }
     if (tableView == self.messageTableView && [identifier isEqual:@"date"] && [value respondsToSelector:@selector(integerValue)]) {
         NSInteger timestamp = [value integerValue];
@@ -2296,6 +2739,62 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     return [NSString stringWithFormat:@"%lld|%lld|%d|%@", chatValue, dateValue, [item outgoing] ? 1 : 0, preview];
 }
 
+- (BOOL)messageItem:(TGMessageItem *)left isLikelyLocalDuplicateOfMessageItem:(TGMessageItem *)right {
+    if (![left isKindOfClass:[TGMessageItem class]] || ![right isKindOfClass:[TGMessageItem class]]) {
+        return NO;
+    }
+    if (![left outgoing] || ![right outgoing]) {
+        return NO;
+    }
+    id leftChatID = [left chatID];
+    id rightChatID = [right chatID];
+    if (![leftChatID respondsToSelector:@selector(longLongValue)] ||
+        ![rightChatID respondsToSelector:@selector(longLongValue)] ||
+        [leftChatID longLongValue] != [rightChatID longLongValue]) {
+        return NO;
+    }
+    NSString *leftPreview = [left preview] ? [left preview] : @"";
+    NSString *rightPreview = [right preview] ? [right preview] : @"";
+    if (![leftPreview isEqualToString:rightPreview]) {
+        return NO;
+    }
+    long long leftDate = [[left date] respondsToSelector:@selector(longLongValue)] ? [[left date] longLongValue] : 0;
+    long long rightDate = [[right date] respondsToSelector:@selector(longLongValue)] ? [[right date] longLongValue] : 0;
+    long long delta = leftDate - rightDate;
+    if (delta < 0) {
+        delta = -delta;
+    }
+    if ([left sending] || [right sending]) {
+        return (delta <= 300);
+    }
+    return (delta <= 2);
+}
+
+- (TGMessageItem *)preferredMessageItemForDuplicateLeft:(TGMessageItem *)left right:(TGMessageItem *)right {
+    if ([left sending] && ![right sending]) {
+        return right;
+    }
+    if (![left sending] && [right sending]) {
+        return left;
+    }
+    id leftID = [left messageID];
+    id rightID = [right messageID];
+    BOOL leftHasID = ([leftID respondsToSelector:@selector(longLongValue)] && [leftID longLongValue] > 0);
+    BOOL rightHasID = ([rightID respondsToSelector:@selector(longLongValue)] && [rightID longLongValue] > 0);
+    if (rightHasID && !leftHasID) {
+        return right;
+    }
+    if (leftHasID && !rightHasID) {
+        return left;
+    }
+    long long leftIDValue = leftHasID ? [leftID longLongValue] : 0;
+    long long rightIDValue = rightHasID ? [rightID longLongValue] : 0;
+    if (rightIDValue > leftIDValue) {
+        return right;
+    }
+    return left;
+}
+
 - (NSArray *)deduplicatedMessageItemsFromItems:(NSArray *)items {
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     NSMutableArray *result = [NSMutableArray array];
@@ -2319,6 +2818,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
         TGMessageItem *previousItem = [result lastObject];
         if ([item outgoing] && previousItem && [previousItem isKindOfClass:[TGMessageItem class]] && [previousItem outgoing]) {
+            if ([self messageItem:item isLikelyLocalDuplicateOfMessageItem:previousItem]) {
+                TGMessageItem *preferredItem = [self preferredMessageItemForDuplicateLeft:previousItem right:item];
+                [result replaceObjectAtIndex:([result count] - 1) withObject:preferredItem];
+                continue;
+            }
             NSString *currentFallbackKey = [self deduplicationKeyForMessageItem:item];
             NSString *previousFallbackKey = [self deduplicationKeyForMessageItem:previousItem];
             if ([currentFallbackKey length] > 0 && [currentFallbackKey isEqualToString:previousFallbackKey]) {
@@ -2326,12 +2830,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                 id previousID = [previousItem messageID];
                 BOOL currentHasID = ([currentID respondsToSelector:@selector(longLongValue)] && [currentID longLongValue] > 0);
                 BOOL previousHasID = ([previousID respondsToSelector:@selector(longLongValue)] && [previousID longLongValue] > 0);
-                if (!(currentHasID && previousHasID)) {
-                    if (currentHasID && !previousHasID) {
-                        [result replaceObjectAtIndex:([result count] - 1) withObject:item];
-                    }
-                    continue;
+                if (currentHasID && !previousHasID) {
+                    [result replaceObjectAtIndex:([result count] - 1) withObject:item];
                 }
+                continue;
             }
         }
 
@@ -2689,7 +3191,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         return;
     }
 
-    [self.profileStateField setStringValue:@"Loading profile from Telegram..."];
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2698,25 +3199,33 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         NSString *profileErrorMessage = [[profileError localizedDescription] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client != client || ![self.currentAuthState isEqualToString:@"ready"]) {
+                [profile release];
+                [profileErrorMessage release];
+                return;
+            }
+
             if (profile) {
                 NSString *displayName = [profile objectForKey:@"display_name"];
                 NSString *username = [profile objectForKey:@"username"];
                 id userID = [profile objectForKey:@"id"];
-                [self.profileNameField setStringValue:[NSString stringWithFormat:@"Name: %@", ([displayName length] > 0) ? displayName : @"Telegram account"]];
-                if ([username length] > 0) {
-                    [self.profileUsernameField setStringValue:[NSString stringWithFormat:@"Username: @%@", username]];
-                } else {
-                    [self.profileUsernameField setStringValue:@"Username: not set"];
-                }
                 if ([userID respondsToSelector:@selector(longLongValue)]) {
-                    [self.profileIDField setStringValue:[NSString stringWithFormat:@"Telegram ID: %lld", [userID longLongValue]]];
+                    self.profileUserID = [NSNumber numberWithLongLong:[userID longLongValue]];
                 } else {
-                    [self.profileIDField setStringValue:@"Telegram ID: not available"];
+                    self.profileUserID = nil;
                 }
-                [self.profileStateField setStringValue:@"Profile loaded locally from Telegram. Phone number and raw profile JSON are not written to logs."];
+                self.profileDisplayName = ([displayName length] > 0) ? displayName : nil;
+                self.profileUsername = ([username length] > 0) ? username : nil;
+                self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
+                [self.profileStateField setStringValue:@""];
+                [self refreshProfileDisplay];
+                [self updateVisibleSection];
                 self.profileSummaryLoaded = YES;
             } else {
-                [self.profileStateField setStringValue:@"Profile is unavailable right now. Chats and messages can still work."];
+                [self.profileStateField setStringValue:@""];
+                [self refreshProfileDisplay];
+                [self updateVisibleSection];
+                self.profileSummaryLoaded = YES;
                 if (profileErrorMessage) {
                     [self appendDetail:[NSString stringWithFormat:@"Profile: %@", profileErrorMessage]];
                 }
@@ -3432,6 +3941,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_settingsPanelView release];
     [_aboutPanelView release];
     [_navigationButtons release];
+    [_accountBadgeView release];
     [_diagnosticsLabel release];
     [_titleField release];
     [_statusField release];
@@ -3484,6 +3994,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_currentAuthState release];
     [_activeSection release];
     [_liveUpdateTimer release];
+    [_profileDisplayName release];
+    [_profileUsername release];
+    [_profileUserID release];
+    [_profileAvatarLocalPath release];
     [super dealloc];
 }
 
