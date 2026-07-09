@@ -27,7 +27,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2026 Telegraphica contributors. Released under the project license.</string>
+	<string>Copyright 2026 Yura Menschikov. All rights reserved.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -25,7 +25,7 @@
 }
 
 - (NSString *)directionSummary {
-    return self.outgoing ? @"Me" : @"In";
+    return self.outgoing ? @"Outgoing" : @"Incoming";
 }
 
 - (id)valueForTableColumnIdentifier:(id)identifier {
