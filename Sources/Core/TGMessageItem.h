@@ -19,6 +19,8 @@
                       outgoing:(BOOL)outgoing
                        preview:(NSString *)preview;
 - (BOOL)isPhotoMessage;
+- (BOOL)isVisualMediaMessage;
+- (NSString *)visualMediaPlaceholderTitle;
 - (NSString *)directionSummary;
 - (id)valueForTableColumnIdentifier:(id)identifier;
 
