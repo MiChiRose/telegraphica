@@ -12,8 +12,8 @@ static NSUInteger const TGMessagePrefillMinimumRows = 20;
 static NSUInteger const TGMessagePrefillMaxAttempts = 3;
 static CGFloat const TGPanelCornerRadius = 8.0;
 static CGFloat const TGPanelHeaderHeight = 40.0;
-static CGFloat const TGMessageBubbleMaximumWidth = 420.0;
-static CGFloat const TGMessagePhotoMaximumSide = 300.0;
+static CGFloat const TGMessageBubbleMaximumWidth = 500.0;
+static CGFloat const TGMessagePhotoMaximumSide = 420.0;
 static NSString * const TGSectionChats = @"chats";
 static NSString * const TGSectionProfile = @"profile";
 static NSString * const TGSectionSettings = @"settings";
@@ -383,6 +383,34 @@ static NSString *TGCurrentYearString(void) {
     return [NSString stringWithFormat:@"%ld", (long)[components year]];
 }
 
+static NSString *TGLogTimestampString(void) {
+    return [NSDateFormatter localizedStringFromDate:[NSDate date]
+                                          dateStyle:NSDateFormatterNoStyle
+                                          timeStyle:NSDateFormatterMediumStyle];
+}
+
+static NSString *TGLogSectionForDetail(NSString *detail) {
+    if (![detail isKindOfClass:[NSString class]] || [detail length] == 0) {
+        return @"Activity";
+    }
+    if ([detail hasPrefix:@"TDLib"] || [detail hasPrefix:@"Loaded:"] || [detail hasPrefix:@"Connecting to Telegram core"]) {
+        return @"Telegram Core";
+    }
+    if ([detail hasPrefix:@"Submitting"] || [detail hasPrefix:@"Login"] || [detail hasPrefix:@"Logout"]) {
+        return @"Account";
+    }
+    if ([detail hasPrefix:@"Loading"] || [detail hasPrefix:@"Select a chat"] || [detail hasPrefix:@"Message text"]) {
+        return @"Chat Activity";
+    }
+    if ([detail hasPrefix:@"Theme changed"] || [detail hasPrefix:@"Opened message link"]) {
+        return @"Interface";
+    }
+    if ([detail hasPrefix:@"Profile"]) {
+        return @"Profile";
+    }
+    return @"Activity";
+}
+
 static NSString *TGInitialsForTitle(NSString *title) {
     if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
         return @"T";
@@ -481,7 +509,83 @@ static NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
     return preview;
 }
 
-static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item) {
+static NSDataDetector *TGSharedLinkDetector(void) {
+    static NSDataDetector *detector = nil;
+    if (!detector) {
+        NSError *error = nil;
+        detector = [[NSDataDetector dataDetectorWithTypes:NSTextCheckingTypeLink error:&error] retain];
+    }
+    return detector;
+}
+
+static NSTextCheckingResult *TGFirstLinkResultInString(NSString *text) {
+    if (![text isKindOfClass:[NSString class]] || [text length] == 0) {
+        return nil;
+    }
+    NSDataDetector *detector = TGSharedLinkDetector();
+    if (!detector) {
+        return nil;
+    }
+    NSArray *matches = [detector matchesInString:text options:0 range:NSMakeRange(0, [text length])];
+    NSUInteger index = 0;
+    for (index = 0; index < [matches count]; index++) {
+        NSTextCheckingResult *result = [matches objectAtIndex:index];
+        if ([result resultType] == NSTextCheckingTypeLink && [result URL]) {
+            return result;
+        }
+    }
+    return nil;
+}
+
+static NSURL *TGFirstURLInMessageItem(TGMessageItem *item) {
+    NSTextCheckingResult *result = TGFirstLinkResultInString(TGDisplayTextForMessageItem(item));
+    return [result URL];
+}
+
+static NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex) {
+    if (![text isKindOfClass:[NSString class]] || characterIndex >= [text length]) {
+        return nil;
+    }
+    NSDataDetector *detector = TGSharedLinkDetector();
+    if (!detector) {
+        return nil;
+    }
+    NSArray *matches = [detector matchesInString:text options:0 range:NSMakeRange(0, [text length])];
+    NSUInteger index = 0;
+    for (index = 0; index < [matches count]; index++) {
+        NSTextCheckingResult *result = [matches objectAtIndex:index];
+        if ([result resultType] == NSTextCheckingTypeLink && [result URL] && NSLocationInRange(characterIndex, [result range])) {
+            return [result URL];
+        }
+    }
+    return nil;
+}
+
+static NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *baseAttributes) {
+    if (![text isKindOfClass:[NSString class]]) {
+        text = @"";
+    }
+    NSMutableAttributedString *attributed = [[[NSMutableAttributedString alloc] initWithString:text
+                                                                                   attributes:baseAttributes] autorelease];
+    NSDataDetector *detector = TGSharedLinkDetector();
+    if (!detector || [text length] == 0) {
+        return attributed;
+    }
+
+    NSArray *matches = [detector matchesInString:text options:0 range:NSMakeRange(0, [text length])];
+    NSUInteger index = 0;
+    for (index = 0; index < [matches count]; index++) {
+        NSTextCheckingResult *result = [matches objectAtIndex:index];
+        if ([result resultType] != NSTextCheckingTypeLink || ![result URL]) {
+            continue;
+        }
+        [attributed addAttribute:NSForegroundColorAttributeName value:TGClassicLinkColor() range:[result range]];
+        [attributed addAttribute:NSUnderlineStyleAttributeName value:[NSNumber numberWithInteger:NSUnderlineStyleSingle] range:[result range]];
+    }
+    return attributed;
+}
+
+static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth) {
     CGFloat width = 220.0;
     CGFloat height = 160.0;
     if ([item.mediaWidth respondsToSelector:@selector(floatValue)] && [item.mediaWidth floatValue] > 0.0) {
@@ -519,20 +623,31 @@ static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item) {
         width *= shrink;
         height *= shrink;
     }
+    if (maximumWidth > 0.0 && width > maximumWidth) {
+        CGFloat shrink = maximumWidth / width;
+        width *= shrink;
+        height *= shrink;
+    }
     return NSMakeSize(ceil(width), ceil(height));
+}
+
+static CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
+    CGFloat widthRatio = ([item isPhotoMessage] ? 0.78 : 0.68);
+    CGFloat maximumWidth = availableWidth * widthRatio;
+    if (maximumWidth > TGMessageBubbleMaximumWidth) {
+        maximumWidth = TGMessageBubbleMaximumWidth;
+    }
+    if (maximumWidth < 180.0) {
+        maximumWidth = 180.0;
+    }
+    return maximumWidth;
 }
 
 static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth) {
     if (!item) {
         return 48.0;
     }
-    CGFloat maximumTextWidth = availableWidth * 0.68;
-    if (maximumTextWidth > TGMessageBubbleMaximumWidth) {
-        maximumTextWidth = TGMessageBubbleMaximumWidth;
-    }
-    if (maximumTextWidth < 180.0) {
-        maximumTextWidth = 180.0;
-    }
+    CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
     NSString *text = TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -551,7 +666,7 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
 
     CGFloat height = textHeight + 26.0;
     if ([item isPhotoMessage]) {
-        NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item);
+        NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
         height = photoSize.height + 24.0 + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
     }
     if (height < 42.0) {
@@ -933,13 +1048,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
-    CGFloat maximumBubbleWidth = NSWidth(cellFrame) * 0.68;
-    if (maximumBubbleWidth > TGMessageBubbleMaximumWidth) {
-        maximumBubbleWidth = TGMessageBubbleMaximumWidth;
-    }
-    if (maximumBubbleWidth < 180.0) {
-        maximumBubbleWidth = 180.0;
-    }
+    CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     NSString *messageText = TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -949,16 +1058,16 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
+    NSAttributedString *attributedMessageText = TGAttributedMessageString(messageText, textAttributes);
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [messageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
-                                                 options:NSStringDrawingUsesLineFragmentOrigin
-                                              attributes:textAttributes];
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+                                                           options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;
     BOOL photoMessage = [item isPhotoMessage];
     if (photoMessage) {
-        photoSize = TGPhotoDisplaySizeForMessageItem(item);
+        photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
     }
 
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
@@ -1040,9 +1149,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                      contentTop - textHeight,
                                      NSWidth(bubbleRect) - 24.0,
                                      textHeight + 2.0);
-        [messageText drawWithRect:textRect
-                          options:NSStringDrawingUsesLineFragmentOrigin
-                       attributes:textAttributes];
+        [attributedMessageText drawWithRect:textRect
+                                    options:NSStringDrawingUsesLineFragmentOrigin];
     }
 
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
@@ -1130,6 +1238,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, copy) NSString *profileUsername;
 @property (nonatomic, retain) NSNumber *profileUserID;
 @property (nonatomic, copy) NSString *profileAvatarLocalPath;
+@property (nonatomic, copy) NSString *lastLogSection;
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, copy) NSString *currentAuthState;
 @property (nonatomic, copy) NSString *activeSection;
@@ -1213,6 +1322,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize profileUsername = _profileUsername;
 @synthesize profileUserID = _profileUserID;
 @synthesize profileAvatarLocalPath = _profileAvatarLocalPath;
+@synthesize lastLogSection = _lastLogSection;
 @synthesize client = _client;
 @synthesize currentAuthState = _currentAuthState;
 @synthesize activeSection = _activeSection;
@@ -1557,7 +1667,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.detailsView setFont:[NSFont userFixedPitchFontOfSize:11.0]];
     [self.detailsView setTextColor:TGClassicMutedInkColor()];
     [self.detailsView setBackgroundColor:TGClassicTablePaperColor()];
-    [self.detailsView setString:@"Diagnostics are separated from the main chat view. Connection events will appear here.\n"];
+    [self.detailsView setString:@"Diagnostic Logs\n"];
     [self.detailsScrollView setDocumentView:self.detailsView];
     [contentView addSubview:self.detailsScrollView];
 
@@ -1719,6 +1829,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.messageTableView setDelegate:self];
     [self.messageTableView setAllowsColumnReordering:NO];
     [self.messageTableView setAllowsMultipleSelection:NO];
+    [self.messageTableView setTarget:self];
+    [self.messageTableView setAction:@selector(openMessageLink:)];
     [self.messageTableView setRowHeight:52.0];
     [self applySkeuomorphicTableStyle:self.messageTableView];
     [self.messageTableView setGridStyleMask:0];
@@ -2464,11 +2576,165 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 }
 
 - (void)appendDetail:(NSString *)detail {
+    if (![detail isKindOfClass:[NSString class]] || [detail length] == 0) {
+        return;
+    }
     NSString *current = [self.detailsView string];
-    NSString *line = [detail stringByAppendingString:@"\n"];
-    [self.detailsView setString:[current stringByAppendingString:line]];
+    NSString *section = TGLogSectionForDetail(detail);
+    NSMutableString *addition = [NSMutableString string];
+    if (![self.lastLogSection isEqualToString:section]) {
+        [addition appendFormat:@"%@%@\n", ([current length] > 0 ? @"\n" : @""), section];
+        self.lastLogSection = section;
+    }
+    [addition appendFormat:@"%@  %@\n", TGLogTimestampString(), detail];
+    [self.detailsView setString:[current stringByAppendingString:addition]];
     NSRange endRange = NSMakeRange([[self.detailsView string] length], 0);
     [self.detailsView scrollRangeToVisible:endRange];
+}
+
+- (NSRect)messageBubbleCellFrameForRow:(NSInteger)row {
+    if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        return NSZeroRect;
+    }
+    NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
+    if (!bubbleColumn) {
+        return NSZeroRect;
+    }
+    NSUInteger columnIndex = [[self.messageTableView tableColumns] indexOfObject:bubbleColumn];
+    if (columnIndex == NSNotFound) {
+        return NSZeroRect;
+    }
+    return [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
+}
+
+- (NSURL *)messageLinkURLForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
+    if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
+        return nil;
+    }
+    NSString *messageText = TGDisplayTextForMessageItem(item);
+    if ([messageText length] == 0 || !TGFirstURLInMessageItem(item)) {
+        return nil;
+    }
+
+    BOOL outgoing = [item outgoing];
+    CGFloat sidePadding = 14.0;
+    CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                    TGClassicInkColor(), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+    NSAttributedString *attributedMessageText = TGAttributedMessageString(messageText, textAttributes);
+    NSRect measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+                                                              options:NSStringDrawingUsesLineFragmentOrigin];
+    NSSize photoSize = NSZeroSize;
+    BOOL photoMessage = [item isPhotoMessage];
+    if (photoMessage) {
+        photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
+    }
+
+    CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
+    if (photoMessage) {
+        CGFloat photoBubbleWidth = photoSize.width + 16.0;
+        if (photoBubbleWidth > bubbleWidth) {
+            bubbleWidth = photoBubbleWidth;
+        }
+    }
+    if (bubbleWidth < 96.0) {
+        bubbleWidth = 96.0;
+    }
+    if (bubbleWidth > maximumBubbleWidth) {
+        bubbleWidth = maximumBubbleWidth;
+    }
+
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    if (photoMessage) {
+        bubbleHeight = photoSize.height + 24.0;
+        if (NSHeight(measuredRect) > 0.0) {
+            bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
+        }
+    }
+    if (bubbleHeight < 42.0) {
+        bubbleHeight = 42.0;
+    }
+
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    if (photoMessage) {
+        NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
+                                      contentTop - photoSize.height,
+                                      photoSize.width,
+                                      photoSize.height);
+        contentTop = NSMinY(imageRect) - 8.0;
+    }
+
+    CGFloat textHeight = ceil(NSHeight(measuredRect));
+    if (textHeight <= 0.0) {
+        return nil;
+    }
+    NSRect textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                 contentTop - textHeight,
+                                 NSWidth(bubbleRect) - 24.0,
+                                 textHeight + 2.0);
+    if (!NSPointInRect(tablePoint, textRect)) {
+        return nil;
+    }
+
+    NSTextStorage *textStorage = [[[NSTextStorage alloc] initWithAttributedString:attributedMessageText] autorelease];
+    NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
+    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 1000.0)] autorelease];
+    [textContainer setLineFragmentPadding:0.0];
+    [layoutManager addTextContainer:textContainer];
+    [textStorage addLayoutManager:layoutManager];
+    [layoutManager glyphRangeForTextContainer:textContainer];
+
+    NSPoint textPoint = NSMakePoint(tablePoint.x - NSMinX(textRect), tablePoint.y - NSMinY(textRect));
+    CGFloat fraction = 0.0;
+    NSUInteger glyphIndex = [layoutManager glyphIndexForPoint:textPoint
+                                               inTextContainer:textContainer
+                        fractionOfDistanceThroughGlyph:&fraction];
+    if (glyphIndex >= [layoutManager numberOfGlyphs]) {
+        return nil;
+    }
+    NSRect glyphRect = [layoutManager boundingRectForGlyphRange:NSMakeRange(glyphIndex, 1)
+                                                inTextContainer:textContainer];
+    if (!NSPointInRect(textPoint, NSInsetRect(glyphRect, -3.0, -4.0))) {
+        return nil;
+    }
+    NSUInteger characterIndex = [layoutManager characterIndexForGlyphAtIndex:glyphIndex];
+    return TGURLAtCharacterIndexInString(messageText, characterIndex);
+}
+
+- (void)openMessageLink:(id)sender {
+    (void)sender;
+    NSInteger row = [self.messageTableView clickedRow];
+    if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        return;
+    }
+    id item = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    NSEvent *event = [NSApp currentEvent];
+    if (!event) {
+        return;
+    }
+    NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
+    NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
+                                 inCellFrame:[self messageBubbleCellFrameForRow:row]
+                                     atPoint:tablePoint];
+    if (!url) {
+        return;
+    }
+    if ([[NSWorkspace sharedWorkspace] openURL:url]) {
+        [self appendDetail:@"Opened message link in default browser."];
+    } else {
+        [self appendDetail:@"Could not open message link in default browser."];
+    }
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
@@ -2492,6 +2758,29 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     CGFloat availableWidth = bubbleColumn ? [bubbleColumn width] : NSWidth([self.messageScrollView frame]);
     return TGMessageBubbleHeightForItem((TGMessageItem *)item, availableWidth);
+}
+
+- (NSString *)tableView:(NSTableView *)tableView
+      toolTipForCell:(NSCell *)cell
+                rect:(NSRectPointer)rect
+         tableColumn:(NSTableColumn *)tableColumn
+                 row:(NSInteger)row
+       mouseLocation:(NSPoint)mouseLocation {
+    (void)cell;
+    (void)rect;
+    (void)tableColumn;
+    (void)mouseLocation;
+    if (tableView != self.messageTableView || row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        return nil;
+    }
+    id item = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return nil;
+    }
+    NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
+                                 inCellFrame:[self messageBubbleCellFrameForRow:row]
+                                     atPoint:mouseLocation];
+    return url ? @"Open link in default browser" : nil;
 }
 
 - (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
@@ -3998,6 +4287,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_profileUsername release];
     [_profileUserID release];
     [_profileAvatarLocalPath release];
+    [_lastLogSection release];
     [super dealloc];
 }
 
