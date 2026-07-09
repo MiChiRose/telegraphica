@@ -69,6 +69,13 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 - (NSInteger)tdlibErrorCodeFromError:(NSError *)error;
 - (BOOL)isTDLibLoadChatsExhaustedError:(NSError *)error;
 - (void)setMainChatListExhausted:(BOOL)exhausted;
+- (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject;
+- (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
+- (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
+- (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
+                                      downloadMissing:(BOOL)downloadMissing
+                                              timeout:(NSTimeInterval)timeout
+                               didRequestDownload:(BOOL *)didRequestDownload;
 @end
 
 @implementation TGTDLibClient
@@ -2215,6 +2222,91 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                       didRequestDownload:didRequestDownload];
 }
 
+- (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject {
+    if (![containerObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id fileObject = [containerObject objectForKey:@"file"];
+    if ([fileObject isKindOfClass:[NSDictionary class]]) {
+        return (NSDictionary *)fileObject;
+    }
+    id documentFileObject = [containerObject objectForKey:@"document"];
+    if ([documentFileObject isKindOfClass:[NSDictionary class]]) {
+        return (NSDictionary *)documentFileObject;
+    }
+    return nil;
+}
+
+- (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject {
+    if (![documentObject isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+
+    id mimeTypeObject = [documentObject objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
+    if ([mimeType hasPrefix:@"image/"]) {
+        return YES;
+    }
+    if ([mimeType isEqualToString:@"video/mp4"] || [mimeType hasPrefix:@"video/"]) {
+        id fileNameObject = [documentObject objectForKey:@"file_name"];
+        if ([fileNameObject isKindOfClass:[NSString class]]) {
+            NSString *extension = [(NSString *)fileNameObject pathExtension];
+            if ([extension length] > 0) {
+                extension = [extension lowercaseString];
+                if ([extension isEqualToString:@"gif"] || [extension isEqualToString:@"mp4"] || [extension isEqualToString:@"mov"] || [extension isEqualToString:@"webm"]) {
+                    return YES;
+                }
+                if ([extension isEqualToString:@"png"] || [extension isEqualToString:@"jpg"] || [extension isEqualToString:@"jpeg"] || [extension isEqualToString:@"webp"]) {
+                    return YES;
+                }
+            }
+        }
+        if ([[documentObject objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject {
+    if (![documentObject isKindOfClass:[NSDictionary class]]) {
+        return @"[Document]";
+    }
+
+    id mimeTypeObject = [documentObject objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
+    id fileNameObject = [documentObject objectForKey:@"file_name"];
+    NSString *fileName = [fileNameObject isKindOfClass:[NSString class]] ? (NSString *)fileNameObject : nil;
+    NSString *extension = [fileName pathExtension];
+    if ([extension length] > 0) {
+        extension = [extension lowercaseString];
+    }
+
+    if ([mimeType isEqualToString:@"image/gif"] || [extension isEqualToString:@"gif"]) {
+        return @"[GIF]";
+    }
+    if ([mimeType hasPrefix:@"video/"]) {
+        return @"[Video]";
+    }
+    if ([mimeType hasPrefix:@"image/"]) {
+        return @"[Photo]";
+    }
+    return @"[Document]";
+}
+
+- (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
+                                   downloadMissing:(BOOL)downloadMissing
+                                           timeout:(NSTimeInterval)timeout
+                                didRequestDownload:(BOOL *)didRequestDownload {
+    if (![self isVisualDocumentObject:documentObject]) {
+        return nil;
+    }
+    return [self visualMediaInfoFromContainerObject:documentObject
+                                   downloadMissing:downloadMissing
+                                           timeout:timeout
+                                didRequestDownload:didRequestDownload];
+}
+
 - (NSDictionary *)photoInfoFromMessageContentObject:(id)contentObject
                                    downloadMissing:(BOOL)downloadMissing
                                            timeout:(NSTimeInterval)timeout
@@ -2253,7 +2345,20 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     id thumbnail = [container objectForKey:@"thumbnail"];
     if ([thumbnail isKindOfClass:[NSDictionary class]]) {
         id thumbnailFile = [(NSDictionary *)thumbnail objectForKey:@"file"];
-        return [self photoInfoFromFileObject:thumbnailFile
+        NSDictionary *thumbnailPhotoInfo = [self photoInfoFromFileObject:thumbnailFile
+                                                                  width:width
+                                                                 height:height
+                                                        downloadMissing:downloadMissing
+                                                                timeout:timeout
+                                                     didRequestDownload:didRequestDownload];
+        if (thumbnailPhotoInfo) {
+            return thumbnailPhotoInfo;
+        }
+    }
+
+    NSDictionary *mediaFile = [self mediaFileObjectFromContainerObject:container];
+    if (mediaFile) {
+        return [self photoInfoFromFileObject:mediaFile
                                        width:width
                                       height:height
                              downloadMissing:downloadMissing
@@ -2309,6 +2414,12 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                                         downloadMissing:downloadMissing
                                                 timeout:timeout
                                      didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageDocument"]) {
+        return [self visualMediaInfoFromDocumentObject:[content objectForKey:@"document"]
+                                      downloadMissing:downloadMissing
+                                              timeout:timeout
+                                   didRequestDownload:didRequestDownload];
     }
     return nil;
 }
@@ -2374,6 +2485,12 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
             if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0) {
                 label = [NSString stringWithFormat:@"%@ %@", label, emoji];
             }
+        }
+    }
+    if ([type isEqualToString:@"messageDocument"]) {
+        NSDictionary *document = [content objectForKey:@"document"];
+        if ([document isKindOfClass:[NSDictionary class]] && [self isVisualDocumentObject:document]) {
+            label = [self documentVisualLabelFromObject:document];
         }
     }
 
@@ -2445,7 +2562,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
-    NSUInteger visualMediaDownloadsRemaining = 8;
+    NSUInteger visualMediaDownloadsRemaining = 30;
     for (index = 0; index < [(NSArray *)messages count]; index++) {
         id messageObject = [(NSArray *)messages objectAtIndex:index];
         if (![messageObject isKindOfClass:[NSDictionary class]]) {

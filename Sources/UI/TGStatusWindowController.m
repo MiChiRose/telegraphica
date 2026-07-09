@@ -3,6 +3,7 @@
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
+#import <ImageIO/ImageIO.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
@@ -13,7 +14,7 @@ static NSUInteger const TGMessagePrefillMaxAttempts = 3;
 static CGFloat const TGPanelCornerRadius = 8.0;
 static CGFloat const TGPanelHeaderHeight = 40.0;
 static CGFloat const TGMessageBubbleMaximumWidth = 500.0;
-static CGFloat const TGMessagePhotoMaximumSide = 420.0;
+static CGFloat const TGMessagePhotoMaximumSide = 320.0;
 static NSString * const TGSectionChats = @"chats";
 static NSString * const TGSectionProfile = @"profile";
 static NSString * const TGSectionSettings = @"settings";
@@ -81,6 +82,80 @@ static NSColor *TGColorFromRGB(TGRGBColor color) {
 
 static NSColor *TGColorFromRGBWithAlpha(TGRGBColor color, CGFloat alpha) {
     return [NSColor colorWithCalibratedRed:color.red green:color.green blue:color.blue alpha:alpha];
+}
+
+static NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
+        return nil;
+    }
+
+    NSString *resolvedPath = [path stringByStandardizingPath];
+    if (![resolvedPath length]) {
+        return nil;
+    }
+
+    CGImageSourceRef source = nil;
+    CGImageRef imageRef = nil;
+    NSDictionary *properties = nil;
+    CFURLRef fileURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
+                                                     (CFStringRef)resolvedPath,
+                                                     kCFURLPOSIXPathStyle,
+                                                     false);
+    if (!fileURL) {
+        return nil;
+    }
+    source = CGImageSourceCreateWithURL(fileURL, NULL);
+    CFRelease(fileURL);
+    if (!source) {
+        return nil;
+    }
+
+    properties = (NSDictionary *)CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
+    imageRef = CGImageSourceCreateImageAtIndex(source, 0, NULL);
+    if (!imageRef) {
+        CFRelease(properties);
+        CFRelease(source);
+        return nil;
+    }
+
+    NSUInteger orientation = 1;
+    if ([properties isKindOfClass:[NSDictionary class]]) {
+        id orientationObject = [properties objectForKey:(NSString *)kCGImagePropertyOrientation];
+        if ([orientationObject respondsToSelector:@selector(integerValue)]) {
+            NSUInteger value = (NSUInteger)[orientationObject integerValue];
+            if (value >= 1 && value <= 8) {
+                orientation = value;
+            }
+        }
+    }
+    CFRelease(properties);
+
+    if (orientation > 1) {
+        CGFloat imageWidth = (CGFloat)CGImageGetWidth(imageRef);
+        CGFloat imageHeight = (CGFloat)CGImageGetHeight(imageRef);
+        NSInteger maxPixelSize = (NSInteger)MAX(imageWidth, imageHeight);
+        NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 (id)kCFBooleanTrue, kCGImageSourceCreateThumbnailFromImageAlways,
+                                 (id)kCFBooleanTrue, kCGImageSourceCreateThumbnailWithTransform,
+                                 [NSNumber numberWithInteger:maxPixelSize], kCGImageSourceThumbnailMaxPixelSize,
+                                 nil];
+        CGImageRef transformed = CGImageSourceCreateThumbnailAtIndex(source, 0, (CFDictionaryRef)options);
+        if (transformed) {
+            CGImageRelease(imageRef);
+            imageRef = transformed;
+        }
+    }
+
+    if (!imageRef) {
+        CFRelease(source);
+        return nil;
+    }
+
+    NSSize size = NSMakeSize((CGFloat)CGImageGetWidth(imageRef), (CGFloat)CGImageGetHeight(imageRef));
+    NSImage *image = [[[NSImage alloc] initWithCGImage:imageRef size:size] autorelease];
+    CGImageRelease(imageRef);
+    CFRelease(source);
+    return image;
 }
 
 static NSArray *TGThemeIdentifiers(void) {
@@ -472,7 +547,10 @@ static void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect
     NSBezierPath *avatarPath = [NSBezierPath bezierPathWithOvalInRect:rect];
     NSImage *image = nil;
     if ([imagePath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:imagePath]) {
-        image = [[[NSImage alloc] initWithContentsOfFile:imagePath] autorelease];
+        image = TGImageWithCorrectOrientationFromFile(imagePath);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:imagePath] autorelease];
+        }
     }
 
     if (image) {
@@ -1024,7 +1102,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [unreadPath fill];
 
         NSRect unreadTextRect = NSMakeRect(NSMinX(unreadRect),
-                                           NSMinY(unreadRect) + floor((NSHeight(unreadRect) - unreadSize.height) / 2.0) - 1.0,
+                                           NSMinY(unreadRect) + floor((NSHeight(unreadRect) - unreadSize.height) / 2.0),
                                            NSWidth(unreadRect),
                                            unreadSize.height + 2.0);
         NSMutableParagraphStyle *unreadParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -1345,10 +1423,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSRect planeRect = NSInsetRect(buttonRect, 9.0, 8.0);
     NSBezierPath *planePath = [NSBezierPath bezierPath];
-    [planePath moveToPoint:NSMakePoint(NSMinX(planeRect), NSMidY(planeRect))];
-    [planePath lineToPoint:NSMakePoint(NSMaxX(planeRect), NSMaxY(planeRect))];
-    [planePath lineToPoint:NSMakePoint(NSMaxX(planeRect) - 4.0, NSMidY(planeRect))];
-    [planePath lineToPoint:NSMakePoint(NSMaxX(planeRect), NSMinY(planeRect))];
+    [planePath moveToPoint:NSMakePoint(NSMaxX(planeRect), NSMidY(planeRect))];
+    [planePath lineToPoint:NSMakePoint(NSMinX(planeRect), NSMaxY(planeRect))];
+    [planePath lineToPoint:NSMakePoint(NSMinX(planeRect) + 4.0, NSMidY(planeRect))];
+    [planePath lineToPoint:NSMakePoint(NSMinX(planeRect), NSMinY(planeRect))];
     [planePath closePath];
     [TGClassicHeaderTextColor(alpha) set];
     [planePath fill];
@@ -1522,7 +1600,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
-    NSAttributedString *attributedMessageText = TGAttributedMessageString(messageText, textAttributes);
+    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
+    if ([messageText length] > 0) {
+        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        [composedMessageText appendAttributedString:baseText];
+        if ([timeString length] > 0) {
+            NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
+            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
+            [composedMessageText appendAttributedString:timeSuffixText];
+        }
+    }
+    NSAttributedString *attributedMessageText = composedMessageText;
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
         measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
@@ -1581,7 +1674,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *mediaPath = [item mediaLocalPath];
         NSImage *image = nil;
         if ([mediaPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:mediaPath]) {
-            image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
+            image = TGImageWithCorrectOrientationFromFile(mediaPath);
+            if (!image) {
+                image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
+            }
         }
         if (image) {
             [NSGraphicsContext saveGraphicsState];
@@ -1617,12 +1713,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                     options:NSStringDrawingUsesLineFragmentOrigin];
     }
 
-    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
-    if ([timeString length] > 0) {
-        NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                        [NSFont systemFontOfSize:9.0], NSFontAttributeName,
-                                        TGClassicTimeTextColor(), NSForegroundColorAttributeName,
-                                        nil];
+    if ([timeString length] > 0 && [messageText length] == 0) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - 12.0,
                                      NSMinY(bubbleRect) + 4.0,
@@ -3563,14 +3654,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
     CGFloat headerButtonSize = 30.0;
-    CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0);
-    CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0);
+    CGFloat sectionHeaderVerticalOffset = -4.0;
+    CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVerticalOffset;
+    CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVerticalOffset;
     [self.chatsLabel setFrame:NSMakeRect(mainX + 16.0, headerLabelY, 88.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(NSMinX([self.loadMoreChatsButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
-    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0 + sectionHeaderVerticalOffset;
     CGFloat chatListHeight = chatListTop - chatListBottom;
     if (chatListHeight < 128.0) {
         chatListHeight = 128.0;
@@ -3600,7 +3692,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
-    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0 + sectionHeaderVerticalOffset;
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
@@ -4182,9 +4274,29 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
-    NSAttributedString *attributedMessageText = TGAttributedMessageString(messageText, textAttributes);
-    NSRect measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
-                                                              options:NSStringDrawingUsesLineFragmentOrigin];
+    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
+    if ([messageText length] > 0) {
+        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        [composedMessageText appendAttributedString:baseText];
+        if ([timeString length] > 0) {
+            NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
+            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
+            [composedMessageText appendAttributedString:timeSuffixText];
+        }
+    }
+    NSAttributedString *attributedMessageText = composedMessageText;
+    NSRect measuredRect = NSZeroRect;
+    if ([messageText length] > 0) {
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+                                                           options:NSStringDrawingUsesLineFragmentOrigin];
+    } else {
+        measuredRect = NSZeroRect;
+    }
     NSSize photoSize = NSZeroSize;
     BOOL visualMediaMessage = [item isVisualMediaMessage];
     if (visualMediaMessage) {
@@ -4261,6 +4373,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return nil;
     }
     NSUInteger characterIndex = [layoutManager characterIndexForGlyphAtIndex:glyphIndex];
+    if (characterIndex >= [messageText length]) {
+        return nil;
+    }
     return TGURLAtCharacterIndexInString(messageText, characterIndex);
 }
 
@@ -4600,6 +4715,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSString *leftPreview = [left preview] ? [left preview] : @"";
     NSString *rightPreview = [right preview] ? [right preview] : @"";
+    NSString *leftContentType = [left contentType] ? [left contentType] : @"";
+    NSString *rightContentType = [right contentType] ? [right contentType] : @"";
+    if (![leftContentType isEqualToString:rightContentType]) {
+        return NO;
+    }
     if (![leftPreview isEqualToString:rightPreview]) {
         return NO;
     }
@@ -4612,7 +4732,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([left sending] || [right sending]) {
         return (delta <= 300);
     }
-    return (delta <= 2);
+    return (delta <= 30);
 }
 
 - (TGMessageItem *)preferredMessageItemForDuplicateLeft:(TGMessageItem *)left right:(TGMessageItem *)right {

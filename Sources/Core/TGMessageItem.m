@@ -38,7 +38,23 @@
     return [self.contentType isEqualToString:@"messageSticker"];
 }
 
+- (BOOL)isDocumentMessage {
+    return [self.contentType isEqualToString:@"messageDocument"];
+}
+
 - (BOOL)isVisualMediaMessage {
+    if ([self isDocumentMessage]) {
+        NSString *label = [self.preview length] > 0 ? self.preview : @"";
+        BOOL visualLabel = ([label hasPrefix:@"[Photo]"] ||
+                            [label hasPrefix:@"[Video]"] ||
+                            [label hasPrefix:@"[GIF]"] ||
+                            [label hasPrefix:@"[Sticker]"]);
+        BOOL hasDimensions = ([self.mediaWidth respondsToSelector:@selector(floatValue)] &&
+                              [self.mediaWidth floatValue] > 0.0 &&
+                              [self.mediaHeight respondsToSelector:@selector(floatValue)] &&
+                              [self.mediaHeight floatValue] > 0.0);
+        return (visualLabel && ([self.mediaLocalPath length] > 0 || hasDimensions));
+    }
     if ([self isPhotoMessage]) {
         return YES;
     }
@@ -56,6 +72,9 @@
     }
     if ([self.contentType isEqualToString:@"messageVideo"]) {
         return @"Video";
+    }
+    if ([self isDocumentMessage]) {
+        return @"Media";
     }
     return @"Photo";
 }

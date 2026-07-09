@@ -20,6 +20,7 @@
                        preview:(NSString *)preview;
 - (BOOL)isPhotoMessage;
 - (BOOL)isStickerMessage;
+- (BOOL)isDocumentMessage;
 - (BOOL)isVisualMediaMessage;
 - (NSString *)visualMediaPlaceholderTitle;
 - (NSString *)directionSummary;
