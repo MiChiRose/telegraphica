@@ -19,28 +19,16 @@ static NSString * const TGSectionSettings = @"settings";
 static NSString * const TGSectionAbout = @"about";
 static NSString * const TGSectionLogs = @"logs";
 
-static NSColor *TGClassicWindowTopColor(void) {
-    return [NSColor colorWithCalibratedRed:0.22 green:0.16 blue:0.11 alpha:1.0];
-}
-
 static NSColor *TGClassicWindowBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.08 green:0.06 blue:0.045 alpha:1.0];
-}
-
-static NSColor *TGClassicPanelTopColor(void) {
-    return [NSColor colorWithCalibratedRed:0.91 green:0.86 blue:0.74 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.17 green:0.145 blue:0.115 alpha:1.0];
 }
 
 static NSColor *TGClassicPanelBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.68 green:0.55 blue:0.36 alpha:1.0];
-}
-
-static NSColor *TGClassicHeaderTopColor(void) {
-    return [NSColor colorWithCalibratedRed:0.78 green:0.61 blue:0.34 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.90 green:0.86 blue:0.76 alpha:1.0];
 }
 
 static NSColor *TGClassicHeaderBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.47 green:0.32 blue:0.16 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.39 green:0.315 blue:0.22 alpha:1.0];
 }
 
 static NSColor *TGClassicTablePaperColor(void) {
@@ -55,20 +43,12 @@ static NSColor *TGClassicMutedInkColor(void) {
     return [NSColor colorWithCalibratedRed:0.36 green:0.26 blue:0.16 alpha:1.0];
 }
 
-static NSColor *TGClassicOutgoingBubbleTopColor(void) {
-    return [NSColor colorWithCalibratedRed:0.88 green:0.70 blue:0.36 alpha:1.0];
-}
-
 static NSColor *TGClassicOutgoingBubbleBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.62 green:0.42 blue:0.19 alpha:1.0];
-}
-
-static NSColor *TGClassicIncomingBubbleTopColor(void) {
-    return [NSColor colorWithCalibratedRed:0.99 green:0.96 blue:0.86 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.82 green:0.66 blue:0.38 alpha:1.0];
 }
 
 static NSColor *TGClassicIncomingBubbleBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.82 green:0.73 blue:0.57 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.985 green:0.955 blue:0.875 alpha:1.0];
 }
 
 static NSString *TGCurrentYearString(void) {
@@ -161,23 +141,29 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
-    NSGradient *topGradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedRed:0.31 green:0.23 blue:0.15 alpha:1.0]
-                                                             endingColor:TGClassicWindowTopColor()] autorelease];
-    [topGradient drawInRect:bounds angle:90.0];
+    [TGClassicWindowBottomColor() set];
+    NSRectFill(bounds);
+}
 
-    NSRect lowerHalf = NSMakeRect(NSMinX(bounds), NSMinY(bounds), NSWidth(bounds), NSHeight(bounds) * 0.55);
-    NSGradient *bottomGradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedRed:0.16 green:0.10 blue:0.065 alpha:1.0]
-                                                                endingColor:TGClassicWindowBottomColor()] autorelease];
-    [bottomGradient drawInRect:lowerHalf angle:90.0];
+@end
 
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.045] set];
-    CGFloat y = 0.0;
-    for (y = 0.0; y < NSHeight(bounds); y += 9.0) {
-        NSRectFill(NSMakeRect(0.0, y, NSWidth(bounds), 1.0));
-    }
+@interface TGRailView : NSView
+@end
 
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
-    NSRectFill(NSMakeRect(0.0, NSHeight(bounds) - 1.0, NSWidth(bounds), 1.0));
+@implementation TGRailView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSBezierPath *railPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 1.0, 1.0)
+                                                             xRadius:TGPanelCornerRadius
+                                                             yRadius:TGPanelCornerRadius];
+    [TGClassicWindowBottomColor() set];
+    [railPath fill];
+
+    [[NSColor colorWithCalibratedRed:0.48 green:0.36 blue:0.20 alpha:1.0] set];
+    [railPath setLineWidth:1.0];
+    [railPath stroke];
 }
 
 @end
@@ -190,23 +176,13 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
-    NSRect panelBounds = NSInsetRect(bounds, 2.5, 2.5);
+    NSRect panelBounds = NSInsetRect(bounds, 1.0, 1.0);
     NSBezierPath *panelPath = [NSBezierPath bezierPathWithRoundedRect:panelBounds
                                                              xRadius:TGPanelCornerRadius
                                                              yRadius:TGPanelCornerRadius];
 
-    [NSGraphicsContext saveGraphicsState];
-    NSShadow *outerShadow = [[[NSShadow alloc] init] autorelease];
-    [outerShadow setShadowColor:[[NSColor colorWithCalibratedWhite:0.0 alpha:0.24] colorWithAlphaComponent:0.32]];
-    [outerShadow setShadowOffset:NSMakeSize(0.0, -1.2)];
-    [outerShadow setShadowBlurRadius:2.4];
-    [outerShadow set];
+    [TGClassicPanelBottomColor() set];
     [panelPath fill];
-    [NSGraphicsContext restoreGraphicsState];
-
-    NSGradient *panelGradient = [[[NSGradient alloc] initWithStartingColor:TGClassicPanelTopColor()
-                                                              endingColor:TGClassicPanelBottomColor()] autorelease];
-    [panelGradient drawInBezierPath:panelPath angle:90.0];
 
     [NSGraphicsContext saveGraphicsState];
     [panelPath addClip];
@@ -214,33 +190,18 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                    NSMaxY(panelBounds) - TGPanelHeaderHeight,
                                    NSWidth(panelBounds),
                                    TGPanelHeaderHeight);
-    NSGradient *headerGradient = [[[NSGradient alloc] initWithStartingColor:TGClassicHeaderTopColor()
-                                                               endingColor:TGClassicHeaderBottomColor()] autorelease];
-    [headerGradient drawInRect:headerRect angle:90.0];
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
-    NSRectFill(NSMakeRect(NSMinX(headerRect), NSMaxY(headerRect) - 1.0, NSWidth(headerRect), 1.0));
-    [[NSColor colorWithCalibratedRed:0.30 green:0.18 blue:0.08 alpha:0.80] set];
+    [TGClassicHeaderBottomColor() set];
+    NSRectFill(headerRect);
+    [[NSColor colorWithCalibratedRed:0.23 green:0.18 blue:0.12 alpha:1.0] set];
     NSRectFill(NSMakeRect(NSMinX(headerRect), NSMinY(headerRect), NSWidth(headerRect), 1.0));
     [NSGraphicsContext restoreGraphicsState];
 
     NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(panelBounds, 1.0, 1.0)
                                                                xRadius:(TGPanelCornerRadius - 1.0)
                                                                yRadius:(TGPanelCornerRadius - 1.0)];
-    [[NSColor colorWithCalibratedRed:0.26 green:0.15 blue:0.07 alpha:0.68] set];
-    [innerPath setLineWidth:0.9];
+    [[NSColor colorWithCalibratedRed:0.31 green:0.24 blue:0.16 alpha:1.0] set];
+    [innerPath setLineWidth:1.0];
     [innerPath stroke];
-
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.55] set];
-    NSBezierPath *highlight = [NSBezierPath bezierPath];
-    [highlight moveToPoint:NSMakePoint(NSMinX(panelBounds) + 8.0, NSMaxY(panelBounds) - 1.5)];
-    [highlight lineToPoint:NSMakePoint(NSMaxX(panelBounds) - 8.0, NSMaxY(panelBounds) - 1.5)];
-    [highlight stroke];
-
-    [[NSColor colorWithCalibratedWhite:0.46 alpha:0.35] set];
-    NSBezierPath *lowerStroke = [NSBezierPath bezierPath];
-    [lowerStroke moveToPoint:NSMakePoint(NSMinX(panelBounds) + 9.0, NSMinY(panelBounds) + 1.0)];
-    [lowerStroke lineToPoint:NSMakePoint(NSMaxX(panelBounds) - 9.0, NSMinY(panelBounds) + 1.0)];
-    [lowerStroke stroke];
 }
 
 @end
@@ -263,44 +224,23 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 2.0);
     NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:6.0 yRadius:6.0];
 
-    NSColor *topColor = nil;
-    NSColor *bottomColor = nil;
+    NSColor *fillColor = nil;
     if (selected) {
-        topColor = [NSColor colorWithCalibratedRed:0.88 green:0.70 blue:0.38 alpha:alpha];
-        bottomColor = [NSColor colorWithCalibratedRed:0.48 green:0.31 blue:0.13 alpha:alpha];
+        fillColor = [NSColor colorWithCalibratedRed:0.79 green:0.62 blue:0.34 alpha:alpha];
     } else if (highlighted) {
-        topColor = [NSColor colorWithCalibratedRed:0.37 green:0.26 blue:0.16 alpha:alpha];
-        bottomColor = [NSColor colorWithCalibratedRed:0.14 green:0.09 blue:0.055 alpha:alpha];
+        fillColor = [NSColor colorWithCalibratedRed:0.25 green:0.20 blue:0.15 alpha:alpha];
     } else {
-        topColor = [NSColor colorWithCalibratedRed:0.27 green:0.19 blue:0.12 alpha:alpha];
-        bottomColor = [NSColor colorWithCalibratedRed:0.10 green:0.065 blue:0.04 alpha:alpha];
+        fillColor = [NSColor colorWithCalibratedRed:0.16 green:0.13 blue:0.10 alpha:alpha];
     }
 
-    NSShadow *shadow = [[[NSShadow alloc] init] autorelease];
-    [shadow setShadowColor:[NSColor colorWithCalibratedWhite:0.0 alpha:(selected ? 0.38 : 0.24)]];
-    [shadow setShadowOffset:NSMakeSize(0.0, -1.0)];
-    [shadow setShadowBlurRadius:selected ? 1.8 : 1.2];
-
-    [NSGraphicsContext saveGraphicsState];
-    [shadow set];
+    [fillColor set];
     [path fill];
-    [NSGraphicsContext restoreGraphicsState];
-
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:topColor endingColor:bottomColor] autorelease];
-    [gradient drawInBezierPath:path angle:90.0];
 
     NSColor *strokeColor = selected ? [NSColor colorWithCalibratedRed:0.30 green:0.18 blue:0.07 alpha:0.95]
                                     : [NSColor colorWithCalibratedRed:0.46 green:0.36 blue:0.23 alpha:0.75];
     [strokeColor set];
     [path setLineWidth:1.0];
     [path stroke];
-
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:(selected ? 0.28 : 0.12)] set];
-    NSBezierPath *highlightPath = [NSBezierPath bezierPath];
-    [highlightPath moveToPoint:NSMakePoint(NSMinX(buttonRect) + 7.0, NSMaxY(buttonRect) - 2.0)];
-    [highlightPath lineToPoint:NSMakePoint(NSMaxX(buttonRect) - 7.0, NSMaxY(buttonRect) - 2.0)];
-    [highlightPath setLineWidth:1.0];
-    [highlightPath stroke];
 
     NSString *title = [self title] ? [self title] : @"";
     NSFont *font = selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0];
@@ -319,24 +259,45 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 @end
 
-@interface TGMessageBubbleCell : NSTextFieldCell
+@interface TGMessageBubbleCell : NSTextFieldCell {
+    TGMessageItem *_messageItem;
+}
+@property (nonatomic, retain) TGMessageItem *messageItem;
 @end
 
 @implementation TGMessageBubbleCell
 
+@synthesize messageItem = _messageItem;
+
 - (id)copyWithZone:(NSZone *)zone {
     TGMessageBubbleCell *cell = [super copyWithZone:zone];
+    [cell setMessageItem:self.messageItem];
     return cell;
 }
 
+- (void)setObjectValue:(id)value {
+    if ([value isKindOfClass:[TGMessageItem class]]) {
+        self.messageItem = (TGMessageItem *)value;
+        [super setObjectValue:@""];
+        return;
+    }
+    self.messageItem = nil;
+    [super setObjectValue:(value ? value : @"")];
+}
+
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    id value = [self objectValue];
-    if (![value isKindOfClass:[TGMessageItem class]]) {
+    TGMessageItem *item = self.messageItem;
+    if (!item) {
+        id value = [self objectValue];
+        if ([value isKindOfClass:[TGMessageItem class]]) {
+            item = (TGMessageItem *)value;
+        }
+    }
+    if (!item) {
         [super drawWithFrame:cellFrame inView:controlView];
         return;
     }
 
-    TGMessageItem *item = (TGMessageItem *)value;
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     CGFloat maximumBubbleWidth = NSWidth(cellFrame) * 0.68;
@@ -374,38 +335,15 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     NSBezierPath *bubblePath = [NSBezierPath bezierPathWithRoundedRect:bubbleRect xRadius:13.0 yRadius:13.0];
 
-    NSShadow *shadow = [[[NSShadow alloc] init] autorelease];
-    [shadow setShadowColor:[NSColor colorWithCalibratedWhite:0.0 alpha:0.22]];
-    [shadow setShadowOffset:NSMakeSize(0.0, -1.0)];
-    [shadow setShadowBlurRadius:1.6];
-
-    [NSGraphicsContext saveGraphicsState];
-    [shadow set];
+    NSColor *bubbleFillColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
+    [bubbleFillColor set];
     [bubblePath fill];
-    [NSGraphicsContext restoreGraphicsState];
-
-    NSGradient *bubbleGradient = nil;
-    if (outgoing) {
-        bubbleGradient = [[[NSGradient alloc] initWithStartingColor:TGClassicOutgoingBubbleTopColor()
-                                                       endingColor:TGClassicOutgoingBubbleBottomColor()] autorelease];
-    } else {
-        bubbleGradient = [[[NSGradient alloc] initWithStartingColor:TGClassicIncomingBubbleTopColor()
-                                                       endingColor:TGClassicIncomingBubbleBottomColor()] autorelease];
-    }
-    [bubbleGradient drawInBezierPath:bubblePath angle:90.0];
 
     NSColor *strokeColor = outgoing ? [NSColor colorWithCalibratedRed:0.36 green:0.22 blue:0.09 alpha:0.85]
                                     : [NSColor colorWithCalibratedRed:0.55 green:0.45 blue:0.30 alpha:0.70];
     [strokeColor set];
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
-
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:(outgoing ? 0.30 : 0.55)] set];
-    NSBezierPath *highlight = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bubbleRect, 1.5, 1.5)
-                                                              xRadius:11.5
-                                                              yRadius:11.5];
-    [highlight setLineWidth:0.7];
-    [highlight stroke];
 
     NSRect textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
                                  NSMinY(bubbleRect) + 13.0,
@@ -428,6 +366,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                      10.0);
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
     }
+}
+
+- (void)dealloc {
+    [_messageItem release];
+    [super dealloc];
 }
 
 @end
@@ -682,7 +625,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [tableView setGridColor:[NSColor colorWithCalibratedRed:0.72 green:0.62 blue:0.45 alpha:1.0]];
     [tableView setUsesAlternatingRowBackgroundColors:NO];
     [tableView setIntercellSpacing:NSMakeSize(8.0, 1.0)];
-    [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+    [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
 }
 
 - (void)applySkeuomorphicHeaderCellStyle:(NSTextFieldCell *)headerCell {
@@ -702,7 +645,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [[self window] setContentView:contentView];
     [contentView setAutoresizesSubviews:YES];
 
-    self.topPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 628, 948, 56)] autorelease];
+    self.topPanelView = [[[TGRailView alloc] initWithFrame:NSMakeRect(16, 628, 948, 56)] autorelease];
     [self.topPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.topPanelView];
 
@@ -872,7 +815,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.chatTableView setDelegate:self];
     [self.chatTableView setAllowsColumnReordering:NO];
     [self.chatTableView setAllowsMultipleSelection:NO];
-    [self.chatTableView setRowHeight:28.0];
+    [self.chatTableView setRowHeight:34.0];
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self.chatTableView setHeaderView:nil];
 
@@ -939,6 +882,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.messageTableView setRowHeight:52.0];
     [self applySkeuomorphicTableStyle:self.messageTableView];
     [self.messageTableView setGridStyleMask:0];
+    [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
     [self.messageTableView setHeaderView:nil];
 
     NSTableColumn *bubbleColumn = [[[NSTableColumn alloc] initWithIdentifier:@"bubble"] autorelease];
@@ -1227,89 +1171,107 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    CGFloat margin = 16.0;
-    CGFloat gutter = 12.0;
-    CGFloat topPanelHeight = 72.0;
-    CGFloat bodyY = margin;
-    CGFloat topPanelY = height - margin - topPanelHeight;
-    CGFloat bodyTop = topPanelY - gutter;
-    CGFloat bodyHeight = bodyTop - bodyY;
-    CGFloat sidebarWidth = 286.0;
-    CGFloat contentWidth = width - (margin * 2.0);
-    CGFloat conversationX = margin + sidebarWidth + gutter;
+    CGFloat margin = 10.0;
+    CGFloat gutter = 10.0;
+    CGFloat railWidth = 88.0;
+    CGFloat railX = margin;
+    CGFloat railY = margin;
+    CGFloat railHeight = height - (margin * 2.0);
+    CGFloat railTop = railY + railHeight;
+    CGFloat mainX = railX + railWidth + gutter;
+    CGFloat mainY = margin;
+    CGFloat mainWidth = width - mainX - margin;
+    CGFloat mainHeight = railHeight;
+    CGFloat mainTop = mainY + mainHeight;
+    CGFloat sidebarWidth = 292.0;
+
+    if (railHeight < 520.0) {
+        railHeight = 520.0;
+        railTop = railY + railHeight;
+        mainHeight = railHeight;
+        mainTop = mainY + mainHeight;
+    }
+    if (width < 900.0) {
+        sidebarWidth = 248.0;
+    } else if (width < 1040.0) {
+        sidebarWidth = 272.0;
+    }
+
+    CGFloat conversationX = mainX + sidebarWidth + gutter;
     CGFloat conversationWidth = width - conversationX - margin;
-
-    if (bodyHeight < 320.0) {
-        bodyHeight = 320.0;
+    if (conversationWidth < 320.0) {
+        CGFloat reduction = 320.0 - conversationWidth;
+        sidebarWidth -= reduction;
+        if (sidebarWidth < 220.0) {
+            sidebarWidth = 220.0;
+        }
+        conversationX = mainX + sidebarWidth + gutter;
+        conversationWidth = width - conversationX - margin;
+    }
+    if (mainWidth < 420.0) {
+        mainWidth = 420.0;
     }
 
-    [self.topPanelView setFrame:NSMakeRect(margin, topPanelY, contentWidth, topPanelHeight)];
-    [self.sidebarPanelView setFrame:NSMakeRect(margin, bodyY, sidebarWidth, bodyHeight)];
-    [self.conversationPanelView setFrame:NSMakeRect(conversationX, bodyY, conversationWidth, bodyHeight)];
-    [self.diagnosticsPanelView setFrame:NSMakeRect(margin, bodyY, contentWidth, bodyHeight)];
-    [self.profilePanelView setFrame:NSMakeRect(margin, bodyY, contentWidth, bodyHeight)];
-    [self.settingsPanelView setFrame:NSMakeRect(margin, bodyY, contentWidth, bodyHeight)];
-    [self.aboutPanelView setFrame:NSMakeRect(margin, bodyY, contentWidth, bodyHeight)];
+    [self.topPanelView setFrame:NSMakeRect(railX, railY, railWidth, railHeight)];
+    [self.sidebarPanelView setFrame:NSMakeRect(mainX, mainY, sidebarWidth, mainHeight)];
+    [self.conversationPanelView setFrame:NSMakeRect(conversationX, mainY, conversationWidth, mainHeight)];
+    [self.diagnosticsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    [self.profilePanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
 
-    CGFloat topActionGap = 9.0;
-    CGFloat topQuitWidth = 86.0;
-    CGFloat navigationWidth = 418.0;
-    CGFloat topActionBaseY = topPanelY + 20.0;
-    CGFloat topQuitX = width - margin - topActionGap - topQuitWidth;
-    CGFloat navigationX = topQuitX - topActionGap - navigationWidth;
-    CGFloat topTextStart = margin + 18.0;
-    CGFloat topAvailableTextWidth = (navigationX - topTextStart - 12.0);
-    if (topAvailableTextWidth < 240.0) {
-        topAvailableTextWidth = 240.0;
-    }
-    [self.titleField setFrame:NSMakeRect(topTextStart, topPanelY + 42.0, topAvailableTextWidth, 22.0)];
-    [self.statusField setFrame:NSMakeRect(topTextStart, topPanelY + 21.0, topAvailableTextWidth, 18.0)];
-    CGFloat navigationButtonX = navigationX;
+    [self.titleField setFont:[NSFont boldSystemFontOfSize:13.0]];
+    [[self.titleField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [self.titleField setFrame:NSMakeRect(railX + 9.0, railTop - 48.0, railWidth - 18.0, 18.0)];
+    [self.statusField setFont:[NSFont systemFontOfSize:9.0]];
+    [[self.statusField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [self.statusField setFrame:NSMakeRect(railX + 9.0, railTop - 66.0, railWidth - 18.0, 14.0)];
+
+    CGFloat navigationButtonY = railTop - 116.0;
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
-        CGFloat buttonWidth = 76.0;
-        if ([navigationButton tag] == 2) {
-            buttonWidth = 88.0;
-        } else if ([navigationButton tag] == 3) {
-            buttonWidth = 70.0;
-        } else if ([navigationButton tag] == 4) {
-            buttonWidth = 62.0;
-        }
-        [navigationButton setFrame:NSMakeRect(navigationButtonX, topPanelY + 21.0, buttonWidth, 28.0)];
-        navigationButtonX += buttonWidth + 8.0;
+        [navigationButton setFrame:NSMakeRect(railX + 8.0, navigationButtonY, railWidth - 16.0, 30.0)];
+        navigationButtonY -= 38.0;
     }
-    [self.quitButton setFrame:NSMakeRect(topQuitX, topActionBaseY, topQuitWidth, 32.0)];
+    [self.quitButton setFrame:NSMakeRect(railX + 8.0, railY + 12.0, railWidth - 16.0, 30.0)];
 
-    CGFloat loginWidth = contentWidth - 180.0;
+    CGFloat loginWidth = mainWidth - 96.0;
     if (loginWidth > 580.0) {
         loginWidth = 580.0;
     }
-    if (loginWidth < 420.0) {
-        loginWidth = 420.0;
+    if (loginWidth < 390.0) {
+        loginWidth = mainWidth - 24.0;
     }
-    CGFloat loginHeight = 318.0;
-    CGFloat loginX = margin + ((contentWidth - loginWidth) / 2.0);
-    CGFloat loginY = bodyY + ((bodyHeight - loginHeight) / 2.0);
-    if (loginY < bodyY + 18.0) {
-        loginY = bodyY + 18.0;
+    CGFloat loginHeight = 300.0;
+    CGFloat loginX = mainX + ((mainWidth - loginWidth) / 2.0);
+    CGFloat loginY = mainY + ((mainHeight - loginHeight) / 2.0);
+    if (loginY < mainY + 18.0) {
+        loginY = mainY + 18.0;
     }
     [self.loginPanelView setFrame:NSMakeRect(loginX, loginY, loginWidth, loginHeight)];
-    [self.loginTitleField setFrame:NSMakeRect(loginX + 40.0, loginY + loginHeight - 74.0, loginWidth - 80.0, 28.0)];
-    [self.loginHintField setFrame:NSMakeRect(loginX + 54.0, loginY + loginHeight - 128.0, loginWidth - 108.0, 46.0)];
-    [self.authLabel setFrame:NSMakeRect(loginX + 72.0, loginY + 128.0, 110.0, 22.0)];
-    [self.authStateField setFrame:NSMakeRect(loginX + 72.0, loginY + 106.0, loginWidth - 144.0, 40.0)];
-    [self.authTextField setFrame:NSMakeRect(loginX + 184.0, loginY + 126.0, loginWidth - 318.0, 26.0)];
-    [self.authSecureField setFrame:NSMakeRect(loginX + 184.0, loginY + 126.0, loginWidth - 318.0, 26.0)];
-    [self.authButton setFrame:NSMakeRect(loginX + loginWidth - 122.0, loginY + 122.0, 92.0, 32.0)];
+    [self.loginTitleField setFrame:NSMakeRect(loginX + 36.0, loginY + loginHeight - 70.0, loginWidth - 72.0, 28.0)];
+    [self.loginHintField setFrame:NSMakeRect(loginX + 42.0, loginY + loginHeight - 132.0, loginWidth - 84.0, 52.0)];
+    [self.authLabel setFrame:NSMakeRect(loginX + 52.0, loginY + 128.0, loginWidth - 104.0, 18.0)];
+    [self.authStateField setFrame:NSMakeRect(loginX + 52.0, loginY + 82.0, loginWidth - 104.0, 48.0)];
+    CGFloat loginButtonWidth = 92.0;
+    CGFloat loginInputX = loginX + 52.0;
+    CGFloat loginButtonX = loginX + loginWidth - 52.0 - loginButtonWidth;
+    CGFloat loginInputWidth = loginButtonX - loginInputX - 10.0;
+    if (loginInputWidth < 180.0) {
+        loginInputWidth = 180.0;
+    }
+    [self.authTextField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
+    [self.authSecureField setFrame:NSMakeRect(loginInputX, loginY + 92.0, loginInputWidth, 26.0)];
+    [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
-    [self.chatsLabel setFrame:NSMakeRect(margin + 14.0, bodyTop - 30.0, 90.0, 22.0)];
-    [self.loadChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 142.0, bodyTop - 36.0, 72.0, 30.0)];
-    [self.loadMoreChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 64.0, bodyTop - 36.0, 48.0, 30.0)];
-    [self.chatScrollView setFrame:NSMakeRect(margin + 12.0, bodyY + 12.0, sidebarWidth - 24.0, bodyHeight - 56.0)];
+    [self.chatsLabel setFrame:NSMakeRect(mainX + 14.0, mainTop - 30.0, 88.0, 22.0)];
+    [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 144.0, mainTop - 36.0, 82.0, 30.0)];
+    [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 56.0, mainTop - 36.0, 44.0, 30.0)];
+    [self.chatScrollView setFrame:NSMakeRect(mainX + 1.0, mainY + 1.0, sidebarWidth - 2.0, mainHeight - 38.0)];
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"title"];
     if (chatColumn) {
-        CGFloat chatWidth = sidebarWidth - 84.0;
+        CGFloat chatWidth = sidebarWidth - 66.0;
         if (chatWidth < 132.0) {
             chatWidth = 132.0;
         }
@@ -1317,26 +1279,26 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     }
     NSTableColumn *newColumn = [self.chatTableView tableColumnWithIdentifier:@"unread_count"];
     if (newColumn) {
-        [newColumn setWidth:48.0];
+        [newColumn setWidth:46.0];
     }
 
-    [self.messagesLabel setFrame:NSMakeRect(conversationX + 14.0, bodyTop - 30.0, 108.0, 22.0)];
-    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 186.0, bodyTop - 36.0, 92.0, 30.0)];
-    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 88.0, bodyTop - 36.0, 72.0, 30.0)];
-    [self.selectedChatField setFrame:NSMakeRect(conversationX + 126.0, bodyTop - 30.0, conversationWidth - 326.0, 22.0)];
+    [self.messagesLabel setFrame:NSMakeRect(conversationX + 14.0, mainTop - 30.0, 96.0, 22.0)];
+    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 184.0, mainTop - 36.0, 90.0, 30.0)];
+    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 88.0, mainTop - 36.0, 76.0, 30.0)];
+    [self.selectedChatField setFrame:NSMakeRect(conversationX + 112.0, mainTop - 30.0, conversationWidth - 310.0, 22.0)];
 
     CGFloat composerHeight = 42.0;
-    CGFloat composerY = bodyY + 14.0;
+    CGFloat composerY = mainY + 12.0;
     CGFloat messageBottom = composerY + composerHeight + 10.0;
-    CGFloat messageTop = bodyTop - 46.0;
+    CGFloat messageTop = mainTop - 42.0;
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
     }
-    [self.messageScrollView setFrame:NSMakeRect(conversationX + 12.0, messageBottom, conversationWidth - 24.0, messageHeight)];
+    [self.messageScrollView setFrame:NSMakeRect(conversationX + 1.0, messageBottom, conversationWidth - 2.0, messageHeight)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     if (bubbleColumn) {
-        CGFloat bubbleWidth = conversationWidth - 24.0;
+        CGFloat bubbleWidth = conversationWidth - 2.0;
         if (bubbleWidth < 260.0) {
             bubbleWidth = 260.0;
         }
@@ -1354,34 +1316,35 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 26.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 3.0, sendButtonWidth, 30.0)];
 
-    CGFloat panelTitleY = bodyTop - 30.0;
-    [self.profileTitleField setFrame:NSMakeRect(margin + 18.0, panelTitleY, 240.0, 22.0)];
-    [self.profileNameField setFrame:NSMakeRect(margin + 48.0, bodyTop - 96.0, contentWidth - 96.0, 24.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(margin + 48.0, bodyTop - 132.0, contentWidth - 96.0, 24.0)];
-    [self.profileIDField setFrame:NSMakeRect(margin + 48.0, bodyTop - 168.0, contentWidth - 96.0, 24.0)];
-    [self.profileStateField setFrame:NSMakeRect(margin + 48.0, bodyTop - 226.0, contentWidth - 96.0, 46.0)];
+    CGFloat panelTitleY = mainTop - 30.0;
+    [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
+    [self.profileNameField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
+    [self.profileIDField setFrame:NSMakeRect(mainX + 48.0, mainTop - 168.0, mainWidth - 96.0, 24.0)];
+    [self.profileStateField setFrame:NSMakeRect(mainX + 48.0, mainTop - 226.0, mainWidth - 96.0, 46.0)];
 
-    [self.settingsTitleField setFrame:NSMakeRect(margin + 18.0, panelTitleY, 240.0, 22.0)];
-    [self.settingsStateField setFrame:NSMakeRect(margin + 48.0, bodyTop - 96.0, contentWidth - 96.0, 24.0)];
-    [self.settingsLibraryField setFrame:NSMakeRect(margin + 48.0, bodyTop - 132.0, contentWidth - 96.0, 24.0)];
-    [self.settingsStorageField setFrame:NSMakeRect(margin + 48.0, bodyTop - 190.0, contentWidth - 96.0, 46.0)];
+    [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
+    [self.settingsStateField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
+    [self.settingsLibraryField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
+    [self.settingsStorageField setFrame:NSMakeRect(mainX + 48.0, mainTop - 190.0, mainWidth - 96.0, 46.0)];
 
     CGFloat aboutIconSize = 118.0;
-    CGFloat aboutCenterX = margin + (contentWidth / 2.0);
-    [self.aboutIconView setFrame:NSMakeRect(aboutCenterX - (aboutIconSize / 2.0), bodyTop - 174.0, aboutIconSize, aboutIconSize)];
-    [self.aboutTitleField setFrame:NSMakeRect(margin + 90.0, bodyTop - 220.0, contentWidth - 180.0, 30.0)];
-    [self.aboutVersionField setFrame:NSMakeRect(margin + 90.0, bodyTop - 252.0, contentWidth - 180.0, 22.0)];
-    [self.aboutCopyrightField setFrame:NSMakeRect(margin + 90.0, bodyTop - 286.0, contentWidth - 180.0, 22.0)];
-    [self.aboutLinkField setFrame:NSMakeRect(margin + 90.0, bodyTop - 320.0, contentWidth - 180.0, 22.0)];
+    CGFloat aboutCenterX = mainX + (mainWidth / 2.0);
+    [self.aboutIconView setFrame:NSMakeRect(aboutCenterX - (aboutIconSize / 2.0), mainTop - 174.0, aboutIconSize, aboutIconSize)];
+    [self.aboutTitleField setFrame:NSMakeRect(mainX + 90.0, mainTop - 220.0, mainWidth - 180.0, 30.0)];
+    [self.aboutVersionField setFrame:NSMakeRect(mainX + 90.0, mainTop - 252.0, mainWidth - 180.0, 22.0)];
+    [self.aboutCopyrightField setFrame:NSMakeRect(mainX + 90.0, mainTop - 286.0, mainWidth - 180.0, 22.0)];
+    [self.aboutLinkField setFrame:NSMakeRect(mainX + 90.0, mainTop - 320.0, mainWidth - 180.0, 22.0)];
 
-    [self.diagnosticsLabel setFrame:NSMakeRect(margin + 14.0, bodyTop - 30.0, 120.0, 18.0)];
-    [self.checkButton setFrame:NSMakeRect(width - margin - 132.0, bodyTop - 36.0, 116.0, 30.0)];
-    [self.detailsScrollView setFrame:NSMakeRect(margin + 12.0, bodyY + 12.0, contentWidth - 24.0, bodyHeight - 56.0)];
+    [self.diagnosticsLabel setFrame:NSMakeRect(mainX + 14.0, mainTop - 30.0, 120.0, 18.0)];
+    [self.checkButton setFrame:NSMakeRect(mainX + mainWidth - 132.0, mainTop - 36.0, 116.0, 30.0)];
+    [self.detailsScrollView setFrame:NSMakeRect(mainX + 12.0, mainY + 12.0, mainWidth - 24.0, mainHeight - 56.0)];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
     (void)notification;
     [self layoutContentView];
+    [self.messageTableView reloadData];
     [self updateVisibleSection];
 }
 
@@ -1626,16 +1589,32 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
         return [tableView rowHeight];
     }
-    return TGMessageBubbleHeightForItem((TGMessageItem *)[self.messageItems objectAtIndex:(NSUInteger)row], NSWidth([self.messageScrollView frame]));
+    id item = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return [tableView rowHeight];
+    }
+    NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
+    CGFloat availableWidth = bubbleColumn ? [bubbleColumn width] : NSWidth([self.messageScrollView frame]);
+    return TGMessageBubbleHeightForItem((TGMessageItem *)item, availableWidth);
 }
 
 - (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
-    (void)row;
     if (![cell isKindOfClass:[NSTextFieldCell class]]) {
         return;
     }
     NSTextFieldCell *textCell = (NSTextFieldCell *)cell;
     id identifier = [tableColumn identifier];
+    if (tableView == self.messageTableView && [identifier isEqual:@"bubble"] && [cell isKindOfClass:[TGMessageBubbleCell class]]) {
+        TGMessageItem *messageItem = nil;
+        if (row >= 0 && (NSUInteger)row < [self.messageItems count]) {
+            id item = [self.messageItems objectAtIndex:(NSUInteger)row];
+            if ([item isKindOfClass:[TGMessageItem class]]) {
+                messageItem = (TGMessageItem *)item;
+            }
+        }
+        [(TGMessageBubbleCell *)cell setMessageItem:messageItem];
+        return;
+    }
     [textCell setAlignment:NSLeftTextAlignment];
     [textCell setFont:[NSFont systemFontOfSize:12.0]];
     [textCell setTextColor:TGClassicInkColor()];
@@ -1688,7 +1667,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     id value = nil;
     if (tableView == self.messageTableView && [item isKindOfClass:[TGMessageItem class]]) {
         if ([identifier isEqual:@"bubble"]) {
-            value = item;
+            value = [(TGMessageItem *)item preview];
         } else {
             value = [(TGMessageItem *)item valueForTableColumnIdentifier:identifier];
         }

@@ -1,6 +1,6 @@
 #import <Foundation/Foundation.h>
 
-@interface TGMessageItem : NSObject
+@interface TGMessageItem : NSObject <NSCopying>
 
 @property (nonatomic, retain) NSNumber *chatID;
 @property (nonatomic, retain) NSNumber *messageID;
