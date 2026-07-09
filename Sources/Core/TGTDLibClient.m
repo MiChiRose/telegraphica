@@ -1666,6 +1666,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     }
 
     NSUInteger index = 0;
+    NSUInteger avatarDownloadsRemaining = 12;
     for (index = 0; index < [chatIDs count]; index++) {
         id chatID = [chatIDs objectAtIndex:index];
         if (!chatID) {
@@ -1706,6 +1707,18 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        BOOL didRequestAvatarDownload = NO;
+        NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[chatResponse objectForKey:@"photo"]
+                                                      downloadMissing:(avatarDownloadsRemaining > 0)
+                                                              timeout:0.9
+                                                   didRequestDownload:&didRequestAvatarDownload];
+        if (didRequestAvatarDownload && avatarDownloadsRemaining > 0) {
+            avatarDownloadsRemaining--;
+        }
+        NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+        if ([avatarPath length] > 0) {
+            [item setAvatarLocalPath:avatarPath];
+        }
         [items addObject:item];
     }
 
@@ -1745,6 +1758,198 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         return @"";
     }
     return [self singleLineTrimmedString:(NSString *)text maximumLength:300];
+}
+
+- (NSNumber *)fileIDFromFileObject:(id)fileObject {
+    if (![fileObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id fileID = [(NSDictionary *)fileObject objectForKey:@"id"];
+    if (![fileID respondsToSelector:@selector(integerValue)]) {
+        return nil;
+    }
+    return [NSNumber numberWithInteger:[fileID integerValue]];
+}
+
+- (NSString *)completedLocalPathFromFileObject:(id)fileObject {
+    if (![fileObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id local = [(NSDictionary *)fileObject objectForKey:@"local"];
+    if (![local isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id completed = [(NSDictionary *)local objectForKey:@"is_downloading_completed"];
+    id path = [(NSDictionary *)local objectForKey:@"path"];
+    if (![completed respondsToSelector:@selector(boolValue)] || ![completed boolValue]) {
+        return nil;
+    }
+    if (![path isKindOfClass:[NSString class]] || [(NSString *)path length] == 0) {
+        return nil;
+    }
+    return (NSString *)path;
+}
+
+- (NSDictionary *)downloadedFileInfoForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout {
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"downloadFile" forKey:@"@type"];
+    [request setObject:fileID forKey:@"file_id"];
+    [request setObject:[NSNumber numberWithInt:16] forKey:@"priority"];
+    [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+    [request setObject:[NSNumber numberWithInt:0] forKey:@"limit"];
+    [request setObject:[NSNumber numberWithBool:YES] forKey:@"synchronous"];
+
+    NSError *downloadError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-download-file"
+                                                           timeout:timeout
+                                                         errorCode:56
+                                                             error:&downloadError];
+    if (![response isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"file"]) {
+        return nil;
+    }
+    NSString *path = [self completedLocalPathFromFileObject:response];
+    if ([path length] == 0) {
+        return nil;
+    }
+    return [NSDictionary dictionaryWithObjectsAndKeys:path, @"local_path", fileID, @"file_id", nil];
+}
+
+- (NSDictionary *)photoInfoFromFileObject:(id)fileObject
+                                    width:(NSNumber *)width
+                                   height:(NSNumber *)height
+                          downloadMissing:(BOOL)downloadMissing
+                                  timeout:(NSTimeInterval)timeout
+                       didRequestDownload:(BOOL *)didRequestDownload {
+    NSNumber *fileID = [self fileIDFromFileObject:fileObject];
+    NSString *localPath = [self completedLocalPathFromFileObject:fileObject];
+    if ([localPath length] == 0 && downloadMissing && fileID) {
+        if (didRequestDownload) {
+            *didRequestDownload = YES;
+        }
+        NSDictionary *downloadedInfo = [self downloadedFileInfoForFileID:fileID timeout:timeout];
+        localPath = [downloadedInfo objectForKey:@"local_path"];
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    if (fileID) {
+        [info setObject:fileID forKey:@"file_id"];
+    }
+    if ([localPath length] > 0) {
+        [info setObject:localPath forKey:@"local_path"];
+    }
+    if (width) {
+        [info setObject:width forKey:@"width"];
+    }
+    if (height) {
+        [info setObject:height forKey:@"height"];
+    }
+    return ([info count] > 0) ? info : nil;
+}
+
+- (NSDictionary *)photoInfoFromPhotoSizes:(NSArray *)sizes
+                          downloadMissing:(BOOL)downloadMissing
+                                  timeout:(NSTimeInterval)timeout
+                       didRequestDownload:(BOOL *)didRequestDownload {
+    if (![sizes isKindOfClass:[NSArray class]] || [sizes count] == 0) {
+        return nil;
+    }
+
+    NSDictionary *bestDownloadedSize = nil;
+    NSDictionary *bestDownloadableSize = nil;
+    NSInteger bestDownloadedScore = NSIntegerMax;
+    NSInteger bestDownloadableScore = NSIntegerMax;
+    NSUInteger index = 0;
+    for (index = 0; index < [sizes count]; index++) {
+        id sizeObject = [sizes objectAtIndex:index];
+        if (![sizeObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *size = (NSDictionary *)sizeObject;
+        id widthObject = [size objectForKey:@"width"];
+        id heightObject = [size objectForKey:@"height"];
+        NSInteger width = [widthObject respondsToSelector:@selector(integerValue)] ? [widthObject integerValue] : 0;
+        NSInteger height = [heightObject respondsToSelector:@selector(integerValue)] ? [heightObject integerValue] : 0;
+        if (width <= 0 || height <= 0) {
+            continue;
+        }
+        NSInteger longestSide = (width > height) ? width : height;
+        NSInteger score = (longestSide > 300) ? (longestSide - 300) : (300 - longestSide);
+        id fileObject = [size objectForKey:@"photo"];
+        NSString *localPath = [self completedLocalPathFromFileObject:fileObject];
+        NSNumber *fileID = [self fileIDFromFileObject:fileObject];
+        if ([localPath length] > 0) {
+            if (!bestDownloadedSize || score < bestDownloadedScore) {
+                bestDownloadedSize = size;
+                bestDownloadedScore = score;
+            }
+        } else if (fileID) {
+            if (!bestDownloadableSize || score < bestDownloadableScore) {
+                bestDownloadableSize = size;
+                bestDownloadableScore = score;
+            }
+        }
+    }
+
+    NSDictionary *selectedSize = bestDownloadedSize ? bestDownloadedSize : bestDownloadableSize;
+    if (!selectedSize) {
+        return nil;
+    }
+    id widthObject = [selectedSize objectForKey:@"width"];
+    id heightObject = [selectedSize objectForKey:@"height"];
+    NSNumber *width = [widthObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[widthObject integerValue]] : nil;
+    NSNumber *height = [heightObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[heightObject integerValue]] : nil;
+    return [self photoInfoFromFileObject:[selectedSize objectForKey:@"photo"]
+                                   width:width
+                                  height:height
+                         downloadMissing:(downloadMissing && !bestDownloadedSize)
+                                 timeout:timeout
+                      didRequestDownload:didRequestDownload];
+}
+
+- (NSDictionary *)photoInfoFromMessageContentObject:(id)contentObject
+                                   downloadMissing:(BOOL)downloadMissing
+                                           timeout:(NSTimeInterval)timeout
+                                didRequestDownload:(BOOL *)didRequestDownload {
+    if (![contentObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id typeObject = [(NSDictionary *)contentObject objectForKey:@"@type"];
+    if (![typeObject isKindOfClass:[NSString class]] || ![(NSString *)typeObject isEqualToString:@"messagePhoto"]) {
+        return nil;
+    }
+    id photo = [(NSDictionary *)contentObject objectForKey:@"photo"];
+    if (![photo isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    return [self photoInfoFromPhotoSizes:[(NSDictionary *)photo objectForKey:@"sizes"]
+                         downloadMissing:downloadMissing
+                                 timeout:timeout
+                      didRequestDownload:didRequestDownload];
+}
+
+- (NSDictionary *)photoInfoFromChatPhotoObject:(id)photoObject
+                               downloadMissing:(BOOL)downloadMissing
+                                       timeout:(NSTimeInterval)timeout
+                            didRequestDownload:(BOOL *)didRequestDownload {
+    if (![photoObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id smallFile = [(NSDictionary *)photoObject objectForKey:@"small"];
+    return [self photoInfoFromFileObject:smallFile
+                                   width:nil
+                                  height:nil
+                         downloadMissing:downloadMissing
+                                 timeout:timeout
+                      didRequestDownload:didRequestDownload];
 }
 
 - (NSString *)messageContentPreviewForObject:(id)contentObject {
@@ -1853,6 +2058,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
+    NSUInteger photoDownloadsRemaining = 6;
     for (index = 0; index < [(NSArray *)messages count]; index++) {
         id messageObject = [(NSArray *)messages objectAtIndex:index];
         if (![messageObject isKindOfClass:[NSDictionary class]]) {
@@ -1869,9 +2075,17 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         id date = [message objectForKey:@"date"];
         id isOutgoing = [message objectForKey:@"is_outgoing"];
         BOOL outgoing = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]);
-        NSString *preview = [self messageContentPreviewForObject:[message objectForKey:@"content"]];
+        id contentObject = [message objectForKey:@"content"];
+        NSString *preview = [self messageContentPreviewForObject:contentObject];
         if ([preview length] == 0) {
             preview = @"[Message]";
+        }
+        NSString *contentType = nil;
+        if ([contentObject isKindOfClass:[NSDictionary class]]) {
+            id contentTypeObject = [(NSDictionary *)contentObject objectForKey:@"@type"];
+            if ([contentTypeObject isKindOfClass:[NSString class]]) {
+                contentType = (NSString *)contentTypeObject;
+            }
         }
 
         NSNumber *safeMessageID = nil;
@@ -1890,6 +2104,22 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                                                                 date:safeDate
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
+        [item setContentType:contentType];
+        [item setSending:([[message objectForKey:@"sending_state"] isKindOfClass:[NSDictionary class]])];
+        BOOL didRequestPhotoDownload = NO;
+        NSDictionary *photoInfo = [self photoInfoFromMessageContentObject:contentObject
+                                                           downloadMissing:(photoDownloadsRemaining > 0)
+                                                                   timeout:1.5
+                                                        didRequestDownload:&didRequestPhotoDownload];
+        if (didRequestPhotoDownload && photoDownloadsRemaining > 0) {
+            photoDownloadsRemaining--;
+        }
+        NSString *mediaPath = [photoInfo objectForKey:@"local_path"];
+        if ([mediaPath length] > 0) {
+            [item setMediaLocalPath:mediaPath];
+        }
+        [item setMediaWidth:[photoInfo objectForKey:@"width"]];
+        [item setMediaHeight:[photoInfo objectForKey:@"height"]];
         [items addObject:item];
     }
 
@@ -2118,6 +2348,15 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     id userID = [userResponse objectForKey:@"id"];
     if ([userID respondsToSelector:@selector(longLongValue)]) {
         [summary setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"id"];
+    }
+    BOOL didRequestAvatarDownload = NO;
+    NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[userResponse objectForKey:@"profile_photo"]
+                                                  downloadMissing:YES
+                                                          timeout:1.5
+                                               didRequestDownload:&didRequestAvatarDownload];
+    NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+    if ([avatarPath length] > 0) {
+        [summary setObject:avatarPath forKey:@"avatar_path"];
     }
     return summary;
 }

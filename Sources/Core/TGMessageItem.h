@@ -6,13 +6,19 @@
 @property (nonatomic, retain) NSNumber *messageID;
 @property (nonatomic, retain) NSNumber *date;
 @property (nonatomic, assign) BOOL outgoing;
+@property (nonatomic, assign) BOOL sending;
 @property (nonatomic, copy) NSString *preview;
+@property (nonatomic, copy) NSString *contentType;
+@property (nonatomic, copy) NSString *mediaLocalPath;
+@property (nonatomic, retain) NSNumber *mediaWidth;
+@property (nonatomic, retain) NSNumber *mediaHeight;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
                           date:(NSNumber *)date
                       outgoing:(BOOL)outgoing
                        preview:(NSString *)preview;
+- (BOOL)isPhotoMessage;
 - (NSString *)directionSummary;
 - (id)valueForTableColumnIdentifier:(id)identifier;
 

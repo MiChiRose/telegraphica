@@ -6,6 +6,7 @@
 @synthesize title = _title;
 @synthesize typeSummary = _typeSummary;
 @synthesize unreadCount = _unreadCount;
+@synthesize avatarLocalPath = _avatarLocalPath;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                          title:(NSString *)title
@@ -42,6 +43,7 @@
     [_title release];
     [_typeSummary release];
     [_unreadCount release];
+    [_avatarLocalPath release];
     [super dealloc];
 }
 

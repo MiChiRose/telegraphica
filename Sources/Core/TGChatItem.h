@@ -6,6 +6,7 @@
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *typeSummary;
 @property (nonatomic, retain) NSNumber *unreadCount;
+@property (nonatomic, copy) NSString *avatarLocalPath;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                          title:(NSString *)title
