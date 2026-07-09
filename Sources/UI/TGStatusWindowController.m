@@ -450,6 +450,23 @@ static NSColor *TGAvatarColorForTitle(NSString *title) {
     return TGColorFromRGB(TGRGBMake(colors[index]));
 }
 
+static void TGDrawImageInRect(NSImage *image, NSRect rect) {
+    if (!image || NSIsEmptyRect(rect)) {
+        return;
+    }
+    NSSize imageSize = [image size];
+    NSRect sourceRect = NSZeroRect;
+    if (imageSize.width > 0.0 && imageSize.height > 0.0) {
+        sourceRect = NSMakeRect(0.0, 0.0, imageSize.width, imageSize.height);
+    }
+    [image drawInRect:rect
+             fromRect:sourceRect
+            operation:NSCompositeSourceOver
+             fraction:1.0
+       respectFlipped:YES
+                hints:nil];
+}
+
 static void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected) {
     NSBezierPath *avatarPath = [NSBezierPath bezierPathWithOvalInRect:rect];
     NSImage *image = nil;
@@ -460,7 +477,7 @@ static void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect
     if (image) {
         [NSGraphicsContext saveGraphicsState];
         [avatarPath addClip];
-        [image drawInRect:rect fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:1.0];
+        TGDrawImageInRect(image, rect);
         [NSGraphicsContext restoreGraphicsState];
     } else {
         [(selected ? TGClassicSelectedRowTextColor() : TGAvatarColorForTitle(title)) set];
@@ -829,6 +846,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 - (id)copyWithZone:(NSZone *)zone {
     TGChatListCell *cell = [super copyWithZone:zone];
+    cell->_chatItem = nil;
     [cell setChatItem:self.chatItem];
     return cell;
 }
@@ -1019,6 +1037,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 - (id)copyWithZone:(NSZone *)zone {
     TGMessageBubbleCell *cell = [super copyWithZone:zone];
+    cell->_messageItem = nil;
     [cell setMessageItem:self.messageItem];
     return cell;
 }
@@ -1122,7 +1141,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         if (image) {
             [NSGraphicsContext saveGraphicsState];
             [imagePath addClip];
-            [image drawInRect:imageRect fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:1.0];
+            TGDrawImageInRect(image, imageRect);
             [NSGraphicsContext restoreGraphicsState];
         } else {
             [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
@@ -2863,13 +2882,13 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     id value = nil;
     if (tableView == self.messageTableView && [item isKindOfClass:[TGMessageItem class]]) {
         if ([identifier isEqual:@"bubble"]) {
-            value = [(TGMessageItem *)item preview];
+            value = @"";
         } else {
             value = [(TGMessageItem *)item valueForTableColumnIdentifier:identifier];
         }
     } else if (tableView == self.chatTableView && [item isKindOfClass:[TGChatItem class]]) {
         if ([identifier isEqual:@"chat"]) {
-            value = item;
+            value = @"";
         } else {
             value = [(TGChatItem *)item valueForTableColumnIdentifier:identifier];
         }
