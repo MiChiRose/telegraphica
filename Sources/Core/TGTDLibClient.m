@@ -13,9 +13,15 @@ typedef const char *(*TGTDJsonClientExecuteFunction)(void *, const char *);
 typedef void (*TGTDJsonClientDestroyFunction)(void *);
 
 static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
+static NSString * const TGTDLibTDLibCodeErrorKey = @"TelegraphicaTDLibCode";
+static NSString * const TGTDLibTDLibMessageErrorKey = @"TelegraphicaTDLibMessage";
+static NSString * const TGTDLibTDLibResponseErrorKey = @"TelegraphicaTDLibResponse";
 static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_encryption_key";
 static NSUInteger const TGTDLibMaxPendingResponses = 64;
 static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
+static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
+static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
+static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
 @interface TGTDLibClient () {
     void *_libraryHandle;
@@ -37,6 +43,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     BOOL _receiverRunning;
     BOOL _receiverShouldStop;
     BOOL _shutdownStarted;
+    BOOL _mainChatListExhausted;
     NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
@@ -54,6 +61,10 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSString *)cachedAuthorizationStateSummary;
 - (NSUInteger)authorizationStateGeneration;
 - (NSString *)uniqueExtraWithPrefix:(NSString *)prefix;
+- (NSError *)errorWithTDLibErrorResponse:(NSDictionary *)response code:(NSInteger)code;
+- (NSInteger)tdlibErrorCodeFromError:(NSError *)error;
+- (BOOL)isTDLibLoadChatsExhaustedError:(NSError *)error;
+- (void)setMainChatListExhausted:(BOOL)exhausted;
 @end
 
 @implementation TGTDLibClient
@@ -159,6 +170,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     [_pendingUpdateSummaries removeAllObjects];
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
+    _mainChatListExhausted = NO;
     [_responseCondition broadcast];
     [_responseCondition unlock];
 
@@ -190,6 +202,23 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 
 - (NSString *)loadedLibraryPath {
     return _loadedPath;
+}
+
+- (BOOL)mainChatListExhausted {
+    [_responseCondition lock];
+    BOOL exhausted = _mainChatListExhausted;
+    [_responseCondition unlock];
+    return exhausted;
+}
+
+- (void)setMainChatListExhausted:(BOOL)exhausted {
+    [_responseCondition lock];
+    _mainChatListExhausted = exhausted;
+    [_responseCondition unlock];
+}
+
+- (void)invalidateMainChatListExhaustion {
+    [self setMainChatListExhausted:NO];
 }
 
 - (NSString *)receiverStatusSummary {
@@ -323,6 +352,12 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     if ([type hasPrefix:@"update"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         id chatID = [dictionary objectForKey:@"chat_id"];
+        if (![chatID respondsToSelector:@selector(longLongValue)] && [type isEqualToString:@"updateNewChat"]) {
+            id chatObject = [dictionary objectForKey:@"chat"];
+            if ([chatObject isKindOfClass:[NSDictionary class]]) {
+                chatID = [(NSDictionary *)chatObject objectForKey:@"id"];
+            }
+        }
         if ([chatID respondsToSelector:@selector(longLongValue)]) {
             [summary setObject:@"chat_update" forKey:@"kind"];
             [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
@@ -555,9 +590,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
         id type = [response objectForKey:@"@type"];
         if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"error"]) {
             if (error) {
-                NSString *summary = [self summaryForAuthorizationStateObject:response];
-                NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
-                *error = [self errorWithDescription:message code:errorCode];
+                *error = [self errorWithTDLibErrorResponse:response code:errorCode];
             }
             return nil;
         }
@@ -588,6 +621,37 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     NSDictionary *info = [NSDictionary dictionaryWithObject:(description ? description : @"Unknown TDLib error")
                                                      forKey:NSLocalizedDescriptionKey];
     return [NSError errorWithDomain:TGTDLibErrorDomain code:code userInfo:info];
+}
+
+- (NSError *)errorWithTDLibErrorResponse:(NSDictionary *)response code:(NSInteger)code {
+    NSString *summary = [self summaryForAuthorizationStateObject:response];
+    NSString *message = [NSString stringWithFormat:@"TDLib request failed: %@", summary ? summary : @"error"];
+    NSMutableDictionary *info = [NSMutableDictionary dictionaryWithObject:message forKey:NSLocalizedDescriptionKey];
+
+    id tdlibCode = [response objectForKey:@"code"];
+    if ([tdlibCode respondsToSelector:@selector(integerValue)]) {
+        [info setObject:[NSNumber numberWithInteger:[tdlibCode integerValue]] forKey:TGTDLibTDLibCodeErrorKey];
+    }
+
+    id tdlibMessage = [response objectForKey:@"message"];
+    if ([tdlibMessage isKindOfClass:[NSString class]]) {
+        [info setObject:tdlibMessage forKey:TGTDLibTDLibMessageErrorKey];
+    }
+
+    [info setObject:response forKey:TGTDLibTDLibResponseErrorKey];
+    return [NSError errorWithDomain:TGTDLibErrorDomain code:code userInfo:info];
+}
+
+- (NSInteger)tdlibErrorCodeFromError:(NSError *)error {
+    id value = [[error userInfo] objectForKey:TGTDLibTDLibCodeErrorKey];
+    if ([value respondsToSelector:@selector(integerValue)]) {
+        return [value integerValue];
+    }
+    return 0;
+}
+
+- (BOOL)isTDLibLoadChatsExhaustedError:(NSError *)error {
+    return [self tdlibErrorCodeFromError:error] == 404;
 }
 
 - (NSString *)authorizationErrorDescriptionForSummary:(NSString *)summary actionName:(NSString *)actionName {
@@ -1433,27 +1497,18 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 - (NSArray *)mainChatIDsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSUInteger safeLimit = limit;
     if (safeLimit == 0) {
-        safeLimit = 40;
-    } else if (safeLimit > 200) {
-        safeLimit = 200;
+        safeLimit = TGTDLibMainChatLoadBatchSize;
+    } else if (safeLimit > TGTDLibMaxMainChatPreviewLimit) {
+        safeLimit = TGTDLibMaxMainChatPreviewLimit;
     }
 
     NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
     [chatList setObject:@"chatListMain" forKey:@"@type"];
 
-    NSMutableDictionary *loadChatsRequest = [NSMutableDictionary dictionary];
-    [loadChatsRequest setObject:@"loadChats" forKey:@"@type"];
-    [loadChatsRequest setObject:chatList forKey:@"chat_list"];
-    [loadChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
     NSTimeInterval loadChatsTimeout = timeout;
     if (loadChatsTimeout > 1.0) {
         loadChatsTimeout = 1.0;
     }
-    [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
-                              extraPrefix:@"telegraphica-load-main-chats"
-                                  timeout:loadChatsTimeout
-                                errorCode:32
-                                    error:NULL];
 
     NSMutableDictionary *getChatsRequest = [NSMutableDictionary dictionary];
     [getChatsRequest setObject:@"getChats" forKey:@"@type"];
@@ -1461,11 +1516,65 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
     [getChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
 
     NSError *currentChatsError = nil;
-    NSDictionary *chatsResponse = [self sendTDLibRequestAndWaitForExtra:getChatsRequest
-                                                            extraPrefix:@"telegraphica-main-chats"
-                                                                timeout:timeout
-                                                              errorCode:33
-                                                                  error:&currentChatsError];
+    NSDictionary *chatsResponse = nil;
+    NSUInteger lastChatIDCount = 0;
+    NSUInteger attempt = 0;
+    NSUInteger stagnantAttemptCount = 0;
+    BOOL reachedEndOfMainChatList = [self mainChatListExhausted];
+    for (attempt = 0; attempt < TGTDLibMainChatLoadAttemptLimit; attempt++) {
+        currentChatsError = nil;
+        chatsResponse = [self sendTDLibRequestAndWaitForExtra:getChatsRequest
+                                                  extraPrefix:@"telegraphica-main-chats"
+                                                      timeout:timeout
+                                                    errorCode:33
+                                                        error:&currentChatsError];
+        if (!chatsResponse) {
+            break;
+        }
+
+        id currentChatIDs = [chatsResponse objectForKey:@"chat_ids"];
+        NSUInteger currentChatIDCount = [currentChatIDs isKindOfClass:[NSArray class]] ? [(NSArray *)currentChatIDs count] : 0;
+        if (currentChatIDCount >= safeLimit || reachedEndOfMainChatList) {
+            break;
+        }
+        if (attempt > 0 && currentChatIDCount == lastChatIDCount) {
+            stagnantAttemptCount++;
+            if (stagnantAttemptCount >= 2) {
+                break;
+            }
+        } else {
+            stagnantAttemptCount = 0;
+        }
+
+        NSUInteger requestedBatchSize = safeLimit - currentChatIDCount;
+        if (requestedBatchSize > TGTDLibMainChatLoadBatchSize) {
+            requestedBatchSize = TGTDLibMainChatLoadBatchSize;
+        }
+        if (requestedBatchSize == 0) {
+            requestedBatchSize = TGTDLibMainChatLoadBatchSize;
+        }
+
+        NSMutableDictionary *loadChatsRequest = [NSMutableDictionary dictionary];
+        [loadChatsRequest setObject:@"loadChats" forKey:@"@type"];
+        [loadChatsRequest setObject:chatList forKey:@"chat_list"];
+        [loadChatsRequest setObject:[NSNumber numberWithInt:(int)requestedBatchSize] forKey:@"limit"];
+
+        NSError *loadChatsError = nil;
+        NSDictionary *loadResponse = [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
+                                                                extraPrefix:@"telegraphica-load-main-chats"
+                                                                    timeout:loadChatsTimeout
+                                                                  errorCode:32
+                                                                      error:&loadChatsError];
+        if (!loadResponse) {
+            if ([self isTDLibLoadChatsExhaustedError:loadChatsError]) {
+                reachedEndOfMainChatList = YES;
+                [self setMainChatListExhausted:YES];
+            }
+            break;
+        }
+        lastChatIDCount = currentChatIDCount;
+    }
+
     if (!chatsResponse) {
         NSError *legacyChatsError = nil;
         NSMutableDictionary *legacyGetChatsRequest = [NSMutableDictionary dictionary];

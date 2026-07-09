@@ -4,6 +4,10 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 
+static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
+static NSUInteger const TGStatusChatPreviewStep = 40;
+static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
+
 @interface TGChromeView : NSView
 @end
 
@@ -92,6 +96,7 @@
 @property (nonatomic, assign) BOOL pendingLiveChatRefresh;
 @property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
+@property (nonatomic, assign) BOOL chatsExhausted;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
 @end
 
@@ -140,6 +145,7 @@
 @synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
 @synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
+@synthesize chatsExhausted = _chatsExhausted;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
 
 - (instancetype)init {
@@ -158,7 +164,7 @@
         self.client = [[[TGTDLibClient alloc] init] autorelease];
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
-        self.chatPreviewLimit = 40;
+        self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.olderMessagesExhausted = NO;
         [self buildContentView];
         [self startLiveUpdateTimerIfNeeded];
@@ -549,6 +555,14 @@
     [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
 }
 
+- (BOOL)canLoadMoreChats {
+    return (!self.controlsBusy &&
+            [self.currentAuthState isEqualToString:@"ready"] &&
+            [self.chatItems count] > 0 &&
+            !self.chatsExhausted &&
+            [self.chatItems count] < TGStatusChatPreviewMaximumLimit);
+}
+
 - (void)updateAuthControlsForState:(NSString *)state {
     NSString *previousState = [self.currentAuthState copy];
     self.currentAuthState = state;
@@ -567,12 +581,16 @@
         [self.messageTableView reloadData];
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
+        self.chatsExhausted = NO;
+        [self.client invalidateMainChatListExhaustion];
         self.olderMessagesExhausted = NO;
         [self.selectedChatField setStringValue:@"select a chat"];
         [self.sendTextField setStringValue:@""];
     }
 
     if (![state isEqualToString:@"ready"]) {
+        self.chatsExhausted = NO;
+        [self.client invalidateMainChatListExhaustion];
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
     } else if (![previousState isEqualToString:@"ready"] && [self.chatItems count] == 0) {
@@ -639,7 +657,7 @@
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
-    [self.loadMoreChatsButton setEnabled:([state isEqualToString:@"ready"] && [self.chatItems count] > 0 && self.chatPreviewLimit < 200)];
+    [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
     [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self updateSendControls];
@@ -651,7 +669,7 @@
     _controlsBusy = busy;
     [self.checkButton setEnabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
-    [self.loadMoreChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && [self.chatItems count] > 0 && self.chatPreviewLimit < 200)];
+    [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
     [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
@@ -922,9 +940,9 @@
     }
 
     if (requestedLimit == 0) {
-        requestedLimit = 40;
-    } else if (requestedLimit > 200) {
-        requestedLimit = 200;
+        requestedLimit = TGStatusChatPreviewInitialLimit;
+    } else if (requestedLimit > TGStatusChatPreviewMaximumLimit) {
+        requestedLimit = TGStatusChatPreviewMaximumLimit;
     }
 
     TGTDLibClient *client = [self.client retain];
@@ -932,17 +950,22 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *chatError = nil;
         NSArray *items = [client mainChatPreviewItemsWithLimit:requestedLimit timeout:10.0 error:&chatError];
+        BOOL chatsExhausted = [client mainChatListExhausted];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *chatErrorMessage = [[chatError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (itemsCopy) {
-                self.chatPreviewLimit = requestedLimit;
+                self.chatPreviewLimit = [itemsCopy count];
+                self.chatsExhausted = chatsExhausted;
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
                 if (interactive) {
                     [self.statusField setStringValue:@"TDLib chats: loaded"];
                     [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews (limit %lu)", (unsigned long)[itemsCopy count], (unsigned long)requestedLimit]];
+                    if (self.chatsExhausted) {
+                        [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
+                    }
                     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
                 }
             } else {
@@ -1170,6 +1193,8 @@
 
         if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"]) {
             needsChatRefresh = YES;
+            self.chatsExhausted = NO;
+            [self.client invalidateMainChatListExhaustion];
             id chatID = [summary objectForKey:@"chat_id"];
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
@@ -1378,9 +1403,15 @@
 
 - (void)loadMoreChats:(id)sender {
     (void)sender;
-    NSUInteger nextLimit = self.chatPreviewLimit + 40;
-    if (nextLimit > 200) {
-        nextLimit = 200;
+    if (self.chatsExhausted) {
+        [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
+        return;
+    }
+
+    NSUInteger currentCount = [self.chatItems count];
+    NSUInteger nextLimit = currentCount + TGStatusChatPreviewStep;
+    if (nextLimit > TGStatusChatPreviewMaximumLimit) {
+        nextLimit = TGStatusChatPreviewMaximumLimit;
     }
     if (nextLimit == self.chatPreviewLimit) {
         [self appendDetail:@"TDLib chats: maximum preview limit reached for this build."];
