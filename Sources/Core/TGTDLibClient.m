@@ -36,6 +36,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     NSMutableArray *_pendingResponseExtras;
     NSMutableSet *_waitingResponseExtras;
     NSMutableArray *_pendingUpdateSummaries;
+    NSArray *_chatFilterInfos;
     NSString *_latestAuthorizationStateSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
@@ -44,6 +45,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     BOOL _receiverShouldStop;
     BOOL _shutdownStarted;
     BOOL _mainChatListExhausted;
+    BOOL _chatFilterInfosKnown;
     NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
@@ -54,6 +56,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 - (BOOL)startReceiverThreadIfNeededWithError:(NSError **)error;
 - (void)receiverThreadMain;
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
+- (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary;
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
@@ -61,6 +64,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 - (NSString *)cachedAuthorizationStateSummary;
 - (NSUInteger)authorizationStateGeneration;
 - (NSString *)uniqueExtraWithPrefix:(NSString *)prefix;
+- (NSArray *)chatFilterChatIDsForFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error;
 - (NSError *)errorWithTDLibErrorResponse:(NSDictionary *)response code:(NSInteger)code;
 - (NSInteger)tdlibErrorCodeFromError:(NSError *)error;
 - (BOOL)isTDLibLoadChatsExhaustedError:(NSError *)error;
@@ -130,6 +134,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         [_pendingResponseExtras removeAllObjects];
         [_waitingResponseExtras removeAllObjects];
         [_pendingUpdateSummaries removeAllObjects];
+        [_chatFilterInfos release];
+        _chatFilterInfos = nil;
+        _chatFilterInfosKnown = NO;
         [_responseCondition broadcast];
     }
     [_responseCondition unlock];
@@ -159,6 +166,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     [_pendingResponseExtras removeAllObjects];
     [_waitingResponseExtras removeAllObjects];
     [_pendingUpdateSummaries removeAllObjects];
+    [_chatFilterInfos release];
+    _chatFilterInfos = nil;
+    _chatFilterInfosKnown = NO;
     [_responseCondition broadcast];
     [_responseCondition unlock];
 
@@ -168,6 +178,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     [_pendingResponseExtras removeAllObjects];
     [_waitingResponseExtras removeAllObjects];
     [_pendingUpdateSummaries removeAllObjects];
+    [_chatFilterInfos release];
+    _chatFilterInfos = nil;
+    _chatFilterInfosKnown = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
     _mainChatListExhausted = NO;
@@ -193,6 +206,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     [_pendingResponseExtras release];
     [_waitingResponseExtras release];
     [_pendingUpdateSummaries release];
+    [_chatFilterInfos release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
     [_receiverThread release];
@@ -219,6 +233,25 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
 - (void)invalidateMainChatListExhaustion {
     [self setMainChatListExhausted:NO];
+}
+
+- (NSArray *)chatFilterInfoItemsWithTimeout:(NSTimeInterval)timeout {
+    if (timeout < 0.0) {
+        timeout = 0.0;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    [_responseCondition lock];
+    while (!_chatFilterInfosKnown && [[NSDate date] compare:deadline] == NSOrderedAscending) {
+        [_responseCondition waitUntilDate:deadline];
+    }
+    NSArray *filters = [_chatFilterInfos copy];
+    [_responseCondition unlock];
+
+    if (!filters) {
+        return [NSArray array];
+    }
+    return [filters autorelease];
 }
 
 - (NSString *)receiverStatusSummary {
@@ -307,6 +340,50 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     return YES;
 }
 
+- (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary {
+    id typeObject = [dictionary objectForKey:@"@type"];
+    if (![typeObject isKindOfClass:[NSString class]] || ![(NSString *)typeObject isEqualToString:@"updateChatFilters"]) {
+        return nil;
+    }
+
+    id filterObjects = [dictionary objectForKey:@"chat_filters"];
+    if (![filterObjects isKindOfClass:[NSArray class]]) {
+        return [NSArray array];
+    }
+
+    NSMutableArray *filters = [NSMutableArray arrayWithCapacity:[(NSArray *)filterObjects count]];
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)filterObjects count]; index++) {
+        id filterObject = [(NSArray *)filterObjects objectAtIndex:index];
+        if (![filterObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSDictionary *filterDictionary = (NSDictionary *)filterObject;
+        id identifier = [filterDictionary objectForKey:@"id"];
+        id titleObject = [filterDictionary objectForKey:@"title"];
+        id iconObject = [filterDictionary objectForKey:@"icon_name"];
+        if (![identifier respondsToSelector:@selector(integerValue)] || ![titleObject isKindOfClass:[NSString class]]) {
+            continue;
+        }
+
+        NSString *title = (NSString *)titleObject;
+        if ([title length] == 0) {
+            continue;
+        }
+
+        NSMutableDictionary *safeFilter = [NSMutableDictionary dictionary];
+        [safeFilter setObject:[NSNumber numberWithInteger:[identifier integerValue]] forKey:@"id"];
+        [safeFilter setObject:title forKey:@"title"];
+        if ([iconObject isKindOfClass:[NSString class]] && [(NSString *)iconObject length] > 0) {
+            [safeFilter setObject:iconObject forKey:@"icon_name"];
+        }
+        [filters addObject:safeFilter];
+    }
+
+    return filters;
+}
+
 - (NSDictionary *)safeUpdateSummaryForObject:(NSDictionary *)dictionary {
     id typeObject = [dictionary objectForKey:@"@type"];
     if (![typeObject isKindOfClass:[NSString class]]) {
@@ -349,6 +426,16 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         return summary;
     }
 
+    if ([type isEqualToString:@"updateChatFilters"]) {
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"chat_filters" forKey:@"kind"];
+        id filterObjects = [dictionary objectForKey:@"chat_filters"];
+        if ([filterObjects isKindOfClass:[NSArray class]]) {
+            [summary setObject:[NSNumber numberWithUnsignedInteger:[(NSArray *)filterObjects count]] forKey:@"count"];
+        }
+        return summary;
+    }
+
     if ([type hasPrefix:@"update"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         id chatID = [dictionary objectForKey:@"chat_id"];
@@ -385,6 +472,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary {
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
     id extraObject = [dictionary objectForKey:@"@extra"];
+    NSArray *chatFilterInfos = [self chatFilterInfoItemsFromUpdateObject:dictionary];
     NSDictionary *updateSummary = nil;
     if (![extraObject isKindOfClass:[NSString class]]) {
         updateSummary = [self safeUpdateSummaryForObject:dictionary];
@@ -395,6 +483,12 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         [_latestAuthorizationStateSummary release];
         _latestAuthorizationStateSummary = [authorizationSummary copy];
         _authorizationStateGeneration++;
+    }
+
+    if (chatFilterInfos) {
+        [_chatFilterInfos release];
+        _chatFilterInfos = [chatFilterInfos copy];
+        _chatFilterInfosKnown = YES;
     }
 
     if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
@@ -1725,6 +1819,209 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     if (returnedChatIDCount > 0 && [items count] == 0) {
         if (error) {
             *error = [self errorWithDescription:@"TDLib returned chat IDs, but no chat previews could be loaded." code:37];
+        }
+        return nil;
+    }
+
+    return items;
+}
+
+- (NSArray *)chatFilterChatIDsForFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error {
+    if (exhausted) {
+        *exhausted = NO;
+    }
+    if (![filterID respondsToSelector:@selector(integerValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat filter identifier is missing." code:70];
+        }
+        return nil;
+    }
+
+    NSUInteger safeLimit = limit;
+    if (safeLimit == 0) {
+        safeLimit = TGTDLibMainChatLoadBatchSize;
+    } else if (safeLimit > TGTDLibMaxMainChatPreviewLimit) {
+        safeLimit = TGTDLibMaxMainChatPreviewLimit;
+    }
+
+    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
+    [chatList setObject:@"chatListFilter" forKey:@"@type"];
+    [chatList setObject:[NSNumber numberWithInteger:[filterID integerValue]] forKey:@"chat_filter_id"];
+
+    NSTimeInterval loadChatsTimeout = timeout;
+    if (loadChatsTimeout > 1.0) {
+        loadChatsTimeout = 1.0;
+    }
+
+    NSMutableDictionary *getChatsRequest = [NSMutableDictionary dictionary];
+    [getChatsRequest setObject:@"getChats" forKey:@"@type"];
+    [getChatsRequest setObject:chatList forKey:@"chat_list"];
+    [getChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+
+    NSError *currentChatsError = nil;
+    NSDictionary *chatsResponse = nil;
+    NSUInteger lastChatIDCount = 0;
+    NSUInteger attempt = 0;
+    NSUInteger stagnantAttemptCount = 0;
+    BOOL reachedEndOfChatList = NO;
+    for (attempt = 0; attempt < TGTDLibMainChatLoadAttemptLimit; attempt++) {
+        currentChatsError = nil;
+        chatsResponse = [self sendTDLibRequestAndWaitForExtra:getChatsRequest
+                                                  extraPrefix:@"telegraphica-filter-chats"
+                                                      timeout:timeout
+                                                    errorCode:71
+                                                        error:&currentChatsError];
+        if (!chatsResponse) {
+            break;
+        }
+
+        id currentChatIDs = [chatsResponse objectForKey:@"chat_ids"];
+        NSUInteger currentChatIDCount = [currentChatIDs isKindOfClass:[NSArray class]] ? [(NSArray *)currentChatIDs count] : 0;
+        if (currentChatIDCount >= safeLimit || reachedEndOfChatList) {
+            break;
+        }
+        if (attempt > 0 && currentChatIDCount == lastChatIDCount) {
+            stagnantAttemptCount++;
+            if (stagnantAttemptCount >= 2) {
+                break;
+            }
+        } else {
+            stagnantAttemptCount = 0;
+        }
+
+        NSUInteger requestedBatchSize = safeLimit - currentChatIDCount;
+        if (requestedBatchSize > TGTDLibMainChatLoadBatchSize) {
+            requestedBatchSize = TGTDLibMainChatLoadBatchSize;
+        }
+        if (requestedBatchSize == 0) {
+            requestedBatchSize = TGTDLibMainChatLoadBatchSize;
+        }
+
+        NSMutableDictionary *loadChatsRequest = [NSMutableDictionary dictionary];
+        [loadChatsRequest setObject:@"loadChats" forKey:@"@type"];
+        [loadChatsRequest setObject:chatList forKey:@"chat_list"];
+        [loadChatsRequest setObject:[NSNumber numberWithInt:(int)requestedBatchSize] forKey:@"limit"];
+
+        NSError *loadChatsError = nil;
+        NSDictionary *loadResponse = [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
+                                                                extraPrefix:@"telegraphica-load-filter-chats"
+                                                                    timeout:loadChatsTimeout
+                                                                  errorCode:72
+                                                                      error:&loadChatsError];
+        if (!loadResponse) {
+            if ([self isTDLibLoadChatsExhaustedError:loadChatsError]) {
+                reachedEndOfChatList = YES;
+                if (exhausted) {
+                    *exhausted = YES;
+                }
+            }
+            break;
+        }
+        lastChatIDCount = currentChatIDCount;
+    }
+
+    if (!chatsResponse) {
+        if (error) {
+            NSString *message = currentChatsError ? [currentChatsError localizedDescription] : @"TDLib filter getChats failed.";
+            *error = [self errorWithDescription:message code:71];
+        }
+        return nil;
+    }
+
+    id chatsType = [chatsResponse objectForKey:@"@type"];
+    id chatIDs = [chatsResponse objectForKey:@"chat_ids"];
+    if (![chatsType isKindOfClass:[NSString class]] || ![(NSString *)chatsType isEqualToString:@"chats"] || ![chatIDs isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib filter getChats returned an unexpected response." code:73];
+        }
+        return nil;
+    }
+
+    return chatIDs;
+}
+
+- (NSArray *)chatPreviewItemsForChatFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load folder chats. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:74];
+        }
+        return nil;
+    }
+
+    NSArray *chatIDs = [self chatFilterChatIDsForFilterID:filterID limit:limit timeout:timeout exhausted:exhausted error:error];
+    if (!chatIDs) {
+        return nil;
+    }
+
+    NSUInteger returnedChatIDCount = [chatIDs count];
+    NSMutableArray *items = [NSMutableArray array];
+    NSTimeInterval chatTimeout = timeout;
+    if (chatTimeout > 1.0) {
+        chatTimeout = 1.0;
+    }
+
+    NSUInteger index = 0;
+    NSUInteger avatarDownloadsRemaining = 12;
+    for (index = 0; index < [chatIDs count]; index++) {
+        id chatID = [chatIDs objectAtIndex:index];
+        if (!chatID) {
+            continue;
+        }
+
+        NSMutableDictionary *getChatRequest = [NSMutableDictionary dictionary];
+        [getChatRequest setObject:@"getChat" forKey:@"@type"];
+        [getChatRequest setObject:chatID forKey:@"chat_id"];
+
+        NSError *chatError = nil;
+        NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:getChatRequest
+                                                               extraPrefix:@"telegraphica-get-filter-chat"
+                                                                   timeout:chatTimeout
+                                                                 errorCode:75
+                                                                     error:&chatError];
+        if (!chatResponse) {
+            continue;
+        }
+
+        id responseType = [chatResponse objectForKey:@"@type"];
+        if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chat"]) {
+            continue;
+        }
+
+        id titleValue = [chatResponse objectForKey:@"title"];
+        NSString *title = ([titleValue isKindOfClass:[NSString class]] && [(NSString *)titleValue length] > 0) ? (NSString *)titleValue : @"Untitled";
+        NSString *typeSummary = [self chatTypeSummaryForChatTypeObject:[chatResponse objectForKey:@"type"]];
+        id unreadValue = [chatResponse objectForKey:@"unread_count"];
+        NSNumber *unreadCount = nil;
+        if ([unreadValue respondsToSelector:@selector(integerValue)]) {
+            unreadCount = [NSNumber numberWithInteger:[unreadValue integerValue]];
+        } else {
+            unreadCount = [NSNumber numberWithInteger:0];
+        }
+
+        TGChatItem *item = [[[TGChatItem alloc] initWithChatID:chatID
+                                                         title:title
+                                                   typeSummary:typeSummary
+                                                   unreadCount:unreadCount] autorelease];
+        BOOL didRequestAvatarDownload = NO;
+        NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[chatResponse objectForKey:@"photo"]
+                                                      downloadMissing:(avatarDownloadsRemaining > 0)
+                                                              timeout:0.9
+                                                   didRequestDownload:&didRequestAvatarDownload];
+        if (didRequestAvatarDownload && avatarDownloadsRemaining > 0) {
+            avatarDownloadsRemaining--;
+        }
+        NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+        if ([avatarPath length] > 0) {
+            [item setAvatarLocalPath:avatarPath];
+        }
+        [items addObject:item];
+    }
+
+    if (returnedChatIDCount > 0 && [items count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib returned folder chat IDs, but no chat previews could be loaded." code:76];
         }
         return nil;
     }

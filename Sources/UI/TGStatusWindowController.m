@@ -1223,6 +1223,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [@"i" drawAtPoint:NSMakePoint(NSMidX(circleRect) - (size.width / 2.0),
                                       NSMidY(circleRect) - (size.height / 2.0) - 0.5)
            withAttributes:attributes];
+    } else {
+        NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
+        NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
+        NSBezierPath *folderPath = [NSBezierPath bezierPath];
+        [folderPath appendBezierPathWithRoundedRect:folderBody xRadius:2.0 yRadius:2.0];
+        [folderPath appendBezierPathWithRoundedRect:folderTab xRadius:1.5 yRadius:1.5];
+        [folderPath fill];
     }
 }
 
@@ -1644,6 +1651,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) TGGroupedCardView *bottomNavigationView;
 @property (nonatomic, retain) NSArray *navigationButtons;
 @property (nonatomic, retain) NSArray *drawerFolderButtons;
+@property (nonatomic, retain) NSArray *chatFilterInfos;
 @property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
 @property (nonatomic, retain) NSButton *drawerButton;
 @property (nonatomic, retain) TGGroupedCardView *profileSummaryCardView;
@@ -1720,6 +1728,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *aboutLinkField;
 @property (nonatomic, retain) NSNumber *selectedChatID;
 @property (nonatomic, copy) NSString *selectedChatTitle;
+@property (nonatomic, retain) NSNumber *selectedChatFilterID;
 @property (nonatomic, copy) NSString *profileDisplayName;
 @property (nonatomic, copy) NSString *profileFirstName;
 @property (nonatomic, copy) NSString *profileLastName;
@@ -1754,6 +1763,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
 @property (nonatomic, assign) BOOL drawerOpen;
 @property (nonatomic, assign) BOOL composerRefocusPending;
+@property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
+@property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
 @end
 
 @implementation TGStatusWindowController
@@ -1769,6 +1780,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize bottomNavigationView = _bottomNavigationView;
 @synthesize navigationButtons = _navigationButtons;
 @synthesize drawerFolderButtons = _drawerFolderButtons;
+@synthesize chatFilterInfos = _chatFilterInfos;
 @synthesize accountBadgeView = _accountBadgeView;
 @synthesize drawerButton = _drawerButton;
 @synthesize profileSummaryCardView = _profileSummaryCardView;
@@ -1845,6 +1857,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize aboutLinkField = _aboutLinkField;
 @synthesize selectedChatID = _selectedChatID;
 @synthesize selectedChatTitle = _selectedChatTitle;
+@synthesize selectedChatFilterID = _selectedChatFilterID;
 @synthesize profileDisplayName = _profileDisplayName;
 @synthesize profileFirstName = _profileFirstName;
 @synthesize profileLastName = _profileLastName;
@@ -1878,6 +1891,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize initialConnectStarted = _initialConnectStarted;
 @synthesize profileSummaryLoaded = _profileSummaryLoaded;
 @synthesize drawerOpen = _drawerOpen;
+@synthesize composerRefocusPending = _composerRefocusPending;
+@synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
+@synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -1896,6 +1912,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.chatFilterInfos = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
         self.autoChatListLoadArmed = YES;
@@ -2275,7 +2292,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.drawerButton setCell:drawerCell];
     [self.drawerButton setTitle:@""];
     [self.drawerButton setBordered:NO];
-    [self.drawerButton setToolTip:@"Chat folders will appear here when supported"];
+    [self.drawerButton setToolTip:@"Chat folders"];
     [self.drawerButton setTarget:self];
     [self.drawerButton setAction:@selector(toggleDrawer:)];
     [self.drawerButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
@@ -2350,29 +2367,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     self.navigationButtons = navigationButtons;
 
-    NSArray *drawerFolderTitles = [NSArray array];
-    NSMutableArray *drawerFolderButtons = [NSMutableArray arrayWithCapacity:[drawerFolderTitles count]];
-    for (navigationIndex = 0; navigationIndex < [drawerFolderTitles count]; navigationIndex++) {
-        NSString *buttonTitle = [drawerFolderTitles objectAtIndex:navigationIndex];
-        NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (navigationIndex * 48), 92, 42)] autorelease];
-        TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
-        [folderCell setButtonType:NSToggleButton];
-        [folderButton setCell:folderCell];
-        [folderButton setTitle:buttonTitle];
-        [folderButton setButtonType:NSToggleButton];
-        [folderButton setBordered:NO];
-        [folderButton setTag:(NSInteger)navigationIndex];
-        [folderButton setToolTip:[NSString stringWithFormat:@"%@ folder", buttonTitle]];
-        [folderButton setTarget:self];
-        [folderButton setAction:@selector(folderFilterChanged:)];
-        [folderButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-        if (navigationIndex == 0) {
-            [folderButton setState:NSOnState];
-        }
-        [contentView addSubview:folderButton];
-        [drawerFolderButtons addObject:folderButton];
-    }
-    self.drawerFolderButtons = drawerFolderButtons;
+    self.drawerFolderButtons = [NSArray array];
 
     self.logsCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 410, 712, 210)] autorelease];
     [self.logsCardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -2493,6 +2488,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.chatTableView setAllowsMultipleSelection:NO];
     [self.chatTableView setRowHeight:38.0];
     [self applySkeuomorphicTableStyle:self.chatTableView];
+    [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
     [self.chatTableView setHeaderView:nil];
 
     NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"chat"] autorelease];
@@ -2872,6 +2868,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self refreshThemeAppearance];
     [self refreshProfileDisplay];
+    [self rebuildDrawerFolderButtons];
     [self layoutContentView];
     [self updateVisibleSection];
 }
@@ -2908,6 +2905,132 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return 0;
 }
 
+- (void)updateDrawerFolderButtonStates {
+    NSUInteger index = 0;
+    for (index = 0; index < [self.drawerFolderButtons count]; index++) {
+        NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
+        BOOL selected = NO;
+        if ([button tag] < 0) {
+            selected = (self.selectedChatFilterID == nil);
+        } else if (self.selectedChatFilterID && [button tag] == [self.selectedChatFilterID integerValue]) {
+            selected = YES;
+        }
+        [button setState:selected ? NSOnState : NSOffState];
+    }
+}
+
+- (void)rebuildDrawerFolderButtons {
+    NSView *contentView = [[self window] contentView];
+    if (!contentView) {
+        return;
+    }
+
+    NSUInteger index = 0;
+    for (index = 0; index < [self.drawerFolderButtons count]; index++) {
+        NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
+        [button removeFromSuperview];
+    }
+
+    NSMutableArray *buttons = [NSMutableArray array];
+    NSMutableArray *folderItems = [NSMutableArray array];
+    NSDictionary *allItem = [NSDictionary dictionaryWithObjectsAndKeys:
+                             [NSNumber numberWithInteger:-1], @"id",
+                             @"All", @"title",
+                             nil];
+    [folderItems addObject:allItem];
+    if ([self.chatFilterInfos count] > 0) {
+        [folderItems addObjectsFromArray:self.chatFilterInfos];
+    }
+
+    for (index = 0; index < [folderItems count]; index++) {
+        NSDictionary *folderInfo = [folderItems objectAtIndex:index];
+        NSString *buttonTitle = [folderInfo objectForKey:@"title"];
+        id filterID = [folderInfo objectForKey:@"id"];
+        if (![buttonTitle isKindOfClass:[NSString class]] || [buttonTitle length] == 0 || ![filterID respondsToSelector:@selector(integerValue)]) {
+            continue;
+        }
+
+        NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (index * 48), 92, 42)] autorelease];
+        TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
+        [folderCell setButtonType:NSToggleButton];
+        [folderButton setCell:folderCell];
+        [folderButton setTitle:buttonTitle];
+        [folderButton setButtonType:NSToggleButton];
+        [folderButton setBordered:NO];
+        [folderButton setTag:[filterID integerValue]];
+        [folderButton setToolTip:([filterID integerValue] < 0) ? @"All chats" : [NSString stringWithFormat:@"%@ folder", buttonTitle]];
+        [folderButton setTarget:self];
+        [folderButton setAction:@selector(folderFilterChanged:)];
+        [folderButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+        [contentView addSubview:folderButton];
+        [buttons addObject:folderButton];
+    }
+
+    self.drawerFolderButtons = buttons;
+    [self updateDrawerFolderButtonStates];
+    [self layoutContentView];
+    [self updateVisibleSection];
+}
+
+- (void)reloadChatFiltersIfReady {
+    if (![self.currentAuthState isEqualToString:@"ready"] || self.chatFilterRefreshInFlight) {
+        return;
+    }
+
+    self.chatFilterRefreshInFlight = YES;
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSArray *filters = [[client chatFilterInfoItemsWithTimeout:1.5] retain];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client == client && [self.currentAuthState isEqualToString:@"ready"]) {
+                self.chatFilterInfos = filters ? filters : [NSArray array];
+                BOOL selectedFilterWasCleared = NO;
+                if (self.selectedChatFilterID) {
+                    BOOL selectedFilterStillExists = NO;
+                    NSUInteger filterIndex = 0;
+                    for (filterIndex = 0; filterIndex < [self.chatFilterInfos count]; filterIndex++) {
+                        NSDictionary *filterInfo = [self.chatFilterInfos objectAtIndex:filterIndex];
+                        id filterID = [filterInfo objectForKey:@"id"];
+                        if ([filterID respondsToSelector:@selector(integerValue)] && [filterID integerValue] == [self.selectedChatFilterID integerValue]) {
+                            selectedFilterStillExists = YES;
+                            break;
+                        }
+                    }
+                    if (!selectedFilterStillExists) {
+                        self.selectedChatFilterID = nil;
+                        selectedFilterWasCleared = YES;
+                    }
+                }
+                [self rebuildDrawerFolderButtons];
+                if ([self.chatFilterInfos count] > 0) {
+                    self.chatFilterRefreshRetryCount = 0;
+                } else if (self.chatFilterRefreshRetryCount < 5) {
+                    self.chatFilterRefreshRetryCount++;
+                    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                             selector:@selector(reloadChatFiltersIfReady)
+                                                               object:nil];
+                    [self performSelector:@selector(reloadChatFiltersIfReady)
+                               withObject:nil
+                               afterDelay:2.0];
+                }
+                if (selectedFilterWasCleared) {
+                    self.chatsExhausted = NO;
+                    self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
+                    [self.client invalidateMainChatListExhaustion];
+                    [self reloadChatsInteractive:NO preserveSelection:NO requestedLimit:TGStatusChatPreviewInitialLimit];
+                }
+            }
+            self.chatFilterRefreshInFlight = NO;
+            [filters release];
+            [client release];
+        });
+
+        [pool drain];
+    });
+}
+
 - (void)updateNavigationButtonsForSection:(NSString *)section enabled:(BOOL)enabled {
     NSInteger selectedTag = [self navigationTagForSectionIdentifier:section];
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
@@ -2923,6 +3046,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [button setEnabled:(enabled && ready)];
         [button setHidden:(!ready || !self.drawerOpen)];
     }
+    [self updateDrawerFolderButtonStates];
 }
 
 - (void)navigationChanged:(id)sender {
@@ -2937,21 +3061,41 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)folderFilterChanged:(id)sender {
-    NSUInteger index = 0;
-    for (index = 0; index < [self.drawerFolderButtons count]; index++) {
-        NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
-        [button setState:(button == sender) ? NSOnState : NSOffState];
+    if (![self.currentAuthState isEqualToString:@"ready"] || ![sender respondsToSelector:@selector(tag)]) {
+        [self updateDrawerFolderButtonStates];
+        return;
     }
+
+    NSInteger tag = [sender tag];
+    NSNumber *filterID = nil;
+    if (tag >= 0) {
+        filterID = [NSNumber numberWithInteger:tag];
+    }
+
+    BOOL sameFilter = NO;
+    if (!filterID && !self.selectedChatFilterID) {
+        sameFilter = YES;
+    } else if (filterID && self.selectedChatFilterID && [filterID integerValue] == [self.selectedChatFilterID integerValue]) {
+        sameFilter = YES;
+    }
+
+    self.selectedChatFilterID = filterID;
+    [self updateDrawerFolderButtonStates];
+    if (sameFilter) {
+        return;
+    }
+
+    self.chatsExhausted = NO;
+    self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
+    self.autoChatListLoadArmed = YES;
+    if (!self.selectedChatFilterID) {
+        [self.client invalidateMainChatListExhaustion];
+    }
+    [self reloadChatsInteractive:YES preserveSelection:NO requestedLimit:TGStatusChatPreviewInitialLimit];
 }
 
 - (void)toggleDrawer:(id)sender {
     (void)sender;
-    if ([self.drawerFolderButtons count] == 0) {
-        self.drawerOpen = NO;
-        [self layoutContentView];
-        [self updateVisibleSection];
-        return;
-    }
     self.drawerOpen = !self.drawerOpen;
     [self layoutContentView];
     [self updateVisibleSection];
@@ -3828,13 +3972,24 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![state isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
         self.chatsExhausted = NO;
+        self.selectedChatFilterID = nil;
+        self.chatFilterInfos = [NSArray array];
+        self.chatFilterRefreshRetryCount = 0;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(reloadChatFiltersIfReady)
+                                                   object:nil];
         self.profileSummaryLoaded = NO;
         [self clearProfileDisplayCache];
         [self.client invalidateMainChatListExhaustion];
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
+        if (self.drawerButton) {
+            [self rebuildDrawerFolderButtons];
+        }
     } else if (![previousState isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
+        self.chatFilterRefreshRetryCount = 0;
+        [self reloadChatFiltersIfReady];
         if ([self.chatItems count] == 0) {
             self.pendingLiveChatRefresh = YES;
             [self handlePendingLiveRefreshesIfPossible];
@@ -4209,6 +4364,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 chatItem = (TGChatItem *)item;
             }
         }
+        [(TGChatListCell *)cell setHighlighted:[tableView isRowSelected:row]];
         [(TGChatListCell *)cell setChatItem:chatItem];
         return;
     }
@@ -5059,10 +5215,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
+    NSNumber *activeFilterID = [self.selectedChatFilterID retain];
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading chats..."];
-        [self appendDetail:@"Loading main chat previews from TDLib..."];
+        [self appendDetail:activeFilterID ? @"Loading folder chat previews from TDLib..." : @"Loading main chat previews from TDLib..."];
     } else {
         self.backgroundChatRefreshInFlight = YES;
     }
@@ -5077,20 +5234,43 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *chatError = nil;
-        NSArray *items = [client mainChatPreviewItemsWithLimit:requestedLimit timeout:10.0 error:&chatError];
-        BOOL chatsExhausted = [client mainChatListExhausted];
+        BOOL chatsExhausted = NO;
+        NSArray *items = nil;
+        if (activeFilterID) {
+            items = [client chatPreviewItemsForChatFilterID:activeFilterID
+                                                      limit:requestedLimit
+                                                    timeout:10.0
+                                                  exhausted:&chatsExhausted
+                                                      error:&chatError];
+        } else {
+            items = [client mainChatPreviewItemsWithLimit:requestedLimit timeout:10.0 error:&chatError];
+            chatsExhausted = [client mainChatListExhausted];
+        }
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *chatErrorMessage = [[chatError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (itemsCopy) {
+            BOOL filterStillCurrent = NO;
+            if (!activeFilterID && !self.selectedChatFilterID) {
+                filterStillCurrent = YES;
+            } else if (activeFilterID && self.selectedChatFilterID && [activeFilterID integerValue] == [self.selectedChatFilterID integerValue]) {
+                filterStillCurrent = YES;
+            }
+
+            if (!filterStillCurrent) {
+                if (interactive) {
+                    [self appendDetail:@"TDLib chats: ignored stale folder result after selection changed."];
+                } else {
+                    [self appendDetail:@"TDLib live refresh: ignored stale folder result after selection changed."];
+                }
+            } else if (itemsCopy) {
                 self.chatPreviewLimit = [itemsCopy count];
                 self.chatsExhausted = chatsExhausted;
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews (limit %lu)", (unsigned long)[itemsCopy count], (unsigned long)requestedLimit]];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu %@chat previews (limit %lu)", (unsigned long)[itemsCopy count], activeFilterID ? @"folder " : @"", (unsigned long)requestedLimit]];
                     if (self.chatsExhausted) {
                         [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
                     }
@@ -5118,6 +5298,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [itemsCopy release];
             [chatErrorMessage release];
             [authorizationState release];
+            [activeFilterID release];
             [preferredChatID release];
         });
 
@@ -5318,6 +5499,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *latestAuthorizationState = nil;
     BOOL needsChatRefresh = NO;
     BOOL needsMessageRefresh = NO;
+    BOOL needsChatFilterRefresh = NO;
 
     NSUInteger index = 0;
     for (index = 0; index < [updates count]; index++) {
@@ -5343,6 +5525,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
             }
+        } else if ([kind isEqualToString:@"chat_filters"]) {
+            needsChatFilterRefresh = YES;
         }
     }
 
@@ -5355,6 +5539,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     if (needsMessageRefresh) {
         self.pendingLiveMessageRefresh = YES;
+    }
+    if (needsChatFilterRefresh) {
+        [self reloadChatFiltersIfReady];
     }
 
     [selectedChatID release];
@@ -5738,6 +5925,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(consumePendingComposerRefocus:)
                                                object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(reloadChatFiltersIfReady)
+                                               object:nil];
     [self stopLiveUpdateTimer];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
@@ -5759,6 +5949,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_bottomNavigationView release];
     [_navigationButtons release];
     [_drawerFolderButtons release];
+    [_chatFilterInfos release];
     [_accountBadgeView release];
     [_drawerButton release];
     [_profileSummaryCardView release];
@@ -5835,6 +6026,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_aboutLinkField release];
     [_selectedChatID release];
     [_selectedChatTitle release];
+    [_selectedChatFilterID release];
     [_client release];
     [_currentAuthState release];
     [_activeSection release];
