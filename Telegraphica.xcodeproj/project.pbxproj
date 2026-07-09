@@ -13,6 +13,8 @@
 		111111111111111111111104 /* TGKeychainHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111207 /* TGKeychainHelper.m */; };
 		111111111111111111111105 /* TGLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111209 /* TGLogger.m */; };
 		111111111111111111111106 /* TGStatusWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111211 /* TGStatusWindowController.m */; };
+		111111111111111111111111 /* TGChatItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111213 /* TGChatItem.m */; };
+		111111111111111111111112 /* TGMessageItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111215 /* TGMessageItem.m */; };
 		111111111111111111111107 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111220 /* Localizable.strings */; };
 		111111111111111111111108 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111230 /* Cocoa.framework */; };
 		111111111111111111111109 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111231 /* Security.framework */; };
@@ -32,6 +34,10 @@
 		111111111111111111111209 /* TGLogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLogger.m; sourceTree = "<group>"; };
 		111111111111111111111210 /* TGStatusWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111211 /* TGStatusWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111212 /* TGChatItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatItem.h; sourceTree = "<group>"; };
+		111111111111111111111213 /* TGChatItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatItem.m; sourceTree = "<group>"; };
+		111111111111111111111214 /* TGMessageItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageItem.h; sourceTree = "<group>"; };
+		111111111111111111111215 /* TGMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageItem.m; sourceTree = "<group>"; };
 		111111111111111111111221 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111222 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111223 /* Telegraphica.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Telegraphica.icns; sourceTree = "<group>"; };
@@ -99,6 +105,10 @@
 			children = (
 				111111111111111111111204 /* TGTDLibClient.h */,
 				111111111111111111111205 /* TGTDLibClient.m */,
+				111111111111111111111212 /* TGChatItem.h */,
+				111111111111111111111213 /* TGChatItem.m */,
+				111111111111111111111214 /* TGMessageItem.h */,
+				111111111111111111111215 /* TGMessageItem.m */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -202,6 +212,8 @@
 				111111111111111111111104 /* TGKeychainHelper.m in Sources */,
 				111111111111111111111105 /* TGLogger.m in Sources */,
 				111111111111111111111106 /* TGStatusWindowController.m in Sources */,
+				111111111111111111111111 /* TGChatItem.m in Sources */,
+				111111111111111111111112 /* TGMessageItem.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
