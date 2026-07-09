@@ -19,6 +19,7 @@
                       outgoing:(BOOL)outgoing
                        preview:(NSString *)preview;
 - (BOOL)isPhotoMessage;
+- (BOOL)isStickerMessage;
 - (BOOL)isVisualMediaMessage;
 - (NSString *)visualMediaPlaceholderTitle;
 - (NSString *)directionSummary;

@@ -34,17 +34,21 @@
     return [self.contentType isEqualToString:@"messagePhoto"];
 }
 
+- (BOOL)isStickerMessage {
+    return [self.contentType isEqualToString:@"messageSticker"];
+}
+
 - (BOOL)isVisualMediaMessage {
     if ([self isPhotoMessage]) {
         return YES;
     }
-    return ([self.contentType isEqualToString:@"messageSticker"] ||
+    return ([self isStickerMessage] ||
             [self.contentType isEqualToString:@"messageAnimation"] ||
             [self.contentType isEqualToString:@"messageVideo"]);
 }
 
 - (NSString *)visualMediaPlaceholderTitle {
-    if ([self.contentType isEqualToString:@"messageSticker"]) {
+    if ([self isStickerMessage]) {
         return @"Sticker";
     }
     if ([self.contentType isEqualToString:@"messageAnimation"]) {
