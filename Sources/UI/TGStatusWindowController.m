@@ -744,6 +744,19 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 @end
 
+@interface TGUtilityWindowView : NSView
+@end
+
+@implementation TGUtilityWindowView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    [TGClassicPanelBottomColor() set];
+    NSRectFill([self bounds]);
+}
+
+@end
+
 @interface TGRailView : NSView
 @end
 
@@ -1205,6 +1218,113 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
+@interface TGSendButtonCell : NSButtonCell
+@end
+
+@implementation TGSendButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:7.0 yRadius:7.0];
+    NSColor *fillColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicHeaderBottomColor();
+    [fillColor set];
+    [buttonPath fill];
+    [TGClassicPanelStrokeColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSRect planeRect = NSInsetRect(buttonRect, 9.0, 8.0);
+    NSBezierPath *planePath = [NSBezierPath bezierPath];
+    [planePath moveToPoint:NSMakePoint(NSMinX(planeRect), NSMidY(planeRect))];
+    [planePath lineToPoint:NSMakePoint(NSMaxX(planeRect), NSMaxY(planeRect))];
+    [planePath lineToPoint:NSMakePoint(NSMaxX(planeRect) - 4.0, NSMidY(planeRect))];
+    [planePath lineToPoint:NSMakePoint(NSMaxX(planeRect), NSMinY(planeRect))];
+    [planePath closePath];
+    [TGClassicHeaderTextColor(alpha) set];
+    [planePath fill];
+}
+
+@end
+
+@interface TGSettingsListButtonCell : NSButtonCell
+@end
+
+@implementation TGSettingsListButtonCell
+
+- (NSColor *)accentColorForTitle:(NSString *)title alpha:(CGFloat)alpha {
+    if ([title isEqualToString:@"Appearance"]) {
+        return [NSColor colorWithCalibratedRed:0.180 green:0.600 blue:0.860 alpha:alpha];
+    }
+    if ([title isEqualToString:@"Diagnostic Logs"]) {
+        return [NSColor colorWithCalibratedRed:0.520 green:0.540 blue:0.590 alpha:alpha];
+    }
+    return [NSColor colorWithCalibratedRed:0.950 green:0.520 blue:0.160 alpha:alpha];
+}
+
+- (NSString *)glyphForTitle:(NSString *)title {
+    if ([title isEqualToString:@"Appearance"]) {
+        return @"A";
+    }
+    if ([title isEqualToString:@"Diagnostic Logs"]) {
+        return @"L";
+    }
+    return @"i";
+}
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.46;
+    NSRect rowRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *rowPath = [NSBezierPath bezierPathWithRoundedRect:rowRect xRadius:9.0 yRadius:9.0];
+    NSColor *rowColor = highlighted ? TGClassicTableHeaderColor() : TGClassicTablePaperColor();
+    [rowColor set];
+    [rowPath fill];
+    [TGClassicPanelStrokeColor() set];
+    [rowPath setLineWidth:1.0];
+    [rowPath stroke];
+
+    NSString *title = [self title] ? [self title] : @"";
+    NSRect iconRect = NSMakeRect(NSMinX(rowRect) + 11.0, NSMidY(rowRect) - 12.0, 24.0, 24.0);
+    NSBezierPath *iconPath = [NSBezierPath bezierPathWithRoundedRect:iconRect xRadius:5.0 yRadius:5.0];
+    [[self accentColorForTitle:title alpha:alpha] set];
+    [iconPath fill];
+
+    NSDictionary *glyphAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                     [NSColor colorWithCalibratedWhite:1.0 alpha:alpha], NSForegroundColorAttributeName,
+                                     nil];
+    NSString *glyph = [self glyphForTitle:title];
+    NSSize glyphSize = [glyph sizeWithAttributes:glyphAttributes];
+    [glyph drawAtPoint:NSMakePoint(NSMidX(iconRect) - (glyphSize.width / 2.0),
+                                   NSMidY(iconRect) - (glyphSize.height / 2.0) - 0.5)
+        withAttributes:glyphAttributes];
+
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont systemFontOfSize:14.0], NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     nil];
+    NSRect titleRect = NSMakeRect(NSMinX(rowRect) + 48.0,
+                                  NSMidY(rowRect) - 9.0,
+                                  NSWidth(rowRect) - 82.0,
+                                  18.0);
+    [title drawInRect:titleRect withAttributes:titleAttributes];
+
+    NSDictionary *chevronAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                       [NSFont systemFontOfSize:18.0], NSFontAttributeName,
+                                       TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                       nil];
+    [@">" drawAtPoint:NSMakePoint(NSMaxX(rowRect) - 24.0, NSMidY(rowRect) - 12.0)
+       withAttributes:chevronAttributes];
+}
+
+@end
+
 @interface TGMessageBubbleCell : NSTextFieldCell {
     TGMessageItem *_messageItem;
 }
@@ -1434,6 +1554,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *settingsStorageField;
 @property (nonatomic, retain) NSTextField *settingsThemeLabel;
 @property (nonatomic, retain) NSPopUpButton *themePopUpButton;
+@property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
 @property (nonatomic, retain) NSButton *settingsAboutButton;
 @property (nonatomic, retain) NSButton *logoutButton;
@@ -1451,8 +1572,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, copy) NSString *lastLogSection;
 @property (nonatomic, retain) NSWindow *logsWindow;
 @property (nonatomic, retain) NSWindow *aboutWindow;
+@property (nonatomic, retain) NSWindow *appearanceWindow;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
 @property (nonatomic, retain) NSButton *logsCheckButton;
+@property (nonatomic, retain) NSPopUpButton *appearanceThemePopUpButton;
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, copy) NSString *currentAuthState;
 @property (nonatomic, copy) NSString *activeSection;
@@ -1534,6 +1657,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsStorageField = _settingsStorageField;
 @synthesize settingsThemeLabel = _settingsThemeLabel;
 @synthesize themePopUpButton = _themePopUpButton;
+@synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
 @synthesize settingsAboutButton = _settingsAboutButton;
 @synthesize logoutButton = _logoutButton;
@@ -1551,8 +1675,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize lastLogSection = _lastLogSection;
 @synthesize logsWindow = _logsWindow;
 @synthesize aboutWindow = _aboutWindow;
+@synthesize appearanceWindow = _appearanceWindow;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
 @synthesize logsCheckButton = _logsCheckButton;
+@synthesize appearanceThemePopUpButton = _appearanceThemePopUpButton;
 @synthesize client = _client;
 @synthesize currentAuthState = _currentAuthState;
 @synthesize activeSection = _activeSection;
@@ -1650,6 +1776,23 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
+- (void)applyUtilityButtonStyle:(NSButton *)button {
+    [button setButtonType:NSMomentaryPushInButton];
+    [button setBezelStyle:NSRoundedBezelStyle];
+    [button setBordered:YES];
+    [button setImagePosition:NSNoImage];
+    [button setFocusRingType:NSFocusRingTypeExterior];
+    [button setFont:[NSFont systemFontOfSize:12.0]];
+}
+
+- (void)applySettingsListButtonStyle:(NSButton *)button {
+    TGSettingsListButtonCell *cell = [[[TGSettingsListButtonCell alloc] initTextCell:[button title]] autorelease];
+    [cell setButtonType:NSMomentaryPushInButton];
+    [button setCell:cell];
+    [button setBordered:NO];
+    [button setFocusRingType:NSFocusRingTypeExterior];
+}
+
 - (void)applyDestructiveSettingsButtonStyle:(NSButton *)button {
     [button setButtonType:NSMomentaryPushInButton];
     [button setBezelStyle:NSRegularSquareBezelStyle];
@@ -1675,6 +1818,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [textField setDrawsBackground:YES];
     [textField setFocusRingType:NSFocusRingTypeExterior];
     [textField setFont:[NSFont systemFontOfSize:12.0]];
+    if ([[textField cell] isKindOfClass:[NSTextFieldCell class]]) {
+        NSTextFieldCell *textFieldCell = (NSTextFieldCell *)[textField cell];
+        [textFieldCell setBezelStyle:NSTextFieldRoundedBezel];
+    }
 }
 
 - (void)applySkeuomorphicScrollStyle:(NSScrollView *)scrollView {
@@ -1705,19 +1852,30 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)selectThemePopUpItemForIdentifier:(NSString *)identifier {
-    if (!self.themePopUpButton) {
-        return;
-    }
-    NSArray *items = [self.themePopUpButton itemArray];
-    NSUInteger index = 0;
-    for (index = 0; index < [items count]; index++) {
-        NSMenuItem *item = [items objectAtIndex:index];
-        if ([[item representedObject] isEqual:identifier]) {
-            [self.themePopUpButton selectItem:item];
-            return;
+    NSArray *popUpButtons = [NSArray arrayWithObjects:
+                             self.themePopUpButton ? self.themePopUpButton : (id)[NSNull null],
+                             self.appearanceThemePopUpButton ? self.appearanceThemePopUpButton : (id)[NSNull null],
+                             nil];
+    NSUInteger popUpIndex = 0;
+    for (popUpIndex = 0; popUpIndex < [popUpButtons count]; popUpIndex++) {
+        id candidate = [popUpButtons objectAtIndex:popUpIndex];
+        if (![candidate isKindOfClass:[NSPopUpButton class]]) {
+            continue;
+        }
+        NSPopUpButton *popUpButton = (NSPopUpButton *)candidate;
+        NSArray *items = [popUpButton itemArray];
+        NSUInteger index = 0;
+        for (index = 0; index < [items count]; index++) {
+            NSMenuItem *item = [items objectAtIndex:index];
+            if ([[item representedObject] isEqual:identifier]) {
+                [popUpButton selectItem:item];
+                break;
+            }
+        }
+        if ([popUpButton selectedItem] == nil && [items count] > 0) {
+            [popUpButton selectItemAtIndex:0];
         }
     }
-    [self.themePopUpButton selectItemAtIndex:0];
 }
 
 - (void)refreshThemeAppearance {
@@ -1752,6 +1910,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applySkeuomorphicTextFieldStyle:self.authTextField];
     [self applySkeuomorphicTextFieldStyle:self.authSecureField];
     [self applySkeuomorphicTextFieldStyle:self.sendTextField];
+    [self applySettingsListButtonStyle:self.settingsAppearanceButton];
+    [self applySettingsListButtonStyle:self.settingsLogsButton];
+    [self applySettingsListButtonStyle:self.settingsAboutButton];
     [self applySkeuomorphicScrollStyle:self.detailsScrollView];
     [self applySkeuomorphicScrollStyle:self.chatScrollView];
     [self applySkeuomorphicScrollStyle:self.messageScrollView];
@@ -2122,7 +2283,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.messageScrollView];
 
     self.sendLabel = [self labelWithFrame:NSMakeRect(24, 58, 48, 22)
-                                     text:@"Send:"
+                                     text:@""
                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.sendLabel];
 
@@ -2134,11 +2295,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.sendTextField];
 
     self.sendMessageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(588, 50, 148, 32)] autorelease];
-    [self.sendMessageButton setTitle:@"Send"];
+    TGSendButtonCell *sendCell = [[[TGSendButtonCell alloc] initTextCell:@""] autorelease];
+    [sendCell setButtonType:NSMomentaryPushInButton];
+    [self.sendMessageButton setCell:sendCell];
+    [self.sendMessageButton setTitle:@""];
     [self.sendMessageButton setTarget:self];
     [self.sendMessageButton setAction:@selector(sendMessage:)];
     [self.sendMessageButton setEnabled:NO];
-    [self applySkeuomorphicButtonStyle:self.sendMessageButton isPrimary:YES];
+    [self.sendMessageButton setBordered:NO];
+    [self.sendMessageButton setToolTip:@"Send message"];
     [self.sendMessageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.sendMessageButton];
 
@@ -2251,12 +2416,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self selectThemePopUpItemForIdentifier:TGCurrentThemeIdentifier()];
     [contentView addSubview:self.themePopUpButton];
 
+    self.settingsAppearanceButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 328, 260, 40)] autorelease];
+    [self.settingsAppearanceButton setTitle:@"Appearance"];
+    [self.settingsAppearanceButton setToolTip:@"Open appearance settings"];
+    [self.settingsAppearanceButton setTarget:self];
+    [self.settingsAppearanceButton setAction:@selector(showAppearanceWindow:)];
+    [self applySettingsListButtonStyle:self.settingsAppearanceButton];
+    [self.settingsAppearanceButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsAppearanceButton];
+
     self.settingsLogsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 276, 260, 40)] autorelease];
     [self.settingsLogsButton setTitle:@"Diagnostic Logs"];
     [self.settingsLogsButton setToolTip:@"Open diagnostic logs"];
     [self.settingsLogsButton setTarget:self];
     [self.settingsLogsButton setAction:@selector(showLogsWindow:)];
-    [self applySkeuomorphicButtonStyle:self.settingsLogsButton isPrimary:NO];
+    [self applySettingsListButtonStyle:self.settingsLogsButton];
     [self.settingsLogsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLogsButton];
 
@@ -2265,7 +2439,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAboutButton setToolTip:@"Open application information"];
     [self.settingsAboutButton setTarget:self];
     [self.settingsAboutButton setAction:@selector(showAboutWindow:)];
-    [self applySkeuomorphicButtonStyle:self.settingsAboutButton isPrimary:NO];
+    [self applySettingsListButtonStyle:self.settingsAboutButton];
     [self.settingsAboutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsAboutButton];
 
@@ -2396,7 +2570,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [button setTitle:@"Close"];
     [button setTarget:self];
     [button setAction:@selector(closeUtilityWindow:)];
-    [self applySkeuomorphicButtonStyle:button isPrimary:NO];
+    [self applyUtilityButtonStyle:button];
     return button;
 }
 
@@ -2404,6 +2578,68 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([sender respondsToSelector:@selector(window)]) {
         [[sender window] close];
     }
+}
+
+- (void)showAppearanceWindow:(id)sender {
+    (void)sender;
+    if (!self.appearanceWindow) {
+        NSRect frame = NSMakeRect(0, 0, 480, 260);
+        NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                        styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                                          backing:NSBackingStoreBuffered
+                                                            defer:NO] autorelease];
+        [window setTitle:@"Appearance"];
+        [window setReleasedWhenClosed:NO];
+
+        TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
+        [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [window setContentView:contentView];
+
+        TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(30, 72, 420, 124)] autorelease];
+        [cardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [contentView addSubview:cardView];
+
+        NSTextField *titleField = [self labelWithFrame:NSMakeRect(34, 214, 220, 22)
+                                                  text:@"Appearance"
+                                                  font:[NSFont boldSystemFontOfSize:14.0]];
+        [titleField setAutoresizingMask:NSViewMinYMargin];
+        [contentView addSubview:titleField];
+
+        NSTextField *themeLabel = [self labelWithFrame:NSMakeRect(54, 142, 86, 22)
+                                                  text:@"Theme"
+                                                  font:[NSFont systemFontOfSize:13.0]];
+        [contentView addSubview:themeLabel];
+
+        NSPopUpButton *themePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(142, 136, 282, 30) pullsDown:NO] autorelease];
+        NSArray *themeIdentifiers = TGThemeIdentifiers();
+        NSUInteger themeIndex = 0;
+        for (themeIndex = 0; themeIndex < [themeIdentifiers count]; themeIndex++) {
+            NSString *themeIdentifier = [themeIdentifiers objectAtIndex:themeIndex];
+            [themePopUpButton addItemWithTitle:TGThemeDisplayNameForIdentifier(themeIdentifier)];
+            [[themePopUpButton lastItem] setRepresentedObject:themeIdentifier];
+        }
+        [themePopUpButton setTarget:self];
+        [themePopUpButton setAction:@selector(themeSelectionChanged:)];
+        [themePopUpButton setAutoresizingMask:NSViewMaxYMargin];
+        [contentView addSubview:themePopUpButton];
+        self.appearanceThemePopUpButton = themePopUpButton;
+
+        NSTextField *hintField = [self labelWithFrame:NSMakeRect(54, 98, 370, 22)
+                                                 text:@"Theme changes apply immediately."
+                                                 font:[NSFont systemFontOfSize:12.0]];
+        [self applyMutedLabelStyle:hintField];
+        [contentView addSubview:hintField];
+
+        NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(330, 22, 120, 30)];
+        [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+        [contentView addSubview:closeButton];
+
+        self.appearanceWindow = window;
+    }
+
+    [self selectThemePopUpItemForIdentifier:TGCurrentThemeIdentifier()];
+    [self.appearanceWindow center];
+    [self.appearanceWindow makeKeyAndOrderFront:nil];
 }
 
 - (void)showLogsWindow:(id)sender {
@@ -2417,7 +2653,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [window setTitle:@"Diagnostic Logs"];
         [window setReleasedWhenClosed:NO];
 
-        TGChromeView *contentView = [[[TGChromeView alloc] initWithFrame:frame] autorelease];
+        TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
         [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [window setContentView:contentView];
 
@@ -2449,7 +2685,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [checkButton setTitle:@"Check"];
         [checkButton setTarget:self];
         [checkButton setAction:@selector(checkTDLib:)];
-        [self applySkeuomorphicButtonStyle:checkButton isPrimary:NO];
+        [self applyUtilityButtonStyle:checkButton];
         [checkButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
         [contentView addSubview:checkButton];
         self.logsCheckButton = checkButton;
@@ -2480,7 +2716,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [window setTitle:@"About Telegraphica"];
         [window setReleasedWhenClosed:NO];
 
-        TGChromeView *contentView = [[[TGChromeView alloc] initWithFrame:frame] autorelease];
+        TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
         [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [window setContentView:contentView];
 
@@ -2544,8 +2780,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)themeSelectionChanged:(id)sender {
-    (void)sender;
-    NSMenuItem *selectedItem = [self.themePopUpButton selectedItem];
+    NSPopUpButton *sourcePopUpButton = [sender isKindOfClass:[NSPopUpButton class]] ? (NSPopUpButton *)sender : self.themePopUpButton;
+    NSMenuItem *selectedItem = [sourcePopUpButton selectedItem];
     NSString *themeIdentifier = [selectedItem representedObject];
     if (!TGThemeIdentifierIsValid(themeIdentifier)) {
         themeIdentifier = TGThemeIdentifierVKBlue;
@@ -2597,7 +2833,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.loadOlderMessagesButton visible:showChats];
     [self showView:self.selectedChatField visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
-    [self showView:self.sendLabel visible:showChats];
+    [self showView:self.sendLabel visible:NO];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
 
@@ -2616,14 +2852,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
     [self showView:self.settingsAccountCardView visible:NO];
-    [self showView:self.settingsThemeCardView visible:showSettings];
+    [self showView:self.settingsThemeCardView visible:NO];
     [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:NO];
     [self showView:self.settingsLibraryField visible:NO];
     [self showView:self.settingsStorageField visible:NO];
-    [self showView:self.settingsThemeLabel visible:showSettings];
-    [self showView:self.themePopUpButton visible:showSettings];
+    [self showView:self.settingsThemeLabel visible:NO];
+    [self showView:self.themePopUpButton visible:NO];
+    [self showView:self.settingsAppearanceButton visible:showSettings];
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
 
@@ -2697,7 +2934,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
 
     [self.drawerButton setFrame:NSMakeRect(railX + 5.0, railTop - 43.0, 34.0, 34.0)];
-    [self.accountBadgeView setFrame:NSMakeRect(railX + 14.0, railTop - 72.0, railWidth - 28.0, 60.0)];
+    CGFloat accountBadgeWidth = railWidth - 48.0;
+    if (accountBadgeWidth < 0.0) {
+        accountBadgeWidth = 0.0;
+    }
+    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, railTop - 112.0, accountBadgeWidth, 60.0)];
     [self.titleField setFont:[NSFont boldSystemFontOfSize:13.0]];
     [[self.titleField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self.titleField setFrame:NSMakeRect(railX + 9.0, railTop - 48.0, railWidth - 18.0, 18.0)];
@@ -2707,7 +2948,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     CGFloat navigationButtonHeight = 54.0;
     CGFloat navigationButtonGap = 8.0;
-    CGFloat navigationButtonY = railTop - 134.0;
+    CGFloat navigationButtonY = railTop - 184.0;
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
@@ -2782,16 +3023,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [bubbleColumn setWidth:bubbleWidth];
     }
 
-    CGFloat sendButtonWidth = (conversationWidth < 470.0) ? 78.0 : 88.0;
-    CGFloat sendFieldX = conversationX + 62.0;
+    CGFloat sendButtonWidth = 38.0;
+    CGFloat sendFieldX = conversationX + 14.0;
     CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
     CGFloat sendFieldWidth = sendButtonX - sendFieldX - 10.0;
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
     }
-    [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 46.0, 22.0)];
-    [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 26.0)];
-    [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 3.0, sendButtonWidth, 30.0)];
+    [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
+    [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
+    [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
 
     CGFloat panelTitleY = headerLabelY;
     CGFloat contentTop = mainTop - TGPanelHeaderHeight;
@@ -2843,21 +3084,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                themePopupWidth,
                                                30.0)];
 
-    CGFloat sessionCardY = themeCardY - 68.0;
-    [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, sessionCardY, groupedWidth, 86.0)];
-    CGFloat settingsButtonGap = 12.0;
-    CGFloat settingsButtonWidth = floor((groupedWidth - 44.0 - settingsButtonGap) / 2.0);
-    if (settingsButtonWidth < 136.0) {
-        settingsButtonWidth = groupedWidth - 44.0;
-        [self.settingsLogsButton setFrame:NSMakeRect(groupedX + 22.0, sessionCardY + 46.0, settingsButtonWidth, 30.0)];
-        [self.settingsAboutButton setFrame:NSMakeRect(groupedX + 22.0, sessionCardY + 10.0, settingsButtonWidth, 30.0)];
-    } else {
-        [self.settingsLogsButton setFrame:NSMakeRect(groupedX + 22.0, sessionCardY + 28.0, settingsButtonWidth, 34.0)];
-        [self.settingsAboutButton setFrame:NSMakeRect(groupedX + 22.0 + settingsButtonWidth + settingsButtonGap,
-                                                      sessionCardY + 28.0,
-                                                      settingsButtonWidth,
-                                                      34.0)];
-    }
+    CGFloat sessionCardHeight = 164.0;
+    CGFloat sessionCardY = contentTop - sessionCardHeight - 22.0;
+    [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, sessionCardY, groupedWidth, sessionCardHeight)];
+    CGFloat settingsButtonWidth = groupedWidth - 28.0;
+    CGFloat settingsButtonX = groupedX + 14.0;
+    [self.settingsAppearanceButton setFrame:NSMakeRect(settingsButtonX, sessionCardY + 110.0, settingsButtonWidth, 42.0)];
+    [self.settingsLogsButton setFrame:NSMakeRect(settingsButtonX, sessionCardY + 62.0, settingsButtonWidth, 42.0)];
+    [self.settingsAboutButton setFrame:NSMakeRect(settingsButtonX, sessionCardY + 14.0, settingsButtonWidth, 42.0)];
 
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
@@ -4840,6 +5074,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsStorageField release];
     [_settingsThemeLabel release];
     [_themePopUpButton release];
+    [_settingsAppearanceButton release];
     [_settingsLogsButton release];
     [_settingsAboutButton release];
     [_logoutButton release];
@@ -4861,10 +5096,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_lastLogSection release];
     [_logsWindow close];
     [_aboutWindow close];
+    [_appearanceWindow close];
     [_logsWindow release];
     [_aboutWindow release];
+    [_appearanceWindow release];
     [_logsWindowDetailsView release];
     [_logsCheckButton release];
+    [_appearanceThemePopUpButton release];
     [super dealloc];
 }
 
