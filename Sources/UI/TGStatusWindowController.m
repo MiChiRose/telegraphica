@@ -1044,10 +1044,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     BOOL selected = [self isHighlighted];
     if (selected) {
-        NSRect selectedRect = NSInsetRect(cellFrame, 2.0, 2.0);
+        NSRect selectedRect = NSInsetRect(cellFrame, 1.0, 1.0);
         NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:selectedRect
-                                                                     xRadius:6.0
-                                                                     yRadius:6.0];
+                                                                     xRadius:8.0
+                                                                     yRadius:8.0];
         [TGClassicSelectedRowColor() set];
         [selectedPath fill];
     }
@@ -1106,7 +1106,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [unreadPath fill];
 
         NSRect unreadTextRect = NSMakeRect(NSMinX(unreadRect),
-                                           NSMinY(unreadRect) + floor((NSHeight(unreadRect) - unreadSize.height) / 2.0) - 2.0,
+                                           NSMinY(unreadRect) + floor((NSHeight(unreadRect) - unreadSize.height) / 2.0) + 2.0,
                                            NSWidth(unreadRect),
                                            unreadSize.height + 2.0);
         NSMutableParagraphStyle *unreadParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -2665,6 +2665,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.messageTableView setTarget:self];
     [self.messageTableView setAction:@selector(openMessageLink:)];
     [self.messageTableView setRowHeight:52.0];
+    [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self applySkeuomorphicTableStyle:self.messageTableView];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
@@ -3671,7 +3672,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
     CGFloat headerButtonSize = 30.0;
-    CGFloat sectionHeaderVerticalOffset = 0.0;
+    CGFloat sectionHeaderVerticalOffset = 2.0;
     CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVerticalOffset;
     CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVerticalOffset;
     [self.chatsLabel setFrame:NSMakeRect(mainX + 16.0, headerLabelY, 88.0, 20.0)];
