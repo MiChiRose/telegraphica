@@ -7,6 +7,9 @@
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
 static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
+static NSUInteger const TGMessagePreviewInitialLimit = 20;
+static NSUInteger const TGMessagePrefillMinimumRows = 20;
+static NSUInteger const TGMessagePrefillMaxAttempts = 3;
 static CGFloat const TGPanelCornerRadius = 10.0;
 
 static long long TGMessageSortValue(id value) {
@@ -291,8 +294,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 - (void)applySkeuomorphicTableStyle:(NSTableView *)tableView {
     [tableView setBackgroundColor:[NSColor colorWithCalibratedRed:0.98 green:0.98 blue:0.96 alpha:1.0]];
-    [tableView setGridStyleMask:NSTableViewSolidVerticalGridLineMask | NSTableViewSolidHorizontalGridLineMask];
-    [tableView setGridColor:[NSColor colorWithCalibratedRed:0.72 green:0.70 blue:0.65 alpha:1.0]];
+    [tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+    [tableView setGridColor:[NSColor colorWithCalibratedRed:0.78 green:0.76 blue:0.70 alpha:1.0]];
     [tableView setUsesAlternatingRowBackgroundColors:NO];
     [tableView setIntercellSpacing:NSMakeSize(8.0, 2.0)];
     [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleSourceList];
@@ -494,7 +497,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.messageTableView setDelegate:self];
     [self.messageTableView setAllowsColumnReordering:NO];
     [self.messageTableView setAllowsMultipleSelection:NO];
-    [self.messageTableView setRowHeight:24.0];
+    [self.messageTableView setRowHeight:26.0];
     [self applySkeuomorphicTableStyle:self.messageTableView];
 
     NSTableColumn *dateColumn = [[[NSTableColumn alloc] initWithIdentifier:@"date"] autorelease];
@@ -1016,13 +1019,20 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 }
 
 - (NSNumber *)oldestLoadedMessageID {
+    long long minimumMessageID = 0;
     NSUInteger index = 0;
     for (index = 0; index < [self.messageItems count]; index++) {
         TGMessageItem *item = [self.messageItems objectAtIndex:(NSUInteger)index];
         id messageID = [item messageID];
         if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
-            return [NSNumber numberWithLongLong:[messageID longLongValue]];
+            long long value = [messageID longLongValue];
+            if (minimumMessageID == 0 || value < minimumMessageID) {
+                minimumMessageID = value;
+            }
         }
+    }
+    if (minimumMessageID > 0) {
+        return [NSNumber numberWithLongLong:minimumMessageID];
     }
     return nil;
 }
@@ -1084,12 +1094,15 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     }
 }
 
-- (NSUInteger)appendOlderMessageItems:(NSArray *)items {
+- (NSUInteger)appendOlderMessageItems:(NSArray *)items preservingVisiblePosition:(BOOL)preserveVisiblePosition {
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
-    NSPoint visibleOrigin = [[self.messageScrollView contentView] bounds].origin;
-    NSInteger firstVisibleRow = [self.messageTableView rowAtPoint:visibleOrigin];
-    if (firstVisibleRow < 0) {
-        firstVisibleRow = 0;
+    NSInteger firstVisibleRow = 0;
+    if (preserveVisiblePosition) {
+        NSPoint visibleOrigin = [[self.messageScrollView contentView] bounds].origin;
+        firstVisibleRow = [self.messageTableView rowAtPoint:visibleOrigin];
+        if (firstVisibleRow < 0) {
+            firstVisibleRow = 0;
+        }
     }
     NSMutableSet *messageIDs = [NSMutableSet set];
     NSUInteger index = 0;
@@ -1125,13 +1138,21 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     [self.messageTableView reloadData];
     if (added > 0) {
-        NSUInteger targetRow = (NSUInteger)firstVisibleRow + added;
-        if (targetRow >= [self.messageItems count]) {
-            targetRow = [self.messageItems count] - 1;
+        if (preserveVisiblePosition) {
+            NSUInteger targetRow = (NSUInteger)firstVisibleRow + added;
+            if (targetRow >= [self.messageItems count]) {
+                targetRow = [self.messageItems count] - 1;
+            }
+            [self.messageTableView scrollRowToVisible:targetRow];
+        } else {
+            [self scrollMessagesToNewestIfAvailable];
         }
-        [self.messageTableView scrollRowToVisible:targetRow];
     }
     return added;
+}
+
+- (NSUInteger)appendOlderMessageItems:(NSArray *)items {
+    return [self appendOlderMessageItems:items preservingVisiblePosition:YES];
 }
 
 - (BOOL)isChatListNearBottom {
@@ -1209,6 +1230,34 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     return (distanceFromBottom <= 48.0);
 }
 
+- (BOOL)isMessageHistoryScrollable {
+    if ([self.messageItems count] == 0) {
+        return NO;
+    }
+
+    NSClipView *clipView = [self.messageScrollView contentView];
+    NSView *documentView = [self.messageScrollView documentView];
+    if (!clipView || !documentView) {
+        return NO;
+    }
+
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    CGFloat estimatedRowsHeight = ([self.messageTableView rowHeight] + [self.messageTableView intercellSpacing].height) * (CGFloat)[self.messageItems count];
+    CGFloat documentHeight = NSHeight(documentBounds);
+    if (estimatedRowsHeight > documentHeight) {
+        documentHeight = estimatedRowsHeight;
+    }
+    return (documentHeight > (NSHeight(visibleRect) + 16.0));
+}
+
+- (BOOL)messageHistoryNeedsPrefill {
+    if ([self.messageItems count] == 0 || self.olderMessagesExhausted) {
+        return NO;
+    }
+    return ([self.messageItems count] < TGMessagePrefillMinimumRows || ![self isMessageHistoryScrollable]);
+}
+
 - (BOOL)isMessageHistoryNearTop {
     if ([self.messageItems count] == 0 || self.olderMessagesExhausted) {
         return NO;
@@ -1221,11 +1270,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     }
 
     NSRect visibleRect = [clipView bounds];
-    NSRect documentBounds = [documentView bounds];
-    if (NSHeight(documentBounds) <= (NSHeight(visibleRect) + 16.0)) {
+    if (![self isMessageHistoryScrollable]) {
         return NO;
     }
 
+    NSRect documentBounds = [documentView bounds];
     CGFloat distanceFromTop = NSMinY(visibleRect) - NSMinY(documentBounds);
     return (distanceFromTop <= 48.0);
 }
@@ -1255,6 +1304,80 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     self.autoOlderMessagesLoadArmed = NO;
     [self reloadOlderMessagesInteractive];
+}
+
+- (void)prefillOlderMessagesIfNeededWithAttemptsRemaining:(NSUInteger)attemptsRemaining {
+    if (attemptsRemaining == 0 ||
+        self.controlsBusy ||
+        self.backgroundMessageRefreshInFlight ||
+        ![self.currentAuthState isEqualToString:@"ready"] ||
+        !self.selectedChatID ||
+        ![self messageHistoryNeedsPrefill]) {
+        return;
+    }
+
+    NSNumber *anchorMessageID = [[self oldestLoadedMessageID] retain];
+    if (!anchorMessageID) {
+        [anchorMessageID release];
+        return;
+    }
+
+    NSNumber *chatIDCopy = [self.selectedChatID retain];
+    self.backgroundMessageRefreshInFlight = YES;
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *messageError = nil;
+        NSArray *items = [client messagePreviewItemsForChatID:chatIDCopy
+                                                fromMessageID:anchorMessageID
+                                                        limit:TGMessagePreviewInitialLimit
+                                                      timeout:8.0
+                                                        error:&messageError];
+        BOOL hadMessageError = (messageError != nil);
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
+        NSArray *itemsCopy = [items copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+            NSUInteger added = 0;
+            if (selectionStillCurrent && itemsCopy) {
+                added = [self appendOlderMessageItems:itemsCopy preservingVisiblePosition:NO];
+                if (added == 0) {
+                    self.olderMessagesExhausted = YES;
+                }
+                if (added > 0) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib messages: prefilled %lu older previews", (unsigned long)added]];
+                }
+            } else if (selectionStillCurrent && hadMessageError) {
+                self.autoOlderMessagesLoadArmed = YES;
+            }
+
+            self.backgroundMessageRefreshInFlight = NO;
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            } else {
+                [self updateAuthControlsForState:self.currentAuthState];
+            }
+
+            if (selectionStillCurrent &&
+                added > 0 &&
+                attemptsRemaining > 1 &&
+                [self messageHistoryNeedsPrefill]) {
+                [self prefillOlderMessagesIfNeededWithAttemptsRemaining:(attemptsRemaining - 1)];
+            } else {
+                [self handlePendingLiveRefreshesIfPossible];
+            }
+
+            [itemsCopy release];
+            [authorizationState release];
+            [chatIDCopy release];
+            [anchorMessageID release];
+        });
+
+        [client release];
+        [pool drain];
+    });
 }
 
 - (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection {
@@ -1368,7 +1491,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *messageError = nil;
-        NSArray *items = [client recentMessagePreviewItemsForChatID:chatIDCopy limit:20 timeout:8.0 error:&messageError];
+        NSArray *items = [client recentMessagePreviewItemsForChatID:chatIDCopy limit:TGMessagePreviewInitialLimit timeout:8.0 error:&messageError];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *messageErrorMessage = [[messageError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];
@@ -1397,13 +1520,18 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                 }
                 [[TGLogger sharedLogger] log:@"TDLib message preview load failed."];
             }
-            if ([authorizationState length] > 0) {
-                [self updateAuthControlsForState:authorizationState];
-            }
+            BOOL shouldPrefillOlderMessages = (selectionStillCurrent && itemsCopy && [self messageHistoryNeedsPrefill]);
             if (interactive) {
                 [self setControlsBusy:NO];
             } else {
                 self.backgroundMessageRefreshInFlight = NO;
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            if (shouldPrefillOlderMessages) {
+                [self prefillOlderMessagesIfNeededWithAttemptsRemaining:TGMessagePrefillMaxAttempts];
+            } else if (!interactive) {
                 [self handlePendingLiveRefreshesIfPossible];
             }
             [itemsCopy release];
@@ -1444,7 +1572,11 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *messageError = nil;
-        NSArray *items = [client messagePreviewItemsForChatID:chatIDCopy fromMessageID:anchorMessageID limit:20 timeout:8.0 error:&messageError];
+        NSArray *items = [client messagePreviewItemsForChatID:chatIDCopy
+                                                fromMessageID:anchorMessageID
+                                                        limit:TGMessagePreviewInitialLimit
+                                                      timeout:8.0
+                                                        error:&messageError];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
         NSString *messageErrorMessage = [[messageError localizedDescription] copy];
         NSArray *itemsCopy = [items copy];
@@ -1455,7 +1587,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                 [self appendDetail:@"TDLib messages: ignored stale older-history result for previous chat selection."];
             } else if (itemsCopy) {
                 NSUInteger added = [self appendOlderMessageItems:itemsCopy];
-                if (added == 0 || [itemsCopy count] < 20) {
+                if (added == 0) {
                     self.olderMessagesExhausted = YES;
                 }
                 if (added == 0) {
