@@ -19,36 +19,362 @@ static NSString * const TGSectionSettings = @"settings";
 static NSString * const TGSectionAbout = @"about";
 static NSString * const TGSectionLogs = @"logs";
 
+static NSString * const TGThemeDefaultsKey = @"TelegraphicaThemeIdentifier";
+static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
+static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
+static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
+static NSString * const TGThemeIdentifierIceNavy = @"ice-navy";
+static NSString * const TGThemeIdentifierRubyObsidian = @"ruby-obsidian";
+static NSString * const TGThemeIdentifierEggshellBurgundy = @"eggshell-burgundy";
+static NSString * const TGThemeIdentifierMelonOlive = @"melon-olive";
+
+typedef struct {
+    CGFloat red;
+    CGFloat green;
+    CGFloat blue;
+} TGRGBColor;
+
+typedef struct {
+    TGRGBColor window;
+    TGRGBColor panel;
+    TGRGBColor header;
+    TGRGBColor tablePaper;
+    TGRGBColor ink;
+    TGRGBColor mutedInk;
+    TGRGBColor railStroke;
+    TGRGBColor headerSeparator;
+    TGRGBColor panelStroke;
+    TGRGBColor navigationSelected;
+    TGRGBColor navigationHighlighted;
+    TGRGBColor navigationNormal;
+    TGRGBColor navigationSelectedStroke;
+    TGRGBColor navigationNormalStroke;
+    TGRGBColor navigationText;
+    TGRGBColor navigationMutedText;
+    TGRGBColor selectedRow;
+    TGRGBColor selectedRowText;
+    TGRGBColor unreadText;
+    TGRGBColor outgoingBubble;
+    TGRGBColor incomingBubble;
+    TGRGBColor outgoingBubbleStroke;
+    TGRGBColor incomingBubbleStroke;
+    TGRGBColor timeText;
+    TGRGBColor tableGrid;
+    TGRGBColor tableHeader;
+    TGRGBColor link;
+} TGThemePalette;
+
+static NSString *TGActiveThemeIdentifier = nil;
+
+static TGRGBColor TGRGBMake(NSUInteger hex) {
+    TGRGBColor color;
+    color.red = (CGFloat)((hex >> 16) & 0xff) / 255.0;
+    color.green = (CGFloat)((hex >> 8) & 0xff) / 255.0;
+    color.blue = (CGFloat)(hex & 0xff) / 255.0;
+    return color;
+}
+
+static NSColor *TGColorFromRGB(TGRGBColor color) {
+    return [NSColor colorWithCalibratedRed:color.red green:color.green blue:color.blue alpha:1.0];
+}
+
+static NSColor *TGColorFromRGBWithAlpha(TGRGBColor color, CGFloat alpha) {
+    return [NSColor colorWithCalibratedRed:color.red green:color.green blue:color.blue alpha:alpha];
+}
+
+static NSArray *TGThemeIdentifiers(void) {
+    return [NSArray arrayWithObjects:
+            TGThemeIdentifierVKBlue,
+            TGThemeIdentifierCoffee,
+            TGThemeIdentifierCoralPlum,
+            TGThemeIdentifierIceNavy,
+            TGThemeIdentifierRubyObsidian,
+            TGThemeIdentifierEggshellBurgundy,
+            TGThemeIdentifierMelonOlive,
+            nil];
+}
+
+static BOOL TGThemeIdentifierIsValid(NSString *identifier) {
+    return (identifier && [TGThemeIdentifiers() containsObject:identifier]);
+}
+
+static NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
+    if ([identifier isEqualToString:TGThemeIdentifierCoffee]) {
+        return @"Coffee & Brass";
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierCoralPlum]) {
+        return @"Electric Coral / Deep Plum";
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierIceNavy]) {
+        return @"Ice Blue / Deep Navy";
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierRubyObsidian]) {
+        return @"Neon Ruby / Obsidian";
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierEggshellBurgundy]) {
+        return @"Eggshell Cream / Burgundy";
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierMelonOlive]) {
+        return @"Soft Melon / Olive Slate";
+    }
+    return @"VK Blue";
+}
+
+static TGThemePalette TGThemePaletteMake(NSUInteger window,
+                                         NSUInteger panel,
+                                         NSUInteger header,
+                                         NSUInteger tablePaper,
+                                         NSUInteger ink,
+                                         NSUInteger mutedInk,
+                                         NSUInteger line,
+                                         NSUInteger selectedRow,
+                                         NSUInteger selectedRowText,
+                                         NSUInteger unreadText,
+                                         NSUInteger outgoingBubble,
+                                         NSUInteger incomingBubble,
+                                         NSUInteger outgoingBubbleStroke,
+                                         NSUInteger incomingBubbleStroke,
+                                         NSUInteger timeText,
+                                         NSUInteger tableHeader,
+                                         NSUInteger link,
+                                         NSUInteger navigationText,
+                                         NSUInteger navigationMutedText) {
+    TGThemePalette palette;
+    palette.window = TGRGBMake(window);
+    palette.panel = TGRGBMake(panel);
+    palette.header = TGRGBMake(header);
+    palette.tablePaper = TGRGBMake(tablePaper);
+    palette.ink = TGRGBMake(ink);
+    palette.mutedInk = TGRGBMake(mutedInk);
+    palette.railStroke = TGRGBMake(line);
+    palette.headerSeparator = TGRGBMake(window);
+    palette.panelStroke = TGRGBMake(line);
+    palette.navigationSelected = TGRGBMake(header);
+    palette.navigationHighlighted = TGRGBMake(line);
+    palette.navigationNormal = TGRGBMake(window);
+    palette.navigationSelectedStroke = TGRGBMake(window);
+    palette.navigationNormalStroke = TGRGBMake(line);
+    palette.navigationText = TGRGBMake(navigationText);
+    palette.navigationMutedText = TGRGBMake(navigationMutedText);
+    palette.selectedRow = TGRGBMake(selectedRow);
+    palette.selectedRowText = TGRGBMake(selectedRowText);
+    palette.unreadText = TGRGBMake(unreadText);
+    palette.outgoingBubble = TGRGBMake(outgoingBubble);
+    palette.incomingBubble = TGRGBMake(incomingBubble);
+    palette.outgoingBubbleStroke = TGRGBMake(outgoingBubbleStroke);
+    palette.incomingBubbleStroke = TGRGBMake(incomingBubbleStroke);
+    palette.timeText = TGRGBMake(timeText);
+    palette.tableGrid = TGRGBMake(line);
+    palette.tableHeader = TGRGBMake(tableHeader);
+    palette.link = TGRGBMake(link);
+    return palette;
+}
+
+static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
+    if ([identifier isEqualToString:TGThemeIdentifierCoffee]) {
+        return TGThemePaletteMake(0x33291f, 0xe7ddc6, 0x6a5437, 0xf5ecd8, 0x21170f, 0x6b563b,
+                                  0x92734a, 0xd8bd83, 0x20160e, 0x7a5524, 0xd7b46e, 0xfffbf1,
+                                  0x9a7440, 0xc8b899, 0x6c5a44, 0xead8b4, 0x6f4b22, 0xfffbef, 0xf0dcc0);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierCoralPlum]) {
+        return TGThemePaletteMake(0x22092c, 0xf7e7e5, 0xc94e42, 0xfff7f4, 0x22092c, 0x775060,
+                                  0xd38378, 0xf7c0b5, 0x22092c, 0xa23d36, 0xf3aa9e, 0xfffbf8,
+                                  0xc46f64, 0xdfc7c0, 0x775060, 0xf4d6d0, 0x9d392f, 0xfff7f0, 0xf8d9d2);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierIceNavy]) {
+        return TGThemePaletteMake(0x141a29, 0xeef4ff, 0x536e99, 0xf9fbff, 0x141a29, 0x536176,
+                                  0x9aabc4, 0xd6e4ff, 0x141a29, 0x355780, 0xd6e4ff, 0xffffff,
+                                  0x7895c1, 0xc6d1e2, 0x526174, 0xdfe9fb, 0x315f96, 0xf7fbff, 0xdce8ff);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierRubyObsidian]) {
+        return TGThemePaletteMake(0x0d0c1d, 0xf4edf2, 0xb50944, 0xfff8fb, 0x0d0c1d, 0x62546a,
+                                  0xc87396, 0xffb9cf, 0x160716, 0xb50944, 0xffb9cf, 0xffffff,
+                                  0xcc6c91, 0xd7c4cf, 0x62546a, 0xf5d7e2, 0xb50944, 0xfff5fa, 0xf7d7e4);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierEggshellBurgundy]) {
+        return TGThemePaletteMake(0x4a0010, 0xfff5e4, 0x71152a, 0xfffbf1, 0x4a0010, 0x7a4c53,
+                                  0xb38673, 0xf4d9c3, 0x4a0010, 0x7a1228, 0xf0d0b7, 0xfffdf7,
+                                  0xba806b, 0xe0cbb8, 0x7a4c53, 0xf6e3cb, 0x7a1228, 0xfffbf1, 0xf8dfc9);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierMelonOlive]) {
+        return TGThemePaletteMake(0x3c4826, 0xfff1cc, 0x5a6a36, 0xfff7df, 0x263018, 0x687247,
+                                  0xa79562, 0xffd289, 0x263018, 0x5a6a36, 0xffd289, 0xfffdf3,
+                                  0xbc8f48, 0xd7c7a2, 0x687247, 0xf6dda1, 0x52612f, 0xfff7df, 0xf5dfb2);
+    }
+    return TGThemePaletteMake(0x182537, 0xecf3fb, 0x3c5d8a, 0xf8fbfe, 0x0e141d, 0x4e637c,
+                              0x8ca6c4, 0xb3cce9, 0x091321, 0x305d96, 0xc2ddf8, 0xffffff,
+                              0x5b88bd, 0xaabace, 0x465d77, 0xd6e4f4, 0x2d5d96, 0xf8fbff, 0xdce9f7);
+}
+
+static void TGSetActiveThemeIdentifier(NSString *identifier) {
+    NSString *validIdentifier = TGThemeIdentifierIsValid(identifier) ? identifier : TGThemeIdentifierVKBlue;
+    if (TGActiveThemeIdentifier && [TGActiveThemeIdentifier isEqualToString:validIdentifier]) {
+        return;
+    }
+    [TGActiveThemeIdentifier release];
+    TGActiveThemeIdentifier = [validIdentifier copy];
+}
+
+static NSString *TGCurrentThemeIdentifier(void) {
+    if (!TGActiveThemeIdentifier) {
+        TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
+    }
+    return TGActiveThemeIdentifier ? TGActiveThemeIdentifier : TGThemeIdentifierVKBlue;
+}
+
+static TGThemePalette TGCurrentThemePalette(void) {
+    return TGThemePaletteForIdentifier(TGCurrentThemeIdentifier());
+}
+
 static NSColor *TGClassicWindowBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.095 green:0.145 blue:0.215 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.window);
 }
 
 static NSColor *TGClassicPanelBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.925 green:0.952 blue:0.982 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.panel);
 }
 
 static NSColor *TGClassicHeaderBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.235 green:0.365 blue:0.540 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.header);
 }
 
 static NSColor *TGClassicTablePaperColor(void) {
-    return [NSColor colorWithCalibratedRed:0.972 green:0.984 blue:0.996 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.tablePaper);
 }
 
 static NSColor *TGClassicInkColor(void) {
-    return [NSColor colorWithCalibratedRed:0.055 green:0.080 blue:0.115 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.ink);
 }
 
 static NSColor *TGClassicMutedInkColor(void) {
-    return [NSColor colorWithCalibratedRed:0.305 green:0.390 blue:0.485 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.mutedInk);
 }
 
 static NSColor *TGClassicOutgoingBubbleBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.760 green:0.865 blue:0.972 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.outgoingBubble);
 }
 
 static NSColor *TGClassicIncomingBubbleBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.995 green:0.998 blue:1.0 alpha:1.0];
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.incomingBubble);
+}
+
+static NSColor *TGClassicRailStrokeColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.railStroke);
+}
+
+static NSColor *TGClassicHeaderSeparatorColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.headerSeparator);
+}
+
+static NSColor *TGClassicPanelStrokeColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.panelStroke);
+}
+
+static NSColor *TGClassicNavigationSelectedColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationSelected, alpha);
+}
+
+static NSColor *TGClassicNavigationHighlightedColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationHighlighted, alpha);
+}
+
+static NSColor *TGClassicNavigationNormalColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationNormal, alpha);
+}
+
+static NSColor *TGClassicNavigationSelectedStrokeColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationSelectedStroke, alpha);
+}
+
+static NSColor *TGClassicNavigationNormalStrokeColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationNormalStroke, alpha);
+}
+
+static NSColor *TGClassicNavigationTextColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationText, alpha);
+}
+
+static NSColor *TGClassicNavigationMutedTextColor(CGFloat alpha) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.navigationMutedText, alpha);
+}
+
+static NSColor *TGClassicSelectedRowColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.selectedRow);
+}
+
+static NSColor *TGClassicSelectedRowTextColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.selectedRowText);
+}
+
+static NSColor *TGClassicUnreadTextColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.unreadText);
+}
+
+static NSColor *TGClassicOutgoingBubbleStrokeColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.outgoingBubbleStroke, 0.85);
+}
+
+static NSColor *TGClassicIncomingBubbleStrokeColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.incomingBubbleStroke, 0.72);
+}
+
+static NSColor *TGClassicTimeTextColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGBWithAlpha(palette.timeText, 1.0);
+}
+
+static NSColor *TGClassicTableGridColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.tableGrid);
+}
+
+static NSColor *TGClassicTableHeaderColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.tableHeader);
+}
+
+static NSColor *TGClassicLinkColor(void) {
+    TGThemePalette palette = TGCurrentThemePalette();
+    return TGColorFromRGB(palette.link);
+}
+
+static NSColor *TGClassicHeaderTextColor(CGFloat alpha) {
+    if ([TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierCoralPlum]) {
+        TGThemePalette palette = TGCurrentThemePalette();
+        return TGColorFromRGBWithAlpha(palette.ink, alpha);
+    }
+    return [NSColor colorWithCalibratedWhite:0.99 alpha:alpha];
+}
+
+static NSColor *TGClassicHeaderDetailTextColor(CGFloat alpha) {
+    if ([TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierCoralPlum]) {
+        TGThemePalette palette = TGCurrentThemePalette();
+        return TGColorFromRGBWithAlpha(palette.ink, alpha);
+    }
+    return [NSColor colorWithCalibratedWhite:0.94 alpha:alpha];
 }
 
 static NSString *TGCurrentYearString(void) {
@@ -161,7 +487,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [TGClassicWindowBottomColor() set];
     [railPath fill];
 
-    [[NSColor colorWithCalibratedRed:0.245 green:0.355 blue:0.495 alpha:1.0] set];
+    [TGClassicRailStrokeColor() set];
     [railPath setLineWidth:1.0];
     [railPath stroke];
 }
@@ -192,14 +518,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                    TGPanelHeaderHeight);
     [TGClassicHeaderBottomColor() set];
     NSRectFill(headerRect);
-    [[NSColor colorWithCalibratedRed:0.125 green:0.215 blue:0.340 alpha:1.0] set];
+    [TGClassicHeaderSeparatorColor() set];
     NSRectFill(NSMakeRect(NSMinX(headerRect), NSMinY(headerRect), NSWidth(headerRect), 1.0));
     [NSGraphicsContext restoreGraphicsState];
 
     NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(panelBounds, 1.0, 1.0)
                                                                xRadius:(TGPanelCornerRadius - 1.0)
                                                                yRadius:(TGPanelCornerRadius - 1.0)];
-    [[NSColor colorWithCalibratedRed:0.545 green:0.650 blue:0.770 alpha:1.0] set];
+    [TGClassicPanelStrokeColor() set];
     [innerPath setLineWidth:1.0];
     [innerPath stroke];
 }
@@ -226,25 +552,24 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     NSColor *fillColor = nil;
     if (selected) {
-        fillColor = [NSColor colorWithCalibratedRed:0.315 green:0.505 blue:0.735 alpha:alpha];
+        fillColor = TGClassicNavigationSelectedColor(alpha);
     } else if (highlighted) {
-        fillColor = [NSColor colorWithCalibratedRed:0.150 green:0.250 blue:0.380 alpha:alpha];
+        fillColor = TGClassicNavigationHighlightedColor(alpha);
     } else {
-        fillColor = [NSColor colorWithCalibratedRed:0.090 green:0.145 blue:0.225 alpha:alpha];
+        fillColor = TGClassicNavigationNormalColor(alpha);
     }
 
     [fillColor set];
     [path fill];
 
-    NSColor *strokeColor = selected ? [NSColor colorWithCalibratedRed:0.120 green:0.230 blue:0.365 alpha:0.95]
-                                    : [NSColor colorWithCalibratedRed:0.255 green:0.360 blue:0.500 alpha:0.75];
+    NSColor *strokeColor = selected ? TGClassicNavigationSelectedStrokeColor(0.95) : TGClassicNavigationNormalStrokeColor(0.75);
     [strokeColor set];
     [path setLineWidth:1.0];
     [path stroke];
 
     NSString *title = [self title] ? [self title] : @"";
     NSFont *font = selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0];
-    NSColor *textColor = selected ? [NSColor colorWithCalibratedWhite:0.99 alpha:alpha] : [NSColor colorWithCalibratedRed:0.860 green:0.910 blue:0.970 alpha:alpha];
+    NSColor *textColor = selected ? TGClassicNavigationTextColor(alpha) : TGClassicNavigationMutedTextColor(alpha);
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 font, NSFontAttributeName,
                                 textColor, NSForegroundColorAttributeName,
@@ -339,8 +664,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [bubbleFillColor set];
     [bubblePath fill];
 
-    NSColor *strokeColor = outgoing ? [NSColor colorWithCalibratedRed:0.355 green:0.535 blue:0.740 alpha:0.85]
-                                    : [NSColor colorWithCalibratedRed:0.665 green:0.730 blue:0.805 alpha:0.70];
+    NSColor *strokeColor = outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor();
     [strokeColor set];
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
@@ -357,7 +681,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if ([timeString length] > 0) {
         NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                         [NSFont systemFontOfSize:9.0], NSFontAttributeName,
-                                        [NSColor colorWithCalibratedRed:0.275 green:0.365 blue:0.465 alpha:0.72], NSForegroundColorAttributeName,
+                                        TGClassicTimeTextColor(), NSForegroundColorAttributeName,
                                         nil];
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - 12.0,
@@ -423,6 +747,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, retain) NSTextField *settingsStateField;
 @property (nonatomic, retain) NSTextField *settingsLibraryField;
 @property (nonatomic, retain) NSTextField *settingsStorageField;
+@property (nonatomic, retain) NSTextField *settingsThemeLabel;
+@property (nonatomic, retain) NSPopUpButton *themePopUpButton;
 @property (nonatomic, retain) NSButton *logoutButton;
 @property (nonatomic, retain) NSImageView *aboutIconView;
 @property (nonatomic, retain) NSTextField *aboutTitleField;
@@ -499,6 +825,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize settingsStateField = _settingsStateField;
 @synthesize settingsLibraryField = _settingsLibraryField;
 @synthesize settingsStorageField = _settingsStorageField;
+@synthesize settingsThemeLabel = _settingsThemeLabel;
+@synthesize themePopUpButton = _themePopUpButton;
 @synthesize logoutButton = _logoutButton;
 @synthesize aboutIconView = _aboutIconView;
 @synthesize aboutTitleField = _aboutTitleField;
@@ -539,6 +867,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if (self) {
         [[self window] setDelegate:self];
         self.client = [[[TGTDLibClient alloc] init] autorelease];
+        TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
@@ -570,7 +899,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if (!field) {
         return;
     }
-    [field setTextColor:[NSColor colorWithCalibratedWhite:0.98 alpha:1.0]];
+    [field setTextColor:TGClassicHeaderTextColor(1.0)];
     [field setFont:[NSFont boldSystemFontOfSize:12.0]];
 }
 
@@ -578,7 +907,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if (!field) {
         return;
     }
-    [field setTextColor:[NSColor colorWithCalibratedWhite:0.92 alpha:1.0]];
+    [field setTextColor:TGClassicHeaderDetailTextColor(1.0)];
     [field setFont:[NSFont systemFontOfSize:12.0]];
 }
 
@@ -622,7 +951,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 - (void)applySkeuomorphicTableStyle:(NSTableView *)tableView {
     [tableView setBackgroundColor:TGClassicTablePaperColor()];
     [tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
-    [tableView setGridColor:[NSColor colorWithCalibratedRed:0.755 green:0.820 blue:0.900 alpha:1.0]];
+    [tableView setGridColor:TGClassicTableGridColor()];
     [tableView setUsesAlternatingRowBackgroundColors:NO];
     [tableView setIntercellSpacing:NSMakeSize(8.0, 1.0)];
     [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
@@ -636,7 +965,88 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [headerCell setTextColor:TGClassicMutedInkColor()];
     [headerCell setAlignment:NSLeftTextAlignment];
     [headerCell setDrawsBackground:YES];
-    [headerCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.840 green:0.895 blue:0.955 alpha:1.0]];
+    [headerCell setBackgroundColor:TGClassicTableHeaderColor()];
+}
+
+- (void)selectThemePopUpItemForIdentifier:(NSString *)identifier {
+    if (!self.themePopUpButton) {
+        return;
+    }
+    NSArray *items = [self.themePopUpButton itemArray];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        NSMenuItem *item = [items objectAtIndex:index];
+        if ([[item representedObject] isEqual:identifier]) {
+            [self.themePopUpButton selectItem:item];
+            return;
+        }
+    }
+    [self.themePopUpButton selectItemAtIndex:0];
+}
+
+- (void)refreshThemeAppearance {
+    [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
+    [self applyPanelHeaderDetailStyle:self.statusField];
+    [self applyPanelHeaderLabelStyle:self.diagnosticsLabel];
+    [self applyPanelHeaderLabelStyle:self.chatsLabel];
+    [self applyPanelHeaderLabelStyle:self.messagesLabel];
+    [self applyPanelHeaderLabelStyle:self.profileTitleField];
+    [self applyPanelHeaderLabelStyle:self.settingsTitleField];
+    [self applyPanelHeaderDetailStyle:self.selectedChatField];
+
+    [self.loginTitleField setTextColor:TGClassicInkColor()];
+    [self.sendLabel setTextColor:TGClassicInkColor()];
+    [self.profileNameField setTextColor:TGClassicInkColor()];
+    [self.settingsStateField setTextColor:TGClassicInkColor()];
+    [self.aboutTitleField setTextColor:TGClassicInkColor()];
+    [self applyMutedLabelStyle:self.loginHintField];
+    [self applyMutedLabelStyle:self.authLabel];
+    [self applyMutedLabelStyle:self.authStateField];
+    [self applyMutedLabelStyle:self.profileUsernameField];
+    [self applyMutedLabelStyle:self.profileIDField];
+    [self applyMutedLabelStyle:self.profileStateField];
+    [self applyMutedLabelStyle:self.settingsLibraryField];
+    [self applyMutedLabelStyle:self.settingsStorageField];
+    [self applyMutedLabelStyle:self.settingsThemeLabel];
+    [self applyMutedLabelStyle:self.aboutVersionField];
+    [self applyMutedLabelStyle:self.aboutCopyrightField];
+    [self.aboutLinkField setTextColor:TGClassicLinkColor()];
+
+    [self applySkeuomorphicTextFieldStyle:self.authTextField];
+    [self applySkeuomorphicTextFieldStyle:self.authSecureField];
+    [self applySkeuomorphicTextFieldStyle:self.sendTextField];
+    [self applySkeuomorphicScrollStyle:self.detailsScrollView];
+    [self applySkeuomorphicScrollStyle:self.chatScrollView];
+    [self applySkeuomorphicScrollStyle:self.messageScrollView];
+    [self.detailsView setTextColor:TGClassicMutedInkColor()];
+    [self.detailsView setBackgroundColor:TGClassicTablePaperColor()];
+
+    [self applySkeuomorphicTableStyle:self.chatTableView];
+    [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self.messageTableView setGridStyleMask:0];
+    [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+
+    NSArray *tables = [NSArray arrayWithObjects:self.chatTableView, self.messageTableView, nil];
+    NSUInteger tableIndex = 0;
+    for (tableIndex = 0; tableIndex < [tables count]; tableIndex++) {
+        NSTableView *tableView = [tables objectAtIndex:tableIndex];
+        NSArray *columns = [tableView tableColumns];
+        NSUInteger columnIndex = 0;
+        for (columnIndex = 0; columnIndex < [columns count]; columnIndex++) {
+            NSTableColumn *column = [columns objectAtIndex:columnIndex];
+            [self applySkeuomorphicHeaderCellStyle:[column headerCell]];
+        }
+    }
+
+    NSView *contentView = [[self window] contentView];
+    [contentView setNeedsDisplay:YES];
+    NSArray *subviews = [contentView subviews];
+    NSUInteger viewIndex = 0;
+    for (viewIndex = 0; viewIndex < [subviews count]; viewIndex++) {
+        [[subviews objectAtIndex:viewIndex] setNeedsDisplay:YES];
+    }
+    [self.chatTableView reloadData];
+    [self.messageTableView reloadData];
 }
 
 - (void)buildContentView {
@@ -988,7 +1398,27 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self applyMutedLabelStyle:self.settingsStorageField];
     [contentView addSubview:self.settingsStorageField];
 
-    self.logoutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 314, 132, 32)] autorelease];
+    self.settingsThemeLabel = [self labelWithFrame:NSMakeRect(64, 332, 88, 24)
+                                              text:@"Theme:"
+                                              font:[NSFont systemFontOfSize:13.0]];
+    [self applyMutedLabelStyle:self.settingsThemeLabel];
+    [contentView addSubview:self.settingsThemeLabel];
+
+    self.themePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(154, 326, 300, 30) pullsDown:NO] autorelease];
+    NSArray *themeIdentifiers = TGThemeIdentifiers();
+    NSUInteger themeIndex = 0;
+    for (themeIndex = 0; themeIndex < [themeIdentifiers count]; themeIndex++) {
+        NSString *themeIdentifier = [themeIdentifiers objectAtIndex:themeIndex];
+        [self.themePopUpButton addItemWithTitle:TGThemeDisplayNameForIdentifier(themeIdentifier)];
+        [[self.themePopUpButton lastItem] setRepresentedObject:themeIdentifier];
+    }
+    [self.themePopUpButton setTarget:self];
+    [self.themePopUpButton setAction:@selector(themeSelectionChanged:)];
+    [self.themePopUpButton setAutoresizingMask:NSViewMaxYMargin];
+    [self selectThemePopUpItemForIdentifier:TGCurrentThemeIdentifier()];
+    [contentView addSubview:self.themePopUpButton];
+
+    self.logoutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 276, 132, 32)] autorelease];
     [self.logoutButton setTitle:@"Logout"];
     [self.logoutButton setTarget:self];
     [self.logoutButton setAction:@selector(logout:)];
@@ -1035,9 +1465,10 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                           font:[NSFont systemFontOfSize:12.0]];
     [self.aboutLinkField setAlignment:NSCenterTextAlignment];
     [self.aboutLinkField setSelectable:YES];
-    [self.aboutLinkField setTextColor:[NSColor colorWithCalibratedRed:0.175 green:0.355 blue:0.590 alpha:1.0]];
+    [self.aboutLinkField setTextColor:TGClassicLinkColor()];
     [contentView addSubview:self.aboutLinkField];
 
+    [self refreshThemeAppearance];
     [self layoutContentView];
     [self updateVisibleSection];
 }
@@ -1097,6 +1528,21 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self updateVisibleSection];
 }
 
+- (void)themeSelectionChanged:(id)sender {
+    (void)sender;
+    NSMenuItem *selectedItem = [self.themePopUpButton selectedItem];
+    NSString *themeIdentifier = [selectedItem representedObject];
+    if (!TGThemeIdentifierIsValid(themeIdentifier)) {
+        themeIdentifier = TGThemeIdentifierVKBlue;
+    }
+    TGSetActiveThemeIdentifier(themeIdentifier);
+    [[NSUserDefaults standardUserDefaults] setObject:themeIdentifier forKey:TGThemeDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self selectThemePopUpItemForIdentifier:themeIdentifier];
+    [self refreshThemeAppearance];
+    [self appendDetail:[NSString stringWithFormat:@"Theme changed: %@", TGThemeDisplayNameForIdentifier(themeIdentifier)]];
+}
+
 - (void)showView:(NSView *)view visible:(BOOL)visible {
     [view setHidden:!visible];
 }
@@ -1153,6 +1599,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
     [self showView:self.settingsStorageField visible:showSettings];
+    [self showView:self.settingsThemeLabel visible:showSettings];
+    [self showView:self.themePopUpButton visible:showSettings];
     [self showView:self.logoutButton visible:showSettings];
 
     BOOL showAbout = (ready && [section isEqualToString:TGSectionAbout]);
@@ -1328,7 +1776,9 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.settingsStateField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
     [self.settingsLibraryField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
     [self.settingsStorageField setFrame:NSMakeRect(mainX + 48.0, mainTop - 190.0, mainWidth - 96.0, 46.0)];
-    [self.logoutButton setFrame:NSMakeRect(mainX + 48.0, mainTop - 254.0, 132.0, 32.0)];
+    [self.settingsThemeLabel setFrame:NSMakeRect(mainX + 48.0, mainTop - 246.0, 82.0, 24.0)];
+    [self.themePopUpButton setFrame:NSMakeRect(mainX + 132.0, mainTop - 252.0, 300.0, 30.0)];
+    [self.logoutButton setFrame:NSMakeRect(mainX + 48.0, mainTop - 308.0, 132.0, 32.0)];
 
     CGFloat aboutIconSize = 118.0;
     CGFloat aboutCenterX = mainX + (mainWidth / 2.0);
@@ -1643,8 +2093,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         BOOL selected = [tableView isRowSelected:row];
         if (selected) {
             [textCell setDrawsBackground:YES];
-            [textCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.700 green:0.800 blue:0.925 alpha:1.0]];
-            [textCell setTextColor:[NSColor colorWithCalibratedRed:0.035 green:0.075 blue:0.130 alpha:1.0]];
+            [textCell setBackgroundColor:TGClassicSelectedRowColor()];
+            [textCell setTextColor:TGClassicSelectedRowTextColor()];
         }
         if ([identifier isEqual:@"title"]) {
             [textCell setFont:[NSFont boldSystemFontOfSize:12.0]];
@@ -1654,7 +2104,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         } else if ([identifier isEqual:@"unread_count"]) {
             [textCell setFont:[NSFont boldSystemFontOfSize:11.0]];
             if (!selected) {
-                [textCell setTextColor:[NSColor colorWithCalibratedRed:0.190 green:0.365 blue:0.590 alpha:1.0]];
+                [textCell setTextColor:TGClassicUnreadTextColor()];
             }
             [textCell setAlignment:NSCenterTextAlignment];
         } else {
@@ -3020,6 +3470,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_settingsStateField release];
     [_settingsLibraryField release];
     [_settingsStorageField release];
+    [_settingsThemeLabel release];
+    [_themePopUpButton release];
     [_logoutButton release];
     [_aboutIconView release];
     [_aboutTitleField release];
