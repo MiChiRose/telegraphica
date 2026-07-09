@@ -1044,8 +1044,12 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     BOOL selected = [self isHighlighted];
     if (selected) {
+        NSRect selectedRect = NSInsetRect(cellFrame, 2.0, 2.0);
+        NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:selectedRect
+                                                                     xRadius:6.0
+                                                                     yRadius:6.0];
         [TGClassicSelectedRowColor() set];
-        NSRectFill(cellFrame);
+        [selectedPath fill];
     }
 
     NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 8.0,
@@ -1102,7 +1106,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [unreadPath fill];
 
         NSRect unreadTextRect = NSMakeRect(NSMinX(unreadRect),
-                                           NSMinY(unreadRect) + floor((NSHeight(unreadRect) - unreadSize.height) / 2.0),
+                                           NSMinY(unreadRect) + floor((NSHeight(unreadRect) - unreadSize.height) / 2.0) - 2.0,
                                            NSWidth(unreadRect),
                                            unreadSize.height + 2.0);
         NSMutableParagraphStyle *unreadParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -1465,7 +1469,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                 nil];
     NSSize titleSize = [title sizeWithAttributes:attributes];
     NSRect titleRect = NSMakeRect(NSMinX(buttonRect),
-                                  NSMinY(buttonRect) + floor((NSHeight(buttonRect) - titleSize.height) / 2.0) - 1.0,
+                                  NSMinY(buttonRect) + floor((NSHeight(buttonRect) - titleSize.height) / 2.0),
                                   NSWidth(buttonRect),
                                   titleSize.height + 2.0);
     [title drawInRect:titleRect withAttributes:attributes];
@@ -2304,16 +2308,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileAvatarView setAvatarLocalPath:self.profileAvatarLocalPath];
 
     if ([self.profileDisplayName length] > 0) {
-        NSString *primaryName = ([self.profileFirstName length] > 0) ? self.profileFirstName : self.profileDisplayName;
-        NSString *secondaryName = nil;
-        if ([self.profileLastName length] > 0) {
-            secondaryName = self.profileLastName;
+        NSString *fullName = nil;
+        if ([self.profileFirstName length] > 0 && [self.profileLastName length] > 0) {
+            fullName = [NSString stringWithFormat:@"%@ %@", self.profileFirstName, self.profileLastName];
+        } else if ([self.profileFirstName length] > 0) {
+            fullName = self.profileFirstName;
+        } else {
+            fullName = self.profileDisplayName;
         }
-        [self.profileNameField setStringValue:primaryName ? primaryName : @"Profile"];
-        [self.profileUsernameField setStringValue:secondaryName ? secondaryName : @""];
+        [self.profileNameField setStringValue:fullName ? fullName : @"Profile"];
     } else {
         [self.profileNameField setStringValue:@"Profile"];
-        [self.profileUsernameField setStringValue:@""];
     }
     [self.settingsStateField setStringValue:@""];
 
@@ -2339,6 +2344,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     } else {
         [self.profileIDRowValueField setStringValue:@""];
     }
+
+    NSMutableString *profileSubtitle = [NSMutableString string];
+    if ([self.profileUsername length] > 0) {
+        [profileSubtitle appendFormat:@"@%@", self.profileUsername];
+    }
+    if (hasProfileUserID) {
+        if ([profileSubtitle length] > 0) {
+            [profileSubtitle appendString:@" "];
+        }
+        [profileSubtitle appendFormat:@"(%lld)", [self.profileUserID longLongValue]];
+    }
+    [self.profileUsernameField setStringValue:profileSubtitle ? profileSubtitle : @""];
 
     [self.profileIDField setStringValue:@""];
     [self.profileStateField setStringValue:([self.profileBio length] > 0) ? self.profileBio : @""];
@@ -3448,7 +3465,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.loadMoreChatsButton visible:showChats];
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
-    [self showView:self.messagesLabel visible:showChats];
+    [self showView:self.messagesLabel visible:NO];
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:showChats];
     [self showView:self.selectedChatField visible:showChats];
@@ -3573,7 +3590,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
 
-    [self.drawerButton setFrame:NSMakeRect(railX + 5.0, railTop - 43.0, 34.0, 34.0)];
+    [self.drawerButton setFrame:NSMakeRect(railX + 5.0, railTop - 39.0, 34.0, 34.0)];
     CGFloat accountBadgeWidth = railWidth - 48.0;
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
@@ -3654,7 +3671,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
     CGFloat headerButtonSize = 30.0;
-    CGFloat sectionHeaderVerticalOffset = -4.0;
+    CGFloat sectionHeaderVerticalOffset = 0.0;
     CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVerticalOffset;
     CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVerticalOffset;
     [self.chatsLabel setFrame:NSMakeRect(mainX + 16.0, headerLabelY, 88.0, 20.0)];
@@ -3684,10 +3701,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [chatColumn setWidth:chatWidth];
     }
 
-    [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 96.0, 20.0)];
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(NSMinX([self.loadOlderMessagesButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.selectedChatField setFrame:NSMakeRect(conversationX + 116.0, headerLabelY, conversationWidth - 210.0, 20.0)];
+    [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
+    [self.selectedChatField setFrame:NSMakeRect(conversationX + 16.0,
+                                                headerLabelY,
+                                                NSMinX([self.loadMessagesButton frame]) - conversationX - 28.0,
+                                                20.0)];
 
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 8.0;
