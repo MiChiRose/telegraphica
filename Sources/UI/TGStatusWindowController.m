@@ -98,6 +98,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
 @property (nonatomic, assign) BOOL chatsExhausted;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
+@property (nonatomic, assign) BOOL autoOlderMessagesLoadArmed;
 @end
 
 @implementation TGStatusWindowController
@@ -147,6 +148,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
 @synthesize chatsExhausted = _chatsExhausted;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
+@synthesize autoOlderMessagesLoadArmed = _autoOlderMessagesLoadArmed;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -166,6 +168,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         self.messageItems = [NSMutableArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.olderMessagesExhausted = NO;
+        self.autoOlderMessagesLoadArmed = YES;
         [self buildContentView];
         [self startLiveUpdateTimerIfNeeded];
     }
@@ -381,6 +384,11 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [self.messageTableView addTableColumn:previewColumn];
 
     [self.messageScrollView setDocumentView:self.messageTableView];
+    [[self.messageScrollView contentView] setPostsBoundsChangedNotifications:YES];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(messageScrollViewDidScroll:)
+                                                 name:NSViewBoundsDidChangeNotification
+                                               object:[self.messageScrollView contentView]];
     [contentView addSubview:self.messageScrollView];
 
     self.sendLabel = [self labelWithFrame:NSMakeRect(24, 58, 48, 22)
@@ -584,6 +592,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         self.chatsExhausted = NO;
         [self.client invalidateMainChatListExhaustion];
         self.olderMessagesExhausted = NO;
+        self.autoOlderMessagesLoadArmed = YES;
         [self.selectedChatField setStringValue:@"select a chat"];
         [self.sendTextField setStringValue:@""];
     }
@@ -760,6 +769,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
         self.olderMessagesExhausted = NO;
+        self.autoOlderMessagesLoadArmed = YES;
         [self updateAuthControlsForState:self.currentAuthState];
         [previousChatID release];
         return;
@@ -783,6 +793,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
         self.olderMessagesExhausted = NO;
+        self.autoOlderMessagesLoadArmed = YES;
     }
     [self updateAuthControlsForState:self.currentAuthState];
     if (newChatID && (selectionChanged || [self.messageItems count] == 0)) {
@@ -825,6 +836,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [self.messageTableView reloadData];
     [self.sendTextField setStringValue:@""];
     self.olderMessagesExhausted = NO;
+    self.autoOlderMessagesLoadArmed = YES;
     [self updateAuthControlsForState:self.currentAuthState];
 }
 
@@ -846,6 +858,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:items];
         self.olderMessagesExhausted = NO;
+        self.autoOlderMessagesLoadArmed = YES;
         [self.messageTableView reloadData];
         if ([self.messageItems count] > 0) {
             [self.messageTableView scrollRowToVisible:0];
@@ -911,6 +924,52 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         [self.messageTableView scrollRowToVisible:([self.messageItems count] - 1)];
     }
     return added;
+}
+
+- (BOOL)isMessageHistoryNearBottom {
+    if ([self.messageItems count] == 0 || self.olderMessagesExhausted) {
+        return NO;
+    }
+
+    NSClipView *clipView = [self.messageScrollView contentView];
+    NSView *documentView = [self.messageScrollView documentView];
+    if (!clipView || !documentView) {
+        return NO;
+    }
+
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    CGFloat visibleBottom = NSMaxY(visibleRect);
+    CGFloat documentBottom = NSMaxY(documentBounds);
+    CGFloat distanceFromBottom = documentBottom - visibleBottom;
+    return (distanceFromBottom <= 48.0);
+}
+
+- (void)messageScrollViewDidScroll:(NSNotification *)notification {
+    if ([notification object] != [self.messageScrollView contentView]) {
+        return;
+    }
+
+    if (![self.currentAuthState isEqualToString:@"ready"] ||
+        !self.selectedChatID ||
+        self.controlsBusy ||
+        self.backgroundMessageRefreshInFlight ||
+        self.olderMessagesExhausted ||
+        [self.messageItems count] == 0) {
+        return;
+    }
+
+    if (![self isMessageHistoryNearBottom]) {
+        self.autoOlderMessagesLoadArmed = YES;
+        return;
+    }
+
+    if (!self.autoOlderMessagesLoadArmed) {
+        return;
+    }
+
+    self.autoOlderMessagesLoadArmed = NO;
+    [self reloadOlderMessagesInteractive];
 }
 
 - (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection {
@@ -1114,6 +1173,9 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
                 if (added == 0 || [itemsCopy count] < 20) {
                     self.olderMessagesExhausted = YES;
                 }
+                if (added == 0) {
+                    self.autoOlderMessagesLoadArmed = NO;
+                }
                 [self.statusField setStringValue:(added > 0) ? @"TDLib messages: older loaded" : @"TDLib messages: no older items"];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib messages: appended %lu older previews", (unsigned long)added]];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib older message previews appended: %lu", (unsigned long)added]];
@@ -1145,17 +1207,17 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         return;
     }
 
-    if (self.pendingLiveChatRefresh && !self.backgroundChatRefreshInFlight) {
-        self.pendingLiveChatRefresh = NO;
-        [self reloadChatsInteractive:NO preserveSelection:YES];
-        return;
-    }
-
     if (self.pendingLiveMessageRefresh && !self.backgroundChatRefreshInFlight && !self.backgroundMessageRefreshInFlight && self.selectedChatID) {
         NSNumber *chatID = [self.selectedChatID retain];
         self.pendingLiveMessageRefresh = NO;
         [self reloadMessagesForChatID:chatID interactive:NO];
         [chatID release];
+        return;
+    }
+
+    if (self.pendingLiveChatRefresh && !self.backgroundChatRefreshInFlight) {
+        self.pendingLiveChatRefresh = NO;
+        [self reloadChatsInteractive:NO preserveSelection:YES];
     }
 }
 
@@ -1423,6 +1485,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 - (void)loadMessages:(id)sender {
     (void)sender;
     self.olderMessagesExhausted = NO;
+    self.autoOlderMessagesLoadArmed = YES;
     [self reloadMessagesForChatID:self.selectedChatID interactive:YES];
 }
 
@@ -1514,6 +1577,7 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 
 - (void)dealloc {
     [self stopLiveUpdateTimer];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
     [_chatTableView setDataSource:nil];
     [_chatTableView setDelegate:nil];
