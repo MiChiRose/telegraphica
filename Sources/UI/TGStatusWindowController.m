@@ -20,35 +20,35 @@ static NSString * const TGSectionAbout = @"about";
 static NSString * const TGSectionLogs = @"logs";
 
 static NSColor *TGClassicWindowBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.17 green:0.145 blue:0.115 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.095 green:0.145 blue:0.215 alpha:1.0];
 }
 
 static NSColor *TGClassicPanelBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.90 green:0.86 blue:0.76 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.925 green:0.952 blue:0.982 alpha:1.0];
 }
 
 static NSColor *TGClassicHeaderBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.39 green:0.315 blue:0.22 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.235 green:0.365 blue:0.540 alpha:1.0];
 }
 
 static NSColor *TGClassicTablePaperColor(void) {
-    return [NSColor colorWithCalibratedRed:0.95 green:0.91 blue:0.80 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.972 green:0.984 blue:0.996 alpha:1.0];
 }
 
 static NSColor *TGClassicInkColor(void) {
-    return [NSColor colorWithCalibratedRed:0.12 green:0.075 blue:0.045 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.055 green:0.080 blue:0.115 alpha:1.0];
 }
 
 static NSColor *TGClassicMutedInkColor(void) {
-    return [NSColor colorWithCalibratedRed:0.36 green:0.26 blue:0.16 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.305 green:0.390 blue:0.485 alpha:1.0];
 }
 
 static NSColor *TGClassicOutgoingBubbleBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.82 green:0.66 blue:0.38 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.760 green:0.865 blue:0.972 alpha:1.0];
 }
 
 static NSColor *TGClassicIncomingBubbleBottomColor(void) {
-    return [NSColor colorWithCalibratedRed:0.985 green:0.955 blue:0.875 alpha:1.0];
+    return [NSColor colorWithCalibratedRed:0.995 green:0.998 blue:1.0 alpha:1.0];
 }
 
 static NSString *TGCurrentYearString(void) {
@@ -161,7 +161,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [TGClassicWindowBottomColor() set];
     [railPath fill];
 
-    [[NSColor colorWithCalibratedRed:0.48 green:0.36 blue:0.20 alpha:1.0] set];
+    [[NSColor colorWithCalibratedRed:0.245 green:0.355 blue:0.495 alpha:1.0] set];
     [railPath setLineWidth:1.0];
     [railPath stroke];
 }
@@ -192,14 +192,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                    TGPanelHeaderHeight);
     [TGClassicHeaderBottomColor() set];
     NSRectFill(headerRect);
-    [[NSColor colorWithCalibratedRed:0.23 green:0.18 blue:0.12 alpha:1.0] set];
+    [[NSColor colorWithCalibratedRed:0.125 green:0.215 blue:0.340 alpha:1.0] set];
     NSRectFill(NSMakeRect(NSMinX(headerRect), NSMinY(headerRect), NSWidth(headerRect), 1.0));
     [NSGraphicsContext restoreGraphicsState];
 
     NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(panelBounds, 1.0, 1.0)
                                                                xRadius:(TGPanelCornerRadius - 1.0)
                                                                yRadius:(TGPanelCornerRadius - 1.0)];
-    [[NSColor colorWithCalibratedRed:0.31 green:0.24 blue:0.16 alpha:1.0] set];
+    [[NSColor colorWithCalibratedRed:0.545 green:0.650 blue:0.770 alpha:1.0] set];
     [innerPath setLineWidth:1.0];
     [innerPath stroke];
 }
@@ -226,25 +226,25 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     NSColor *fillColor = nil;
     if (selected) {
-        fillColor = [NSColor colorWithCalibratedRed:0.79 green:0.62 blue:0.34 alpha:alpha];
+        fillColor = [NSColor colorWithCalibratedRed:0.315 green:0.505 blue:0.735 alpha:alpha];
     } else if (highlighted) {
-        fillColor = [NSColor colorWithCalibratedRed:0.25 green:0.20 blue:0.15 alpha:alpha];
+        fillColor = [NSColor colorWithCalibratedRed:0.150 green:0.250 blue:0.380 alpha:alpha];
     } else {
-        fillColor = [NSColor colorWithCalibratedRed:0.16 green:0.13 blue:0.10 alpha:alpha];
+        fillColor = [NSColor colorWithCalibratedRed:0.090 green:0.145 blue:0.225 alpha:alpha];
     }
 
     [fillColor set];
     [path fill];
 
-    NSColor *strokeColor = selected ? [NSColor colorWithCalibratedRed:0.30 green:0.18 blue:0.07 alpha:0.95]
-                                    : [NSColor colorWithCalibratedRed:0.46 green:0.36 blue:0.23 alpha:0.75];
+    NSColor *strokeColor = selected ? [NSColor colorWithCalibratedRed:0.120 green:0.230 blue:0.365 alpha:0.95]
+                                    : [NSColor colorWithCalibratedRed:0.255 green:0.360 blue:0.500 alpha:0.75];
     [strokeColor set];
     [path setLineWidth:1.0];
     [path stroke];
 
     NSString *title = [self title] ? [self title] : @"";
     NSFont *font = selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0];
-    NSColor *textColor = selected ? TGClassicInkColor() : [NSColor colorWithCalibratedRed:0.95 green:0.88 blue:0.72 alpha:alpha];
+    NSColor *textColor = selected ? [NSColor colorWithCalibratedWhite:0.99 alpha:alpha] : [NSColor colorWithCalibratedRed:0.860 green:0.910 blue:0.970 alpha:alpha];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 font, NSFontAttributeName,
                                 textColor, NSForegroundColorAttributeName,
@@ -339,8 +339,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [bubbleFillColor set];
     [bubblePath fill];
 
-    NSColor *strokeColor = outgoing ? [NSColor colorWithCalibratedRed:0.36 green:0.22 blue:0.09 alpha:0.85]
-                                    : [NSColor colorWithCalibratedRed:0.55 green:0.45 blue:0.30 alpha:0.70];
+    NSColor *strokeColor = outgoing ? [NSColor colorWithCalibratedRed:0.355 green:0.535 blue:0.740 alpha:0.85]
+                                    : [NSColor colorWithCalibratedRed:0.665 green:0.730 blue:0.805 alpha:0.70];
     [strokeColor set];
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
@@ -357,7 +357,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if ([timeString length] > 0) {
         NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                         [NSFont systemFontOfSize:9.0], NSFontAttributeName,
-                                        [NSColor colorWithCalibratedRed:0.31 green:0.22 blue:0.13 alpha:0.72], NSForegroundColorAttributeName,
+                                        [NSColor colorWithCalibratedRed:0.275 green:0.365 blue:0.465 alpha:0.72], NSForegroundColorAttributeName,
                                         nil];
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - 12.0,
@@ -395,7 +395,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, retain) NSButton *loadMoreChatsButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
-@property (nonatomic, retain) NSButton *quitButton;
 @property (nonatomic, retain) NSTextField *sendLabel;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *sendMessageButton;
@@ -424,6 +423,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @property (nonatomic, retain) NSTextField *settingsStateField;
 @property (nonatomic, retain) NSTextField *settingsLibraryField;
 @property (nonatomic, retain) NSTextField *settingsStorageField;
+@property (nonatomic, retain) NSButton *logoutButton;
 @property (nonatomic, retain) NSImageView *aboutIconView;
 @property (nonatomic, retain) NSTextField *aboutTitleField;
 @property (nonatomic, retain) NSTextField *aboutVersionField;
@@ -471,7 +471,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize loadMoreChatsButton = _loadMoreChatsButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
-@synthesize quitButton = _quitButton;
 @synthesize sendLabel = _sendLabel;
 @synthesize sendTextField = _sendTextField;
 @synthesize sendMessageButton = _sendMessageButton;
@@ -500,6 +499,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 @synthesize settingsStateField = _settingsStateField;
 @synthesize settingsLibraryField = _settingsLibraryField;
 @synthesize settingsStorageField = _settingsStorageField;
+@synthesize logoutButton = _logoutButton;
 @synthesize aboutIconView = _aboutIconView;
 @synthesize aboutTitleField = _aboutTitleField;
 @synthesize aboutVersionField = _aboutVersionField;
@@ -622,7 +622,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 - (void)applySkeuomorphicTableStyle:(NSTableView *)tableView {
     [tableView setBackgroundColor:TGClassicTablePaperColor()];
     [tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
-    [tableView setGridColor:[NSColor colorWithCalibratedRed:0.72 green:0.62 blue:0.45 alpha:1.0]];
+    [tableView setGridColor:[NSColor colorWithCalibratedRed:0.755 green:0.820 blue:0.900 alpha:1.0]];
     [tableView setUsesAlternatingRowBackgroundColors:NO];
     [tableView setIntercellSpacing:NSMakeSize(8.0, 1.0)];
     [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
@@ -636,7 +636,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [headerCell setTextColor:TGClassicMutedInkColor()];
     [headerCell setAlignment:NSLeftTextAlignment];
     [headerCell setDrawsBackground:YES];
-    [headerCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.78 green:0.66 blue:0.46 alpha:1.0]];
+    [headerCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.840 green:0.895 blue:0.955 alpha:1.0]];
 }
 
 - (void)buildContentView {
@@ -725,7 +725,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.detailsScrollView];
 
     self.diagnosticsLabel = [self labelWithFrame:NSMakeRect(24, 104, 112, 18)
-                                            text:@"Activity"
+                                            text:@"Diagnostic Logs"
                                             font:[NSFont boldSystemFontOfSize:11.0]];
     [self applyPanelHeaderLabelStyle:self.diagnosticsLabel];
     [contentView addSubview:self.diagnosticsLabel];
@@ -762,6 +762,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.authTextField setEnabled:NO];
     [self.authTextField setHidden:YES];
     [self applySkeuomorphicTextFieldStyle:self.authTextField];
+    [self.authTextField setDelegate:(id)self];
     [self.authTextField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authTextField];
 
@@ -769,6 +770,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.authSecureField setEnabled:NO];
     [self.authSecureField setHidden:YES];
     [self applySkeuomorphicTextFieldStyle:self.authSecureField];
+    [self.authSecureField setDelegate:(id)self];
     [self.authSecureField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authSecureField];
 
@@ -924,20 +926,12 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [contentView addSubview:self.sendMessageButton];
 
     self.checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 28, 140, 32)] autorelease];
-    [self.checkButton setTitle:@"Reconnect"];
+    [self.checkButton setTitle:@"Check Connection"];
     [self.checkButton setTarget:self];
     [self.checkButton setAction:@selector(checkTDLib:)];
     [self applySkeuomorphicButtonStyle:self.checkButton isPrimary:YES];
     [self.checkButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.checkButton];
-
-    self.quitButton = [[[NSButton alloc] initWithFrame:NSMakeRect(176, 28, 96, 32)] autorelease];
-    [self.quitButton setTitle:@"Quit"];
-    [self.quitButton setTarget:NSApp];
-    [self.quitButton setAction:@selector(terminate:)];
-    [self applySkeuomorphicButtonStyle:self.quitButton isPrimary:NO];
-    [self.quitButton setAutoresizingMask:NSViewMaxYMargin];
-    [contentView addSubview:self.quitButton];
 
     self.profileTitleField = [self labelWithFrame:NSMakeRect(40, 520, 400, 28)
                                              text:@"My Profile"
@@ -994,6 +988,14 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self applyMutedLabelStyle:self.settingsStorageField];
     [contentView addSubview:self.settingsStorageField];
 
+    self.logoutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 314, 132, 32)] autorelease];
+    [self.logoutButton setTitle:@"Logout"];
+    [self.logoutButton setTarget:self];
+    [self.logoutButton setAction:@selector(logout:)];
+    [self applySkeuomorphicButtonStyle:self.logoutButton isPrimary:NO];
+    [self.logoutButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.logoutButton];
+
     self.aboutIconView = [[[NSImageView alloc] initWithFrame:NSMakeRect(430, 396, 120, 120)] autorelease];
     NSImage *appIcon = [NSImage imageNamed:@"Telegraphica"];
     if (!appIcon) {
@@ -1033,7 +1035,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                           font:[NSFont systemFontOfSize:12.0]];
     [self.aboutLinkField setAlignment:NSCenterTextAlignment];
     [self.aboutLinkField setSelectable:YES];
-    [self.aboutLinkField setTextColor:[NSColor colorWithCalibratedRed:0.42 green:0.26 blue:0.10 alpha:1.0]];
+    [self.aboutLinkField setTextColor:[NSColor colorWithCalibratedRed:0.175 green:0.355 blue:0.590 alpha:1.0]];
     [contentView addSubview:self.aboutLinkField];
 
     [self layoutContentView];
@@ -1151,6 +1153,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
     [self showView:self.settingsStorageField visible:showSettings];
+    [self showView:self.logoutButton visible:showSettings];
 
     BOOL showAbout = (ready && [section isEqualToString:TGSectionAbout]);
     [self showView:self.aboutPanelView visible:showAbout];
@@ -1234,8 +1237,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [navigationButton setFrame:NSMakeRect(railX + 8.0, navigationButtonY, railWidth - 16.0, 30.0)];
         navigationButtonY -= 38.0;
     }
-    [self.quitButton setFrame:NSMakeRect(railX + 8.0, railY + 12.0, railWidth - 16.0, 30.0)];
-
     CGFloat loginWidth = mainWidth - 96.0;
     if (loginWidth > 580.0) {
         loginWidth = 580.0;
@@ -1327,6 +1328,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.settingsStateField setFrame:NSMakeRect(mainX + 48.0, mainTop - 96.0, mainWidth - 96.0, 24.0)];
     [self.settingsLibraryField setFrame:NSMakeRect(mainX + 48.0, mainTop - 132.0, mainWidth - 96.0, 24.0)];
     [self.settingsStorageField setFrame:NSMakeRect(mainX + 48.0, mainTop - 190.0, mainWidth - 96.0, 46.0)];
+    [self.logoutButton setFrame:NSMakeRect(mainX + 48.0, mainTop - 254.0, 132.0, 32.0)];
 
     CGFloat aboutIconSize = 118.0;
     CGFloat aboutCenterX = mainX + (mainWidth / 2.0);
@@ -1336,8 +1338,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.aboutCopyrightField setFrame:NSMakeRect(mainX + 90.0, mainTop - 286.0, mainWidth - 180.0, 22.0)];
     [self.aboutLinkField setFrame:NSMakeRect(mainX + 90.0, mainTop - 320.0, mainWidth - 180.0, 22.0)];
 
-    [self.diagnosticsLabel setFrame:NSMakeRect(mainX + 14.0, mainTop - 30.0, 120.0, 18.0)];
-    [self.checkButton setFrame:NSMakeRect(mainX + mainWidth - 132.0, mainTop - 36.0, 116.0, 30.0)];
+    [self.diagnosticsLabel setFrame:NSMakeRect(mainX + 14.0, mainTop - 30.0, 160.0, 18.0)];
+    [self.checkButton setFrame:NSMakeRect(mainX + mainWidth - 158.0, mainTop - 36.0, 142.0, 30.0)];
     [self.detailsScrollView setFrame:NSMakeRect(mainX + 12.0, mainY + 12.0, mainWidth - 24.0, mainHeight - 56.0)];
 }
 
@@ -1518,6 +1520,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
     [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
+    [self.logoutButton setEnabled:([state isEqualToString:@"ready"] && !self.controlsBusy)];
     [self updateSendControls];
     [self.settingsStateField setStringValue:[NSString stringWithFormat:@"Session: %@", [state isEqualToString:@"ready"] ? @"signed in" : (([state length] > 0) ? state : @"connecting")]];
     NSString *loadedLibrary = [self.client loadedLibraryPath];
@@ -1533,6 +1536,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 - (void)setControlsBusy:(BOOL)busy {
     _controlsBusy = busy;
     [self.checkButton setEnabled:!busy];
+    [self.logoutButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self updateNavigationButtonsForSection:(self.activeSection ? self.activeSection : TGSectionChats) enabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
@@ -1548,6 +1552,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         [self.loadMoreChatsButton setEnabled:NO];
         [self.loadMessagesButton setEnabled:NO];
         [self.loadOlderMessagesButton setEnabled:NO];
+        [self.logoutButton setEnabled:NO];
         [self.chatTableView setEnabled:NO];
         [self.messageTableView setEnabled:NO];
         [self.sendTextField setEnabled:NO];
@@ -1565,6 +1570,19 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if ([notification object] == self.sendTextField) {
         [self updateSendControls];
     }
+}
+
+- (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector {
+    (void)textView;
+    if (control == self.sendTextField && commandSelector == @selector(insertNewline:)) {
+        [self sendMessage:control];
+        return YES;
+    }
+    if ((control == self.authTextField || control == self.authSecureField) && commandSelector == @selector(insertNewline:)) {
+        [self submitAuthInput:control];
+        return YES;
+    }
+    return NO;
 }
 
 - (void)appendDetail:(NSString *)detail {
@@ -1625,8 +1643,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         BOOL selected = [tableView isRowSelected:row];
         if (selected) {
             [textCell setDrawsBackground:YES];
-            [textCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.72 green:0.55 blue:0.29 alpha:1.0]];
-            [textCell setTextColor:[NSColor colorWithCalibratedRed:0.12 green:0.07 blue:0.035 alpha:1.0]];
+            [textCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.700 green:0.800 blue:0.925 alpha:1.0]];
+            [textCell setTextColor:[NSColor colorWithCalibratedRed:0.035 green:0.075 blue:0.130 alpha:1.0]];
         }
         if ([identifier isEqual:@"title"]) {
             [textCell setFont:[NSFont boldSystemFontOfSize:12.0]];
@@ -1636,7 +1654,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         } else if ([identifier isEqual:@"unread_count"]) {
             [textCell setFont:[NSFont boldSystemFontOfSize:11.0]];
             if (!selected) {
-                [textCell setTextColor:[NSColor colorWithCalibratedRed:0.52 green:0.32 blue:0.10 alpha:1.0]];
+                [textCell setTextColor:[NSColor colorWithCalibratedRed:0.190 green:0.365 blue:0.590 alpha:1.0]];
             }
             [textCell setAlignment:NSCenterTextAlignment];
         } else {
@@ -1814,6 +1832,65 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     return [items sortedArrayUsingFunction:TGCompareMessageItemsAscending context:NULL];
 }
 
+- (NSString *)deduplicationKeyForMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return nil;
+    }
+
+    id chatID = [item chatID];
+    id date = [item date];
+    NSString *preview = [item preview] ? [item preview] : @"";
+    long long chatValue = [chatID respondsToSelector:@selector(longLongValue)] ? [chatID longLongValue] : 0;
+    long long dateValue = [date respondsToSelector:@selector(longLongValue)] ? [date longLongValue] : 0;
+
+    return [NSString stringWithFormat:@"%lld|%lld|%d|%@", chatValue, dateValue, [item outgoing] ? 1 : 0, preview];
+}
+
+- (NSArray *)deduplicatedMessageItemsFromItems:(NSArray *)items {
+    NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
+    NSMutableArray *result = [NSMutableArray array];
+    NSMutableSet *messageIDs = [NSMutableSet set];
+    NSUInteger index = 0;
+
+    for (index = 0; index < [orderedItems count]; index++) {
+        TGMessageItem *item = [orderedItems objectAtIndex:index];
+        if (![item isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+
+        id messageID = [item messageID];
+        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
+            NSString *messageKey = [NSString stringWithFormat:@"id:%lld", [messageID longLongValue]];
+            if ([messageIDs containsObject:messageKey]) {
+                continue;
+            }
+            [messageIDs addObject:messageKey];
+        }
+
+        TGMessageItem *previousItem = [result lastObject];
+        if ([item outgoing] && previousItem && [previousItem isKindOfClass:[TGMessageItem class]] && [previousItem outgoing]) {
+            NSString *currentFallbackKey = [self deduplicationKeyForMessageItem:item];
+            NSString *previousFallbackKey = [self deduplicationKeyForMessageItem:previousItem];
+            if ([currentFallbackKey length] > 0 && [currentFallbackKey isEqualToString:previousFallbackKey]) {
+                id currentID = [item messageID];
+                id previousID = [previousItem messageID];
+                BOOL currentHasID = ([currentID respondsToSelector:@selector(longLongValue)] && [currentID longLongValue] > 0);
+                BOOL previousHasID = ([previousID respondsToSelector:@selector(longLongValue)] && [previousID longLongValue] > 0);
+                if (!(currentHasID && previousHasID)) {
+                    if (currentHasID && !previousHasID) {
+                        [result replaceObjectAtIndex:([result count] - 1) withObject:item];
+                    }
+                    continue;
+                }
+            }
+        }
+
+        [result addObject:item];
+    }
+
+    return result;
+}
+
 - (void)scrollMessagesToNewestIfAvailable {
     NSUInteger count = [self.messageItems count];
     if (count > 0) {
@@ -1827,7 +1904,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     self.forceMessageScrollToNewest = NO;
     if (!preserveOlder || [self.messageItems count] == 0) {
         [self.messageItems removeAllObjects];
-        [self.messageItems addObjectsFromArray:orderedItems];
+        [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:orderedItems]];
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self.messageTableView reloadData];
@@ -1860,7 +1937,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     }
 
     [self.messageItems removeAllObjects];
-    [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:mergedItems]];
+    [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
     [self.messageTableView reloadData];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
@@ -1906,7 +1983,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:itemsToPrepend];
         [mergedItems addObjectsFromArray:self.messageItems];
         [self.messageItems removeAllObjects];
-        [self.messageItems addObjectsFromArray:mergedItems];
+        [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
     }
 
     [self.messageTableView reloadData];
@@ -2764,18 +2841,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
         return;
     }
 
-    NSString *chatTitle = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Selected chat";
-    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setAlertStyle:NSWarningAlertStyle];
-    [alert setMessageText:@"Send real Telegram message?"];
-    [alert setInformativeText:[NSString stringWithFormat:@"This will send the current text field contents to \"%@\". This is not a dry run.", chatTitle]];
-    [alert addButtonWithTitle:@"Cancel"];
-    [alert addButtonWithTitle:@"Send"];
-    NSInteger result = [alert runModal];
-    if (result != NSAlertSecondButtonReturn) {
-        return;
-    }
-
     NSNumber *chatID = [self.selectedChatID retain];
     NSString *messageText = [text copy];
     [self setControlsBusy:YES];
@@ -2801,6 +2866,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                 if (selectionStillCurrent) {
                     [self.sendTextField setStringValue:@""];
                     self.forceMessageScrollToNewest = YES;
+                    [[self window] makeFirstResponder:self.sendTextField];
                 }
             } else {
                 [self.statusField setStringValue:@"Send not confirmed"];
@@ -2826,6 +2892,76 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     });
 }
 
+- (void)logout:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Logout is available only after sign-in is ready."];
+        return;
+    }
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setAlertStyle:NSWarningAlertStyle];
+    [alert setMessageText:@"Log out of Telegram?"];
+    [alert setInformativeText:@"Telegraphica will close the current local TDLib session. You will need to sign in again on this Mac."];
+    [alert addButtonWithTitle:@"Cancel"];
+    [alert addButtonWithTitle:@"Logout"];
+    NSInteger result = [alert runModal];
+    if (result != NSAlertSecondButtonReturn) {
+        return;
+    }
+
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"Logging out..."];
+    [self appendDetail:@"Submitting Telegram logout to TDLib..."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *logoutError = nil;
+        NSString *logoutSummary = [[client logOutWithTimeout:8.0 error:&logoutError] copy];
+        NSString *logoutErrorMessage = [[logoutError localizedDescription] copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (logoutSummary) {
+                [self appendDetail:[NSString stringWithFormat:@"TDLib logout: %@", logoutSummary]];
+                [[TGLogger sharedLogger] log:@"TDLib logout accepted."];
+                self.client = [[[TGTDLibClient alloc] init] autorelease];
+                self.initialConnectStarted = NO;
+                self.profileSummaryLoaded = NO;
+                self.pendingLiveChatRefresh = NO;
+                self.pendingLiveMessageRefresh = NO;
+                [self.chatItems removeAllObjects];
+                [self.messageItems removeAllObjects];
+                [self.chatTableView deselectAll:nil];
+                [self.chatTableView reloadData];
+                [self.messageTableView reloadData];
+                self.selectedChatID = nil;
+                self.selectedChatTitle = nil;
+                self.chatsExhausted = NO;
+                self.olderMessagesExhausted = NO;
+                self.autoChatListLoadArmed = YES;
+                self.autoOlderMessagesLoadArmed = YES;
+                [self.selectedChatField setStringValue:@"Select a chat"];
+                [self.sendTextField setStringValue:@""];
+                [self updateAuthControlsForState:@"closed"];
+                [self setControlsBusy:NO];
+                [self checkTDLib:nil];
+            } else {
+                NSString *message = logoutErrorMessage ? logoutErrorMessage : @"TDLib logout did not return a result.";
+                [self.statusField setStringValue:@"Logout failed"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib logout: %@", message]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib logout failed: %@", message]];
+                [self setControlsBusy:NO];
+            }
+            [logoutSummary release];
+            [logoutErrorMessage release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
 - (void)dealloc {
     [self stopLiveUpdateTimer];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -2835,6 +2971,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
     [_sendTextField setDelegate:nil];
+    [_authTextField setDelegate:nil];
+    [_authSecureField setDelegate:nil];
     [_topPanelView release];
     [_sidebarPanelView release];
     [_conversationPanelView release];
@@ -2854,7 +2992,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_loadMoreChatsButton release];
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
-    [_quitButton release];
     [_sendLabel release];
     [_sendTextField release];
     [_sendMessageButton release];
@@ -2883,6 +3020,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     [_settingsStateField release];
     [_settingsLibraryField release];
     [_settingsStorageField release];
+    [_logoutButton release];
     [_aboutIconView release];
     [_aboutTitleField release];
     [_aboutVersionField release];
