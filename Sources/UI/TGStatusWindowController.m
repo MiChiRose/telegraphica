@@ -7,6 +7,7 @@
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
 static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
+static CGFloat const TGPanelCornerRadius = 10.0;
 
 @interface TGChromeView : NSView
 @end
@@ -16,11 +17,19 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedWhite:0.86 alpha:1.0]
-                                                          endingColor:[NSColor colorWithCalibratedWhite:0.74 alpha:1.0]] autorelease];
-    [gradient drawInRect:bounds angle:90.0];
+    NSGradient *topGradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedRed:0.88 green:0.87 blue:0.84 alpha:1.0]
+                                                             endingColor:[NSColor colorWithCalibratedRed:0.80 green:0.80 blue:0.74 alpha:1.0]] autorelease];
+    [topGradient drawInRect:bounds angle:90.0];
 
-    [[NSColor colorWithCalibratedWhite:0.93 alpha:1.0] set];
+    NSRect lowerHalf = NSMakeRect(NSMinX(bounds), NSMinY(bounds), NSWidth(bounds), NSHeight(bounds) * 0.55);
+    NSGradient *bottomGradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedRed:0.80 green:0.80 blue:0.74 alpha:1.0]
+                                                                endingColor:[NSColor colorWithCalibratedRed:0.70 green:0.70 blue:0.65 alpha:1.0]] autorelease];
+    [bottomGradient drawInRect:lowerHalf angle:90.0];
+
+    [[NSColor colorWithCalibratedRed:1.0 green:1.0 blue:1.0 alpha:0.48] set];
+    NSRectFill(NSMakeRect(0.0, NSHeight(bounds) - 12.0, NSWidth(bounds), 5.0));
+
+    [[NSColor colorWithCalibratedWhite:0.2 alpha:0.28] set];
     NSRectFill(NSMakeRect(0.0, NSHeight(bounds) - 1.0, NSWidth(bounds), 1.0));
 }
 
@@ -34,20 +43,42 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
-    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 0.5, 0.5)
-                                                         xRadius:6.0
-                                                         yRadius:6.0];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]
-                                                          endingColor:[NSColor colorWithCalibratedWhite:0.88 alpha:1.0]] autorelease];
-    [gradient drawInBezierPath:path angle:90.0];
-    [[NSColor colorWithCalibratedWhite:0.64 alpha:1.0] set];
-    [path stroke];
+    NSRect panelBounds = NSInsetRect(bounds, 2.5, 2.5);
+    NSBezierPath *panelPath = [NSBezierPath bezierPathWithRoundedRect:panelBounds
+                                                             xRadius:TGPanelCornerRadius
+                                                             yRadius:TGPanelCornerRadius];
 
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.65] set];
+    [NSGraphicsContext saveGraphicsState];
+    NSShadow *outerShadow = [[[NSShadow alloc] init] autorelease];
+    [outerShadow setShadowColor:[[NSColor colorWithCalibratedWhite:0.0 alpha:0.30] colorWithAlphaComponent:0.35]];
+    [outerShadow setShadowOffset:NSMakeSize(0.0, -1.2)];
+    [outerShadow setShadowBlurRadius:3.0];
+    [outerShadow set];
+    [panelPath fill];
+    [NSGraphicsContext restoreGraphicsState];
+
+    NSGradient *panelGradient = [[[NSGradient alloc] initWithStartingColor:[NSColor colorWithCalibratedRed:0.98 green:0.98 blue:0.96 alpha:1.0]
+                                                              endingColor:[NSColor colorWithCalibratedRed:0.84 green:0.82 blue:0.76 alpha:1.0]] autorelease];
+    [panelGradient drawInBezierPath:panelPath angle:90.0];
+
+    NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(panelBounds, 1.0, 1.0)
+                                                               xRadius:(TGPanelCornerRadius - 1.0)
+                                                               yRadius:(TGPanelCornerRadius - 1.0)];
+    [[NSColor colorWithCalibratedWhite:0.35 alpha:0.45] set];
+    [innerPath setLineWidth:0.9];
+    [innerPath stroke];
+
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.55] set];
     NSBezierPath *highlight = [NSBezierPath bezierPath];
-    [highlight moveToPoint:NSMakePoint(6.0, NSHeight(bounds) - 1.5)];
-    [highlight lineToPoint:NSMakePoint(NSWidth(bounds) - 6.0, NSHeight(bounds) - 1.5)];
+    [highlight moveToPoint:NSMakePoint(NSMinX(panelBounds) + 8.0, NSMaxY(panelBounds) - 1.5)];
+    [highlight lineToPoint:NSMakePoint(NSMaxX(panelBounds) - 8.0, NSMaxY(panelBounds) - 1.5)];
     [highlight stroke];
+
+    [[NSColor colorWithCalibratedWhite:0.46 alpha:0.35] set];
+    NSBezierPath *lowerStroke = [NSBezierPath bezierPath];
+    [lowerStroke moveToPoint:NSMakePoint(NSMinX(panelBounds) + 9.0, NSMinY(panelBounds) + 1.0)];
+    [lowerStroke lineToPoint:NSMakePoint(NSMaxX(panelBounds) - 9.0, NSMinY(panelBounds) + 1.0)];
+    [lowerStroke stroke];
 }
 
 @end
@@ -182,12 +213,63 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     NSTextField *field = [[[NSTextField alloc] initWithFrame:frame] autorelease];
     [field setStringValue:(text ? text : @"")];
     [field setFont:font];
+    [field setTextColor:[NSColor colorWithCalibratedRed:0.19 green:0.18 blue:0.15 alpha:1.0]];
     [field setEditable:NO];
     [field setSelectable:NO];
     [field setBordered:NO];
     [field setDrawsBackground:NO];
     [field setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     return field;
+}
+
+- (void)applySkeuomorphicButtonStyle:(NSButton *)button isPrimary:(BOOL)isPrimary {
+    [button setButtonType:NSMomentaryPushInButton];
+    [button setBezelStyle:NSTexturedRoundedBezelStyle];
+    [button setBordered:YES];
+    [button setImagePosition:NSNoImage];
+    [button setFocusRingType:NSFocusRingTypeExterior];
+    if (isPrimary) {
+        [button setFont:[NSFont boldSystemFontOfSize:12.0]];
+    } else {
+        [button setFont:[NSFont systemFontOfSize:11.0]];
+    }
+}
+
+- (void)applySkeuomorphicTextFieldStyle:(NSTextField *)textField {
+    [textField setBezeled:YES];
+    [textField setBordered:YES];
+    [textField setBackgroundColor:[NSColor colorWithCalibratedRed:0.98 green:0.98 blue:0.96 alpha:1.0]];
+    [textField setTextColor:[NSColor colorWithCalibratedRed:0.12 green:0.11 blue:0.09 alpha:1.0]];
+    [textField setDrawsBackground:YES];
+    [textField setFocusRingType:NSFocusRingTypeExterior];
+    [textField setFont:[NSFont systemFontOfSize:12.0]];
+}
+
+- (void)applySkeuomorphicScrollStyle:(NSScrollView *)scrollView {
+    [scrollView setBorderType:NSNoBorder];
+    [[scrollView contentView] setDrawsBackground:YES];
+    [[scrollView contentView] setBackgroundColor:[NSColor colorWithCalibratedRed:0.98 green:0.98 blue:0.96 alpha:1.0]];
+    [scrollView setHasVerticalScroller:YES];
+}
+
+- (void)applySkeuomorphicTableStyle:(NSTableView *)tableView {
+    [tableView setBackgroundColor:[NSColor colorWithCalibratedRed:0.98 green:0.98 blue:0.96 alpha:1.0]];
+    [tableView setGridStyleMask:NSTableViewSolidVerticalGridLineMask | NSTableViewSolidHorizontalGridLineMask];
+    [tableView setGridColor:[NSColor colorWithCalibratedRed:0.72 green:0.70 blue:0.65 alpha:1.0]];
+    [tableView setUsesAlternatingRowBackgroundColors:NO];
+    [tableView setIntercellSpacing:NSMakeSize(8.0, 2.0)];
+    [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleSourceList];
+}
+
+- (void)applySkeuomorphicHeaderCellStyle:(NSTextFieldCell *)headerCell {
+    if (!headerCell) {
+        return;
+    }
+    [headerCell setFont:[NSFont boldSystemFontOfSize:11.0]];
+    [headerCell setTextColor:[NSColor colorWithCalibratedRed:0.25 green:0.24 blue:0.20 alpha:1.0]];
+    [headerCell setAlignment:NSLeftTextAlignment];
+    [headerCell setDrawsBackground:YES];
+    [headerCell setBackgroundColor:[NSColor colorWithCalibratedRed:0.89 green:0.87 blue:0.82 alpha:1.0]];
 }
 
 - (void)buildContentView {
@@ -218,21 +300,20 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [contentView addSubview:self.titleField];
 
     self.statusField = [self labelWithFrame:NSMakeRect(24, 636, 712, 22)
-                                       text:@"TDLib status: not checked"
-                                       font:[NSFont systemFontOfSize:13.0]];
+                                     text:@"TDLib status: not checked"
+                                     font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.statusField];
 
     self.detailsScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 410, 712, 210)] autorelease];
-    [self.detailsScrollView setBorderType:NSBezelBorder];
-    [self.detailsScrollView setHasVerticalScroller:YES];
     [self.detailsScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [self applySkeuomorphicScrollStyle:self.detailsScrollView];
 
     self.detailsView = [[[NSTextView alloc] initWithFrame:[[self.detailsScrollView contentView] bounds]] autorelease];
     [self.detailsView setEditable:NO];
     [self.detailsView setSelectable:YES];
     [self.detailsView setFont:[NSFont userFixedPitchFontOfSize:11.0]];
-    [self.detailsView setTextColor:[NSColor colorWithCalibratedWhite:0.12 alpha:1.0]];
-    [self.detailsView setBackgroundColor:[NSColor colorWithCalibratedWhite:0.98 alpha:1.0]];
+    [self.detailsView setTextColor:[NSColor colorWithCalibratedRed:0.12 green:0.11 blue:0.09 alpha:1.0]];
+    [self.detailsView setBackgroundColor:[NSColor colorWithCalibratedRed:0.98 green:0.98 blue:0.96 alpha:1.0]];
     [self.detailsView setString:@"Ready. Place libtdjson.dylib in Contents/Frameworks or set TELEGRAPHICA_TDJSON_PATH, then check the core.\n"];
     [self.detailsScrollView setDocumentView:self.detailsView];
     [contentView addSubview:self.detailsScrollView];
@@ -256,22 +337,24 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     self.authTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(104, 370, 240, 24)] autorelease];
     [self.authTextField setEnabled:NO];
     [self.authTextField setHidden:YES];
+    [self applySkeuomorphicTextFieldStyle:self.authTextField];
     [self.authTextField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authTextField];
 
     self.authSecureField = [[[NSSecureTextField alloc] initWithFrame:NSMakeRect(104, 370, 240, 24)] autorelease];
     [self.authSecureField setEnabled:NO];
     [self.authSecureField setHidden:YES];
+    [self applySkeuomorphicTextFieldStyle:self.authSecureField];
     [self.authSecureField setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authSecureField];
 
     self.authButton = [[[NSButton alloc] initWithFrame:NSMakeRect(356, 366, 116, 32)] autorelease];
     [self.authButton setTitle:@"Send"];
-    [self.authButton setBezelStyle:NSRoundedBezelStyle];
     [self.authButton setTarget:self];
     [self.authButton setAction:@selector(submitAuthInput:)];
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
+    [self applySkeuomorphicButtonStyle:self.authButton isPrimary:NO];
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
@@ -282,26 +365,25 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 
     self.loadChatsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(104, 332, 112, 32)] autorelease];
     [self.loadChatsButton setTitle:@"Load Chats"];
-    [self.loadChatsButton setBezelStyle:NSRoundedBezelStyle];
     [self.loadChatsButton setTarget:self];
     [self.loadChatsButton setAction:@selector(loadChats:)];
     [self.loadChatsButton setEnabled:NO];
+    [self applySkeuomorphicButtonStyle:self.loadChatsButton isPrimary:YES];
     [self.loadChatsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadChatsButton];
 
     self.loadMoreChatsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(224, 332, 80, 32)] autorelease];
     [self.loadMoreChatsButton setTitle:@"More"];
-    [self.loadMoreChatsButton setBezelStyle:NSRoundedBezelStyle];
     [self.loadMoreChatsButton setTarget:self];
     [self.loadMoreChatsButton setAction:@selector(loadMoreChats:)];
     [self.loadMoreChatsButton setEnabled:NO];
+    [self applySkeuomorphicButtonStyle:self.loadMoreChatsButton isPrimary:NO];
     [self.loadMoreChatsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadMoreChatsButton];
 
     self.chatScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 232, 712, 96)] autorelease];
-    [self.chatScrollView setBorderType:NSBezelBorder];
-    [self.chatScrollView setHasVerticalScroller:YES];
     [self.chatScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [self applySkeuomorphicScrollStyle:self.chatScrollView];
 
     self.chatTableView = [[[NSTableView alloc] initWithFrame:[[self.chatScrollView contentView] bounds]] autorelease];
     [self.chatTableView setDataSource:self];
@@ -309,20 +391,23 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [self.chatTableView setAllowsColumnReordering:NO];
     [self.chatTableView setAllowsMultipleSelection:NO];
     [self.chatTableView setRowHeight:24.0];
-    [self.chatTableView setUsesAlternatingRowBackgroundColors:YES];
+    [self applySkeuomorphicTableStyle:self.chatTableView];
 
     NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"title"] autorelease];
     [[chatColumn headerCell] setStringValue:@"Chat"];
+    [self applySkeuomorphicHeaderCellStyle:[chatColumn headerCell]];
     [chatColumn setWidth:470.0];
     [self.chatTableView addTableColumn:chatColumn];
 
     NSTableColumn *typeColumn = [[[NSTableColumn alloc] initWithIdentifier:@"type"] autorelease];
     [[typeColumn headerCell] setStringValue:@"Type"];
+    [self applySkeuomorphicHeaderCellStyle:[typeColumn headerCell]];
     [typeColumn setWidth:130.0];
     [self.chatTableView addTableColumn:typeColumn];
 
     NSTableColumn *unreadColumn = [[[NSTableColumn alloc] initWithIdentifier:@"unread_count"] autorelease];
     [[unreadColumn headerCell] setStringValue:@"Unread"];
+    [self applySkeuomorphicHeaderCellStyle:[unreadColumn headerCell]];
     [unreadColumn setWidth:80.0];
     [self.chatTableView addTableColumn:unreadColumn];
 
@@ -341,19 +426,19 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 
     self.loadMessagesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(116, 192, 136, 32)] autorelease];
     [self.loadMessagesButton setTitle:@"Load Messages"];
-    [self.loadMessagesButton setBezelStyle:NSRoundedBezelStyle];
     [self.loadMessagesButton setTarget:self];
     [self.loadMessagesButton setAction:@selector(loadMessages:)];
     [self.loadMessagesButton setEnabled:NO];
+    [self applySkeuomorphicButtonStyle:self.loadMessagesButton isPrimary:YES];
     [self.loadMessagesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadMessagesButton];
 
     self.loadOlderMessagesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(264, 192, 112, 32)] autorelease];
     [self.loadOlderMessagesButton setTitle:@"Older"];
-    [self.loadOlderMessagesButton setBezelStyle:NSRoundedBezelStyle];
     [self.loadOlderMessagesButton setTarget:self];
     [self.loadOlderMessagesButton setAction:@selector(loadOlderMessages:)];
     [self.loadOlderMessagesButton setEnabled:NO];
+    [self applySkeuomorphicButtonStyle:self.loadOlderMessagesButton isPrimary:NO];
     [self.loadOlderMessagesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadOlderMessagesButton];
 
@@ -364,9 +449,8 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [contentView addSubview:self.selectedChatField];
 
     self.messageScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 72, 712, 112)] autorelease];
-    [self.messageScrollView setBorderType:NSBezelBorder];
-    [self.messageScrollView setHasVerticalScroller:YES];
     [self.messageScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [self applySkeuomorphicScrollStyle:self.messageScrollView];
 
     self.messageTableView = [[[NSTableView alloc] initWithFrame:[[self.messageScrollView contentView] bounds]] autorelease];
     [self.messageTableView setDataSource:self];
@@ -374,20 +458,23 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [self.messageTableView setAllowsColumnReordering:NO];
     [self.messageTableView setAllowsMultipleSelection:NO];
     [self.messageTableView setRowHeight:24.0];
-    [self.messageTableView setUsesAlternatingRowBackgroundColors:YES];
+    [self applySkeuomorphicTableStyle:self.messageTableView];
 
     NSTableColumn *dateColumn = [[[NSTableColumn alloc] initWithIdentifier:@"date"] autorelease];
     [[dateColumn headerCell] setStringValue:@"Time"];
+    [self applySkeuomorphicHeaderCellStyle:[dateColumn headerCell]];
     [dateColumn setWidth:120.0];
     [self.messageTableView addTableColumn:dateColumn];
 
     NSTableColumn *directionColumn = [[[NSTableColumn alloc] initWithIdentifier:@"direction"] autorelease];
     [[directionColumn headerCell] setStringValue:@"Dir"];
+    [self applySkeuomorphicHeaderCellStyle:[directionColumn headerCell]];
     [directionColumn setWidth:54.0];
     [self.messageTableView addTableColumn:directionColumn];
 
     NSTableColumn *previewColumn = [[[NSTableColumn alloc] initWithIdentifier:@"preview"] autorelease];
     [[previewColumn headerCell] setStringValue:@"Message"];
+    [self applySkeuomorphicHeaderCellStyle:[previewColumn headerCell]];
     [previewColumn setWidth:500.0];
     [self.messageTableView addTableColumn:previewColumn];
 
@@ -406,32 +493,33 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 
     self.sendTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextField setEnabled:NO];
+    [self applySkeuomorphicTextFieldStyle:self.sendTextField];
     [self.sendTextField setDelegate:(id)self];
     [self.sendTextField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.sendTextField];
 
     self.sendMessageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(588, 50, 148, 32)] autorelease];
     [self.sendMessageButton setTitle:@"Send Message"];
-    [self.sendMessageButton setBezelStyle:NSRoundedBezelStyle];
     [self.sendMessageButton setTarget:self];
     [self.sendMessageButton setAction:@selector(sendMessage:)];
     [self.sendMessageButton setEnabled:NO];
+    [self applySkeuomorphicButtonStyle:self.sendMessageButton isPrimary:YES];
     [self.sendMessageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.sendMessageButton];
 
     self.checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 28, 140, 32)] autorelease];
     [self.checkButton setTitle:@"Check TDLib"];
-    [self.checkButton setBezelStyle:NSRoundedBezelStyle];
     [self.checkButton setTarget:self];
     [self.checkButton setAction:@selector(checkTDLib:)];
+    [self applySkeuomorphicButtonStyle:self.checkButton isPrimary:YES];
     [self.checkButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.checkButton];
 
     self.quitButton = [[[NSButton alloc] initWithFrame:NSMakeRect(176, 28, 96, 32)] autorelease];
     [self.quitButton setTitle:@"Quit"];
-    [self.quitButton setBezelStyle:NSRoundedBezelStyle];
     [self.quitButton setTarget:NSApp];
     [self.quitButton setAction:@selector(terminate:)];
+    [self applySkeuomorphicButtonStyle:self.quitButton isPrimary:NO];
     [self.quitButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.quitButton];
 
@@ -469,20 +557,40 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
     [self.conversationPanelView setFrame:NSMakeRect(conversationX, bodyY, conversationWidth, bodyHeight)];
     [self.diagnosticsPanelView setFrame:NSMakeRect(margin, diagnosticsY, contentWidth, diagnosticsHeight)];
 
-    [self.titleField setFrame:NSMakeRect(margin + 18.0, topPanelY + 24.0, 260.0, 24.0)];
-    [self.statusField setFrame:NSMakeRect(margin + 20.0, topPanelY + 8.0, contentWidth - 360.0, 18.0)];
-    [self.checkButton setFrame:NSMakeRect(width - margin - 248.0, topPanelY + 12.0, 140.0, 32.0)];
-    [self.quitButton setFrame:NSMakeRect(width - margin - 100.0, topPanelY + 12.0, 84.0, 32.0)];
+    CGFloat topActionGap = 9.0;
+    CGFloat topQuitWidth = 86.0;
+    CGFloat topCheckWidth = 146.0;
+    CGFloat topActionBaseY = topPanelY + 12.0;
+    CGFloat topActionRight = width - margin - topActionGap;
+    CGFloat topCheckX = topActionRight - topCheckWidth;
+    CGFloat topQuitX = topCheckX - topActionGap - topQuitWidth;
+    CGFloat topTextStart = margin + 18.0;
+    CGFloat topAvailableTextWidth = (topCheckX - topTextStart - 4.0);
+    if (topAvailableTextWidth < 240.0) {
+        topAvailableTextWidth = 240.0;
+    }
+    [self.titleField setFrame:NSMakeRect(topTextStart, topPanelY + 24.0, topAvailableTextWidth, 24.0)];
+    [self.statusField setFrame:NSMakeRect(topTextStart, topPanelY + 8.0, topAvailableTextWidth, 18.0)];
+    [self.checkButton setFrame:NSMakeRect(topCheckX, topActionBaseY, topCheckWidth, 32.0)];
+    [self.quitButton setFrame:NSMakeRect(topQuitX, topActionBaseY, topQuitWidth, 32.0)];
 
+    CGFloat authInputWidth = contentWidth - 420.0;
+    if (authInputWidth < 170.0) {
+        authInputWidth = 170.0;
+    }
+    CGFloat authButtonX = width - margin - 122.0;
+    if (authButtonX < (margin + 220.0)) {
+        authButtonX = margin + 220.0;
+    }
     [self.authLabel setFrame:NSMakeRect(margin + 10.0, authY + 8.0, 62.0, 20.0)];
-    [self.authStateField setFrame:NSMakeRect(margin + 78.0, authY + 8.0, contentWidth - 560.0, 20.0)];
+    [self.authStateField setFrame:NSMakeRect(margin + 78.0, authY + 8.0, authInputWidth, 20.0)];
     [self.authTextField setFrame:NSMakeRect(margin + 78.0, authY + 4.0, 240.0, 24.0)];
     [self.authSecureField setFrame:NSMakeRect(margin + 78.0, authY + 4.0, 240.0, 24.0)];
-    [self.authButton setFrame:NSMakeRect(margin + 332.0, authY, 116.0, 32.0)];
+    [self.authButton setFrame:NSMakeRect(authButtonX, authY, 116.0, 32.0)];
 
     [self.chatsLabel setFrame:NSMakeRect(margin + 14.0, bodyTop - 30.0, 90.0, 22.0)];
-    [self.loadChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 176.0, bodyTop - 36.0, 108.0, 30.0)];
-    [self.loadMoreChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 62.0, bodyTop - 36.0, 44.0, 30.0)];
+    [self.loadChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 184.0, bodyTop - 36.0, 112.0, 30.0)];
+    [self.loadMoreChatsButton setFrame:NSMakeRect(margin + sidebarWidth - 66.0, bodyTop - 36.0, 50.0, 30.0)];
     [self.chatScrollView setFrame:NSMakeRect(margin + 12.0, bodyY + 12.0, sidebarWidth - 24.0, bodyHeight - 56.0)];
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"title"];
     if (chatColumn) {
@@ -516,9 +624,16 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         [previewColumn setWidth:previewWidth];
     }
 
+    CGFloat sendButtonWidth = (conversationWidth < 470.0) ? 112.0 : 132.0;
+    CGFloat sendFieldX = conversationX + 62.0;
+    CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
+    CGFloat sendFieldWidth = sendButtonX - sendFieldX - 10.0;
+    if (sendFieldWidth < 160.0) {
+        sendFieldWidth = 160.0;
+    }
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 46.0, 22.0)];
-    [self.sendTextField setFrame:NSMakeRect(conversationX + 62.0, composerY + 4.0, conversationWidth - 222.0, 24.0)];
-    [self.sendMessageButton setFrame:NSMakeRect(conversationX + conversationWidth - 148.0, composerY, 132.0, 32.0)];
+    [self.sendTextField setFrame:NSMakeRect(sendFieldX, composerY + 4.0, sendFieldWidth, 24.0)];
+    [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY, sendButtonWidth, 32.0)];
 
     [self.diagnosticsLabel setFrame:NSMakeRect(margin + 14.0, diagnosticsY + diagnosticsHeight - 26.0, 120.0, 18.0)];
     [self.detailsScrollView setFrame:NSMakeRect(margin + 12.0, diagnosticsY + 12.0, contentWidth - 24.0, diagnosticsHeight - 42.0)];
@@ -731,6 +846,19 @@ static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
         return (NSInteger)[self.messageItems count];
     }
     return (NSInteger)[self.chatItems count];
+}
+
+- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    (void)tableColumn;
+    (void)row;
+    if (![cell isKindOfClass:[NSTextFieldCell class]]) {
+        return;
+    }
+    NSTextFieldCell *textCell = (NSTextFieldCell *)cell;
+    [textCell setFont:[NSFont systemFontOfSize:12.0]];
+    [textCell setTextColor:[NSColor colorWithCalibratedRed:0.15 green:0.14 blue:0.12 alpha:1.0]];
+    [textCell setDrawsBackground:NO];
+    [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
 }
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
