@@ -9,6 +9,44 @@ static NSUInteger const TGStatusChatPreviewStep = 40;
 static NSUInteger const TGStatusChatPreviewMaximumLimit = 500;
 static CGFloat const TGPanelCornerRadius = 10.0;
 
+static long long TGMessageSortValue(id value) {
+    if ([value respondsToSelector:@selector(longLongValue)]) {
+        return [value longLongValue];
+    }
+    return 0;
+}
+
+static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context) {
+    (void)context;
+    long long leftDate = 0;
+    long long rightDate = 0;
+    long long leftMessageID = 0;
+    long long rightMessageID = 0;
+
+    if ([left isKindOfClass:[TGMessageItem class]]) {
+        leftDate = TGMessageSortValue([(TGMessageItem *)left date]);
+        leftMessageID = TGMessageSortValue([(TGMessageItem *)left messageID]);
+    }
+    if ([right isKindOfClass:[TGMessageItem class]]) {
+        rightDate = TGMessageSortValue([(TGMessageItem *)right date]);
+        rightMessageID = TGMessageSortValue([(TGMessageItem *)right messageID]);
+    }
+
+    if (leftDate < rightDate) {
+        return NSOrderedAscending;
+    }
+    if (leftDate > rightDate) {
+        return NSOrderedDescending;
+    }
+    if (leftMessageID < rightMessageID) {
+        return NSOrderedAscending;
+    }
+    if (leftMessageID > rightMessageID) {
+        return NSOrderedDescending;
+    }
+    return NSOrderedSame;
+}
+
 @interface TGChromeView : NSView
 @end
 
@@ -26,10 +64,7 @@ static CGFloat const TGPanelCornerRadius = 10.0;
                                                                 endingColor:[NSColor colorWithCalibratedRed:0.70 green:0.70 blue:0.65 alpha:1.0]] autorelease];
     [bottomGradient drawInRect:lowerHalf angle:90.0];
 
-    [[NSColor colorWithCalibratedRed:1.0 green:1.0 blue:1.0 alpha:0.48] set];
-    NSRectFill(NSMakeRect(0.0, NSHeight(bounds) - 12.0, NSWidth(bounds), 5.0));
-
-    [[NSColor colorWithCalibratedWhite:0.2 alpha:0.28] set];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.18] set];
     NSRectFill(NSMakeRect(0.0, NSHeight(bounds) - 1.0, NSWidth(bounds), 1.0));
 }
 
@@ -131,6 +166,7 @@ static CGFloat const TGPanelCornerRadius = 10.0;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
 @property (nonatomic, assign) BOOL autoOlderMessagesLoadArmed;
 @property (nonatomic, assign) BOOL autoChatListLoadArmed;
+@property (nonatomic, assign) BOOL forceMessageScrollToNewest;
 @end
 
 @implementation TGStatusWindowController
@@ -182,6 +218,7 @@ static CGFloat const TGPanelCornerRadius = 10.0;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
 @synthesize autoOlderMessagesLoadArmed = _autoOlderMessagesLoadArmed;
 @synthesize autoChatListLoadArmed = _autoChatListLoadArmed;
+@synthesize forceMessageScrollToNewest = _forceMessageScrollToNewest;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -979,44 +1016,56 @@ static CGFloat const TGPanelCornerRadius = 10.0;
 }
 
 - (NSNumber *)oldestLoadedMessageID {
-    NSInteger index = (NSInteger)[self.messageItems count] - 1;
-    while (index >= 0) {
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
         TGMessageItem *item = [self.messageItems objectAtIndex:(NSUInteger)index];
         id messageID = [item messageID];
         if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
             return [NSNumber numberWithLongLong:[messageID longLongValue]];
         }
-        index--;
     }
     return nil;
 }
 
+- (NSArray *)messageItemsInDisplayOrderFromItems:(NSArray *)items {
+    return [items sortedArrayUsingFunction:TGCompareMessageItemsAscending context:NULL];
+}
+
+- (void)scrollMessagesToNewestIfAvailable {
+    NSUInteger count = [self.messageItems count];
+    if (count > 0) {
+        [self.messageTableView scrollRowToVisible:(count - 1)];
+    }
+}
+
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
+    NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
+    BOOL forceScrollToNewest = self.forceMessageScrollToNewest;
+    self.forceMessageScrollToNewest = NO;
     if (!preserveOlder || [self.messageItems count] == 0) {
         [self.messageItems removeAllObjects];
-        [self.messageItems addObjectsFromArray:items];
+        [self.messageItems addObjectsFromArray:orderedItems];
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self.messageTableView reloadData];
-        if ([self.messageItems count] > 0) {
-            [self.messageTableView scrollRowToVisible:0];
-        }
+        [self scrollMessagesToNewestIfAvailable];
         return;
     }
 
+    BOOL shouldScrollToNewest = forceScrollToNewest || [self isMessageHistoryNearBottom];
     NSMutableSet *messageIDs = [NSMutableSet set];
-    NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:items];
+    NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:self.messageItems];
     NSUInteger index = 0;
-    for (index = 0; index < [items count]; index++) {
-        TGMessageItem *item = [items objectAtIndex:index];
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
         id messageID = [item messageID];
         if (messageID) {
             [messageIDs addObject:messageID];
         }
     }
 
-    for (index = 0; index < [self.messageItems count]; index++) {
-        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+    for (index = 0; index < [orderedItems count]; index++) {
+        TGMessageItem *item = [orderedItems objectAtIndex:index];
         id messageID = [item messageID];
         if (messageID && [messageIDs containsObject:messageID]) {
             continue;
@@ -1028,11 +1077,20 @@ static CGFloat const TGPanelCornerRadius = 10.0;
     }
 
     [self.messageItems removeAllObjects];
-    [self.messageItems addObjectsFromArray:mergedItems];
+    [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:mergedItems]];
     [self.messageTableView reloadData];
+    if (shouldScrollToNewest) {
+        [self scrollMessagesToNewestIfAvailable];
+    }
 }
 
 - (NSUInteger)appendOlderMessageItems:(NSArray *)items {
+    NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
+    NSPoint visibleOrigin = [[self.messageScrollView contentView] bounds].origin;
+    NSInteger firstVisibleRow = [self.messageTableView rowAtPoint:visibleOrigin];
+    if (firstVisibleRow < 0) {
+        firstVisibleRow = 0;
+    }
     NSMutableSet *messageIDs = [NSMutableSet set];
     NSUInteger index = 0;
     for (index = 0; index < [self.messageItems count]; index++) {
@@ -1043,9 +1101,10 @@ static CGFloat const TGPanelCornerRadius = 10.0;
         }
     }
 
+    NSMutableArray *itemsToPrepend = [NSMutableArray array];
     NSUInteger added = 0;
-    for (index = 0; index < [items count]; index++) {
-        TGMessageItem *item = [items objectAtIndex:index];
+    for (index = 0; index < [orderedItems count]; index++) {
+        TGMessageItem *item = [orderedItems objectAtIndex:index];
         id messageID = [item messageID];
         if (messageID && [messageIDs containsObject:messageID]) {
             continue;
@@ -1053,13 +1112,24 @@ static CGFloat const TGPanelCornerRadius = 10.0;
         if (messageID) {
             [messageIDs addObject:messageID];
         }
-        [self.messageItems addObject:item];
+        [itemsToPrepend addObject:item];
         added++;
+    }
+
+    if (added > 0) {
+        NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:itemsToPrepend];
+        [mergedItems addObjectsFromArray:self.messageItems];
+        [self.messageItems removeAllObjects];
+        [self.messageItems addObjectsFromArray:mergedItems];
     }
 
     [self.messageTableView reloadData];
     if (added > 0) {
-        [self.messageTableView scrollRowToVisible:([self.messageItems count] - 1)];
+        NSUInteger targetRow = (NSUInteger)firstVisibleRow + added;
+        if (targetRow >= [self.messageItems count]) {
+            targetRow = [self.messageItems count] - 1;
+        }
+        [self.messageTableView scrollRowToVisible:targetRow];
     }
     return added;
 }
@@ -1121,7 +1191,7 @@ static CGFloat const TGPanelCornerRadius = 10.0;
 }
 
 - (BOOL)isMessageHistoryNearBottom {
-    if ([self.messageItems count] == 0 || self.olderMessagesExhausted) {
+    if ([self.messageItems count] == 0) {
         return NO;
     }
 
@@ -1139,6 +1209,27 @@ static CGFloat const TGPanelCornerRadius = 10.0;
     return (distanceFromBottom <= 48.0);
 }
 
+- (BOOL)isMessageHistoryNearTop {
+    if ([self.messageItems count] == 0 || self.olderMessagesExhausted) {
+        return NO;
+    }
+
+    NSClipView *clipView = [self.messageScrollView contentView];
+    NSView *documentView = [self.messageScrollView documentView];
+    if (!clipView || !documentView) {
+        return NO;
+    }
+
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    if (NSHeight(documentBounds) <= (NSHeight(visibleRect) + 16.0)) {
+        return NO;
+    }
+
+    CGFloat distanceFromTop = NSMinY(visibleRect) - NSMinY(documentBounds);
+    return (distanceFromTop <= 48.0);
+}
+
 - (void)messageScrollViewDidScroll:(NSNotification *)notification {
     if ([notification object] != [self.messageScrollView contentView]) {
         return;
@@ -1153,7 +1244,7 @@ static CGFloat const TGPanelCornerRadius = 10.0;
         return;
     }
 
-    if (![self isMessageHistoryNearBottom]) {
+    if (![self isMessageHistoryNearTop]) {
         self.autoOlderMessagesLoadArmed = YES;
         return;
     }
@@ -1746,6 +1837,7 @@ static CGFloat const TGPanelCornerRadius = 10.0;
                 [[TGLogger sharedLogger] log:@"TDLib text message send accepted."];
                 if (selectionStillCurrent) {
                     [self.sendTextField setStringValue:@""];
+                    self.forceMessageScrollToNewest = YES;
                 }
             } else {
                 [self.statusField setStringValue:@"TDLib send: not confirmed"];
