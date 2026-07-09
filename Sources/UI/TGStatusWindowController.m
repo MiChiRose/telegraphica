@@ -751,7 +751,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    [TGClassicPanelBottomColor() set];
+    [[NSColor colorWithCalibratedWhite:0.925 alpha:1.0] set];
     NSRectFill([self bounds]);
 }
 
@@ -1786,11 +1786,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)applySettingsListButtonStyle:(NSButton *)button {
+    id target = [button target];
+    SEL action = [button action];
+    NSString *title = [[button title] copy];
     TGSettingsListButtonCell *cell = [[[TGSettingsListButtonCell alloc] initTextCell:[button title]] autorelease];
     [cell setButtonType:NSMomentaryPushInButton];
     [button setCell:cell];
+    [button setTitle:title];
+    [button setTarget:target];
+    [button setAction:action];
     [button setBordered:NO];
     [button setFocusRingType:NSFocusRingTypeExterior];
+    [title release];
 }
 
 - (void)applyDestructiveSettingsButtonStyle:(NSButton *)button {
@@ -1910,9 +1917,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applySkeuomorphicTextFieldStyle:self.authTextField];
     [self applySkeuomorphicTextFieldStyle:self.authSecureField];
     [self applySkeuomorphicTextFieldStyle:self.sendTextField];
-    [self applySettingsListButtonStyle:self.settingsAppearanceButton];
-    [self applySettingsListButtonStyle:self.settingsLogsButton];
-    [self applySettingsListButtonStyle:self.settingsAboutButton];
+    [self.settingsAppearanceButton setNeedsDisplay:YES];
+    [self.settingsLogsButton setNeedsDisplay:YES];
+    [self.settingsAboutButton setNeedsDisplay:YES];
     [self applySkeuomorphicScrollStyle:self.detailsScrollView];
     [self applySkeuomorphicScrollStyle:self.chatScrollView];
     [self applySkeuomorphicScrollStyle:self.messageScrollView];
