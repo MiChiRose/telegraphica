@@ -4409,7 +4409,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *voiceContent = [NSMutableDictionary dictionary];
     [voiceContent setObject:@"inputMessageVoiceNote" forKey:@"@type"];
     [voiceContent setObject:inputFile forKey:@"voice_note"];
-    [voiceContent setObject:[NSArray array] forKey:@"waveform"];
+    [voiceContent setObject:@"" forKey:@"waveform"];
     [voiceContent setObject:formattedCaption forKey:@"caption"];
     [voiceContent setObject:safeDuration forKey:@"duration"];
 
@@ -4442,6 +4442,24 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
                                 extraPrefix:@"telegraphica-send-audio-fallback"
+                                    timeout:timeout
+                                  errorCode:90
+                                      error:&sendError];
+    }
+    if (!response) {
+        NSMutableDictionary *documentContent = [NSMutableDictionary dictionary];
+        [documentContent setObject:@"inputMessageDocument" forKey:@"@type"];
+        [documentContent setObject:inputFile forKey:@"document"];
+        [documentContent setObject:[NSNull null] forKey:@"thumbnail"];
+        [documentContent setObject:[NSNumber numberWithBool:NO] forKey:@"disable_content_type_detection"];
+        [documentContent setObject:formattedCaption forKey:@"caption"];
+
+        NSMutableDictionary *documentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [documentRequest setObject:documentContent forKey:@"input_message_content"];
+        response = [self sendMessageRequest:documentRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-voice-document-fallback"
                                     timeout:timeout
                                   errorCode:90
                                       error:&sendError];
