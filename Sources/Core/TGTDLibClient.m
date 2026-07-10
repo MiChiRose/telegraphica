@@ -2352,6 +2352,13 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     return [NSDictionary dictionaryWithObjectsAndKeys:path, @"local_path", fileID, @"file_id", nil];
 }
 
+- (NSString *)downloadedLocalPathForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    (void)error;
+    NSDictionary *info = [self downloadedFileInfoForFileID:fileID timeout:timeout];
+    NSString *path = [info objectForKey:@"local_path"];
+    return ([path isKindOfClass:[NSString class]] && [path length] > 0) ? path : nil;
+}
+
 - (NSDictionary *)photoInfoFromFileObject:(id)fileObject
                                     width:(NSNumber *)width
                                    height:(NSNumber *)height
@@ -2392,10 +2399,10 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         return nil;
     }
 
-    NSDictionary *bestDownloadedSize = nil;
-    NSDictionary *bestDownloadableSize = nil;
-    NSInteger bestDownloadedScore = NSIntegerMax;
-    NSInteger bestDownloadableScore = NSIntegerMax;
+    NSDictionary *bestDisplayDownloadedSize = nil;
+    NSDictionary *largestSize = nil;
+    NSInteger bestDisplayScore = NSIntegerMax;
+    long long largestArea = 0;
     NSUInteger index = 0;
     for (index = 0; index < [sizes count]; index++) {
         id sizeObject = [sizes objectAtIndex:index];
@@ -2412,36 +2419,67 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         }
         NSInteger longestSide = (width > height) ? width : height;
         NSInteger score = (longestSide > 300) ? (longestSide - 300) : (300 - longestSide);
+        long long area = (long long)width * (long long)height;
         id fileObject = [size objectForKey:@"photo"];
         NSString *localPath = [self completedLocalPathFromFileObject:fileObject];
-        NSNumber *fileID = [self fileIDFromFileObject:fileObject];
         if ([localPath length] > 0) {
-            if (!bestDownloadedSize || score < bestDownloadedScore) {
-                bestDownloadedSize = size;
-                bestDownloadedScore = score;
+            if (!bestDisplayDownloadedSize || score < bestDisplayScore) {
+                bestDisplayDownloadedSize = size;
+                bestDisplayScore = score;
             }
-        } else if (fileID) {
-            if (!bestDownloadableSize || score < bestDownloadableScore) {
-                bestDownloadableSize = size;
-                bestDownloadableScore = score;
-            }
+        }
+        if (!largestSize || area > largestArea) {
+            largestSize = size;
+            largestArea = area;
         }
     }
 
-    NSDictionary *selectedSize = bestDownloadedSize ? bestDownloadedSize : bestDownloadableSize;
-    if (!selectedSize) {
+    NSDictionary *displaySize = bestDisplayDownloadedSize ? bestDisplayDownloadedSize : largestSize;
+    if (!displaySize) {
         return nil;
     }
-    id widthObject = [selectedSize objectForKey:@"width"];
-    id heightObject = [selectedSize objectForKey:@"height"];
+
+    id widthObject = [displaySize objectForKey:@"width"];
+    id heightObject = [displaySize objectForKey:@"height"];
     NSNumber *width = [widthObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[widthObject integerValue]] : nil;
     NSNumber *height = [heightObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[heightObject integerValue]] : nil;
-    return [self photoInfoFromFileObject:[selectedSize objectForKey:@"photo"]
-                                   width:width
-                                  height:height
-                         downloadMissing:(downloadMissing && !bestDownloadedSize)
-                                 timeout:timeout
-                      didRequestDownload:didRequestDownload];
+    NSDictionary *displayInfo = [self photoInfoFromFileObject:[displaySize objectForKey:@"photo"]
+                                                        width:width
+                                                       height:height
+                                              downloadMissing:NO
+                                                      timeout:timeout
+                                           didRequestDownload:didRequestDownload];
+    NSMutableDictionary *info = displayInfo ? [NSMutableDictionary dictionaryWithDictionary:displayInfo] : [NSMutableDictionary dictionary];
+
+    id fullWidthObject = [largestSize objectForKey:@"width"];
+    id fullHeightObject = [largestSize objectForKey:@"height"];
+    NSNumber *fullWidth = [fullWidthObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[fullWidthObject integerValue]] : nil;
+    NSNumber *fullHeight = [fullHeightObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[fullHeightObject integerValue]] : nil;
+    id fullFileObject = [largestSize objectForKey:@"photo"];
+    NSNumber *fullFileID = [self fileIDFromFileObject:fullFileObject];
+    NSString *fullLocalPath = [self completedLocalPathFromFileObject:fullFileObject];
+    if ([fullLocalPath length] == 0 && downloadMissing && fullFileID) {
+        if (didRequestDownload) {
+            *didRequestDownload = YES;
+        }
+        NSDictionary *downloadedInfo = [self downloadedFileInfoForFileID:fullFileID timeout:timeout];
+        fullLocalPath = [downloadedInfo objectForKey:@"local_path"];
+    }
+
+    if (fullFileID) {
+        [info setObject:fullFileID forKey:@"full_file_id"];
+    }
+    if ([fullLocalPath length] > 0) {
+        [info setObject:fullLocalPath forKey:@"full_local_path"];
+        [info setObject:fullLocalPath forKey:@"local_path"];
+    }
+    if (fullWidth) {
+        [info setObject:fullWidth forKey:@"full_width"];
+    }
+    if (fullHeight) {
+        [info setObject:fullHeight forKey:@"full_height"];
+    }
+    return ([info count] > 0) ? info : nil;
 }
 
 - (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject {
@@ -2792,6 +2830,20 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         }
         [item setMediaWidth:[photoInfo objectForKey:@"width"]];
         [item setMediaHeight:[photoInfo objectForKey:@"height"]];
+        if ([photoInfo count] > 0 && [item isVisualMediaMessage]) {
+            NSMutableDictionary *mediaInfo = [NSMutableDictionary dictionaryWithDictionary:photoInfo];
+            if ([contentType length] > 0) {
+                [mediaInfo setObject:contentType forKey:@"content_type"];
+            }
+            if ([safeMessageID respondsToSelector:@selector(longLongValue)]) {
+                [mediaInfo setObject:safeMessageID forKey:@"message_id"];
+            }
+            NSString *placeholder = [item visualMediaPlaceholderTitle];
+            if ([placeholder length] > 0) {
+                [mediaInfo setObject:placeholder forKey:@"placeholder"];
+            }
+            [item setMediaItems:[NSArray arrayWithObject:mediaInfo]];
+        }
         [items addObject:item];
     }
     return [self messagePreviewItemsByGroupingMediaAlbums:items];

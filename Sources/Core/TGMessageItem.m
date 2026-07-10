@@ -141,6 +141,11 @@
         return @"Media";
     }
     if ([self isStickerMessage]) {
+        NSString *preview = ([self.preview length] > 0) ? self.preview : @"";
+        NSString *stickerPrefix = @"[Sticker] ";
+        if ([preview hasPrefix:stickerPrefix] && [preview length] > [stickerPrefix length]) {
+            return [preview substringFromIndex:[stickerPrefix length]];
+        }
         return @"Sticker";
     }
     if ([self.contentType isEqualToString:@"messageAnimation"]) {
