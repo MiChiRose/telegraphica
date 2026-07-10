@@ -64,6 +64,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize mediaHeight = _mediaHeight;
 @synthesize mediaAlbumID = _mediaAlbumID;
 @synthesize mediaItems = _mediaItems;
+@synthesize mediaFileID = _mediaFileID;
+@synthesize mediaDuration = _mediaDuration;
+@synthesize mediaMimeType = _mediaMimeType;
 @synthesize reactionSummary = _reactionSummary;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
@@ -117,7 +120,25 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     }
     return ([self isStickerMessage] ||
             [self.contentType isEqualToString:@"messageAnimation"] ||
-            [self.contentType isEqualToString:@"messageVideo"]);
+            [self.contentType isEqualToString:@"messageVideo"] ||
+            [self.contentType isEqualToString:@"messageVideoNote"]);
+}
+
+- (BOOL)isVoiceNoteMessage {
+    return [self.contentType isEqualToString:@"messageVoiceNote"];
+}
+
+- (BOOL)isVideoNoteMessage {
+    return [self.contentType isEqualToString:@"messageVideoNote"];
+}
+
+- (BOOL)isPlayableMediaMessage {
+    if ([self isVoiceNoteMessage] || [self isVideoNoteMessage]) {
+        return YES;
+    }
+    return ([self.contentType isEqualToString:@"messageAudio"] ||
+            [self.contentType isEqualToString:@"messageVideo"] ||
+            [self.contentType isEqualToString:@"messageAnimation"]);
 }
 
 - (BOOL)isMediaAlbumMessage {
@@ -147,6 +168,15 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     }
     if ([self.reactionSummary length] > 0) {
         [media setObject:self.reactionSummary forKey:@"reaction_summary"];
+    }
+    if ([self.mediaFileID respondsToSelector:@selector(integerValue)]) {
+        [media setObject:self.mediaFileID forKey:@"playable_file_id"];
+    }
+    if ([self.mediaDuration respondsToSelector:@selector(integerValue)]) {
+        [media setObject:self.mediaDuration forKey:@"duration"];
+    }
+    if ([self.mediaMimeType length] > 0) {
+        [media setObject:self.mediaMimeType forKey:@"mime_type"];
     }
     NSString *placeholder = [self visualMediaPlaceholderTitle];
     if ([placeholder length] > 0) {
@@ -211,6 +241,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     if ([self.contentType isEqualToString:@"messageAnimation"]) {
         return @"GIF";
     }
+    if ([self isVideoNoteMessage]) {
+        return @"Video note";
+    }
     if ([self.contentType isEqualToString:@"messageVideo"]) {
         return @"Video";
     }
@@ -238,6 +271,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setMediaHeight:_mediaHeight];
     [copy setMediaAlbumID:_mediaAlbumID];
     [copy setMediaItems:_mediaItems];
+    [copy setMediaFileID:_mediaFileID];
+    [copy setMediaDuration:_mediaDuration];
+    [copy setMediaMimeType:_mediaMimeType];
     [copy setReactionSummary:_reactionSummary];
     return copy;
 }
@@ -272,6 +308,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_mediaHeight release];
     [_mediaAlbumID release];
     [_mediaItems release];
+    [_mediaFileID release];
+    [_mediaDuration release];
+    [_mediaMimeType release];
     [_reactionSummary release];
     [super dealloc];
 }

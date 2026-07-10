@@ -4,6 +4,7 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 #import <ImageIO/ImageIO.h>
+#import <AVFoundation/AVFoundation.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
@@ -22,6 +23,9 @@ static NSString * const TGSectionAbout = @"about";
 static NSString * const TGSectionLogs = @"logs";
 
 static NSString * const TGThemeDefaultsKey = @"TelegraphicaThemeIdentifier";
+static NSString * const TGNotificationsEnabledDefaultsKey = @"TelegraphicaNotificationsEnabled";
+static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNotificationSoundEnabled";
+static NSString * const TGNotificationBadgeEnabledDefaultsKey = @"TelegraphicaNotificationBadgeEnabled";
 static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
 static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
 static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
@@ -29,6 +33,14 @@ static NSString * const TGThemeIdentifierIceNavy = @"ice-navy";
 static NSString * const TGThemeIdentifierRubyObsidian = @"ruby-obsidian";
 static NSString * const TGThemeIdentifierEggshellBurgundy = @"eggshell-burgundy";
 static NSString * const TGThemeIdentifierMelonOlive = @"melon-olive";
+
+static BOOL TGUserDefaultBoolWithDefault(NSString *key, BOOL defaultValue) {
+    id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+    if (!value) {
+        return defaultValue;
+    }
+    return [[NSUserDefaults standardUserDefaults] boolForKey:key];
+}
 
 typedef struct {
     CGFloat red;
@@ -777,6 +789,10 @@ static NSNumber *TGMediaItemFullFileID(NSDictionary *mediaItem) {
     if ([fileID respondsToSelector:@selector(integerValue)]) {
         return [NSNumber numberWithInteger:[fileID integerValue]];
     }
+    fileID = [mediaItem objectForKey:@"playable_file_id"];
+    if ([fileID respondsToSelector:@selector(integerValue)]) {
+        return [NSNumber numberWithInteger:[fileID integerValue]];
+    }
     fileID = [mediaItem objectForKey:@"file_id"];
     if ([fileID respondsToSelector:@selector(integerValue)]) {
         return [NSNumber numberWithInteger:[fileID integerValue]];
@@ -794,7 +810,38 @@ static BOOL TGMediaItemIsAnimation(NSDictionary *mediaItem) {
 }
 
 static BOOL TGMediaItemIsVideo(NSDictionary *mediaItem) {
-    return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageVideo"];
+    NSString *contentType = TGMediaItemContentType(mediaItem);
+    return ([contentType isEqualToString:@"messageVideo"] ||
+            [contentType isEqualToString:@"messageVideoNote"]);
+}
+
+static BOOL TGMediaItemIsPlayable(NSDictionary *mediaItem) {
+    NSString *contentType = TGMediaItemContentType(mediaItem);
+    return ([contentType isEqualToString:@"messageAnimation"] ||
+            [contentType isEqualToString:@"messageVideo"] ||
+            [contentType isEqualToString:@"messageVideoNote"]);
+}
+
+static NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
+    id path = [mediaItem objectForKey:@"playable_local_path"];
+    if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
+        return (NSString *)path;
+    }
+    path = [mediaItem objectForKey:@"full_local_path"];
+    if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
+        return (NSString *)path;
+    }
+    return TGMediaItemLocalPath(mediaItem);
+}
+
+static NSString *TGDurationStringFromSecondsValue(id durationValue) {
+    NSInteger seconds = [durationValue respondsToSelector:@selector(integerValue)] ? [durationValue integerValue] : 0;
+    if (seconds <= 0) {
+        return @"";
+    }
+    NSInteger minutes = seconds / 60;
+    NSInteger remainder = seconds % 60;
+    return [NSString stringWithFormat:@"%ld:%02ld", (long)minutes, (long)remainder];
 }
 
 static NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem) {
@@ -847,6 +894,30 @@ static void TGDrawMediaKindBadge(NSString *badgeText, NSRect rect, BOOL flipped)
     NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:attributes];
     [centeredAttributes setObject:paragraph forKey:NSParagraphStyleAttributeName];
     [badgeText drawInRect:textRect withAttributes:centeredAttributes];
+}
+
+static void TGDrawMediaPlayBadge(NSRect rect, BOOL flipped) {
+    (void)flipped;
+    CGFloat badgeSide = 34.0;
+    NSRect badgeRect = NSMakeRect(NSMidX(rect) - (badgeSide / 2.0),
+                                  NSMidY(rect) - (badgeSide / 2.0),
+                                  badgeSide,
+                                  badgeSide);
+    NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:badgeRect];
+    [[NSColor colorWithCalibratedWhite:0.0 alpha:0.34] set];
+    [circle fill];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.82] set];
+    [circle setLineWidth:1.0];
+    [circle stroke];
+
+    NSRect triangleRect = NSInsetRect(badgeRect, 11.0, 9.0);
+    NSBezierPath *triangle = [NSBezierPath bezierPath];
+    [triangle moveToPoint:NSMakePoint(NSMinX(triangleRect), NSMinY(triangleRect))];
+    [triangle lineToPoint:NSMakePoint(NSMinX(triangleRect), NSMaxY(triangleRect))];
+    [triangle lineToPoint:NSMakePoint(NSMaxX(triangleRect), NSMidY(triangleRect))];
+    [triangle closePath];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.92] set];
+    [triangle fill];
 }
 
 static NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth) {
@@ -1076,6 +1147,9 @@ static void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL out
         } else if (TGMediaItemIsVideo(mediaItem)) {
             TGDrawMediaKindBadge(@"VIDEO", rect, flipped);
         }
+        if (TGMediaItemIsPlayable(mediaItem)) {
+            TGDrawMediaPlayBadge(rect, flipped);
+        }
     }
 
     if (overflowCount > 0) {
@@ -1099,6 +1173,8 @@ static void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL out
     }
 }
 
+static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
+
 static CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
     CGFloat widthRatio = ([item isVisualMediaMessage] ? 0.78 : 0.68);
     CGFloat maximumWidth = availableWidth * widthRatio;
@@ -1109,6 +1185,49 @@ static CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availabl
         maximumWidth = 180.0;
     }
     return maximumWidth;
+}
+
+static BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item) {
+    return ([item isKindOfClass:[TGMessageItem class]] &&
+            [item isPlayableMediaMessage] &&
+            ![item isVisualMediaMessage]);
+}
+
+static NSString *TGPlayableMediaTitleForMessageItem(TGMessageItem *item) {
+    if ([item isVoiceNoteMessage]) {
+        return @"Voice message";
+    }
+    if ([item isVideoNoteMessage]) {
+        return @"Video message";
+    }
+    if ([[item contentType] isEqualToString:@"messageAudio"]) {
+        return @"Audio";
+    }
+    if ([[item contentType] isEqualToString:@"messageAnimation"]) {
+        return @"GIF";
+    }
+    if ([[item contentType] isEqualToString:@"messageVideo"]) {
+        return @"Video";
+    }
+    return @"Media";
+}
+
+static CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth) {
+    (void)item;
+    CGFloat width = 228.0;
+    if (width > maximumWidth) {
+        width = maximumWidth;
+    }
+    if (width < 170.0) {
+        width = 170.0;
+    }
+    return width;
+}
+
+static CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item) {
+    CGFloat height = [item isVoiceNoteMessage] ? 58.0 : 62.0;
+    height += TGReactionBandHeightForMessageItem(item);
+    return height;
 }
 
 static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
@@ -1180,7 +1299,7 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
     }
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
-    NSString *text = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
+    NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -1213,6 +1332,9 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
     }
 
     CGFloat height = textHeight + 26.0;
+    if (TGMessageItemIsNonVisualPlayableMedia(item)) {
+        height = TGPlayableMediaBubbleHeightForItem(item);
+    }
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
         height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
@@ -1220,7 +1342,9 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
     if (height < 42.0) {
         height = 42.0;
     }
-    height += TGReactionBandHeightForMessageItem(item);
+    if (!TGMessageItemIsNonVisualPlayableMedia(item)) {
+        height += TGReactionBandHeightForMessageItem(item);
+    }
     return height + 10.0;
 }
 
@@ -1229,7 +1353,7 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
         return NSZeroRect;
     }
 
-    NSString *messageText = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
@@ -1271,6 +1395,7 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
                                                          options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;
+    BOOL nonVisualPlayable = TGMessageItemIsNonVisualPlayableMedia(item);
     BOOL visualMediaMessage = [item isVisualMediaMessage];
     if (visualMediaMessage) {
         photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
@@ -1278,6 +1403,9 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
 
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
+    if (nonVisualPlayable) {
+        bubbleWidth = TGPlayableMediaBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -1292,6 +1420,9 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
     }
 
     CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    if (nonVisualPlayable) {
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item);
+    }
     if (visualMediaMessage) {
         bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
         if (NSHeight(measuredRect) > 0.0) {
@@ -1301,10 +1432,89 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
-    bubbleHeight += TGReactionBandHeightForMessageItem(item);
+    if (!nonVisualPlayable) {
+        bubbleHeight += TGReactionBandHeightForMessageItem(item);
+    }
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
     return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+}
+
+static void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(bubbleRect)) {
+        return;
+    }
+
+    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
+    CGFloat usableHeight = NSHeight(bubbleRect) - reactionBandHeight;
+    if (usableHeight < 42.0) {
+        usableHeight = NSHeight(bubbleRect);
+    }
+    NSRect playableRect = NSMakeRect(NSMinX(bubbleRect),
+                                     flipped ? NSMinY(bubbleRect) : (NSMaxY(bubbleRect) - usableHeight),
+                                     NSWidth(bubbleRect),
+                                     usableHeight);
+    CGFloat circleSide = 34.0;
+    NSRect playCircleRect = NSMakeRect(NSMinX(playableRect) + 12.0,
+                                       NSMidY(playableRect) - (circleSide / 2.0),
+                                       circleSide,
+                                       circleSide);
+    NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:playCircleRect];
+    [TGClassicNavigationSelectedColor(0.90) set];
+    [circle fill];
+    [TGClassicNavigationSelectedStrokeColor(0.78) set];
+    [circle setLineWidth:1.0];
+    [circle stroke];
+
+    NSRect triangleRect = NSInsetRect(playCircleRect, 11.0, 9.0);
+    NSBezierPath *triangle = [NSBezierPath bezierPath];
+    [triangle moveToPoint:NSMakePoint(NSMinX(triangleRect), NSMinY(triangleRect))];
+    [triangle lineToPoint:NSMakePoint(NSMinX(triangleRect), NSMaxY(triangleRect))];
+    [triangle lineToPoint:NSMakePoint(NSMaxX(triangleRect), NSMidY(triangleRect))];
+    [triangle closePath];
+    [TGClassicHeaderTextColor(0.96) set];
+    [triangle fill];
+
+    NSString *title = TGPlayableMediaTitleForMessageItem(item);
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     nil];
+    NSString *duration = TGDurationStringFromSecondsValue([item mediaDuration]);
+    if ([duration length] == 0) {
+        duration = @"Tap to play";
+    }
+    NSDictionary *durationAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                        TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                        nil];
+    CGFloat textX = NSMaxX(playCircleRect) + 10.0;
+    CGFloat textWidth = NSWidth(playableRect) - (textX - NSMinX(playableRect)) - 68.0;
+    if (textWidth < 80.0) {
+        textWidth = 80.0;
+    }
+    [title drawInRect:NSMakeRect(textX, NSMidY(playableRect) - 4.0, textWidth, 16.0)
+       withAttributes:titleAttributes];
+    [duration drawInRect:NSMakeRect(textX, NSMidY(playableRect) - 19.0, textWidth, 14.0)
+          withAttributes:durationAttributes];
+
+    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    if ([timeString length] > 0) {
+        NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                        TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                        nil];
+        NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
+        CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
+        CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
+        CGFloat timeY = flipped ? (NSMaxY(playableRect) - 16.0) : (NSMinY(playableRect) + 5.0);
+        NSRect timeRect = NSMakeRect(NSMaxX(playableRect) - timeSize.width - statusWidth - statusGap - 12.0,
+                                     timeY,
+                                     timeSize.width,
+                                     10.0);
+        [timeString drawInRect:timeRect withAttributes:timeAttributes];
+        TGDrawOutgoingStatusDotsForItem(item, timeRect, flipped);
+    }
 }
 
 static long long TGMessageSortValue(id value) {
@@ -2187,10 +2397,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     BOOL flipped = [controlView isFlipped];
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 21.0,
-                                 NSMidY(buttonRect) - 21.0,
-                                 42.0,
-                                 42.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 19.0,
+                                 NSMidY(buttonRect) - 19.0,
+                                 38.0,
+                                 38.0);
     TGDrawPaperclipSvgPathInRect(iconRect, flipped, alpha);
 }
 
@@ -2413,7 +2623,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
-    NSString *messageText = [item isStickerMessage] ? @"" : rawMessageText;
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -2452,6 +2662,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                            options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;
+    BOOL nonVisualPlayable = TGMessageItemIsNonVisualPlayableMedia(item);
     BOOL visualMediaMessage = [item isVisualMediaMessage];
     if (visualMediaMessage) {
         photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
@@ -2459,6 +2670,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
 
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
+    if (nonVisualPlayable) {
+        bubbleWidth = TGPlayableMediaBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -2478,11 +2692,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
     }
+    if (nonVisualPlayable) {
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item);
+    }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    bubbleHeight += reactionBandHeight;
+    if (!nonVisualPlayable) {
+        bubbleHeight += reactionBandHeight;
+    }
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
@@ -2496,6 +2715,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [strokeColor set];
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
+
+    if (nonVisualPlayable) {
+        TGDrawPlayableMediaContentForItem(item, bubbleRect, [controlView isFlipped]);
+    }
 
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
     if ([controlView isFlipped] && reactionBandHeight > 0.0) {
@@ -2557,7 +2780,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                     options:NSStringDrawingUsesLineFragmentOrigin];
     }
 
-    if ([timeString length] > 0 && [messageText length] == 0) {
+    if ([timeString length] > 0 && [messageText length] == 0 && !nonVisualPlayable) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
         CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
@@ -2618,7 +2841,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, TGMediaPreviewMagnificationTarget>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) NSView *conversationPanelView;
@@ -2706,6 +2929,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *settingsStorageField;
 @property (nonatomic, retain) NSTextField *settingsThemeLabel;
 @property (nonatomic, retain) NSPopUpButton *themePopUpButton;
+@property (nonatomic, retain) NSButton *settingsNotificationsEnabledButton;
+@property (nonatomic, retain) NSButton *settingsNotificationSoundButton;
+@property (nonatomic, retain) NSButton *settingsNotificationBadgeButton;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
 @property (nonatomic, retain) NSButton *settingsAboutButton;
@@ -2741,6 +2967,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
+@property (nonatomic, retain) NSWindow *mediaPlaybackWindow;
+@property (nonatomic, retain) NSView *mediaPlaybackContainerView;
+@property (nonatomic, retain) NSTextField *mediaPlaybackTitleField;
+@property (nonatomic, retain) NSButton *mediaPlaybackPlayPauseButton;
+@property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
+@property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
 @property (nonatomic, assign) NSUInteger mediaPreviewRequestGeneration;
@@ -2774,6 +3006,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @property (nonatomic, assign) BOOL showingForumTopicList;
 @property (nonatomic, assign) CGFloat mediaPreviewZoomScale;
+@property (nonatomic, assign) BOOL mediaPlaybackPlaying;
 @end
 
 @implementation TGStatusWindowController
@@ -2865,6 +3098,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsStorageField = _settingsStorageField;
 @synthesize settingsThemeLabel = _settingsThemeLabel;
 @synthesize themePopUpButton = _themePopUpButton;
+@synthesize settingsNotificationsEnabledButton = _settingsNotificationsEnabledButton;
+@synthesize settingsNotificationSoundButton = _settingsNotificationSoundButton;
+@synthesize settingsNotificationBadgeButton = _settingsNotificationBadgeButton;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
 @synthesize settingsAboutButton = _settingsAboutButton;
@@ -2900,6 +3136,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
+@synthesize mediaPlaybackWindow = _mediaPlaybackWindow;
+@synthesize mediaPlaybackContainerView = _mediaPlaybackContainerView;
+@synthesize mediaPlaybackTitleField = _mediaPlaybackTitleField;
+@synthesize mediaPlaybackPlayPauseButton = _mediaPlaybackPlayPauseButton;
+@synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
+@synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
@@ -2933,6 +3175,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
+@synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -2958,6 +3201,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.autoChatListLoadArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
+        [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
@@ -3965,6 +4209,36 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self selectThemePopUpItemForIdentifier:TGCurrentThemeIdentifier()];
     [contentView addSubview:self.themePopUpButton];
 
+    self.settingsNotificationsEnabledButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 300, 260, 22)] autorelease];
+    [self.settingsNotificationsEnabledButton setButtonType:NSSwitchButton];
+    [self.settingsNotificationsEnabledButton setTitle:@"Show message notifications"];
+    [self.settingsNotificationsEnabledButton setTarget:self];
+    [self.settingsNotificationsEnabledButton setAction:@selector(notificationSettingChanged:)];
+    [self.settingsNotificationsEnabledButton setState:TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES) ? NSOnState : NSOffState];
+    [self.settingsNotificationsEnabledButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsNotificationsEnabledButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsNotificationsEnabledButton];
+
+    self.settingsNotificationSoundButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 276, 260, 22)] autorelease];
+    [self.settingsNotificationSoundButton setButtonType:NSSwitchButton];
+    [self.settingsNotificationSoundButton setTitle:@"Play notification sound"];
+    [self.settingsNotificationSoundButton setTarget:self];
+    [self.settingsNotificationSoundButton setAction:@selector(notificationSettingChanged:)];
+    [self.settingsNotificationSoundButton setState:TGUserDefaultBoolWithDefault(TGNotificationSoundEnabledDefaultsKey, YES) ? NSOnState : NSOffState];
+    [self.settingsNotificationSoundButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsNotificationSoundButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsNotificationSoundButton];
+
+    self.settingsNotificationBadgeButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 252, 260, 22)] autorelease];
+    [self.settingsNotificationBadgeButton setButtonType:NSSwitchButton];
+    [self.settingsNotificationBadgeButton setTitle:@"Show unread badge in Dock"];
+    [self.settingsNotificationBadgeButton setTarget:self];
+    [self.settingsNotificationBadgeButton setAction:@selector(notificationSettingChanged:)];
+    [self.settingsNotificationBadgeButton setState:TGUserDefaultBoolWithDefault(TGNotificationBadgeEnabledDefaultsKey, YES) ? NSOnState : NSOffState];
+    [self.settingsNotificationBadgeButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsNotificationBadgeButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsNotificationBadgeButton];
+
     self.settingsAppearanceButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 328, 260, 40)] autorelease];
     [self.settingsAppearanceButton setTitle:@"Appearance"];
     [self.settingsAppearanceButton setToolTip:@"Open appearance settings"];
@@ -4288,6 +4562,225 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
+- (void)ensureMediaPlaybackWindow {
+    if (self.mediaPlaybackWindow) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(0, 0, 520, 360);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask)
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO] autorelease];
+    [window setTitle:@"Media"];
+    [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
+
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [window setContentView:contentView];
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 318, 472, 22)
+                                              text:@"Media"
+                                              font:[NSFont boldSystemFontOfSize:15.0]];
+    [titleField setAlignment:NSCenterTextAlignment];
+    [titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:titleField];
+    self.mediaPlaybackTitleField = titleField;
+
+    NSView *containerView = [[[NSView alloc] initWithFrame:NSMakeRect(24, 64, 472, 238)] autorelease];
+    [containerView setWantsLayer:YES];
+    [containerView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:containerView];
+    self.mediaPlaybackContainerView = containerView;
+
+    NSButton *playPauseButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 18, 112, 30)] autorelease];
+    [playPauseButton setTitle:@"Pause"];
+    [playPauseButton setToolTip:@"Play or pause media"];
+    [playPauseButton setTarget:self];
+    [playPauseButton setAction:@selector(toggleMediaPlayback:)];
+    [self applyUtilityButtonStyle:playPauseButton];
+    [playPauseButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:playPauseButton];
+    self.mediaPlaybackPlayPauseButton = playPauseButton;
+
+    NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(376, 18, 120, 30)];
+    [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:closeButton];
+
+    self.mediaPlaybackWindow = window;
+}
+
+- (void)resetMediaPlaybackState {
+    [self.mediaPlaybackPlayer pause];
+    [self.mediaPlaybackLayer removeFromSuperlayer];
+    self.mediaPlaybackPlayer = nil;
+    self.mediaPlaybackLayer = nil;
+    self.mediaPlaybackPlaying = NO;
+    [self.mediaPlaybackPlayPauseButton setTitle:@"Play"];
+}
+
+- (void)toggleMediaPlayback:(id)sender {
+    (void)sender;
+    if (!self.mediaPlaybackPlayer) {
+        return;
+    }
+    if (self.mediaPlaybackPlaying) {
+        [self.mediaPlaybackPlayer pause];
+        self.mediaPlaybackPlaying = NO;
+        [self.mediaPlaybackPlayPauseButton setTitle:@"Play"];
+    } else {
+        [self.mediaPlaybackPlayer play];
+        self.mediaPlaybackPlaying = YES;
+        [self.mediaPlaybackPlayPauseButton setTitle:@"Pause"];
+    }
+}
+
+- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title {
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self appendDetail:@"Playable media file is not available yet."];
+        return NO;
+    }
+
+    [self ensureMediaPlaybackWindow];
+    [self resetMediaPlaybackState];
+
+    NSURL *url = [NSURL fileURLWithPath:path];
+    AVPlayer *player = [[[AVPlayer alloc] initWithURL:url] autorelease];
+    if (!player) {
+        [self appendDetail:@"Could not create media player."];
+        return NO;
+    }
+
+    AVPlayerLayer *layer = [AVPlayerLayer playerLayerWithPlayer:player];
+    [layer setVideoGravity:AVLayerVideoGravityResizeAspect];
+    [layer setFrame:[self.mediaPlaybackContainerView bounds]];
+    [[self.mediaPlaybackContainerView layer] addSublayer:layer];
+
+    self.mediaPlaybackPlayer = player;
+    self.mediaPlaybackLayer = layer;
+    self.mediaPlaybackPlaying = YES;
+    [self.mediaPlaybackTitleField setStringValue:([title length] > 0 ? title : @"Media")];
+    [self.mediaPlaybackPlayPauseButton setTitle:@"Pause"];
+    [self.mediaPlaybackWindow setTitle:([title length] > 0 ? title : @"Media")];
+    [self.mediaPlaybackWindow center];
+    [self.mediaPlaybackWindow makeKeyAndOrderFront:nil];
+    [self.mediaPlaybackPlayer play];
+    return YES;
+}
+
+- (NSString *)titleForMediaItem:(NSDictionary *)mediaItem {
+    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return @"Media";
+    }
+    id typeObject = [mediaItem objectForKey:@"content_type"];
+    NSString *contentType = [typeObject isKindOfClass:[NSString class]] ? (NSString *)typeObject : nil;
+    if ([contentType isEqualToString:@"messageVideoNote"]) {
+        return @"Video message";
+    }
+    if ([contentType isEqualToString:@"messageAnimation"]) {
+        return @"GIF";
+    }
+    if ([contentType isEqualToString:@"messageVideo"]) {
+        return @"Video";
+    }
+    return TGMediaItemPlaceholder(mediaItem);
+}
+
+- (void)openPlayableMediaForMediaItem:(NSDictionary *)mediaItem {
+    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+
+    NSString *path = TGMediaItemPlayableLocalPath(mediaItem);
+    if ([path length] == 0) {
+        path = TGMediaItemFullLocalPath(mediaItem);
+    }
+    if ([path length] == 0) {
+        path = TGMediaItemLocalPath(mediaItem);
+    }
+    if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self openPlayableMediaAtPath:path title:[self titleForMediaItem:mediaItem]];
+        return;
+    }
+
+    NSNumber *fileID = TGMediaItemFullFileID(mediaItem);
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        [self appendDetail:@"Playable media does not have a downloadable file id yet."];
+        return;
+    }
+
+    NSNumber *fileIDCopy = [fileID retain];
+    NSString *titleCopy = [[self titleForMediaItem:mediaItem] copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:@"Loading media..."];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *downloadError = nil;
+        NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:12.0 error:&downloadError] copy];
+        NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.statusField setStringValue:@"Connected"];
+            if ([downloadedPath length] > 0) {
+                [self openPlayableMediaAtPath:downloadedPath title:titleCopy];
+            } else {
+                NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
+                [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
+            }
+            [downloadedPath release];
+            [downloadErrorMessage release];
+            [fileIDCopy release];
+            [titleCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)openPlayableMediaForMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isPlayableMediaMessage]) {
+        return;
+    }
+
+    NSString *path = [item mediaLocalPath];
+    if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self openPlayableMediaAtPath:path title:TGPlayableMediaTitleForMessageItem(item)];
+        return;
+    }
+
+    NSNumber *fileID = [item mediaFileID];
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        [self appendDetail:@"Playable message does not have a downloadable file id yet."];
+        return;
+    }
+
+    NSNumber *fileIDCopy = [fileID retain];
+    NSString *titleCopy = [TGPlayableMediaTitleForMessageItem(item) copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:@"Loading media..."];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *downloadError = nil;
+        NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:12.0 error:&downloadError] copy];
+        NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.statusField setStringValue:@"Connected"];
+            if ([downloadedPath length] > 0) {
+                [self openPlayableMediaAtPath:downloadedPath title:titleCopy];
+            } else {
+                NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
+                [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
+            }
+            [downloadedPath release];
+            [downloadErrorMessage release];
+            [fileIDCopy release];
+            [titleCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)ensureMediaPreviewWindow {
     if (self.mediaPreviewWindow) {
         return;
@@ -4485,6 +4978,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)openMediaPreviewForMediaItem:(NSDictionary *)mediaItem {
     if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    if (TGMediaItemIsPlayable(mediaItem)) {
+        [self openPlayableMediaForMediaItem:mediaItem];
         return;
     }
 
@@ -4813,6 +5310,105 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self appendDetail:[NSString stringWithFormat:@"Theme changed: %@", TGThemeDisplayNameForIdentifier(themeIdentifier)]];
 }
 
+- (NSUInteger)totalUnreadCountFromChatItems {
+    NSUInteger total = 0;
+    NSUInteger index = 0;
+    for (index = 0; index < [self.chatItems count]; index++) {
+        id candidate = [self.chatItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        NSNumber *unreadCount = [(TGChatItem *)candidate unreadCount];
+        if ([unreadCount respondsToSelector:@selector(integerValue)] && [unreadCount integerValue] > 0) {
+            total += (NSUInteger)[unreadCount integerValue];
+        }
+    }
+    return total;
+}
+
+- (void)updateApplicationBadge {
+    if (!TGUserDefaultBoolWithDefault(TGNotificationBadgeEnabledDefaultsKey, YES)) {
+        [[[NSApplication sharedApplication] dockTile] setBadgeLabel:nil];
+        return;
+    }
+
+    NSUInteger unreadCount = [self totalUnreadCountFromChatItems];
+    NSString *badge = nil;
+    if (unreadCount > 999) {
+        badge = @"999+";
+    } else if (unreadCount > 0) {
+        badge = [NSString stringWithFormat:@"%lu", (unsigned long)unreadCount];
+    }
+    [[[NSApplication sharedApplication] dockTile] setBadgeLabel:badge];
+}
+
+- (void)notificationSettingChanged:(id)sender {
+    (void)sender;
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationsEnabledButton state] == NSOnState)
+                                            forKey:TGNotificationsEnabledDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationSoundButton state] == NSOnState)
+                                            forKey:TGNotificationSoundEnabledDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationBadgeButton state] == NSOnState)
+                                            forKey:TGNotificationBadgeEnabledDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self updateApplicationBadge];
+}
+
+- (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
+    (void)center;
+    (void)notification;
+    return TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES);
+}
+
+- (NSString *)titleForChatID:(NSNumber *)chatID fallback:(NSString *)fallback {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return fallback;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [self.chatItems count]; index++) {
+        id candidate = [self.chatItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        TGChatItem *item = (TGChatItem *)candidate;
+        NSNumber *itemChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
+        if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == [chatID longLongValue]) {
+            NSString *title = [item title];
+            if ([title length] > 0) {
+                return title;
+            }
+        }
+    }
+    return fallback;
+}
+
+- (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {
+    if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
+        return;
+    }
+    if (![summary isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSString *direction = [summary objectForKey:@"direction"];
+    if (![direction isEqualToString:@"Incoming"]) {
+        return;
+    }
+
+    NSNumber *chatID = [summary objectForKey:@"chat_id"];
+    NSString *title = [self titleForChatID:chatID fallback:@"Telegram"];
+    NSString *preview = [summary objectForKey:@"preview"];
+    if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
+        preview = @"New message";
+    }
+    NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
+    [notification setTitle:title];
+    [notification setInformativeText:preview];
+    if (TGUserDefaultBoolWithDefault(TGNotificationSoundEnabledDefaultsKey, YES)) {
+        [notification setSoundName:NSUserNotificationDefaultSoundName];
+    }
+    [[NSUserNotificationCenter defaultUserNotificationCenter] deliverNotification:notification];
+}
+
 - (void)showView:(NSView *)view visible:(BOOL)visible {
     [view setHidden:!visible];
 }
@@ -4918,7 +5514,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
-    [self showView:self.settingsAccountCardView visible:NO];
+    [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:NO];
     [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
@@ -4927,6 +5523,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.settingsStorageField visible:NO];
     [self showView:self.settingsThemeLabel visible:NO];
     [self showView:self.themePopUpButton visible:NO];
+    [self showView:self.settingsNotificationsEnabledButton visible:showSettings];
+    [self showView:self.settingsNotificationSoundButton visible:showSettings];
+    [self showView:self.settingsNotificationBadgeButton visible:showSettings];
     [self showView:self.settingsAppearanceButton visible:showSettings];
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
@@ -5370,8 +5969,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                themePopupWidth,
                                                30.0)];
 
+    CGFloat notificationCardHeight = 96.0;
+    CGFloat notificationCardY = contentTop - notificationCardHeight - 22.0;
+    [self.settingsAccountCardView setFrame:NSMakeRect(groupedX, notificationCardY, groupedWidth, notificationCardHeight)];
+    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 61.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationSoundButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 37.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 13.0, groupedWidth - 44.0, 22.0)];
+
     CGFloat sessionCardHeight = 164.0;
-    CGFloat sessionCardY = contentTop - sessionCardHeight - 22.0;
+    CGFloat sessionCardY = notificationCardY - sessionCardHeight - 14.0;
     [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, sessionCardY, groupedWidth, sessionCardHeight)];
     CGFloat settingsButtonWidth = groupedWidth - 28.0;
     CGFloat settingsButtonX = groupedX + 14.0;
@@ -5439,6 +6045,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                    withObject:closingWindow
                    afterDelay:0.0];
         [closingWindow release];
+    }
+    if ([notification object] == self.mediaPlaybackWindow) {
+        [self resetMediaPlaybackState];
+        [self.mediaPlaybackWindow setDelegate:nil];
+        self.mediaPlaybackContainerView = nil;
+        self.mediaPlaybackTitleField = nil;
+        self.mediaPlaybackPlayPauseButton = nil;
+        self.mediaPlaybackWindow = nil;
     }
 }
 
@@ -5857,7 +6471,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return nil;
     }
 
-    NSString *messageText = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
@@ -5960,6 +6574,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (NSURL *)messageLinkURLForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
     if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
+        return nil;
+    }
+    if (TGMessageItemIsNonVisualPlayableMedia(item)) {
         return nil;
     }
     NSString *messageText = TGDisplayTextForMessageItem(item);
@@ -6107,6 +6724,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self openMediaPreviewForMediaItem:mediaItem];
         return;
     }
+    if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame);
+        if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
+            [self openPlayableMediaForMessageItem:(TGMessageItem *)item];
+            return;
+        }
+    }
 
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
                                  inCellFrame:cellFrame
@@ -6164,6 +6788,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSDictionary *mediaItem = [self mediaItemForItem:item inCellFrame:cellFrame atPoint:tablePoint];
     if (mediaItem) {
         return YES;
+    }
+    if (TGMessageItemIsNonVisualPlayableMedia(item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame);
+        if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
+            return YES;
+        }
     }
     NSURL *url = [self messageLinkURLForItem:item inCellFrame:cellFrame atPoint:tablePoint];
     return (url != nil);
@@ -6377,7 +7007,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                         inCellFrame:cellFrame
                                             atPoint:mouseLocation];
     if (mediaItem) {
-        return @"Open media preview";
+        return TGMediaItemIsPlayable(mediaItem) ? @"Play media" : @"Open media preview";
+    }
+    if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame);
+        if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(mouseLocation, bubbleRect)) {
+            return @"Play media";
+        }
     }
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
                                  inCellFrame:cellFrame
@@ -6694,6 +7330,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:items];
     [self.chatTableView reloadData];
+    [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;
 
     if (selectedIndex != NSNotFound) {
@@ -7574,6 +8211,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     if (didClear) {
         [self.chatTableView reloadData];
+        [self updateApplicationBadge];
     }
 }
 
@@ -8066,6 +8704,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             needsChatRefresh = YES;
             self.chatsExhausted = NO;
             [self.client invalidateMainChatListExhaustion];
+            if ([kind isEqualToString:@"new_message"]) {
+                [self presentNotificationForUpdateSummary:summary];
+            }
             id chatID = [summary objectForKey:@"chat_id"];
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
@@ -8615,6 +9256,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.autoOlderMessagesLoadArmed = YES;
                 [self refreshSelectedChatHeaderDisplay];
                 [self.sendTextField setStringValue:@""];
+                [self updateApplicationBadge];
                 [self updateAuthControlsForState:@"closed"];
                 [self setControlsBusy:NO];
                 [self checkTDLib:nil];
@@ -8635,6 +9277,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)dealloc {
+    if ([[NSUserNotificationCenter defaultUserNotificationCenter] delegate] == self) {
+        [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:nil];
+    }
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(consumePendingComposerRefocus:)
                                                object:nil];
@@ -8745,6 +9390,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsAppearanceButton release];
     [_settingsLogsButton release];
     [_settingsAboutButton release];
+    [_settingsNotificationsEnabledButton release];
+    [_settingsNotificationSoundButton release];
+    [_settingsNotificationBadgeButton release];
     [_logoutButton release];
     [_aboutIconView release];
     [_aboutTitleField release];
@@ -8780,12 +9428,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_appearanceWindow close];
     [_mediaPreviewWindow setDelegate:nil];
     [_mediaPreviewWindow close];
+    [_mediaPlaybackWindow setDelegate:nil];
+    [_mediaPlaybackPlayer pause];
+    [_mediaPlaybackLayer removeFromSuperlayer];
+    [_mediaPlaybackWindow close];
     [_logsWindow release];
     [_aboutWindow release];
     [_appearanceWindow release];
     [_mediaPreviewWindow release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];
+    [_mediaPlaybackWindow release];
+    [_mediaPlaybackContainerView release];
+    [_mediaPlaybackTitleField release];
+    [_mediaPlaybackPlayPauseButton release];
+    [_mediaPlaybackPlayer release];
+    [_mediaPlaybackLayer release];
     [_messageContextMenu release];
     [_mediaPreviewPath release];
     [_logsWindowDetailsView release];
