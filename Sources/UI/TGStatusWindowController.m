@@ -27,6 +27,7 @@ static NSString * const TGNotificationsEnabledDefaultsKey = @"TelegraphicaNotifi
 static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNotificationSoundEnabled";
 static NSString * const TGNotificationBadgeEnabledDefaultsKey = @"TelegraphicaNotificationBadgeEnabled";
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
+static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
 static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
 static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
@@ -3054,6 +3055,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTableView *messageTableView;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
+@property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
 @property (nonatomic, retain) NSTextField *profileTitleField;
 @property (nonatomic, retain) NSTextField *profileNameField;
 @property (nonatomic, retain) NSTextField *profileUsernameField;
@@ -3078,6 +3080,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *settingsNotificationsEnabledButton;
 @property (nonatomic, retain) NSButton *settingsNotificationSoundButton;
 @property (nonatomic, retain) NSButton *settingsNotificationBadgeButton;
+@property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
 @property (nonatomic, retain) NSButton *settingsAboutButton;
@@ -3144,6 +3147,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL initialConnectStarted;
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
 @property (nonatomic, assign) BOOL drawerOpen;
+@property (nonatomic, assign) BOOL suppressComposerDraftSave;
 @property (nonatomic, assign) BOOL loginErrorVisible;
 @property (nonatomic, assign) BOOL composerRefocusPending;
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
@@ -3231,6 +3235,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize messageTableView = _messageTableView;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
+@synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
 @synthesize profileTitleField = _profileTitleField;
 @synthesize profileNameField = _profileNameField;
 @synthesize profileUsernameField = _profileUsernameField;
@@ -3255,6 +3260,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsNotificationsEnabledButton = _settingsNotificationsEnabledButton;
 @synthesize settingsNotificationSoundButton = _settingsNotificationSoundButton;
 @synthesize settingsNotificationBadgeButton = _settingsNotificationBadgeButton;
+@synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
 @synthesize settingsAboutButton = _settingsAboutButton;
@@ -3321,6 +3327,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize initialConnectStarted = _initialConnectStarted;
 @synthesize profileSummaryLoaded = _profileSummaryLoaded;
 @synthesize drawerOpen = _drawerOpen;
+@synthesize suppressComposerDraftSave = _suppressComposerDraftSave;
 @synthesize loginErrorVisible = _loginErrorVisible;
 @synthesize composerRefocusPending = _composerRefocusPending;
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
@@ -3355,6 +3362,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
@@ -3590,7 +3598,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginTitleField setTextColor:TGClassicInkColor()];
     [self.sendLabel setTextColor:TGClassicInkColor()];
     [self.profileNameField setTextColor:TGClassicInkColor()];
-    [self.settingsStateField setTextColor:TGClassicInkColor()];
+    [self applyMutedLabelStyle:self.settingsStateField];
     [self.aboutTitleField setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.loginHintField];
     [self applyMutedLabelStyle:self.authLabel];
@@ -4420,8 +4428,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.settingsTitleField];
 
     self.settingsStateField = [self labelWithFrame:NSMakeRect(64, 458, 760, 24)
-                                              text:@"Account"
+                                              text:@"Interface & notifications"
                                               font:[NSFont systemFontOfSize:13.0]];
+    [self applyMutedLabelStyle:self.settingsStateField];
     [contentView addSubview:self.settingsStateField];
 
     self.settingsLibraryField = [self labelWithFrame:NSMakeRect(64, 424, 760, 24)
@@ -4486,6 +4495,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsNotificationBadgeButton setFont:[NSFont systemFontOfSize:13.0]];
     [self.settingsNotificationBadgeButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsNotificationBadgeButton];
+
+    self.settingsDrawerHiddenButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 228, 260, 22)] autorelease];
+    [self.settingsDrawerHiddenButton setButtonType:NSSwitchButton];
+    [self.settingsDrawerHiddenButton setTitle:@"Hide side drawer"];
+    [self.settingsDrawerHiddenButton setTarget:self];
+    [self.settingsDrawerHiddenButton setAction:@selector(interfaceSettingChanged:)];
+    [self.settingsDrawerHiddenButton setState:TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO) ? NSOnState : NSOffState];
+    [self.settingsDrawerHiddenButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsDrawerHiddenButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsDrawerHiddenButton];
 
     self.settingsAppearanceButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 328, 260, 40)] autorelease];
     [self.settingsAppearanceButton setTitle:@"Appearance"];
@@ -4609,6 +4628,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)updateDrawerFolderButtonStates {
     NSUInteger index = 0;
+    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
         BOOL selected = NO;
@@ -4618,6 +4639,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             selected = YES;
         }
         [button setState:selected ? NSOnState : NSOffState];
+        [button setHidden:(!ready || drawerHidden || !self.drawerOpen)];
     }
 }
 
@@ -4727,6 +4749,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (void)updateNavigationButtonsForSection:(NSString *)section enabled:(BOOL)enabled {
     NSInteger selectedTag = [self navigationTagForSectionIdentifier:section];
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
+    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
         NSButton *button = [self.navigationButtons objectAtIndex:index];
@@ -4737,7 +4760,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
         [button setEnabled:(enabled && ready)];
-        [button setHidden:(!ready || !self.drawerOpen)];
+        [button setHidden:(!ready || drawerHidden || !self.drawerOpen)];
     }
     [self updateDrawerFolderButtonStates];
 }
@@ -4790,6 +4813,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)toggleDrawer:(id)sender {
     (void)sender;
+    if (TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO)) {
+        self.drawerOpen = NO;
+        return;
+    }
     self.drawerOpen = !self.drawerOpen;
     [self layoutContentView];
     [self updateVisibleSection];
@@ -5754,6 +5781,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateApplicationBadge];
 }
 
+- (void)interfaceSettingChanged:(id)sender {
+    (void)sender;
+    BOOL drawerHidden = ([self.settingsDrawerHiddenButton state] == NSOnState);
+    [[NSUserDefaults standardUserDefaults] setBool:drawerHidden forKey:TGDrawerHiddenDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    if (drawerHidden) {
+        self.drawerOpen = NO;
+    }
+    [self layoutContentView];
+    [self updateVisibleSection];
+}
+
 - (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
     (void)center;
     (void)notification;
@@ -5806,6 +5845,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (alreadySelected && self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
         [self reloadMessagesForChatID:chatID interactive:NO];
     }
+    [self clearUnreadCountForChatID:chatID messageThreadID:messageThreadID];
     return YES;
 }
 
@@ -5903,6 +5943,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return avatarImage;
 }
 
+- (NSImage *)notificationApplicationIconImage {
+    NSImage *image = [NSImage imageNamed:@"TelegraphicaNotificationIcon"];
+    if (!image) {
+        image = [NSImage imageNamed:@"Telegraphica"];
+    }
+    if (image) {
+        [image setSize:NSMakeSize(64.0, 64.0)];
+    }
+    return image;
+}
+
+- (void)applyNotificationApplicationIconToNotification:(NSUserNotification *)notification {
+    NSImage *applicationIcon = [self notificationApplicationIconImage];
+    if (!applicationIcon) {
+        return;
+    }
+
+    @try {
+        [notification setValue:applicationIcon forKey:@"_identityImage"];
+        [notification setValue:[NSNumber numberWithBool:NO] forKey:@"_identityImageHasBorder"];
+    }
+    @catch (NSException *exception) {
+        (void)exception;
+    }
+}
+
 - (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {
     if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
         return;
@@ -5927,6 +5993,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
+    [self applyNotificationApplicationIconToNotification:notification];
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
         [userInfo setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
@@ -5978,11 +6045,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.activeSection = TGSectionChats;
     }
     BOOL showLogin = !ready;
+    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
-    [self showView:self.topPanelView visible:ready];
-    [self showView:self.drawerButton visible:ready];
-    [self showView:self.accountBadgeView visible:(ready && self.drawerOpen)];
+    [self showView:self.topPanelView visible:(ready && !drawerHidden)];
+    [self showView:self.drawerButton visible:(ready && !drawerHidden)];
+    [self showView:self.accountBadgeView visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.bottomNavigationView visible:ready];
 
     [self showView:self.loginPanelView visible:showLogin];
@@ -6064,7 +6132,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.settingsThemeCardView visible:NO];
     [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
-    [self showView:self.settingsStateField visible:NO];
+    [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsLibraryField visible:NO];
     [self showView:self.settingsStorageField visible:NO];
     [self showView:self.settingsThemeLabel visible:NO];
@@ -6072,6 +6140,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.settingsNotificationsEnabledButton visible:showSettings];
     [self showView:self.settingsNotificationSoundButton visible:showSettings];
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
+    [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsAppearanceButton visible:showSettings];
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
@@ -6097,13 +6166,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
     CGFloat margin = 10.0;
-    CGFloat gutter = 10.0;
-    CGFloat railWidth = self.drawerOpen ? 108.0 : 44.0;
+    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    CGFloat railGutter = drawerHidden ? 0.0 : 10.0;
+    CGFloat panelGutter = 10.0;
+    CGFloat railWidth = drawerHidden ? 0.0 : (self.drawerOpen ? 108.0 : 44.0);
     CGFloat railX = margin;
     CGFloat railY = margin;
     CGFloat railHeight = height - (margin * 2.0);
     CGFloat railTop = railY + railHeight;
-    CGFloat mainX = railX + railWidth + gutter;
+    CGFloat mainX = drawerHidden ? margin : (railX + railWidth + railGutter);
     CGFloat mainY = margin;
     CGFloat mainWidth = width - mainX - margin;
     CGFloat mainHeight = railHeight;
@@ -6122,7 +6193,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         sidebarWidth = 272.0;
     }
 
-    CGFloat conversationX = mainX + sidebarWidth + gutter;
+    CGFloat conversationX = mainX + sidebarWidth + panelGutter;
     CGFloat conversationWidth = width - conversationX - margin;
     if (conversationWidth < 320.0) {
         CGFloat reduction = 320.0 - conversationWidth;
@@ -6130,7 +6201,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         if (sidebarWidth < 220.0) {
             sidebarWidth = 220.0;
         }
-        conversationX = mainX + sidebarWidth + gutter;
+        conversationX = mainX + sidebarWidth + panelGutter;
         conversationWidth = width - conversationX - margin;
     }
     if (mainWidth < 420.0) {
@@ -6500,8 +6571,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileActionsY, 0.0, 0.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    CGFloat themeCardY = contentTop - 96.0;
-    [self.settingsThemeCardView setFrame:NSMakeRect(groupedX, themeCardY, groupedWidth, 54.0)];
+    [self.settingsThemeCardView setFrame:NSMakeRect(groupedX, contentTop, 0.0, 0.0)];
     CGFloat themePopupWidth = 300.0;
     if (themePopupWidth > groupedWidth - 150.0) {
         themePopupWidth = groupedWidth - 150.0;
@@ -6515,18 +6585,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (themeClusterX < groupedX + 22.0) {
         themeClusterX = groupedX + 22.0;
     }
-    [self.settingsThemeLabel setFrame:NSMakeRect(themeClusterX, themeCardY + 17.0, themeLabelWidth, 20.0)];
+    [self.settingsThemeLabel setFrame:NSMakeRect(themeClusterX, contentTop, 0.0, 0.0)];
     [self.themePopUpButton setFrame:NSMakeRect(themeClusterX + themeLabelWidth + 16.0,
-                                               themeCardY + 12.0,
-                                               themePopupWidth,
-                                               30.0)];
+                                               contentTop,
+                                               0.0,
+                                               0.0)];
 
-    CGFloat notificationCardHeight = 96.0;
-    CGFloat notificationCardY = contentTop - notificationCardHeight - 22.0;
+    CGFloat settingsSectionLabelY = contentTop - 44.0;
+    [self.settingsStateField setFrame:NSMakeRect(groupedX + 20.0, settingsSectionLabelY, groupedWidth - 40.0, 16.0)];
+
+    CGFloat notificationCardHeight = 124.0;
+    CGFloat notificationCardY = settingsSectionLabelY - notificationCardHeight - 8.0;
     [self.settingsAccountCardView setFrame:NSMakeRect(groupedX, notificationCardY, groupedWidth, notificationCardHeight)];
-    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 61.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsNotificationSoundButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 37.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 13.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 89.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationSoundButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 65.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 41.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 17.0, groupedWidth - 44.0, 22.0)];
 
     CGFloat sessionCardHeight = 164.0;
     CGFloat sessionCardY = notificationCardY - sessionCardHeight - 14.0;
@@ -6654,6 +6728,80 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.attachPhotoButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];
     [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
+}
+
+- (NSString *)composerDraftKeyForChatID:(NSNumber *)chatID
+                        messageThreadID:(NSNumber *)messageThreadID
+                         messageTopicKind:(NSString *)messageTopicKind {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+
+    long long threadValue = ([messageThreadID respondsToSelector:@selector(longLongValue)] ? [messageThreadID longLongValue] : 0);
+    NSString *topicKind = ([messageTopicKind length] > 0) ? messageTopicKind : @"main";
+    return [NSString stringWithFormat:@"%lld|%lld|%@", [chatID longLongValue], threadValue, topicKind];
+}
+
+- (NSString *)currentComposerDraftKey {
+    return [self composerDraftKeyForChatID:self.selectedChatID
+                           messageThreadID:self.selectedMessageThreadID
+                            messageTopicKind:self.selectedMessageTopicKind];
+}
+
+- (void)setComposerTextWithoutSavingDraft:(NSString *)text {
+    BOOL previousSuppress = self.suppressComposerDraftSave;
+    self.suppressComposerDraftSave = YES;
+    [self.sendTextField setStringValue:(text ? text : @"")];
+    self.suppressComposerDraftSave = previousSuppress;
+    [self updateSendControls];
+}
+
+- (void)saveComposerDraftForChatID:(NSNumber *)chatID
+                   messageThreadID:(NSNumber *)messageThreadID
+                    messageTopicKind:(NSString *)messageTopicKind {
+    NSString *key = [self composerDraftKeyForChatID:chatID
+                                    messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind];
+    if ([key length] == 0) {
+        return;
+    }
+
+    NSString *text = [self.sendTextField stringValue];
+    if ([text length] > 0) {
+        [self.composerDraftsByTargetKey setObject:text forKey:key];
+    } else {
+        [self.composerDraftsByTargetKey removeObjectForKey:key];
+    }
+}
+
+- (void)saveCurrentComposerDraft {
+    if (self.suppressComposerDraftSave) {
+        return;
+    }
+    [self saveComposerDraftForChatID:self.selectedChatID
+                     messageThreadID:self.selectedMessageThreadID
+                      messageTopicKind:self.selectedMessageTopicKind];
+}
+
+- (void)restoreComposerDraftForChatID:(NSNumber *)chatID
+                      messageThreadID:(NSNumber *)messageThreadID
+                       messageTopicKind:(NSString *)messageTopicKind {
+    NSString *key = [self composerDraftKeyForChatID:chatID
+                                    messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind];
+    NSString *draft = ([key length] > 0) ? [self.composerDraftsByTargetKey objectForKey:key] : nil;
+    [self setComposerTextWithoutSavingDraft:draft];
+}
+
+- (void)removeComposerDraftForChatID:(NSNumber *)chatID
+                     messageThreadID:(NSNumber *)messageThreadID
+                      messageTopicKind:(NSString *)messageTopicKind {
+    NSString *key = [self composerDraftKeyForChatID:chatID
+                                    messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind];
+    if ([key length] > 0) {
+        [self.composerDraftsByTargetKey removeObjectForKey:key];
+    }
 }
 
 - (void)refocusComposerIfPossible {
@@ -6798,7 +6946,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self refreshSelectedChatHeaderDisplay];
-        [self.sendTextField setStringValue:@""];
+        [self setComposerTextWithoutSavingDraft:nil];
         self.activeSection = TGSectionChats;
     }
 
@@ -6963,6 +7111,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)controlTextDidChange:(NSNotification *)notification {
     if ([notification object] == self.sendTextField) {
+        [self saveCurrentComposerDraft];
         [self updateSendControls];
     } else if ([notification object] == self.authTextField || [notification object] == self.authSecureField) {
         if (self.loginErrorVisible) {
@@ -7893,6 +8042,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *previousChatID = [self.selectedChatID retain];
     NSNumber *previousThreadID = [self.selectedMessageThreadID retain];
     NSString *previousTopicKind = [self.selectedMessageTopicKind copy];
+    [self saveComposerDraftForChatID:previousChatID
+                     messageThreadID:previousThreadID
+                      messageTopicKind:previousTopicKind];
     NSInteger clickedRow = [self.chatTableView clickedRow];
     NSInteger row = (clickedRow >= 0) ? clickedRow : [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
@@ -7906,7 +8058,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
-        [self.sendTextField setStringValue:@""];
+        [self setComposerTextWithoutSavingDraft:nil];
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self updateAuthControlsForState:self.currentAuthState];
@@ -7948,16 +8100,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedChatLastReadOutboxMessageID = [item lastReadOutboxMessageID];
     [self updateOutgoingReadStateForVisibleMessages];
     [self refreshSelectedChatHeaderDisplay];
+    BOOL shouldOpenTopicList = (!selectedForumTopic && !self.showingForumTopicList && [[item typeSummary] isEqualToString:@"Supergroup"]);
     if (selectionChanged) {
         [self clearTypingIndicator];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
-        [self.sendTextField setStringValue:@""];
+        if (shouldOpenTopicList) {
+            [self setComposerTextWithoutSavingDraft:nil];
+        } else {
+            [self restoreComposerDraftForChatID:newChatID
+                                messageThreadID:newThreadID
+                                 messageTopicKind:newTopicKind];
+        }
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
     }
     [self updateAuthControlsForState:self.currentAuthState];
-    BOOL shouldOpenTopicList = (!selectedForumTopic && !self.showingForumTopicList && [[item typeSummary] isEqualToString:@"Supergroup"]);
     if (selectedForumTopic) {
         if (newThreadID) {
             [self appendDetail:[NSString stringWithFormat:@"Forum topic selected: %@ (%lld).", self.selectedChatTitle ? self.selectedChatTitle : @"Topic", [newThreadID longLongValue]]];
@@ -8078,7 +8236,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
-    [self.sendTextField setStringValue:@""];
+    [self setComposerTextWithoutSavingDraft:nil];
     self.olderMessagesExhausted = NO;
     self.autoOlderMessagesLoadArmed = YES;
     [self updateAuthControlsForState:self.currentAuthState];
@@ -8194,7 +8352,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
-    [self.sendTextField setStringValue:@""];
+    [self setComposerTextWithoutSavingDraft:nil];
     NSString *topicListTitle = ([self.topicParentTitle length] > 0 ? self.topicParentTitle : @"Topics");
     [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
     [self updateAuthControlsForState:self.currentAuthState];
@@ -8417,6 +8575,39 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![leftContentType isEqualToString:rightContentType]) {
         return NO;
     }
+    BOOL leftHasID = ([[left messageID] respondsToSelector:@selector(longLongValue)] && [[left messageID] longLongValue] != 0);
+    BOOL rightHasID = ([[right messageID] respondsToSelector:@selector(longLongValue)] && [[right messageID] longLongValue] != 0);
+    if ([left isVisualMediaMessage] || [right isVisualMediaMessage]) {
+        NSString *leftMediaPath = [left mediaLocalPath] ? [left mediaLocalPath] : @"";
+        NSString *rightMediaPath = [right mediaLocalPath] ? [right mediaLocalPath] : @"";
+        if ([leftMediaPath length] == 0) {
+            NSArray *leftMediaItems = [left visualMediaItems];
+            if ([leftMediaItems count] > 0 && [[leftMediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) {
+                id candidatePath = [(NSDictionary *)[leftMediaItems objectAtIndex:0] objectForKey:@"local_path"];
+                if ([candidatePath isKindOfClass:[NSString class]]) {
+                    leftMediaPath = (NSString *)candidatePath;
+                }
+            }
+        }
+        if ([rightMediaPath length] == 0) {
+            NSArray *rightMediaItems = [right visualMediaItems];
+            if ([rightMediaItems count] > 0 && [[rightMediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) {
+                id candidatePath = [(NSDictionary *)[rightMediaItems objectAtIndex:0] objectForKey:@"local_path"];
+                if ([candidatePath isKindOfClass:[NSString class]]) {
+                    rightMediaPath = (NSString *)candidatePath;
+                }
+            }
+        }
+        if (leftHasID && rightHasID) {
+            return ([[left messageID] longLongValue] == [[right messageID] longLongValue]);
+        }
+        if ([leftMediaPath length] > 0 && [rightMediaPath length] > 0 && ![leftMediaPath isEqualToString:rightMediaPath]) {
+            return NO;
+        }
+        if ([leftMediaPath length] == 0 || [rightMediaPath length] == 0) {
+            return NO;
+        }
+    }
     if (![leftPreview isEqualToString:rightPreview]) {
         return NO;
     }
@@ -8485,6 +8676,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [result replaceObjectAtIndex:([result count] - 1) withObject:preferredItem];
                 continue;
             }
+            if ([item isVisualMediaMessage] || [previousItem isVisualMediaMessage]) {
+                [result addObject:item];
+                continue;
+            }
             NSString *currentFallbackKey = [self deduplicationKeyForMessageItem:item];
             NSString *previousFallbackKey = [self deduplicationKeyForMessageItem:previousItem];
             if ([currentFallbackKey length] > 0 && [currentFallbackKey isEqualToString:previousFallbackKey]) {
@@ -8492,6 +8687,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 id previousID = [previousItem messageID];
                 BOOL currentHasID = ([currentID respondsToSelector:@selector(longLongValue)] && [currentID longLongValue] > 0);
                 BOOL previousHasID = ([previousID respondsToSelector:@selector(longLongValue)] && [previousID longLongValue] > 0);
+                if (currentHasID && previousHasID && [currentID longLongValue] != [previousID longLongValue]) {
+                    [result addObject:item];
+                    continue;
+                }
                 if (currentHasID && !previousHasID) {
                     [result replaceObjectAtIndex:([result count] - 1) withObject:item];
                 }
@@ -8897,6 +9096,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     BOOL wantsTopic = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0);
+    long long targetChatID = [chatID longLongValue];
+    long long targetThreadID = wantsTopic ? [messageThreadID longLongValue] : 0;
     BOOL didClear = NO;
     NSUInteger index = 0;
     for (index = 0; index < [self.chatItems count]; index++) {
@@ -8905,16 +9106,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             continue;
         }
         TGChatItem *item = (TGChatItem *)candidate;
-        if (wantsTopic != [item isForumTopic]) {
-            continue;
-        }
+
         id itemChatID = [item chatID];
-        if (![itemChatID respondsToSelector:@selector(longLongValue)] || [itemChatID longLongValue] != [chatID longLongValue]) {
+        id parentChatID = [item parentChatID];
+        long long itemChatValue = [itemChatID respondsToSelector:@selector(longLongValue)] ? [itemChatID longLongValue] : 0;
+        long long parentChatValue = [parentChatID respondsToSelector:@selector(longLongValue)] ? [parentChatID longLongValue] : 0;
+        BOOL chatMatches = (itemChatValue == targetChatID || parentChatValue == targetChatID);
+        if (!chatMatches) {
             continue;
         }
-        if (wantsTopic) {
+
+        if (wantsTopic && ![item isForumTopic]) {
+            continue;
+        }
+        if (wantsTopic && [item isForumTopic]) {
             id itemThreadID = [item messageThreadID];
-            if (![itemThreadID respondsToSelector:@selector(longLongValue)] || [itemThreadID longLongValue] != [messageThreadID longLongValue]) {
+            if (![itemThreadID respondsToSelector:@selector(longLongValue)] || [itemThreadID longLongValue] != targetThreadID) {
                 continue;
             }
         }
@@ -8922,7 +9129,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [item setUnreadCount:[NSNumber numberWithInteger:0]];
             didClear = YES;
         }
-        break;
     }
 
     if (didClear) {
@@ -8948,6 +9154,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread && sameTopicKind);
         BOOL messagePaneVisible = ([self.messageScrollView window] != nil && ![self.messageScrollView isHidden]);
         if (selectionStillCurrent && messagePaneVisible && [self.currentAuthState isEqualToString:@"ready"]) {
+            [self clearUnreadCountForChatID:chatIDCopy messageThreadID:messageThreadIDCopy];
             [self markMessageItemsReadForChatID:chatIDCopy messageThreadID:messageThreadIDCopy messageTopicKind:messageTopicKindCopy items:itemsCopy];
         }
         [chatIDCopy release];
@@ -9919,8 +10126,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self.statusField setStringValue:@"Message sent"];
                 [self appendDetail:@"TDLib send: text message accepted by TDLib."];
                 [[TGLogger sharedLogger] log:@"TDLib text message send accepted."];
+                [self removeComposerDraftForChatID:chatID
+                                   messageThreadID:messageThreadID
+                                    messageTopicKind:messageTopicKind];
                 if (selectionStillCurrent) {
-                    [self.sendTextField setStringValue:@""];
+                    [self setComposerTextWithoutSavingDraft:nil];
                     self.forceMessageScrollToNewest = YES;
                 }
             } else {
@@ -10011,7 +10221,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.autoChatListLoadArmed = YES;
                 self.autoOlderMessagesLoadArmed = YES;
                 [self refreshSelectedChatHeaderDisplay];
-                [self.sendTextField setStringValue:@""];
+                [self.composerDraftsByTargetKey removeAllObjects];
+                [self setComposerTextWithoutSavingDraft:nil];
                 [self updateApplicationBadge];
                 [self updateAuthControlsForState:@"closed"];
                 [self setControlsBusy:NO];
@@ -10124,6 +10335,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_messageTableView release];
     [_messageDropOverlayView release];
     [_messageItems release];
+    [_composerDraftsByTargetKey release];
     [_profileTitleField release];
     [_profileNameField release];
     [_profileUsernameField release];
@@ -10151,6 +10363,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsNotificationsEnabledButton release];
     [_settingsNotificationSoundButton release];
     [_settingsNotificationBadgeButton release];
+    [_settingsDrawerHiddenButton release];
     [_logoutButton release];
     [_aboutIconView release];
     [_aboutTitleField release];
