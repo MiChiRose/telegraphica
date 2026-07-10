@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright 2026 Yura Menschikov. All rights reserved.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Telegraphica uses the microphone only when you record a voice message.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

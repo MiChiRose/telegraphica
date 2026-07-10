@@ -31,6 +31,7 @@ static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGLanguageDefaultsKey = @"TelegraphicaLanguageCode";
 static NSString * const TGDownloadFolderDefaultsKey = @"TelegraphicaDownloadFolderPath";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
+static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
 static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
 static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
@@ -70,12 +71,24 @@ static NSString *TGLoc(NSString *key) {
                         @"Звук уведомлений", @"settings.sound",
                         @"Бейдж непрочитанных в Dock", @"settings.badge",
                         @"Скрыть боковую панель", @"settings.drawer",
+                        @"Тема", @"settings.theme",
                         @"Оформление", @"settings.appearance",
                         @"Папка загрузок", @"settings.downloads",
                         @"Язык", @"settings.language",
                         @"Проверить обновления", @"settings.update",
                         @"Диагностические логи", @"settings.logs",
                         @"О Telegraphica", @"settings.about",
+                        @"Уведомления", @"settings.section.notifications",
+                        @"Боковая панель", @"settings.section.drawer",
+                        @"Интерфейс", @"settings.section.interface",
+                        @"Файлы", @"settings.section.files",
+                        @"Справка", @"settings.section.help",
+                        @"Выберите папку, в которой будут сохраняться загруженные файлы", @"settings.downloads.help",
+                        @"Начать запись голоса?", @"voice.permission.title",
+                        @"Telegraphica сможет использовать микрофон для записи голосовых сообщений. Запись начинается только после нажатия кнопки голоса.", @"voice.permission.message",
+                        @"Записывается...", @"voice.recording",
+                        @"Нажмите кнопку голоса ещё раз, чтобы остановить запись", @"voice.stopHint",
+                        @"Отправка...", @"sending",
                         @"Отметить прочитанным", @"chat.markRead",
                         @"Скачать медиа", @"message.downloadMedia",
                         @"Скачать документ", @"message.downloadDocument",
@@ -102,12 +115,24 @@ static NSString *TGLoc(NSString *key) {
                         @"Гук апавяшчэнняў", @"settings.sound",
                         @"Бэйдж непрачытаных у Dock", @"settings.badge",
                         @"Схаваць бакавую панэль", @"settings.drawer",
+                        @"Тэма", @"settings.theme",
                         @"Афармленне", @"settings.appearance",
                         @"Папка загрузак", @"settings.downloads",
                         @"Мова", @"settings.language",
                         @"Праверыць абнаўленні", @"settings.update",
                         @"Дыягнастычныя логі", @"settings.logs",
                         @"Пра Telegraphica", @"settings.about",
+                        @"Апавяшчэнні", @"settings.section.notifications",
+                        @"Бакавая панэль", @"settings.section.drawer",
+                        @"Інтэрфейс", @"settings.section.interface",
+                        @"Файлы", @"settings.section.files",
+                        @"Даведка", @"settings.section.help",
+                        @"Выберыце папку, у якой будуць захоўвацца спампаваныя файлы", @"settings.downloads.help",
+                        @"Пачаць запіс голасу?", @"voice.permission.title",
+                        @"Telegraphica зможа выкарыстоўваць мікрафон для запісу галасавых паведамленняў. Запіс пачынаецца толькі пасля націску кнопкі голасу.", @"voice.permission.message",
+                        @"Запісваецца...", @"voice.recording",
+                        @"Націсніце кнопку голасу яшчэ раз, каб спыніць запіс", @"voice.stopHint",
+                        @"Адпраўка...", @"sending",
                         @"Адзначыць прачытаным", @"chat.markRead",
                         @"Спампаваць медыя", @"message.downloadMedia",
                         @"Спампаваць дакумент", @"message.downloadDocument",
@@ -134,12 +159,24 @@ static NSString *TGLoc(NSString *key) {
                         @"Play notification sound", @"settings.sound",
                         @"Show unread badge in Dock", @"settings.badge",
                         @"Hide side drawer", @"settings.drawer",
+                        @"Theme", @"settings.theme",
                         @"Appearance", @"settings.appearance",
                         @"Downloads folder", @"settings.downloads",
                         @"Language", @"settings.language",
                         @"Check for Updates", @"settings.update",
                         @"Diagnostic Logs", @"settings.logs",
                         @"About Telegraphica", @"settings.about",
+                        @"Notifications", @"settings.section.notifications",
+                        @"Side Drawer", @"settings.section.drawer",
+                        @"Interface", @"settings.section.interface",
+                        @"Files", @"settings.section.files",
+                        @"Help", @"settings.section.help",
+                        @"Choose where downloaded files will be saved", @"settings.downloads.help",
+                        @"Start voice recording?", @"voice.permission.title",
+                        @"Telegraphica can use the microphone to record voice messages. Recording starts only after you press the voice button.", @"voice.permission.message",
+                        @"Recording...", @"voice.recording",
+                        @"Press the voice button again to stop recording", @"voice.stopHint",
+                        @"Sending...", @"sending",
                         @"Mark as read", @"chat.markRead",
                         @"Download media", @"message.downloadMedia",
                         @"Download document", @"message.downloadDocument",
@@ -3276,6 +3313,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) TGGroupedCardView *settingsAccountCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsThemeCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsSessionCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsDrawerCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsFilesCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsHelpCardView;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
@@ -3343,6 +3383,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *settingsStateField;
 @property (nonatomic, retain) NSTextField *settingsLibraryField;
 @property (nonatomic, retain) NSTextField *settingsStorageField;
+@property (nonatomic, retain) NSTextField *settingsDrawerSectionField;
+@property (nonatomic, retain) NSTextField *settingsFilesSectionField;
+@property (nonatomic, retain) NSTextField *settingsHelpSectionField;
 @property (nonatomic, retain) NSTextField *settingsThemeLabel;
 @property (nonatomic, retain) NSPopUpButton *themePopUpButton;
 @property (nonatomic, retain) NSButton *settingsNotificationsEnabledButton;
@@ -3351,6 +3394,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
 @property (nonatomic, retain) NSTextField *settingsLanguageLabel;
 @property (nonatomic, retain) NSPopUpButton *settingsLanguagePopUpButton;
+@property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
@@ -3396,8 +3440,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
 @property (nonatomic, retain) NSWindow *photoSendPreviewWindow;
 @property (nonatomic, retain) NSImageView *photoSendPreviewImageView;
+@property (nonatomic, retain) NSView *photoSendCaptionBackgroundView;
 @property (nonatomic, retain) NSTextField *photoSendCaptionField;
 @property (nonatomic, retain) NSTextField *photoSendTitleField;
+@property (nonatomic, retain) NSTextField *photoSendErrorField;
+@property (nonatomic, retain) NSButton *photoSendSendButton;
 @property (nonatomic, copy) NSString *pendingPhotoSendPath;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendChatID;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendThreadID;
@@ -3414,6 +3461,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSWindow *voicePreviewWindow;
 @property (nonatomic, retain) NSTextField *voicePreviewTitleField;
 @property (nonatomic, retain) NSButton *voicePreviewPlayButton;
+@property (nonatomic, retain) NSButton *voicePreviewSendButton;
+@property (nonatomic, retain) NSTextField *voicePreviewErrorField;
+@property (nonatomic, retain) NSTextField *voiceRecordingIndicatorField;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, retain) NSMenu *chatContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
@@ -3482,6 +3532,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsAccountCardView = _settingsAccountCardView;
 @synthesize settingsThemeCardView = _settingsThemeCardView;
 @synthesize settingsSessionCardView = _settingsSessionCardView;
+@synthesize settingsDrawerCardView = _settingsDrawerCardView;
+@synthesize settingsFilesCardView = _settingsFilesCardView;
+@synthesize settingsHelpCardView = _settingsHelpCardView;
 @synthesize aboutCardView = _aboutCardView;
 @synthesize logsCardView = _logsCardView;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
@@ -3549,6 +3602,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsStateField = _settingsStateField;
 @synthesize settingsLibraryField = _settingsLibraryField;
 @synthesize settingsStorageField = _settingsStorageField;
+@synthesize settingsDrawerSectionField = _settingsDrawerSectionField;
+@synthesize settingsFilesSectionField = _settingsFilesSectionField;
+@synthesize settingsHelpSectionField = _settingsHelpSectionField;
 @synthesize settingsThemeLabel = _settingsThemeLabel;
 @synthesize themePopUpButton = _themePopUpButton;
 @synthesize settingsNotificationsEnabledButton = _settingsNotificationsEnabledButton;
@@ -3557,6 +3613,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
 @synthesize settingsLanguageLabel = _settingsLanguageLabel;
 @synthesize settingsLanguagePopUpButton = _settingsLanguagePopUpButton;
+@synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
@@ -3602,8 +3659,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
 @synthesize photoSendPreviewWindow = _photoSendPreviewWindow;
 @synthesize photoSendPreviewImageView = _photoSendPreviewImageView;
+@synthesize photoSendCaptionBackgroundView = _photoSendCaptionBackgroundView;
 @synthesize photoSendCaptionField = _photoSendCaptionField;
 @synthesize photoSendTitleField = _photoSendTitleField;
+@synthesize photoSendErrorField = _photoSendErrorField;
+@synthesize photoSendSendButton = _photoSendSendButton;
 @synthesize pendingPhotoSendPath = _pendingPhotoSendPath;
 @synthesize pendingPhotoSendChatID = _pendingPhotoSendChatID;
 @synthesize pendingPhotoSendThreadID = _pendingPhotoSendThreadID;
@@ -3620,6 +3680,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize voicePreviewWindow = _voicePreviewWindow;
 @synthesize voicePreviewTitleField = _voicePreviewTitleField;
 @synthesize voicePreviewPlayButton = _voicePreviewPlayButton;
+@synthesize voicePreviewSendButton = _voicePreviewSendButton;
+@synthesize voicePreviewErrorField = _voicePreviewErrorField;
+@synthesize voiceRecordingIndicatorField = _voiceRecordingIndicatorField;
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize chatContextMenu = _chatContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
@@ -3952,7 +4015,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsNotificationSoundButton setTitle:TGLoc(@"settings.sound")];
     [self.settingsNotificationBadgeButton setTitle:TGLoc(@"settings.badge")];
     [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
+    [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
+    [self.settingsDrawerSectionField setStringValue:TGLoc(@"settings.section.drawer")];
+    [self.settingsLibraryField setStringValue:TGLoc(@"settings.section.interface")];
+    [self.settingsFilesSectionField setStringValue:TGLoc(@"settings.section.files")];
+    [self.settingsHelpSectionField setStringValue:TGLoc(@"settings.section.help")];
+    [self.settingsThemeLabel setStringValue:TGLoc(@"settings.theme")];
     [self.settingsLanguageLabel setStringValue:TGLoc(@"settings.language")];
+    [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
     [self.settingsAppearanceButton setTitle:TGLoc(@"settings.appearance")];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
@@ -3994,6 +4064,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.sendLabel setTextColor:TGClassicInkColor()];
     [self.profileNameField setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.settingsStateField];
+    [self applyMutedLabelStyle:self.settingsDrawerSectionField];
+    [self applyMutedLabelStyle:self.settingsFilesSectionField];
+    [self applyMutedLabelStyle:self.settingsHelpSectionField];
     [self.aboutTitleField setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.loginHintField];
     [self applyMutedLabelStyle:self.authLabel];
@@ -4017,6 +4090,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyMutedLabelStyle:self.profileIDRowValueField];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
+    [self applyMutedLabelStyle:self.settingsDownloadFolderHelpField];
     [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
     [self.settingsLanguageLabel setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.aboutVersionField];
@@ -4029,11 +4103,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authTextFieldBackgroundView setNeedsDisplay:YES];
     [self applyComposerTextFieldStyle:self.sendTextField];
     [self.sendTextFieldBackgroundView setNeedsDisplay:YES];
+    [self applyComposerTextFieldStyle:self.photoSendCaptionField];
+    [self.photoSendCaptionBackgroundView setNeedsDisplay:YES];
+    [self.voiceRecordingIndicatorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
     [self.settingsAppearanceButton setNeedsDisplay:YES];
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
     [self.settingsDownloadFolderButton setNeedsDisplay:YES];
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
+    [self.settingsAccountCardView setNeedsDisplay:YES];
+    [self.settingsDrawerCardView setNeedsDisplay:YES];
+    [self.settingsThemeCardView setNeedsDisplay:YES];
+    [self.settingsFilesCardView setNeedsDisplay:YES];
+    [self.settingsHelpCardView setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
     [self.chatScrollSurfaceView setNeedsDisplay:YES];
     [self.messageScrollSurfaceView setNeedsDisplay:YES];
@@ -4687,6 +4769,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.voiceRecordButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.voiceRecordButton];
 
+    self.voiceRecordingIndicatorField = [self labelWithFrame:NSMakeRect(150, 84, 340, 18)
+                                                        text:@""
+                                                        font:[NSFont boldSystemFontOfSize:11.0]];
+    [self.voiceRecordingIndicatorField setHidden:YES];
+    [self.voiceRecordingIndicatorField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.voiceRecordingIndicatorField];
+
     self.sendTextFieldBackgroundView = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextFieldBackgroundView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.sendTextFieldBackgroundView];
@@ -4845,6 +4934,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsSessionCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.settingsSessionCardView];
 
+    self.settingsDrawerCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 190, 760, 54)] autorelease];
+    [self.settingsDrawerCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsDrawerCardView];
+
+    self.settingsFilesCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 130, 760, 76)] autorelease];
+    [self.settingsFilesCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsFilesCardView];
+
+    self.settingsHelpCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 56, 760, 92)] autorelease];
+    [self.settingsHelpCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsHelpCardView];
+
     self.settingsTitleField = [self labelWithFrame:NSMakeRect(40, 520, 400, 28)
                                               text:@"Settings"
                                               font:[NSFont boldSystemFontOfSize:18.0]];
@@ -4870,6 +4971,24 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [[self.settingsStorageField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [contentView addSubview:self.settingsStorageField];
+
+    self.settingsDrawerSectionField = [self labelWithFrame:NSMakeRect(64, 356, 760, 18)
+                                                      text:@"Drawer"
+                                                      font:[NSFont systemFontOfSize:13.0]];
+    [self applyMutedLabelStyle:self.settingsDrawerSectionField];
+    [contentView addSubview:self.settingsDrawerSectionField];
+
+    self.settingsFilesSectionField = [self labelWithFrame:NSMakeRect(64, 206, 760, 18)
+                                                     text:@"Files"
+                                                     font:[NSFont systemFontOfSize:13.0]];
+    [self applyMutedLabelStyle:self.settingsFilesSectionField];
+    [contentView addSubview:self.settingsFilesSectionField];
+
+    self.settingsHelpSectionField = [self labelWithFrame:NSMakeRect(64, 126, 760, 18)
+                                                    text:@"Help"
+                                                    font:[NSFont systemFontOfSize:13.0]];
+    [self applyMutedLabelStyle:self.settingsHelpSectionField];
+    [contentView addSubview:self.settingsHelpSectionField];
 
     self.settingsThemeLabel = [self labelWithFrame:NSMakeRect(64, 332, 88, 24)
                                               text:@"Theme"
@@ -4947,6 +5066,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsLanguagePopUpButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLanguagePopUpButton];
 
+    self.settingsDownloadFolderHelpField = [self labelWithFrame:NSMakeRect(64, 198, 360, 18)
+                                                           text:@"Choose where downloaded files will be saved"
+                                                           font:[NSFont systemFontOfSize:11.0]];
+    [self applyMutedLabelStyle:self.settingsDownloadFolderHelpField];
+    [contentView addSubview:self.settingsDownloadFolderHelpField];
+
     self.settingsDownloadFolderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 178, 260, 22)] autorelease];
     [self.settingsDownloadFolderButton setTitle:@"Downloads folder"];
     [self.settingsDownloadFolderButton setTarget:self];
@@ -4968,7 +5093,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAppearanceButton setToolTip:@"Open appearance settings"];
     [self.settingsAppearanceButton setTarget:self];
     [self.settingsAppearanceButton setAction:@selector(showAppearanceWindow:)];
-    [self applySettingsListButtonStyle:self.settingsAppearanceButton];
+    [self applyUtilityButtonStyle:self.settingsAppearanceButton];
     [self.settingsAppearanceButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsAppearanceButton];
 
@@ -4977,7 +5102,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsLogsButton setToolTip:@"Open diagnostic logs"];
     [self.settingsLogsButton setTarget:self];
     [self.settingsLogsButton setAction:@selector(showLogsWindow:)];
-    [self applySettingsListButtonStyle:self.settingsLogsButton];
+    [self applyUtilityButtonStyle:self.settingsLogsButton];
     [self.settingsLogsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLogsButton];
 
@@ -4986,7 +5111,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAboutButton setToolTip:@"Open application information"];
     [self.settingsAboutButton setTarget:self];
     [self.settingsAboutButton setAction:@selector(showAboutWindow:)];
-    [self applySettingsListButtonStyle:self.settingsAboutButton];
+    [self applyUtilityButtonStyle:self.settingsAboutButton];
     [self.settingsAboutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsAboutButton];
 
@@ -6774,6 +6899,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.attachPhotoButton visible:showChats];
     [self showView:self.stickerButton visible:showChats];
     [self showView:self.voiceRecordButton visible:showChats];
+    [self showView:self.voiceRecordingIndicatorField visible:(showChats && [self.voiceRecorder isRecording])];
     [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
@@ -6811,20 +6937,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
-    [self showView:self.settingsThemeCardView visible:NO];
-    [self showView:self.settingsSessionCardView visible:showSettings];
+    [self showView:self.settingsDrawerCardView visible:showSettings];
+    [self showView:self.settingsThemeCardView visible:showSettings];
+    [self showView:self.settingsFilesCardView visible:showSettings];
+    [self showView:self.settingsHelpCardView visible:showSettings];
+    [self showView:self.settingsSessionCardView visible:NO];
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
-    [self showView:self.settingsLibraryField visible:NO];
+    [self showView:self.settingsDrawerSectionField visible:showSettings];
+    [self showView:self.settingsLibraryField visible:showSettings];
+    [self showView:self.settingsFilesSectionField visible:showSettings];
+    [self showView:self.settingsHelpSectionField visible:showSettings];
     [self showView:self.settingsStorageField visible:NO];
-    [self showView:self.settingsThemeLabel visible:NO];
-    [self showView:self.themePopUpButton visible:NO];
+    [self showView:self.settingsThemeLabel visible:showSettings];
+    [self showView:self.themePopUpButton visible:showSettings];
     [self showView:self.settingsNotificationsEnabledButton visible:showSettings];
     [self showView:self.settingsNotificationSoundButton visible:showSettings];
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsLanguageLabel visible:showSettings];
     [self showView:self.settingsLanguagePopUpButton visible:showSettings];
+    [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsAppearanceButton visible:showSettings];
@@ -7069,7 +7202,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                         NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
                                                         selectedAvatarSize + 4.0)];
 
-    CGFloat composerHeight = 42.0;
+    BOOL voiceRecordingActive = [self.voiceRecorder isRecording];
+    CGFloat composerHeight = voiceRecordingActive ? 60.0 : 42.0;
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
     CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -7117,6 +7251,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerY + 5.0, smallComposerButtonWidth, 32.0)];
     [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerY + 5.0, smallComposerButtonWidth, 32.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
+    if (voiceRecordingActive) {
+        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + 41.0, conversationWidth - (sendFieldX - conversationX) - 28.0, 16.0)];
+    } else {
+        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + 41.0, 0.0, 0.0)];
+    }
 
     CGFloat panelTitleY = headerLabelY;
     CGFloat contentTop = mainTop - TGPanelHeaderHeight;
@@ -7263,49 +7402,64 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileActionsY, 0.0, 0.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    [self.settingsThemeCardView setFrame:NSMakeRect(groupedX, contentTop, 0.0, 0.0)];
-    CGFloat themePopupWidth = 300.0;
-    if (themePopupWidth > groupedWidth - 150.0) {
-        themePopupWidth = groupedWidth - 150.0;
-    }
-    if (themePopupWidth < 180.0) {
-        themePopupWidth = 180.0;
-    }
-    CGFloat themeLabelWidth = 72.0;
-    CGFloat themeClusterWidth = themeLabelWidth + 16.0 + themePopupWidth;
-    CGFloat themeClusterX = groupedX + floor((groupedWidth - themeClusterWidth) / 2.0);
-    if (themeClusterX < groupedX + 22.0) {
-        themeClusterX = groupedX + 22.0;
-    }
-    [self.settingsThemeLabel setFrame:NSMakeRect(themeClusterX, contentTop, 0.0, 0.0)];
-    [self.themePopUpButton setFrame:NSMakeRect(themeClusterX + themeLabelWidth + 16.0,
-                                               contentTop,
-                                               0.0,
-                                               0.0)];
+    CGFloat settingsNextY = contentTop - 36.0;
+    CGFloat settingsLabelHeight = 16.0;
+    CGFloat settingsLabelGap = 7.0;
+    CGFloat settingsGroupGap = 12.0;
+    CGFloat rowLeft = groupedX + 22.0;
+    CGFloat rowWidth = groupedWidth - 44.0;
 
-    CGFloat settingsSectionLabelY = contentTop - 44.0;
-    [self.settingsStateField setFrame:NSMakeRect(groupedX + 20.0, settingsSectionLabelY, groupedWidth - 40.0, 16.0)];
-
-    CGFloat notificationCardHeight = 226.0;
-    CGFloat notificationCardY = settingsSectionLabelY - notificationCardHeight - 8.0;
+    CGFloat notificationCardHeight = 92.0;
+    CGFloat settingsSectionLabelY = settingsNextY;
+    [self.settingsStateField setFrame:NSMakeRect(groupedX + 20.0, settingsSectionLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat notificationCardY = settingsSectionLabelY - settingsLabelGap - notificationCardHeight;
     [self.settingsAccountCardView setFrame:NSMakeRect(groupedX, notificationCardY, groupedWidth, notificationCardHeight)];
-    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 190.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsNotificationSoundButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 166.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 142.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 118.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsLanguageLabel setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 84.0, 130.0, 22.0)];
-    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(groupedX + 154.0, notificationCardY + 80.0, 210.0, 28.0)];
-    [self.settingsDownloadFolderButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 44.0, groupedWidth - 44.0, 28.0)];
-    [self.settingsCheckUpdatesButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 12.0, groupedWidth - 44.0, 28.0)];
+    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(rowLeft, notificationCardY + 58.0, rowWidth, 22.0)];
+    [self.settingsNotificationSoundButton setFrame:NSMakeRect(rowLeft, notificationCardY + 34.0, rowWidth, 22.0)];
+    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 10.0, rowWidth, 22.0)];
 
-    CGFloat sessionCardHeight = 164.0;
-    CGFloat sessionCardY = notificationCardY - sessionCardHeight - 14.0;
-    [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, sessionCardY, groupedWidth, sessionCardHeight)];
-    CGFloat settingsButtonWidth = groupedWidth - 28.0;
-    CGFloat settingsButtonX = groupedX + 14.0;
-    [self.settingsAppearanceButton setFrame:NSMakeRect(settingsButtonX, sessionCardY + 110.0, settingsButtonWidth, 42.0)];
-    [self.settingsLogsButton setFrame:NSMakeRect(settingsButtonX, sessionCardY + 62.0, settingsButtonWidth, 42.0)];
-    [self.settingsAboutButton setFrame:NSMakeRect(settingsButtonX, sessionCardY + 14.0, settingsButtonWidth, 42.0)];
+    CGFloat drawerLabelY = notificationCardY - settingsGroupGap - settingsLabelHeight;
+    [self.settingsDrawerSectionField setFrame:NSMakeRect(groupedX + 20.0, drawerLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat drawerCardHeight = 54.0;
+    CGFloat drawerCardY = drawerLabelY - settingsLabelGap - drawerCardHeight;
+    [self.settingsDrawerCardView setFrame:NSMakeRect(groupedX, drawerCardY, groupedWidth, drawerCardHeight)];
+    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 16.0, rowWidth, 22.0)];
+
+    CGFloat interfaceLabelY = drawerCardY - settingsGroupGap - settingsLabelHeight;
+    [self.settingsLibraryField setFrame:NSMakeRect(groupedX + 20.0, interfaceLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat interfaceCardHeight = 122.0;
+    CGFloat interfaceCardY = interfaceLabelY - settingsLabelGap - interfaceCardHeight;
+    [self.settingsThemeCardView setFrame:NSMakeRect(groupedX, interfaceCardY, groupedWidth, interfaceCardHeight)];
+    [self.settingsAppearanceButton setFrame:NSMakeRect(rowLeft, interfaceCardY + 84.0, rowWidth, 28.0)];
+
+    CGFloat popupWidth = 210.0;
+    if (popupWidth > groupedWidth - 150.0) {
+        popupWidth = groupedWidth - 150.0;
+    }
+    CGFloat labelWidth = 88.0;
+    CGFloat popupX = rowLeft + labelWidth + 8.0;
+    [self.settingsThemeLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 52.0, labelWidth, 22.0)];
+    [self.themePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 48.0, popupWidth, 28.0)];
+    [self.settingsLanguageLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 18.0, labelWidth, 22.0)];
+    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 14.0, popupWidth, 28.0)];
+
+    CGFloat filesLabelY = interfaceCardY - settingsGroupGap - settingsLabelHeight;
+    [self.settingsFilesSectionField setFrame:NSMakeRect(groupedX + 20.0, filesLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat filesCardHeight = 76.0;
+    CGFloat filesCardY = filesLabelY - settingsLabelGap - filesCardHeight;
+    [self.settingsFilesCardView setFrame:NSMakeRect(groupedX, filesCardY, groupedWidth, filesCardHeight)];
+    [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 46.0, rowWidth, 18.0)];
+    [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 28.0)];
+
+    CGFloat helpLabelY = filesCardY - settingsGroupGap - settingsLabelHeight;
+    [self.settingsHelpSectionField setFrame:NSMakeRect(groupedX + 20.0, helpLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat helpCardHeight = 112.0;
+    CGFloat helpCardY = helpLabelY - settingsLabelGap - helpCardHeight;
+    [self.settingsHelpCardView setFrame:NSMakeRect(groupedX, helpCardY, groupedWidth, helpCardHeight)];
+    [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, helpCardY, 0.0, 0.0)];
+    [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
+    [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
+    [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
 
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
@@ -9497,7 +9651,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     BOOL leftHasID = ([[left messageID] respondsToSelector:@selector(longLongValue)] && [[left messageID] longLongValue] > 0);
     BOOL rightHasID = ([[right messageID] respondsToSelector:@selector(longLongValue)] && [[right messageID] longLongValue] > 0);
+    long long leftDate = [[left date] respondsToSelector:@selector(longLongValue)] ? [[left date] longLongValue] : 0;
+    long long rightDate = [[right date] respondsToSelector:@selector(longLongValue)] ? [[right date] longLongValue] : 0;
+    long long delta = leftDate - rightDate;
+    if (delta < 0) {
+        delta = -delta;
+    }
     if ([left isVisualMediaMessage] || [right isVisualMediaMessage]) {
+        BOOL stickerLike = [leftContentType isEqualToString:@"messageSticker"];
         NSString *leftMediaPath = [left mediaLocalPath] ? [left mediaLocalPath] : @"";
         NSString *rightMediaPath = [right mediaLocalPath] ? [right mediaLocalPath] : @"";
         if ([leftMediaPath length] == 0) {
@@ -9525,17 +9686,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             return NO;
         }
         if ([leftMediaPath length] == 0 || [rightMediaPath length] == 0) {
+            if (stickerLike && [leftPreview isEqualToString:rightPreview] && ([left sending] || [right sending] || !leftHasID || !rightHasID)) {
+                return (delta <= 300);
+            }
             return NO;
         }
     }
     if (![leftPreview isEqualToString:rightPreview]) {
         return NO;
-    }
-    long long leftDate = [[left date] respondsToSelector:@selector(longLongValue)] ? [[left date] longLongValue] : 0;
-    long long rightDate = [[right date] respondsToSelector:@selector(longLongValue)] ? [[right date] longLongValue] : 0;
-    long long delta = leftDate - rightDate;
-    if (delta < 0) {
-        delta = -delta;
     }
     if ([left sending] || [right sending]) {
         return (delta <= 300);
@@ -9622,6 +9780,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     return result;
+}
+
+- (BOOL)removeDisplayedMessageWithID:(NSNumber *)messageID chatID:(NSNumber *)chatID {
+    if (![messageID respondsToSelector:@selector(longLongValue)] || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        return NO;
+    }
+    long long targetMessageID = [messageID longLongValue];
+    long long targetChatID = [chatID longLongValue];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        if (![item isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+        id itemMessageID = [item messageID];
+        id itemChatID = [item chatID];
+        if ([itemMessageID respondsToSelector:@selector(longLongValue)] &&
+            [itemChatID respondsToSelector:@selector(longLongValue)] &&
+            [itemMessageID longLongValue] == targetMessageID &&
+            [itemChatID longLongValue] == targetChatID) {
+            [self.messageItems removeObjectAtIndex:index];
+            [self.messageTableView reloadData];
+            return YES;
+        }
+    }
+    return NO;
 }
 
 - (void)scrollMessagesToNewestIfAvailable {
@@ -10576,6 +10760,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self presentNotificationForUpdateSummary:summary];
             }
             id chatID = [summary objectForKey:@"chat_id"];
+            id oldMessageID = [summary objectForKey:@"old_message_id"];
+            if ([kind isEqualToString:@"message_update"] &&
+                [oldMessageID respondsToSelector:@selector(longLongValue)] &&
+                [chatID respondsToSelector:@selector(longLongValue)]) {
+                [self removeDisplayedMessageWithID:oldMessageID chatID:chatID];
+            }
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
             }
@@ -10906,13 +11096,28 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:imageView];
     self.photoSendPreviewImageView = imageView;
 
-    NSTextField *captionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(44, 76, 432, 30)] autorelease];
-    [self applySkeuomorphicTextFieldStyle:captionField];
+    TGComposerInputBackgroundView *captionBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(44, 76, 432, 30)] autorelease];
+    [captionBackground setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:captionBackground];
+    self.photoSendCaptionBackgroundView = captionBackground;
+
+    NSTextField *captionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(53, 83, 414, 18)] autorelease];
+    [self applyComposerTextFieldStyle:captionField];
     [[captionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
     [captionField setDelegate:(id)self];
     [captionField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:captionField];
     self.photoSendCaptionField = captionField;
+
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(44, 58, 432, 16)
+                                              text:@""
+                                              font:[NSFont systemFontOfSize:11.0]];
+    [errorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [errorField setHidden:YES];
+    [errorField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [[errorField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
+    [contentView addSubview:errorField];
+    self.photoSendErrorField = errorField;
 
     NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(244, 28, 108, 30)];
     [cancelButton setTitle:TGLoc(@"cancel")];
@@ -10928,6 +11133,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
     [sendButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:sendButton];
+    self.photoSendSendButton = sendButton;
 
     self.photoSendPreviewWindow = window;
 }
@@ -10965,6 +11171,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.photoSendPreviewImageView setImage:image];
     [self.photoSendCaptionField setStringValue:@""];
     [[self.photoSendCaptionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
+    [self.photoSendErrorField setStringValue:@""];
+    [self.photoSendErrorField setHidden:YES];
+    [self.photoSendSendButton setTitle:TGLoc(@"send")];
+    [self.photoSendSendButton setEnabled:YES];
     [self.photoSendPreviewWindow center];
     [self.photoSendPreviewWindow makeKeyAndOrderFront:nil];
     [[self.photoSendPreviewWindow contentView] setNeedsDisplay:YES];
@@ -11023,6 +11233,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self.statusField setStringValue:@"Photo sent"];
                 [self appendDetail:@"TDLib send: photo message accepted by TDLib."];
                 [[TGLogger sharedLogger] log:@"TDLib photo message send accepted."];
+                self.pendingPhotoSendPath = nil;
+                self.pendingPhotoSendChatID = nil;
+                self.pendingPhotoSendThreadID = nil;
+                self.pendingPhotoSendTopicKind = nil;
+                if (self.photoSendPreviewWindow && ![self.photoSendPreviewWindow isVisible]) {
+                    [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                    [self.photoSendSendButton setEnabled:YES];
+                }
+                if (self.photoSendPreviewWindow && [self.photoSendPreviewWindow isVisible]) {
+                    [self.photoSendPreviewWindow orderOut:nil];
+                    [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                    [self.photoSendSendButton setEnabled:YES];
+                    [self.photoSendErrorField setStringValue:@""];
+                    [self.photoSendErrorField setHidden:YES];
+                }
                 if (selectionStillCurrent) {
                     self.forceMessageScrollToNewest = YES;
                 }
@@ -11035,6 +11260,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 }
                 [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@", message]];
                 [[TGLogger sharedLogger] log:@"TDLib photo message send failed."];
+                if (self.photoSendPreviewWindow && [self.photoSendPreviewWindow isVisible]) {
+                    [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                    [self.photoSendSendButton setEnabled:YES];
+                    [self.photoSendErrorField setStringValue:message];
+                    [self.photoSendErrorField setHidden:NO];
+                }
             }
             if ([authorizationState length] > 0) {
                 [self updateAuthControlsForState:authorizationState];
@@ -11081,8 +11312,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *chatID = [self.pendingPhotoSendChatID retain];
     NSNumber *threadID = [self.pendingPhotoSendThreadID retain];
     NSString *topicKind = [self.pendingPhotoSendTopicKind copy];
-    [self cancelPendingPhotoSend:nil];
-    [self submitPhotoAtPath:path caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+    if (![path length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        [self.photoSendErrorField setStringValue:@"Photo target is no longer available."];
+        [self.photoSendErrorField setHidden:NO];
+    } else {
+        [self.photoSendErrorField setStringValue:@""];
+        [self.photoSendErrorField setHidden:YES];
+        [self.photoSendSendButton setTitle:TGLoc(@"sending")];
+        [self.photoSendSendButton setEnabled:NO];
+        [self submitPhotoAtPath:path caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+    }
     [path release];
     [caption release];
     [chatID release];
@@ -11350,8 +11589,38 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [sendButton setAction:@selector(sendVoicePreview:)];
     [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
     [contentView addSubview:sendButton];
+    self.voicePreviewSendButton = sendButton;
+
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(24, 92, 372, 16)
+                                              text:@""
+                                              font:[NSFont systemFontOfSize:11.0]];
+    [errorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [errorField setAlignment:NSCenterTextAlignment];
+    [errorField setHidden:YES];
+    [[errorField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
+    [contentView addSubview:errorField];
+    self.voicePreviewErrorField = errorField;
 
     self.voicePreviewWindow = window;
+}
+
+- (BOOL)ensureMicrophoneConsent {
+    if (TGUserDefaultBoolWithDefault(TGMicrophoneConsentDefaultsKey, NO)) {
+        return YES;
+    }
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"voice.permission.title")];
+    [alert setInformativeText:TGLoc(@"voice.permission.message")];
+    [alert addButtonWithTitle:@"OK"];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    NSInteger result = [alert runModal];
+    if (result == NSAlertFirstButtonReturn) {
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:TGMicrophoneConsentDefaultsKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        return YES;
+    }
+    return NO;
 }
 
 - (void)toggleVoiceRecording:(id)sender {
@@ -11366,12 +11635,24 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.voiceRecorder = nil;
         [self.voiceRecordButton setToolTip:@"Record voice message"];
         [self.statusField setStringValue:@"Voice recorded"];
+        [self.voiceRecordingIndicatorField setStringValue:@""];
+        [self.voiceRecordingIndicatorField setHidden:YES];
         [self ensureVoicePreviewWindow];
         NSTimeInterval duration = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
         [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
         [self.voicePreviewPlayButton setTitle:@"Play"];
+        [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
+        [self.voicePreviewSendButton setEnabled:YES];
+        [self.voicePreviewErrorField setStringValue:@""];
+        [self.voicePreviewErrorField setHidden:YES];
         [self.voicePreviewWindow center];
         [self.voicePreviewWindow makeKeyAndOrderFront:nil];
+        [self layoutContentView];
+        [self updateVisibleSection];
+        return;
+    }
+
+    if (![self ensureMicrophoneConsent]) {
         return;
     }
 
@@ -11397,8 +11678,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.voiceRecordingPath = path;
     self.voiceRecordingStartDate = [NSDate date];
     self.voiceRecorder = recorder;
-    [self.statusField setStringValue:@"Recording voice..."];
-    [self.voiceRecordButton setToolTip:@"Click again to stop recording"];
+    [self.statusField setStringValue:TGLoc(@"voice.recording")];
+    [self.voiceRecordingIndicatorField setStringValue:[NSString stringWithFormat:@"%@ %@", TGLoc(@"voice.recording"), TGLoc(@"voice.stopHint")]];
+    [self.voiceRecordingIndicatorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [self.voiceRecordingIndicatorField setHidden:NO];
+    [self.voiceRecordButton setToolTip:TGLoc(@"voice.stopHint")];
+    [self layoutContentView];
+    [self updateVisibleSection];
 }
 
 - (void)toggleVoicePreviewPlayback:(id)sender {
@@ -11453,7 +11739,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
     NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
-    [self.voicePreviewWindow orderOut:nil];
+    [self.voicePreviewSendButton setTitle:TGLoc(@"sending")];
+    [self.voicePreviewSendButton setEnabled:NO];
+    [self.voicePreviewErrorField setStringValue:@""];
+    [self.voicePreviewErrorField setHidden:YES];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending voice..."];
 
@@ -11477,11 +11766,24 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.pendingLiveChatRefresh = YES;
                 self.pendingLiveMessageRefresh = YES;
                 [self handlePendingLiveRefreshesIfPossible];
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(refreshSelectedMessagesAfterMediaSend)
+                                                           object:nil];
+                [self performSelector:@selector(refreshSelectedMessagesAfterMediaSend) withObject:nil afterDelay:1.25];
+                [self.voicePreviewWindow orderOut:nil];
+                [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
+                [self.voicePreviewSendButton setEnabled:YES];
+                [self.voicePreviewErrorField setStringValue:@""];
+                [self.voicePreviewErrorField setHidden:YES];
                 self.voiceRecordingPath = nil;
                 self.voiceRecordingStartDate = nil;
             } else {
                 [self.statusField setStringValue:@"Voice send failed"];
                 [self appendDetail:([errorMessage length] > 0 ? errorMessage : @"Voice send was not confirmed.")];
+                [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
+                [self.voicePreviewSendButton setEnabled:YES];
+                [self.voicePreviewErrorField setStringValue:([errorMessage length] > 0 ? errorMessage : @"Voice send was not confirmed.")];
+                [self.voicePreviewErrorField setHidden:NO];
             }
             [self setControlsBusy:NO];
             [self requestComposerRefocus];
@@ -11755,6 +12057,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsAccountCardView release];
     [_settingsThemeCardView release];
     [_settingsSessionCardView release];
+    [_settingsDrawerCardView release];
+    [_settingsFilesCardView release];
+    [_settingsHelpCardView release];
     [_aboutCardView release];
     [_logsCardView release];
     [_diagnosticsLabel release];
@@ -11825,6 +12130,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsStateField release];
     [_settingsLibraryField release];
     [_settingsStorageField release];
+    [_settingsDrawerSectionField release];
+    [_settingsFilesSectionField release];
+    [_settingsHelpSectionField release];
     [_settingsThemeLabel release];
     [_themePopUpButton release];
     [_settingsAppearanceButton release];
@@ -11836,6 +12144,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsDrawerHiddenButton release];
     [_settingsLanguageLabel release];
     [_settingsLanguagePopUpButton release];
+    [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
     [_settingsCheckUpdatesButton release];
     [_logoutButton release];
@@ -11900,8 +12209,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPlaybackLayer release];
     [_photoSendPreviewWindow release];
     [_photoSendPreviewImageView release];
+    [_photoSendCaptionBackgroundView release];
     [_photoSendCaptionField release];
     [_photoSendTitleField release];
+    [_photoSendErrorField release];
+    [_photoSendSendButton release];
     [_pendingPhotoSendPath release];
     [_pendingPhotoSendChatID release];
     [_pendingPhotoSendThreadID release];
@@ -11918,6 +12230,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_voicePreviewWindow release];
     [_voicePreviewTitleField release];
     [_voicePreviewPlayButton release];
+    [_voicePreviewSendButton release];
+    [_voicePreviewErrorField release];
+    [_voiceRecordingIndicatorField release];
     [_messageContextMenu release];
     [_chatContextMenu release];
     [_mediaPreviewPath release];
