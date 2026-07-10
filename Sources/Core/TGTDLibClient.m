@@ -1842,6 +1842,10 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
+        if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
+            [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
+        }
         BOOL didRequestAvatarDownload = NO;
         NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[chatResponse objectForKey:@"photo"]
                                                       downloadMissing:(avatarDownloadsRemaining > 0)
@@ -2045,6 +2049,10 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
+        if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
+            [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
+        }
         BOOL didRequestAvatarDownload = NO;
         NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[chatResponse objectForKey:@"photo"]
                                                       downloadMissing:(avatarDownloadsRemaining > 0)
@@ -3067,6 +3075,10 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                                   title:([topicTitle length] > 0 ? topicTitle : @"Topic")
                                                             typeSummary:@"Forum topic"
                                                             unreadCount:(unreadCount ? unreadCount : [NSNumber numberWithInteger:0])] autorelease];
+            id lastReadOutboxValue = [topic objectForKey:@"last_read_outbox_message_id"];
+            if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
+                [topicItem setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
+            }
             [topicItem setForumTopic:YES];
             [topicItem setParentChatID:chatID];
             [topicItem setMessageThreadID:[NSNumber numberWithLongLong:[threadID longLongValue]]];

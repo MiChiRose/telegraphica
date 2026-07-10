@@ -56,6 +56,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize date = _date;
 @synthesize outgoing = _outgoing;
 @synthesize sending = _sending;
+@synthesize outgoingRead = _outgoingRead;
 @synthesize preview = _preview;
 @synthesize contentType = _contentType;
 @synthesize mediaLocalPath = _mediaLocalPath;
@@ -77,6 +78,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         self.date = date ? date : [NSNumber numberWithInteger:0];
         self.outgoing = outgoing;
         self.sending = NO;
+        self.outgoingRead = NO;
         self.preview = ([preview length] > 0) ? preview : @"[Message]";
     }
     return self;
@@ -229,6 +231,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
                                                                    outgoing:_outgoing
                                                                     preview:_preview];
     [copy setSending:_sending];
+    [copy setOutgoingRead:_outgoingRead];
     [copy setContentType:_contentType];
     [copy setMediaLocalPath:_mediaLocalPath];
     [copy setMediaWidth:_mediaWidth];

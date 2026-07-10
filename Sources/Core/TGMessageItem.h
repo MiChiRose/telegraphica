@@ -7,6 +7,7 @@
 @property (nonatomic, retain) NSNumber *date;
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL sending;
+@property (nonatomic, assign) BOOL outgoingRead;
 @property (nonatomic, copy) NSString *preview;
 @property (nonatomic, copy) NSString *contentType;
 @property (nonatomic, copy) NSString *mediaLocalPath;
