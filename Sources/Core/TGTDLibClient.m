@@ -2975,7 +2975,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     NSMutableArray *parts = [NSMutableArray array];
     NSMutableArray *chosenEmojis = [NSMutableArray array];
     NSUInteger index = 0;
-    for (index = 0; index < [(NSArray *)reactions count] && [parts count] < 3; index++) {
+    for (index = 0; index < [(NSArray *)reactions count]; index++) {
         id reactionObject = [(NSArray *)reactions objectAtIndex:index];
         if (![reactionObject isKindOfClass:[NSDictionary class]]) {
             continue;
@@ -3002,10 +3002,12 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         if ([countObject respondsToSelector:@selector(integerValue)] && [countObject integerValue] > 0) {
             count = [countObject integerValue];
         }
-        if (count == 1) {
-            [parts addObject:emoji];
-        } else {
-            [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
+        if ([parts count] < 3) {
+            if (count == 1) {
+                [parts addObject:emoji];
+            } else {
+                [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
+            }
         }
 
         id chosenObject = [reaction objectForKey:@"is_chosen"];
