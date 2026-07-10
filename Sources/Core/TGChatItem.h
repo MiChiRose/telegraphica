@@ -10,6 +10,7 @@
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
 @property (nonatomic, retain) NSNumber *parentChatID;
 @property (nonatomic, retain) NSNumber *messageThreadID;
+@property (nonatomic, copy) NSString *messageTopicKind;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                          title:(NSString *)title

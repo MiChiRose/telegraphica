@@ -1855,6 +1855,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, copy) NSString *selectedChatTypeSummary;
 @property (nonatomic, copy) NSString *selectedChatAvatarLocalPath;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
+@property (nonatomic, copy) NSString *selectedMessageTopicKind;
 @property (nonatomic, retain) NSNumber *topicParentChatID;
 @property (nonatomic, copy) NSString *topicParentTitle;
 @property (nonatomic, copy) NSString *topicParentAvatarLocalPath;
@@ -1997,6 +1998,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize selectedChatTypeSummary = _selectedChatTypeSummary;
 @synthesize selectedChatAvatarLocalPath = _selectedChatAvatarLocalPath;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
+@synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
 @synthesize topicParentChatID = _topicParentChatID;
 @synthesize topicParentTitle = _topicParentTitle;
 @synthesize topicParentAvatarLocalPath = _topicParentAvatarLocalPath;
@@ -4231,6 +4233,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.selectedChatTypeSummary = nil;
         self.selectedChatAvatarLocalPath = nil;
         self.selectedMessageThreadID = nil;
+        self.selectedMessageTopicKind = nil;
         [self clearForumTopicListState];
         self.chatsExhausted = NO;
         [self.client invalidateMainChatListExhaustion];
@@ -4771,6 +4774,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *previousChatID = [self.selectedChatID retain];
     NSNumber *previousThreadID = [self.selectedMessageThreadID retain];
+    NSString *previousTopicKind = [self.selectedMessageTopicKind copy];
     NSInteger row = [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
         self.selectedChatID = nil;
@@ -4778,6 +4782,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.selectedChatTypeSummary = nil;
         self.selectedChatAvatarLocalPath = nil;
         self.selectedMessageThreadID = nil;
+        self.selectedMessageTopicKind = nil;
         [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
@@ -4787,6 +4792,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self updateAuthControlsForState:self.currentAuthState];
         [previousChatID release];
         [previousThreadID release];
+        [previousTopicKind release];
         return;
     }
 
@@ -4802,15 +4808,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.selectedChatID = nil;
     }
     NSNumber *newThreadID = nil;
+    NSString *newTopicKind = nil;
     if (selectedForumTopic && [[item messageThreadID] respondsToSelector:@selector(longLongValue)]) {
         newThreadID = [NSNumber numberWithLongLong:[[item messageThreadID] longLongValue]];
+        newTopicKind = [[item messageTopicKind] length] > 0 ? [item messageTopicKind] : @"forum";
     }
     self.selectedMessageThreadID = newThreadID;
+    self.selectedMessageTopicKind = newTopicKind;
 
     BOOL sameChat = ((previousChatID && newChatID) && ([previousChatID longLongValue] == [newChatID longLongValue]));
     BOOL sameThread = ((!previousThreadID && !newThreadID) ||
                        (previousThreadID && newThreadID && [previousThreadID longLongValue] == [newThreadID longLongValue]));
-    BOOL selectionChanged = !(sameChat && sameThread);
+    BOOL sameTopicKind = ((!previousTopicKind && !newTopicKind) ||
+                          (previousTopicKind && newTopicKind && [previousTopicKind isEqualToString:newTopicKind]));
+    BOOL selectionChanged = !(sameChat && sameThread && sameTopicKind);
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"Selected chat";
     self.selectedChatTypeSummary = [item typeSummary];
     self.selectedChatAvatarLocalPath = [item avatarLocalPath];
@@ -4841,6 +4852,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     [previousChatID release];
     [previousThreadID release];
+    [previousTopicKind release];
     [item release];
 }
 
@@ -4885,6 +4897,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedChatTypeSummary = nil;
     self.selectedChatAvatarLocalPath = nil;
     self.selectedMessageThreadID = nil;
+    self.selectedMessageTopicKind = nil;
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
@@ -4998,6 +5011,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedChatTypeSummary = @"Forum";
     self.selectedChatAvatarLocalPath = self.topicParentAvatarLocalPath;
     self.selectedMessageThreadID = nil;
+    self.selectedMessageTopicKind = nil;
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
@@ -5021,6 +5035,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.topicParentTitle = nil;
     self.topicParentAvatarLocalPath = nil;
     self.selectedMessageThreadID = nil;
+    self.selectedMessageTopicKind = nil;
     self.chatsExhausted = NO;
 
     NSArray *restoreItems = self.chatItemsBeforeTopicList ? self.chatItemsBeforeTopicList : [NSArray array];
@@ -5090,6 +5105,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.selectedChatTypeSummary = @"Forum";
                 self.selectedChatAvatarLocalPath = parentAvatarPath;
                 self.selectedMessageThreadID = nil;
+                self.selectedMessageTopicKind = nil;
                 [self refreshSelectedChatHeaderDisplay];
                 [self.messageItems removeAllObjects];
                 [self.messageTableView reloadData];
@@ -5592,26 +5608,30 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *chatIDCopy = [self.selectedChatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
     self.backgroundMessageRefreshInFlight = YES;
 
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+      TGTDLibClient *client = [self.client retain];
+      dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *messageError = nil;
         NSArray *items = [client messagePreviewItemsForChatID:chatIDCopy
                                               messageThreadID:messageThreadIDCopy
+                                             messageTopicKind:messageTopicKindCopy
                                                 fromMessageID:anchorMessageID
                                                         limit:TGMessagePreviewInitialLimit
                                                       timeout:8.0
                                                         error:&messageError];
         BOOL hadMessageError = (messageError != nil);
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL] copy];
-        NSArray *itemsCopy = [items copy];
+          NSArray *itemsCopy = [items copy];
 
-        dispatch_async(dispatch_get_main_queue(), ^{
+          dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadIDCopy) ||
                                (self.selectedMessageThreadID && messageThreadIDCopy && [self.selectedMessageThreadID longLongValue] == [messageThreadIDCopy longLongValue]));
-            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread);
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKindCopy) ||
+                                  (self.selectedMessageTopicKind && messageTopicKindCopy && [self.selectedMessageTopicKind isEqualToString:messageTopicKindCopy]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread && sameTopicKind);
             NSUInteger added = 0;
             if (selectionStillCurrent && itemsCopy) {
                 added = [self appendOlderMessageItems:itemsCopy preservingVisiblePosition:NO];
@@ -5643,6 +5663,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
             [itemsCopy release];
             [authorizationState release];
+            [messageTopicKindCopy release];
             [messageThreadIDCopy release];
             [chatIDCopy release];
             [anchorMessageID release];
@@ -5731,17 +5752,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
     NSArray *itemsCopy = [items copy];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.85 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadIDCopy) ||
                            (self.selectedMessageThreadID && messageThreadIDCopy && [self.selectedMessageThreadID longLongValue] == [messageThreadIDCopy longLongValue]));
-        BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread);
+        BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKindCopy) ||
+                              (self.selectedMessageTopicKind && messageTopicKindCopy && [self.selectedMessageTopicKind isEqualToString:messageTopicKindCopy]));
+        BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread && sameTopicKind);
         BOOL messagePaneVisible = ([self.messageScrollView window] != nil && ![self.messageScrollView isHidden]);
         if (selectionStillCurrent && messagePaneVisible && [self.currentAuthState isEqualToString:@"ready"]) {
-            [self markMessageItemsReadForChatID:chatIDCopy messageThreadID:messageThreadIDCopy items:itemsCopy];
+            [self markMessageItemsReadForChatID:chatIDCopy messageThreadID:messageThreadIDCopy messageTopicKind:messageTopicKindCopy items:itemsCopy];
         }
         [chatIDCopy release];
         [messageThreadIDCopy release];
+        [messageTopicKindCopy release];
         [itemsCopy release];
     });
 }
@@ -5751,6 +5776,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)markMessageItemsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID items:(NSArray *)items {
+    [self markMessageItemsReadForChatID:chatID messageThreadID:messageThreadID messageTopicKind:nil items:items];
+}
+
+- (void)markMessageItemsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind items:(NSArray *)items {
     if (![self.currentAuthState isEqualToString:@"ready"] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         return;
     }
@@ -5762,6 +5791,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [messageThreadID retain];
+    NSString *messageTopicKindCopy = [messageTopicKind copy];
     NSArray *messageIDsCopy = [messageIDs copy];
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -5769,6 +5799,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSError *readError = nil;
         BOOL success = [client markMessagesAsReadForChatID:chatIDCopy
                                            messageThreadID:messageThreadIDCopy
+                                          messageTopicKind:messageTopicKindCopy
                                                 messageIDs:messageIDsCopy
                                                    timeout:4.0
                                                      error:&readError];
@@ -5784,6 +5815,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [readErrorMessage release];
             [chatIDCopy release];
             [messageThreadIDCopy release];
+            [messageTopicKindCopy release];
             [messageIDsCopy release];
             [client release];
         });
@@ -5979,6 +6011,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading messages..."];
@@ -5993,6 +6026,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSError *messageError = nil;
         NSArray *items = [client recentMessagePreviewItemsForChatID:chatIDCopy
                                                     messageThreadID:messageThreadIDCopy
+                                                   messageTopicKind:messageTopicKindCopy
                                                               limit:TGMessagePreviewInitialLimit
                                                             timeout:8.0
                                                               error:&messageError];
@@ -6003,7 +6037,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadIDCopy) ||
                                (self.selectedMessageThreadID && messageThreadIDCopy && [self.selectedMessageThreadID longLongValue] == [messageThreadIDCopy longLongValue]));
-            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread);
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKindCopy) ||
+                                  (self.selectedMessageTopicKind && messageTopicKindCopy && [self.selectedMessageTopicKind isEqualToString:messageTopicKindCopy]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread && sameTopicKind);
             if (!selectionStillCurrent) {
                 if (interactive) {
                     [self appendDetail:@"TDLib messages: ignored stale result for previous chat selection."];
@@ -6045,10 +6081,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self consumePendingComposerRefocus:nil];
             }
             [itemsCopy release];
-            [messageErrorMessage release];
-            [authorizationState release];
-            [messageThreadIDCopy release];
-            [chatIDCopy release];
+              [messageErrorMessage release];
+              [authorizationState release];
+              [messageTopicKindCopy release];
+              [messageThreadIDCopy release];
+              [chatIDCopy release];
         });
 
         [client release];
@@ -6076,6 +6113,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *chatIDCopy = [self.selectedChatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Loading older messages..."];
     [self appendDetail:(messageThreadIDCopy ? @"Loading older topic message previews from TDLib..." : @"Loading older message previews from TDLib...")];
@@ -6086,6 +6124,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSError *messageError = nil;
         NSArray *items = [client messagePreviewItemsForChatID:chatIDCopy
                                               messageThreadID:messageThreadIDCopy
+                                             messageTopicKind:messageTopicKindCopy
                                                 fromMessageID:anchorMessageID
                                                         limit:TGMessagePreviewInitialLimit
                                                       timeout:8.0
@@ -6097,7 +6136,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadIDCopy) ||
                                (self.selectedMessageThreadID && messageThreadIDCopy && [self.selectedMessageThreadID longLongValue] == [messageThreadIDCopy longLongValue]));
-            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread);
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKindCopy) ||
+                                  (self.selectedMessageTopicKind && messageTopicKindCopy && [self.selectedMessageTopicKind isEqualToString:messageTopicKindCopy]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && sameThread && sameTopicKind);
             if (!selectionStillCurrent) {
                 [self appendDetail:@"TDLib messages: ignored stale older-history result for previous chat selection."];
             } else if (itemsCopy) {
@@ -6125,6 +6166,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [itemsCopy release];
             [messageErrorMessage release];
             [authorizationState release];
+            [messageTopicKindCopy release];
             [messageThreadIDCopy release];
             [chatIDCopy release];
             [anchorMessageID release];
@@ -6490,6 +6532,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
     NSString *messageText = [text copy];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending..."];
@@ -6503,6 +6546,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSError *stateError = nil;
         NSString *sendSummary = [client sendTextMessageToChatID:chatID
                                                 messageThreadID:messageThreadID
+                                              messageTopicKind:messageTopicKind
                                                            text:messageText
                                                         timeout:8.0
                                                           error:&sendError];
@@ -6512,7 +6556,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadID) ||
                                (self.selectedMessageThreadID && messageThreadID && [self.selectedMessageThreadID longLongValue] == [messageThreadID longLongValue]));
-            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread);
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKind) ||
+                                  (self.selectedMessageTopicKind && messageTopicKind && [self.selectedMessageTopicKind isEqualToString:messageTopicKind]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
             if (sendSucceeded) {
                 [self.statusField setStringValue:@"Message sent"];
                 [self appendDetail:@"TDLib send: text message accepted by TDLib."];
@@ -6539,6 +6585,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [authorizationState release];
             [chatID release];
             [messageThreadID release];
+            [messageTopicKind release];
             [messageText release];
         });
 
@@ -6595,6 +6642,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.selectedChatTypeSummary = nil;
                 self.selectedChatAvatarLocalPath = nil;
                 self.selectedMessageThreadID = nil;
+                self.selectedMessageTopicKind = nil;
                 self.chatsExhausted = NO;
                 self.olderMessagesExhausted = NO;
                 self.autoChatListLoadArmed = YES;
@@ -6732,6 +6780,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_selectedChatTypeSummary release];
     [_selectedChatAvatarLocalPath release];
     [_selectedMessageThreadID release];
+    [_selectedMessageTopicKind release];
     [_topicParentChatID release];
     [_topicParentTitle release];
     [_topicParentAvatarLocalPath release];

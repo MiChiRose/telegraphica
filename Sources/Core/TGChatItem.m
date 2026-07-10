@@ -10,6 +10,7 @@
 @synthesize forumTopic = _forumTopic;
 @synthesize parentChatID = _parentChatID;
 @synthesize messageThreadID = _messageThreadID;
+@synthesize messageTopicKind = _messageTopicKind;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                          title:(NSString *)title
@@ -44,6 +45,9 @@
     if ([identifier isEqual:@"message_thread_id"]) {
         return self.messageThreadID;
     }
+    if ([identifier isEqual:@"message_topic_kind"]) {
+        return self.messageTopicKind;
+    }
     return @"";
 }
 
@@ -55,6 +59,7 @@
     [_avatarLocalPath release];
     [_parentChatID release];
     [_messageThreadID release];
+    [_messageTopicKind release];
     [super dealloc];
 }
 
