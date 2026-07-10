@@ -253,9 +253,6 @@ static NSArray *TGReactionEmojisByMergingEmojiArrays(NSArray *leftEmojis, NSArra
     if ([incomingReaction length] > 0) {
         self.reactionSummary = TGReactionSummaryByMergingSummaries(self.reactionSummary, incomingReaction);
     }
-    if ([[item chosenReactionEmojis] count] > 0) {
-        self.chosenReactionEmojis = TGReactionEmojisByMergingEmojiArrays(self.chosenReactionEmojis, [item chosenReactionEmojis]);
-    }
 }
 
 - (NSString *)visualMediaPlaceholderTitle {
