@@ -732,6 +732,23 @@ static NSString *TGMediaItemLocalPath(NSDictionary *mediaItem) {
     return [path isKindOfClass:[NSString class]] ? (NSString *)path : nil;
 }
 
+static NSString *TGMediaItemFullLocalPath(NSDictionary *mediaItem) {
+    id path = [mediaItem objectForKey:@"full_local_path"];
+    return [path isKindOfClass:[NSString class]] ? (NSString *)path : nil;
+}
+
+static NSNumber *TGMediaItemFullFileID(NSDictionary *mediaItem) {
+    id fileID = [mediaItem objectForKey:@"full_file_id"];
+    if ([fileID respondsToSelector:@selector(integerValue)]) {
+        return [NSNumber numberWithInteger:[fileID integerValue]];
+    }
+    fileID = [mediaItem objectForKey:@"file_id"];
+    if ([fileID respondsToSelector:@selector(integerValue)]) {
+        return [NSNumber numberWithInteger:[fileID integerValue]];
+    }
+    return nil;
+}
+
 static NSString *TGMediaItemContentType(NSDictionary *mediaItem) {
     id contentType = [mediaItem objectForKey:@"content_type"];
     return [contentType isKindOfClass:[NSString class]] ? (NSString *)contentType : nil;
@@ -3587,7 +3604,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
-    [window setTitle:@"Media Preview"];
+    [window setTitle:@""];
     [window setMinSize:NSMakeSize(420, 340)];
     [window setReleasedWhenClosed:NO];
 
@@ -3610,12 +3627,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:scrollView];
     self.mediaPreviewScrollView = scrollView;
     self.mediaPreviewImageView = imageView;
-
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20, 524, 280, 20)
-                                              text:@"Media Preview"
-                                              font:[NSFont boldSystemFontOfSize:13.0]];
-    [titleField setAutoresizingMask:NSViewMinYMargin];
-    [contentView addSubview:titleField];
 
     NSButton *zoomOutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(16, 18, 42, 30)] autorelease];
     [zoomOutButton setTitle:@"-"];
@@ -3731,10 +3742,62 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self ensureMediaPreviewWindow];
     self.mediaPreviewPath = path;
     [self.mediaPreviewImageView setImage:image];
-    [self.mediaPreviewWindow setTitle:@"Media Preview"];
+    [self.mediaPreviewWindow setTitle:@""];
     [self fitMediaPreview:nil];
     [self.mediaPreviewWindow center];
     [self.mediaPreviewWindow makeKeyAndOrderFront:nil];
+}
+
+- (void)openMediaPreviewForMediaItem:(NSDictionary *)mediaItem {
+    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+
+    NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
+    if ([fullPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:fullPath]) {
+        [self openMediaPreviewAtPath:fullPath];
+        return;
+    }
+
+    NSString *fallbackPath = TGMediaItemLocalPath(mediaItem);
+    NSNumber *fileID = TGMediaItemFullFileID(mediaItem);
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        if ([fallbackPath length] > 0) {
+            [self openMediaPreviewAtPath:fallbackPath];
+        }
+        return;
+    }
+
+    NSNumber *fileIDCopy = [fileID retain];
+    NSString *fallbackPathCopy = [fallbackPath copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:@"Loading full photo..."];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *downloadError = nil;
+        NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:12.0 error:&downloadError] copy];
+        NSString *fallback = [fallbackPathCopy copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([downloadedPath length] > 0) {
+                [self openMediaPreviewAtPath:downloadedPath];
+                [self.statusField setStringValue:@"Connected"];
+            } else if ([fallback length] > 0) {
+                [self openMediaPreviewAtPath:fallback];
+                [self.statusField setStringValue:@"Connected"];
+                [self appendDetail:@"Full media was not available yet; opened cached preview."];
+            } else {
+                [self.statusField setStringValue:@"Connected"];
+                [self appendDetail:@"Full media was not available yet."];
+            }
+            [downloadedPath release];
+            [fallback release];
+            [fileIDCopy release];
+            [fallbackPathCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)openSelectedChatProfile:(id)sender {
@@ -4869,7 +4932,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
 }
 
-- (NSString *)mediaLocalPathForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
+- (NSDictionary *)mediaItemForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
     if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage] || NSIsEmptyRect(cellFrame)) {
         return nil;
     }
@@ -4954,8 +5017,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         if (![mediaObject isKindOfClass:[NSDictionary class]]) {
             return nil;
         }
-        NSString *path = TGMediaItemLocalPath((NSDictionary *)mediaObject);
-        return ([path length] > 0) ? path : nil;
+        return (NSDictionary *)mediaObject;
     }
     return nil;
 }
@@ -5101,11 +5163,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
-    NSString *mediaPath = [self mediaLocalPathForItem:(TGMessageItem *)item
-                                          inCellFrame:cellFrame
-                                              atPoint:tablePoint];
-    if ([mediaPath length] > 0) {
-        [self openMediaPreviewAtPath:mediaPath];
+    NSDictionary *mediaItem = [self mediaItemForItem:(TGMessageItem *)item
+                                        inCellFrame:cellFrame
+                                            atPoint:tablePoint];
+    if (mediaItem) {
+        [self openMediaPreviewForMediaItem:mediaItem];
         return;
     }
 
@@ -5163,10 +5225,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return nil;
     }
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
-    NSString *mediaPath = [self mediaLocalPathForItem:(TGMessageItem *)item
-                                          inCellFrame:cellFrame
-                                              atPoint:mouseLocation];
-    if ([mediaPath length] > 0) {
+    NSDictionary *mediaItem = [self mediaItemForItem:(TGMessageItem *)item
+                                        inCellFrame:cellFrame
+                                            atPoint:mouseLocation];
+    if (mediaItem) {
         return @"Open media preview";
     }
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
