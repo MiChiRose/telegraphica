@@ -7203,7 +7203,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUInteger index = 0;
     for (index = 0; index < [emojis count]; index++) {
         NSString *emoji = [emojis objectAtIndex:index];
-        NSString *title = [NSString stringWithFormat:@"%@ React", emoji];
+        BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
+        NSString *title = [NSString stringWithFormat:@"%@ %@", emoji, chosen ? @"Remove" : @"React"];
         NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
                                                           action:@selector(reactToMessageFromMenu:)
                                                    keyEquivalent:@""] autorelease];
@@ -7222,7 +7223,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSMenu *moreMenu = [[[NSMenu alloc] initWithTitle:@"More reactions"] autorelease];
         for (index = 0; index < [moreEmojis count]; index++) {
             NSString *emoji = [moreEmojis objectAtIndex:index];
-            NSString *title = [NSString stringWithFormat:@"%@ React", emoji];
+            BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
+            NSString *title = [NSString stringWithFormat:@"%@ %@", emoji, chosen ? @"Remove" : @"React"];
             NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
                                                               action:@selector(reactToMessageFromMenu:)
                                                        keyEquivalent:@""] autorelease];
@@ -7267,7 +7269,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self appendDetail:[NSString stringWithFormat:@"Local notifications enabled for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
 }
 
-- (void)sendReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item {
+- (void)submitReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item removing:(BOOL)removing {
     if (![item isKindOfClass:[TGMessageItem class]] ||
         ![item.chatID respondsToSelector:@selector(longLongValue)] ||
         ![item.messageID respondsToSelector:@selector(longLongValue)] ||
@@ -7288,34 +7290,43 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *messageID = [item.messageID retain];
     NSString *reactionEmoji = [emoji copy];
     [self setControlsBusy:YES];
-    [self.statusField setStringValue:@"Sending reaction..."];
-    [self appendDetail:@"Submitting message reaction to TDLib..."];
-    [[TGLogger sharedLogger] log:@"TDLib reaction send requested."];
+    [self.statusField setStringValue:removing ? @"Removing reaction..." : @"Sending reaction..."];
+    [self appendDetail:removing ? @"Removing message reaction through TDLib..." : @"Submitting message reaction to TDLib..."];
+    [[TGLogger sharedLogger] log:removing ? @"TDLib reaction remove requested." : @"TDLib reaction send requested."];
 
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *reactionError = nil;
         NSError *stateError = nil;
-        NSString *reactionSummary = [client addReactionToChatID:chatID
-                                                      messageID:messageID
-                                                          emoji:reactionEmoji
-                                                        timeout:8.0
-                                                          error:&reactionError];
+        NSString *reactionSummary = nil;
+        if (removing) {
+            reactionSummary = [client removeReactionFromChatID:chatID
+                                                     messageID:messageID
+                                                         emoji:reactionEmoji
+                                                       timeout:8.0
+                                                         error:&reactionError];
+        } else {
+            reactionSummary = [client addReactionToChatID:chatID
+                                                messageID:messageID
+                                                    emoji:reactionEmoji
+                                                  timeout:8.0
+                                                    error:&reactionError];
+        }
         NSString *reactionErrorMessage = [[reactionError localizedDescription] copy];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
         BOOL reactionSucceeded = ([reactionSummary length] > 0);
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (reactionSucceeded) {
-                [self.statusField setStringValue:@"Reaction sent"];
-                [self appendDetail:@"TDLib reaction: accepted by TDLib."];
-                [[TGLogger sharedLogger] log:@"TDLib reaction send accepted."];
+                [self.statusField setStringValue:removing ? @"Reaction removed" : @"Reaction sent"];
+                [self appendDetail:removing ? @"TDLib reaction: removed by TDLib." : @"TDLib reaction: accepted by TDLib."];
+                [[TGLogger sharedLogger] log:removing ? @"TDLib reaction remove accepted." : @"TDLib reaction send accepted."];
             } else {
                 NSString *message = ([reactionErrorMessage length] > 0) ? reactionErrorMessage : @"Reaction was not accepted by TDLib.";
                 [self.statusField setStringValue:@"Reaction unavailable"];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib reaction: %@", message]];
-                [[TGLogger sharedLogger] log:@"TDLib reaction send failed or unsupported."];
+                [[TGLogger sharedLogger] log:removing ? @"TDLib reaction remove failed or unsupported." : @"TDLib reaction send failed or unsupported."];
             }
             if ([authorizationState length] > 0) {
                 [self updateAuthControlsForState:authorizationState];
@@ -7336,6 +7347,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [client release];
         [pool drain];
     });
+}
+
+- (void)sendReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item {
+    BOOL removing = NO;
+    if ([item isKindOfClass:[TGMessageItem class]] && [[item chosenReactionEmojis] containsObject:emoji]) {
+        removing = YES;
+    }
+    [self submitReactionEmoji:emoji toMessageItem:item removing:removing];
 }
 
 - (void)reactToMessageFromMenu:(id)sender {
@@ -7369,7 +7388,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             return;
         }
     }
-    [self sendReactionEmoji:@"👍" toMessageItem:item];
+    NSArray *chosenReactionEmojis = [item chosenReactionEmojis];
+    NSString *chosenReactionEmoji = nil;
+    if ([chosenReactionEmojis count] > 0 && [[chosenReactionEmojis objectAtIndex:0] isKindOfClass:[NSString class]]) {
+        chosenReactionEmoji = [chosenReactionEmojis objectAtIndex:0];
+    }
+    if ([chosenReactionEmoji length] > 0) {
+        [self submitReactionEmoji:chosenReactionEmoji toMessageItem:item removing:YES];
+    } else {
+        [self submitReactionEmoji:@"👍" toMessageItem:item removing:NO];
+    }
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {

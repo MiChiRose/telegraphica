@@ -94,7 +94,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
 - (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject;
 - (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
-- (NSString *)reactionSummaryFromMessageObject:(NSDictionary *)messageObject;
+- (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject;
 - (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject;
@@ -2952,7 +2952,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     return label;
 }
 
-- (NSString *)reactionSummaryFromMessageObject:(NSDictionary *)messageObject {
+- (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject {
     if (![messageObject isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
@@ -2973,6 +2973,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     }
 
     NSMutableArray *parts = [NSMutableArray array];
+    NSMutableArray *chosenEmojis = [NSMutableArray array];
     NSUInteger index = 0;
     for (index = 0; index < [(NSArray *)reactions count] && [parts count] < 3; index++) {
         id reactionObject = [(NSArray *)reactions objectAtIndex:index];
@@ -3001,13 +3002,31 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         if ([countObject respondsToSelector:@selector(integerValue)] && [countObject integerValue] > 0) {
             count = [countObject integerValue];
         }
-        [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
+        if (count == 1) {
+            [parts addObject:emoji];
+        } else {
+            [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
+        }
+
+        id chosenObject = [reaction objectForKey:@"is_chosen"];
+        if ([chosenObject respondsToSelector:@selector(boolValue)] &&
+            [chosenObject boolValue] &&
+            ![chosenEmojis containsObject:emoji]) {
+            [chosenEmojis addObject:emoji];
+        }
     }
 
-    if ([parts count] == 0) {
+    if ([parts count] == 0 && [chosenEmojis count] == 0) {
         return nil;
     }
-    return [parts componentsJoinedByString:@"  "];
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    if ([parts count] > 0) {
+        [info setObject:[parts componentsJoinedByString:@"  "] forKey:@"summary"];
+    }
+    if ([chosenEmojis count] > 0) {
+        [info setObject:chosenEmojis forKey:@"chosen_emojis"];
+    }
+    return info;
 }
 
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject {
@@ -3080,7 +3099,15 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
         [item setSending:([[message objectForKey:@"sending_state"] isKindOfClass:[NSDictionary class]])];
-        [item setReactionSummary:[self reactionSummaryFromMessageObject:message]];
+        NSDictionary *reactionInfo = [self reactionInfoFromMessageObject:message];
+        id reactionSummary = [reactionInfo objectForKey:@"summary"];
+        if ([reactionSummary isKindOfClass:[NSString class]]) {
+            [item setReactionSummary:reactionSummary];
+        }
+        id chosenReactionEmojis = [reactionInfo objectForKey:@"chosen_emojis"];
+        if ([chosenReactionEmojis isKindOfClass:[NSArray class]]) {
+            [item setChosenReactionEmojis:chosenReactionEmojis];
+        }
         id mediaAlbumID = [message objectForKey:@"media_album_id"];
         if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
             [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
@@ -4057,6 +4084,62 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         return nil;
     }
     return @"reaction submitted";
+}
+
+- (NSString *)removeReactionFromChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing." code:74];
+        }
+        return nil;
+    }
+    if (![emoji isKindOfClass:[NSString class]] || [emoji length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Reaction emoji is missing." code:75];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to remove reactions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:76];
+        }
+        return nil;
+    }
+
+    NSDictionary *reactionType = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  @"reactionTypeEmoji", @"@type",
+                                  emoji, @"emoji",
+                                  nil];
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"removeMessageReaction" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:messageID forKey:@"message_id"];
+    [request setObject:reactionType forKey:@"reaction_type"];
+
+    NSError *reactionError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-remove-reaction"
+                                                           timeout:timeout
+                                                         errorCode:77
+                                                             error:&reactionError];
+    if (!response) {
+        if (error) {
+            *error = reactionError ? reactionError : [self errorWithDescription:@"TDLib did not accept the remove reaction request. This TDLib build may not support removing message reactions." code:77];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib remove reaction request returned an unexpected response." code:78];
+        }
+        return nil;
+    }
+    return @"reaction removed";
 }
 
 - (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {

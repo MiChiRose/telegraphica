@@ -19,12 +19,18 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         for (partIndex = 0; partIndex < [parts count]; partIndex++) {
             NSString *part = [[parts objectAtIndex:partIndex] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
             NSRange separator = [part rangeOfString:@" " options:NSBackwardsSearch];
+            NSString *emoji = nil;
+            NSInteger count = 1;
             if (separator.location == NSNotFound || separator.location == 0 || NSMaxRange(separator) >= [part length]) {
-                continue;
+                emoji = part;
+            } else {
+                emoji = [part substringToIndex:separator.location];
+                NSString *countText = [[part substringFromIndex:NSMaxRange(separator)] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                NSInteger parsedCount = [countText integerValue];
+                if (parsedCount > 0) {
+                    count = parsedCount;
+                }
             }
-            NSString *emoji = [part substringToIndex:separator.location];
-            NSString *countText = [[part substringFromIndex:NSMaxRange(separator)] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-            NSInteger count = [countText integerValue];
             if ([emoji length] == 0 || count <= 0) {
                 continue;
             }
@@ -43,10 +49,32 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         NSString *emoji = [orderedEmojis objectAtIndex:emojiIndex];
         NSNumber *count = [countsByEmoji objectForKey:emoji];
         if ([emoji length] > 0 && [count integerValue] > 0) {
-            [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)[count integerValue]]];
+            if ([count integerValue] == 1) {
+                [parts addObject:emoji];
+            } else {
+                [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)[count integerValue]]];
+            }
         }
     }
     return ([parts count] > 0) ? [parts componentsJoinedByString:@"  "] : leftSummary;
+}
+
+static NSArray *TGReactionEmojisByMergingEmojiArrays(NSArray *leftEmojis, NSArray *rightEmojis) {
+    NSMutableArray *merged = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [leftEmojis count]; index++) {
+        id emoji = [leftEmojis objectAtIndex:index];
+        if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0 && ![merged containsObject:emoji]) {
+            [merged addObject:emoji];
+        }
+    }
+    for (index = 0; index < [rightEmojis count]; index++) {
+        id emoji = [rightEmojis objectAtIndex:index];
+        if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0 && ![merged containsObject:emoji]) {
+            [merged addObject:emoji];
+        }
+    }
+    return merged;
 }
 
 @implementation TGMessageItem
@@ -68,6 +96,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize mediaDuration = _mediaDuration;
 @synthesize mediaMimeType = _mediaMimeType;
 @synthesize reactionSummary = _reactionSummary;
+@synthesize chosenReactionEmojis = _chosenReactionEmojis;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -224,6 +253,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     if ([incomingReaction length] > 0) {
         self.reactionSummary = TGReactionSummaryByMergingSummaries(self.reactionSummary, incomingReaction);
     }
+    if ([[item chosenReactionEmojis] count] > 0) {
+        self.chosenReactionEmojis = TGReactionEmojisByMergingEmojiArrays(self.chosenReactionEmojis, [item chosenReactionEmojis]);
+    }
 }
 
 - (NSString *)visualMediaPlaceholderTitle {
@@ -275,6 +307,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setMediaDuration:_mediaDuration];
     [copy setMediaMimeType:_mediaMimeType];
     [copy setReactionSummary:_reactionSummary];
+    [copy setChosenReactionEmojis:_chosenReactionEmojis];
     return copy;
 }
 
@@ -312,6 +345,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_mediaDuration release];
     [_mediaMimeType release];
     [_reactionSummary release];
+    [_chosenReactionEmojis release];
     [super dealloc];
 }
 
