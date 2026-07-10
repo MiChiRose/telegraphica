@@ -6,6 +6,7 @@
 @synthesize title = _title;
 @synthesize typeSummary = _typeSummary;
 @synthesize unreadCount = _unreadCount;
+@synthesize lastReadOutboxMessageID = _lastReadOutboxMessageID;
 @synthesize avatarLocalPath = _avatarLocalPath;
 @synthesize forumTopic = _forumTopic;
 @synthesize parentChatID = _parentChatID;
@@ -36,6 +37,9 @@
     if ([identifier isEqual:@"unread_count"]) {
         return self.unreadCount;
     }
+    if ([identifier isEqual:@"last_read_outbox_message_id"]) {
+        return self.lastReadOutboxMessageID;
+    }
     if ([identifier isEqual:@"chat_id"]) {
         return self.chatID;
     }
@@ -56,6 +60,7 @@
     [_title release];
     [_typeSummary release];
     [_unreadCount release];
+    [_lastReadOutboxMessageID release];
     [_avatarLocalPath release];
     [_parentChatID release];
     [_messageThreadID release];

@@ -1115,6 +1115,37 @@ static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
     return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
 }
 
+static void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing] || NSIsEmptyRect(bubbleRect)) {
+        return;
+    }
+
+    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
+    CGFloat dotSide = 3.0;
+    CGFloat dotGap = 3.0;
+    CGFloat totalWidth = (dotSide * 2.0) + dotGap;
+    CGFloat dotX = NSMaxX(bubbleRect) - totalWidth - 9.0;
+    CGFloat dotY = flipped ? (NSMaxY(bubbleRect) - reactionBandHeight - 10.0)
+                           : (NSMinY(bubbleRect) + reactionBandHeight + 7.0);
+    NSColor *strokeColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.72];
+    NSColor *fillColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.86];
+    BOOL delivered = ![item sending];
+    BOOL read = delivered && [item outgoingRead];
+
+    NSUInteger index = 0;
+    for (index = 0; index < 2; index++) {
+        NSRect dotRect = NSMakeRect(dotX + ((dotSide + dotGap) * (CGFloat)index), dotY, dotSide, dotSide);
+        NSBezierPath *dotPath = [NSBezierPath bezierPathWithOvalInRect:dotRect];
+        if ((index == 0 && delivered) || (index == 1 && read)) {
+            [fillColor set];
+            [dotPath fill];
+        }
+        [strokeColor set];
+        [dotPath setLineWidth:0.8];
+        [dotPath stroke];
+    }
+}
+
 static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth) {
     if (!item) {
         return 48.0;
@@ -2394,6 +2425,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];
         }
     }
+
+    TGDrawOutgoingStatusDotsForItem(item, bubbleRect, [controlView isFlipped]);
 }
 
 - (void)dealloc {
@@ -2503,6 +2536,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, copy) NSString *selectedChatTitle;
 @property (nonatomic, copy) NSString *selectedChatTypeSummary;
 @property (nonatomic, copy) NSString *selectedChatAvatarLocalPath;
+@property (nonatomic, retain) NSNumber *selectedChatLastReadOutboxMessageID;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
 @property (nonatomic, retain) NSNumber *topicParentChatID;
@@ -2659,6 +2693,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize selectedChatTitle = _selectedChatTitle;
 @synthesize selectedChatTypeSummary = _selectedChatTypeSummary;
 @synthesize selectedChatAvatarLocalPath = _selectedChatAvatarLocalPath;
+@synthesize selectedChatLastReadOutboxMessageID = _selectedChatLastReadOutboxMessageID;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
 @synthesize topicParentChatID = _topicParentChatID;
@@ -5287,6 +5322,34 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [self.chatItems count] < TGStatusChatPreviewMaximumLimit);
 }
 
+- (void)updateOutgoingReadStateForVisibleMessages {
+    long long lastReadOutboxMessageID = 0;
+    if ([self.selectedChatLastReadOutboxMessageID respondsToSelector:@selector(longLongValue)]) {
+        lastReadOutboxMessageID = [self.selectedChatLastReadOutboxMessageID longLongValue];
+    }
+
+    NSUInteger index = 0;
+    BOOL changed = NO;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        id candidate = [self.messageItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+        TGMessageItem *item = (TGMessageItem *)candidate;
+        BOOL read = NO;
+        if ([item outgoing] && ![item sending] && [[item messageID] respondsToSelector:@selector(longLongValue)] && lastReadOutboxMessageID > 0) {
+            read = ([[item messageID] longLongValue] <= lastReadOutboxMessageID);
+        }
+        if ([item outgoingRead] != read) {
+            [item setOutgoingRead:read];
+            changed = YES;
+        }
+    }
+    if (changed) {
+        [self.messageTableView reloadData];
+    }
+}
+
 - (void)setLoginErrorMessage:(NSString *)message {
     BOOL hasMessage = ([message length] > 0);
     self.loginErrorVisible = hasMessage;
@@ -5342,6 +5405,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.selectedChatTitle = nil;
         self.selectedChatTypeSummary = nil;
         self.selectedChatAvatarLocalPath = nil;
+        self.selectedChatLastReadOutboxMessageID = nil;
         self.selectedMessageThreadID = nil;
         self.selectedMessageTopicKind = nil;
         [self clearForumTopicListState];
@@ -6256,6 +6320,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.selectedChatTitle = nil;
         self.selectedChatTypeSummary = nil;
         self.selectedChatAvatarLocalPath = nil;
+        self.selectedChatLastReadOutboxMessageID = nil;
         self.selectedMessageThreadID = nil;
         self.selectedMessageTopicKind = nil;
         [self refreshSelectedChatHeaderDisplay];
@@ -6300,6 +6365,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"Selected chat";
     self.selectedChatTypeSummary = [item typeSummary];
     self.selectedChatAvatarLocalPath = [item avatarLocalPath];
+    self.selectedChatLastReadOutboxMessageID = [item lastReadOutboxMessageID];
+    [self updateOutgoingReadStateForVisibleMessages];
     [self refreshSelectedChatHeaderDisplay];
     if (selectionChanged) {
         [self.messageItems removeAllObjects];
@@ -6388,6 +6455,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
         [self.chatTableView scrollRowToVisible:selectedIndex];
+        id selectedItem = [items objectAtIndex:selectedIndex];
+        if ([selectedItem isKindOfClass:[TGChatItem class]]) {
+            self.selectedChatLastReadOutboxMessageID = [(TGChatItem *)selectedItem lastReadOutboxMessageID];
+            [self updateOutgoingReadStateForVisibleMessages];
+        }
         return;
     }
 
@@ -6403,6 +6475,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedChatTitle = nil;
     self.selectedChatTypeSummary = nil;
     self.selectedChatAvatarLocalPath = nil;
+    self.selectedChatLastReadOutboxMessageID = nil;
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
     [self refreshSelectedChatHeaderDisplay];
@@ -6517,6 +6590,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedChatTitle = self.topicParentTitle;
     self.selectedChatTypeSummary = @"Forum";
     self.selectedChatAvatarLocalPath = self.topicParentAvatarLocalPath;
+    self.selectedChatLastReadOutboxMessageID = nil;
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
     [self refreshSelectedChatHeaderDisplay];
@@ -6611,6 +6685,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.selectedChatTitle = parentTitle;
                 self.selectedChatTypeSummary = @"Forum";
                 self.selectedChatAvatarLocalPath = parentAvatarPath;
+                self.selectedChatLastReadOutboxMessageID = nil;
                 self.selectedMessageThreadID = nil;
                 self.selectedMessageTopicKind = nil;
                 [self refreshSelectedChatHeaderDisplay];
@@ -6848,6 +6923,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:orderedItems]];
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
+        [self updateOutgoingReadStateForVisibleMessages];
         [self.messageTableView reloadData];
         [self scrollMessagesToNewestIfAvailable];
         return;
@@ -6881,6 +6957,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self.messageItems removeAllObjects];
     [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
+    [self updateOutgoingReadStateForVisibleMessages];
     [self.messageTableView reloadData];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
@@ -6929,6 +7006,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
     }
 
+    [self updateOutgoingReadStateForVisibleMessages];
     [self.messageTableView reloadData];
     if (added > 0) {
         if (preserveVisiblePosition) {
@@ -8283,6 +8361,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.selectedChatTitle = nil;
                 self.selectedChatTypeSummary = nil;
                 self.selectedChatAvatarLocalPath = nil;
+                self.selectedChatLastReadOutboxMessageID = nil;
                 self.selectedMessageThreadID = nil;
                 self.selectedMessageTopicKind = nil;
                 self.chatsExhausted = NO;
@@ -8427,6 +8506,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_selectedChatTitle release];
     [_selectedChatTypeSummary release];
     [_selectedChatAvatarLocalPath release];
+    [_selectedChatLastReadOutboxMessageID release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
     [_topicParentChatID release];

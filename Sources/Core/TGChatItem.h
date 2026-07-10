@@ -6,6 +6,7 @@
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *typeSummary;
 @property (nonatomic, retain) NSNumber *unreadCount;
+@property (nonatomic, retain) NSNumber *lastReadOutboxMessageID;
 @property (nonatomic, copy) NSString *avatarLocalPath;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
 @property (nonatomic, retain) NSNumber *parentChatID;
