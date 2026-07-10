@@ -1852,9 +1852,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @implementation TGMediaZoomButtonCell
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    (void)controlView;
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
+    BOOL flipped = [controlView isFlipped];
     CGFloat alpha = enabled ? 1.0 : 0.48;
     NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
     NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
@@ -1870,8 +1870,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSColor *iconColor = TGClassicHeaderTextColor(alpha);
     [iconColor set];
     CGFloat circleSide = 11.0;
+    CGFloat visualYOffset = flipped ? -2.0 : 2.0;
     NSRect lensRect = NSMakeRect(NSMidX(buttonRect) - 7.0,
-                                 NSMidY(buttonRect) - 4.0,
+                                 NSMidY(buttonRect) - 4.0 + visualYOffset,
                                  circleSide,
                                  circleSide);
     NSBezierPath *lensPath = [NSBezierPath bezierPathWithOvalInRect:lensRect];
@@ -1880,7 +1881,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSBezierPath *handlePath = [NSBezierPath bezierPath];
     [handlePath setLineWidth:1.8];
-    BOOL flipped = [controlView isFlipped];
     CGFloat handleStartY = flipped ? (NSMaxY(lensRect) - 1.5) : (NSMinY(lensRect) + 1.5);
     CGFloat handleEndY = flipped ? (NSMaxY(lensRect) + 5.0) : (NSMinY(lensRect) - 5.0);
     [handlePath moveToPoint:NSMakePoint(NSMaxX(lensRect) - 1.5, handleStartY)];
@@ -4830,10 +4830,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)windowWillClose:(NSNotification *)notification {
     if ([notification object] == self.mediaPreviewWindow) {
+        NSWindow *closingWindow = [(NSWindow *)[notification object] retain];
         self.mediaPreviewRequestGeneration = self.mediaPreviewRequestGeneration + 1;
         self.mediaPreviewPath = nil;
         self.mediaPreviewZoomScale = 1.0;
         [self.mediaPreviewImageView setImage:nil];
+        [closingWindow setDelegate:nil];
+        self.mediaPreviewImageView = nil;
+        self.mediaPreviewScrollView = nil;
+        self.mediaPreviewWindow = nil;
+        [closingWindow release];
     }
 }
 
