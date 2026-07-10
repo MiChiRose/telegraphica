@@ -769,7 +769,7 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
     }
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
-    NSString *text = TGDisplayTextForMessageItem(item);
+    NSString *text = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -1600,7 +1600,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat sidePadding = 14.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
-    NSString *messageText = TGDisplayTextForMessageItem(item);
+    NSString *rawMessageText = TGDisplayTextForMessageItem(item);
+    NSString *stickerFallbackText = [item isStickerMessage] ? rawMessageText : @"";
+    NSString *messageText = [item isStickerMessage] ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -1692,6 +1694,25 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [imagePath addClip];
             TGDrawImageInRect(image, imageRect, [controlView isFlipped]);
             [NSGraphicsContext restoreGraphicsState];
+        } else if ([item isStickerMessage]) {
+            [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
+            [imagePath setLineWidth:1.0];
+            [imagePath stroke];
+            NSString *fallbackText = ([stickerFallbackText length] > 0) ? stickerFallbackText : @"Sticker";
+            CGFloat fallbackFontSize = ([fallbackText length] <= 4) ? 42.0 : 14.0;
+            NSMutableParagraphStyle *fallbackParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+            [fallbackParagraph setAlignment:NSCenterTextAlignment];
+            NSDictionary *fallbackAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                                [NSFont boldSystemFontOfSize:fallbackFontSize], NSFontAttributeName,
+                                                TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                                fallbackParagraph, NSParagraphStyleAttributeName,
+                                                nil];
+            NSSize fallbackSize = [fallbackText sizeWithAttributes:fallbackAttributes];
+            NSRect fallbackRect = NSMakeRect(NSMinX(imageRect) + 4.0,
+                                            NSMidY(imageRect) - ceil(fallbackSize.height / 2.0) - 2.0,
+                                            NSWidth(imageRect) - 8.0,
+                                            fallbackSize.height + 4.0);
+            [fallbackText drawInRect:fallbackRect withAttributes:fallbackAttributes];
         } else {
             [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
             [imagePath setLineWidth:1.0];
@@ -3676,15 +3697,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
     CGFloat headerButtonSize = 30.0;
-    CGFloat sectionHeaderVerticalOffset = 0.0;
-    CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVerticalOffset;
-    CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVerticalOffset;
+    CGFloat sectionHeaderVisualOffset = -1.0;
+    CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVisualOffset;
+    CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVisualOffset;
     [self.chatsLabel setFrame:NSMakeRect(mainX + 16.0, headerLabelY, 88.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(NSMinX([self.loadMoreChatsButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
-    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0 + sectionHeaderVerticalOffset;
+    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
     CGFloat chatListHeight = chatListTop - chatListBottom;
     if (chatListHeight < 128.0) {
         chatListHeight = 128.0;
@@ -3717,7 +3738,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
-    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0 + sectionHeaderVerticalOffset;
+    CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
