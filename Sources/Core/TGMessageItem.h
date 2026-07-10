@@ -14,6 +14,7 @@
 @property (nonatomic, retain) NSNumber *mediaHeight;
 @property (nonatomic, retain) NSNumber *mediaAlbumID;
 @property (nonatomic, copy) NSArray *mediaItems;
+@property (nonatomic, copy) NSString *reactionSummary;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
