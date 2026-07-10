@@ -2400,8 +2400,10 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     }
 
     NSDictionary *bestDisplayDownloadedSize = nil;
+    NSDictionary *bestDisplayDownloadableSize = nil;
     NSDictionary *largestSize = nil;
     NSInteger bestDisplayScore = NSIntegerMax;
+    NSInteger bestDisplayDownloadableScore = NSIntegerMax;
     long long largestArea = 0;
     NSUInteger index = 0;
     for (index = 0; index < [sizes count]; index++) {
@@ -2422,10 +2424,16 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         long long area = (long long)width * (long long)height;
         id fileObject = [size objectForKey:@"photo"];
         NSString *localPath = [self completedLocalPathFromFileObject:fileObject];
+        NSNumber *fileID = [self fileIDFromFileObject:fileObject];
         if ([localPath length] > 0) {
             if (!bestDisplayDownloadedSize || score < bestDisplayScore) {
                 bestDisplayDownloadedSize = size;
                 bestDisplayScore = score;
+            }
+        } else if (fileID) {
+            if (!bestDisplayDownloadableSize || score < bestDisplayDownloadableScore) {
+                bestDisplayDownloadableSize = size;
+                bestDisplayDownloadableScore = score;
             }
         }
         if (!largestSize || area > largestArea) {
@@ -2434,7 +2442,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         }
     }
 
-    NSDictionary *displaySize = bestDisplayDownloadedSize ? bestDisplayDownloadedSize : largestSize;
+    NSDictionary *displaySize = bestDisplayDownloadedSize ? bestDisplayDownloadedSize : (bestDisplayDownloadableSize ? bestDisplayDownloadableSize : largestSize);
     if (!displaySize) {
         return nil;
     }
@@ -2446,7 +2454,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     NSDictionary *displayInfo = [self photoInfoFromFileObject:[displaySize objectForKey:@"photo"]
                                                         width:width
                                                        height:height
-                                              downloadMissing:NO
+                                              downloadMissing:(downloadMissing && !bestDisplayDownloadedSize)
                                                       timeout:timeout
                                            didRequestDownload:didRequestDownload];
     NSMutableDictionary *info = displayInfo ? [NSMutableDictionary dictionaryWithDictionary:displayInfo] : [NSMutableDictionary dictionary];
@@ -2458,20 +2466,14 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     id fullFileObject = [largestSize objectForKey:@"photo"];
     NSNumber *fullFileID = [self fileIDFromFileObject:fullFileObject];
     NSString *fullLocalPath = [self completedLocalPathFromFileObject:fullFileObject];
-    if ([fullLocalPath length] == 0 && downloadMissing && fullFileID) {
-        if (didRequestDownload) {
-            *didRequestDownload = YES;
-        }
-        NSDictionary *downloadedInfo = [self downloadedFileInfoForFileID:fullFileID timeout:timeout];
-        fullLocalPath = [downloadedInfo objectForKey:@"local_path"];
-    }
-
     if (fullFileID) {
         [info setObject:fullFileID forKey:@"full_file_id"];
     }
     if ([fullLocalPath length] > 0) {
         [info setObject:fullLocalPath forKey:@"full_local_path"];
-        [info setObject:fullLocalPath forKey:@"local_path"];
+        if ([[info objectForKey:@"local_path"] length] == 0) {
+            [info setObject:fullLocalPath forKey:@"local_path"];
+        }
     }
     if (fullWidth) {
         [info setObject:fullWidth forKey:@"full_width"];
@@ -2486,13 +2488,13 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     if (![containerObject isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
-    id fileObject = [containerObject objectForKey:@"file"];
-    if ([fileObject isKindOfClass:[NSDictionary class]]) {
-        return (NSDictionary *)fileObject;
-    }
-    id documentFileObject = [containerObject objectForKey:@"document"];
-    if ([documentFileObject isKindOfClass:[NSDictionary class]]) {
-        return (NSDictionary *)documentFileObject;
+    NSArray *fileKeys = [NSArray arrayWithObjects:@"file", @"document", @"sticker", @"animation", @"video", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [fileKeys count]; index++) {
+        id fileObject = [containerObject objectForKey:[fileKeys objectAtIndex:index]];
+        if ([fileObject isKindOfClass:[NSDictionary class]]) {
+            return (NSDictionary *)fileObject;
+        }
     }
     return nil;
 }
@@ -2601,6 +2603,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     id heightObject = [container objectForKey:@"height"];
     NSNumber *width = [widthObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[widthObject integerValue]] : nil;
     NSNumber *height = [heightObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[heightObject integerValue]] : nil;
+    NSDictionary *mediaFile = [self mediaFileObjectFromContainerObject:container];
 
     id thumbnail = [container objectForKey:@"thumbnail"];
     if ([thumbnail isKindOfClass:[NSDictionary class]]) {
@@ -2612,11 +2615,19 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                                 timeout:timeout
                                                      didRequestDownload:didRequestDownload];
         if (thumbnailPhotoInfo) {
-            return thumbnailPhotoInfo;
+            NSMutableDictionary *info = [NSMutableDictionary dictionaryWithDictionary:thumbnailPhotoInfo];
+            NSNumber *fullFileID = [self fileIDFromFileObject:mediaFile];
+            NSString *fullLocalPath = [self completedLocalPathFromFileObject:mediaFile];
+            if (fullFileID) {
+                [info setObject:fullFileID forKey:@"full_file_id"];
+            }
+            if ([fullLocalPath length] > 0) {
+                [info setObject:fullLocalPath forKey:@"full_local_path"];
+            }
+            return info;
         }
     }
 
-    NSDictionary *mediaFile = [self mediaFileObjectFromContainerObject:container];
     if (mediaFile) {
         return [self photoInfoFromFileObject:mediaFile
                                        width:width

@@ -754,6 +754,14 @@ static NSString *TGMediaItemContentType(NSDictionary *mediaItem) {
     return [contentType isKindOfClass:[NSString class]] ? (NSString *)contentType : nil;
 }
 
+static BOOL TGMediaItemIsAnimation(NSDictionary *mediaItem) {
+    return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageAnimation"];
+}
+
+static BOOL TGMediaItemIsVideo(NSDictionary *mediaItem) {
+    return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageVideo"];
+}
+
 static NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem) {
     id placeholder = [mediaItem objectForKey:@"placeholder"];
     if ([placeholder isKindOfClass:[NSString class]] && [(NSString *)placeholder length] > 0) {
@@ -774,6 +782,36 @@ static NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem) {
 
 static BOOL TGMediaItemIsSticker(NSDictionary *mediaItem) {
     return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageSticker"];
+}
+
+static void TGDrawMediaKindBadge(NSString *badgeText, NSRect rect, BOOL flipped) {
+    if (![badgeText isKindOfClass:[NSString class]] || [badgeText length] == 0 || NSIsEmptyRect(rect)) {
+        return;
+    }
+
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:9.0], NSFontAttributeName,
+                                [NSColor colorWithCalibratedWhite:1.0 alpha:0.96], NSForegroundColorAttributeName,
+                                nil];
+    NSSize badgeSize = [badgeText sizeWithAttributes:attributes];
+    CGFloat badgeWidth = ceil(badgeSize.width) + 12.0;
+    CGFloat badgeHeight = 18.0;
+    CGFloat badgeX = NSMinX(rect) + 6.0;
+    CGFloat badgeY = flipped ? (NSMaxY(rect) - badgeHeight - 6.0) : (NSMinY(rect) + 6.0);
+    NSRect badgeRect = NSMakeRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    NSBezierPath *badgePath = [NSBezierPath bezierPathWithRoundedRect:badgeRect xRadius:9.0 yRadius:9.0];
+    [[NSColor colorWithCalibratedWhite:0.0 alpha:0.38] set];
+    [badgePath fill];
+
+    NSRect textRect = NSMakeRect(NSMinX(badgeRect),
+                                 NSMinY(badgeRect) + floor((NSHeight(badgeRect) - badgeSize.height) / 2.0) - 1.0,
+                                 NSWidth(badgeRect),
+                                 badgeSize.height + 2.0);
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:attributes];
+    [centeredAttributes setObject:paragraph forKey:NSParagraphStyleAttributeName];
+    [badgeText drawInRect:textRect withAttributes:centeredAttributes];
 }
 
 static NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth) {
@@ -996,6 +1034,14 @@ static void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL out
     [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
     [mediaPath setLineWidth:1.0];
     [mediaPath stroke];
+
+    if (overflowCount == 0) {
+        if (TGMediaItemIsAnimation(mediaItem)) {
+            TGDrawMediaKindBadge(@"GIF", rect, flipped);
+        } else if (TGMediaItemIsVideo(mediaItem)) {
+            TGDrawMediaKindBadge(@"VIDEO", rect, flipped);
+        }
+    }
 
     if (overflowCount > 0) {
         [NSGraphicsContext saveGraphicsState];
@@ -1494,6 +1540,58 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 @end
 
+@protocol TGMediaPreviewMagnificationTarget
+- (void)mediaPreviewView:(id)sender didMagnifyBy:(NSNumber *)magnificationNumber;
+@end
+
+@interface TGMediaPreviewScrollView : NSScrollView {
+    id<TGMediaPreviewMagnificationTarget> _magnificationTarget;
+}
+@property (nonatomic, assign) id<TGMediaPreviewMagnificationTarget> magnificationTarget;
+@end
+
+@implementation TGMediaPreviewScrollView
+
+@synthesize magnificationTarget = _magnificationTarget;
+
+- (BOOL)acceptsFirstResponder {
+    return YES;
+}
+
+- (void)magnifyWithEvent:(NSEvent *)event {
+    if (self.magnificationTarget) {
+        [self.magnificationTarget mediaPreviewView:self didMagnifyBy:[NSNumber numberWithDouble:[event magnification]]];
+        return;
+    }
+    [super magnifyWithEvent:event];
+}
+
+@end
+
+@interface TGMediaPreviewImageView : NSImageView {
+    id<TGMediaPreviewMagnificationTarget> _magnificationTarget;
+}
+@property (nonatomic, assign) id<TGMediaPreviewMagnificationTarget> magnificationTarget;
+@end
+
+@implementation TGMediaPreviewImageView
+
+@synthesize magnificationTarget = _magnificationTarget;
+
+- (BOOL)acceptsFirstResponder {
+    return YES;
+}
+
+- (void)magnifyWithEvent:(NSEvent *)event {
+    if (self.magnificationTarget) {
+        [self.magnificationTarget mediaPreviewView:self didMagnifyBy:[NSNumber numberWithDouble:[event magnification]]];
+        return;
+    }
+    [super magnifyWithEvent:event];
+}
+
+@end
+
 static void TGStrokeLine(NSPoint startPoint, NSPoint endPoint, CGFloat width) {
     NSBezierPath *path = [NSBezierPath bezierPath];
     [path setLineWidth:width];
@@ -1744,6 +1842,61 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                   NSWidth(buttonRect),
                                   titleSize.height + 2.0);
     [title drawInRect:titleRect withAttributes:attributes];
+}
+
+@end
+
+@interface TGMediaZoomButtonCell : NSButtonCell
+@end
+
+@implementation TGMediaZoomButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
+    NSColor *topColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicNavigationSelectedColor(alpha);
+    NSColor *bottomColor = highlighted ? TGClassicNavigationSelectedColor(alpha) : TGClassicNavigationSelectedStrokeColor(alpha);
+    NSGradient *buttonGradient = [[[NSGradient alloc] initWithStartingColor:topColor
+                                                                endingColor:bottomColor] autorelease];
+    [buttonGradient drawInBezierPath:buttonPath angle:90.0];
+    [TGClassicTableGridColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSColor *iconColor = TGClassicHeaderTextColor(alpha);
+    [iconColor set];
+    CGFloat circleSide = 11.0;
+    NSRect lensRect = NSMakeRect(NSMidX(buttonRect) - 7.0,
+                                 NSMidY(buttonRect) - 4.0,
+                                 circleSide,
+                                 circleSide);
+    NSBezierPath *lensPath = [NSBezierPath bezierPathWithOvalInRect:lensRect];
+    [lensPath setLineWidth:1.5];
+    [lensPath stroke];
+
+    NSBezierPath *handlePath = [NSBezierPath bezierPath];
+    [handlePath setLineWidth:1.8];
+    [handlePath moveToPoint:NSMakePoint(NSMaxX(lensRect) - 1.5, NSMinY(lensRect) + 1.5)];
+    [handlePath lineToPoint:NSMakePoint(NSMaxX(lensRect) + 5.0, NSMinY(lensRect) - 5.0)];
+    [handlePath stroke];
+
+    NSBezierPath *minusPath = [NSBezierPath bezierPath];
+    [minusPath setLineWidth:1.5];
+    [minusPath moveToPoint:NSMakePoint(NSMinX(lensRect) + 3.0, NSMidY(lensRect))];
+    [minusPath lineToPoint:NSMakePoint(NSMaxX(lensRect) - 3.0, NSMidY(lensRect))];
+    [minusPath stroke];
+
+    if ([[self title] isEqualToString:@"zoom-in"]) {
+        NSBezierPath *plusPath = [NSBezierPath bezierPath];
+        [plusPath setLineWidth:1.5];
+        [plusPath moveToPoint:NSMakePoint(NSMidX(lensRect), NSMinY(lensRect) + 3.0)];
+        [plusPath lineToPoint:NSMakePoint(NSMidX(lensRect), NSMaxY(lensRect) - 3.0)];
+        [plusPath stroke];
+    }
 }
 
 @end
@@ -2011,7 +2164,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) NSView *conversationPanelView;
@@ -3612,7 +3765,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(16, 58, 728, 486)] autorelease];
+    TGMediaPreviewScrollView *scrollView = [[[TGMediaPreviewScrollView alloc] initWithFrame:NSMakeRect(16, 58, 728, 486)] autorelease];
+    [scrollView setMagnificationTarget:self];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [scrollView setBorderType:NSNoBorder];
     [scrollView setHasVerticalScroller:YES];
@@ -3620,20 +3774,24 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [[scrollView contentView] setDrawsBackground:YES];
     [[scrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
 
-    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)] autorelease];
+    TGMediaPreviewImageView *imageView = [[[TGMediaPreviewImageView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)] autorelease];
+    [imageView setMagnificationTarget:self];
     [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
     [imageView setImageFrameStyle:NSImageFrameNone];
+    [imageView setAnimates:YES];
     [scrollView setDocumentView:imageView];
     [contentView addSubview:scrollView];
     self.mediaPreviewScrollView = scrollView;
     self.mediaPreviewImageView = imageView;
 
     NSButton *zoomOutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(16, 18, 42, 30)] autorelease];
-    [zoomOutButton setTitle:@"-"];
+    [zoomOutButton setTitle:@"zoom-out"];
+    [zoomOutButton setCell:[[[TGMediaZoomButtonCell alloc] initTextCell:@"zoom-out"] autorelease]];
+    [zoomOutButton setBordered:NO];
+    [zoomOutButton setFocusRingType:NSFocusRingTypeNone];
     [zoomOutButton setToolTip:@"Zoom out"];
     [zoomOutButton setTarget:self];
     [zoomOutButton setAction:@selector(zoomOutMediaPreview:)];
-    [self applyUtilityButtonStyle:zoomOutButton];
     [zoomOutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:zoomOutButton];
 
@@ -3647,11 +3805,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:fitButton];
 
     NSButton *zoomInButton = [[[NSButton alloc] initWithFrame:NSMakeRect(148, 18, 42, 30)] autorelease];
-    [zoomInButton setTitle:@"+"];
+    [zoomInButton setTitle:@"zoom-in"];
+    [zoomInButton setCell:[[[TGMediaZoomButtonCell alloc] initTextCell:@"zoom-in"] autorelease]];
+    [zoomInButton setBordered:NO];
+    [zoomInButton setFocusRingType:NSFocusRingTypeNone];
     [zoomInButton setToolTip:@"Zoom in"];
     [zoomInButton setTarget:self];
     [zoomInButton setAction:@selector(zoomInMediaPreview:)];
-    [self applyUtilityButtonStyle:zoomInButton];
     [zoomInButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:zoomInButton];
 
@@ -3724,28 +3884,61 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyMediaPreviewZoomScale:scale / 1.25];
 }
 
-- (void)openMediaPreviewAtPath:(NSString *)path {
-    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        [self appendDetail:@"Media preview file is not available yet."];
+- (void)mediaPreviewView:(id)sender didMagnifyBy:(NSNumber *)magnificationNumber {
+    (void)sender;
+    CGFloat delta = [magnificationNumber respondsToSelector:@selector(doubleValue)] ? (CGFloat)[magnificationNumber doubleValue] : 0.0;
+    if (delta > -0.002 && delta < 0.002) {
         return;
     }
 
-    NSImage *image = TGImageWithCorrectOrientationFromFile(path);
-    if (!image) {
+    CGFloat scale = self.mediaPreviewZoomScale > 0.0 ? self.mediaPreviewZoomScale : 1.0;
+    CGFloat factor = 1.0 + delta;
+    if (factor < 0.25) {
+        factor = 0.25;
+    }
+    if (factor > 4.0) {
+        factor = 4.0;
+    }
+    [self applyMediaPreviewZoomScale:scale * factor];
+}
+
+- (BOOL)openMediaPreviewAtPath:(NSString *)path preferAnimated:(BOOL)preferAnimated {
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self appendDetail:@"Media preview file is not available yet."];
+        return NO;
+    }
+
+    NSString *extension = [[path pathExtension] lowercaseString];
+    BOOL likelyAnimated = preferAnimated || [extension isEqualToString:@"gif"];
+    NSImage *image = nil;
+    if (likelyAnimated) {
         image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
     }
     if (!image) {
+        image = TGImageWithCorrectOrientationFromFile(path);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+        }
+    }
+    if (!image) {
         [self appendDetail:@"Could not open media preview."];
-        return;
+        return NO;
     }
 
     [self ensureMediaPreviewWindow];
     self.mediaPreviewPath = path;
     [self.mediaPreviewImageView setImage:image];
+    [self.mediaPreviewImageView setAnimates:YES];
     [self.mediaPreviewWindow setTitle:@""];
     [self fitMediaPreview:nil];
     [self.mediaPreviewWindow center];
     [self.mediaPreviewWindow makeKeyAndOrderFront:nil];
+    [self.mediaPreviewWindow makeFirstResponder:self.mediaPreviewImageView];
+    return YES;
+}
+
+- (BOOL)openMediaPreviewAtPath:(NSString *)path {
+    return [self openMediaPreviewAtPath:path preferAnimated:NO];
 }
 
 - (void)openMediaPreviewForMediaItem:(NSDictionary *)mediaItem {
@@ -3753,9 +3946,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
 
+    BOOL preferAnimated = TGMediaItemIsAnimation(mediaItem);
     NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
     if ([fullPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:fullPath]) {
-        [self openMediaPreviewAtPath:fullPath];
+        if ([self openMediaPreviewAtPath:fullPath preferAnimated:preferAnimated]) {
+            return;
+        }
+        NSString *fallbackPath = TGMediaItemLocalPath(mediaItem);
+        if ([fallbackPath length] > 0 && ![fallbackPath isEqualToString:fullPath]) {
+            [self openMediaPreviewAtPath:fallbackPath];
+        }
         return;
     }
 
@@ -3771,7 +3971,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *fileIDCopy = [fileID retain];
     NSString *fallbackPathCopy = [fallbackPath copy];
     TGTDLibClient *client = [self.client retain];
-    [self.statusField setStringValue:@"Loading full photo..."];
+    [self.statusField setStringValue:@"Loading full media..."];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -3780,8 +3980,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *fallback = [fallbackPathCopy copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if ([downloadedPath length] > 0) {
-                [self openMediaPreviewAtPath:downloadedPath];
-                [self.statusField setStringValue:@"Connected"];
+                if ([self openMediaPreviewAtPath:downloadedPath preferAnimated:preferAnimated]) {
+                    [self.statusField setStringValue:@"Connected"];
+                } else if ([fallback length] > 0) {
+                    [self openMediaPreviewAtPath:fallback];
+                    [self.statusField setStringValue:@"Connected"];
+                    [self appendDetail:@"Full media format is not previewable yet; opened cached preview."];
+                } else {
+                    [self.statusField setStringValue:@"Connected"];
+                    [self appendDetail:@"Full media format is not previewable yet."];
+                }
             } else if ([fallback length] > 0) {
                 [self openMediaPreviewAtPath:fallback];
                 [self.statusField setStringValue:@"Connected"];
