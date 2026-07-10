@@ -684,6 +684,41 @@ static NSURL *TGFirstURLInMessageItem(TGMessageItem *item) {
     return [result URL];
 }
 
+static BOOL TGIsSupportedPhotoPath(NSString *path) {
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
+        return NO;
+    }
+
+    NSString *standardPath = [path stringByStandardizingPath];
+    BOOL isDirectory = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:standardPath isDirectory:&isDirectory] || isDirectory) {
+        return NO;
+    }
+
+    NSString *extension = [[standardPath pathExtension] lowercaseString];
+    NSArray *allowedExtensions = [NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", nil];
+    return [allowedExtensions containsObject:extension];
+}
+
+static NSString *TGFirstSupportedPhotoPathFromPasteboard(NSPasteboard *pasteboard) {
+    if (!pasteboard) {
+        return nil;
+    }
+    NSArray *paths = [pasteboard propertyListForType:NSFilenamesPboardType];
+    if (![paths isKindOfClass:[NSArray class]]) {
+        return nil;
+    }
+
+    NSUInteger index = 0;
+    for (index = 0; index < [paths count]; index++) {
+        id candidate = [paths objectAtIndex:index];
+        if ([candidate isKindOfClass:[NSString class]] && TGIsSupportedPhotoPath((NSString *)candidate)) {
+            return (NSString *)candidate;
+        }
+    }
+    return nil;
+}
+
 static NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex) {
     if (![text isKindOfClass:[NSString class]] || characterIndex >= [text length]) {
         return nil;
@@ -1076,6 +1111,10 @@ static CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availabl
     return maximumWidth;
 }
 
+static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
+    return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
+}
+
 static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth) {
     if (!item) {
         return 48.0;
@@ -1105,7 +1144,81 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
     if (height < 42.0) {
         height = 42.0;
     }
+    height += TGReactionBandHeightForMessageItem(item);
     return height + 10.0;
+}
+
+static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) {
+    if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
+        return NSZeroRect;
+    }
+
+    NSString *messageText = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
+    BOOL outgoing = [item outgoing];
+    CGFloat sidePadding = 14.0;
+    CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                    TGClassicInkColor(), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
+    if ([messageText length] > 0) {
+        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        [composedMessageText appendAttributedString:baseText];
+        if ([timeString length] > 0) {
+            NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
+            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
+            [composedMessageText appendAttributedString:timeSuffixText];
+        }
+    }
+
+    NSRect measuredRect = NSZeroRect;
+    if ([messageText length] > 0) {
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+                                                         options:NSStringDrawingUsesLineFragmentOrigin];
+    }
+    NSSize photoSize = NSZeroSize;
+    BOOL visualMediaMessage = [item isVisualMediaMessage];
+    if (visualMediaMessage) {
+        photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
+    }
+
+    CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
+    if (visualMediaMessage) {
+        CGFloat photoBubbleWidth = photoSize.width + 16.0;
+        if (photoBubbleWidth > bubbleWidth) {
+            bubbleWidth = photoBubbleWidth;
+        }
+    }
+    if (bubbleWidth < 96.0) {
+        bubbleWidth = 96.0;
+    }
+    if (bubbleWidth > maximumBubbleWidth) {
+        bubbleWidth = maximumBubbleWidth;
+    }
+
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    if (visualMediaMessage) {
+        bubbleHeight = photoSize.height + 24.0;
+        if (NSHeight(measuredRect) > 0.0) {
+            bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
+        }
+    }
+    if (bubbleHeight < 42.0) {
+        bubbleHeight = 42.0;
+    }
+    bubbleHeight += TGReactionBandHeightForMessageItem(item);
+
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
 }
 
 static long long TGMessageSortValue(id value) {
@@ -1807,6 +1920,44 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
+@interface TGAttachButtonCell : NSButtonCell
+@end
+
+@implementation TGAttachButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:7.0 yRadius:7.0];
+    NSColor *fillColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicHeaderBottomColor();
+    [fillColor set];
+    [buttonPath fill];
+    [TGClassicPanelStrokeColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    BOOL flipped = [controlView isFlipped];
+    NSRect iconRect = NSInsetRect(buttonRect, 9.0, 7.0);
+    NSBezierPath *clipPath = [NSBezierPath bezierPath];
+    [clipPath setLineWidth:2.0];
+    [clipPath moveToPoint:TGIconPoint(iconRect, 13.0, 4.0, flipped)];
+    [clipPath curveToPoint:TGIconPoint(iconRect, 5.0, 12.0, flipped)
+             controlPoint1:TGIconPoint(iconRect, 13.0, 11.0, flipped)
+             controlPoint2:TGIconPoint(iconRect, 5.0, 11.0, flipped)];
+    [clipPath curveToPoint:TGIconPoint(iconRect, 5.0, 5.0, flipped)
+             controlPoint1:TGIconPoint(iconRect, 5.0, 17.0, flipped)
+             controlPoint2:TGIconPoint(iconRect, 18.0, 17.0, flipped)];
+    [clipPath curveToPoint:TGIconPoint(iconRect, 16.0, 4.0, flipped)
+             controlPoint1:TGIconPoint(iconRect, 5.0, -1.0, flipped)
+             controlPoint2:TGIconPoint(iconRect, 16.0, -1.0, flipped)];
+    [TGClassicHeaderTextColor(alpha) set];
+    [clipPath stroke];
+}
+
+@end
+
 @interface TGHeaderIconButtonCell : NSButtonCell
 @end
 
@@ -2082,6 +2233,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
+    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
+    bubbleHeight += reactionBandHeight;
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
@@ -2153,10 +2306,47 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([timeString length] > 0 && [messageText length] == 0) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - 12.0,
-                                     NSMinY(bubbleRect) + 4.0,
+                                     NSMinY(bubbleRect) + 4.0 + reactionBandHeight,
                                      timeSize.width,
                                      10.0);
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
+    }
+
+    NSString *reactionSummary = [item reactionSummary];
+    if ([reactionSummary length] > 0) {
+        NSDictionary *reactionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
+                                            TGClassicSelectedRowTextColor(), NSForegroundColorAttributeName,
+                                            nil];
+        NSSize reactionSize = [reactionSummary sizeWithAttributes:reactionAttributes];
+        CGFloat reactionWidth = ceil(reactionSize.width) + 14.0;
+        CGFloat maximumReactionWidth = NSWidth(bubbleRect) - 24.0;
+        if (reactionWidth > maximumReactionWidth) {
+            reactionWidth = maximumReactionWidth;
+        }
+        if (reactionWidth > 20.0) {
+            CGFloat reactionHeight = 18.0;
+            NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0,
+                                             NSMinY(bubbleRect) + 4.0,
+                                             reactionWidth,
+                                             reactionHeight);
+            NSBezierPath *reactionPath = [NSBezierPath bezierPathWithRoundedRect:reactionRect xRadius:9.0 yRadius:9.0];
+            [TGClassicNavigationSelectedColor(0.82) set];
+            [reactionPath fill];
+            [TGClassicNavigationSelectedStrokeColor(0.72) set];
+            [reactionPath setLineWidth:1.0];
+            [reactionPath stroke];
+
+            NSMutableParagraphStyle *reactionParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+            [reactionParagraph setAlignment:NSCenterTextAlignment];
+            NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
+            [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
+            NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
+                                                 NSMinY(reactionRect) + floor((reactionHeight - reactionSize.height) / 2.0) - 1.0,
+                                                 NSWidth(reactionRect) - 8.0,
+                                                 reactionSize.height + 3.0);
+            [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];
+        }
     }
 }
 
@@ -2167,7 +2357,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, TGMediaPreviewMagnificationTarget>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) NSView *conversationPanelView;
@@ -2206,6 +2396,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *sendLabel;
 @property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
+@property (nonatomic, retain) NSButton *attachPhotoButton;
 @property (nonatomic, retain) NSButton *sendMessageButton;
 @property (nonatomic, retain) NSTextField *authLabel;
 @property (nonatomic, retain) NSTextField *authStateField;
@@ -2283,6 +2474,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
+@property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
 @property (nonatomic, assign) NSUInteger mediaPreviewRequestGeneration;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
@@ -2355,6 +2547,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize sendLabel = _sendLabel;
 @synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
+@synthesize attachPhotoButton = _attachPhotoButton;
 @synthesize sendMessageButton = _sendMessageButton;
 @synthesize authLabel = _authLabel;
 @synthesize authStateField = _authStateField;
@@ -2432,6 +2625,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
+@synthesize messageContextMenu = _messageContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -3198,6 +3392,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.messageTableView setAllowsMultipleSelection:NO];
     [self.messageTableView setTarget:self];
     [self.messageTableView setAction:@selector(openMessageLink:)];
+    [self.messageTableView setDoubleAction:@selector(reactToMessageWithDefaultReaction:)];
     [self.messageTableView setRowHeight:52.0];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self applySkeuomorphicTableStyle:self.messageTableView];
@@ -3205,6 +3400,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
     [self.messageTableView setHeaderView:nil];
+    [self.messageTableView registerForDraggedTypes:[NSArray arrayWithObject:NSFilenamesPboardType]];
+
+    self.messageContextMenu = [[[NSMenu alloc] initWithTitle:@"Message"] autorelease];
+    [self.messageContextMenu setDelegate:self];
+    [self.messageTableView setMenu:self.messageContextMenu];
 
     NSTableColumn *bubbleColumn = [[[NSTableColumn alloc] initWithIdentifier:@"bubble"] autorelease];
     [[bubbleColumn headerCell] setStringValue:@"Conversation"];
@@ -3227,6 +3427,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                      text:@""
                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.sendLabel];
+
+    self.attachPhotoButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 50, 38, 32)] autorelease];
+    TGAttachButtonCell *attachCell = [[[TGAttachButtonCell alloc] initTextCell:@""] autorelease];
+    [attachCell setButtonType:NSMomentaryPushInButton];
+    [self.attachPhotoButton setCell:attachCell];
+    [self.attachPhotoButton setTitle:@""];
+    [self.attachPhotoButton setTarget:self];
+    [self.attachPhotoButton setAction:@selector(attachPhoto:)];
+    [self.attachPhotoButton setEnabled:NO];
+    [self.attachPhotoButton setBordered:NO];
+    [self.attachPhotoButton setToolTip:@"Attach photo"];
+    [self.attachPhotoButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.attachPhotoButton];
 
     self.sendTextFieldBackgroundView = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextFieldBackgroundView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
@@ -4324,6 +4537,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.sendLabel visible:NO];
+    [self showView:self.attachPhotoButton visible:showChats];
     [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
@@ -4607,13 +4821,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     CGFloat sendButtonWidth = 38.0;
-    CGFloat sendFieldX = conversationX + 14.0;
+    CGFloat attachButtonWidth = 38.0;
+    CGFloat attachButtonX = conversationX + 12.0;
+    CGFloat sendFieldX = attachButtonX + attachButtonWidth + 8.0;
     CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
     CGFloat sendFieldWidth = sendButtonX - sendFieldX - 10.0;
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
     }
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
+    [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerY + 5.0, attachButtonWidth, 32.0)];
     [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
     [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerY + 11.0, sendFieldWidth - 16.0, 20.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
@@ -4895,6 +5112,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     BOOL canTargetChat = [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget;
     NSString *text = [self.sendTextField stringValue];
     NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    [self.attachPhotoButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];
     [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
 }
@@ -4957,6 +5175,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadMoreChatsButton setEnabled:NO];
     [self.loadMessagesButton setEnabled:NO];
     [self.loadOlderMessagesButton setEnabled:NO];
+    [self.attachPhotoButton setEnabled:NO];
     [self.sendMessageButton setEnabled:NO];
     if (![state isEqualToString:@"ready"] && ([self.chatItems count] > 0 || [self.messageItems count] > 0 || self.selectedChatID != nil)) {
         [self.chatItems removeAllObjects];
@@ -5106,6 +5325,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
+    [self.attachPhotoButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.sendMessageButton setEnabled:NO];
     if (busy) {
@@ -5119,6 +5339,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.logoutButton setEnabled:NO];
         [self.chatTableView setEnabled:NO];
         [self.messageTableView setEnabled:NO];
+        [self.attachPhotoButton setEnabled:NO];
         [self.sendTextField setEnabled:NO];
         [self.sendMessageButton setEnabled:NO];
     } else {
@@ -5245,6 +5466,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
+    bubbleHeight += TGReactionBandHeightForMessageItem(item);
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
@@ -5349,6 +5571,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
+    bubbleHeight += TGReactionBandHeightForMessageItem(item);
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
@@ -5438,6 +5661,192 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
+- (TGMessageItem *)messageItemAtCurrentEventWithRow:(NSInteger *)rowOut tablePoint:(NSPoint *)pointOut {
+    NSEvent *event = [NSApp currentEvent];
+    if (!event) {
+        return nil;
+    }
+    NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
+    NSInteger row = [self.messageTableView rowAtPoint:tablePoint];
+    if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        return nil;
+    }
+    id item = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return nil;
+    }
+    if (rowOut) {
+        *rowOut = row;
+    }
+    if (pointOut) {
+        *pointOut = tablePoint;
+    }
+    return (TGMessageItem *)item;
+}
+
+- (BOOL)messageItem:(TGMessageItem *)item atRow:(NSInteger)row containsTablePoint:(NSPoint)tablePoint {
+    if (![item isKindOfClass:[TGMessageItem class]] || row < 0) {
+        return NO;
+    }
+    NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame);
+    return (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect));
+}
+
+- (BOOL)currentEventHitsActionableMessageContentForItem:(TGMessageItem *)item row:(NSInteger)row tablePoint:(NSPoint)tablePoint {
+    if (![item isKindOfClass:[TGMessageItem class]] || row < 0) {
+        return NO;
+    }
+    NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    if (NSIsEmptyRect(cellFrame)) {
+        return NO;
+    }
+    NSDictionary *mediaItem = [self mediaItemForItem:item inCellFrame:cellFrame atPoint:tablePoint];
+    if (mediaItem) {
+        return YES;
+    }
+    NSURL *url = [self messageLinkURLForItem:item inCellFrame:cellFrame atPoint:tablePoint];
+    return (url != nil);
+}
+
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+    if (menu != self.messageContextMenu) {
+        return;
+    }
+
+    [menu removeAllItems];
+    NSInteger row = -1;
+    NSPoint tablePoint = NSZeroPoint;
+    TGMessageItem *item = [self messageItemAtCurrentEventWithRow:&row tablePoint:&tablePoint];
+    if (!item || ![item.messageID respondsToSelector:@selector(longLongValue)] || ![item.chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self messageItem:item atRow:row containsTablePoint:tablePoint]) {
+        return;
+    }
+    NSArray *emojis = [NSArray arrayWithObjects:@"🔥", @"😁", @"👍", @"👎", @"❤", @"😢", @"😱", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [emojis count]; index++) {
+        NSString *emoji = [emojis objectAtIndex:index];
+        NSString *title = [NSString stringWithFormat:@"%@ React", emoji];
+        NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
+                                                          action:@selector(reactToMessageFromMenu:)
+                                                   keyEquivalent:@""] autorelease];
+        NSDictionary *payload = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 item, @"message",
+                                 emoji, @"emoji",
+                                 nil];
+        [menuItem setRepresentedObject:payload];
+        [menuItem setTarget:self];
+        [menu addItem:menuItem];
+    }
+}
+
+- (void)sendReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)] ||
+        ![emoji isKindOfClass:[NSString class]] ||
+        [emoji length] == 0) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Reaction is available only after sign-in is ready."];
+        return;
+    }
+    if (self.controlsBusy) {
+        [self appendDetail:@"Wait for the current Telegram operation to finish before sending a reaction."];
+        return;
+    }
+
+    NSNumber *chatID = [item.chatID retain];
+    NSNumber *messageID = [item.messageID retain];
+    NSString *reactionEmoji = [emoji copy];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"Sending reaction..."];
+    [self appendDetail:@"Submitting message reaction to TDLib..."];
+    [[TGLogger sharedLogger] log:@"TDLib reaction send requested."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *reactionError = nil;
+        NSError *stateError = nil;
+        NSString *reactionSummary = [client addReactionToChatID:chatID
+                                                      messageID:messageID
+                                                          emoji:reactionEmoji
+                                                        timeout:8.0
+                                                          error:&reactionError];
+        NSString *reactionErrorMessage = [[reactionError localizedDescription] copy];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
+        BOOL reactionSucceeded = ([reactionSummary length] > 0);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (reactionSucceeded) {
+                [self.statusField setStringValue:@"Reaction sent"];
+                [self appendDetail:@"TDLib reaction: accepted by TDLib."];
+                [[TGLogger sharedLogger] log:@"TDLib reaction send accepted."];
+            } else {
+                NSString *message = ([reactionErrorMessage length] > 0) ? reactionErrorMessage : @"Reaction was not accepted by TDLib.";
+                [self.statusField setStringValue:@"Reaction unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib reaction: %@", message]];
+                [[TGLogger sharedLogger] log:@"TDLib reaction send failed or unsupported."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            [self setControlsBusy:NO];
+            if (reactionSucceeded) {
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            }
+            [authorizationState release];
+            [reactionErrorMessage release];
+            [chatID release];
+            [messageID release];
+            [reactionEmoji release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
+- (void)reactToMessageFromMenu:(id)sender {
+    id payload = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![payload isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    TGMessageItem *item = [(NSDictionary *)payload objectForKey:@"message"];
+    NSString *emoji = [(NSDictionary *)payload objectForKey:@"emoji"];
+    [self sendReactionEmoji:emoji toMessageItem:item];
+}
+
+- (void)reactToMessageWithDefaultReaction:(id)sender {
+    (void)sender;
+    NSInteger row = [self.messageTableView clickedRow];
+    if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        return;
+    }
+    id candidate = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![candidate isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    TGMessageItem *item = (TGMessageItem *)candidate;
+    NSEvent *event = [NSApp currentEvent];
+    if (event) {
+        NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
+        if (![self messageItem:item atRow:row containsTablePoint:tablePoint]) {
+            return;
+        }
+        if ([self currentEventHitsActionableMessageContentForItem:item row:row tablePoint:tablePoint]) {
+            return;
+        }
+    }
+    [self sendReactionEmoji:@"👍" toMessageItem:item];
+}
+
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
     if (tableView == self.messageTableView) {
         return (NSInteger)[self.messageItems count];
@@ -5489,6 +5898,44 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                  inCellFrame:cellFrame
                                      atPoint:mouseLocation];
     return url ? @"Open link in default browser" : nil;
+}
+
+- (NSDragOperation)tableView:(NSTableView *)tableView
+                validateDrop:(id <NSDraggingInfo>)info
+                  proposedRow:(NSInteger)row
+        proposedDropOperation:(NSTableViewDropOperation)dropOperation {
+    (void)row;
+    (void)dropOperation;
+    if (tableView != self.messageTableView) {
+        return NSDragOperationNone;
+    }
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        return NSDragOperationNone;
+    }
+    NSString *photoPath = TGFirstSupportedPhotoPathFromPasteboard([info draggingPasteboard]);
+    return ([photoPath length] > 0) ? NSDragOperationCopy : NSDragOperationNone;
+}
+
+- (BOOL)tableView:(NSTableView *)tableView
+       acceptDrop:(id <NSDraggingInfo>)info
+              row:(NSInteger)row
+    dropOperation:(NSTableViewDropOperation)dropOperation {
+    (void)row;
+    (void)dropOperation;
+    if (tableView != self.messageTableView) {
+        return NO;
+    }
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        return NO;
+    }
+    NSString *photoPath = TGFirstSupportedPhotoPathFromPasteboard([info draggingPasteboard]);
+    if ([photoPath length] == 0) {
+        return NO;
+    }
+    [self sendPhotoAtPath:photoPath];
+    return YES;
 }
 
 - (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
@@ -6222,25 +6669,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     BOOL shouldScrollToNewest = forceScrollToNewest || [self isMessageHistoryNearBottom];
-    NSMutableSet *messageIDs = [NSMutableSet set];
+    NSMutableDictionary *messageIndexesByID = [NSMutableDictionary dictionary];
     NSMutableArray *mergedItems = [NSMutableArray arrayWithArray:self.messageItems];
     NSUInteger index = 0;
     for (index = 0; index < [self.messageItems count]; index++) {
         TGMessageItem *item = [self.messageItems objectAtIndex:index];
         id messageID = [item messageID];
         if (messageID) {
-            [messageIDs addObject:messageID];
+            [messageIndexesByID setObject:[NSNumber numberWithUnsignedInteger:index] forKey:messageID];
         }
     }
 
     for (index = 0; index < [orderedItems count]; index++) {
         TGMessageItem *item = [orderedItems objectAtIndex:index];
         id messageID = [item messageID];
-        if (messageID && [messageIDs containsObject:messageID]) {
+        NSNumber *existingIndex = messageID ? [messageIndexesByID objectForKey:messageID] : nil;
+        if (existingIndex) {
+            [mergedItems replaceObjectAtIndex:[existingIndex unsignedIntegerValue] withObject:item];
             continue;
         }
         if (messageID) {
-            [messageIDs addObject:messageID];
+            [messageIndexesByID setObject:[NSNumber numberWithUnsignedInteger:[mergedItems count]] forKey:messageID];
         }
         [mergedItems addObject:item];
     }
@@ -7384,6 +7833,116 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self reloadOlderMessagesInteractive];
 }
 
+- (void)sendPhotoAtPath:(NSString *)path {
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
+        [self appendDetail:@"Select a chat after sign-in is ready before sending a photo."];
+        return;
+    }
+    if (self.controlsBusy) {
+        [self appendDetail:@"Wait for the current Telegram operation to finish before sending a photo."];
+        return;
+    }
+    if (!TGIsSupportedPhotoPath(path)) {
+        [self appendDetail:@"Photo send supports local JPG, PNG, and TIFF files."];
+        return;
+    }
+
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    NSString *photoPath = [[path stringByStandardizingPath] copy];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"Sending photo..."];
+    [self appendDetail:(messageThreadID ? @"Submitting topic photo message to TDLib..." : @"Submitting photo message to TDLib...")];
+    [[TGLogger sharedLogger] log:@"TDLib photo message send requested."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSError *stateError = nil;
+        NSString *sendSummary = [client sendPhotoMessageToChatID:chatID
+                                                 messageThreadID:messageThreadID
+                                               messageTopicKind:messageTopicKind
+                                                       localPath:photoPath
+                                                         caption:@""
+                                                         timeout:18.0
+                                                           error:&sendError];
+        NSString *sendErrorMessage = [[sendError localizedDescription] copy];
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
+        BOOL sendSucceeded = ([sendSummary length] > 0);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadID) ||
+                               (self.selectedMessageThreadID && messageThreadID && [self.selectedMessageThreadID longLongValue] == [messageThreadID longLongValue]));
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKind) ||
+                                  (self.selectedMessageTopicKind && messageTopicKind && [self.selectedMessageTopicKind isEqualToString:messageTopicKind]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
+            if (sendSucceeded) {
+                [self.statusField setStringValue:@"Photo sent"];
+                [self appendDetail:@"TDLib send: photo message accepted by TDLib."];
+                [[TGLogger sharedLogger] log:@"TDLib photo message send accepted."];
+                if (selectionStillCurrent) {
+                    self.forceMessageScrollToNewest = YES;
+                }
+            } else {
+                NSString *message = ([sendErrorMessage length] > 0) ? sendErrorMessage : @"Photo send was not confirmed.";
+                [self.statusField setStringValue:@"Photo send failed"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@", message]];
+                [[TGLogger sharedLogger] log:@"TDLib photo message send failed."];
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            [self setControlsBusy:NO];
+            if (sendSucceeded && selectionStillCurrent) {
+                self.pendingLiveChatRefresh = YES;
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            }
+            [authorizationState release];
+            [sendErrorMessage release];
+            [chatID release];
+            [messageThreadID release];
+            [messageTopicKind release];
+            [photoPath release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
+- (void)attachPhoto:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
+        [self appendDetail:@"Select a chat after sign-in is ready before attaching a photo."];
+        return;
+    }
+
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    [panel setCanChooseFiles:YES];
+    [panel setCanChooseDirectories:NO];
+    [panel setAllowsMultipleSelection:NO];
+    [panel setAllowedFileTypes:[NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", nil]];
+    NSInteger result = [panel runModal];
+    if (result != NSOKButton) {
+        [self requestComposerRefocus];
+        return;
+    }
+
+    NSArray *urls = [panel URLs];
+    if ([urls count] == 0) {
+        return;
+    }
+    NSURL *url = [urls objectAtIndex:0];
+    NSString *photoPath = [url path];
+    [self sendPhotoAtPath:photoPath];
+}
+
 - (void)sendMessage:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
@@ -7557,6 +8116,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_chatTableView setDelegate:nil];
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
+    [_messageContextMenu setDelegate:nil];
     [_sendTextField setDelegate:nil];
     [_authTextField setDelegate:nil];
     [_authSecureField setDelegate:nil];
@@ -7598,6 +8158,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_sendLabel release];
     [_sendTextFieldBackgroundView release];
     [_sendTextField release];
+    [_attachPhotoButton release];
     [_sendMessageButton release];
     [_authLabel release];
     [_authStateField release];
@@ -7684,6 +8245,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPreviewWindow release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];
+    [_messageContextMenu release];
     [_mediaPreviewPath release];
     [_logsWindowDetailsView release];
     [_logsCheckButton release];

@@ -94,10 +94,18 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
 - (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject;
 - (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
+- (NSString *)reactionSummaryFromMessageObject:(NSDictionary *)messageObject;
 - (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject;
 - (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject;
 - (NSString *)messageTopicKindFromMessageObject:(NSDictionary *)messageObject;
 - (NSArray *)messagePreviewItemsByGroupingMediaAlbums:(NSArray *)items;
+- (NSDictionary *)sendMessageRequest:(NSDictionary *)request
+                      messageThreadID:(NSNumber *)messageThreadID
+                     messageTopicKind:(NSString *)messageTopicKind
+                          extraPrefix:(NSString *)extraPrefix
+                              timeout:(NSTimeInterval)timeout
+                            errorCode:(NSInteger)errorCode
+                                error:(NSError **)error;
 - (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -2772,6 +2780,64 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     return label;
 }
 
+- (NSString *)reactionSummaryFromMessageObject:(NSDictionary *)messageObject {
+    if (![messageObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id interactionInfo = [messageObject objectForKey:@"interaction_info"];
+    if (![interactionInfo isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id reactionsObject = [(NSDictionary *)interactionInfo objectForKey:@"reactions"];
+    if (![reactionsObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id reactions = [(NSDictionary *)reactionsObject objectForKey:@"reactions"];
+    if (![reactions isKindOfClass:[NSArray class]] || [(NSArray *)reactions count] == 0) {
+        return nil;
+    }
+
+    NSMutableArray *parts = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)reactions count] && [parts count] < 3; index++) {
+        id reactionObject = [(NSArray *)reactions objectAtIndex:index];
+        if (![reactionObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *reaction = (NSDictionary *)reactionObject;
+        id typeObject = [reaction objectForKey:@"type"];
+        NSString *emoji = nil;
+        if ([typeObject isKindOfClass:[NSDictionary class]]) {
+            id reactionType = [(NSDictionary *)typeObject objectForKey:@"@type"];
+            id emojiObject = [(NSDictionary *)typeObject objectForKey:@"emoji"];
+            if ([reactionType isKindOfClass:[NSString class]] &&
+                [(NSString *)reactionType isEqualToString:@"reactionTypeEmoji"] &&
+                [emojiObject isKindOfClass:[NSString class]] &&
+                [(NSString *)emojiObject length] > 0) {
+                emoji = (NSString *)emojiObject;
+            }
+        }
+        if ([emoji length] == 0) {
+            continue;
+        }
+
+        NSInteger count = 1;
+        id countObject = [reaction objectForKey:@"total_count"];
+        if ([countObject respondsToSelector:@selector(integerValue)] && [countObject integerValue] > 0) {
+            count = [countObject integerValue];
+        }
+        [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
+    }
+
+    if ([parts count] == 0) {
+        return nil;
+    }
+    return [parts componentsJoinedByString:@"  "];
+}
+
 - (NSArray *)messagePreviewItemsFromMessages:(NSArray *)messages chatID:(NSNumber *)chatID {
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
@@ -2823,6 +2889,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
         [item setSending:([[message objectForKey:@"sending_state"] isKindOfClass:[NSDictionary class]])];
+        [item setReactionSummary:[self reactionSummaryFromMessageObject:message]];
         id mediaAlbumID = [message objectForKey:@"media_album_id"];
         if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
             [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
@@ -3514,6 +3581,247 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     }
 
     return @"message submitted";
+}
+
+- (NSString *)sendPhotoMessageToChatID:(NSNumber *)chatID localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendPhotoMessageToChatID:chatID messageThreadID:nil messageTopicKind:nil localPath:localPath caption:caption timeout:timeout error:error];
+}
+
+- (NSDictionary *)sendMessageRequest:(NSDictionary *)request
+                      messageThreadID:(NSNumber *)messageThreadID
+                     messageTopicKind:(NSString *)messageTopicKind
+                          extraPrefix:(NSString *)extraPrefix
+                              timeout:(NSTimeInterval)timeout
+                            errorCode:(NSInteger)errorCode
+                                error:(NSError **)error {
+    BOOL threadSend = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0);
+    NSString *safeTopicKind = [messageTopicKind isKindOfClass:[NSString class]] ? messageTopicKind : nil;
+    BOOL knownFreshForumTopic = [safeTopicKind isEqualToString:@"forum"];
+    BOOL knownLegacyForumTopic = [safeTopicKind isEqualToString:@"forum_legacy"];
+    BOOL knownThreadTopic = [safeTopicKind isEqualToString:@"thread"];
+    BOOL allowForumSchema = threadSend && !knownThreadTopic;
+    BOOL allowThreadSchema = threadSend && !knownFreshForumTopic && !knownLegacyForumTopic;
+    BOOL allowLegacyThreadSchema = threadSend && !knownFreshForumTopic;
+
+    NSDictionary *response = nil;
+    if (threadSend && allowForumSchema) {
+        NSMutableDictionary *forumRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        NSDictionary *forumTopic = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    @"messageTopicForum", @"@type",
+                                    [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"forum_topic_id",
+                                    nil];
+        [forumRequest setObject:forumTopic forKey:@"topic_id"];
+        response = [self sendTDLibRequestAndWaitForExtra:forumRequest
+                                             extraPrefix:[extraPrefix stringByAppendingString:@"-forum-topic"]
+                                                 timeout:timeout
+                                               errorCode:errorCode
+                                                   error:error];
+    }
+    if (!response && threadSend && allowThreadSchema) {
+        NSMutableDictionary *threadRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        NSDictionary *messageThread = [NSDictionary dictionaryWithObjectsAndKeys:
+                                       @"messageTopicThread", @"@type",
+                                       [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"message_thread_id",
+                                       nil];
+        [threadRequest setObject:messageThread forKey:@"topic_id"];
+        response = [self sendTDLibRequestAndWaitForExtra:threadRequest
+                                             extraPrefix:[extraPrefix stringByAppendingString:@"-message-thread"]
+                                                 timeout:timeout
+                                               errorCode:errorCode
+                                                   error:error];
+    }
+    if (!response && threadSend && allowLegacyThreadSchema) {
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [legacyRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+        response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
+                                             extraPrefix:[extraPrefix stringByAppendingString:@"-legacy-thread"]
+                                                 timeout:timeout
+                                               errorCode:errorCode
+                                                   error:error];
+    }
+    if (!response && !threadSend) {
+        response = [self sendTDLibRequestAndWaitForExtra:request
+                                             extraPrefix:extraPrefix
+                                                 timeout:timeout
+                                               errorCode:errorCode
+                                                   error:error];
+    }
+    return response;
+}
+
+- (NSString *)sendPhotoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:62];
+        }
+        return nil;
+    }
+    if (![localPath isKindOfClass:[NSString class]] || [localPath length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Photo path is missing." code:63];
+        }
+        return nil;
+    }
+    NSString *standardPath = [localPath stringByStandardizingPath];
+    BOOL isDirectory = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:standardPath isDirectory:&isDirectory] || isDirectory) {
+        if (error) {
+            *error = [self errorWithDescription:@"Photo file does not exist." code:64];
+        }
+        return nil;
+    }
+
+    NSString *safeCaption = [caption isKindOfClass:[NSString class]] ? caption : @"";
+    if ([safeCaption length] > 1024) {
+        if (error) {
+            *error = [self errorWithDescription:@"Photo caption is too long for this spike." code:65];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to send photos. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:66];
+        }
+        return nil;
+    }
+
+    NSDictionary *inputFile = [NSDictionary dictionaryWithObjectsAndKeys:
+                               @"inputFileLocal", @"@type",
+                               standardPath, @"path",
+                               nil];
+    NSDictionary *formattedCaption = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      @"formattedText", @"@type",
+                                      safeCaption, @"text",
+                                      [NSArray array], @"entities",
+                                      nil];
+    NSMutableDictionary *content = [NSMutableDictionary dictionary];
+    [content setObject:@"inputMessagePhoto" forKey:@"@type"];
+    [content setObject:inputFile forKey:@"photo"];
+    [content setObject:[NSNull null] forKey:@"thumbnail"];
+    [content setObject:[NSArray array] forKey:@"added_sticker_file_ids"];
+    [content setObject:[NSNumber numberWithInt:0] forKey:@"width"];
+    [content setObject:[NSNumber numberWithInt:0] forKey:@"height"];
+    [content setObject:formattedCaption forKey:@"caption"];
+    [content setObject:[NSNumber numberWithInt:0] forKey:@"ttl"];
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"sendMessage" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:content forKey:@"input_message_content"];
+
+    NSError *sendError = nil;
+    NSDictionary *response = [self sendMessageRequest:request
+                                      messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind
+                                          extraPrefix:@"telegraphica-send-photo"
+                                              timeout:timeout
+                                            errorCode:67
+                                                error:&sendError];
+    if (!response) {
+        NSDictionary *inputPhoto = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    @"inputPhoto", @"@type",
+                                    inputFile, @"photo",
+                                    [NSNull null], @"thumbnail",
+                                    [NSNull null], @"video",
+                                    [NSArray array], @"added_sticker_file_ids",
+                                    [NSNumber numberWithInt:0], @"width",
+                                    [NSNumber numberWithInt:0], @"height",
+                                    nil];
+        NSMutableDictionary *currentContent = [NSMutableDictionary dictionary];
+        [currentContent setObject:@"inputMessagePhoto" forKey:@"@type"];
+        [currentContent setObject:inputPhoto forKey:@"photo"];
+        [currentContent setObject:formattedCaption forKey:@"caption"];
+        [currentContent setObject:[NSNumber numberWithBool:NO] forKey:@"show_caption_above_media"];
+        [currentContent setObject:[NSNull null] forKey:@"self_destruct_type"];
+        [currentContent setObject:[NSNumber numberWithBool:NO] forKey:@"has_spoiler"];
+
+        NSMutableDictionary *currentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [currentRequest setObject:currentContent forKey:@"input_message_content"];
+        response = [self sendMessageRequest:currentRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-photo-current"
+                                    timeout:timeout
+                                  errorCode:67
+                                      error:&sendError];
+    }
+    if (!response) {
+        if (error) {
+            *error = sendError ? sendError : [self errorWithDescription:@"TDLib did not confirm photo send before timeout. The photo may or may not have been sent." code:67];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib sendMessage for photo returned an unexpected response." code:68];
+        }
+        return nil;
+    }
+
+    return @"photo submitted";
+}
+
+- (NSString *)addReactionToChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing." code:69];
+        }
+        return nil;
+    }
+    if (![emoji isKindOfClass:[NSString class]] || [emoji length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Reaction emoji is missing." code:70];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to send reactions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:71];
+        }
+        return nil;
+    }
+
+    NSDictionary *reactionType = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  @"reactionTypeEmoji", @"@type",
+                                  emoji, @"emoji",
+                                  nil];
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"addMessageReaction" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:messageID forKey:@"message_id"];
+    [request setObject:reactionType forKey:@"reaction_type"];
+    [request setObject:[NSNumber numberWithBool:YES] forKey:@"is_big"];
+    [request setObject:[NSNumber numberWithBool:YES] forKey:@"update_recent_reactions"];
+
+    NSError *reactionError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-add-reaction"
+                                                           timeout:timeout
+                                                         errorCode:72
+                                                             error:&reactionError];
+    if (!response) {
+        if (error) {
+            *error = reactionError ? reactionError : [self errorWithDescription:@"TDLib did not accept the reaction request. This TDLib build may not support message reactions." code:72];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib reaction request returned an unexpected response." code:73];
+        }
+        return nil;
+    }
+    return @"reaction submitted";
 }
 
 - (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {

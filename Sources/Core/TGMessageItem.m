@@ -1,5 +1,54 @@
 #import "TGMessageItem.h"
 
+static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSString *rightSummary) {
+    if ([leftSummary length] == 0) {
+        return rightSummary;
+    }
+    if ([rightSummary length] == 0) {
+        return leftSummary;
+    }
+
+    NSMutableDictionary *countsByEmoji = [NSMutableDictionary dictionary];
+    NSMutableArray *orderedEmojis = [NSMutableArray array];
+    NSArray *summaries = [NSArray arrayWithObjects:leftSummary, rightSummary, nil];
+    NSUInteger summaryIndex = 0;
+    for (summaryIndex = 0; summaryIndex < [summaries count]; summaryIndex++) {
+        NSString *summary = [summaries objectAtIndex:summaryIndex];
+        NSArray *parts = [summary componentsSeparatedByString:@"  "];
+        NSUInteger partIndex = 0;
+        for (partIndex = 0; partIndex < [parts count]; partIndex++) {
+            NSString *part = [[parts objectAtIndex:partIndex] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            NSRange separator = [part rangeOfString:@" " options:NSBackwardsSearch];
+            if (separator.location == NSNotFound || separator.location == 0 || NSMaxRange(separator) >= [part length]) {
+                continue;
+            }
+            NSString *emoji = [part substringToIndex:separator.location];
+            NSString *countText = [[part substringFromIndex:NSMaxRange(separator)] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            NSInteger count = [countText integerValue];
+            if ([emoji length] == 0 || count <= 0) {
+                continue;
+            }
+            NSNumber *existingCount = [countsByEmoji objectForKey:emoji];
+            if (!existingCount) {
+                [orderedEmojis addObject:emoji];
+                existingCount = [NSNumber numberWithInteger:0];
+            }
+            [countsByEmoji setObject:[NSNumber numberWithInteger:([existingCount integerValue] + count)] forKey:emoji];
+        }
+    }
+
+    NSMutableArray *parts = [NSMutableArray array];
+    NSUInteger emojiIndex = 0;
+    for (emojiIndex = 0; emojiIndex < [orderedEmojis count]; emojiIndex++) {
+        NSString *emoji = [orderedEmojis objectAtIndex:emojiIndex];
+        NSNumber *count = [countsByEmoji objectForKey:emoji];
+        if ([emoji length] > 0 && [count integerValue] > 0) {
+            [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)[count integerValue]]];
+        }
+    }
+    return ([parts count] > 0) ? [parts componentsJoinedByString:@"  "] : leftSummary;
+}
+
 @implementation TGMessageItem
 
 @synthesize chatID = _chatID;
@@ -14,6 +63,7 @@
 @synthesize mediaHeight = _mediaHeight;
 @synthesize mediaAlbumID = _mediaAlbumID;
 @synthesize mediaItems = _mediaItems;
+@synthesize reactionSummary = _reactionSummary;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -93,6 +143,9 @@
     if ([self.messageID respondsToSelector:@selector(longLongValue)]) {
         [media setObject:self.messageID forKey:@"message_id"];
     }
+    if ([self.reactionSummary length] > 0) {
+        [media setObject:self.reactionSummary forKey:@"reaction_summary"];
+    }
     NSString *placeholder = [self visualMediaPlaceholderTitle];
     if ([placeholder length] > 0) {
         [media setObject:placeholder forKey:@"placeholder"];
@@ -134,6 +187,11 @@
 
     NSSortDescriptor *messageIDSort = [[[NSSortDescriptor alloc] initWithKey:@"message_id" ascending:YES] autorelease];
     self.mediaItems = [items sortedArrayUsingDescriptors:[NSArray arrayWithObject:messageIDSort]];
+
+    NSString *incomingReaction = [item reactionSummary];
+    if ([incomingReaction length] > 0) {
+        self.reactionSummary = TGReactionSummaryByMergingSummaries(self.reactionSummary, incomingReaction);
+    }
 }
 
 - (NSString *)visualMediaPlaceholderTitle {
@@ -177,6 +235,7 @@
     [copy setMediaHeight:_mediaHeight];
     [copy setMediaAlbumID:_mediaAlbumID];
     [copy setMediaItems:_mediaItems];
+    [copy setReactionSummary:_reactionSummary];
     return copy;
 }
 
@@ -210,6 +269,7 @@
     [_mediaHeight release];
     [_mediaAlbumID release];
     [_mediaItems release];
+    [_reactionSummary release];
     [super dealloc];
 }
 
