@@ -699,10 +699,10 @@ static NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionar
 
 static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth) {
     BOOL sticker = [item isStickerMessage];
-    CGFloat maximumSide = sticker ? 128.0 : TGMessagePhotoMaximumSide;
-    CGFloat minimumWidth = sticker ? 88.0 : 140.0;
-    CGFloat minimumHeight = sticker ? 88.0 : 92.0;
-    CGFloat width = sticker ? 112.0 : 220.0;
+    CGFloat maximumSide = sticker ? 220.0 : TGMessagePhotoMaximumSide;
+    CGFloat minimumWidth = sticker ? 96.0 : 140.0;
+    CGFloat minimumHeight = sticker ? 96.0 : 92.0;
+    CGFloat width = sticker ? 160.0 : 220.0;
     CGFloat height = sticker ? 112.0 : 160.0;
     if ([item.mediaWidth respondsToSelector:@selector(floatValue)] && [item.mediaWidth floatValue] > 0.0) {
         width = [item.mediaWidth floatValue];
@@ -711,12 +711,12 @@ static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maxi
         height = [item.mediaHeight floatValue];
     }
     if (width <= 0.0 || height <= 0.0) {
-        width = sticker ? 112.0 : 220.0;
+        width = sticker ? 160.0 : 220.0;
         height = sticker ? 112.0 : 160.0;
     }
     if (sticker && [[item mediaLocalPath] length] == 0) {
-        width = 112.0;
-        height = 112.0;
+        width = 96.0;
+        height = 96.0;
     }
     CGFloat scale = maximumSide / ((width > height) ? width : height);
     if (scale < 1.0) {
@@ -1048,7 +1048,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     BOOL selected = [self isHighlighted];
     if (selected) {
-        NSRect selectedRect = NSInsetRect(cellFrame, 1.0, 1.0);
+        NSRect selectedRect = NSInsetRect(cellFrame, 0.0, 1.0);
         NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:selectedRect
                                                                      xRadius:8.0
                                                                      yRadius:8.0];
@@ -1639,7 +1639,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
     if (visualMediaMessage) {
-        CGFloat photoBubbleWidth = photoSize.width + 16.0;
+        CGFloat photoBubbleWidth = photoSize.width + ([item isStickerMessage] ? 0.0 : 16.0);
         if (photoBubbleWidth > bubbleWidth) {
             bubbleWidth = photoBubbleWidth;
         }
@@ -1652,7 +1652,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0;
+        bubbleHeight = photoSize.height + ([item isStickerMessage] ? 0.0 : 24.0);
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
@@ -1665,16 +1665,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     NSBezierPath *bubblePath = [NSBezierPath bezierPathWithRoundedRect:bubbleRect xRadius:13.0 yRadius:13.0];
 
-    NSColor *bubbleFillColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
-    [bubbleFillColor set];
-    [bubblePath fill];
+    BOOL drawsStickerWithoutBubble = ([item isStickerMessage] && NSHeight(measuredRect) <= 0.0);
+    if (!drawsStickerWithoutBubble) {
+        NSColor *bubbleFillColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
+        [bubbleFillColor set];
+        [bubblePath fill];
 
-    NSColor *strokeColor = outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor();
-    [strokeColor set];
-    [bubblePath setLineWidth:1.0];
-    [bubblePath stroke];
+        NSColor *strokeColor = outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor();
+        [strokeColor set];
+        [bubblePath setLineWidth:1.0];
+        [bubblePath stroke];
+    }
 
-    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    CGFloat contentTop = NSMaxY(bubbleRect) - (drawsStickerWithoutBubble ? 0.0 : 9.0);
     if (visualMediaMessage) {
         NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
                                       contentTop - photoSize.height,
@@ -1695,16 +1698,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             TGDrawImageInRect(image, imageRect, [controlView isFlipped]);
             [NSGraphicsContext restoreGraphicsState];
         } else if ([item isStickerMessage]) {
-            [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
-            [imagePath setLineWidth:1.0];
-            [imagePath stroke];
             NSString *fallbackText = ([stickerFallbackText length] > 0) ? stickerFallbackText : @"Sticker";
-            CGFloat fallbackFontSize = ([fallbackText length] <= 4) ? 42.0 : 14.0;
+            CGFloat fallbackFontSize = ([fallbackText length] <= 4) ? 54.0 : 14.0;
             NSMutableParagraphStyle *fallbackParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
             [fallbackParagraph setAlignment:NSCenterTextAlignment];
             NSDictionary *fallbackAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                                 [NSFont boldSystemFontOfSize:fallbackFontSize], NSFontAttributeName,
-                                                TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                                TGClassicInkColor(), NSForegroundColorAttributeName,
                                                 fallbackParagraph, NSParagraphStyleAttributeName,
                                                 nil];
             NSSize fallbackSize = [fallbackText sizeWithAttributes:fallbackAttributes];
@@ -1729,7 +1729,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                 placeholderSize.height);
             [placeholder drawInRect:placeholderRect withAttributes:placeholderAttributes];
         }
-        contentTop = NSMinY(imageRect) - 8.0;
+        contentTop = NSMinY(imageRect) - (drawsStickerWithoutBubble ? 0.0 : 8.0);
     }
 
     if ([messageText length] > 0) {
@@ -2199,7 +2199,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
     [tableView setGridColor:TGClassicTableGridColor()];
     [tableView setUsesAlternatingRowBackgroundColors:NO];
-    [tableView setIntercellSpacing:NSMakeSize(8.0, 1.0)];
+    [tableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
     [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
 }
 
@@ -2298,6 +2298,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
 
@@ -2692,6 +2693,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.messageTableView setRowHeight:52.0];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
     [self.messageTableView setHeaderView:nil];
