@@ -10,6 +10,11 @@
     (void)notification;
     [self buildMainMenu];
 
+    NSImage *appIcon = [NSImage imageNamed:@"Telegraphica"];
+    if (appIcon) {
+        [NSApp setApplicationIconImage:appIcon];
+    }
+
     [[TGLogger sharedLogger] startDiagnosticSession];
     [[TGLogger sharedLogger] log:@"Telegraphica launched."];
 
