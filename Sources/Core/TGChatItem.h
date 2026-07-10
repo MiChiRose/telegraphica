@@ -8,6 +8,8 @@
 @property (nonatomic, retain) NSNumber *unreadCount;
 @property (nonatomic, retain) NSNumber *lastReadOutboxMessageID;
 @property (nonatomic, copy) NSString *avatarLocalPath;
+@property (nonatomic, assign) BOOL serverNotificationsMuted;
+@property (nonatomic, assign) BOOL notificationsMuted;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
 @property (nonatomic, retain) NSNumber *parentChatID;
 @property (nonatomic, retain) NSNumber *messageThreadID;

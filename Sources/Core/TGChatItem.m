@@ -8,6 +8,8 @@
 @synthesize unreadCount = _unreadCount;
 @synthesize lastReadOutboxMessageID = _lastReadOutboxMessageID;
 @synthesize avatarLocalPath = _avatarLocalPath;
+@synthesize serverNotificationsMuted = _serverNotificationsMuted;
+@synthesize notificationsMuted = _notificationsMuted;
 @synthesize forumTopic = _forumTopic;
 @synthesize parentChatID = _parentChatID;
 @synthesize messageThreadID = _messageThreadID;
@@ -39,6 +41,9 @@
     }
     if ([identifier isEqual:@"last_read_outbox_message_id"]) {
         return self.lastReadOutboxMessageID;
+    }
+    if ([identifier isEqual:@"notifications_muted"]) {
+        return [NSNumber numberWithBool:self.notificationsMuted];
     }
     if ([identifier isEqual:@"chat_id"]) {
         return self.chatID;
