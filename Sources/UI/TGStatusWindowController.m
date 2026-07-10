@@ -1880,8 +1880,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSBezierPath *handlePath = [NSBezierPath bezierPath];
     [handlePath setLineWidth:1.8];
-    [handlePath moveToPoint:NSMakePoint(NSMaxX(lensRect) - 1.5, NSMinY(lensRect) + 1.5)];
-    [handlePath lineToPoint:NSMakePoint(NSMaxX(lensRect) + 5.0, NSMinY(lensRect) - 5.0)];
+    BOOL flipped = [controlView isFlipped];
+    CGFloat handleStartY = flipped ? (NSMaxY(lensRect) - 1.5) : (NSMinY(lensRect) + 1.5);
+    CGFloat handleEndY = flipped ? (NSMaxY(lensRect) + 5.0) : (NSMinY(lensRect) - 5.0);
+    [handlePath moveToPoint:NSMakePoint(NSMaxX(lensRect) - 1.5, handleStartY)];
+    [handlePath lineToPoint:NSMakePoint(NSMaxX(lensRect) + 5.0, handleEndY)];
     [handlePath stroke];
 
     NSBezierPath *minusPath = [NSBezierPath bezierPath];
@@ -2281,6 +2284,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
+@property (nonatomic, assign) NSUInteger mediaPreviewRequestGeneration;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
 @property (nonatomic, retain) NSButton *logsCheckButton;
 @property (nonatomic, retain) NSPopUpButton *appearanceThemePopUpButton;
@@ -2429,6 +2433,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
+@synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
 @synthesize logsCheckButton = _logsCheckButton;
 @synthesize appearanceThemePopUpButton = _appearanceThemePopUpButton;
@@ -3760,6 +3765,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [window setTitle:@""];
     [window setMinSize:NSMakeSize(420, 340)];
     [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
 
     TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -3946,6 +3952,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
 
+    NSUInteger requestGeneration = self.mediaPreviewRequestGeneration + 1;
+    self.mediaPreviewRequestGeneration = requestGeneration;
     BOOL preferAnimated = TGMediaItemIsAnimation(mediaItem);
     NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
     if ([fullPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:fullPath]) {
@@ -3979,6 +3987,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:12.0 error:&downloadError] copy];
         NSString *fallback = [fallbackPathCopy copy];
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (requestGeneration != self.mediaPreviewRequestGeneration) {
+                [downloadedPath release];
+                [fallback release];
+                [fileIDCopy release];
+                [fallbackPathCopy release];
+                [client release];
+                return;
+            }
             if ([downloadedPath length] > 0) {
                 if ([self openMediaPreviewAtPath:downloadedPath preferAnimated:preferAnimated]) {
                     [self.statusField setStringValue:@"Connected"];
@@ -4804,10 +4820,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
-    (void)notification;
+    if ([notification object] != [self window]) {
+        return;
+    }
     [self layoutContentView];
     [self.messageTableView reloadData];
     [self updateVisibleSection];
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    if ([notification object] == self.mediaPreviewWindow) {
+        self.mediaPreviewRequestGeneration = self.mediaPreviewRequestGeneration + 1;
+        self.mediaPreviewPath = nil;
+        self.mediaPreviewZoomScale = 1.0;
+        [self.mediaPreviewImageView setImage:nil];
+    }
 }
 
 - (void)startLiveUpdateTimerIfNeeded {
@@ -7630,6 +7657,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_logsWindow close];
     [_aboutWindow close];
     [_appearanceWindow close];
+    [_mediaPreviewWindow setDelegate:nil];
     [_mediaPreviewWindow close];
     [_logsWindow release];
     [_aboutWindow release];
