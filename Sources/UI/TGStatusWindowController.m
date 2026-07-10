@@ -4828,6 +4828,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateVisibleSection];
 }
 
+- (void)tearDownClosedMediaPreviewWindow:(NSWindow *)closingWindow {
+    if (closingWindow != self.mediaPreviewWindow) {
+        return;
+    }
+    self.mediaPreviewPath = nil;
+    self.mediaPreviewZoomScale = 1.0;
+    [self.mediaPreviewImageView setImage:nil];
+    [closingWindow setDelegate:nil];
+    self.mediaPreviewImageView = nil;
+    self.mediaPreviewScrollView = nil;
+    self.mediaPreviewWindow = nil;
+}
+
 - (void)windowWillClose:(NSNotification *)notification {
     if ([notification object] == self.mediaPreviewWindow) {
         NSWindow *closingWindow = [(NSWindow *)[notification object] retain];
@@ -4836,9 +4849,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.mediaPreviewZoomScale = 1.0;
         [self.mediaPreviewImageView setImage:nil];
         [closingWindow setDelegate:nil];
-        self.mediaPreviewImageView = nil;
-        self.mediaPreviewScrollView = nil;
-        self.mediaPreviewWindow = nil;
+        [self performSelector:@selector(tearDownClosedMediaPreviewWindow:)
+                   withObject:closingWindow
+                   afterDelay:0.0];
         [closingWindow release];
     }
 }
