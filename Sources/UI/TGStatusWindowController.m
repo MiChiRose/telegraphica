@@ -43,6 +43,33 @@ static BOOL TGUserDefaultBoolWithDefault(NSString *key, BOOL defaultValue) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:key];
 }
 
+static BOOL TGStatusErrorLooksOffline(NSString *message) {
+    if (![message isKindOfClass:[NSString class]] || [message length] == 0) {
+        return NO;
+    }
+    NSString *lowercase = [message lowercaseString];
+    NSArray *markers = [NSArray arrayWithObjects:
+                        @"offline",
+                        @"network",
+                        @"internet",
+                        @"connection",
+                        @"connect",
+                        @"timed out",
+                        @"timeout",
+                        @"socket",
+                        @"posix",
+                        @"unreachable",
+                        @"temporarily unavailable",
+                        nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [markers count]; index++) {
+        if ([lowercase rangeOfString:[markers objectAtIndex:index]].location != NSNotFound) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 typedef struct {
     CGFloat red;
     CGFloat green;
@@ -3120,6 +3147,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL loginErrorVisible;
 @property (nonatomic, assign) BOOL composerRefocusPending;
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
+@property (nonatomic, assign) BOOL offlineModeActive;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
@@ -3296,6 +3324,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize loginErrorVisible = _loginErrorVisible;
 @synthesize composerRefocusPending = _composerRefocusPending;
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
+@synthesize offlineModeActive = _offlineModeActive;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
@@ -4800,15 +4829,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 318, 472, 22)
-                                              text:@"Media"
-                                              font:[NSFont boldSystemFontOfSize:15.0]];
-    [titleField setAlignment:NSCenterTextAlignment];
-    [titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-    [contentView addSubview:titleField];
-    self.mediaPlaybackTitleField = titleField;
-
-    NSView *containerView = [[[NSView alloc] initWithFrame:NSMakeRect(24, 64, 472, 238)] autorelease];
+    NSView *containerView = [[[NSView alloc] initWithFrame:NSMakeRect(24, 64, 472, 272)] autorelease];
     [containerView setWantsLayer:YES];
     [containerView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:containerView];
@@ -4894,7 +4915,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.mediaPlaybackPlayer = player;
     self.mediaPlaybackLayer = layer;
     self.mediaPlaybackPlaying = YES;
-    [self.mediaPlaybackTitleField setStringValue:([title length] > 0 ? title : @"Media")];
     [self updateMediaPlaybackButton];
     [self.mediaPlaybackWindow setTitle:([title length] > 0 ? title : @"Media")];
     [self.mediaPlaybackWindow center];
@@ -4963,11 +4983,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:12.0 error:&downloadError] copy];
         NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.statusField setStringValue:@"Connected"];
             if ([downloadedPath length] > 0) {
+                [self setOfflineModeActive:NO reason:nil];
+                [self.statusField setStringValue:@"Connected"];
                 [self openPlayableMediaAtPath:downloadedPath title:titleCopy];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
+                if (TGStatusErrorLooksOffline(message)) {
+                    [self setOfflineModeActive:YES reason:@"Network appears unavailable. Media playback will be available after the file can download."];
+                } else {
+                    [self.statusField setStringValue:@"Connected"];
+                }
                 [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
             }
             [downloadedPath release];
@@ -5007,11 +5033,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:12.0 error:&downloadError] copy];
         NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.statusField setStringValue:@"Connected"];
             if ([downloadedPath length] > 0) {
+                [self setOfflineModeActive:NO reason:nil];
+                [self.statusField setStringValue:@"Connected"];
                 [self openPlayableMediaAtPath:downloadedPath title:titleCopy];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
+                if (TGStatusErrorLooksOffline(message)) {
+                    [self setOfflineModeActive:YES reason:@"Network appears unavailable. Media playback will be available after the file can download."];
+                } else {
+                    [self.statusField setStringValue:@"Connected"];
+                }
                 [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
             }
             [downloadedPath release];
@@ -5836,6 +5868,41 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return fallback;
 }
 
+- (NSString *)avatarLocalPathForChatID:(NSNumber *)chatID {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [self.chatItems count]; index++) {
+        id candidate = [self.chatItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        TGChatItem *item = (TGChatItem *)candidate;
+        NSNumber *itemChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
+        if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == [chatID longLongValue]) {
+            NSString *avatarPath = [item avatarLocalPath];
+            if ([avatarPath length] > 0) {
+                return avatarPath;
+            }
+        }
+    }
+    return nil;
+}
+
+- (NSImage *)notificationAvatarImageForChatID:(NSNumber *)chatID {
+    NSString *avatarPath = [self avatarLocalPathForChatID:chatID];
+    if ([avatarPath length] == 0) {
+        return nil;
+    }
+    NSImage *avatarImage = TGImageWithCorrectOrientationFromFile(avatarPath);
+    if (!avatarImage) {
+        return nil;
+    }
+    [avatarImage setSize:NSMakeSize(64.0, 64.0)];
+    return avatarImage;
+}
+
 - (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {
     if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
         return;
@@ -5876,9 +5943,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [notification setUserInfo:userInfo];
     }
     if ([notification respondsToSelector:NSSelectorFromString(@"setContentImage:")]) {
-        NSImage *notificationIcon = [NSImage imageNamed:@"TelegraphicaNotificationIcon"];
-        if (notificationIcon) {
-            [notification setValue:notificationIcon forKey:@"contentImage"];
+        NSImage *avatarImage = [self notificationAvatarImageForChatID:chatID];
+        if (avatarImage) {
+            [notification setValue:avatarImage forKey:@"contentImage"];
         }
     }
     if (TGUserDefaultBoolWithDefault(TGNotificationSoundEnabledDefaultsKey, YES)) {
@@ -6938,6 +7005,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSRange logsEndRange = NSMakeRange([[self.logsWindowDetailsView string] length], 0);
         [self.logsWindowDetailsView scrollRangeToVisible:logsEndRange];
     }
+}
+
+- (void)setOfflineModeActive:(BOOL)active reason:(NSString *)reason {
+    if (active) {
+        [self.statusField setStringValue:@"Offline"];
+        if (!self.offlineModeActive && [reason length] > 0) {
+            [self appendDetail:reason];
+        }
+    } else if (self.offlineModeActive) {
+        [self appendDetail:@"Network connection restored."];
+    }
+    self.offlineModeActive = active;
 }
 
 - (NSRect)messageBubbleCellFrameForRow:(NSInteger)row {
@@ -9064,6 +9143,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.chatPreviewLimit = [itemsCopy count];
                 self.chatsExhausted = chatsExhausted;
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
+                [self setOfflineModeActive:NO reason:nil];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
                     [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu %@chat previews (limit %lu)", (unsigned long)[itemsCopy count], activeFilterID ? @"folder " : @"", (unsigned long)requestedLimit]];
@@ -9073,12 +9153,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
                 }
             } else {
+                BOOL looksOffline = TGStatusErrorLooksOffline(chatErrorMessage);
                 if (interactive) {
-                    NSString *message = chatErrorMessage ? @"Chat preview request failed. Check connection state and try again." : @"Chat list did not return a result.";
-                    [self.statusField setStringValue:@"Chats unavailable"];
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: %@", message]];
+                    if (looksOffline) {
+                        [self setOfflineModeActive:YES reason:@"Network appears unavailable. Keeping the current chat list visible; refresh after the connection returns."];
+                    } else {
+                        NSString *message = chatErrorMessage ? @"Chat preview request failed. Check connection state and try again." : @"Chat list did not return a result.";
+                        [self.statusField setStringValue:@"Chats unavailable"];
+                        [self appendDetail:[NSString stringWithFormat:@"TDLib chats: %@", message]];
+                    }
                 } else {
-                    [self appendDetail:@"TDLib live refresh: chat preview refresh failed."];
+                    if (looksOffline) {
+                        [self setOfflineModeActive:YES reason:@"Network appears unavailable during live chat refresh. Keeping cached chats visible."];
+                    } else {
+                        [self appendDetail:@"TDLib live refresh: chat preview refresh failed."];
+                    }
                 }
                 [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
             }
@@ -9155,18 +9244,28 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
                 [self scheduleMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
+                [self setOfflineModeActive:NO reason:nil];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
                     [self appendDetail:[NSString stringWithFormat:@"TDLib messages: loaded %lu previews for selected chat", (unsigned long)[itemsCopy count]]];
                     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib message previews loaded: %lu", (unsigned long)[itemsCopy count]]];
                 }
             } else {
+                BOOL looksOffline = TGStatusErrorLooksOffline(messageErrorMessage);
                 if (interactive) {
-                    NSString *message = messageErrorMessage ? @"Message preview request failed. Check connection state and try again." : @"Message history did not return a result.";
-                    [self.statusField setStringValue:@"Messages unavailable"];
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
+                    if (looksOffline) {
+                        [self setOfflineModeActive:YES reason:@"Network appears unavailable. Keeping the current messages visible; refresh after the connection returns."];
+                    } else {
+                        NSString *message = messageErrorMessage ? @"Message preview request failed. Check connection state and try again." : @"Message history did not return a result.";
+                        [self.statusField setStringValue:@"Messages unavailable"];
+                        [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
+                    }
                 } else {
-                    [self appendDetail:@"TDLib live refresh: selected chat refresh failed."];
+                    if (looksOffline) {
+                        [self setOfflineModeActive:YES reason:@"Network appears unavailable during live message refresh. Keeping cached messages visible."];
+                    } else {
+                        [self appendDetail:@"TDLib live refresh: selected chat refresh failed."];
+                    }
                 }
                 [[TGLogger sharedLogger] log:@"TDLib message preview load failed."];
             }
@@ -9257,12 +9356,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                     self.autoOlderMessagesLoadArmed = NO;
                 }
                 [self.statusField setStringValue:(added > 0) ? @"Connected" : @"No older messages"];
+                [self setOfflineModeActive:NO reason:nil];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib messages: appended %lu older previews", (unsigned long)added]];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib older message previews appended: %lu", (unsigned long)added]];
             } else {
-                [self.statusField setStringValue:@"Older messages unavailable"];
-                NSString *message = messageErrorMessage ? messageErrorMessage : @"Older message history did not return a result.";
-                [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
+                if (TGStatusErrorLooksOffline(messageErrorMessage)) {
+                    [self setOfflineModeActive:YES reason:@"Network appears unavailable. Older history will stay deferred until the connection returns."];
+                } else {
+                    [self.statusField setStringValue:@"Older messages unavailable"];
+                    NSString *message = messageErrorMessage ? messageErrorMessage : @"Older message history did not return a result.";
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib messages: %@", message]];
+                }
                 [[TGLogger sharedLogger] log:@"TDLib older message preview load failed."];
             }
             if ([authorizationState length] > 0) {
@@ -9691,6 +9795,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                   (self.selectedMessageTopicKind && messageTopicKind && [self.selectedMessageTopicKind isEqualToString:messageTopicKind]));
             BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
             if (sendSucceeded) {
+                [self setOfflineModeActive:NO reason:nil];
                 [self.statusField setStringValue:@"Photo sent"];
                 [self appendDetail:@"TDLib send: photo message accepted by TDLib."];
                 [[TGLogger sharedLogger] log:@"TDLib photo message send accepted."];
@@ -9699,7 +9804,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 }
             } else {
                 NSString *message = ([sendErrorMessage length] > 0) ? sendErrorMessage : @"Photo send was not confirmed.";
-                [self.statusField setStringValue:@"Photo send failed"];
+                if (TGStatusErrorLooksOffline(message)) {
+                    [self setOfflineModeActive:YES reason:@"Network appears unavailable. Photo was not retried automatically to avoid duplicate sends."];
+                } else {
+                    [self.statusField setStringValue:@"Photo send failed"];
+                }
                 [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@", message]];
                 [[TGLogger sharedLogger] log:@"TDLib photo message send failed."];
             }
@@ -9796,6 +9905,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                         timeout:8.0
                                                           error:&sendError];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
+        NSString *sendErrorMessage = [[sendError localizedDescription] copy];
         BOOL sendSucceeded = ([sendSummary length] > 0);
 
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -9805,6 +9915,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                   (self.selectedMessageTopicKind && messageTopicKind && [self.selectedMessageTopicKind isEqualToString:messageTopicKind]));
             BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
             if (sendSucceeded) {
+                [self setOfflineModeActive:NO reason:nil];
                 [self.statusField setStringValue:@"Message sent"];
                 [self appendDetail:@"TDLib send: text message accepted by TDLib."];
                 [[TGLogger sharedLogger] log:@"TDLib text message send accepted."];
@@ -9813,8 +9924,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                     self.forceMessageScrollToNewest = YES;
                 }
             } else {
-                [self.statusField setStringValue:@"Send not confirmed"];
-                [self appendDetail:@"TDLib send: text message was not confirmed. Do not retry automatically; it may or may not have been sent."];
+                NSString *message = ([sendErrorMessage length] > 0) ? sendErrorMessage : @"Text message was not confirmed.";
+                if (TGStatusErrorLooksOffline(message)) {
+                    [self setOfflineModeActive:YES reason:@"Network appears unavailable. Message was not retried automatically to avoid duplicate sends."];
+                } else {
+                    [self.statusField setStringValue:@"Send not confirmed"];
+                }
+                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@ Do not retry automatically; it may or may not have been sent.", message]];
                 [[TGLogger sharedLogger] log:@"TDLib text message send not confirmed."];
             }
             if ([authorizationState length] > 0) {
@@ -9828,6 +9944,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self requestComposerRefocus];
             }
             [authorizationState release];
+            [sendErrorMessage release];
             [chatID release];
             [messageThreadID release];
             [messageTopicKind release];
