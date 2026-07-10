@@ -113,7 +113,9 @@ static NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     properties = (NSDictionary *)CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
     imageRef = CGImageSourceCreateImageAtIndex(source, 0, NULL);
     if (!imageRef) {
-        CFRelease(properties);
+        if (properties) {
+            CFRelease(properties);
+        }
         CFRelease(source);
         return nil;
     }
@@ -128,7 +130,9 @@ static NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
             }
         }
     }
-    CFRelease(properties);
+    if (properties) {
+        CFRelease(properties);
+    }
 
     if (orientation > 1) {
         CGFloat imageWidth = (CGFloat)CGImageGetWidth(imageRef);
