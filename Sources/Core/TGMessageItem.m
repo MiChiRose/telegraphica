@@ -59,24 +59,6 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     return ([parts count] > 0) ? [parts componentsJoinedByString:@"  "] : leftSummary;
 }
 
-static NSArray *TGReactionEmojisByMergingEmojiArrays(NSArray *leftEmojis, NSArray *rightEmojis) {
-    NSMutableArray *merged = [NSMutableArray array];
-    NSUInteger index = 0;
-    for (index = 0; index < [leftEmojis count]; index++) {
-        id emoji = [leftEmojis objectAtIndex:index];
-        if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0 && ![merged containsObject:emoji]) {
-            [merged addObject:emoji];
-        }
-    }
-    for (index = 0; index < [rightEmojis count]; index++) {
-        id emoji = [rightEmojis objectAtIndex:index];
-        if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0 && ![merged containsObject:emoji]) {
-            [merged addObject:emoji];
-        }
-    }
-    return merged;
-}
-
 @implementation TGMessageItem
 
 @synthesize chatID = _chatID;
