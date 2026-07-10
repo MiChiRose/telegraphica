@@ -1835,6 +1835,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
 @end
 
+static void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped);
+
 @interface TGChatListCell : NSTextFieldCell {
     TGChatItem *_chatItem;
 }
@@ -1893,9 +1895,7 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     NSInteger unreadCount = [[item unreadCount] respondsToSelector:@selector(integerValue)] ? [[item unreadCount] integerValue] : 0;
     NSString *unreadString = @"";
-    if ([item notificationsMuted]) {
-        unreadString = @"";
-    } else if (unreadCount > 999) {
+    if (unreadCount > 999) {
         unreadString = @"999+";
     } else if (unreadCount > 0) {
         unreadString = [NSString stringWithFormat:@"%ld", (long)unreadCount];
@@ -1914,16 +1914,6 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                    unreadWidth,
                                    unreadHeight);
 
-    CGFloat titleX = NSMaxX(avatarRect) + 9.0;
-    CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
-    NSRect titleRect = NSMakeRect(titleX,
-                                  NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
-                                  titleRight - titleX,
-                                  16.0);
-    if (NSWidth(titleRect) < 40.0) {
-        titleRect.size.width = 40.0;
-    }
-
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -1931,7 +1921,31 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
                                      selected ? TGClassicSelectedRowTextColor() : TGClassicInkColor(), NSForegroundColorAttributeName,
                                      paragraph, NSParagraphStyleAttributeName,
                                      nil];
+    CGFloat titleX = NSMaxX(avatarRect) + 9.0;
+    CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
+    CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
+    CGFloat titleAvailableWidth = titleRight - titleX - ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0);
+    if (titleAvailableWidth < 40.0) {
+        titleAvailableWidth = 40.0;
+    }
+    NSSize titleSize = [[item title] sizeWithAttributes:titleAttributes];
+    CGFloat titleDrawWidth = titleAvailableWidth;
+    if ([item notificationsMuted] && titleSize.width < titleAvailableWidth) {
+        titleDrawWidth = titleSize.width;
+    }
+    NSRect titleRect = NSMakeRect(titleX,
+                                  NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
+                                  titleDrawWidth,
+                                  16.0);
     [[item title] drawInRect:titleRect withAttributes:titleAttributes];
+    if ([item notificationsMuted]) {
+        NSRect muteRect = NSMakeRect(NSMaxX(titleRect) + 4.0,
+                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
+                                     15.0,
+                                     15.0);
+        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
+        TGDrawMutedSpeakerIconInRect(muteRect, muteColor, [controlView isFlipped]);
+    }
     if ([unreadString length] > 0) {
         NSBezierPath *unreadPath = [NSBezierPath bezierPathWithRoundedRect:unreadRect
                                                                     xRadius:(unreadHeight / 2.0)
@@ -2207,6 +2221,31 @@ static void TGDrawPaperclipSvgPathInRect(NSRect iconRect, BOOL flipped, CGFloat 
     [path fill];
 }
 
+static void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
+    [color set];
+    NSBezierPath *speakerPath = [NSBezierPath bezierPath];
+    [speakerPath moveToPoint:TGIconPoint(iconRect, 3.0, 7.0, flipped)];
+    [speakerPath lineToPoint:TGIconPoint(iconRect, 6.5, 7.0, flipped)];
+    [speakerPath lineToPoint:TGIconPoint(iconRect, 11.0, 3.5, flipped)];
+    [speakerPath lineToPoint:TGIconPoint(iconRect, 11.0, 14.5, flipped)];
+    [speakerPath lineToPoint:TGIconPoint(iconRect, 6.5, 11.0, flipped)];
+    [speakerPath lineToPoint:TGIconPoint(iconRect, 3.0, 11.0, flipped)];
+    [speakerPath closePath];
+    [speakerPath fill];
+
+    NSBezierPath *wavePath = [NSBezierPath bezierPath];
+    [wavePath setLineWidth:1.25];
+    [wavePath moveToPoint:TGIconPoint(iconRect, 13.0, 6.0, flipped)];
+    [wavePath curveToPoint:TGIconPoint(iconRect, 13.0, 12.0, flipped)
+             controlPoint1:TGIconPoint(iconRect, 15.0, 7.4, flipped)
+             controlPoint2:TGIconPoint(iconRect, 15.0, 10.6, flipped)];
+    [wavePath stroke];
+
+    TGStrokeLine(TGIconPoint(iconRect, 3.0, 3.5, flipped),
+                 TGIconPoint(iconRect, 16.0, 15.5, flipped),
+                 1.7);
+}
+
 static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
     if ([title isEqualToString:@"Chats"]) {
@@ -2421,10 +2460,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     BOOL flipped = [controlView isFlipped];
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 19.0,
-                                 NSMidY(buttonRect) - 19.0,
-                                 38.0,
-                                 38.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 13.0,
+                                 NSMidY(buttonRect) - 13.0,
+                                 26.0,
+                                 26.0);
     TGDrawPaperclipSvgPathInRect(iconRect, flipped, alpha);
 }
 
