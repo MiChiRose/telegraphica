@@ -12,6 +12,8 @@
 @synthesize mediaLocalPath = _mediaLocalPath;
 @synthesize mediaWidth = _mediaWidth;
 @synthesize mediaHeight = _mediaHeight;
+@synthesize mediaAlbumID = _mediaAlbumID;
+@synthesize mediaItems = _mediaItems;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -43,6 +45,9 @@
 }
 
 - (BOOL)isVisualMediaMessage {
+    if ([self.mediaItems count] > 0) {
+        return YES;
+    }
     if ([self isDocumentMessage]) {
         NSString *label = [self.preview length] > 0 ? self.preview : @"";
         BOOL visualLabel = ([label hasPrefix:@"[Photo]"] ||
@@ -63,7 +68,78 @@
             [self.contentType isEqualToString:@"messageVideo"]);
 }
 
+- (BOOL)isMediaAlbumMessage {
+    return ([self.mediaItems count] > 1);
+}
+
+- (NSDictionary *)visualMediaDictionary {
+    if (![self isVisualMediaMessage]) {
+        return nil;
+    }
+
+    NSMutableDictionary *media = [NSMutableDictionary dictionary];
+    if ([self.mediaLocalPath length] > 0) {
+        [media setObject:self.mediaLocalPath forKey:@"local_path"];
+    }
+    if ([self.mediaWidth respondsToSelector:@selector(floatValue)] && [self.mediaWidth floatValue] > 0.0) {
+        [media setObject:self.mediaWidth forKey:@"width"];
+    }
+    if ([self.mediaHeight respondsToSelector:@selector(floatValue)] && [self.mediaHeight floatValue] > 0.0) {
+        [media setObject:self.mediaHeight forKey:@"height"];
+    }
+    if ([self.contentType length] > 0) {
+        [media setObject:self.contentType forKey:@"content_type"];
+    }
+    if ([self.messageID respondsToSelector:@selector(longLongValue)]) {
+        [media setObject:self.messageID forKey:@"message_id"];
+    }
+    NSString *placeholder = [self visualMediaPlaceholderTitle];
+    if ([placeholder length] > 0) {
+        [media setObject:placeholder forKey:@"placeholder"];
+    }
+    return ([media count] > 0) ? media : nil;
+}
+
+- (NSArray *)visualMediaItems {
+    if ([self.mediaItems count] > 0) {
+        return self.mediaItems;
+    }
+    NSDictionary *media = [self visualMediaDictionary];
+    return media ? [NSArray arrayWithObject:media] : [NSArray array];
+}
+
+- (void)addVisualMediaFromMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage]) {
+        return;
+    }
+
+    NSMutableArray *items = [NSMutableArray array];
+    if ([self.mediaItems count] > 0) {
+        [items addObjectsFromArray:self.mediaItems];
+    } else {
+        NSDictionary *ownMedia = [self visualMediaDictionary];
+        if (ownMedia) {
+            [items addObject:ownMedia];
+        }
+    }
+
+    NSArray *incomingItems = [item visualMediaItems];
+    NSUInteger index = 0;
+    for (index = 0; index < [incomingItems count]; index++) {
+        id media = [incomingItems objectAtIndex:index];
+        if ([media isKindOfClass:[NSDictionary class]]) {
+            [items addObject:media];
+        }
+    }
+
+    NSSortDescriptor *messageIDSort = [[[NSSortDescriptor alloc] initWithKey:@"message_id" ascending:YES] autorelease];
+    self.mediaItems = [items sortedArrayUsingDescriptors:[NSArray arrayWithObject:messageIDSort]];
+}
+
 - (NSString *)visualMediaPlaceholderTitle {
+    if ([self isMediaAlbumMessage]) {
+        return @"Media";
+    }
     if ([self isStickerMessage]) {
         return @"Sticker";
     }
@@ -94,6 +170,8 @@
     [copy setMediaLocalPath:_mediaLocalPath];
     [copy setMediaWidth:_mediaWidth];
     [copy setMediaHeight:_mediaHeight];
+    [copy setMediaAlbumID:_mediaAlbumID];
+    [copy setMediaItems:_mediaItems];
     return copy;
 }
 
@@ -125,6 +203,8 @@
     [_mediaLocalPath release];
     [_mediaWidth release];
     [_mediaHeight release];
+    [_mediaAlbumID release];
+    [_mediaItems release];
     [super dealloc];
 }
 

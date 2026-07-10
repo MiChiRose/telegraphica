@@ -23,6 +23,28 @@ static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
 static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
 static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
+static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
+    if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
+        return YES;
+    }
+    NSArray *labels = [NSArray arrayWithObjects:
+                       @"[Photo]",
+                       @"[Video]",
+                       @"[Animation]",
+                       @"[GIF]",
+                       @"[Document]",
+                       @"[Sticker]",
+                       @"[Media]",
+                       nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [labels count]; index++) {
+        if ([preview isEqualToString:[labels objectAtIndex:index]]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 @interface TGTDLibClient () {
     void *_libraryHandle;
     void *_client;
@@ -75,6 +97,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 - (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject;
 - (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject;
 - (NSString *)messageTopicKindFromMessageObject:(NSDictionary *)messageObject;
+- (NSArray *)messagePreviewItemsByGroupingMediaAlbums:(NSArray *)items;
 - (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -2751,6 +2774,10 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
         [item setSending:([[message objectForKey:@"sending_state"] isKindOfClass:[NSDictionary class]])];
+        id mediaAlbumID = [message objectForKey:@"media_album_id"];
+        if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
+            [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
+        }
         BOOL didRequestMediaDownload = NO;
         NSDictionary *photoInfo = [self visualMediaInfoFromMessageContentObject:contentObject
                                                                 downloadMissing:(visualMediaDownloadsRemaining > 0)
@@ -2767,7 +2794,64 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         [item setMediaHeight:[photoInfo objectForKey:@"height"]];
         [items addObject:item];
     }
-    return items;
+    return [self messagePreviewItemsByGroupingMediaAlbums:items];
+}
+
+- (NSArray *)messagePreviewItemsByGroupingMediaAlbums:(NSArray *)items {
+    if ([items count] == 0) {
+        return items;
+    }
+
+    NSMutableArray *groupedItems = [NSMutableArray array];
+    NSMutableDictionary *albumItemsByKey = [NSMutableDictionary dictionary];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        id candidate = [items objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+
+        TGMessageItem *item = (TGMessageItem *)candidate;
+        NSNumber *albumID = [item mediaAlbumID];
+        if (![albumID respondsToSelector:@selector(longLongValue)] || [albumID longLongValue] <= 0 || ![item isVisualMediaMessage]) {
+            [groupedItems addObject:item];
+            continue;
+        }
+
+        long long chatValue = [[item chatID] respondsToSelector:@selector(longLongValue)] ? [[item chatID] longLongValue] : 0;
+        NSString *albumKey = [NSString stringWithFormat:@"%lld|%lld|%d", chatValue, [albumID longLongValue], [item outgoing] ? 1 : 0];
+        TGMessageItem *albumItem = [albumItemsByKey objectForKey:albumKey];
+        if (!albumItem) {
+            albumItem = [[item copy] autorelease];
+            [albumItem setMediaItems:[albumItem visualMediaItems]];
+            [albumItemsByKey setObject:albumItem forKey:albumKey];
+            [groupedItems addObject:albumItem];
+            continue;
+        }
+
+        [albumItem addVisualMediaFromMessageItem:item];
+        if (TGPreviewLooksLikePlainMediaLabel([albumItem preview]) && !TGPreviewLooksLikePlainMediaLabel([item preview])) {
+            [albumItem setPreview:[item preview]];
+        }
+
+        id albumMessageID = [albumItem messageID];
+        id itemMessageID = [item messageID];
+        if ([albumMessageID respondsToSelector:@selector(longLongValue)] &&
+            [itemMessageID respondsToSelector:@selector(longLongValue)] &&
+            [itemMessageID longLongValue] < [albumMessageID longLongValue]) {
+            [albumItem setMessageID:[NSNumber numberWithLongLong:[itemMessageID longLongValue]]];
+        }
+
+        id albumDate = [albumItem date];
+        id itemDate = [item date];
+        if ([albumDate respondsToSelector:@selector(integerValue)] &&
+            [itemDate respondsToSelector:@selector(integerValue)] &&
+            [itemDate integerValue] < [albumDate integerValue]) {
+            [albumItem setDate:[NSNumber numberWithInteger:[itemDate integerValue]]];
+        }
+    }
+
+    return groupedItems;
 }
 
 - (NSString *)threadTitleFromMessages:(NSArray *)messages fallback:(NSString *)fallback {

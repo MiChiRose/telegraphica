@@ -547,6 +547,36 @@ static void TGDrawImageInRect(NSImage *image, NSRect rect, BOOL drawingInFlipped
                 hints:nil];
 }
 
+static void TGDrawImageAspectFillInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView) {
+    (void)drawingInFlippedView;
+    if (!image || NSIsEmptyRect(rect)) {
+        return;
+    }
+
+    NSSize imageSize = [image size];
+    if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+        TGDrawImageInRect(image, rect, drawingInFlippedView);
+        return;
+    }
+
+    CGFloat imageRatio = imageSize.width / imageSize.height;
+    CGFloat rectRatio = NSWidth(rect) / NSHeight(rect);
+    NSRect sourceRect = NSZeroRect;
+    if (imageRatio > rectRatio) {
+        CGFloat sourceWidth = imageSize.height * rectRatio;
+        sourceRect = NSMakeRect(floor((imageSize.width - sourceWidth) / 2.0), 0.0, sourceWidth, imageSize.height);
+    } else {
+        CGFloat sourceHeight = imageSize.width / rectRatio;
+        sourceRect = NSMakeRect(0.0, floor((imageSize.height - sourceHeight) / 2.0), imageSize.width, sourceHeight);
+    }
+    [image drawInRect:rect
+             fromRect:sourceRect
+            operation:NSCompositeSourceOver
+             fraction:1.0
+       respectFlipped:YES
+                hints:nil];
+}
+
 static void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected, BOOL drawingInFlippedView) {
     NSBezierPath *avatarPath = [NSBezierPath bezierPathWithOvalInRect:rect];
     NSImage *image = nil;
@@ -697,7 +727,122 @@ static NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionar
     return attributed;
 }
 
+static NSString *TGMediaItemLocalPath(NSDictionary *mediaItem) {
+    id path = [mediaItem objectForKey:@"local_path"];
+    return [path isKindOfClass:[NSString class]] ? (NSString *)path : nil;
+}
+
+static NSString *TGMediaItemContentType(NSDictionary *mediaItem) {
+    id contentType = [mediaItem objectForKey:@"content_type"];
+    return [contentType isKindOfClass:[NSString class]] ? (NSString *)contentType : nil;
+}
+
+static NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem) {
+    id placeholder = [mediaItem objectForKey:@"placeholder"];
+    if ([placeholder isKindOfClass:[NSString class]] && [(NSString *)placeholder length] > 0) {
+        return (NSString *)placeholder;
+    }
+    NSString *contentType = TGMediaItemContentType(mediaItem);
+    if ([contentType isEqualToString:@"messageSticker"]) {
+        return @"Sticker";
+    }
+    if ([contentType isEqualToString:@"messageAnimation"]) {
+        return @"GIF";
+    }
+    if ([contentType isEqualToString:@"messageVideo"]) {
+        return @"Video";
+    }
+    return @"Photo";
+}
+
+static BOOL TGMediaItemIsSticker(NSDictionary *mediaItem) {
+    return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageSticker"];
+}
+
+static NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth) {
+    BOOL sticker = TGMediaItemIsSticker(mediaItem);
+    CGFloat maximumSide = sticker ? 128.0 : TGMessagePhotoMaximumSide;
+    CGFloat minimumWidth = sticker ? 88.0 : 140.0;
+    CGFloat minimumHeight = sticker ? 88.0 : 92.0;
+    CGFloat width = sticker ? 112.0 : 220.0;
+    CGFloat height = sticker ? 112.0 : 160.0;
+    id widthObject = [mediaItem objectForKey:@"width"];
+    id heightObject = [mediaItem objectForKey:@"height"];
+    if ([widthObject respondsToSelector:@selector(floatValue)] && [widthObject floatValue] > 0.0) {
+        width = [widthObject floatValue];
+    }
+    if ([heightObject respondsToSelector:@selector(floatValue)] && [heightObject floatValue] > 0.0) {
+        height = [heightObject floatValue];
+    }
+    if (width <= 0.0 || height <= 0.0) {
+        width = sticker ? 112.0 : 220.0;
+        height = sticker ? 112.0 : 160.0;
+    }
+    if (sticker && [TGMediaItemLocalPath(mediaItem) length] == 0) {
+        width = 112.0;
+        height = 112.0;
+    }
+    CGFloat scale = maximumSide / ((width > height) ? width : height);
+    if (scale < 1.0) {
+        width *= scale;
+        height *= scale;
+    }
+    if (width < minimumWidth) {
+        CGFloat grow = minimumWidth / width;
+        width *= grow;
+        height *= grow;
+    }
+    if (height < minimumHeight) {
+        CGFloat grow = minimumHeight / height;
+        width *= grow;
+        height *= grow;
+    }
+    if (width > maximumSide) {
+        CGFloat shrink = maximumSide / width;
+        width *= shrink;
+        height *= shrink;
+    }
+    if (height > maximumSide) {
+        CGFloat shrink = maximumSide / height;
+        width *= shrink;
+        height *= shrink;
+    }
+    if (maximumWidth > 0.0 && width > maximumWidth) {
+        CGFloat shrink = maximumWidth / width;
+        width *= shrink;
+        height *= shrink;
+    }
+    return NSMakeSize(ceil(width), ceil(height));
+}
+
 static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth) {
+    NSArray *mediaItems = [item visualMediaItems];
+    if ([mediaItems count] > 1) {
+        CGFloat albumWidth = maximumWidth;
+        if (albumWidth > 360.0) {
+            albumWidth = 360.0;
+        }
+        if (albumWidth < 220.0) {
+            albumWidth = 220.0;
+        }
+        NSUInteger count = [mediaItems count];
+        CGFloat albumHeight = 210.0;
+        if (count == 2) {
+            albumHeight = 170.0;
+        } else if (count == 3) {
+            albumHeight = 260.0;
+        } else {
+            albumHeight = 286.0;
+        }
+        if (albumHeight > albumWidth) {
+            albumHeight = albumWidth;
+        }
+        return NSMakeSize(ceil(albumWidth), ceil(albumHeight));
+    }
+    if ([mediaItems count] == 1) {
+        return TGDisplaySizeForMediaDictionary((NSDictionary *)[mediaItems objectAtIndex:0], maximumWidth);
+    }
+
     BOOL sticker = [item isStickerMessage];
     CGFloat maximumSide = sticker ? 128.0 : TGMessagePhotoMaximumSide;
     CGFloat minimumWidth = sticker ? 88.0 : 140.0;
@@ -749,6 +894,111 @@ static NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maxi
         height *= shrink;
     }
     return NSMakeSize(ceil(width), ceil(height));
+}
+
+static NSArray *TGMediaTileRectsForMessageItem(TGMessageItem *item, NSRect imageRect) {
+    NSMutableArray *rects = [NSMutableArray array];
+    NSArray *mediaItems = [item visualMediaItems];
+    NSUInteger count = [mediaItems count];
+    CGFloat gap = 3.0;
+    if (count <= 1 || NSIsEmptyRect(imageRect)) {
+        [rects addObject:[NSValue valueWithRect:imageRect]];
+        return rects;
+    }
+
+    if (count == 2) {
+        CGFloat tileWidth = floor((NSWidth(imageRect) - gap) / 2.0);
+        [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect), NSMinY(imageRect), tileWidth, NSHeight(imageRect))]];
+        [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect) + tileWidth + gap, NSMinY(imageRect), NSWidth(imageRect) - tileWidth - gap, NSHeight(imageRect))]];
+        return rects;
+    }
+
+    if (count == 3) {
+        CGFloat leftWidth = floor((NSWidth(imageRect) - gap) * 0.62);
+        CGFloat rightWidth = NSWidth(imageRect) - leftWidth - gap;
+        CGFloat halfHeight = floor((NSHeight(imageRect) - gap) / 2.0);
+        [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect), NSMinY(imageRect), leftWidth, NSHeight(imageRect))]];
+        [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect) + leftWidth + gap, NSMinY(imageRect), rightWidth, halfHeight)]];
+        [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect) + leftWidth + gap, NSMinY(imageRect) + halfHeight + gap, rightWidth, NSHeight(imageRect) - halfHeight - gap)]];
+        return rects;
+    }
+
+    CGFloat columnWidth = floor((NSWidth(imageRect) - gap) / 2.0);
+    CGFloat rowHeight = floor((NSHeight(imageRect) - gap) / 2.0);
+    [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect), NSMinY(imageRect), columnWidth, rowHeight)]];
+    [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect) + columnWidth + gap, NSMinY(imageRect), NSWidth(imageRect) - columnWidth - gap, rowHeight)]];
+    [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect), NSMinY(imageRect) + rowHeight + gap, columnWidth, NSHeight(imageRect) - rowHeight - gap)]];
+    [rects addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(imageRect) + columnWidth + gap, NSMinY(imageRect) + rowHeight + gap, NSWidth(imageRect) - columnWidth - gap, NSHeight(imageRect) - rowHeight - gap)]];
+    return rects;
+}
+
+static void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, BOOL flipped, BOOL aspectFill, NSUInteger overflowCount) {
+    if (![mediaItem isKindOfClass:[NSDictionary class]] || NSIsEmptyRect(rect)) {
+        return;
+    }
+
+    NSBezierPath *mediaPath = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
+    NSString *localPath = TGMediaItemLocalPath(mediaItem);
+    NSImage *image = nil;
+    if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+        image = TGImageWithCorrectOrientationFromFile(localPath);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
+        }
+    }
+
+    if (image) {
+        [NSGraphicsContext saveGraphicsState];
+        [mediaPath addClip];
+        if (aspectFill) {
+            TGDrawImageAspectFillInRect(image, rect, flipped);
+        } else {
+            TGDrawImageInRect(image, rect, flipped);
+        }
+        [NSGraphicsContext restoreGraphicsState];
+    } else {
+        [[NSColor colorWithCalibratedWhite:0.96 alpha:0.92] set];
+        [mediaPath fill];
+        NSString *fallbackText = TGMediaItemPlaceholder(mediaItem);
+        CGFloat fallbackFontSize = ([fallbackText length] <= 4) ? 34.0 : 13.0;
+        NSMutableParagraphStyle *fallbackParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [fallbackParagraph setAlignment:NSCenterTextAlignment];
+        NSDictionary *fallbackAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSFont boldSystemFontOfSize:fallbackFontSize], NSFontAttributeName,
+                                            TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                            fallbackParagraph, NSParagraphStyleAttributeName,
+                                            nil];
+        NSSize fallbackSize = [fallbackText sizeWithAttributes:fallbackAttributes];
+        NSRect fallbackRect = NSMakeRect(NSMinX(rect) + 4.0,
+                                         NSMidY(rect) - ceil(fallbackSize.height / 2.0) - 1.0,
+                                         NSWidth(rect) - 8.0,
+                                         fallbackSize.height + 4.0);
+        [fallbackText drawInRect:fallbackRect withAttributes:fallbackAttributes];
+    }
+
+    [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
+    [mediaPath setLineWidth:1.0];
+    [mediaPath stroke];
+
+    if (overflowCount > 0) {
+        [NSGraphicsContext saveGraphicsState];
+        [mediaPath addClip];
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.38] set];
+        NSRectFillUsingOperation(rect, NSCompositeSourceOver);
+        [NSGraphicsContext restoreGraphicsState];
+
+        NSString *overflowText = [NSString stringWithFormat:@"+%lu", (unsigned long)overflowCount];
+        NSDictionary *overflowAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSFont boldSystemFontOfSize:22.0], NSFontAttributeName,
+                                            [NSColor colorWithCalibratedWhite:1.0 alpha:0.96], NSForegroundColorAttributeName,
+                                            nil];
+        NSSize overflowSize = [overflowText sizeWithAttributes:overflowAttributes];
+        NSRect overflowRect = NSMakeRect(NSMidX(rect) - floor(overflowSize.width / 2.0),
+                                         NSMidY(rect) - floor(overflowSize.height / 2.0) - 1.0,
+                                         overflowSize.width,
+                                         overflowSize.height + 2.0);
+        [overflowText drawInRect:overflowRect withAttributes:overflowAttributes];
+    }
 }
 
 static CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
@@ -1601,7 +1851,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
-    NSString *stickerFallbackText = [item isStickerMessage] ? rawMessageText : @"";
     NSString *messageText = [item isStickerMessage] ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
@@ -1680,40 +1929,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                       contentTop - photoSize.height,
                                       photoSize.width,
                                       photoSize.height);
-        NSBezierPath *imagePath = [NSBezierPath bezierPathWithRoundedRect:imageRect xRadius:9.0 yRadius:9.0];
-        NSString *mediaPath = [item mediaLocalPath];
-        NSImage *image = nil;
-        if ([mediaPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:mediaPath]) {
-            image = TGImageWithCorrectOrientationFromFile(mediaPath);
-            if (!image) {
-                image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
+        NSArray *mediaItems = [item visualMediaItems];
+        NSArray *tileRects = TGMediaTileRectsForMessageItem(item, imageRect);
+        NSUInteger tileCount = [tileRects count];
+        NSUInteger mediaCount = [mediaItems count];
+        if (mediaCount > 0 && tileCount > 0) {
+            NSUInteger tileIndex = 0;
+            for (tileIndex = 0; tileIndex < tileCount && tileIndex < mediaCount; tileIndex++) {
+                id mediaObject = [mediaItems objectAtIndex:tileIndex];
+                if (![mediaObject isKindOfClass:[NSDictionary class]]) {
+                    continue;
+                }
+                NSUInteger overflowCount = 0;
+                if (tileIndex == tileCount - 1 && mediaCount > tileCount) {
+                    overflowCount = mediaCount - tileCount;
+                }
+                NSRect tileRect = [[tileRects objectAtIndex:tileIndex] rectValue];
+                TGDrawMediaItemInRect((NSDictionary *)mediaObject, tileRect, outgoing, [controlView isFlipped], mediaCount > 1, overflowCount);
             }
-        }
-        if (image) {
-            [NSGraphicsContext saveGraphicsState];
-            [imagePath addClip];
-            TGDrawImageInRect(image, imageRect, [controlView isFlipped]);
-            [NSGraphicsContext restoreGraphicsState];
-        } else if ([item isStickerMessage]) {
-            [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
-            [imagePath setLineWidth:1.0];
-            [imagePath stroke];
-            NSString *fallbackText = ([stickerFallbackText length] > 0) ? stickerFallbackText : @"Sticker";
-            CGFloat fallbackFontSize = ([fallbackText length] <= 4) ? 42.0 : 14.0;
-            NSMutableParagraphStyle *fallbackParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-            [fallbackParagraph setAlignment:NSCenterTextAlignment];
-            NSDictionary *fallbackAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                                [NSFont boldSystemFontOfSize:fallbackFontSize], NSFontAttributeName,
-                                                TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                                fallbackParagraph, NSParagraphStyleAttributeName,
-                                                nil];
-            NSSize fallbackSize = [fallbackText sizeWithAttributes:fallbackAttributes];
-            NSRect fallbackRect = NSMakeRect(NSMinX(imageRect) + 4.0,
-                                            NSMidY(imageRect) - ceil(fallbackSize.height / 2.0) - 2.0,
-                                            NSWidth(imageRect) - 8.0,
-                                            fallbackSize.height + 4.0);
-            [fallbackText drawInRect:fallbackRect withAttributes:fallbackAttributes];
         } else {
+            NSBezierPath *imagePath = [NSBezierPath bezierPathWithRoundedRect:imageRect xRadius:9.0 yRadius:9.0];
             [(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor()) set];
             [imagePath setLineWidth:1.0];
             [imagePath stroke];
@@ -1872,6 +2107,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSWindow *logsWindow;
 @property (nonatomic, retain) NSWindow *aboutWindow;
 @property (nonatomic, retain) NSWindow *appearanceWindow;
+@property (nonatomic, retain) NSWindow *mediaPreviewWindow;
+@property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
+@property (nonatomic, retain) NSImageView *mediaPreviewImageView;
+@property (nonatomic, copy) NSString *mediaPreviewPath;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
 @property (nonatomic, retain) NSButton *logsCheckButton;
 @property (nonatomic, retain) NSPopUpButton *appearanceThemePopUpButton;
@@ -1899,6 +2138,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @property (nonatomic, assign) BOOL showingForumTopicList;
+@property (nonatomic, assign) CGFloat mediaPreviewZoomScale;
 @end
 
 @implementation TGStatusWindowController
@@ -2015,6 +2255,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize logsWindow = _logsWindow;
 @synthesize aboutWindow = _aboutWindow;
 @synthesize appearanceWindow = _appearanceWindow;
+@synthesize mediaPreviewWindow = _mediaPreviewWindow;
+@synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
+@synthesize mediaPreviewImageView = _mediaPreviewImageView;
+@synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
 @synthesize logsCheckButton = _logsCheckButton;
 @synthesize appearanceThemePopUpButton = _appearanceThemePopUpButton;
@@ -2042,6 +2286,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
+@synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -2063,6 +2308,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.chatFilterInfos = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
+        self.mediaPreviewZoomScale = 1.0;
         self.autoChatListLoadArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
@@ -2231,6 +2477,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
 }
 
+- (void)applyTransparentChatTableStyle {
+    [self.chatTableView setBackgroundColor:[NSColor clearColor]];
+    [self.chatTableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+    [self.chatTableView setGridColor:TGClassicTableGridColor()];
+    [self.chatTableView setUsesAlternatingRowBackgroundColors:NO];
+    [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+    [[self.chatScrollView contentView] setDrawsBackground:NO];
+    [[self.chatScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+}
+
 - (void)applySkeuomorphicHeaderCellStyle:(NSTextFieldCell *)headerCell {
     if (!headerCell) {
         return;
@@ -2326,7 +2582,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self applySkeuomorphicTableStyle:self.messageTableView];
-    [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+    [self applyTransparentChatTableStyle];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
@@ -2684,7 +2940,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.chatTableView setAllowsMultipleSelection:NO];
     [self.chatTableView setRowHeight:38.0];
     [self applySkeuomorphicTableStyle:self.chatTableView];
-    [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+    [self applyTransparentChatTableStyle];
     [self.chatTableView setHeaderView:nil];
 
     NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"chat"] autorelease];
@@ -3319,6 +3575,166 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([sender respondsToSelector:@selector(window)]) {
         [[sender window] close];
     }
+}
+
+- (void)ensureMediaPreviewWindow {
+    if (self.mediaPreviewWindow) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(0, 0, 760, 560);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO] autorelease];
+    [window setTitle:@"Media Preview"];
+    [window setMinSize:NSMakeSize(420, 340)];
+    [window setReleasedWhenClosed:NO];
+
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [window setContentView:contentView];
+
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(16, 58, 728, 486)] autorelease];
+    [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [scrollView setBorderType:NSNoBorder];
+    [scrollView setHasVerticalScroller:YES];
+    [scrollView setHasHorizontalScroller:YES];
+    [[scrollView contentView] setDrawsBackground:YES];
+    [[scrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+
+    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)] autorelease];
+    [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
+    [imageView setImageFrameStyle:NSImageFrameNone];
+    [scrollView setDocumentView:imageView];
+    [contentView addSubview:scrollView];
+    self.mediaPreviewScrollView = scrollView;
+    self.mediaPreviewImageView = imageView;
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20, 524, 280, 20)
+                                              text:@"Media Preview"
+                                              font:[NSFont boldSystemFontOfSize:13.0]];
+    [titleField setAutoresizingMask:NSViewMinYMargin];
+    [contentView addSubview:titleField];
+
+    NSButton *zoomOutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(16, 18, 42, 30)] autorelease];
+    [zoomOutButton setTitle:@"-"];
+    [zoomOutButton setToolTip:@"Zoom out"];
+    [zoomOutButton setTarget:self];
+    [zoomOutButton setAction:@selector(zoomOutMediaPreview:)];
+    [self applyUtilityButtonStyle:zoomOutButton];
+    [zoomOutButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:zoomOutButton];
+
+    NSButton *fitButton = [[[NSButton alloc] initWithFrame:NSMakeRect(66, 18, 74, 30)] autorelease];
+    [fitButton setTitle:@"Fit"];
+    [fitButton setToolTip:@"Fit media to window"];
+    [fitButton setTarget:self];
+    [fitButton setAction:@selector(fitMediaPreview:)];
+    [self applyUtilityButtonStyle:fitButton];
+    [fitButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:fitButton];
+
+    NSButton *zoomInButton = [[[NSButton alloc] initWithFrame:NSMakeRect(148, 18, 42, 30)] autorelease];
+    [zoomInButton setTitle:@"+"];
+    [zoomInButton setToolTip:@"Zoom in"];
+    [zoomInButton setTarget:self];
+    [zoomInButton setAction:@selector(zoomInMediaPreview:)];
+    [self applyUtilityButtonStyle:zoomInButton];
+    [zoomInButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:zoomInButton];
+
+    NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(624, 18, 120, 30)];
+    [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:closeButton];
+
+    self.mediaPreviewWindow = window;
+}
+
+- (void)applyMediaPreviewZoomScale:(CGFloat)scale {
+    NSImage *image = [self.mediaPreviewImageView image];
+    if (!image) {
+        return;
+    }
+
+    if (scale < 0.10) {
+        scale = 0.10;
+    }
+    if (scale > 6.0) {
+        scale = 6.0;
+    }
+    self.mediaPreviewZoomScale = scale;
+
+    NSSize imageSize = [image size];
+    CGFloat width = ceil(imageSize.width * scale);
+    CGFloat height = ceil(imageSize.height * scale);
+    if (width < 1.0) {
+        width = 1.0;
+    }
+    if (height < 1.0) {
+        height = 1.0;
+    }
+    [self.mediaPreviewImageView setFrame:NSMakeRect(0, 0, width, height)];
+    [self.mediaPreviewImageView setNeedsDisplay:YES];
+}
+
+- (void)fitMediaPreview:(id)sender {
+    (void)sender;
+    NSImage *image = [self.mediaPreviewImageView image];
+    if (!image) {
+        return;
+    }
+
+    NSSize imageSize = [image size];
+    NSRect visibleRect = [[self.mediaPreviewScrollView contentView] bounds];
+    if (imageSize.width <= 0.0 || imageSize.height <= 0.0 || NSWidth(visibleRect) <= 0.0 || NSHeight(visibleRect) <= 0.0) {
+        [self applyMediaPreviewZoomScale:1.0];
+        return;
+    }
+
+    CGFloat scaleX = NSWidth(visibleRect) / imageSize.width;
+    CGFloat scaleY = NSHeight(visibleRect) / imageSize.height;
+    CGFloat scale = (scaleX < scaleY) ? scaleX : scaleY;
+    if (scale > 1.0) {
+        scale = 1.0;
+    }
+    [self applyMediaPreviewZoomScale:scale];
+}
+
+- (void)zoomInMediaPreview:(id)sender {
+    (void)sender;
+    CGFloat scale = self.mediaPreviewZoomScale > 0.0 ? self.mediaPreviewZoomScale : 1.0;
+    [self applyMediaPreviewZoomScale:scale * 1.25];
+}
+
+- (void)zoomOutMediaPreview:(id)sender {
+    (void)sender;
+    CGFloat scale = self.mediaPreviewZoomScale > 0.0 ? self.mediaPreviewZoomScale : 1.0;
+    [self applyMediaPreviewZoomScale:scale / 1.25];
+}
+
+- (void)openMediaPreviewAtPath:(NSString *)path {
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self appendDetail:@"Media preview file is not available yet."];
+        return;
+    }
+
+    NSImage *image = TGImageWithCorrectOrientationFromFile(path);
+    if (!image) {
+        image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+    }
+    if (!image) {
+        [self appendDetail:@"Could not open media preview."];
+        return;
+    }
+
+    [self ensureMediaPreviewWindow];
+    self.mediaPreviewPath = path;
+    [self.mediaPreviewImageView setImage:image];
+    [self.mediaPreviewWindow setTitle:@"Media Preview"];
+    [self fitMediaPreview:nil];
+    [self.mediaPreviewWindow center];
+    [self.mediaPreviewWindow makeKeyAndOrderFront:nil];
 }
 
 - (void)openSelectedChatProfile:(id)sender {
@@ -4453,6 +4869,97 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
 }
 
+- (NSString *)mediaLocalPathForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage] || NSIsEmptyRect(cellFrame)) {
+        return nil;
+    }
+
+    NSString *messageText = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
+    BOOL outgoing = [item outgoing];
+    CGFloat sidePadding = 14.0;
+    CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                    TGClassicInkColor(), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
+    if ([messageText length] > 0) {
+        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        [composedMessageText appendAttributedString:baseText];
+        if ([timeString length] > 0) {
+            NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
+            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
+            [composedMessageText appendAttributedString:timeSuffixText];
+        }
+    }
+
+    NSRect measuredRect = NSZeroRect;
+    if ([messageText length] > 0) {
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+                                                         options:NSStringDrawingUsesLineFragmentOrigin];
+    }
+
+    NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
+    CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
+    CGFloat photoBubbleWidth = photoSize.width + 16.0;
+    if (photoBubbleWidth > bubbleWidth) {
+        bubbleWidth = photoBubbleWidth;
+    }
+    if (bubbleWidth < 96.0) {
+        bubbleWidth = 96.0;
+    }
+    if (bubbleWidth > maximumBubbleWidth) {
+        bubbleWidth = maximumBubbleWidth;
+    }
+
+    CGFloat bubbleHeight = photoSize.height + 24.0;
+    if (NSHeight(measuredRect) > 0.0) {
+        bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
+    }
+    if (bubbleHeight < 42.0) {
+        bubbleHeight = 42.0;
+    }
+
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
+                                  contentTop - photoSize.height,
+                                  photoSize.width,
+                                  photoSize.height);
+    if (!NSPointInRect(tablePoint, imageRect)) {
+        return nil;
+    }
+
+    NSArray *mediaItems = [item visualMediaItems];
+    NSArray *tileRects = TGMediaTileRectsForMessageItem(item, imageRect);
+    NSUInteger tileIndex = 0;
+    NSUInteger tileCount = [tileRects count];
+    NSUInteger mediaCount = [mediaItems count];
+    for (tileIndex = 0; tileIndex < tileCount && tileIndex < mediaCount; tileIndex++) {
+        NSRect tileRect = [[tileRects objectAtIndex:tileIndex] rectValue];
+        if (!NSPointInRect(tablePoint, tileRect)) {
+            continue;
+        }
+        id mediaObject = [mediaItems objectAtIndex:tileIndex];
+        if (![mediaObject isKindOfClass:[NSDictionary class]]) {
+            return nil;
+        }
+        NSString *path = TGMediaItemLocalPath((NSDictionary *)mediaObject);
+        return ([path length] > 0) ? path : nil;
+    }
+    return nil;
+}
+
 - (NSURL *)messageLinkURLForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
     if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
         return nil;
@@ -4593,8 +5100,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
     NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
+    NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    NSString *mediaPath = [self mediaLocalPathForItem:(TGMessageItem *)item
+                                          inCellFrame:cellFrame
+                                              atPoint:tablePoint];
+    if ([mediaPath length] > 0) {
+        [self openMediaPreviewAtPath:mediaPath];
+        return;
+    }
+
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
-                                 inCellFrame:[self messageBubbleCellFrameForRow:row]
+                                 inCellFrame:cellFrame
                                      atPoint:tablePoint];
     if (!url) {
         return;
@@ -4646,8 +5162,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![item isKindOfClass:[TGMessageItem class]]) {
         return nil;
     }
+    NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    NSString *mediaPath = [self mediaLocalPathForItem:(TGMessageItem *)item
+                                          inCellFrame:cellFrame
+                                              atPoint:mouseLocation];
+    if ([mediaPath length] > 0) {
+        return @"Open media preview";
+    }
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
-                                 inCellFrame:[self messageBubbleCellFrameForRow:row]
+                                 inCellFrame:cellFrame
                                      atPoint:mouseLocation];
     return url ? @"Open link in default browser" : nil;
 }
@@ -6837,9 +7360,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_logsWindow close];
     [_aboutWindow close];
     [_appearanceWindow close];
+    [_mediaPreviewWindow close];
     [_logsWindow release];
     [_aboutWindow release];
     [_appearanceWindow release];
+    [_mediaPreviewWindow release];
+    [_mediaPreviewScrollView release];
+    [_mediaPreviewImageView release];
+    [_mediaPreviewPath release];
     [_logsWindowDetailsView release];
     [_logsCheckButton release];
     [_appearanceThemePopUpButton release];
