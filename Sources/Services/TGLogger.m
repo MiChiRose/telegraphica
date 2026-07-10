@@ -24,17 +24,38 @@ static NSString *TGLoggerThreadLabel(void) {
     return [NSThread isMainThread] ? @"main" : @"background";
 }
 
+static NSString *TGLoggerRedactedByPattern(NSString *message, NSString *pattern, NSString *replacement) {
+    if (![message isKindOfClass:[NSString class]] || [message length] == 0) {
+        return @"";
+    }
+    NSError *error = nil;
+    NSRegularExpression *regularExpression = [NSRegularExpression regularExpressionWithPattern:pattern
+                                                                                       options:NSRegularExpressionCaseInsensitive
+                                                                                         error:&error];
+    if (!regularExpression || error) {
+        return message;
+    }
+    return [regularExpression stringByReplacingMatchesInString:message
+                                                       options:0
+                                                         range:NSMakeRange(0, [message length])
+                                                  withTemplate:replacement];
+}
+
 static NSString *TGLoggerRedactedMessage(NSString *message) {
     if (!message) return @"";
     NSString *lowercase = [message lowercaseString];
-    NSArray *sensitiveMarkers = [NSArray arrayWithObjects:@"api_hash", @"authentication_code", @"authentication code", @"auth code", @"phone_number", @"phone number", @"database_encryption_key", @"encryption_key", @"password", @"\"code\"", nil];
+    NSArray *sensitiveMarkers = [NSArray arrayWithObjects:@"api_hash", @"authentication_code", @"authentication code", @"auth code", @"phone_number", @"phone number", @"database_encryption_key", @"encryption_key", @"password", @"\"code\"", @"login code", @"api id", @"api_id", nil];
     NSUInteger index = 0;
     for (index = 0; index < [sensitiveMarkers count]; index++) {
         if ([lowercase rangeOfString:[sensitiveMarkers objectAtIndex:index]].location != NSNotFound) {
             return @"<redacted sensitive log line>";
         }
     }
-    return message;
+    NSString *redacted = message;
+    redacted = TGLoggerRedactedByPattern(redacted, @"([?&](token|hash|code|key|password)=)[^\\s&]+", @"$1<redacted>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"\\+?[0-9][0-9 ()-]{7,}[0-9]", @"<redacted-number>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"\\b[A-Fa-f0-9]{32,}\\b", @"<redacted-token>");
+    return redacted;
 }
 
 + (instancetype)sharedLogger {
