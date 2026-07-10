@@ -464,6 +464,14 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         NSString *direction = ([isOutgoing respondsToSelector:@selector(boolValue)] && [isOutgoing boolValue]) ? @"Outgoing" : @"Incoming";
         [summary setObject:direction forKey:@"direction"];
 
+        id contentObject = [message objectForKey:@"content"];
+        if ([contentObject isKindOfClass:[NSDictionary class]]) {
+            NSString *preview = [self messageContentPreviewForObject:(NSDictionary *)contentObject];
+            if ([preview length] > 0) {
+                [summary setObject:[self singleLineTrimmedString:preview maximumLength:96] forKey:@"preview"];
+            }
+        }
+
         return summary;
     }
 
@@ -2504,7 +2512,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     if (![containerObject isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
-    NSArray *fileKeys = [NSArray arrayWithObjects:@"file", @"document", @"sticker", @"animation", @"video", nil];
+    NSArray *fileKeys = [NSArray arrayWithObjects:@"file", @"document", @"sticker", @"animation", @"video", @"voice", @"audio", nil];
     NSUInteger index = 0;
     for (index = 0; index < [fileKeys count]; index++) {
         id fileObject = [containerObject objectForKey:[fileKeys objectAtIndex:index]];
@@ -2702,11 +2710,106 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                 timeout:timeout
                                      didRequestDownload:didRequestDownload];
     }
+    if ([type isEqualToString:@"messageVideoNote"]) {
+        return [self visualMediaInfoFromContainerObject:[content objectForKey:@"video_note"]
+                                        downloadMissing:downloadMissing
+                                                timeout:timeout
+                                     didRequestDownload:didRequestDownload];
+    }
     if ([type isEqualToString:@"messageDocument"]) {
         return [self visualMediaInfoFromDocumentObject:[content objectForKey:@"document"]
                                       downloadMissing:downloadMissing
                                               timeout:timeout
                                    didRequestDownload:didRequestDownload];
+    }
+    return nil;
+}
+
+- (NSDictionary *)playableMediaInfoFromContainerObject:(id)containerObject
+                                      downloadMissing:(BOOL)downloadMissing
+                                              timeout:(NSTimeInterval)timeout
+                                   didRequestDownload:(BOOL *)didRequestDownload {
+    if (![containerObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *container = (NSDictionary *)containerObject;
+    NSDictionary *mediaFile = [self mediaFileObjectFromContainerObject:container];
+    NSNumber *fileID = [self fileIDFromFileObject:mediaFile];
+    NSString *localPath = [self completedLocalPathFromFileObject:mediaFile];
+    if ([localPath length] == 0 && downloadMissing && fileID) {
+        if (didRequestDownload) {
+            *didRequestDownload = YES;
+        }
+        NSDictionary *downloadedInfo = [self downloadedFileInfoForFileID:fileID timeout:timeout];
+        localPath = [downloadedInfo objectForKey:@"local_path"];
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    if (fileID) {
+        [info setObject:fileID forKey:@"file_id"];
+    }
+    if ([localPath length] > 0) {
+        [info setObject:localPath forKey:@"local_path"];
+    }
+
+    id durationObject = [container objectForKey:@"duration"];
+    if ([durationObject respondsToSelector:@selector(integerValue)]) {
+        [info setObject:[NSNumber numberWithInteger:[durationObject integerValue]] forKey:@"duration"];
+    }
+
+    id mimeTypeObject = [container objectForKey:@"mime_type"];
+    if ([mimeTypeObject isKindOfClass:[NSString class]] && [(NSString *)mimeTypeObject length] > 0) {
+        [info setObject:mimeTypeObject forKey:@"mime_type"];
+    }
+
+    return ([info count] > 0) ? info : nil;
+}
+
+- (NSDictionary *)playableMediaInfoFromMessageContentObject:(id)contentObject
+                                           downloadMissing:(BOOL)downloadMissing
+                                                   timeout:(NSTimeInterval)timeout
+                                        didRequestDownload:(BOOL *)didRequestDownload {
+    if (![contentObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *content = (NSDictionary *)contentObject;
+    id typeObject = [content objectForKey:@"@type"];
+    if (![typeObject isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    NSString *type = (NSString *)typeObject;
+    if ([type isEqualToString:@"messageVoiceNote"]) {
+        return [self playableMediaInfoFromContainerObject:[content objectForKey:@"voice_note"]
+                                          downloadMissing:downloadMissing
+                                                  timeout:timeout
+                                       didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageAudio"]) {
+        return [self playableMediaInfoFromContainerObject:[content objectForKey:@"audio"]
+                                          downloadMissing:downloadMissing
+                                                  timeout:timeout
+                                       didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageVideoNote"]) {
+        return [self playableMediaInfoFromContainerObject:[content objectForKey:@"video_note"]
+                                          downloadMissing:downloadMissing
+                                                  timeout:timeout
+                                       didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageVideo"]) {
+        return [self playableMediaInfoFromContainerObject:[content objectForKey:@"video"]
+                                          downloadMissing:NO
+                                                  timeout:timeout
+                                       didRequestDownload:didRequestDownload];
+    }
+    if ([type isEqualToString:@"messageAnimation"]) {
+        return [self playableMediaInfoFromContainerObject:[content objectForKey:@"animation"]
+                                          downloadMissing:NO
+                                                  timeout:timeout
+                                       didRequestDownload:didRequestDownload];
     }
     return nil;
 }
@@ -2850,6 +2953,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
     NSUInteger visualMediaDownloadsRemaining = 30;
+    NSUInteger playableMediaDownloadsRemaining = 12;
     for (index = 0; index < [messages count]; index++) {
         id messageObject = [messages objectAtIndex:index];
         if (![messageObject isKindOfClass:[NSDictionary class]]) {
@@ -2910,16 +3014,50 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         if (didRequestMediaDownload && visualMediaDownloadsRemaining > 0) {
             visualMediaDownloadsRemaining--;
         }
+        BOOL didRequestPlayableDownload = NO;
+        NSDictionary *playableInfo = [self playableMediaInfoFromMessageContentObject:contentObject
+                                                                     downloadMissing:(playableMediaDownloadsRemaining > 0)
+                                                                             timeout:1.5
+                                                                  didRequestDownload:&didRequestPlayableDownload];
+        if (didRequestPlayableDownload && playableMediaDownloadsRemaining > 0) {
+            playableMediaDownloadsRemaining--;
+        }
         NSString *mediaPath = [photoInfo objectForKey:@"local_path"];
         if ([mediaPath length] > 0) {
             [item setMediaLocalPath:mediaPath];
         }
+        NSString *playablePath = [playableInfo objectForKey:@"local_path"];
+        if ([playablePath length] > 0 && [mediaPath length] == 0) {
+            [item setMediaLocalPath:playablePath];
+        }
         [item setMediaWidth:[photoInfo objectForKey:@"width"]];
         [item setMediaHeight:[photoInfo objectForKey:@"height"]];
+        NSNumber *playableFileID = [playableInfo objectForKey:@"file_id"];
+        if (!playableFileID) {
+            playableFileID = [photoInfo objectForKey:@"full_file_id"];
+        }
+        if (!playableFileID) {
+            playableFileID = [photoInfo objectForKey:@"file_id"];
+        }
+        [item setMediaFileID:playableFileID];
+        [item setMediaDuration:[playableInfo objectForKey:@"duration"]];
+        [item setMediaMimeType:[playableInfo objectForKey:@"mime_type"]];
         if ([photoInfo count] > 0 && [item isVisualMediaMessage]) {
             NSMutableDictionary *mediaInfo = [NSMutableDictionary dictionaryWithDictionary:photoInfo];
             if ([contentType length] > 0) {
                 [mediaInfo setObject:contentType forKey:@"content_type"];
+            }
+            if (playableFileID) {
+                [mediaInfo setObject:playableFileID forKey:@"playable_file_id"];
+            }
+            if ([[playableInfo objectForKey:@"local_path"] length] > 0) {
+                [mediaInfo setObject:[playableInfo objectForKey:@"local_path"] forKey:@"playable_local_path"];
+            }
+            if ([item mediaDuration]) {
+                [mediaInfo setObject:[item mediaDuration] forKey:@"duration"];
+            }
+            if ([[item mediaMimeType] length] > 0) {
+                [mediaInfo setObject:[item mediaMimeType] forKey:@"mime_type"];
             }
             if ([safeMessageID respondsToSelector:@selector(longLongValue)]) {
                 [mediaInfo setObject:safeMessageID forKey:@"message_id"];

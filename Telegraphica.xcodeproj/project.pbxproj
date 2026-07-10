@@ -19,6 +19,7 @@
 		111111111111111111111108 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111230 /* Cocoa.framework */; };
 		111111111111111111111109 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111231 /* Security.framework */; };
 		111111111111111111111110 /* Telegraphica.icns in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111223 /* Telegraphica.icns */; };
+		111111111111111111111113 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111232 /* AVFoundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 		111111111111111111111223 /* Telegraphica.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Telegraphica.icns; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -53,6 +55,7 @@
 			files = (
 				111111111111111111111108 /* Cocoa.framework in Frameworks */,
 				111111111111111111111109 /* Security.framework in Frameworks */,
+				111111111111111111111113 /* AVFoundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +91,7 @@
 			children = (
 				111111111111111111111230 /* Cocoa.framework */,
 				111111111111111111111231 /* Security.framework */,
+				111111111111111111111232 /* AVFoundation.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

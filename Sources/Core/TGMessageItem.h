@@ -15,6 +15,9 @@
 @property (nonatomic, retain) NSNumber *mediaHeight;
 @property (nonatomic, retain) NSNumber *mediaAlbumID;
 @property (nonatomic, copy) NSArray *mediaItems;
+@property (nonatomic, retain) NSNumber *mediaFileID;
+@property (nonatomic, retain) NSNumber *mediaDuration;
+@property (nonatomic, copy) NSString *mediaMimeType;
 @property (nonatomic, copy) NSString *reactionSummary;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
@@ -26,6 +29,9 @@
 - (BOOL)isStickerMessage;
 - (BOOL)isDocumentMessage;
 - (BOOL)isVisualMediaMessage;
+- (BOOL)isPlayableMediaMessage;
+- (BOOL)isVoiceNoteMessage;
+- (BOOL)isVideoNoteMessage;
 - (BOOL)isMediaAlbumMessage;
 - (NSArray *)visualMediaItems;
 - (void)addVisualMediaFromMessageItem:(TGMessageItem *)item;
