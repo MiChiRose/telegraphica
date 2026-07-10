@@ -72,6 +72,8 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 - (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject;
 - (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
+- (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject;
+- (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject;
 - (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -2036,6 +2038,60 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     return items;
 }
 
+- (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject {
+    if (![topicObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id infoObject = [topicObject objectForKey:@"info"];
+    NSDictionary *info = [infoObject isKindOfClass:[NSDictionary class]] ? (NSDictionary *)infoObject : topicObject;
+    id topicID = [info objectForKey:@"forum_topic_id"];
+    if (![topicID respondsToSelector:@selector(longLongValue)]) {
+        topicID = [topicObject objectForKey:@"forum_topic_id"];
+    }
+    if (![topicID respondsToSelector:@selector(longLongValue)]) {
+        topicID = [info objectForKey:@"message_thread_id"];
+    }
+    if (![topicID respondsToSelector:@selector(longLongValue)]) {
+        topicID = [topicObject objectForKey:@"message_thread_id"];
+    }
+    if (![topicID respondsToSelector:@selector(longLongValue)] || [topicID longLongValue] <= 0) {
+        return nil;
+    }
+    return [NSNumber numberWithLongLong:[topicID longLongValue]];
+}
+
+- (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject {
+    if (![messageObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id threadIDObject = [messageObject objectForKey:@"message_thread_id"];
+    if ([threadIDObject respondsToSelector:@selector(longLongValue)] && [threadIDObject longLongValue] > 0) {
+        return [NSNumber numberWithLongLong:[threadIDObject longLongValue]];
+    }
+
+    id topicObject = [messageObject objectForKey:@"topic_id"];
+    if ([topicObject isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *topic = (NSDictionary *)topicObject;
+        id topicType = [topic objectForKey:@"@type"];
+        if ([topicType isKindOfClass:[NSString class]] && [(NSString *)topicType isEqualToString:@"messageTopicForum"]) {
+            id forumTopicID = [topic objectForKey:@"forum_topic_id"];
+            if ([forumTopicID respondsToSelector:@selector(longLongValue)] && [forumTopicID longLongValue] > 0) {
+                return [NSNumber numberWithLongLong:[forumTopicID longLongValue]];
+            }
+        }
+        if ([topicType isKindOfClass:[NSString class]] && [(NSString *)topicType isEqualToString:@"messageTopicThread"]) {
+            id messageThreadID = [topic objectForKey:@"message_thread_id"];
+            if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+                return [NSNumber numberWithLongLong:[messageThreadID longLongValue]];
+            }
+        }
+    }
+
+    return nil;
+}
+
 - (NSArray *)forumTopicPreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {
@@ -2065,14 +2121,29 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     [request setObject:@"" forKey:@"query"];
     [request setObject:[NSNumber numberWithInt:0] forKey:@"offset_date"];
     [request setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_message_id"];
-    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_message_thread_id"];
+    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_forum_topic_id"];
     [request setObject:[NSNumber numberWithInteger:safeLimit] forKey:@"limit"];
 
+    NSError *freshSchemaError = nil;
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
                                                        extraPrefix:@"telegraphica-forum-topics"
                                                            timeout:timeout
                                                          errorCode:82
-                                                             error:error];
+                                                             error:&freshSchemaError];
+    if (!response) {
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [legacyRequest removeObjectForKey:@"offset_forum_topic_id"];
+        [legacyRequest setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_message_thread_id"];
+        NSError *legacySchemaError = nil;
+        response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
+                                             extraPrefix:@"telegraphica-forum-topics-legacy"
+                                                 timeout:timeout
+                                               errorCode:82
+                                                   error:&legacySchemaError];
+        if (!response && error) {
+            *error = legacySchemaError ? legacySchemaError : freshSchemaError;
+        }
+    }
     if (![response isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
@@ -2099,11 +2170,8 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         NSDictionary *topic = (NSDictionary *)topicObject;
         id infoObject = [topic objectForKey:@"info"];
         NSDictionary *info = [infoObject isKindOfClass:[NSDictionary class]] ? (NSDictionary *)infoObject : topic;
-        id threadID = [info objectForKey:@"message_thread_id"];
-        if (![threadID respondsToSelector:@selector(longLongValue)]) {
-            threadID = [topic objectForKey:@"message_thread_id"];
-        }
-        if (![threadID respondsToSelector:@selector(longLongValue)]) {
+        NSNumber *topicID = [self forumTopicIDFromTopicObject:topic];
+        if (![topicID respondsToSelector:@selector(longLongValue)]) {
             continue;
         }
 
@@ -2127,7 +2195,8 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
         NSMutableDictionary *topicInfo = [NSMutableDictionary dictionary];
         [topicInfo setObject:name forKey:@"title"];
-        [topicInfo setObject:[NSNumber numberWithLongLong:[threadID longLongValue]] forKey:@"message_thread_id"];
+        [topicInfo setObject:[NSNumber numberWithLongLong:[topicID longLongValue]] forKey:@"message_thread_id"];
+        [topicInfo setObject:[NSNumber numberWithLongLong:[topicID longLongValue]] forKey:@"forum_topic_id"];
         [topicInfo setObject:unreadCount forKey:@"unread_count"];
         [topics addObject:topicInfo];
     }
@@ -2693,6 +2762,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                         fallbackThreadID:(NSNumber *)fallbackThreadID {
     id threadID = [threadInfo objectForKey:@"message_thread_id"];
     if (![threadID respondsToSelector:@selector(longLongValue)]) {
+        threadID = [threadInfo objectForKey:@"forum_topic_id"];
+    }
+    if (![threadID respondsToSelector:@selector(longLongValue)]) {
         threadID = fallbackThreadID;
     }
     if (![threadID respondsToSelector:@selector(longLongValue)]) {
@@ -2728,6 +2800,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
             NSDictionary *topic = (NSDictionary *)topicObject;
             NSString *topicTitle = [topic objectForKey:@"title"];
             NSNumber *threadID = [topic objectForKey:@"message_thread_id"];
+            if (![threadID respondsToSelector:@selector(longLongValue)]) {
+                threadID = [topic objectForKey:@"forum_topic_id"];
+            }
             NSNumber *unreadCount = [topic objectForKey:@"unread_count"];
             if (![unreadCount respondsToSelector:@selector(integerValue)]) {
                 unreadCount = [topic objectForKey:@"unread_message_count"];
@@ -2798,11 +2873,8 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         }
         NSDictionary *message = (NSDictionary *)messageObject;
         id messageID = [message objectForKey:@"id"];
-        id threadIDObject = [message objectForKey:@"message_thread_id"];
-        NSNumber *threadID = nil;
-        if ([threadIDObject respondsToSelector:@selector(longLongValue)] && [threadIDObject longLongValue] > 0) {
-            threadID = [NSNumber numberWithLongLong:[threadIDObject longLongValue]];
-        } else {
+        NSNumber *threadID = [self messageThreadIDFromMessageObject:message];
+        if (![threadID respondsToSelector:@selector(longLongValue)] || [threadID longLongValue] <= 0) {
             id canGetThread = [message objectForKey:@"can_get_message_thread"];
             if ([canGetThread respondsToSelector:@selector(boolValue)] && [canGetThread boolValue] && [messageID respondsToSelector:@selector(longLongValue)]) {
                 threadID = [NSNumber numberWithLongLong:[messageID longLongValue]];
@@ -2896,9 +2968,9 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     BOOL threadHistory = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0);
     if (threadHistory) {
-        [request setObject:@"getMessageThreadHistory" forKey:@"@type"];
+        [request setObject:@"getForumTopicHistory" forKey:@"@type"];
         [request setObject:chatID forKey:@"chat_id"];
-        [request setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_id"];
+        [request setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"forum_topic_id"];
         [request setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
         [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
         [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
@@ -2911,11 +2983,26 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         [request setObject:[NSNumber numberWithBool:NO] forKey:@"only_local"];
     }
 
+    NSError *primaryHistoryError = nil;
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
                                                        extraPrefix:(threadHistory ? @"telegraphica-thread-history" : @"telegraphica-chat-history")
                                                            timeout:timeout
                                                          errorCode:40
-                                                             error:error];
+                                                              error:&primaryHistoryError];
+    if (!response && threadHistory) {
+        NSMutableDictionary *legacyThreadRequest = [NSMutableDictionary dictionary];
+        [legacyThreadRequest setObject:@"getMessageThreadHistory" forKey:@"@type"];
+        [legacyThreadRequest setObject:chatID forKey:@"chat_id"];
+        [legacyThreadRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_id"];
+        [legacyThreadRequest setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
+        [legacyThreadRequest setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+        [legacyThreadRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+        response = [self sendTDLibRequestAndWaitForExtra:legacyThreadRequest
+                                             extraPrefix:@"telegraphica-message-thread-history"
+                                                 timeout:timeout
+                                               errorCode:40
+                                                   error:&primaryHistoryError];
+    }
     if (!response && threadHistory) {
         NSMutableDictionary *searchRequest = [NSMutableDictionary dictionary];
         [searchRequest setObject:@"searchChatMessages" forKey:@"@type"];
@@ -2926,20 +3013,47 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
         [searchRequest setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
         [searchRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
         [searchRequest setObject:[NSNull null] forKey:@"filter"];
-        [searchRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+        NSDictionary *forumTopic = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    @"messageTopicForum", @"@type",
+                                    [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"forum_topic_id",
+                                    nil];
+        [searchRequest setObject:forumTopic forKey:@"topic_id"];
         response = [self sendTDLibRequestAndWaitForExtra:searchRequest
-                                             extraPrefix:@"telegraphica-thread-search-history"
+                                               extraPrefix:@"telegraphica-thread-search-history"
+                                                   timeout:timeout
+                                                 errorCode:40
+                                                     error:&primaryHistoryError];
+    }
+    if (!response && threadHistory) {
+        NSMutableDictionary *legacySearchRequest = [NSMutableDictionary dictionary];
+        [legacySearchRequest setObject:@"searchChatMessages" forKey:@"@type"];
+        [legacySearchRequest setObject:chatID forKey:@"chat_id"];
+        [legacySearchRequest setObject:@"" forKey:@"query"];
+        [legacySearchRequest setObject:[NSNull null] forKey:@"sender_id"];
+        [legacySearchRequest setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
+        [legacySearchRequest setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+        [legacySearchRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+        [legacySearchRequest setObject:[NSNull null] forKey:@"filter"];
+        [legacySearchRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+        response = [self sendTDLibRequestAndWaitForExtra:legacySearchRequest
+                                             extraPrefix:@"telegraphica-thread-search-history-legacy"
                                                  timeout:timeout
                                                errorCode:40
-                                                   error:error];
+                                                   error:&primaryHistoryError];
     }
     if (!response) {
+        if (error) {
+            *error = primaryHistoryError;
+        }
         return nil;
     }
 
     id responseType = [response objectForKey:@"@type"];
     id messages = [response objectForKey:@"messages"];
-    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"messages"] || ![messages isKindOfClass:[NSArray class]]) {
+    BOOL expectedMessagesResponse = ([responseType isKindOfClass:[NSString class]] &&
+                                     ([(NSString *)responseType isEqualToString:@"messages"] ||
+                                      [(NSString *)responseType isEqualToString:@"foundChatMessages"]));
+    if (!expectedMessagesResponse || ![messages isKindOfClass:[NSArray class]]) {
         if (error) {
             *error = [self errorWithDescription:@"TDLib getChatHistory returned an unexpected response." code:41];
         }
@@ -3009,14 +3123,28 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
             safeThreadID = [NSNumber numberWithLongLong:[messageThreadID longLongValue]];
         }
         [legacyRequest setObject:safeThreadID forKey:@"message_thread_id"];
+        NSError *legacySchemaError = nil;
         response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
                                              extraPrefix:@"telegraphica-view-messages-legacy"
                                                  timeout:timeout
                                                errorCode:59
-                                                   error:error];
+                                                   error:&legacySchemaError];
+        if (!response && [messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+            NSMutableDictionary *currentWithoutThreadRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+            [currentWithoutThreadRequest removeObjectForKey:@"message_thread_id"];
+            NSError *currentWithoutThreadError = nil;
+            response = [self sendTDLibRequestAndWaitForExtra:currentWithoutThreadRequest
+                                                 extraPrefix:@"telegraphica-view-messages-current-no-thread"
+                                                     timeout:timeout
+                                                   errorCode:59
+                                                       error:&currentWithoutThreadError];
+            if (!response && error) {
+                *error = currentWithoutThreadError ? currentWithoutThreadError : (legacySchemaError ? legacySchemaError : currentSchemaError);
+            }
+        }
         if (!response) {
             if (error && *error == nil) {
-                *error = currentSchemaError;
+                *error = legacySchemaError ? legacySchemaError : currentSchemaError;
             }
             return NO;
         }
@@ -3087,19 +3215,36 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"sendMessage" forKey:@"@type"];
     [request setObject:chatID forKey:@"chat_id"];
-    if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
-        [request setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
-    }
     [request setObject:content forKey:@"input_message_content"];
 
+    BOOL threadSend = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0);
+    if (threadSend) {
+        NSDictionary *forumTopic = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    @"messageTopicForum", @"@type",
+                                    [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"forum_topic_id",
+                                    nil];
+        [request setObject:forumTopic forKey:@"topic_id"];
+    }
+
+    NSError *sendError = nil;
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
                                                        extraPrefix:@"telegraphica-send-text"
                                                            timeout:timeout
                                                          errorCode:46
-                                                             error:error];
+                                                             error:&sendError];
+    if (!response && threadSend) {
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [legacyRequest removeObjectForKey:@"topic_id"];
+        [legacyRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+        response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
+                                             extraPrefix:@"telegraphica-send-text-legacy-thread"
+                                                 timeout:timeout
+                                               errorCode:46
+                                                   error:&sendError];
+    }
     if (!response) {
-        if (error && !*error) {
-            *error = [self errorWithDescription:@"TDLib did not confirm sendMessage before timeout. The message may or may not have been sent." code:46];
+        if (error) {
+            *error = sendError ? sendError : [self errorWithDescription:@"TDLib did not confirm sendMessage before timeout. The message may or may not have been sent." code:46];
         }
         return nil;
     }

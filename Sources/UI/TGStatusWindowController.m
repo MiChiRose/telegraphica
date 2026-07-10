@@ -988,8 +988,8 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     if (avatarSide > 92.0) {
         avatarSide = 92.0;
     }
-    if (avatarSide < 38.0) {
-        avatarSide = 38.0;
+    if (avatarSide < 1.0) {
+        return;
     }
     NSRect avatarRect = NSMakeRect(floor(NSMidX(bounds) - (avatarSide / 2.0)),
                                    floor(NSMidY(bounds) - (avatarSide / 2.0)),
