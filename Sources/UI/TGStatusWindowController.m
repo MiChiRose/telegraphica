@@ -1040,6 +1040,11 @@ static NSString *TGMediaItemFullLocalPath(NSDictionary *mediaItem) {
     return [path isKindOfClass:[NSString class]] ? (NSString *)path : nil;
 }
 
+static NSData *TGMediaItemMiniThumbnailData(NSDictionary *mediaItem) {
+    id data = [mediaItem objectForKey:@"minithumbnail_data"];
+    return [data isKindOfClass:[NSData class]] ? (NSData *)data : nil;
+}
+
 static NSNumber *TGMediaItemFullFileID(NSDictionary *mediaItem) {
     id fileID = [mediaItem objectForKey:@"full_file_id"];
     if ([fileID respondsToSelector:@selector(integerValue)]) {
@@ -1382,6 +1387,13 @@ static void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL out
         image = TGImageWithCorrectOrientationFromFile(localPath);
         if (!image) {
             image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
+        }
+    }
+
+    if (!image) {
+        NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(mediaItem);
+        if ([miniThumbnailData length] > 0) {
+            image = [[[NSImage alloc] initWithData:miniThumbnailData] autorelease];
         }
     }
 
@@ -2386,6 +2398,17 @@ static void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL f
 
 @end
 
+@interface TGFlippedDocumentView : NSView
+@end
+
+@implementation TGFlippedDocumentView
+
+- (BOOL)isFlipped {
+    return YES;
+}
+
+@end
+
 @protocol TGMediaPreviewMagnificationTarget
 - (void)mediaPreviewView:(id)sender didMagnifyBy:(NSNumber *)magnificationNumber;
 @end
@@ -3298,6 +3321,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *loginPanelView;
 @property (nonatomic, retain) NSView *profilePanelView;
 @property (nonatomic, retain) NSView *settingsPanelView;
+@property (nonatomic, retain) NSScrollView *settingsScrollView;
+@property (nonatomic, retain) NSView *settingsContentView;
 @property (nonatomic, retain) NSView *aboutPanelView;
 @property (nonatomic, retain) TGGroupedCardView *bottomNavigationView;
 @property (nonatomic, retain) NSArray *navigationButtons;
@@ -3517,6 +3542,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize loginPanelView = _loginPanelView;
 @synthesize profilePanelView = _profilePanelView;
 @synthesize settingsPanelView = _settingsPanelView;
+@synthesize settingsScrollView = _settingsScrollView;
+@synthesize settingsContentView = _settingsContentView;
 @synthesize aboutPanelView = _aboutPanelView;
 @synthesize bottomNavigationView = _bottomNavigationView;
 @synthesize navigationButtons = _navigationButtons;
@@ -4017,14 +4044,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
     [self.settingsDrawerSectionField setStringValue:TGLoc(@"settings.section.drawer")];
-    [self.settingsLibraryField setStringValue:TGLoc(@"settings.section.interface")];
+    [self.settingsLibraryField setStringValue:TGLoc(@"settings.appearance")];
     [self.settingsFilesSectionField setStringValue:TGLoc(@"settings.section.files")];
     [self.settingsHelpSectionField setStringValue:TGLoc(@"settings.section.help")];
     [self.settingsThemeLabel setStringValue:TGLoc(@"settings.theme")];
     [self.settingsLanguageLabel setStringValue:TGLoc(@"settings.language")];
     [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
-    [self.settingsAppearanceButton setTitle:TGLoc(@"settings.appearance")];
+    [self.settingsAppearanceButton setTitle:@""];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
     [self.settingsAboutButton setTitle:TGLoc(@"settings.about")];
     [self.loginLogsButton setTitle:@"Logs"];
@@ -4377,6 +4404,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.settingsPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 948, 480)] autorelease];
     [self.settingsPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.settingsPanelView];
+
+    self.settingsScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(16, 132, 948, 420)] autorelease];
+    [self.settingsScrollView setBorderType:NSNoBorder];
+    [self.settingsScrollView setDrawsBackground:NO];
+    [self.settingsScrollView setHasVerticalScroller:YES];
+    [self.settingsScrollView setAutohidesScrollers:YES];
+    [[self.settingsScrollView contentView] setDrawsBackground:NO];
+    self.settingsContentView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0, 0, 760, 620)] autorelease];
+    [self.settingsScrollView setDocumentView:self.settingsContentView];
+    [contentView addSubview:self.settingsScrollView];
 
     self.aboutPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 948, 480)] autorelease];
     [self.aboutPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -5114,6 +5151,41 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyUtilityButtonStyle:self.settingsAboutButton];
     [self.settingsAboutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsAboutButton];
+
+    NSArray *settingsContentViews = [NSArray arrayWithObjects:
+                                     self.settingsAccountCardView,
+                                     self.settingsThemeCardView,
+                                     self.settingsSessionCardView,
+                                     self.settingsDrawerCardView,
+                                     self.settingsFilesCardView,
+                                     self.settingsHelpCardView,
+                                     self.settingsStateField,
+                                     self.settingsLibraryField,
+                                     self.settingsStorageField,
+                                     self.settingsDrawerSectionField,
+                                     self.settingsFilesSectionField,
+                                     self.settingsHelpSectionField,
+                                     self.settingsThemeLabel,
+                                     self.themePopUpButton,
+                                     self.settingsNotificationsEnabledButton,
+                                     self.settingsNotificationSoundButton,
+                                     self.settingsNotificationBadgeButton,
+                                     self.settingsDrawerHiddenButton,
+                                     self.settingsLanguageLabel,
+                                     self.settingsLanguagePopUpButton,
+                                     self.settingsDownloadFolderHelpField,
+                                     self.settingsDownloadFolderButton,
+                                     self.settingsCheckUpdatesButton,
+                                     self.settingsAppearanceButton,
+                                     self.settingsLogsButton,
+                                     self.settingsAboutButton,
+                                     nil];
+    NSUInteger settingsViewIndex = 0;
+    for (settingsViewIndex = 0; settingsViewIndex < [settingsContentViews count]; settingsViewIndex++) {
+        NSView *settingsView = [settingsContentViews objectAtIndex:settingsViewIndex];
+        [settingsView removeFromSuperview];
+        [self.settingsContentView addSubview:settingsView];
+    }
 
     self.logoutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 276, 132, 32)] autorelease];
     [self.logoutButton setTitle:@"Logout"];
@@ -6798,7 +6870,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
-    [self applyNotificationApplicationIconToNotification:notification];
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
         [userInfo setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
@@ -6936,6 +7007,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
+    [self showView:self.settingsScrollView visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
@@ -6960,7 +7032,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
-    [self showView:self.settingsAppearanceButton visible:showSettings];
+    [self showView:self.settingsAppearanceButton visible:NO];
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
 
@@ -7402,64 +7474,98 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileActionsY, 0.0, 0.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    CGFloat settingsNextY = contentTop - 36.0;
+
+    CGFloat settingsScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
+    CGFloat settingsScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
+    CGFloat settingsScrollHeight = settingsScrollTop - settingsScrollBottom;
+    if (settingsScrollHeight < 180.0) {
+        settingsScrollHeight = 180.0;
+    }
+    CGFloat settingsScrollX = mainX + 8.0;
+    CGFloat settingsScrollWidth = mainWidth - 16.0;
+    if (settingsScrollWidth < 360.0) {
+        settingsScrollWidth = 360.0;
+    }
+    [self.settingsScrollView setFrame:NSMakeRect(settingsScrollX,
+                                                 settingsScrollBottom,
+                                                 settingsScrollWidth,
+                                                 settingsScrollHeight)];
+
+    CGFloat settingsDocWidth = settingsScrollWidth - 18.0;
+    if (settingsDocWidth < 340.0) {
+        settingsDocWidth = settingsScrollWidth;
+    }
+    CGFloat settingsDocHeight = 620.0;
+    if (settingsDocHeight < settingsScrollHeight) {
+        settingsDocHeight = settingsScrollHeight;
+    }
+    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
+
     CGFloat settingsLabelHeight = 16.0;
     CGFloat settingsLabelGap = 7.0;
     CGFloat settingsGroupGap = 12.0;
-    CGFloat rowLeft = groupedX + 22.0;
-    CGFloat rowWidth = groupedWidth - 44.0;
+    CGFloat settingsGroupedWidth = settingsDocWidth - 56.0;
+    if (settingsGroupedWidth > 760.0) {
+        settingsGroupedWidth = 760.0;
+    }
+    if (settingsGroupedWidth < 300.0) {
+        settingsGroupedWidth = settingsDocWidth - 24.0;
+    }
+    CGFloat settingsGroupedX = floor((settingsDocWidth - settingsGroupedWidth) / 2.0);
+    CGFloat rowLeft = settingsGroupedX + 22.0;
+    CGFloat rowWidth = settingsGroupedWidth - 44.0;
+    CGFloat settingsNextY = 18.0;
 
     CGFloat notificationCardHeight = 92.0;
-    CGFloat settingsSectionLabelY = settingsNextY;
-    [self.settingsStateField setFrame:NSMakeRect(groupedX + 20.0, settingsSectionLabelY, groupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat notificationCardY = settingsSectionLabelY - settingsLabelGap - notificationCardHeight;
-    [self.settingsAccountCardView setFrame:NSMakeRect(groupedX, notificationCardY, groupedWidth, notificationCardHeight)];
-    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(rowLeft, notificationCardY + 58.0, rowWidth, 22.0)];
-    [self.settingsNotificationSoundButton setFrame:NSMakeRect(rowLeft, notificationCardY + 34.0, rowWidth, 22.0)];
-    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 10.0, rowWidth, 22.0)];
+    [self.settingsStateField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat notificationCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsAccountCardView setFrame:NSMakeRect(settingsGroupedX, notificationCardY, settingsGroupedWidth, notificationCardHeight)];
+    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(rowLeft, notificationCardY + 12.0, rowWidth, 22.0)];
+    [self.settingsNotificationSoundButton setFrame:NSMakeRect(rowLeft, notificationCardY + 36.0, rowWidth, 22.0)];
+    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 60.0, rowWidth, 22.0)];
+    settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
 
-    CGFloat drawerLabelY = notificationCardY - settingsGroupGap - settingsLabelHeight;
-    [self.settingsDrawerSectionField setFrame:NSMakeRect(groupedX + 20.0, drawerLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat drawerCardHeight = 54.0;
-    CGFloat drawerCardY = drawerLabelY - settingsLabelGap - drawerCardHeight;
-    [self.settingsDrawerCardView setFrame:NSMakeRect(groupedX, drawerCardY, groupedWidth, drawerCardHeight)];
+    CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsDrawerCardView setFrame:NSMakeRect(settingsGroupedX, drawerCardY, settingsGroupedWidth, drawerCardHeight)];
     [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 16.0, rowWidth, 22.0)];
+    settingsNextY = drawerCardY + drawerCardHeight + settingsGroupGap;
 
-    CGFloat interfaceLabelY = drawerCardY - settingsGroupGap - settingsLabelHeight;
-    [self.settingsLibraryField setFrame:NSMakeRect(groupedX + 20.0, interfaceLabelY, groupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat interfaceCardHeight = 122.0;
-    CGFloat interfaceCardY = interfaceLabelY - settingsLabelGap - interfaceCardHeight;
-    [self.settingsThemeCardView setFrame:NSMakeRect(groupedX, interfaceCardY, groupedWidth, interfaceCardHeight)];
-    [self.settingsAppearanceButton setFrame:NSMakeRect(rowLeft, interfaceCardY + 84.0, rowWidth, 28.0)];
+    [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat interfaceCardHeight = 88.0;
+    CGFloat interfaceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsThemeCardView setFrame:NSMakeRect(settingsGroupedX, interfaceCardY, settingsGroupedWidth, interfaceCardHeight)];
+    [self.settingsAppearanceButton setFrame:NSMakeRect(rowLeft, interfaceCardY, 0.0, 0.0)];
 
     CGFloat popupWidth = 210.0;
-    if (popupWidth > groupedWidth - 150.0) {
-        popupWidth = groupedWidth - 150.0;
+    if (popupWidth > settingsGroupedWidth - 150.0) {
+        popupWidth = settingsGroupedWidth - 150.0;
     }
     CGFloat labelWidth = 88.0;
     CGFloat popupX = rowLeft + labelWidth + 8.0;
-    [self.settingsThemeLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 52.0, labelWidth, 22.0)];
-    [self.themePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 48.0, popupWidth, 28.0)];
-    [self.settingsLanguageLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 18.0, labelWidth, 22.0)];
-    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 14.0, popupWidth, 28.0)];
+    [self.settingsThemeLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 16.0, labelWidth, 22.0)];
+    [self.themePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 12.0, popupWidth, 28.0)];
+    [self.settingsLanguageLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 50.0, labelWidth, 22.0)];
+    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 46.0, popupWidth, 28.0)];
+    settingsNextY = interfaceCardY + interfaceCardHeight + settingsGroupGap;
 
-    CGFloat filesLabelY = interfaceCardY - settingsGroupGap - settingsLabelHeight;
-    [self.settingsFilesSectionField setFrame:NSMakeRect(groupedX + 20.0, filesLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    [self.settingsFilesSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat filesCardHeight = 76.0;
-    CGFloat filesCardY = filesLabelY - settingsLabelGap - filesCardHeight;
-    [self.settingsFilesCardView setFrame:NSMakeRect(groupedX, filesCardY, groupedWidth, filesCardHeight)];
-    [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 46.0, rowWidth, 18.0)];
-    [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 28.0)];
+    CGFloat filesCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
+    [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
+    [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 38.0, rowWidth, 28.0)];
+    settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
-    CGFloat helpLabelY = filesCardY - settingsGroupGap - settingsLabelHeight;
-    [self.settingsHelpSectionField setFrame:NSMakeRect(groupedX + 20.0, helpLabelY, groupedWidth - 40.0, settingsLabelHeight)];
+    [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat helpCardHeight = 112.0;
-    CGFloat helpCardY = helpLabelY - settingsLabelGap - helpCardHeight;
-    [self.settingsHelpCardView setFrame:NSMakeRect(groupedX, helpCardY, groupedWidth, helpCardHeight)];
-    [self.settingsSessionCardView setFrame:NSMakeRect(groupedX, helpCardY, 0.0, 0.0)];
-    [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
+    CGFloat helpCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsHelpCardView setFrame:NSMakeRect(settingsGroupedX, helpCardY, settingsGroupedWidth, helpCardHeight)];
+    [self.settingsSessionCardView setFrame:NSMakeRect(settingsGroupedX, helpCardY, 0.0, 0.0)];
+    [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
-    [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
+    [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
 
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
@@ -11416,6 +11522,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
             }
         }
+        if (!image) {
+            NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(item);
+            if ([miniThumbnailData length] > 0) {
+                image = [[[NSImage alloc] initWithData:miniThumbnailData] autorelease];
+            }
+        }
         if (image) {
             [button setImage:image];
             [button setImageScaling:NSImageScaleProportionallyUpOrDown];
@@ -12042,6 +12154,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_loginPanelView release];
     [_profilePanelView release];
     [_settingsPanelView release];
+    [_settingsScrollView release];
+    [_settingsContentView release];
     [_aboutPanelView release];
     [_bottomNavigationView release];
     [_navigationButtons release];

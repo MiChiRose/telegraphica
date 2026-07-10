@@ -57,6 +57,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                         @"cannot parse",
                         @"unexpected field",
                         @"unknown class",
+                        @"inputfile is not specified",
+                        @"input file is not specified",
                         @"thumbnail",
                         @"self_destruct_type",
                         @"show_caption_above_media",
@@ -2458,6 +2460,34 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return (NSString *)path;
 }
 
+- (void)addMiniThumbnailFromContainerObject:(NSDictionary *)containerObject toMediaInfo:(NSMutableDictionary *)info {
+    if (![containerObject isKindOfClass:[NSDictionary class]] || ![info isKindOfClass:[NSMutableDictionary class]]) {
+        return;
+    }
+
+    id miniThumbnailObject = [containerObject objectForKey:@"minithumbnail"];
+    if (![miniThumbnailObject isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+
+    id dataObject = [(NSDictionary *)miniThumbnailObject objectForKey:@"data"];
+    if ([dataObject isKindOfClass:[NSString class]] && [(NSString *)dataObject length] > 0) {
+        NSData *data = [[[NSData alloc] initWithBase64EncodedString:(NSString *)dataObject options:0] autorelease];
+        if ([data length] > 0) {
+            [info setObject:data forKey:@"minithumbnail_data"];
+        }
+    }
+
+    id widthObject = [(NSDictionary *)miniThumbnailObject objectForKey:@"width"];
+    id heightObject = [(NSDictionary *)miniThumbnailObject objectForKey:@"height"];
+    if ([widthObject respondsToSelector:@selector(integerValue)] && [widthObject integerValue] > 0) {
+        [info setObject:[NSNumber numberWithInteger:[widthObject integerValue]] forKey:@"minithumbnail_width"];
+    }
+    if ([heightObject respondsToSelector:@selector(integerValue)] && [heightObject integerValue] > 0) {
+        [info setObject:[NSNumber numberWithInteger:[heightObject integerValue]] forKey:@"minithumbnail_height"];
+    }
+}
+
 - (NSDictionary *)downloadedFileInfoForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout {
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
         return nil;
@@ -2763,17 +2793,23 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             if ([fullLocalPath length] > 0) {
                 [info setObject:fullLocalPath forKey:@"full_local_path"];
             }
+            [self addMiniThumbnailFromContainerObject:container toMediaInfo:info];
             return info;
         }
     }
 
     if (mediaFile) {
-        return [self photoInfoFromFileObject:mediaFile
-                                       width:width
-                                      height:height
-                             downloadMissing:downloadMissing
-                                     timeout:timeout
-                          didRequestDownload:didRequestDownload];
+        NSDictionary *fileInfo = [self photoInfoFromFileObject:mediaFile
+                                                         width:width
+                                                        height:height
+                                               downloadMissing:downloadMissing
+                                                       timeout:timeout
+                                            didRequestDownload:didRequestDownload];
+        if (fileInfo) {
+            NSMutableDictionary *info = [NSMutableDictionary dictionaryWithDictionary:fileInfo];
+            [self addMiniThumbnailFromContainerObject:container toMediaInfo:info];
+            return info;
+        }
     }
 
     NSMutableDictionary *info = [NSMutableDictionary dictionary];
@@ -2783,6 +2819,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (height) {
         [info setObject:height forKey:@"height"];
     }
+    [self addMiniThumbnailFromContainerObject:container toMediaInfo:info];
     return ([info count] > 0) ? info : nil;
 }
 
