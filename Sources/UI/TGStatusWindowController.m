@@ -2566,6 +2566,61 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
+@interface TGMediaPlaybackButtonCell : NSButtonCell
+@end
+
+@implementation TGMediaPlaybackButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:6.0 yRadius:6.0];
+    NSColor *topColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicNavigationSelectedColor(alpha);
+    NSColor *bottomColor = highlighted ? TGClassicNavigationSelectedColor(alpha) : TGClassicNavigationSelectedStrokeColor(alpha);
+    NSGradient *buttonGradient = [[[NSGradient alloc] initWithStartingColor:topColor
+                                                                endingColor:bottomColor] autorelease];
+    [buttonGradient drawInBezierPath:buttonPath angle:90.0];
+    [TGClassicTableGridColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSColor *iconColor = TGClassicHeaderTextColor(alpha);
+    [iconColor set];
+    BOOL pauseIcon = [[self title] isEqualToString:@"pause"];
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 8.0,
+                                 NSMidY(buttonRect) - 8.0,
+                                 16.0,
+                                 16.0);
+    if (pauseIcon) {
+        NSBezierPath *leftBar = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMinX(iconRect) + 3.0,
+                                                                                   NSMinY(iconRect) + 2.0,
+                                                                                   4.0,
+                                                                                   12.0)
+                                                                 xRadius:1.2
+                                                                 yRadius:1.2];
+        NSBezierPath *rightBar = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMaxX(iconRect) - 7.0,
+                                                                                    NSMinY(iconRect) + 2.0,
+                                                                                    4.0,
+                                                                                    12.0)
+                                                                  xRadius:1.2
+                                                                  yRadius:1.2];
+        [leftBar fill];
+        [rightBar fill];
+    } else {
+        NSBezierPath *playPath = [NSBezierPath bezierPath];
+        [playPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 4.0, NSMinY(iconRect) + 2.0)];
+        [playPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 3.0, NSMidY(iconRect))];
+        [playPath lineToPoint:NSMakePoint(NSMinX(iconRect) + 4.0, NSMaxY(iconRect) - 2.0)];
+        [playPath closePath];
+        [playPath fill];
+    }
+}
+
+@end
+
 @interface TGSettingsListButtonCell : NSButtonCell
 @end
 
@@ -3075,6 +3130,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSNumber *typingChatID;
 @property (nonatomic, copy) NSString *typingIndicatorText;
 @property (nonatomic, retain) NSTimer *typingClearTimer;
+@property (nonatomic, retain) NSNumber *pendingNotificationChatID;
+@property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
 @end
 
 @implementation TGStatusWindowController
@@ -3245,6 +3302,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize typingChatID = _typingChatID;
 @synthesize typingIndicatorText = _typingIndicatorText;
 @synthesize typingClearTimer = _typingClearTimer;
+@synthesize pendingNotificationChatID = _pendingNotificationChatID;
+@synthesize pendingNotificationThreadID = _pendingNotificationThreadID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
@@ -3694,11 +3753,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     NSNumber *threadID = [summary objectForKey:@"message_thread_id"];
-    BOOL threadMatches = NO;
-    if (![threadID respondsToSelector:@selector(longLongValue)] || [threadID longLongValue] <= 0) {
-        threadMatches = (self.selectedMessageThreadID == nil);
-    } else {
-        threadMatches = (self.selectedMessageThreadID && [self.selectedMessageThreadID longLongValue] == [threadID longLongValue]);
+    BOOL threadMatches = YES;
+    if (self.selectedMessageThreadID) {
+        threadMatches = ([threadID respondsToSelector:@selector(longLongValue)] &&
+                         [threadID longLongValue] == [self.selectedMessageThreadID longLongValue]);
+    } else if (self.showingForumTopicList) {
+        threadMatches = NO;
     }
     if (!threadMatches) {
         return;
@@ -4728,10 +4788,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSRect frame = NSMakeRect(0, 0, 520, 360);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
-                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask)
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@"Media"];
+    [window setMinSize:NSMakeSize(360, 260)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
@@ -4753,12 +4814,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:containerView];
     self.mediaPlaybackContainerView = containerView;
 
-    NSButton *playPauseButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 18, 112, 30)] autorelease];
-    [playPauseButton setTitle:@"Pause"];
+    NSButton *playPauseButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 18, 42, 30)] autorelease];
+    [playPauseButton setTitle:@"pause"];
+    [playPauseButton setCell:[[[TGMediaPlaybackButtonCell alloc] initTextCell:@"pause"] autorelease]];
+    [playPauseButton setBordered:NO];
+    [playPauseButton setFocusRingType:NSFocusRingTypeNone];
     [playPauseButton setToolTip:@"Play or pause media"];
     [playPauseButton setTarget:self];
     [playPauseButton setAction:@selector(toggleMediaPlayback:)];
-    [self applyUtilityButtonStyle:playPauseButton];
     [playPauseButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:playPauseButton];
     self.mediaPlaybackPlayPauseButton = playPauseButton;
@@ -4770,13 +4833,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.mediaPlaybackWindow = window;
 }
 
+- (void)updateMediaPlaybackButton {
+    [self.mediaPlaybackPlayPauseButton setTitle:(self.mediaPlaybackPlaying ? @"pause" : @"play")];
+    [self.mediaPlaybackPlayPauseButton setToolTip:(self.mediaPlaybackPlaying ? @"Pause media" : @"Play media")];
+    [self.mediaPlaybackPlayPauseButton setNeedsDisplay:YES];
+}
+
+- (void)layoutMediaPlaybackLayer {
+    if (!self.mediaPlaybackLayer || !self.mediaPlaybackContainerView) {
+        return;
+    }
+    [self.mediaPlaybackLayer setFrame:[self.mediaPlaybackContainerView bounds]];
+}
+
 - (void)resetMediaPlaybackState {
     [self.mediaPlaybackPlayer pause];
     [self.mediaPlaybackLayer removeFromSuperlayer];
     self.mediaPlaybackPlayer = nil;
     self.mediaPlaybackLayer = nil;
     self.mediaPlaybackPlaying = NO;
-    [self.mediaPlaybackPlayPauseButton setTitle:@"Play"];
+    [self updateMediaPlaybackButton];
 }
 
 - (void)toggleMediaPlayback:(id)sender {
@@ -4787,12 +4863,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (self.mediaPlaybackPlaying) {
         [self.mediaPlaybackPlayer pause];
         self.mediaPlaybackPlaying = NO;
-        [self.mediaPlaybackPlayPauseButton setTitle:@"Play"];
     } else {
         [self.mediaPlaybackPlayer play];
         self.mediaPlaybackPlaying = YES;
-        [self.mediaPlaybackPlayPauseButton setTitle:@"Pause"];
     }
+    [self updateMediaPlaybackButton];
 }
 
 - (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title {
@@ -4820,10 +4895,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.mediaPlaybackLayer = layer;
     self.mediaPlaybackPlaying = YES;
     [self.mediaPlaybackTitleField setStringValue:([title length] > 0 ? title : @"Media")];
-    [self.mediaPlaybackPlayPauseButton setTitle:@"Pause"];
+    [self updateMediaPlaybackButton];
     [self.mediaPlaybackWindow setTitle:([title length] > 0 ? title : @"Media")];
     [self.mediaPlaybackWindow center];
     [self.mediaPlaybackWindow makeKeyAndOrderFront:nil];
+    [self layoutMediaPlaybackLayer];
     [self.mediaPlaybackPlayer play];
     return YES;
 }
@@ -5652,6 +5728,92 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES);
 }
 
+- (BOOL)selectChatFromNotificationWithChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return NO;
+    }
+
+    NSUInteger fallbackIndex = NSNotFound;
+    NSUInteger topicIndex = NSNotFound;
+    NSUInteger index = 0;
+    for (index = 0; index < [self.chatItems count]; index++) {
+        id candidate = [self.chatItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        TGChatItem *item = (TGChatItem *)candidate;
+        NSNumber *itemChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
+        if (![itemChatID respondsToSelector:@selector(longLongValue)] || [itemChatID longLongValue] != [chatID longLongValue]) {
+            continue;
+        }
+        if ([messageThreadID respondsToSelector:@selector(longLongValue)] &&
+            [messageThreadID longLongValue] > 0 &&
+            [item isForumTopic] &&
+            [[item messageThreadID] respondsToSelector:@selector(longLongValue)] &&
+            [[item messageThreadID] longLongValue] == [messageThreadID longLongValue]) {
+            topicIndex = index;
+            break;
+        }
+        if (fallbackIndex == NSNotFound) {
+            fallbackIndex = index;
+        }
+    }
+
+    NSUInteger targetIndex = (topicIndex != NSNotFound) ? topicIndex : fallbackIndex;
+    if (targetIndex == NSNotFound && [self chatItemsContainForumTopicRows]) {
+        [self removeForumTopicRowsPreservingChatID:chatID];
+        return [self selectChatFromNotificationWithChatID:chatID messageThreadID:messageThreadID];
+    }
+    if (targetIndex == NSNotFound) {
+        return NO;
+    }
+
+    BOOL alreadySelected = ([self.chatTableView selectedRow] == (NSInteger)targetIndex);
+    [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:targetIndex] byExtendingSelection:NO];
+    [self.chatTableView scrollRowToVisible:targetIndex];
+    if (alreadySelected && self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
+        [self reloadMessagesForChatID:chatID interactive:NO];
+    }
+    return YES;
+}
+
+- (void)openChatFromNotification:(NSUserNotification *)notification {
+    NSDictionary *userInfo = [notification userInfo];
+    if (![userInfo isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSNumber *chatID = [userInfo objectForKey:@"chat_id"];
+    NSNumber *messageThreadID = [userInfo objectForKey:@"message_thread_id"];
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+
+    [self showWindow:nil];
+    [[self window] makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    self.activeSection = TGSectionChats;
+    [self updateNavigationButtonsForSection:TGSectionChats enabled:!self.controlsBusy];
+    [self layoutContentView];
+    [self updateVisibleSection];
+    if (![self selectChatFromNotificationWithChatID:chatID messageThreadID:messageThreadID]) {
+        self.pendingNotificationChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
+        if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+            self.pendingNotificationThreadID = [NSNumber numberWithLongLong:[messageThreadID longLongValue]];
+        } else {
+            self.pendingNotificationThreadID = nil;
+        }
+        [self appendDetail:@"Notification selected a chat that is not loaded yet. Refreshing chats."];
+        [self reloadChatsInteractive:NO preserveSelection:YES];
+    }
+}
+
+- (void)userNotificationCenter:(NSUserNotificationCenter *)center didActivateNotification:(NSUserNotification *)notification {
+    [self openChatFromNotification:notification];
+    if ([center respondsToSelector:@selector(removeDeliveredNotification:)]) {
+        [center removeDeliveredNotification:notification];
+    }
+}
+
 - (NSString *)titleForChatID:(NSNumber *)chatID fallback:(NSString *)fallback {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         return fallback;
@@ -5698,8 +5860,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+    if ([chatID respondsToSelector:@selector(longLongValue)]) {
+        [userInfo setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    }
+    id messageID = [summary objectForKey:@"message_id"];
+    if ([messageID respondsToSelector:@selector(longLongValue)]) {
+        [userInfo setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+    }
+    id messageThreadID = [summary objectForKey:@"message_thread_id"];
+    if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+        [userInfo setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+    }
+    if ([userInfo count] > 0) {
+        [notification setUserInfo:userInfo];
+    }
     if ([notification respondsToSelector:NSSelectorFromString(@"setContentImage:")]) {
-        [notification setValue:nil forKey:@"contentImage"];
+        NSImage *notificationIcon = [NSImage imageNamed:@"TelegraphicaNotificationIcon"];
+        if (notificationIcon) {
+            [notification setValue:notificationIcon forKey:@"contentImage"];
+        }
     }
     if (TGUserDefaultBoolWithDefault(TGNotificationSoundEnabledDefaultsKey, YES)) {
         [notification setSoundName:NSUserNotificationDefaultSoundName];
@@ -6317,6 +6497,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
+    if ([notification object] == self.mediaPlaybackWindow) {
+        [self layoutMediaPlaybackLayer];
+        return;
+    }
     if ([notification object] != [self window]) {
         return;
     }
@@ -7289,7 +7473,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *chatID = [item.chatID retain];
     NSNumber *messageID = [item.messageID retain];
     NSString *reactionEmoji = [emoji copy];
-    [self setControlsBusy:YES];
     [self.statusField setStringValue:removing ? @"Removing reaction..." : @"Sending reaction..."];
     [self appendDetail:removing ? @"Removing message reaction through TDLib..." : @"Submitting message reaction to TDLib..."];
     [[TGLogger sharedLogger] log:removing ? @"TDLib reaction remove requested." : @"TDLib reaction send requested."];
@@ -7331,7 +7514,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if ([authorizationState length] > 0) {
                 [self updateAuthControlsForState:authorizationState];
             }
-            [self setControlsBusy:NO];
             if (reactionSucceeded) {
                 self.pendingLiveMessageRefresh = YES;
                 [self handlePendingLiveRefreshesIfPossible];
@@ -7772,6 +7954,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.chatTableView reloadData];
     [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;
+
+    if (self.pendingNotificationChatID) {
+        NSNumber *pendingChatID = [self.pendingNotificationChatID retain];
+        NSNumber *pendingThreadID = [self.pendingNotificationThreadID retain];
+        if ([self selectChatFromNotificationWithChatID:pendingChatID messageThreadID:pendingThreadID]) {
+            self.pendingNotificationChatID = nil;
+            self.pendingNotificationThreadID = nil;
+            [pendingChatID release];
+            [pendingThreadID release];
+            return;
+        }
+        [pendingChatID release];
+        [pendingThreadID release];
+    }
 
     if (selectedIndex != NSNotFound) {
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
@@ -9899,6 +10095,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_typingClearTimer release];
     [_typingChatID release];
     [_typingIndicatorText release];
+    [_pendingNotificationChatID release];
+    [_pendingNotificationThreadID release];
     [super dealloc];
 }
 

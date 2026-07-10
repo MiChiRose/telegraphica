@@ -456,6 +456,16 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
             [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
         }
 
+        id messageID = [message objectForKey:@"id"];
+        if ([messageID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+        }
+
+        NSNumber *threadID = [self messageThreadIDFromMessageObject:message];
+        if ([threadID respondsToSelector:@selector(longLongValue)] && [threadID longLongValue] > 0) {
+            [summary setObject:[NSNumber numberWithLongLong:[threadID longLongValue]] forKey:@"message_thread_id"];
+        }
+
         id date = [message objectForKey:@"date"];
         if ([date respondsToSelector:@selector(integerValue)]) {
             [summary setObject:[NSNumber numberWithInteger:[date integerValue]] forKey:@"date"];
