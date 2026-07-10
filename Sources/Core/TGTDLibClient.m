@@ -2351,7 +2351,7 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
                                                         downloadMissing:downloadMissing
                                                                 timeout:timeout
                                                      didRequestDownload:didRequestDownload];
-        if ([[thumbnailPhotoInfo objectForKey:@"local_path"] length] > 0) {
+        if (thumbnailPhotoInfo) {
             return thumbnailPhotoInfo;
         }
     }
