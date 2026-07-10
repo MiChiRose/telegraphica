@@ -77,6 +77,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize mediaFileID = _mediaFileID;
 @synthesize mediaDuration = _mediaDuration;
 @synthesize mediaMimeType = _mediaMimeType;
+@synthesize downloadFileName = _downloadFileName;
+@synthesize downloadFileSize = _downloadFileSize;
 @synthesize reactionSummary = _reactionSummary;
 @synthesize chosenReactionEmojis = _chosenReactionEmojis;
 
@@ -120,14 +122,13 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
                             [label hasPrefix:@"[Video]"] ||
                             [label hasPrefix:@"[GIF]"] ||
                             [label hasPrefix:@"[Sticker]"]);
-        BOOL hasDimensions = ([self.mediaWidth respondsToSelector:@selector(floatValue)] &&
-                              [self.mediaWidth floatValue] > 0.0 &&
-                              [self.mediaHeight respondsToSelector:@selector(floatValue)] &&
-                              [self.mediaHeight floatValue] > 0.0);
-        return (visualLabel && ([self.mediaLocalPath length] > 0 || hasDimensions));
+        BOOL playableFallback = (([label hasPrefix:@"[Video]"] || [label hasPrefix:@"[GIF]"]) &&
+                                 [self.mediaFileID respondsToSelector:@selector(integerValue)] &&
+                                 [self.mediaFileID integerValue] > 0);
+        return (visualLabel && ([self.mediaLocalPath length] > 0 || [self.mediaItems count] > 0 || playableFallback));
     }
     if ([self isPhotoMessage]) {
-        return YES;
+        return ([self.mediaLocalPath length] > 0 || [self.mediaItems count] > 0);
     }
     return ([self isStickerMessage] ||
             [self.contentType isEqualToString:@"messageAnimation"] ||
@@ -188,6 +189,12 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     }
     if ([self.mediaMimeType length] > 0) {
         [media setObject:self.mediaMimeType forKey:@"mime_type"];
+    }
+    if ([self.downloadFileName length] > 0) {
+        [media setObject:self.downloadFileName forKey:@"file_name"];
+    }
+    if ([self.downloadFileSize respondsToSelector:@selector(longLongValue)]) {
+        [media setObject:self.downloadFileSize forKey:@"file_size"];
     }
     NSString *placeholder = [self visualMediaPlaceholderTitle];
     if ([placeholder length] > 0) {
@@ -285,6 +292,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setMediaFileID:_mediaFileID];
     [copy setMediaDuration:_mediaDuration];
     [copy setMediaMimeType:_mediaMimeType];
+    [copy setDownloadFileName:_downloadFileName];
+    [copy setDownloadFileSize:_downloadFileSize];
     [copy setReactionSummary:_reactionSummary];
     [copy setChosenReactionEmojis:_chosenReactionEmojis];
     return copy;
@@ -323,6 +332,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_mediaFileID release];
     [_mediaDuration release];
     [_mediaMimeType release];
+    [_downloadFileName release];
+    [_downloadFileSize release];
     [_reactionSummary release];
     [_chosenReactionEmojis release];
     [super dealloc];

@@ -28,6 +28,9 @@ static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNo
 static NSString * const TGNotificationBadgeEnabledDefaultsKey = @"TelegraphicaNotificationBadgeEnabled";
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
+static NSString * const TGLanguageDefaultsKey = @"TelegraphicaLanguageCode";
+static NSString * const TGDownloadFolderDefaultsKey = @"TelegraphicaDownloadFolderPath";
+static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
 static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
 static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
@@ -35,6 +38,193 @@ static NSString * const TGThemeIdentifierIceNavy = @"ice-navy";
 static NSString * const TGThemeIdentifierRubyObsidian = @"ruby-obsidian";
 static NSString * const TGThemeIdentifierEggshellBurgundy = @"eggshell-burgundy";
 static NSString * const TGThemeIdentifierMelonOlive = @"melon-olive";
+static NSString * const TGUpdateAPIURLString = @"https://api.github.com/repos/MiChiRose/telegraphica/releases?per_page=10";
+static NSString * const TGProjectReleasesURLString = @"https://github.com/MiChiRose/telegraphica/releases";
+
+static NSString *TGLanguageCode(void) {
+    NSString *code = [[NSUserDefaults standardUserDefaults] stringForKey:TGLanguageDefaultsKey];
+    if ([code isEqualToString:@"ru"] || [code isEqualToString:@"be"] || [code isEqualToString:@"en"]) {
+        return code;
+    }
+    return @"ru";
+}
+
+static NSString *TGLoc(NSString *key) {
+    if (![key isKindOfClass:[NSString class]]) {
+        return @"";
+    }
+
+    NSString *language = TGLanguageCode();
+    NSDictionary *ru = [NSDictionary dictionaryWithObjectsAndKeys:
+                        @"Чаты", @"chats",
+                        @"Профиль", @"profile",
+                        @"Настройки", @"settings",
+                        @"Сообщение", @"message.placeholder",
+                        @"Прикрепить фото", @"attach.photo",
+                        @"Стикеры", @"stickers",
+                        @"Голос", @"voice",
+                        @"Отправить", @"send",
+                        @"Отмена", @"cancel",
+                        @"Добавить подпись...", @"caption.placeholder",
+                        @"Показывать уведомления", @"settings.notifications",
+                        @"Звук уведомлений", @"settings.sound",
+                        @"Бейдж непрочитанных в Dock", @"settings.badge",
+                        @"Скрыть боковую панель", @"settings.drawer",
+                        @"Оформление", @"settings.appearance",
+                        @"Папка загрузок", @"settings.downloads",
+                        @"Язык", @"settings.language",
+                        @"Проверить обновления", @"settings.update",
+                        @"Диагностические логи", @"settings.logs",
+                        @"О Telegraphica", @"settings.about",
+                        @"Отметить прочитанным", @"chat.markRead",
+                        @"Скачать медиа", @"message.downloadMedia",
+                        @"Скачать документ", @"message.downloadDocument",
+                        @"Новая версия Telegraphica", @"update.title",
+                        @"Открыть страницу загрузки", @"update.open",
+                        @"Не сейчас", @"update.later",
+                        @"Обновлений нет", @"update.none",
+                        @"Установлена версия %@", @"update.noneMessage",
+                        @"Доступна версия %@. Открыть страницу загрузки?", @"update.availableMessage",
+                        @"Не удалось проверить обновления: %@", @"update.failed",
+                        nil];
+    NSDictionary *be = [NSDictionary dictionaryWithObjectsAndKeys:
+                        @"Чаты", @"chats",
+                        @"Профіль", @"profile",
+                        @"Налады", @"settings",
+                        @"Паведамленне", @"message.placeholder",
+                        @"Прымацаваць фота", @"attach.photo",
+                        @"Стыкеры", @"stickers",
+                        @"Голас", @"voice",
+                        @"Адправіць", @"send",
+                        @"Скасаваць", @"cancel",
+                        @"Дадаць подпіс...", @"caption.placeholder",
+                        @"Паказваць апавяшчэнні", @"settings.notifications",
+                        @"Гук апавяшчэнняў", @"settings.sound",
+                        @"Бэйдж непрачытаных у Dock", @"settings.badge",
+                        @"Схаваць бакавую панэль", @"settings.drawer",
+                        @"Афармленне", @"settings.appearance",
+                        @"Папка загрузак", @"settings.downloads",
+                        @"Мова", @"settings.language",
+                        @"Праверыць абнаўленні", @"settings.update",
+                        @"Дыягнастычныя логі", @"settings.logs",
+                        @"Пра Telegraphica", @"settings.about",
+                        @"Адзначыць прачытаным", @"chat.markRead",
+                        @"Спампаваць медыя", @"message.downloadMedia",
+                        @"Спампаваць дакумент", @"message.downloadDocument",
+                        @"Новая версія Telegraphica", @"update.title",
+                        @"Адкрыць старонку загрузкі", @"update.open",
+                        @"Не зараз", @"update.later",
+                        @"Абнаўленняў няма", @"update.none",
+                        @"Усталявана версія %@", @"update.noneMessage",
+                        @"Даступная версія %@. Адкрыць старонку загрузкі?", @"update.availableMessage",
+                        @"Не атрымалася праверыць абнаўленні: %@", @"update.failed",
+                        nil];
+    NSDictionary *en = [NSDictionary dictionaryWithObjectsAndKeys:
+                        @"Chats", @"chats",
+                        @"Profile", @"profile",
+                        @"Settings", @"settings",
+                        @"Message", @"message.placeholder",
+                        @"Attach photo", @"attach.photo",
+                        @"Stickers", @"stickers",
+                        @"Voice", @"voice",
+                        @"Send", @"send",
+                        @"Cancel", @"cancel",
+                        @"Add a caption...", @"caption.placeholder",
+                        @"Show message notifications", @"settings.notifications",
+                        @"Play notification sound", @"settings.sound",
+                        @"Show unread badge in Dock", @"settings.badge",
+                        @"Hide side drawer", @"settings.drawer",
+                        @"Appearance", @"settings.appearance",
+                        @"Downloads folder", @"settings.downloads",
+                        @"Language", @"settings.language",
+                        @"Check for Updates", @"settings.update",
+                        @"Diagnostic Logs", @"settings.logs",
+                        @"About Telegraphica", @"settings.about",
+                        @"Mark as read", @"chat.markRead",
+                        @"Download media", @"message.downloadMedia",
+                        @"Download document", @"message.downloadDocument",
+                        @"New Telegraphica Version", @"update.title",
+                        @"Open Download Page", @"update.open",
+                        @"Not Now", @"update.later",
+                        @"No Updates", @"update.none",
+                        @"Version %@ is installed.", @"update.noneMessage",
+                        @"Version %@ is available. Open the download page?", @"update.availableMessage",
+                        @"Could not check for updates: %@", @"update.failed",
+                        nil];
+    NSDictionary *dictionary = [language isEqualToString:@"be"] ? be : ([language isEqualToString:@"en"] ? en : ru);
+    NSString *value = [dictionary objectForKey:key];
+    return value ? value : key;
+}
+
+static NSString *TGDefaultDownloadFolderPath(void) {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDownloadsDirectory, NSUserDomainMask, YES);
+    if ([paths count] > 0) {
+        return [paths objectAtIndex:0];
+    }
+    return [@"~/Downloads" stringByExpandingTildeInPath];
+}
+
+static NSString *TGConfiguredDownloadFolderPath(void) {
+    NSString *path = [[NSUserDefaults standardUserDefaults] stringForKey:TGDownloadFolderDefaultsKey];
+    if ([path length] == 0) {
+        path = TGDefaultDownloadFolderPath();
+    }
+    return [path stringByStandardizingPath];
+}
+
+static NSString *TGVersionWithoutLeadingV(NSString *version) {
+    if (![version isKindOfClass:[NSString class]]) {
+        return @"";
+    }
+    NSString *trimmed = [version stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmed length] > 1 && ([[trimmed substringToIndex:1] caseInsensitiveCompare:@"v"] == NSOrderedSame)) {
+        return [trimmed substringFromIndex:1];
+    }
+    return trimmed;
+}
+
+static NSArray *TGNumericVersionComponents(NSString *version) {
+    NSString *clean = TGVersionWithoutLeadingV(version);
+    NSMutableArray *numbers = [NSMutableArray array];
+    NSMutableString *current = [NSMutableString string];
+    NSUInteger index = 0;
+    for (index = 0; index < [clean length]; index++) {
+        unichar character = [clean characterAtIndex:index];
+        if (character >= '0' && character <= '9') {
+            [current appendFormat:@"%C", character];
+        } else {
+            if ([current length] > 0) {
+                [numbers addObject:[NSNumber numberWithInteger:[current integerValue]]];
+                [current setString:@""];
+            }
+            if (character == '-') {
+                break;
+            }
+        }
+    }
+    if ([current length] > 0) {
+        [numbers addObject:[NSNumber numberWithInteger:[current integerValue]]];
+    }
+    return numbers;
+}
+
+static BOOL TGVersionStringIsNewer(NSString *candidate, NSString *current) {
+    NSArray *candidateNumbers = TGNumericVersionComponents(candidate);
+    NSArray *currentNumbers = TGNumericVersionComponents(current);
+    NSUInteger count = MAX([candidateNumbers count], [currentNumbers count]);
+    NSUInteger index = 0;
+    for (index = 0; index < count; index++) {
+        NSInteger candidateValue = (index < [candidateNumbers count]) ? [[candidateNumbers objectAtIndex:index] integerValue] : 0;
+        NSInteger currentValue = (index < [currentNumbers count]) ? [[currentNumbers objectAtIndex:index] integerValue] : 0;
+        if (candidateValue > currentValue) {
+            return YES;
+        }
+        if (candidateValue < currentValue) {
+            return NO;
+        }
+    }
+    return ([TGVersionWithoutLeadingV(candidate) compare:TGVersionWithoutLeadingV(current) options:NSNumericSearch] == NSOrderedDescending);
+}
 
 static BOOL TGUserDefaultBoolWithDefault(NSString *key, BOOL defaultValue) {
     id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
@@ -1243,6 +1433,32 @@ static BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item) {
             ![item isVisualMediaMessage]);
 }
 
+static BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return NO;
+    }
+    if ([[item mediaFileID] respondsToSelector:@selector(integerValue)] && [[item mediaFileID] integerValue] > 0) {
+        return YES;
+    }
+    if ([[item mediaLocalPath] length] > 0) {
+        return YES;
+    }
+    NSArray *mediaItems = [item visualMediaItems];
+    NSUInteger index = 0;
+    for (index = 0; index < [mediaItems count]; index++) {
+        id media = [mediaItems objectAtIndex:index];
+        if (![media isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        if ([TGMediaItemLocalPath(media) length] > 0 ||
+            [TGMediaItemFullLocalPath(media) length] > 0 ||
+            [TGMediaItemFullFileID(media) respondsToSelector:@selector(integerValue)]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 static NSString *TGPlayableMediaTitleForMessageItem(TGMessageItem *item) {
     if ([item isVoiceNoteMessage]) {
         return @"Voice message";
@@ -2276,12 +2492,12 @@ static void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL f
 
 static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
-    if ([title isEqualToString:@"Chats"]) {
+    if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
         NSRect backBubble = TGIconRect(iconRect, 1.0, 5.0, 12.0, 8.0, flipped);
         NSRect frontBubble = TGIconRect(iconRect, 5.0, 2.0, 13.0, 9.0, flipped);
         [[NSBezierPath bezierPathWithRoundedRect:backBubble xRadius:3.0 yRadius:3.0] stroke];
         [[NSBezierPath bezierPathWithRoundedRect:frontBubble xRadius:3.0 yRadius:3.0] fill];
-    } else if ([title isEqualToString:@"Profile"]) {
+    } else if ([title isEqualToString:@"Profile"] || [title isEqualToString:@"Профиль"] || [title isEqualToString:@"Профіль"]) {
         NSRect headRect = TGIconRect(iconRect, 5.0, 10.0, 8.0, 8.0, flipped);
         [[NSBezierPath bezierPathWithOvalInRect:headRect] stroke];
         NSBezierPath *bodyPath = [NSBezierPath bezierPath];
@@ -2291,7 +2507,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                  controlPoint1:TGIconPoint(iconRect, 6.0, 8.0, flipped)
                  controlPoint2:TGIconPoint(iconRect, 12.0, 8.0, flipped)];
         [bodyPath stroke];
-    } else if ([title isEqualToString:@"Settings"]) {
+    } else if ([title isEqualToString:@"Settings"] || [title isEqualToString:@"Настройки"] || [title isEqualToString:@"Налады"]) {
         TGStrokeLine(TGIconPoint(iconRect, 2.0, 14.0, flipped), TGIconPoint(iconRect, 16.0, 14.0, flipped), 1.4);
         TGStrokeLine(TGIconPoint(iconRect, 2.0, 9.0, flipped), TGIconPoint(iconRect, 16.0, 9.0, flipped), 1.4);
         TGStrokeLine(TGIconPoint(iconRect, 2.0, 4.0, flipped), TGIconPoint(iconRect, 16.0, 4.0, flipped), 1.4);
@@ -2488,11 +2704,61 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     BOOL flipped = [controlView isFlipped];
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 13.0,
-                                 NSMidY(buttonRect) - 13.0,
-                                 26.0,
-                                 26.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 10.5,
+                                 NSMidY(buttonRect) - 10.5,
+                                 21.0,
+                                 21.0);
     TGDrawPaperclipSvgPathInRect(iconRect, flipped, alpha);
+}
+
+@end
+
+@interface TGComposerSymbolButtonCell : NSButtonCell
+@end
+
+@implementation TGComposerSymbolButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:7.0 yRadius:7.0];
+    NSColor *fillColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicHeaderBottomColor();
+    [fillColor set];
+    [buttonPath fill];
+    [TGClassicPanelStrokeColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSString *title = [self title] ? [self title] : @"";
+    BOOL flipped = [controlView isFlipped];
+    NSColor *iconColor = TGClassicHeaderTextColor(alpha);
+    [iconColor set];
+    if ([title isEqualToString:@"mic"]) {
+        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 5.0, NSMidY(buttonRect) - 9.0, 10.0, 15.0);
+        NSBezierPath *mic = [NSBezierPath bezierPathWithRoundedRect:micRect xRadius:5.0 yRadius:5.0];
+        [mic stroke];
+        TGStrokeLine(NSMakePoint(NSMidX(buttonRect), NSMidY(buttonRect) + (flipped ? 7.0 : -7.0)),
+                     NSMakePoint(NSMidX(buttonRect), NSMidY(buttonRect) + (flipped ? 11.0 : -11.0)),
+                     1.6);
+        TGStrokeLine(NSMakePoint(NSMidX(buttonRect) - 5.0, NSMidY(buttonRect) + (flipped ? 11.0 : -11.0)),
+                     NSMakePoint(NSMidX(buttonRect) + 5.0, NSMidY(buttonRect) + (flipped ? 11.0 : -11.0)),
+                     1.6);
+        return;
+    }
+
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:18.0], NSFontAttributeName,
+                                iconColor, NSForegroundColorAttributeName,
+                                nil];
+    NSString *symbol = ([title length] > 0) ? title : @"☺";
+    NSSize size = [symbol sizeWithAttributes:attributes];
+    NSRect symbolRect = NSMakeRect(NSMidX(buttonRect) - floor(size.width / 2.0),
+                                   NSMidY(buttonRect) - floor(size.height / 2.0) - 1.0,
+                                   size.width + 2.0,
+                                   size.height + 2.0);
+    [symbol drawInRect:symbolRect withAttributes:attributes];
 }
 
 @end
@@ -3027,6 +3293,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *attachPhotoButton;
+@property (nonatomic, retain) NSButton *stickerButton;
+@property (nonatomic, retain) NSButton *voiceRecordButton;
 @property (nonatomic, retain) NSButton *sendMessageButton;
 @property (nonatomic, retain) NSTextField *authLabel;
 @property (nonatomic, retain) NSTextField *authStateField;
@@ -3081,6 +3349,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *settingsNotificationSoundButton;
 @property (nonatomic, retain) NSButton *settingsNotificationBadgeButton;
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
+@property (nonatomic, retain) NSTextField *settingsLanguageLabel;
+@property (nonatomic, retain) NSPopUpButton *settingsLanguagePopUpButton;
+@property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
+@property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
 @property (nonatomic, retain) NSButton *settingsAboutButton;
@@ -3122,6 +3394,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *mediaPlaybackPlayPauseButton;
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
+@property (nonatomic, retain) NSWindow *photoSendPreviewWindow;
+@property (nonatomic, retain) NSImageView *photoSendPreviewImageView;
+@property (nonatomic, retain) NSTextField *photoSendCaptionField;
+@property (nonatomic, retain) NSTextField *photoSendTitleField;
+@property (nonatomic, copy) NSString *pendingPhotoSendPath;
+@property (nonatomic, retain) NSNumber *pendingPhotoSendChatID;
+@property (nonatomic, retain) NSNumber *pendingPhotoSendThreadID;
+@property (nonatomic, copy) NSString *pendingPhotoSendTopicKind;
+@property (nonatomic, retain) NSWindow *stickerPickerWindow;
+@property (nonatomic, retain) NSScrollView *stickerPickerScrollView;
+@property (nonatomic, retain) NSView *stickerPickerContentView;
+@property (nonatomic, copy) NSArray *stickerPickerItems;
+@property (nonatomic, retain) NSTextField *stickerPickerStatusField;
+@property (nonatomic, retain) AVAudioRecorder *voiceRecorder;
+@property (nonatomic, retain) AVAudioPlayer *voicePreviewPlayer;
+@property (nonatomic, copy) NSString *voiceRecordingPath;
+@property (nonatomic, retain) NSDate *voiceRecordingStartDate;
+@property (nonatomic, retain) NSWindow *voicePreviewWindow;
+@property (nonatomic, retain) NSTextField *voicePreviewTitleField;
+@property (nonatomic, retain) NSButton *voicePreviewPlayButton;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, retain) NSMenu *chatContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
@@ -3207,6 +3499,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
 @synthesize attachPhotoButton = _attachPhotoButton;
+@synthesize stickerButton = _stickerButton;
+@synthesize voiceRecordButton = _voiceRecordButton;
 @synthesize sendMessageButton = _sendMessageButton;
 @synthesize authLabel = _authLabel;
 @synthesize authStateField = _authStateField;
@@ -3261,6 +3555,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsNotificationSoundButton = _settingsNotificationSoundButton;
 @synthesize settingsNotificationBadgeButton = _settingsNotificationBadgeButton;
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
+@synthesize settingsLanguageLabel = _settingsLanguageLabel;
+@synthesize settingsLanguagePopUpButton = _settingsLanguagePopUpButton;
+@synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
+@synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
 @synthesize settingsAboutButton = _settingsAboutButton;
@@ -3302,6 +3600,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPlaybackPlayPauseButton = _mediaPlaybackPlayPauseButton;
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
+@synthesize photoSendPreviewWindow = _photoSendPreviewWindow;
+@synthesize photoSendPreviewImageView = _photoSendPreviewImageView;
+@synthesize photoSendCaptionField = _photoSendCaptionField;
+@synthesize photoSendTitleField = _photoSendTitleField;
+@synthesize pendingPhotoSendPath = _pendingPhotoSendPath;
+@synthesize pendingPhotoSendChatID = _pendingPhotoSendChatID;
+@synthesize pendingPhotoSendThreadID = _pendingPhotoSendThreadID;
+@synthesize pendingPhotoSendTopicKind = _pendingPhotoSendTopicKind;
+@synthesize stickerPickerWindow = _stickerPickerWindow;
+@synthesize stickerPickerScrollView = _stickerPickerScrollView;
+@synthesize stickerPickerContentView = _stickerPickerContentView;
+@synthesize stickerPickerItems = _stickerPickerItems;
+@synthesize stickerPickerStatusField = _stickerPickerStatusField;
+@synthesize voiceRecorder = _voiceRecorder;
+@synthesize voicePreviewPlayer = _voicePreviewPlayer;
+@synthesize voiceRecordingPath = _voiceRecordingPath;
+@synthesize voiceRecordingStartDate = _voiceRecordingStartDate;
+@synthesize voicePreviewWindow = _voicePreviewWindow;
+@synthesize voicePreviewTitleField = _voicePreviewTitleField;
+@synthesize voicePreviewPlayButton = _voicePreviewPlayButton;
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize chatContextMenu = _chatContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
@@ -3374,6 +3692,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self buildContentView];
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+        [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
     }
     return self;
 }
@@ -3584,6 +3903,82 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
+- (void)selectLanguagePopUpItemForCode:(NSString *)code {
+    if (![code isKindOfClass:[NSString class]] || [code length] == 0) {
+        code = TGLanguageCode();
+    }
+    NSArray *items = [self.settingsLanguagePopUpButton itemArray];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        NSMenuItem *item = [items objectAtIndex:index];
+        if ([[item representedObject] isEqual:code]) {
+            [self.settingsLanguagePopUpButton selectItem:item];
+            return;
+        }
+    }
+    if ([items count] > 0) {
+        [self.settingsLanguagePopUpButton selectItemAtIndex:0];
+    }
+}
+
+- (NSString *)displayPathForDownloadFolder:(NSString *)path {
+    if ([path length] == 0) {
+        return @"Downloads";
+    }
+    NSString *home = NSHomeDirectory();
+    if ([home length] > 0 && [path hasPrefix:home]) {
+        return [@"~" stringByAppendingString:[path substringFromIndex:[home length]]];
+    }
+    return path;
+}
+
+- (void)refreshDownloadFolderButtonTitle {
+    NSString *path = TGConfiguredDownloadFolderPath();
+    NSString *displayPath = [self displayPathForDownloadFolder:path];
+    [self.settingsDownloadFolderButton setTitle:[NSString stringWithFormat:@"%@: %@", TGLoc(@"settings.downloads"), displayPath]];
+    [self.settingsDownloadFolderButton setToolTip:path];
+}
+
+- (void)refreshLocalizedText {
+    [self.chatsLabel setStringValue:TGLoc(@"chats")];
+    [self.profileTitleField setStringValue:TGLoc(@"profile")];
+    [self.settingsTitleField setStringValue:TGLoc(@"settings")];
+    [[self.sendTextField cell] setPlaceholderString:TGLoc(@"message.placeholder")];
+    [self.attachPhotoButton setToolTip:TGLoc(@"attach.photo")];
+    [self.stickerButton setToolTip:TGLoc(@"stickers")];
+    [self.voiceRecordButton setToolTip:TGLoc(@"voice")];
+    [self.sendMessageButton setToolTip:TGLoc(@"send")];
+    [self.settingsNotificationsEnabledButton setTitle:TGLoc(@"settings.notifications")];
+    [self.settingsNotificationSoundButton setTitle:TGLoc(@"settings.sound")];
+    [self.settingsNotificationBadgeButton setTitle:TGLoc(@"settings.badge")];
+    [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
+    [self.settingsLanguageLabel setStringValue:TGLoc(@"settings.language")];
+    [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
+    [self.settingsAppearanceButton setTitle:TGLoc(@"settings.appearance")];
+    [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
+    [self.settingsAboutButton setTitle:TGLoc(@"settings.about")];
+    [self.loginLogsButton setTitle:@"Logs"];
+    [self refreshDownloadFolderButtonTitle];
+    [self selectLanguagePopUpItemForCode:TGLanguageCode()];
+
+    NSUInteger index = 0;
+    for (index = 0; index < [self.navigationButtons count]; index++) {
+        id candidate = [self.navigationButtons objectAtIndex:index];
+        if (![candidate isKindOfClass:[NSButton class]]) {
+            continue;
+        }
+        NSButton *button = (NSButton *)candidate;
+        if ([button tag] == 0) {
+            [button setTitle:TGLoc(@"chats")];
+        } else if ([button tag] == 1) {
+            [button setTitle:TGLoc(@"profile")];
+        } else if ([button tag] == 2) {
+            [button setTitle:TGLoc(@"settings")];
+        }
+        [button setNeedsDisplay:YES];
+    }
+}
+
 - (void)refreshThemeAppearance {
     [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self applyPanelHeaderDetailStyle:self.statusField];
@@ -3623,6 +4018,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
+    [self.settingsLanguageLabel setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.aboutVersionField];
     [self applyMutedLabelStyle:self.aboutCopyrightField];
     [self.aboutLinkField setTextColor:TGClassicLinkColor()];
@@ -3636,6 +4032,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAppearanceButton setNeedsDisplay:YES];
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
+    [self.settingsDownloadFolderButton setNeedsDisplay:YES];
+    [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
     [self.chatScrollSurfaceView setNeedsDisplay:YES];
     [self.messageScrollSurfaceView setNeedsDisplay:YES];
@@ -4263,6 +4661,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.attachPhotoButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.attachPhotoButton];
 
+    self.stickerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(76, 50, 34, 32)] autorelease];
+    TGComposerSymbolButtonCell *stickerCell = [[[TGComposerSymbolButtonCell alloc] initTextCell:@"☺"] autorelease];
+    [stickerCell setButtonType:NSMomentaryPushInButton];
+    [self.stickerButton setCell:stickerCell];
+    [self.stickerButton setTitle:@"☺"];
+    [self.stickerButton setTarget:self];
+    [self.stickerButton setAction:@selector(showStickerPicker:)];
+    [self.stickerButton setEnabled:NO];
+    [self.stickerButton setBordered:NO];
+    [self.stickerButton setToolTip:@"Stickers"];
+    [self.stickerButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.stickerButton];
+
+    self.voiceRecordButton = [[[NSButton alloc] initWithFrame:NSMakeRect(112, 50, 34, 32)] autorelease];
+    TGComposerSymbolButtonCell *voiceCell = [[[TGComposerSymbolButtonCell alloc] initTextCell:@"mic"] autorelease];
+    [voiceCell setButtonType:NSMomentaryPushInButton];
+    [self.voiceRecordButton setCell:voiceCell];
+    [self.voiceRecordButton setTitle:@"mic"];
+    [self.voiceRecordButton setTarget:self];
+    [self.voiceRecordButton setAction:@selector(toggleVoiceRecording:)];
+    [self.voiceRecordButton setEnabled:NO];
+    [self.voiceRecordButton setBordered:NO];
+    [self.voiceRecordButton setToolTip:@"Record voice message"];
+    [self.voiceRecordButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.voiceRecordButton];
+
     self.sendTextFieldBackgroundView = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextFieldBackgroundView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.sendTextFieldBackgroundView];
@@ -4506,6 +4930,39 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsDrawerHiddenButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsDrawerHiddenButton];
 
+    self.settingsLanguageLabel = [self labelWithFrame:NSMakeRect(64, 204, 100, 22)
+                                                 text:@"Language"
+                                                 font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.settingsLanguageLabel];
+
+    self.settingsLanguagePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(164, 200, 190, 28) pullsDown:NO] autorelease];
+    [self.settingsLanguagePopUpButton addItemWithTitle:@"Русский"];
+    [[self.settingsLanguagePopUpButton lastItem] setRepresentedObject:@"ru"];
+    [self.settingsLanguagePopUpButton addItemWithTitle:@"English"];
+    [[self.settingsLanguagePopUpButton lastItem] setRepresentedObject:@"en"];
+    [self.settingsLanguagePopUpButton addItemWithTitle:@"Беларуская"];
+    [[self.settingsLanguagePopUpButton lastItem] setRepresentedObject:@"be"];
+    [self.settingsLanguagePopUpButton setTarget:self];
+    [self.settingsLanguagePopUpButton setAction:@selector(languageSelectionChanged:)];
+    [self.settingsLanguagePopUpButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsLanguagePopUpButton];
+
+    self.settingsDownloadFolderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 178, 260, 22)] autorelease];
+    [self.settingsDownloadFolderButton setTitle:@"Downloads folder"];
+    [self.settingsDownloadFolderButton setTarget:self];
+    [self.settingsDownloadFolderButton setAction:@selector(chooseDownloadFolder:)];
+    [self applyUtilityButtonStyle:self.settingsDownloadFolderButton];
+    [self.settingsDownloadFolderButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsDownloadFolderButton];
+
+    self.settingsCheckUpdatesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 152, 260, 22)] autorelease];
+    [self.settingsCheckUpdatesButton setTitle:@"Check for Updates"];
+    [self.settingsCheckUpdatesButton setTarget:self];
+    [self.settingsCheckUpdatesButton setAction:@selector(checkForUpdatesManually:)];
+    [self applyUtilityButtonStyle:self.settingsCheckUpdatesButton];
+    [self.settingsCheckUpdatesButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsCheckUpdatesButton];
+
     self.settingsAppearanceButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 328, 260, 40)] autorelease];
     [self.settingsAppearanceButton setTitle:@"Appearance"];
     [self.settingsAppearanceButton setToolTip:@"Open appearance settings"];
@@ -4587,6 +5044,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.aboutLinkField setTextColor:TGClassicLinkColor()];
     [contentView addSubview:self.aboutLinkField];
 
+    [self refreshLocalizedText];
     [self refreshThemeAppearance];
     [self refreshProfileDisplay];
     [self rebuildDrawerFolderButtons];
@@ -5793,6 +6251,206 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateVisibleSection];
 }
 
+- (void)languageSelectionChanged:(id)sender {
+    NSMenuItem *selectedItem = [self.settingsLanguagePopUpButton selectedItem];
+    NSString *code = [selectedItem representedObject];
+    if (![code isKindOfClass:[NSString class]] || [code length] == 0) {
+        code = @"ru";
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:code forKey:TGLanguageDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self refreshLocalizedText];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self layoutContentView];
+    [self updateVisibleSection];
+    [self refreshThemeAppearance];
+    (void)sender;
+}
+
+- (void)chooseDownloadFolder:(id)sender {
+    (void)sender;
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    [panel setCanChooseFiles:NO];
+    [panel setCanChooseDirectories:YES];
+    [panel setAllowsMultipleSelection:NO];
+    [panel setCanCreateDirectories:YES];
+    [panel setDirectoryURL:[NSURL fileURLWithPath:TGConfiguredDownloadFolderPath()]];
+    NSInteger result = [panel runModal];
+    if (result != NSOKButton) {
+        return;
+    }
+
+    NSURL *url = [panel URL];
+    NSString *path = [url path];
+    if ([path length] == 0) {
+        return;
+    }
+
+    [[NSUserDefaults standardUserDefaults] setObject:[path stringByStandardizingPath] forKey:TGDownloadFolderDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self refreshDownloadFolderButtonTitle];
+}
+
+- (NSString *)currentApplicationVersionString {
+    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    if ([version length] == 0) {
+        version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"];
+    }
+    return ([version length] > 0) ? version : @"0.0.0";
+}
+
+- (NSDictionary *)latestGitHubReleaseInfoWithError:(NSError **)error {
+    NSURL *url = [NSURL URLWithString:TGUpdateAPIURLString];
+    if (!url) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                         code:1
+                                     userInfo:[NSDictionary dictionaryWithObject:@"Update URL is invalid." forKey:NSLocalizedDescriptionKey]];
+        }
+        return nil;
+    }
+
+    NSURLRequest *request = [NSURLRequest requestWithURL:url
+                                             cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                         timeoutInterval:12.0];
+    NSURLResponse *response = nil;
+    NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:error];
+    if (![data isKindOfClass:[NSData class]] || [data length] == 0) {
+        return nil;
+    }
+
+    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
+    if (![json isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                         code:2
+                                     userInfo:[NSDictionary dictionaryWithObject:@"GitHub did not return a release list." forKey:NSLocalizedDescriptionKey]];
+        }
+        return nil;
+    }
+
+    NSArray *releases = (NSArray *)json;
+    NSUInteger index = 0;
+    for (index = 0; index < [releases count]; index++) {
+        id releaseObject = [releases objectAtIndex:index];
+        if (![releaseObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *release = (NSDictionary *)releaseObject;
+        id draft = [release objectForKey:@"draft"];
+        if ([draft respondsToSelector:@selector(boolValue)] && [draft boolValue]) {
+            continue;
+        }
+        NSString *tagName = [release objectForKey:@"tag_name"];
+        NSString *name = [release objectForKey:@"name"];
+        NSString *version = ([tagName length] > 0) ? tagName : name;
+        if ([version length] == 0) {
+            continue;
+        }
+        NSString *htmlURL = [release objectForKey:@"html_url"];
+        if ([htmlURL length] == 0) {
+            htmlURL = TGProjectReleasesURLString;
+        }
+        return [NSDictionary dictionaryWithObjectsAndKeys:
+                version, @"version",
+                htmlURL, @"url",
+                nil];
+    }
+
+    if (error) {
+        *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                     code:3
+                                 userInfo:[NSDictionary dictionaryWithObject:@"No GitHub releases were found." forKey:NSLocalizedDescriptionKey]];
+    }
+    return nil;
+}
+
+- (void)showUpdateCheckResult:(NSDictionary *)releaseInfo errorMessage:(NSString *)errorMessage manual:(BOOL)manual {
+    if ([errorMessage length] > 0) {
+        if (manual) {
+            NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+            [alert setMessageText:TGLoc(@"settings.update")];
+            [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.failed"), errorMessage]];
+            [alert addButtonWithTitle:@"OK"];
+            [alert runModal];
+        } else {
+            [self appendDetail:[NSString stringWithFormat:@"Update check: %@", errorMessage]];
+        }
+        return;
+    }
+
+    NSString *remoteVersion = [releaseInfo objectForKey:@"version"];
+    NSString *currentVersion = [self currentApplicationVersionString];
+    if (![remoteVersion isKindOfClass:[NSString class]] || !TGVersionStringIsNewer(remoteVersion, currentVersion)) {
+        if (manual) {
+            NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+            [alert setMessageText:TGLoc(@"update.none")];
+            [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.noneMessage"), currentVersion]];
+            [alert addButtonWithTitle:@"OK"];
+            [alert runModal];
+        }
+        return;
+    }
+
+    NSString *urlString = [releaseInfo objectForKey:@"url"];
+    if ([urlString length] == 0) {
+        urlString = TGProjectReleasesURLString;
+    }
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"update.title")];
+    [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.availableMessage"), remoteVersion]];
+    [alert addButtonWithTitle:TGLoc(@"update.open")];
+    [alert addButtonWithTitle:TGLoc(@"update.later")];
+    NSInteger result = [alert runModal];
+    if (result == NSAlertFirstButtonReturn) {
+        NSURL *releaseURL = [NSURL URLWithString:urlString];
+        if (releaseURL) {
+            [[NSWorkspace sharedWorkspace] openURL:releaseURL];
+        }
+    }
+}
+
+- (void)checkForUpdatesManual:(BOOL)manual {
+    if (!manual) {
+        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+        NSTimeInterval last = [[NSUserDefaults standardUserDefaults] doubleForKey:TGLastUpdateCheckDefaultsKey];
+        if (last > 0.0 && (now - last) < (24.0 * 60.0 * 60.0)) {
+            return;
+        }
+        [[NSUserDefaults standardUserDefaults] setDouble:now forKey:TGLastUpdateCheckDefaultsKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+
+    if (manual) {
+        [self.statusField setStringValue:@"Checking for updates..."];
+    }
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *updateError = nil;
+        NSDictionary *releaseInfo = [[self latestGitHubReleaseInfoWithError:&updateError] retain];
+        NSString *errorMessage = [[updateError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (manual) {
+                [self.statusField setStringValue:@"Connected"];
+            }
+            [self showUpdateCheckResult:releaseInfo errorMessage:errorMessage manual:manual];
+            [releaseInfo release];
+            [errorMessage release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)checkForUpdatesOnLaunch {
+    [self checkForUpdatesManual:NO];
+}
+
+- (void)checkForUpdatesManually:(id)sender {
+    (void)sender;
+    [self checkForUpdatesManual:YES];
+}
+
 - (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
     (void)center;
     (void)notification;
@@ -5846,7 +6504,29 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self reloadMessagesForChatID:chatID interactive:NO];
     }
     [self clearUnreadCountForChatID:chatID messageThreadID:messageThreadID];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(markCurrentSelectionReadAfterNotification)
+                                               object:nil];
+    [self performSelector:@selector(markCurrentSelectionReadAfterNotification) withObject:nil afterDelay:1.2];
     return YES;
+}
+
+- (void)markCurrentSelectionReadAfterNotification {
+    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
+        return;
+    }
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *threadID = [self.selectedMessageThreadID retain];
+    NSString *topicKind = [self.selectedMessageTopicKind copy];
+    NSArray *items = [self.messageItems copy];
+    [self clearUnreadCountForChatID:chatID messageThreadID:threadID];
+    if ([items count] > 0) {
+        [self markMessageItemsReadForChatID:chatID messageThreadID:threadID messageTopicKind:topicKind items:items];
+    }
+    [items release];
+    [topicKind release];
+    [threadID release];
+    [chatID release];
 }
 
 - (void)openChatFromNotification:(NSUserNotification *)notification {
@@ -6092,6 +6772,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.messageDropOverlayView visible:(showChats && self.messageDropOverlayVisible)];
     [self showView:self.sendLabel visible:NO];
     [self showView:self.attachPhotoButton visible:showChats];
+    [self showView:self.stickerButton visible:showChats];
+    [self showView:self.voiceRecordButton visible:showChats];
     [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
@@ -6141,6 +6823,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.settingsNotificationSoundButton visible:showSettings];
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
+    [self showView:self.settingsLanguageLabel visible:showSettings];
+    [self showView:self.settingsLanguagePopUpButton visible:showSettings];
+    [self showView:self.settingsDownloadFolderButton visible:showSettings];
+    [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsAppearanceButton visible:showSettings];
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
@@ -6413,10 +7099,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     CGFloat sendButtonWidth = 38.0;
     CGFloat attachButtonWidth = 38.0;
+    CGFloat smallComposerButtonWidth = 34.0;
+    CGFloat composerButtonGap = 6.0;
     CGFloat attachButtonX = conversationX + 12.0;
-    CGFloat sendFieldX = attachButtonX + attachButtonWidth + 8.0;
     CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
-    CGFloat sendFieldWidth = sendButtonX - sendFieldX - 10.0;
+    CGFloat voiceButtonX = sendButtonX - composerButtonGap - smallComposerButtonWidth;
+    CGFloat stickerButtonX = voiceButtonX - composerButtonGap - smallComposerButtonWidth;
+    CGFloat sendFieldX = attachButtonX + attachButtonWidth + 8.0;
+    CGFloat sendFieldWidth = stickerButtonX - sendFieldX - 10.0;
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
     }
@@ -6424,6 +7114,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerY + 5.0, attachButtonWidth, 32.0)];
     [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
     [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerY + 11.0, sendFieldWidth - 16.0, 20.0)];
+    [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerY + 5.0, smallComposerButtonWidth, 32.0)];
+    [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerY + 5.0, smallComposerButtonWidth, 32.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
 
     CGFloat panelTitleY = headerLabelY;
@@ -6594,13 +7286,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat settingsSectionLabelY = contentTop - 44.0;
     [self.settingsStateField setFrame:NSMakeRect(groupedX + 20.0, settingsSectionLabelY, groupedWidth - 40.0, 16.0)];
 
-    CGFloat notificationCardHeight = 124.0;
+    CGFloat notificationCardHeight = 226.0;
     CGFloat notificationCardY = settingsSectionLabelY - notificationCardHeight - 8.0;
     [self.settingsAccountCardView setFrame:NSMakeRect(groupedX, notificationCardY, groupedWidth, notificationCardHeight)];
-    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 89.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsNotificationSoundButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 65.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 41.0, groupedWidth - 44.0, 22.0)];
-    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 17.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 190.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationSoundButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 166.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsNotificationBadgeButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 142.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 118.0, groupedWidth - 44.0, 22.0)];
+    [self.settingsLanguageLabel setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 84.0, 130.0, 22.0)];
+    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(groupedX + 154.0, notificationCardY + 80.0, 210.0, 28.0)];
+    [self.settingsDownloadFolderButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 44.0, groupedWidth - 44.0, 28.0)];
+    [self.settingsCheckUpdatesButton setFrame:NSMakeRect(groupedX + 22.0, notificationCardY + 12.0, groupedWidth - 44.0, 28.0)];
 
     CGFloat sessionCardHeight = 164.0;
     CGFloat sessionCardY = notificationCardY - sessionCardHeight - 14.0;
@@ -6726,6 +7422,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *text = [self.sendTextField stringValue];
     NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     [self.attachPhotoButton setEnabled:canTargetChat];
+    [self.stickerButton setEnabled:canTargetChat];
+    [self.voiceRecordButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];
     [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
 }
@@ -6925,6 +7623,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadMessagesButton setEnabled:NO];
     [self.loadOlderMessagesButton setEnabled:NO];
     [self.attachPhotoButton setEnabled:NO];
+    [self.stickerButton setEnabled:NO];
+    [self.voiceRecordButton setEnabled:NO];
     [self.sendMessageButton setEnabled:NO];
     if (![state isEqualToString:@"ready"] && ([self.chatItems count] > 0 || [self.messageItems count] > 0 || self.selectedChatID != nil)) {
         [self.chatItems removeAllObjects];
@@ -7084,6 +7784,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self.attachPhotoButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
+    [self.stickerButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
+    [self.voiceRecordButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.sendMessageButton setEnabled:NO];
     if (busy) {
@@ -7098,6 +7800,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.chatTableView setEnabled:NO];
         [self.messageTableView setEnabled:NO];
         [self.attachPhotoButton setEnabled:NO];
+        [self.stickerButton setEnabled:NO];
+        [self.voiceRecordButton setEnabled:NO];
         [self.sendTextField setEnabled:NO];
         [self.sendMessageButton setEnabled:NO];
     } else {
@@ -7549,6 +8253,147 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return menuItem;
 }
 
+- (NSString *)safeDownloadFileNameFromName:(NSString *)name fallback:(NSString *)fallback {
+    NSString *candidate = ([name length] > 0) ? name : fallback;
+    if ([candidate length] == 0) {
+        candidate = @"telegraphica-download";
+    }
+    NSMutableString *safeName = [NSMutableString stringWithString:candidate];
+    NSCharacterSet *badCharacters = [NSCharacterSet characterSetWithCharactersInString:@"/:\\"];
+    NSUInteger index = 0;
+    while (index < [safeName length]) {
+        unichar ch = [safeName characterAtIndex:index];
+        if ([badCharacters characterIsMember:ch]) {
+            [safeName replaceCharactersInRange:NSMakeRange(index, 1) withString:@"-"];
+        }
+        index++;
+    }
+    return safeName;
+}
+
+- (NSString *)uniqueDownloadDestinationForFileName:(NSString *)fileName {
+    NSString *folder = TGConfiguredDownloadFolderPath();
+    [[NSFileManager defaultManager] createDirectoryAtPath:folder
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:NULL];
+    NSString *safeName = [self safeDownloadFileNameFromName:fileName fallback:@"telegraphica-download"];
+    NSString *destination = [folder stringByAppendingPathComponent:safeName];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:destination]) {
+        return destination;
+    }
+    NSString *base = [safeName stringByDeletingPathExtension];
+    NSString *extension = [safeName pathExtension];
+    NSUInteger suffix = 2;
+    while (suffix < 1000) {
+        NSString *candidateName = ([extension length] > 0)
+            ? [NSString stringWithFormat:@"%@-%lu.%@", base, (unsigned long)suffix, extension]
+            : [NSString stringWithFormat:@"%@-%lu", safeName, (unsigned long)suffix];
+        NSString *candidate = [folder stringByAppendingPathComponent:candidateName];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:candidate]) {
+            return candidate;
+        }
+        suffix++;
+    }
+    return destination;
+}
+
+- (NSNumber *)downloadFileIDForMessageItem:(TGMessageItem *)item localPath:(NSString **)localPathOut fileName:(NSString **)fileNameOut {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return nil;
+    }
+    NSString *localPath = [item mediaLocalPath];
+    NSNumber *fileID = [item mediaFileID];
+    NSString *fileName = [item downloadFileName];
+    NSArray *mediaItems = [item visualMediaItems];
+    if (([localPath length] == 0 || !fileID) && [mediaItems count] > 0) {
+        id media = [mediaItems objectAtIndex:0];
+        if ([media isKindOfClass:[NSDictionary class]]) {
+            if ([localPath length] == 0) {
+                localPath = TGMediaItemFullLocalPath(media);
+                if ([localPath length] == 0) {
+                    localPath = TGMediaItemLocalPath(media);
+                }
+            }
+            if (!fileID) {
+                fileID = TGMediaItemFullFileID(media);
+            }
+            if ([fileName length] == 0) {
+                id mediaFileName = [(NSDictionary *)media objectForKey:@"file_name"];
+                if ([mediaFileName isKindOfClass:[NSString class]]) {
+                    fileName = mediaFileName;
+                }
+            }
+        }
+    }
+    if ([fileName length] == 0 && [localPath length] > 0) {
+        fileName = [localPath lastPathComponent];
+    }
+    if ([fileName length] == 0) {
+        fileName = [item isDocumentMessage] ? @"document" : @"media";
+    }
+    if (localPathOut) {
+        *localPathOut = localPath;
+    }
+    if (fileNameOut) {
+        *fileNameOut = fileName;
+    }
+    return fileID;
+}
+
+- (void)downloadAttachmentForMessageItem:(TGMessageItem *)item {
+    NSString *localPath = nil;
+    NSString *fileName = nil;
+    NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:&localPath fileName:&fileName];
+    if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+        NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
+        NSError *copyError = nil;
+        if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
+            [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
+        } else {
+            [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
+        }
+        return;
+    }
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        [self appendDetail:@"Attachment file id is not available yet."];
+        return;
+    }
+
+    NSNumber *fileIDCopy = [fileID retain];
+    NSString *fileNameCopy = [fileName copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:@"Downloading file..."];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *downloadError = nil;
+        NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:16.0 error:&downloadError] copy];
+        NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([downloadedPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:downloadedPath]) {
+                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
+                NSError *copyError = nil;
+                if ([[NSFileManager defaultManager] copyItemAtPath:downloadedPath toPath:destination error:&copyError]) {
+                    [self.statusField setStringValue:@"File downloaded"];
+                    [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
+                } else {
+                    [self.statusField setStringValue:@"Download failed"];
+                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
+                }
+            } else {
+                [self.statusField setStringValue:@"Download failed"];
+                [self appendDetail:([downloadErrorMessage length] > 0 ? downloadErrorMessage : @"TDLib did not return a file path.")];
+            }
+            [downloadedPath release];
+            [downloadErrorMessage release];
+            [fileIDCopy release];
+            [fileNameCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)populateChatContextMenu:(NSMenu *)menu {
     [menu removeAllItems];
     NSInteger row = -1;
@@ -7561,6 +8406,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSMenuItem *titleItem = [[[NSMenuItem alloc] initWithTitle:chatTitle action:nil keyEquivalent:@""] autorelease];
     [titleItem setEnabled:NO];
     [menu addItem:titleItem];
+    [menu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *markReadItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.markRead")
+                                                           action:@selector(markChatReadFromMenu:)
+                                                    keyEquivalent:@""] autorelease];
+    [markReadItem setRepresentedObject:item];
+    [markReadItem setTarget:self];
+    [markReadItem setEnabled:([[item unreadCount] respondsToSelector:@selector(integerValue)] && [[item unreadCount] integerValue] > 0)];
+    [menu addItem:markReadItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
     if ([item serverNotificationsMuted]) {
@@ -7611,6 +8465,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![self messageItem:item atRow:row containsTablePoint:tablePoint]) {
         return;
     }
+    if (TGMessageItemHasDownloadableAttachment(item)) {
+        NSString *downloadTitle = [item isDocumentMessage] ? TGLoc(@"message.downloadDocument") : TGLoc(@"message.downloadMedia");
+        NSMenuItem *downloadItem = [[[NSMenuItem alloc] initWithTitle:downloadTitle
+                                                               action:@selector(downloadMessageAttachmentFromMenu:)
+                                                        keyEquivalent:@""] autorelease];
+        [downloadItem setRepresentedObject:item];
+        [downloadItem setTarget:self];
+        [menu addItem:downloadItem];
+        [menu addItem:[NSMenuItem separatorItem]];
+    }
     NSArray *emojis = [NSArray arrayWithObjects:@"🔥", @"😁", @"👍", @"👎", @"❤", @"😢", @"😱", nil];
     NSUInteger index = 0;
     for (index = 0; index < [emojis count]; index++) {
@@ -7654,6 +8518,62 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [moreItem setSubmenu:moreMenu];
         [menu addItem:moreItem];
     }
+}
+
+- (void)downloadMessageAttachmentFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    [self downloadAttachmentForMessageItem:item];
+}
+
+- (void)markChatReadFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]]) {
+        return;
+    }
+    NSNumber *sourceChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
+    NSNumber *sourceThreadID = [item isForumTopic] ? [item messageThreadID] : nil;
+    NSString *sourceTopicKind = [item isForumTopic] ? [item messageTopicKind] : nil;
+    NSNumber *chatID = [sourceChatID retain];
+    NSNumber *threadID = [sourceThreadID retain];
+    NSString *topicKind = [sourceTopicKind copy];
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        return;
+    }
+
+    TGTDLibClient *client = [self.client retain];
+    [self clearUnreadCountForChatID:chatID messageThreadID:threadID];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *messageError = nil;
+        NSArray *items = [client recentMessagePreviewItemsForChatID:chatID
+                                                    messageThreadID:threadID
+                                                   messageTopicKind:topicKind
+                                                              limit:50
+                                                            timeout:6.0
+                                                              error:&messageError];
+        NSArray *itemsCopy = [items copy];
+        NSString *errorMessage = [[messageError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([itemsCopy count] > 0) {
+                [self markMessageItemsReadForChatID:chatID messageThreadID:threadID messageTopicKind:topicKind items:itemsCopy];
+            } else if ([errorMessage length] > 0) {
+                [self appendDetail:[NSString stringWithFormat:@"TDLib mark read: %@", errorMessage]];
+            }
+            [itemsCopy release];
+            [errorMessage release];
+            [chatID release];
+            [threadID release];
+            [topicKind release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)muteChatFromMenu:(id)sender {
@@ -8575,8 +9495,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![leftContentType isEqualToString:rightContentType]) {
         return NO;
     }
-    BOOL leftHasID = ([[left messageID] respondsToSelector:@selector(longLongValue)] && [[left messageID] longLongValue] != 0);
-    BOOL rightHasID = ([[right messageID] respondsToSelector:@selector(longLongValue)] && [[right messageID] longLongValue] != 0);
+    BOOL leftHasID = ([[left messageID] respondsToSelector:@selector(longLongValue)] && [[left messageID] longLongValue] > 0);
+    BOOL rightHasID = ([[right messageID] respondsToSelector:@selector(longLongValue)] && [[right messageID] longLongValue] > 0);
     if ([left isVisualMediaMessage] || [right isVisualMediaMessage]) {
         NSString *leftMediaPath = [left mediaLocalPath] ? [left mediaLocalPath] : @"";
         NSString *rightMediaPath = [right mediaLocalPath] ? [right mediaLocalPath] : @"";
@@ -9648,7 +10568,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             continue;
         }
 
-        if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"]) {
+        if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"] || [kind isEqualToString:@"message_update"]) {
             needsChatRefresh = YES;
             self.chatsExhausted = NO;
             [self.client invalidateMainChatListExhaustion];
@@ -9955,7 +10875,64 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self reloadOlderMessagesInteractive];
 }
 
-- (void)sendPhotoAtPath:(NSString *)path {
+- (void)ensurePhotoSendPreviewWindow {
+    if (self.photoSendPreviewWindow) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(0, 0, 520, 560);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO] autorelease];
+    [window setTitle:@"Send photo"];
+    [window setReleasedWhenClosed:NO];
+
+    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [window setContentView:contentView];
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 518, 472, 24)
+                                              text:@"1 media"
+                                              font:[NSFont boldSystemFontOfSize:16.0]];
+    [titleField setAlignment:NSCenterTextAlignment];
+    [contentView addSubview:titleField];
+    self.photoSendTitleField = titleField;
+
+    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(44, 124, 432, 376)] autorelease];
+    [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
+    [imageView setImageFrameStyle:NSImageFrameGrayBezel];
+    [imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:imageView];
+    self.photoSendPreviewImageView = imageView;
+
+    NSTextField *captionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(44, 76, 432, 30)] autorelease];
+    [self applySkeuomorphicTextFieldStyle:captionField];
+    [[captionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
+    [captionField setDelegate:(id)self];
+    [captionField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:captionField];
+    self.photoSendCaptionField = captionField;
+
+    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(244, 28, 108, 30)];
+    [cancelButton setTitle:TGLoc(@"cancel")];
+    [cancelButton setTarget:self];
+    [cancelButton setAction:@selector(cancelPendingPhotoSend:)];
+    [cancelButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:cancelButton];
+
+    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(368, 28, 108, 30)] autorelease];
+    [sendButton setTitle:TGLoc(@"send")];
+    [sendButton setTarget:self];
+    [sendButton setAction:@selector(sendPendingPhotoPreview:)];
+    [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
+    [sendButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:sendButton];
+
+    self.photoSendPreviewWindow = window;
+}
+
+- (void)presentPhotoSendPreviewForPath:(NSString *)path {
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
         [self appendDetail:@"Select a chat after sign-in is ready before sending a photo."];
@@ -9970,10 +10947,50 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
 
-    NSNumber *chatID = [self.selectedChatID retain];
-    NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
-    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    NSString *standardPath = [path stringByStandardizingPath];
+    NSImage *image = TGImageWithCorrectOrientationFromFile(standardPath);
+    if (!image) {
+        image = [[[NSImage alloc] initWithContentsOfFile:standardPath] autorelease];
+    }
+    if (!image) {
+        [self appendDetail:@"Could not load the selected photo preview."];
+        return;
+    }
+
+    [self ensurePhotoSendPreviewWindow];
+    self.pendingPhotoSendPath = standardPath;
+    self.pendingPhotoSendChatID = self.selectedChatID;
+    self.pendingPhotoSendThreadID = self.selectedMessageThreadID;
+    self.pendingPhotoSendTopicKind = self.selectedMessageTopicKind;
+    [self.photoSendPreviewImageView setImage:image];
+    [self.photoSendCaptionField setStringValue:@""];
+    [[self.photoSendCaptionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
+    [self.photoSendPreviewWindow center];
+    [self.photoSendPreviewWindow makeKeyAndOrderFront:nil];
+    [[self.photoSendPreviewWindow contentView] setNeedsDisplay:YES];
+}
+
+- (void)cancelPendingPhotoSend:(id)sender {
+    (void)sender;
+    self.pendingPhotoSendPath = nil;
+    self.pendingPhotoSendChatID = nil;
+    self.pendingPhotoSendThreadID = nil;
+    self.pendingPhotoSendTopicKind = nil;
+    [self.photoSendPreviewWindow orderOut:nil];
+    [self requestComposerRefocus];
+}
+
+- (void)submitPhotoAtPath:(NSString *)path caption:(NSString *)caption chatID:(NSNumber *)targetChatID messageThreadID:(NSNumber *)targetThreadID messageTopicKind:(NSString *)targetTopicKind {
+    if (![path length] || ![targetChatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+
+    NSNumber *chatID = [targetChatID retain];
+    NSNumber *messageThreadID = [targetThreadID retain];
+    NSString *messageTopicKind = [targetTopicKind copy];
     NSString *photoPath = [[path stringByStandardizingPath] copy];
+    NSString *safeCaption = [caption isKindOfClass:[NSString class]] ? caption : @"";
+    NSString *photoCaption = [safeCaption copy];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending photo..."];
     [self appendDetail:(messageThreadID ? @"Submitting topic photo message to TDLib..." : @"Submitting photo message to TDLib...")];
@@ -9988,7 +11005,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                  messageThreadID:messageThreadID
                                                messageTopicKind:messageTopicKind
                                                        localPath:photoPath
-                                                         caption:@""
+                                                         caption:photoCaption
                                                          timeout:18.0
                                                            error:&sendError];
         NSString *sendErrorMessage = [[sendError localizedDescription] copy];
@@ -10027,6 +11044,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.pendingLiveChatRefresh = YES;
                 self.pendingLiveMessageRefresh = YES;
                 [self handlePendingLiveRefreshesIfPossible];
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(refreshSelectedMessagesAfterMediaSend)
+                                                           object:nil];
+                [self performSelector:@selector(refreshSelectedMessagesAfterMediaSend) withObject:nil afterDelay:1.25];
                 [self requestComposerRefocus];
             }
             [authorizationState release];
@@ -10035,11 +11056,449 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [messageThreadID release];
             [messageTopicKind release];
             [photoPath release];
+            [photoCaption release];
         });
 
         [client release];
         [pool drain];
     });
+}
+
+- (void)refreshSelectedMessagesAfterMediaSend {
+    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID || self.backgroundMessageRefreshInFlight) {
+        self.pendingLiveMessageRefresh = YES;
+        return;
+    }
+    NSNumber *chatID = [self.selectedChatID retain];
+    [self reloadMessagesForChatID:chatID interactive:NO];
+    [chatID release];
+}
+
+- (void)sendPendingPhotoPreview:(id)sender {
+    (void)sender;
+    NSString *path = [self.pendingPhotoSendPath copy];
+    NSString *caption = [[self.photoSendCaptionField stringValue] copy];
+    NSNumber *chatID = [self.pendingPhotoSendChatID retain];
+    NSNumber *threadID = [self.pendingPhotoSendThreadID retain];
+    NSString *topicKind = [self.pendingPhotoSendTopicKind copy];
+    [self cancelPendingPhotoSend:nil];
+    [self submitPhotoAtPath:path caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+    [path release];
+    [caption release];
+    [chatID release];
+    [threadID release];
+    [topicKind release];
+}
+
+- (void)ensureStickerPickerWindow {
+    if (self.stickerPickerWindow) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(0, 0, 430, 430);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO] autorelease];
+    [window setTitle:TGLoc(@"stickers")];
+    [window setReleasedWhenClosed:NO];
+
+    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [window setContentView:contentView];
+
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(18, 392, 394, 20)
+                                               text:@"Recent stickers"
+                                               font:[NSFont systemFontOfSize:12.0]];
+    [self applyMutedLabelStyle:statusField];
+    [contentView addSubview:statusField];
+    self.stickerPickerStatusField = statusField;
+
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 18, 394, 362)] autorelease];
+    [scrollView setBorderType:NSBezelBorder];
+    [scrollView setHasVerticalScroller:YES];
+    [scrollView setAutohidesScrollers:YES];
+    [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 376, 360)] autorelease];
+    [scrollView setDocumentView:gridView];
+    [contentView addSubview:scrollView];
+    self.stickerPickerScrollView = scrollView;
+    self.stickerPickerContentView = gridView;
+    self.stickerPickerWindow = window;
+}
+
+- (void)rebuildStickerPickerGrid {
+    NSView *gridView = self.stickerPickerContentView;
+    if (!gridView) {
+        return;
+    }
+    NSArray *oldSubviews = [[gridView subviews] copy];
+    NSUInteger removeIndex = 0;
+    for (removeIndex = 0; removeIndex < [oldSubviews count]; removeIndex++) {
+        [[oldSubviews objectAtIndex:removeIndex] removeFromSuperview];
+    }
+    [oldSubviews release];
+
+    CGFloat buttonSide = 58.0;
+    CGFloat gap = 10.0;
+    NSUInteger columns = 5;
+    CGFloat contentWidth = 376.0;
+    NSUInteger count = [self.stickerPickerItems count];
+    NSUInteger rows = (count == 0) ? 1 : ((count + columns - 1) / columns);
+    CGFloat contentHeight = rows * (buttonSide + gap) + gap;
+    if (contentHeight < 360.0) {
+        contentHeight = 360.0;
+    }
+    [gridView setFrame:NSMakeRect(0, 0, contentWidth, contentHeight)];
+
+    NSUInteger index = 0;
+    for (index = 0; index < count; index++) {
+        id candidate = [self.stickerPickerItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *item = (NSDictionary *)candidate;
+        NSUInteger row = index / columns;
+        NSUInteger column = index % columns;
+        CGFloat x = gap + (CGFloat)column * (buttonSide + gap);
+        CGFloat y = contentHeight - gap - buttonSide - (CGFloat)row * (buttonSide + gap);
+        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(x, y, buttonSide, buttonSide)] autorelease];
+        [button setButtonType:NSMomentaryPushInButton];
+        [button setBezelStyle:NSRegularSquareBezelStyle];
+        [button setBordered:YES];
+        [button setTarget:self];
+        [button setAction:@selector(sendStickerFromPickerButton:)];
+        [button setTag:(NSInteger)index];
+        NSString *localPath = TGMediaItemLocalPath(item);
+        NSImage *image = nil;
+        if ([localPath length] > 0) {
+            image = TGImageWithCorrectOrientationFromFile(localPath);
+            if (!image) {
+                image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
+            }
+        }
+        if (image) {
+            [button setImage:image];
+            [button setImageScaling:NSImageScaleProportionallyUpOrDown];
+            [button setImagePosition:NSImageOnly];
+        } else {
+            NSString *emoji = [item objectForKey:@"emoji"];
+            [button setTitle:([emoji length] > 0 ? emoji : @"☺")];
+            [button setFont:[NSFont systemFontOfSize:28.0]];
+        }
+        [gridView addSubview:button];
+    }
+}
+
+- (void)reloadStickerPickerItems {
+    [self.stickerPickerStatusField setStringValue:@"Loading stickers..."];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *stickerError = nil;
+        NSArray *items = [[client recentStickerItemsWithLimit:40 timeout:8.0 error:&stickerError] copy];
+        NSString *errorMessage = [[stickerError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([items count] > 0) {
+                self.stickerPickerItems = items;
+                [self.stickerPickerStatusField setStringValue:@"Recent stickers"];
+            } else {
+                self.stickerPickerItems = [NSArray array];
+                [self.stickerPickerStatusField setStringValue:([errorMessage length] > 0 ? errorMessage : @"No recent stickers yet")];
+            }
+            [self rebuildStickerPickerGrid];
+            [items release];
+            [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)showStickerPicker:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
+        return;
+    }
+    [self ensureStickerPickerWindow];
+    [self.stickerPickerWindow setTitle:TGLoc(@"stickers")];
+    [self.stickerPickerWindow center];
+    [self.stickerPickerWindow makeKeyAndOrderFront:nil];
+    if ([self.stickerPickerItems count] == 0) {
+        [self reloadStickerPickerItems];
+    } else {
+        [self rebuildStickerPickerGrid];
+    }
+}
+
+- (void)sendStickerFromPickerButton:(id)sender {
+    NSInteger stickerIndex = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
+    id represented = (stickerIndex >= 0 && (NSUInteger)stickerIndex < [self.stickerPickerItems count]) ? [self.stickerPickerItems objectAtIndex:(NSUInteger)stickerIndex] : nil;
+    if (![represented isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSDictionary *sticker = (NSDictionary *)represented;
+    NSNumber *fileID = TGMediaItemFullFileID(sticker);
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        fileID = [sticker objectForKey:@"file_id"];
+    }
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        [self appendDetail:@"Sticker file id is not available."];
+        return;
+    }
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    NSString *emoji = [[sticker objectForKey:@"emoji"] copy];
+    NSNumber *width = [[sticker objectForKey:@"width"] retain];
+    NSNumber *height = [[sticker objectForKey:@"height"] retain];
+    [self.stickerPickerWindow orderOut:nil];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"Sending sticker..."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSString *summary = [[client sendStickerMessageToChatID:chatID
+                                                messageThreadID:messageThreadID
+                                               messageTopicKind:messageTopicKind
+                                                  stickerFileID:fileID
+                                                          emoji:emoji
+                                                          width:width
+                                                         height:height
+                                                        timeout:10.0
+                                                          error:&sendError] copy];
+        NSString *errorMessage = [[sendError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([summary length] > 0) {
+                [self.statusField setStringValue:@"Sticker sent"];
+                self.forceMessageScrollToNewest = YES;
+                self.pendingLiveChatRefresh = YES;
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+            } else {
+                [self.statusField setStringValue:@"Sticker send failed"];
+                [self appendDetail:([errorMessage length] > 0 ? errorMessage : @"Sticker send was not confirmed.")];
+            }
+            [self setControlsBusy:NO];
+            [self requestComposerRefocus];
+            [errorMessage release];
+            [summary release];
+            [chatID release];
+            [messageThreadID release];
+            [messageTopicKind release];
+            [emoji release];
+            [width release];
+            [height release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (NSString *)temporaryVoiceRecordingPath {
+    NSString *directory = [NSTemporaryDirectory() stringByAppendingPathComponent:@"TelegraphicaVoice"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:NULL];
+    NSString *name = [NSString stringWithFormat:@"voice-%lld.m4a", (long long)([[NSDate date] timeIntervalSince1970] * 1000.0)];
+    return [directory stringByAppendingPathComponent:name];
+}
+
+- (void)ensureVoicePreviewWindow {
+    if (self.voicePreviewWindow) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(0, 0, 420, 170);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO] autorelease];
+    [window setTitle:@"Voice message"];
+    [window setReleasedWhenClosed:NO];
+    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    [window setContentView:contentView];
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 112, 372, 24)
+                                              text:@"Voice message ready"
+                                              font:[NSFont boldSystemFontOfSize:15.0]];
+    [titleField setAlignment:NSCenterTextAlignment];
+    [contentView addSubview:titleField];
+    self.voicePreviewTitleField = titleField;
+
+    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(42, 54, 84, 30)] autorelease];
+    [playButton setTitle:@"Play"];
+    [playButton setTarget:self];
+    [playButton setAction:@selector(toggleVoicePreviewPlayback:)];
+    [self applySkeuomorphicButtonStyle:playButton isPrimary:NO];
+    [contentView addSubview:playButton];
+    self.voicePreviewPlayButton = playButton;
+
+    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(178, 24, 92, 30)];
+    [cancelButton setTitle:TGLoc(@"cancel")];
+    [cancelButton setTarget:self];
+    [cancelButton setAction:@selector(cancelVoicePreview:)];
+    [contentView addSubview:cancelButton];
+
+    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(286, 24, 92, 30)] autorelease];
+    [sendButton setTitle:TGLoc(@"send")];
+    [sendButton setTarget:self];
+    [sendButton setAction:@selector(sendVoicePreview:)];
+    [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
+    [contentView addSubview:sendButton];
+
+    self.voicePreviewWindow = window;
+}
+
+- (void)toggleVoiceRecording:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        return;
+    }
+
+    if ([self.voiceRecorder isRecording]) {
+        [self.voiceRecorder stop];
+        self.voiceRecorder = nil;
+        [self.voiceRecordButton setToolTip:@"Record voice message"];
+        [self.statusField setStringValue:@"Voice recorded"];
+        [self ensureVoicePreviewWindow];
+        NSTimeInterval duration = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
+        [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
+        [self.voicePreviewPlayButton setTitle:@"Play"];
+        [self.voicePreviewWindow center];
+        [self.voicePreviewWindow makeKeyAndOrderFront:nil];
+        return;
+    }
+
+    NSString *path = [self temporaryVoiceRecordingPath];
+    NSURL *url = [NSURL fileURLWithPath:path];
+    NSDictionary *settings = [NSDictionary dictionaryWithObjectsAndKeys:
+                              [NSNumber numberWithInt:kAudioFormatMPEG4AAC], AVFormatIDKey,
+                              [NSNumber numberWithFloat:44100.0], AVSampleRateKey,
+                              [NSNumber numberWithInt:1], AVNumberOfChannelsKey,
+                              [NSNumber numberWithInt:AVAudioQualityMedium], AVEncoderAudioQualityKey,
+                              nil];
+    NSError *recordError = nil;
+    AVAudioRecorder *recorder = [[[AVAudioRecorder alloc] initWithURL:url settings:settings error:&recordError] autorelease];
+    if (!recorder) {
+        [self appendDetail:[NSString stringWithFormat:@"Voice recorder: %@", [recordError localizedDescription] ? [recordError localizedDescription] : @"could not start"]];
+        return;
+    }
+    [recorder prepareToRecord];
+    if (![recorder record]) {
+        [self appendDetail:@"Voice recorder could not start recording."];
+        return;
+    }
+    self.voiceRecordingPath = path;
+    self.voiceRecordingStartDate = [NSDate date];
+    self.voiceRecorder = recorder;
+    [self.statusField setStringValue:@"Recording voice..."];
+    [self.voiceRecordButton setToolTip:@"Click again to stop recording"];
+}
+
+- (void)toggleVoicePreviewPlayback:(id)sender {
+    (void)sender;
+    if ([self.voicePreviewPlayer isPlaying]) {
+        [self.voicePreviewPlayer pause];
+        [self.voicePreviewPlayButton setTitle:@"Play"];
+        return;
+    }
+    if ([self.voiceRecordingPath length] == 0) {
+        return;
+    }
+    NSError *playError = nil;
+    AVAudioPlayer *player = [[[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:self.voiceRecordingPath] error:&playError] autorelease];
+    if (!player) {
+        [self appendDetail:[NSString stringWithFormat:@"Voice preview: %@", [playError localizedDescription] ? [playError localizedDescription] : @"could not play"]];
+        return;
+    }
+    self.voicePreviewPlayer = player;
+    [self.voicePreviewPlayer play];
+    [self.voicePreviewPlayButton setTitle:@"Pause"];
+}
+
+- (void)cancelVoicePreview:(id)sender {
+    (void)sender;
+    [self.voicePreviewPlayer stop];
+    self.voicePreviewPlayer = nil;
+    if ([self.voiceRecordingPath length] > 0) {
+        [[NSFileManager defaultManager] removeItemAtPath:self.voiceRecordingPath error:NULL];
+    }
+    self.voiceRecordingPath = nil;
+    self.voiceRecordingStartDate = nil;
+    [self.voicePreviewWindow orderOut:nil];
+    [self requestComposerRefocus];
+}
+
+- (void)sendVoicePreview:(id)sender {
+    (void)sender;
+    if ([self.voiceRecordingPath length] == 0) {
+        return;
+    }
+
+    NSString *path = [self.voiceRecordingPath copy];
+    NSTimeInterval durationInterval = 0.0;
+    AVAudioPlayer *durationPlayer = [[[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:path] error:NULL] autorelease];
+    if (durationPlayer) {
+        durationInterval = [durationPlayer duration];
+    } else if (self.voiceRecordingStartDate) {
+        durationInterval = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
+    }
+    NSNumber *duration = [NSNumber numberWithInteger:(NSInteger)ceil(durationInterval)];
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    [self.voicePreviewWindow orderOut:nil];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"Sending voice..."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSString *summary = [[client sendVoiceMessageToChatID:chatID
+                                              messageThreadID:messageThreadID
+                                             messageTopicKind:messageTopicKind
+                                                    localPath:path
+                                                     duration:duration
+                                                      caption:@""
+                                                      timeout:14.0
+                                                        error:&sendError] copy];
+        NSString *errorMessage = [[sendError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([summary length] > 0) {
+                [self.statusField setStringValue:@"Voice sent"];
+                self.forceMessageScrollToNewest = YES;
+                self.pendingLiveChatRefresh = YES;
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                self.voiceRecordingPath = nil;
+                self.voiceRecordingStartDate = nil;
+            } else {
+                [self.statusField setStringValue:@"Voice send failed"];
+                [self appendDetail:([errorMessage length] > 0 ? errorMessage : @"Voice send was not confirmed.")];
+            }
+            [self setControlsBusy:NO];
+            [self requestComposerRefocus];
+            [summary release];
+            [errorMessage release];
+            [path release];
+            [chatID release];
+            [messageThreadID release];
+            [messageTopicKind release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)sendPhotoAtPath:(NSString *)path {
+    [self presentPhotoSendPreviewForPath:path];
 }
 
 - (void)attachPhoto:(id)sender {
@@ -10253,6 +11712,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(reloadChatFiltersIfReady)
                                                object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(checkForUpdatesOnLaunch)
+                                               object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(refreshSelectedMessagesAfterMediaSend)
+                                               object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(markCurrentSelectionReadAfterNotification)
+                                               object:nil];
     [self stopLiveUpdateTimer];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
@@ -10304,6 +11772,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_sendTextFieldBackgroundView release];
     [_sendTextField release];
     [_attachPhotoButton release];
+    [_stickerButton release];
+    [_voiceRecordButton release];
     [_sendMessageButton release];
     [_authLabel release];
     [_authStateField release];
@@ -10364,6 +11834,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsNotificationSoundButton release];
     [_settingsNotificationBadgeButton release];
     [_settingsDrawerHiddenButton release];
+    [_settingsLanguageLabel release];
+    [_settingsLanguagePopUpButton release];
+    [_settingsDownloadFolderButton release];
+    [_settingsCheckUpdatesButton release];
     [_logoutButton release];
     [_aboutIconView release];
     [_aboutTitleField release];
@@ -10403,6 +11877,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPlaybackPlayer pause];
     [_mediaPlaybackLayer removeFromSuperlayer];
     [_mediaPlaybackWindow close];
+    [_photoSendPreviewWindow setDelegate:nil];
+    [_photoSendCaptionField setDelegate:nil];
+    [_photoSendPreviewWindow close];
+    [_stickerPickerWindow setDelegate:nil];
+    [_stickerPickerWindow close];
+    [_voiceRecorder stop];
+    [_voicePreviewPlayer stop];
+    [_voicePreviewWindow setDelegate:nil];
+    [_voicePreviewWindow close];
     [_logsWindow release];
     [_aboutWindow release];
     [_appearanceWindow release];
@@ -10415,6 +11898,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPlaybackPlayPauseButton release];
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackLayer release];
+    [_photoSendPreviewWindow release];
+    [_photoSendPreviewImageView release];
+    [_photoSendCaptionField release];
+    [_photoSendTitleField release];
+    [_pendingPhotoSendPath release];
+    [_pendingPhotoSendChatID release];
+    [_pendingPhotoSendThreadID release];
+    [_pendingPhotoSendTopicKind release];
+    [_stickerPickerWindow release];
+    [_stickerPickerScrollView release];
+    [_stickerPickerContentView release];
+    [_stickerPickerItems release];
+    [_stickerPickerStatusField release];
+    [_voiceRecorder release];
+    [_voicePreviewPlayer release];
+    [_voiceRecordingPath release];
+    [_voiceRecordingStartDate release];
+    [_voicePreviewWindow release];
+    [_voicePreviewTitleField release];
+    [_voicePreviewPlayButton release];
     [_messageContextMenu release];
     [_chatContextMenu release];
     [_mediaPreviewPath release];
