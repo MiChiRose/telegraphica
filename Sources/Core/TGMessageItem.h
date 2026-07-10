@@ -12,6 +12,8 @@
 @property (nonatomic, copy) NSString *mediaLocalPath;
 @property (nonatomic, retain) NSNumber *mediaWidth;
 @property (nonatomic, retain) NSNumber *mediaHeight;
+@property (nonatomic, retain) NSNumber *mediaAlbumID;
+@property (nonatomic, copy) NSArray *mediaItems;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -22,6 +24,9 @@
 - (BOOL)isStickerMessage;
 - (BOOL)isDocumentMessage;
 - (BOOL)isVisualMediaMessage;
+- (BOOL)isMediaAlbumMessage;
+- (NSArray *)visualMediaItems;
+- (void)addVisualMediaFromMessageItem:(TGMessageItem *)item;
 - (NSString *)visualMediaPlaceholderTitle;
 - (NSString *)directionSummary;
 - (id)valueForTableColumnIdentifier:(id)identifier;
