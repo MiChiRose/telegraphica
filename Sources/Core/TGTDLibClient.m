@@ -95,6 +95,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
 - (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSString *)reactionSummaryFromMessageObject:(NSDictionary *)messageObject;
+- (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject;
 - (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject;
 - (NSString *)messageTopicKindFromMessageObject:(NSDictionary *)messageObject;
@@ -472,6 +473,47 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
             }
         }
 
+        return summary;
+    }
+
+    if ([type isEqualToString:@"updateChatAction"]) {
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"chat_action" forKey:@"kind"];
+        id chatID = [dictionary objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        }
+        id threadID = [dictionary objectForKey:@"message_thread_id"];
+        if ([threadID respondsToSelector:@selector(longLongValue)] && [threadID longLongValue] > 0) {
+            [summary setObject:[NSNumber numberWithLongLong:[threadID longLongValue]] forKey:@"message_thread_id"];
+        }
+        id senderObject = [dictionary objectForKey:@"sender_id"];
+        if ([senderObject isKindOfClass:[NSDictionary class]]) {
+            id senderType = [(NSDictionary *)senderObject objectForKey:@"@type"];
+            id senderID = [(NSDictionary *)senderObject objectForKey:@"user_id"];
+            if (![senderID respondsToSelector:@selector(longLongValue)]) {
+                senderID = [(NSDictionary *)senderObject objectForKey:@"chat_id"];
+            }
+            if ([senderType isKindOfClass:[NSString class]]) {
+                [summary setObject:senderType forKey:@"sender_type"];
+            }
+            if ([senderID respondsToSelector:@selector(longLongValue)]) {
+                [summary setObject:[NSNumber numberWithLongLong:[senderID longLongValue]] forKey:@"sender_id"];
+            }
+        }
+        id actionObject = [dictionary objectForKey:@"action"];
+        NSString *actionType = nil;
+        if ([actionObject isKindOfClass:[NSDictionary class]]) {
+            id actionTypeObject = [(NSDictionary *)actionObject objectForKey:@"@type"];
+            if ([actionTypeObject isKindOfClass:[NSString class]]) {
+                actionType = (NSString *)actionTypeObject;
+            }
+        }
+        if ([actionType length] == 0) {
+            actionType = @"chatActionCancel";
+        }
+        [summary setObject:actionType forKey:@"action_type"];
+        [summary setObject:[NSNumber numberWithBool:![actionType isEqualToString:@"chatActionCancel"]] forKey:@"active"];
         return summary;
     }
 
@@ -1850,6 +1892,9 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
+        [item setServerNotificationsMuted:serverMuted];
+        [item setNotificationsMuted:serverMuted];
         id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
         if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
@@ -2057,6 +2102,9 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
+        [item setServerNotificationsMuted:serverMuted];
+        [item setNotificationsMuted:serverMuted];
         id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
         if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
@@ -2811,6 +2859,19 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                   timeout:timeout
                                        didRequestDownload:didRequestDownload];
     }
+    if ([type isEqualToString:@"messageDocument"]) {
+        id documentObject = [content objectForKey:@"document"];
+        if ([documentObject isKindOfClass:[NSDictionary class]]) {
+            id mimeTypeObject = [(NSDictionary *)documentObject objectForKey:@"mime_type"];
+            NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
+            if ([mimeType hasPrefix:@"video/"] || [mimeType hasPrefix:@"audio/"]) {
+                return [self playableMediaInfoFromContainerObject:documentObject
+                                                  downloadMissing:NO
+                                                          timeout:timeout
+                                               didRequestDownload:didRequestDownload];
+            }
+        }
+    }
     return nil;
 }
 
@@ -2947,6 +3008,24 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
         return nil;
     }
     return [parts componentsJoinedByString:@"  "];
+}
+
+- (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject {
+    if (![chatObject isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+
+    id settingsObject = [chatObject objectForKey:@"notification_settings"];
+    if (![settingsObject isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+
+    id muteFor = [(NSDictionary *)settingsObject objectForKey:@"mute_for"];
+    if ([muteFor respondsToSelector:@selector(integerValue)] && [muteFor integerValue] > 0) {
+        return YES;
+    }
+
+    return NO;
 }
 
 - (NSArray *)messagePreviewItemsFromMessages:(NSArray *)messages chatID:(NSNumber *)chatID {
@@ -3171,6 +3250,9 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                      title:title
                                                typeSummary:@"Message thread"
                                                unreadCount:unreadCount] autorelease];
+    BOOL serverMuted = [self chatNotificationsMutedFromObject:threadInfo];
+    [item setServerNotificationsMuted:serverMuted];
+    [item setNotificationsMuted:serverMuted];
     [item setForumTopic:YES];
     [item setParentChatID:chatID];
     [item setMessageThreadID:[NSNumber numberWithLongLong:[threadID longLongValue]]];
@@ -3213,6 +3295,9 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
                                                                   title:([topicTitle length] > 0 ? topicTitle : @"Topic")
                                                             typeSummary:@"Forum topic"
                                                             unreadCount:(unreadCount ? unreadCount : [NSNumber numberWithInteger:0])] autorelease];
+            BOOL serverMuted = [self chatNotificationsMutedFromObject:topic];
+            [topicItem setServerNotificationsMuted:serverMuted];
+            [topicItem setNotificationsMuted:serverMuted];
             id lastReadOutboxValue = [topic objectForKey:@"last_read_outbox_message_id"];
             if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
                 [topicItem setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];

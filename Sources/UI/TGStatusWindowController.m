@@ -26,6 +26,7 @@ static NSString * const TGThemeDefaultsKey = @"TelegraphicaThemeIdentifier";
 static NSString * const TGNotificationsEnabledDefaultsKey = @"TelegraphicaNotificationsEnabled";
 static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNotificationSoundEnabled";
 static NSString * const TGNotificationBadgeEnabledDefaultsKey = @"TelegraphicaNotificationBadgeEnabled";
+static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
 static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
 static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
@@ -817,9 +818,14 @@ static BOOL TGMediaItemIsVideo(NSDictionary *mediaItem) {
 
 static BOOL TGMediaItemIsPlayable(NSDictionary *mediaItem) {
     NSString *contentType = TGMediaItemContentType(mediaItem);
-    return ([contentType isEqualToString:@"messageAnimation"] ||
-            [contentType isEqualToString:@"messageVideo"] ||
-            [contentType isEqualToString:@"messageVideoNote"]);
+    if ([contentType isEqualToString:@"messageAnimation"] ||
+        [contentType isEqualToString:@"messageVideo"] ||
+        [contentType isEqualToString:@"messageVideoNote"]) {
+        return YES;
+    }
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
+    return ([mimeType hasPrefix:@"video/"] || [mimeType hasPrefix:@"audio/"]);
 }
 
 static NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
@@ -831,7 +837,23 @@ static NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
     if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
         return (NSString *)path;
     }
-    return TGMediaItemLocalPath(mediaItem);
+    path = TGMediaItemLocalPath(mediaItem);
+    if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
+        NSString *extension = [[(NSString *)path pathExtension] lowercaseString];
+        if ([extension isEqualToString:@"mp4"] ||
+            [extension isEqualToString:@"mov"] ||
+            [extension isEqualToString:@"m4v"] ||
+            [extension isEqualToString:@"webm"] ||
+            [extension isEqualToString:@"gif"] ||
+            [extension isEqualToString:@"mp3"] ||
+            [extension isEqualToString:@"m4a"] ||
+            [extension isEqualToString:@"aac"] ||
+            [extension isEqualToString:@"ogg"] ||
+            [extension isEqualToString:@"opus"]) {
+            return (NSString *)path;
+        }
+    }
+    return nil;
 }
 
 static NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -1871,7 +1893,9 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
 
     NSInteger unreadCount = [[item unreadCount] respondsToSelector:@selector(integerValue)] ? [[item unreadCount] integerValue] : 0;
     NSString *unreadString = @"";
-    if (unreadCount > 999) {
+    if ([item notificationsMuted]) {
+        unreadString = @"";
+    } else if (unreadCount > 999) {
         unreadString = @"999+";
     } else if (unreadCount > 0) {
         unreadString = [NSString stringWithFormat:@"%ld", (long)unreadCount];
@@ -2896,6 +2920,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *chatsLabel;
 @property (nonatomic, retain) NSTextField *messagesLabel;
 @property (nonatomic, retain) NSTextField *selectedChatField;
+@property (nonatomic, retain) NSTextField *typingIndicatorField;
 @property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
 @property (nonatomic, retain) NSButton *selectedChatProfileButton;
 @property (nonatomic, retain) NSView *chatScrollSurfaceView;
@@ -2974,6 +2999,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
+@property (nonatomic, retain) NSMenu *chatContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
 @property (nonatomic, assign) NSUInteger mediaPreviewRequestGeneration;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
@@ -3007,6 +3033,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL showingForumTopicList;
 @property (nonatomic, assign) CGFloat mediaPreviewZoomScale;
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
+@property (nonatomic, retain) NSNumber *typingChatID;
+@property (nonatomic, copy) NSString *typingIndicatorText;
+@property (nonatomic, retain) NSTimer *typingClearTimer;
 @end
 
 @implementation TGStatusWindowController
@@ -3065,6 +3094,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize chatsLabel = _chatsLabel;
 @synthesize messagesLabel = _messagesLabel;
 @synthesize selectedChatField = _selectedChatField;
+@synthesize typingIndicatorField = _typingIndicatorField;
 @synthesize selectedChatAvatarView = _selectedChatAvatarView;
 @synthesize selectedChatProfileButton = _selectedChatProfileButton;
 @synthesize chatScrollSurfaceView = _chatScrollSurfaceView;
@@ -3143,6 +3173,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
 @synthesize messageContextMenu = _messageContextMenu;
+@synthesize chatContextMenu = _chatContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -3172,6 +3203,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
+@synthesize typingChatID = _typingChatID;
+@synthesize typingIndicatorText = _typingIndicatorText;
+@synthesize typingClearTimer = _typingClearTimer;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
@@ -3572,10 +3606,82 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (void)refreshSelectedChatHeaderDisplay {
     NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Select a chat";
     [self.selectedChatField setStringValue:title];
+    NSString *typingText = @"";
+    if ([self.typingIndicatorText length] > 0 &&
+        [self.typingChatID respondsToSelector:@selector(longLongValue)] &&
+        [self.selectedChatID respondsToSelector:@selector(longLongValue)] &&
+        [self.typingChatID longLongValue] == [self.selectedChatID longLongValue]) {
+        typingText = self.typingIndicatorText;
+    }
+    [self.typingIndicatorField setStringValue:typingText];
+    [self.typingIndicatorField setHidden:([typingText length] == 0)];
     [self.selectedChatAvatarView setDisplayName:title];
     [self.selectedChatAvatarView setAvatarLocalPath:self.selectedChatAvatarLocalPath];
     [self.selectedChatProfileButton setToolTip:(self.selectedChatID ? @"Open chat profile" : @"Select a chat")];
     [self.selectedChatAvatarView setNeedsDisplay:YES];
+}
+
+- (void)clearTypingIndicator {
+    [self.typingClearTimer invalidate];
+    self.typingClearTimer = nil;
+    self.typingChatID = nil;
+    self.typingIndicatorText = nil;
+    [self refreshSelectedChatHeaderDisplay];
+    [self layoutContentView];
+}
+
+- (void)clearTypingIndicatorTimerFired:(NSTimer *)timer {
+    (void)timer;
+    [self clearTypingIndicator];
+}
+
+- (NSString *)typingIndicatorTextForSelectedChat {
+    NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"";
+    if ([self.selectedChatTypeSummary isEqualToString:@"Private"] && [title length] > 0) {
+        return [NSString stringWithFormat:@"%@ пишет...", title];
+    }
+    return @"Кто-то пишет...";
+}
+
+- (void)handleTypingUpdateSummary:(NSDictionary *)summary {
+    if (![summary isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSNumber *chatID = [summary objectForKey:@"chat_id"];
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![self.selectedChatID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] != [self.selectedChatID longLongValue]) {
+        return;
+    }
+
+    NSNumber *threadID = [summary objectForKey:@"message_thread_id"];
+    BOOL threadMatches = NO;
+    if (![threadID respondsToSelector:@selector(longLongValue)] || [threadID longLongValue] <= 0) {
+        threadMatches = (self.selectedMessageThreadID == nil);
+    } else {
+        threadMatches = (self.selectedMessageThreadID && [self.selectedMessageThreadID longLongValue] == [threadID longLongValue]);
+    }
+    if (!threadMatches) {
+        return;
+    }
+
+    id activeObject = [summary objectForKey:@"active"];
+    BOOL active = ([activeObject respondsToSelector:@selector(boolValue)] && [activeObject boolValue]);
+    if (!active) {
+        [self clearTypingIndicator];
+        return;
+    }
+
+    self.typingChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
+    self.typingIndicatorText = [self typingIndicatorTextForSelectedChat];
+    [self.typingClearTimer invalidate];
+    self.typingClearTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
+                                                             target:self
+                                                           selector:@selector(clearTypingIndicatorTimerFired:)
+                                                           userInfo:nil
+                                                            repeats:NO];
+    [self refreshSelectedChatHeaderDisplay];
+    [self layoutContentView];
 }
 
 - (void)clearForumTopicListState {
@@ -3871,6 +3977,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyTransparentChatTableStyle];
     [self.chatTableView setHeaderView:nil];
 
+    self.chatContextMenu = [[[NSMenu alloc] initWithTitle:@"Chat"] autorelease];
+    [self.chatContextMenu setDelegate:self];
+    [self.chatTableView setMenu:self.chatContextMenu];
+
     NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"chat"] autorelease];
     [[chatColumn headerCell] setStringValue:@"Chat"];
     TGChatListCell *chatCell = [[[TGChatListCell alloc] initTextCell:@""] autorelease];
@@ -3920,6 +4030,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
     [[self.selectedChatField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [contentView addSubview:self.selectedChatField];
+
+    self.typingIndicatorField = [self labelWithFrame:NSMakeRect(264, 184, 472, 16)
+                                                text:@""
+                                                font:[NSFont systemFontOfSize:10.0]];
+    [self applyPanelHeaderDetailStyle:self.typingIndicatorField];
+    [self.typingIndicatorField setFont:[NSFont systemFontOfSize:10.0]];
+    [self.typingIndicatorField setAlphaValue:0.85];
+    [[self.typingIndicatorField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [self.typingIndicatorField setHidden:YES];
+    [contentView addSubview:self.typingIndicatorField];
 
     self.selectedChatAvatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(232, 194, 26, 26)] autorelease];
     [self.selectedChatAvatarView setDisplayName:@"Select a chat"];
@@ -4684,6 +4804,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([contentType isEqualToString:@"messageVideo"]) {
         return @"Video";
     }
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
+    if ([mimeType hasPrefix:@"video/"]) {
+        return @"Video";
+    }
+    if ([mimeType hasPrefix:@"audio/"]) {
+        return @"Audio";
+    }
     return TGMediaItemPlaceholder(mediaItem);
 }
 
@@ -5310,6 +5438,127 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self appendDetail:[NSString stringWithFormat:@"Theme changed: %@", TGThemeDisplayNameForIdentifier(themeIdentifier)]];
 }
 
+- (NSNumber *)notificationChatIDForChatItem:(TGChatItem *)item {
+    if (![item isKindOfClass:[TGChatItem class]]) {
+        return nil;
+    }
+    id chatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSNumber numberWithLongLong:[chatID longLongValue]];
+}
+
+- (NSString *)chatMuteDefaultsKeyForChatID:(NSNumber *)chatID {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%lld", [chatID longLongValue]];
+}
+
+- (NSMutableDictionary *)mutableChatMuteOverrides {
+    id stored = [[NSUserDefaults standardUserDefaults] objectForKey:TGChatNotificationMuteOverridesDefaultsKey];
+    if ([stored isKindOfClass:[NSDictionary class]]) {
+        return [NSMutableDictionary dictionaryWithDictionary:(NSDictionary *)stored];
+    }
+    return [NSMutableDictionary dictionary];
+}
+
+- (NSTimeInterval)localNotificationMuteUntilForChatID:(NSNumber *)chatID {
+    NSString *key = [self chatMuteDefaultsKeyForChatID:chatID];
+    if ([key length] == 0) {
+        return 0.0;
+    }
+    NSDictionary *overrides = [[NSUserDefaults standardUserDefaults] objectForKey:TGChatNotificationMuteOverridesDefaultsKey];
+    if (![overrides isKindOfClass:[NSDictionary class]]) {
+        return 0.0;
+    }
+    id value = [(NSDictionary *)overrides objectForKey:key];
+    if (![value respondsToSelector:@selector(doubleValue)]) {
+        return 0.0;
+    }
+    NSTimeInterval muteUntil = [value doubleValue];
+    if (muteUntil < 0.0) {
+        return muteUntil;
+    }
+    if (muteUntil > [[NSDate date] timeIntervalSince1970]) {
+        return muteUntil;
+    }
+    NSMutableDictionary *mutableOverrides = [self mutableChatMuteOverrides];
+    [mutableOverrides removeObjectForKey:key];
+    [[NSUserDefaults standardUserDefaults] setObject:mutableOverrides forKey:TGChatNotificationMuteOverridesDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    return 0.0;
+}
+
+- (BOOL)isChatIDLocallyMuted:(NSNumber *)chatID {
+    return ([self localNotificationMuteUntilForChatID:chatID] != 0.0);
+}
+
+- (BOOL)isChatItemEffectivelyMuted:(TGChatItem *)item {
+    if (![item isKindOfClass:[TGChatItem class]]) {
+        return NO;
+    }
+    return ([item serverNotificationsMuted] || [self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]);
+}
+
+- (void)applyLocalNotificationMuteStateToItems:(NSArray *)items {
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        id candidate = [items objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        TGChatItem *item = (TGChatItem *)candidate;
+        [item setNotificationsMuted:[self isChatItemEffectivelyMuted:item]];
+    }
+}
+
+- (BOOL)isChatIDMutedForNotifications:(NSNumber *)chatID {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return NO;
+    }
+    if ([self isChatIDLocallyMuted:chatID]) {
+        return YES;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [self.chatItems count]; index++) {
+        id candidate = [self.chatItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        TGChatItem *item = (TGChatItem *)candidate;
+        NSNumber *itemChatID = [self notificationChatIDForChatItem:item];
+        if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == [chatID longLongValue]) {
+            return [item notificationsMuted];
+        }
+    }
+    return NO;
+}
+
+- (void)setLocalNotificationMuteForChatID:(NSNumber *)chatID duration:(NSTimeInterval)duration {
+    NSString *key = [self chatMuteDefaultsKeyForChatID:chatID];
+    if ([key length] == 0) {
+        return;
+    }
+
+    NSMutableDictionary *overrides = [self mutableChatMuteOverrides];
+    if (duration == 0.0) {
+        [overrides removeObjectForKey:key];
+    } else if (duration < 0.0) {
+        [overrides setObject:[NSNumber numberWithDouble:-1.0] forKey:key];
+    } else {
+        NSTimeInterval muteUntil = [[NSDate date] timeIntervalSince1970] + duration;
+        [overrides setObject:[NSNumber numberWithDouble:muteUntil] forKey:key];
+    }
+
+    [[NSUserDefaults standardUserDefaults] setObject:overrides forKey:TGChatNotificationMuteOverridesDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self applyLocalNotificationMuteStateToItems:self.chatItems];
+    [self.chatTableView reloadData];
+    [self updateApplicationBadge];
+}
+
 - (NSUInteger)totalUnreadCountFromChatItems {
     NSUInteger total = 0;
     NSUInteger index = 0;
@@ -5318,7 +5567,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         if (![candidate isKindOfClass:[TGChatItem class]]) {
             continue;
         }
-        NSNumber *unreadCount = [(TGChatItem *)candidate unreadCount];
+        TGChatItem *item = (TGChatItem *)candidate;
+        if ([item notificationsMuted]) {
+            continue;
+        }
+        NSNumber *unreadCount = [item unreadCount];
         if ([unreadCount respondsToSelector:@selector(integerValue)] && [unreadCount integerValue] > 0) {
             total += (NSUInteger)[unreadCount integerValue];
         }
@@ -5395,6 +5648,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     NSNumber *chatID = [summary objectForKey:@"chat_id"];
+    if ([self isChatIDMutedForNotifications:chatID]) {
+        return;
+    }
     NSString *title = [self titleForChatID:chatID fallback:@"Telegram"];
     NSString *preview = [summary objectForKey:@"preview"];
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
@@ -5403,6 +5659,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
+    if ([notification respondsToSelector:NSSelectorFromString(@"setContentImage:")]) {
+        [notification setValue:nil forKey:@"contentImage"];
+    }
     if (TGUserDefaultBoolWithDefault(TGNotificationSoundEnabledDefaultsKey, YES)) {
         [notification setSoundName:NSUserNotificationDefaultSoundName];
     }
@@ -5467,6 +5726,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:showChats];
     [self showView:self.selectedChatField visible:showChats];
+    [self showView:self.typingIndicatorField visible:(showChats && [[self.typingIndicatorField stringValue] length] > 0)];
     BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
     [self showView:self.selectedChatAvatarView visible:showSelectedChatProfile];
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
@@ -5751,10 +6011,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (selectedTitleWidth < 120.0) {
         selectedTitleWidth = 120.0;
     }
+    BOOL hasTypingText = ([[self.typingIndicatorField stringValue] length] > 0);
+    CGFloat selectedTitleY = hasTypingText ? (headerLabelY + 4.0) : headerLabelY;
     [self.selectedChatField setFrame:NSMakeRect(selectedTitleX,
-                                                headerLabelY,
+                                                selectedTitleY,
                                                 selectedTitleWidth,
-                                                20.0)];
+                                                17.0)];
+    [self.typingIndicatorField setFrame:NSMakeRect(selectedTitleX,
+                                                   headerLabelY - 8.0,
+                                                   selectedTitleWidth,
+                                                   14.0)];
     [self.selectedChatProfileButton setFrame:NSMakeRect(selectedAvatarX,
                                                         selectedAvatarY - 2.0,
                                                         NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
@@ -6799,7 +7065,87 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return (url != nil);
 }
 
+- (TGChatItem *)chatItemAtCurrentEventWithRow:(NSInteger *)rowOut {
+    NSEvent *event = [NSApp currentEvent];
+    if (!event) {
+        return nil;
+    }
+    NSPoint tablePoint = [self.chatTableView convertPoint:[event locationInWindow] fromView:nil];
+    NSInteger row = [self.chatTableView rowAtPoint:tablePoint];
+    if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
+        return nil;
+    }
+    id item = [self.chatItems objectAtIndex:(NSUInteger)row];
+    if (![item isKindOfClass:[TGChatItem class]]) {
+        return nil;
+    }
+    if (rowOut) {
+        *rowOut = row;
+    }
+    return (TGChatItem *)item;
+}
+
+- (NSMenuItem *)chatMuteMenuItemWithTitle:(NSString *)title duration:(NSTimeInterval)duration chatItem:(TGChatItem *)item {
+    NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
+                                                       action:@selector(muteChatFromMenu:)
+                                                keyEquivalent:@""] autorelease];
+    NSDictionary *payload = [NSDictionary dictionaryWithObjectsAndKeys:
+                             item, @"chat",
+                             [NSNumber numberWithDouble:duration], @"duration",
+                             nil];
+    [menuItem setRepresentedObject:payload];
+    [menuItem setTarget:self];
+    return menuItem;
+}
+
+- (void)populateChatContextMenu:(NSMenu *)menu {
+    [menu removeAllItems];
+    NSInteger row = -1;
+    TGChatItem *item = [self chatItemAtCurrentEventWithRow:&row];
+    if (!item) {
+        return;
+    }
+
+    NSString *chatTitle = [[item title] length] > 0 ? [item title] : @"Chat";
+    NSMenuItem *titleItem = [[[NSMenuItem alloc] initWithTitle:chatTitle action:nil keyEquivalent:@""] autorelease];
+    [titleItem setEnabled:NO];
+    [menu addItem:titleItem];
+    [menu addItem:[NSMenuItem separatorItem]];
+
+    if ([item serverNotificationsMuted]) {
+        NSMenuItem *serverMutedItem = [[[NSMenuItem alloc] initWithTitle:@"Muted in Telegram" action:nil keyEquivalent:@""] autorelease];
+        [serverMutedItem setEnabled:NO];
+        [menu addItem:serverMutedItem];
+    }
+
+    if ([self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]) {
+        NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:@"Enable local notifications"
+                                                             action:@selector(unmuteChatFromMenu:)
+                                                      keyEquivalent:@""] autorelease];
+        [unmuteItem setRepresentedObject:item];
+        [unmuteItem setTarget:self];
+        [menu addItem:unmuteItem];
+    }
+
+    NSMenu *muteMenu = [[[NSMenu alloc] initWithTitle:@"Mute notifications"] autorelease];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 hour" duration:(60.0 * 60.0) chatItem:item]];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 8 hours" duration:(8.0 * 60.0 * 60.0) chatItem:item]];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 3 days" duration:(3.0 * 24.0 * 60.0 * 60.0) chatItem:item]];
+    [muteMenu addItem:[NSMenuItem separatorItem]];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"Forever" duration:-1.0 chatItem:item]];
+    NSMenuItem *muteRoot = [[[NSMenuItem alloc] initWithTitle:@"Mute notifications"
+                                                       action:nil
+                                                keyEquivalent:@""] autorelease];
+    [muteRoot setSubmenu:muteMenu];
+    [menu addItem:muteRoot];
+}
+
 - (void)menuNeedsUpdate:(NSMenu *)menu {
+    if (menu == self.chatContextMenu) {
+        [self populateChatContextMenu:menu];
+        return;
+    }
+
     if (menu != self.messageContextMenu) {
         return;
     }
@@ -6855,6 +7201,31 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [moreItem setSubmenu:moreMenu];
         [menu addItem:moreItem];
     }
+}
+
+- (void)muteChatFromMenu:(id)sender {
+    id payload = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![payload isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    TGChatItem *item = [(NSDictionary *)payload objectForKey:@"chat"];
+    NSNumber *duration = [(NSDictionary *)payload objectForKey:@"duration"];
+    NSNumber *chatID = [self notificationChatIDForChatItem:item];
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![duration respondsToSelector:@selector(doubleValue)]) {
+        return;
+    }
+    [self setLocalNotificationMuteForChatID:chatID duration:[duration doubleValue]];
+    [self appendDetail:[NSString stringWithFormat:@"Notifications muted locally for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
+}
+
+- (void)unmuteChatFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    NSNumber *chatID = [self notificationChatIDForChatItem:item];
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    [self setLocalNotificationMuteForChatID:chatID duration:0.0];
+    [self appendDetail:[NSString stringWithFormat:@"Local notifications enabled for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
 }
 
 - (void)sendReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item {
@@ -7250,6 +7621,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateOutgoingReadStateForVisibleMessages];
     [self refreshSelectedChatHeaderDisplay];
     if (selectionChanged) {
+        [self clearTypingIndicator];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
@@ -7329,6 +7701,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:items];
+    [self applyLocalNotificationMuteStateToItems:self.chatItems];
     [self.chatTableView reloadData];
     [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;
@@ -7460,6 +7833,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [topicItem setAvatarLocalPath:self.topicParentAvatarLocalPath];
         [topicItems addObject:topicItem];
     }
+    [self applyLocalNotificationMuteStateToItems:topicItems];
 
     self.suppressChatSelectionHandling = YES;
     [self.chatItems removeAllObjects];
@@ -8711,6 +9085,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
             }
+        } else if ([kind isEqualToString:@"chat_action"]) {
+            [self handleTypingUpdateSummary:summary];
         } else if ([kind isEqualToString:@"chat_filters"]) {
             needsChatFilterRefresh = YES;
         }
@@ -9294,6 +9670,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
     [_messageContextMenu setDelegate:nil];
+    [_chatContextMenu setDelegate:nil];
     [_sendTextField setDelegate:nil];
     [_authTextField setDelegate:nil];
     [_authSecureField setDelegate:nil];
@@ -9351,6 +9728,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_chatsLabel release];
     [_messagesLabel release];
     [_selectedChatField release];
+    [_typingIndicatorField release];
     [_selectedChatAvatarView release];
     [_selectedChatProfileButton release];
     [_chatScrollSurfaceView release];
@@ -9445,10 +9823,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackLayer release];
     [_messageContextMenu release];
+    [_chatContextMenu release];
     [_mediaPreviewPath release];
     [_logsWindowDetailsView release];
     [_logsCheckButton release];
     [_appearanceThemePopUpButton release];
+    [_typingClearTimer invalidate];
+    [_typingClearTimer release];
+    [_typingChatID release];
+    [_typingIndicatorText release];
     [super dealloc];
 }
 
