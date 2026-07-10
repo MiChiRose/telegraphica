@@ -2677,6 +2677,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.chatTableView = [[[NSTableView alloc] initWithFrame:[[self.chatScrollView contentView] bounds]] autorelease];
     [self.chatTableView setDataSource:self];
     [self.chatTableView setDelegate:self];
+    [self.chatTableView setTarget:self];
+    [self.chatTableView setAction:@selector(activateSelectedChatRow:)];
+    [self.chatTableView setDoubleAction:@selector(activateSelectedChatRow:)];
     [self.chatTableView setAllowsColumnReordering:NO];
     [self.chatTableView setAllowsMultipleSelection:NO];
     [self.chatTableView setRowHeight:38.0];
@@ -4775,7 +4778,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *previousChatID = [self.selectedChatID retain];
     NSNumber *previousThreadID = [self.selectedMessageThreadID retain];
     NSString *previousTopicKind = [self.selectedMessageTopicKind copy];
-    NSInteger row = [self.chatTableView selectedRow];
+    NSInteger clickedRow = [self.chatTableView clickedRow];
+    NSInteger row = (clickedRow >= 0) ? clickedRow : [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
@@ -4853,6 +4857,38 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [previousChatID release];
     [previousThreadID release];
     [previousTopicKind release];
+    [item release];
+}
+
+- (void)activateSelectedChatRow:(id)sender {
+    (void)sender;
+    if (self.suppressChatSelectionHandling || self.showingForumTopicList || self.forumTopicRefreshInFlight) {
+        return;
+    }
+
+    NSInteger row = [self.chatTableView selectedRow];
+    if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
+        return;
+    }
+
+    id candidate = [self.chatItems objectAtIndex:(NSUInteger)row];
+    if (![candidate isKindOfClass:[TGChatItem class]]) {
+        return;
+    }
+
+    TGChatItem *item = [(TGChatItem *)candidate retain];
+    if ([item isForumTopic] || ![[item typeSummary] isEqualToString:@"Supergroup"]) {
+        [item release];
+        return;
+    }
+
+    id chatID = [item chatID];
+    NSNumber *selectedChatID = nil;
+    if ([chatID respondsToSelector:@selector(longLongValue)]) {
+        selectedChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
+    }
+    [self removeForumTopicRowsPreservingChatID:selectedChatID];
+    [self loadForumTopicsForChatItem:item];
     [item release];
 }
 
