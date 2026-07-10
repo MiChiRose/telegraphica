@@ -19,6 +19,7 @@
 @property (nonatomic, retain) NSNumber *mediaDuration;
 @property (nonatomic, copy) NSString *mediaMimeType;
 @property (nonatomic, copy) NSString *reactionSummary;
+@property (nonatomic, copy) NSArray *chosenReactionEmojis;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
