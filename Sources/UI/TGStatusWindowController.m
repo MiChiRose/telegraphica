@@ -1115,18 +1115,33 @@ static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
     return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
 }
 
-static void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
-    if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing] || NSIsEmptyRect(bubbleRect)) {
+static CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
+    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 9.0 : 0.0;
+}
+
+static NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing]) {
+        return @"";
+    }
+
+    BOOL delivered = ![item sending];
+    BOOL read = delivered && [item outgoingRead];
+    unichar chars[2];
+    chars[0] = delivered ? 0x25CF : 0x25CB;
+    chars[1] = read ? 0x25CF : 0x25CB;
+    return [NSString stringWithCharacters:chars length:2];
+}
+
+static void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL flipped) {
+    (void)flipped;
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing] || NSIsEmptyRect(timeRect)) {
         return;
     }
 
-    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
     CGFloat dotSide = 3.0;
     CGFloat dotGap = 3.0;
-    CGFloat totalWidth = (dotSide * 2.0) + dotGap;
-    CGFloat dotX = NSMaxX(bubbleRect) - totalWidth - 9.0;
-    CGFloat dotY = flipped ? (NSMaxY(bubbleRect) - reactionBandHeight - 10.0)
-                           : (NSMinY(bubbleRect) + reactionBandHeight + 7.0);
+    CGFloat dotX = NSMaxX(timeRect) + 4.0;
+    CGFloat dotY = NSMinY(timeRect) + floor((NSHeight(timeRect) - dotSide) / 2.0) + 1.0;
     NSColor *strokeColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.72];
     NSColor *fillColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.86];
     BOOL delivered = ![item sending];
@@ -1146,6 +1161,19 @@ static void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect bubbleRe
     }
 }
 
+static CGFloat TGMessageMediaFooterHeightForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage]) {
+        return 0.0;
+    }
+
+    NSString *messageText = [item isStickerMessage] ? @"" : TGDisplayTextForMessageItem(item);
+    if ([messageText length] > 0) {
+        return 0.0;
+    }
+
+    return ([TGShortTimeStringFromDateValue([item date]) length] > 0) ? 18.0 : 0.0;
+}
+
 static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth) {
     if (!item) {
         return 48.0;
@@ -1159,18 +1187,35 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
                                 [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                 paragraph, NSParagraphStyleAttributeName,
                                 nil];
+    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    nil];
     CGFloat textHeight = 0.0;
     if ([text length] > 0) {
-        NSRect textRect = [text boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 1000.0)
-                                             options:NSStringDrawingUsesLineFragmentOrigin
-                                          attributes:attributes];
+        NSMutableAttributedString *composedText = [[[NSMutableAttributedString alloc] initWithString:text attributes:attributes] autorelease];
+        NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+        if ([timeString length] > 0) {
+            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
+                                                                                  attributes:timeAttributes] autorelease];
+            [composedText appendAttributedString:timeSuffixText];
+            NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
+            if ([statusDots length] > 0) {
+                NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:6.0] forKey:NSFontAttributeName];
+                NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@" %@", statusDots]
+                                                                                        attributes:statusAttributes] autorelease];
+                [composedText appendAttributedString:statusSuffixText];
+            }
+        }
+        NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 1000.0)
+                                                     options:NSStringDrawingUsesLineFragmentOrigin];
         textHeight = ceil(NSHeight(textRect));
     }
 
     CGFloat height = textHeight + 26.0;
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
-        height = photoSize.height + 24.0 + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
+        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
     }
     if (height < 42.0) {
         height = 42.0;
@@ -1208,6 +1253,15 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
+            NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
+            if ([statusDots length] > 0) {
+                NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:6.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
+                NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
+                NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
+                [composedMessageText appendAttributedString:statusSuffixText];
+            }
         }
     }
 
@@ -1221,6 +1275,7 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
     if (visualMediaMessage) {
         photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
     }
+    CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
 
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
     if (visualMediaMessage) {
@@ -1238,7 +1293,7 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
 
     CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
@@ -1300,6 +1355,91 @@ static NSInteger TGCompareMessageItemsAscending(id left, id right, void *context
     NSRect bounds = [self bounds];
     [TGClassicWindowBottomColor() set];
     NSRectFill(bounds);
+}
+
+@end
+
+@interface TGDropOverlayView : NSView
+@end
+
+@implementation TGDropOverlayView
+
+- (NSView *)hitTest:(NSPoint)aPoint {
+    (void)aPoint;
+    return nil;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = NSInsetRect([self bounds], 2.0, 2.0);
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:bounds xRadius:14.0 yRadius:14.0];
+
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.94] set];
+    [path fill];
+
+    CGFloat dashPattern[2] = { 10.0, 7.0 };
+    [path setLineDash:dashPattern count:2 phase:0.0];
+    [path setLineWidth:2.0];
+    [TGClassicNavigationSelectedColor(0.78) set];
+    [path stroke];
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:17.0], NSFontAttributeName,
+                                     TGClassicNavigationSelectedStrokeColor(0.88), NSForegroundColorAttributeName,
+                                     paragraph, NSParagraphStyleAttributeName,
+                                     nil];
+    NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                        TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                        paragraph, NSParagraphStyleAttributeName,
+                                        nil];
+    NSString *title = @"Drop files here to send them";
+    NSString *subtitle = @"in a quick way";
+    NSSize titleSize = [title sizeWithAttributes:titleAttributes];
+    NSSize subtitleSize = [subtitle sizeWithAttributes:subtitleAttributes];
+    CGFloat totalHeight = titleSize.height + 4.0 + subtitleSize.height;
+    CGFloat titleY = NSMidY(bounds) - floor(totalHeight / 2.0);
+    [title drawInRect:NSMakeRect(NSMinX(bounds) + 24.0,
+                                 titleY,
+                                 NSWidth(bounds) - 48.0,
+                                 titleSize.height + 2.0)
+        withAttributes:titleAttributes];
+    [subtitle drawInRect:NSMakeRect(NSMinX(bounds) + 24.0,
+                                    titleY + titleSize.height + 4.0,
+                                    NSWidth(bounds) - 48.0,
+                                    subtitleSize.height + 2.0)
+           withAttributes:subtitleAttributes];
+}
+
+@end
+
+@interface TGMessageTableView : NSTableView {
+    id _dropOverlayTarget;
+}
+@property (nonatomic, assign) id dropOverlayTarget;
+@end
+
+@implementation TGMessageTableView
+
+@synthesize dropOverlayTarget = _dropOverlayTarget;
+
+- (void)notifyDropOverlayTarget {
+    SEL selector = NSSelectorFromString(@"messageTableViewDragDidEnd:");
+    if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+        [_dropOverlayTarget performSelector:selector withObject:self];
+    }
+}
+
+- (void)draggingExited:(id <NSDraggingInfo>)sender {
+    (void)sender;
+    [self notifyDropOverlayTarget];
+}
+
+- (void)draggingEnded:(id <NSDraggingInfo>)sender {
+    (void)sender;
+    [self notifyDropOverlayTarget];
 }
 
 @end
@@ -2002,28 +2142,25 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    BOOL flipped = [controlView isFlipped];
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0, NSMidY(buttonRect) - 11.0, 18.0, 22.0);
-    NSBezierPath *clipPath = [NSBezierPath bezierPath];
-    [clipPath setLineWidth:2.0];
-    [clipPath setLineCapStyle:NSRoundLineCapStyle];
-    [clipPath setLineJoinStyle:NSRoundLineJoinStyle];
-    [clipPath moveToPoint:TGIconPoint(iconRect, 11.8, 16.8, flipped)];
-    [clipPath lineToPoint:TGIconPoint(iconRect, 11.8, 6.2, flipped)];
-    [clipPath curveToPoint:TGIconPoint(iconRect, 5.4, 6.2, flipped)
-             controlPoint1:TGIconPoint(iconRect, 11.8, 2.6, flipped)
-             controlPoint2:TGIconPoint(iconRect, 5.4, 2.6, flipped)];
-    [clipPath lineToPoint:TGIconPoint(iconRect, 5.4, 16.5, flipped)];
-    [clipPath curveToPoint:TGIconPoint(iconRect, 15.0, 16.5, flipped)
-             controlPoint1:TGIconPoint(iconRect, 5.4, 22.8, flipped)
-             controlPoint2:TGIconPoint(iconRect, 15.0, 22.8, flipped)];
-    [clipPath lineToPoint:TGIconPoint(iconRect, 15.0, 6.2, flipped)];
-    [clipPath curveToPoint:TGIconPoint(iconRect, 8.5, 6.2, flipped)
-             controlPoint1:TGIconPoint(iconRect, 15.0, 1.2, flipped)
-             controlPoint2:TGIconPoint(iconRect, 8.5, 1.2, flipped)];
-    [clipPath lineToPoint:TGIconPoint(iconRect, 8.5, 14.2, flipped)];
+    (void)controlView;
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 7.0, NSMidY(buttonRect) - 11.0, 14.0, 22.0);
+    NSBezierPath *outerPath = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMinX(iconRect) + 1.0,
+                                                                                 NSMinY(iconRect) + 1.0,
+                                                                                 11.5,
+                                                                                 19.5)
+                                                              xRadius:5.8
+                                                              yRadius:5.8];
+    NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMinX(iconRect) + 5.2,
+                                                                                 NSMinY(iconRect) + 5.4,
+                                                                                 4.8,
+                                                                                 11.6)
+                                                              xRadius:2.4
+                                                              yRadius:2.4];
     [TGClassicHeaderTextColor(alpha) set];
-    [clipPath stroke];
+    [outerPath setLineWidth:2.0];
+    [outerPath stroke];
+    [innerPath setLineWidth:1.7];
+    [innerPath stroke];
 }
 
 @end
@@ -2266,6 +2403,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
+            NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
+            if ([statusDots length] > 0) {
+                NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:6.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
+                NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
+                NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
+                [composedMessageText appendAttributedString:statusSuffixText];
+            }
         }
     }
     NSAttributedString *attributedMessageText = composedMessageText;
@@ -2279,6 +2425,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (visualMediaMessage) {
         photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
     }
+    CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
 
     CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
     if (visualMediaMessage) {
@@ -2295,7 +2442,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
@@ -2322,6 +2469,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
     if ([controlView isFlipped] && reactionBandHeight > 0.0) {
         contentTop -= reactionBandHeight;
+    }
+    if ([controlView isFlipped] && visualMediaMessage && [messageText length] == 0 && mediaFooterHeight > 0.0) {
+        contentTop -= mediaFooterHeight;
     }
     if (visualMediaMessage) {
         NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
@@ -2378,13 +2528,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     if ([timeString length] > 0 && [messageText length] == 0) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
+        CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
+        CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
         CGFloat timeY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionBandHeight - 14.0)
                                                 : (NSMinY(bubbleRect) + 4.0 + reactionBandHeight);
-        NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - 12.0,
+        NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - statusWidth - statusGap - 12.0,
                                      timeY,
                                      timeSize.width,
                                      10.0);
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
+        TGDrawOutgoingStatusDotsForItem(item, timeRect, [controlView isFlipped]);
     }
 
     NSString *reactionSummary = [item reactionSummary];
@@ -2425,8 +2578,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];
         }
     }
-
-    TGDrawOutgoingStatusDotsForItem(item, bubbleRect, [controlView isFlipped]);
 }
 
 - (void)dealloc {
@@ -2501,6 +2652,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
+@property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSTextField *profileTitleField;
 @property (nonatomic, retain) NSTextField *profileNameField;
@@ -2584,6 +2736,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL drawerOpen;
 @property (nonatomic, assign) BOOL loginErrorVisible;
 @property (nonatomic, assign) BOOL composerRefocusPending;
+@property (nonatomic, assign) BOOL messageDropOverlayVisible;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
@@ -2658,6 +2811,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize messageScrollSurfaceView = _messageScrollSurfaceView;
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
+@synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
 @synthesize profileTitleField = _profileTitleField;
 @synthesize profileNameField = _profileNameField;
@@ -2741,6 +2895,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize drawerOpen = _drawerOpen;
 @synthesize loginErrorVisible = _loginErrorVisible;
 @synthesize composerRefocusPending = _composerRefocusPending;
+@synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
@@ -3514,7 +3669,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.messageScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [self applySkeuomorphicScrollStyle:self.messageScrollView];
 
-    self.messageTableView = [[[NSTableView alloc] initWithFrame:[[self.messageScrollView contentView] bounds]] autorelease];
+    TGMessageTableView *messageTableView = [[[TGMessageTableView alloc] initWithFrame:[[self.messageScrollView contentView] bounds]] autorelease];
+    [messageTableView setDropOverlayTarget:self];
+    self.messageTableView = messageTableView;
     [self.messageTableView setDataSource:self];
     [self.messageTableView setDelegate:self];
     [self.messageTableView setAllowsColumnReordering:NO];
@@ -3552,6 +3709,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                object:[self.messageScrollView contentView]];
     [contentView addSubview:self.messageScrollView];
 
+    self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
+    [self.messageDropOverlayView setHidden:YES];
+    [self.messageDropOverlayView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:self.messageDropOverlayView];
+
     self.sendLabel = [self labelWithFrame:NSMakeRect(24, 58, 48, 22)
                                      text:@""
                                      font:[NSFont systemFontOfSize:13.0]];
@@ -3577,6 +3739,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.sendTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextField setEnabled:NO];
     [self applyComposerTextFieldStyle:self.sendTextField];
+    [[self.sendTextField cell] setPlaceholderString:@"Message"];
     [self.sendTextField setDelegate:(id)self];
     [self.sendTextField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.sendTextField];
@@ -4623,6 +4786,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [view setHidden:!visible];
 }
 
+- (void)showMessageDropOverlay:(BOOL)visible {
+    self.messageDropOverlayVisible = visible;
+    BOOL showChats = ([self.currentAuthState isEqualToString:@"ready"] && [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
+    [self showView:self.messageDropOverlayView visible:(visible && showChats)];
+    [self.messageDropOverlayView setNeedsDisplay:YES];
+}
+
+- (void)messageTableViewDragDidEnd:(id)sender {
+    (void)sender;
+    [self showMessageDropOverlay:NO];
+}
+
 - (void)updateVisibleSection {
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
     NSString *section = self.activeSection ? self.activeSection : TGSectionChats;
@@ -4670,6 +4845,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
+    if (!showChats) {
+        self.messageDropOverlayVisible = NO;
+    }
+    [self showView:self.messageDropOverlayView visible:(showChats && self.messageDropOverlayVisible)];
     [self showView:self.sendLabel visible:NO];
     [self showView:self.attachPhotoButton visible:showChats];
     [self showView:self.sendTextFieldBackgroundView visible:showChats];
@@ -4855,16 +5034,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     CGFloat loginHeight = 276.0;
     CGFloat loginX = loginAreaX + floor((loginAreaWidth - loginWidth) / 2.0);
-    CGFloat loginY = loginAreaY + floor((loginAreaHeight - loginHeight) / 2.0) - 8.0;
-    if (loginY < loginAreaY + 18.0) {
-        loginY = loginAreaY + 18.0;
-    }
+    CGFloat centeredLoginY = loginAreaY + floor((loginAreaHeight - loginHeight) / 2.0) - 8.0;
     CGFloat brandIconSide = 68.0;
-    CGFloat brandIconY = NSMaxY(NSMakeRect(loginX, loginY, loginWidth, loginHeight)) + 24.0;
+    CGFloat brandIconY = centeredLoginY + loginHeight + 24.0;
     CGFloat brandTitleY = brandIconY - 30.0;
     if (brandIconY + brandIconSide > loginAreaY + loginAreaHeight - 12.0) {
         brandIconY = loginAreaY + loginAreaHeight - brandIconSide - 12.0;
         brandTitleY = brandIconY - 30.0;
+    }
+    CGFloat loginY = brandTitleY - loginHeight - 18.0;
+    if (loginY < loginAreaY + 18.0) {
+        loginY = loginAreaY + 18.0;
     }
     [self.loginIconView setFrame:NSMakeRect(loginAreaX + floor((loginAreaWidth - brandIconSide) / 2.0),
                                             brandIconY,
@@ -4966,6 +5146,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSRect messageSurfaceFrame = NSMakeRect(messageScrollX, messageBottom, messageScrollWidth, messageHeight);
     [self.messageScrollSurfaceView setFrame:messageSurfaceFrame];
     [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 5.0, 5.0)];
+    CGFloat dropOverlayInset = (NSHeight(messageSurfaceFrame) > 130.0) ? 24.0 : 12.0;
+    [self.messageDropOverlayView setFrame:NSInsetRect(messageSurfaceFrame, dropOverlayInset, dropOverlayInset)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     if (bubbleColumn) {
         [self.messageScrollView tile];
@@ -5447,8 +5629,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self.statusField setStringValue:@"Sign in required"];
         [self.loginTitleField setStringValue:@"Sign in"];
-        [self.loginHintField setStringValue:@"Enter the phone number connected to your Telegram account."];
+        [self.loginHintField setStringValue:@"Enter the phone number connected to your Telegram account, including country code."];
         [self.authLabel setStringValue:@"Phone number"];
+        [[self.authTextField cell] setPlaceholderString:@"+375 29 123 45 67"];
+        [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:NO];
         [self.authSecureField setHidden:YES];
@@ -5467,6 +5651,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.loginTitleField setStringValue:@"Enter login code"];
         [self.loginHintField setStringValue:@"The code arrives in Telegram. Enter it here to finish sign-in."];
         [self.authLabel setStringValue:@"Login code"];
+        [[self.authTextField cell] setPlaceholderString:@"12345"];
+        [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:NO];
         [self.authSecureField setHidden:YES];
@@ -5485,6 +5671,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.loginTitleField setStringValue:@"Two-step password"];
         [self.loginHintField setStringValue:@"Enter your Telegram cloud password. Telegraphica will not write it to logs."];
         [self.authLabel setStringValue:@"Password"];
+        [[self.authTextField cell] setPlaceholderString:@""];
+        [[self.authSecureField cell] setPlaceholderString:@"Password"];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:YES];
         [self.authSecureField setHidden:NO];
@@ -5514,6 +5702,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authSecureField setHidden:YES];
     [self.authTextField setEnabled:NO];
     [self.authSecureField setEnabled:NO];
+    [[self.authTextField cell] setPlaceholderString:@""];
+    [[self.authSecureField cell] setPlaceholderString:@""];
     [self.authButton setTitle:@"Send"];
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
@@ -5661,6 +5851,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
+            NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
+            if ([statusDots length] > 0) {
+                NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:6.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
+                NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
+                NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
+                [composedMessageText appendAttributedString:statusSuffixText];
+            }
         }
     }
 
@@ -5683,7 +5882,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         bubbleWidth = maximumBubbleWidth;
     }
 
-    CGFloat bubbleHeight = photoSize.height + 24.0;
+    CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
+    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
     if (NSHeight(measuredRect) > 0.0) {
         bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
     }
@@ -5695,6 +5895,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
+    contentTop -= reactionBandHeight;
+    if ([messageText length] == 0 && mediaFooterHeight > 0.0) {
+        contentTop -= mediaFooterHeight;
+    }
     NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
                                   contentTop - photoSize.height,
                                   photoSize.width,
@@ -6160,10 +6365,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        [self showMessageDropOverlay:NO];
         return NSDragOperationNone;
     }
     NSString *photoPath = TGFirstSupportedPhotoPathFromPasteboard([info draggingPasteboard]);
-    return ([photoPath length] > 0) ? NSDragOperationCopy : NSDragOperationNone;
+    BOOL canDropPhoto = ([photoPath length] > 0);
+    if (canDropPhoto) {
+        [self.messageTableView setDropRow:-1 dropOperation:NSTableViewDropOn];
+        [self showMessageDropOverlay:YES];
+        return NSDragOperationCopy;
+    }
+    [self showMessageDropOverlay:NO];
+    return NSDragOperationNone;
 }
 
 - (BOOL)tableView:(NSTableView *)tableView
@@ -6172,6 +6385,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     dropOperation:(NSTableViewDropOperation)dropOperation {
     (void)row;
     (void)dropOperation;
+    [self showMessageDropOverlay:NO];
     if (tableView != self.messageTableView) {
         return NO;
     }
@@ -8470,7 +8684,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_chatItemsBeforeTopicList release];
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
+    if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
+        [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
+    }
     [_messageTableView release];
+    [_messageDropOverlayView release];
     [_messageItems release];
     [_profileTitleField release];
     [_profileNameField release];
