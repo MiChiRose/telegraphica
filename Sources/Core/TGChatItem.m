@@ -7,6 +7,9 @@
 @synthesize typeSummary = _typeSummary;
 @synthesize unreadCount = _unreadCount;
 @synthesize avatarLocalPath = _avatarLocalPath;
+@synthesize forumTopic = _forumTopic;
+@synthesize parentChatID = _parentChatID;
+@synthesize messageThreadID = _messageThreadID;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                          title:(NSString *)title
@@ -35,6 +38,12 @@
     if ([identifier isEqual:@"chat_id"]) {
         return self.chatID;
     }
+    if ([identifier isEqual:@"parent_chat_id"]) {
+        return self.parentChatID;
+    }
+    if ([identifier isEqual:@"message_thread_id"]) {
+        return self.messageThreadID;
+    }
     return @"";
 }
 
@@ -44,6 +53,8 @@
     [_typeSummary release];
     [_unreadCount release];
     [_avatarLocalPath release];
+    [_parentChatID release];
+    [_messageThreadID release];
     [super dealloc];
 }
 

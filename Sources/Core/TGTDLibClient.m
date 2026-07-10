@@ -2036,6 +2036,99 @@ static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
     return items;
 }
 
+- (NSArray *)forumTopicPreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load forum topics. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:82];
+        }
+        return nil;
+    }
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Forum topic request requires a chat id." code:82];
+        }
+        return nil;
+    }
+
+    NSInteger safeLimit = (NSInteger)limit;
+    if (safeLimit <= 0) {
+        safeLimit = 20;
+    } else if (safeLimit > 50) {
+        safeLimit = 50;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getForumTopics" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:@"" forKey:@"query"];
+    [request setObject:[NSNumber numberWithInt:0] forKey:@"offset_date"];
+    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_message_id"];
+    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"offset_message_thread_id"];
+    [request setObject:[NSNumber numberWithInteger:safeLimit] forKey:@"limit"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-forum-topics"
+                                                           timeout:timeout
+                                                         errorCode:82
+                                                             error:error];
+    if (![response isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"forumTopics"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib getForumTopics returned an unexpected response." code:82];
+        }
+        return nil;
+    }
+
+    id topicsObject = [response objectForKey:@"topics"];
+    if (![topicsObject isKindOfClass:[NSArray class]]) {
+        return [NSArray array];
+    }
+
+    NSMutableArray *topics = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)topicsObject count]; index++) {
+        id topicObject = [(NSArray *)topicsObject objectAtIndex:index];
+        if (![topicObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *topic = (NSDictionary *)topicObject;
+        id infoObject = [topic objectForKey:@"info"];
+        NSDictionary *info = [infoObject isKindOfClass:[NSDictionary class]] ? (NSDictionary *)infoObject : topic;
+        id threadID = [info objectForKey:@"message_thread_id"];
+        if (![threadID respondsToSelector:@selector(longLongValue)]) {
+            threadID = [topic objectForKey:@"message_thread_id"];
+        }
+        if (![threadID respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+
+        id nameValue = [info objectForKey:@"name"];
+        if (![nameValue isKindOfClass:[NSString class]] || [(NSString *)nameValue length] == 0) {
+            nameValue = [topic objectForKey:@"name"];
+        }
+        NSString *name = ([nameValue isKindOfClass:[NSString class]] && [(NSString *)nameValue length] > 0) ? (NSString *)nameValue : @"Topic";
+
+        id unreadValue = [info objectForKey:@"unread_count"];
+        if (![unreadValue respondsToSelector:@selector(integerValue)]) {
+            unreadValue = [topic objectForKey:@"unread_count"];
+        }
+        NSNumber *unreadCount = [unreadValue respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[unreadValue integerValue]] : [NSNumber numberWithInteger:0];
+
+        NSMutableDictionary *topicInfo = [NSMutableDictionary dictionary];
+        [topicInfo setObject:name forKey:@"title"];
+        [topicInfo setObject:[NSNumber numberWithLongLong:[threadID longLongValue]] forKey:@"message_thread_id"];
+        [topicInfo setObject:unreadCount forKey:@"unread_count"];
+        [topics addObject:topicInfo];
+    }
+
+    return topics;
+}
+
 - (NSString *)singleLineTrimmedString:(NSString *)string maximumLength:(NSUInteger)maximumLength {
     if (![string isKindOfClass:[NSString class]]) {
         return @"";

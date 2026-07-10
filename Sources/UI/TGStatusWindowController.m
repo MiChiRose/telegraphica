@@ -1808,6 +1808,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *chatsLabel;
 @property (nonatomic, retain) NSTextField *messagesLabel;
 @property (nonatomic, retain) NSTextField *selectedChatField;
+@property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
+@property (nonatomic, retain) NSButton *selectedChatProfileButton;
 @property (nonatomic, retain) NSView *chatScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *chatScrollView;
 @property (nonatomic, retain) NSTableView *chatTableView;
@@ -1848,6 +1850,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTextField *aboutLinkField;
 @property (nonatomic, retain) NSNumber *selectedChatID;
 @property (nonatomic, copy) NSString *selectedChatTitle;
+@property (nonatomic, copy) NSString *selectedChatTypeSummary;
+@property (nonatomic, copy) NSString *selectedChatAvatarLocalPath;
+@property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, retain) NSNumber *selectedChatFilterID;
 @property (nonatomic, copy) NSString *profileDisplayName;
 @property (nonatomic, copy) NSString *profileFirstName;
@@ -1885,6 +1890,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL composerRefocusPending;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
+@property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
+@property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @end
 
 @implementation TGStatusWindowController
@@ -1937,6 +1944,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize chatsLabel = _chatsLabel;
 @synthesize messagesLabel = _messagesLabel;
 @synthesize selectedChatField = _selectedChatField;
+@synthesize selectedChatAvatarView = _selectedChatAvatarView;
+@synthesize selectedChatProfileButton = _selectedChatProfileButton;
 @synthesize chatScrollSurfaceView = _chatScrollSurfaceView;
 @synthesize chatScrollView = _chatScrollView;
 @synthesize chatTableView = _chatTableView;
@@ -1977,6 +1986,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize aboutLinkField = _aboutLinkField;
 @synthesize selectedChatID = _selectedChatID;
 @synthesize selectedChatTitle = _selectedChatTitle;
+@synthesize selectedChatTypeSummary = _selectedChatTypeSummary;
+@synthesize selectedChatAvatarLocalPath = _selectedChatAvatarLocalPath;
+@synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedChatFilterID = _selectedChatFilterID;
 @synthesize profileDisplayName = _profileDisplayName;
 @synthesize profileFirstName = _profileFirstName;
@@ -2014,6 +2026,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize composerRefocusPending = _composerRefocusPending;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
+@synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
+@synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -2298,6 +2312,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
@@ -2386,6 +2401,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileIDField setStringValue:@""];
     [self.profileStateField setStringValue:([self.profileBio length] > 0) ? self.profileBio : @""];
     [self.settingsStorageField setStringValue:@""];
+}
+
+- (void)refreshSelectedChatHeaderDisplay {
+    NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Select a chat";
+    [self.selectedChatField setStringValue:title];
+    [self.selectedChatAvatarView setDisplayName:title];
+    [self.selectedChatAvatarView setAvatarLocalPath:self.selectedChatAvatarLocalPath];
+    [self.selectedChatProfileButton setToolTip:(self.selectedChatID ? @"Open chat profile" : @"Select a chat")];
+    [self.selectedChatAvatarView setNeedsDisplay:YES];
 }
 
 - (void)clearProfileDisplayCache {
@@ -2674,6 +2698,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
     [[self.selectedChatField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [contentView addSubview:self.selectedChatField];
+
+    self.selectedChatAvatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(232, 194, 26, 26)] autorelease];
+    [self.selectedChatAvatarView setDisplayName:@"Select a chat"];
+    [self.selectedChatAvatarView setHidden:YES];
+    [contentView addSubview:self.selectedChatAvatarView];
+
+    self.selectedChatProfileButton = [[[NSButton alloc] initWithFrame:NSMakeRect(232, 194, 400, 28)] autorelease];
+    [self.selectedChatProfileButton setTitle:@""];
+    [self.selectedChatProfileButton setBordered:NO];
+    [self.selectedChatProfileButton setTransparent:YES];
+    [self.selectedChatProfileButton setTarget:self];
+    [self.selectedChatProfileButton setAction:@selector(openSelectedChatProfile:)];
+    [self.selectedChatProfileButton setToolTip:@"Open chat profile"];
+    [self.selectedChatProfileButton setHidden:YES];
+    [contentView addSubview:self.selectedChatProfileButton];
 
     self.messageScrollSurfaceView = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 72, 712, 112)] autorelease];
     [self.messageScrollSurfaceView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -3243,6 +3282,45 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
+- (void)openSelectedChatProfile:(id)sender {
+    (void)sender;
+    if (!self.selectedChatID) {
+        return;
+    }
+
+    NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Selected chat";
+    title = [title stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([title length] == 0) {
+        title = @"Selected chat";
+    }
+
+    NSMutableString *details = [NSMutableString string];
+    if ([self.selectedChatTypeSummary length] > 0) {
+        [details appendFormat:@"%@\n", self.selectedChatTypeSummary];
+    }
+    if ([self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
+        [details appendFormat:@"Chat ID: %lld", [self.selectedChatID longLongValue]];
+    }
+    if ([self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]) {
+        if ([details length] > 0) {
+            [details appendString:@"\n"];
+        }
+        [details appendFormat:@"Topic ID: %lld", [self.selectedMessageThreadID longLongValue]];
+    }
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:title];
+    [alert setInformativeText:([details length] > 0) ? details : @"No additional profile fields are available yet."];
+    [alert addButtonWithTitle:@"Close"];
+    if ([self.selectedChatAvatarLocalPath length] > 0) {
+        NSImage *avatarImage = [[[NSImage alloc] initWithContentsOfFile:self.selectedChatAvatarLocalPath] autorelease];
+        if (avatarImage) {
+            [alert setIcon:avatarImage];
+        }
+    }
+    [alert runModal];
+}
+
 - (void)showAppearanceWindow:(id)sender {
     (void)sender;
     if (!self.appearanceWindow) {
@@ -3497,6 +3575,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:showChats];
     [self showView:self.selectedChatField visible:showChats];
+    BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
+    [self showView:self.selectedChatAvatarView visible:showSelectedChatProfile];
+    [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.sendLabel visible:NO];
@@ -3699,7 +3780,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setFrame:NSMakeRect(loginButtonX, loginY + 89.0, loginButtonWidth, 32.0)];
 
     CGFloat headerButtonSize = 30.0;
-    CGFloat sectionHeaderVisualOffset = -1.0;
+    CGFloat sectionHeaderVisualOffset = -2.0;
     CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVisualOffset;
     CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVisualOffset;
     [self.chatsLabel setFrame:NSMakeRect(mainX + 16.0, headerLabelY, 88.0, 20.0)];
@@ -3732,10 +3813,23 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(NSMinX([self.loadOlderMessagesButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
-    [self.selectedChatField setFrame:NSMakeRect(conversationX + 16.0,
+    CGFloat selectedAvatarSize = 24.0;
+    CGFloat selectedAvatarX = conversationX + 16.0;
+    CGFloat selectedAvatarY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - selectedAvatarSize) / 2.0) + sectionHeaderVisualOffset;
+    [self.selectedChatAvatarView setFrame:NSMakeRect(selectedAvatarX, selectedAvatarY, selectedAvatarSize, selectedAvatarSize)];
+    CGFloat selectedTitleX = NSMaxX([self.selectedChatAvatarView frame]) + 8.0;
+    CGFloat selectedTitleWidth = NSMinX([self.loadMessagesButton frame]) - selectedTitleX - 12.0;
+    if (selectedTitleWidth < 120.0) {
+        selectedTitleWidth = 120.0;
+    }
+    [self.selectedChatField setFrame:NSMakeRect(selectedTitleX,
                                                 headerLabelY,
-                                                NSMinX([self.loadMessagesButton frame]) - conversationX - 28.0,
+                                                selectedTitleWidth,
                                                 20.0)];
+    [self.selectedChatProfileButton setFrame:NSMakeRect(selectedAvatarX,
+                                                        selectedAvatarY - 2.0,
+                                                        NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
+                                                        selectedAvatarSize + 4.0)];
 
     CGFloat composerHeight = 42.0;
     CGFloat composerY = mainY + 8.0;
@@ -4018,7 +4112,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)updateSendControls {
-    BOOL canTargetChat = [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil;
+    BOOL canTargetChat = [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && self.selectedMessageThreadID == nil;
     NSString *text = [self.sendTextField stringValue];
     NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     [self.sendTextField setEnabled:canTargetChat];
@@ -4028,6 +4122,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (void)refocusComposerIfPossible {
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||
+        self.selectedMessageThreadID != nil ||
         [self.sendTextField isHidden]) {
         return;
     }
@@ -4090,12 +4185,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.messageTableView reloadData];
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
+        self.selectedChatTypeSummary = nil;
+        self.selectedChatAvatarLocalPath = nil;
+        self.selectedMessageThreadID = nil;
         self.chatsExhausted = NO;
         [self.client invalidateMainChatListExhaustion];
         self.autoChatListLoadArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
-        [self.selectedChatField setStringValue:@"Select a chat"];
+        [self refreshSelectedChatHeaderDisplay];
         [self.sendTextField setStringValue:@""];
         self.activeSection = TGSectionChats;
     }
@@ -4199,8 +4297,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
-    [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil)];
-    [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
+    [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && self.selectedMessageThreadID == nil)];
+    [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && self.selectedChatID != nil && self.selectedMessageThreadID == nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
     [self.logoutButton setEnabled:([state isEqualToString:@"ready"] && !self.controlsBusy)];
     [self updateSendControls];
     [self refreshProfileDisplay];
@@ -4220,9 +4318,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateNavigationButtonsForSection:(self.activeSection ? self.activeSection : TGSectionChats) enabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
-    [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
-    [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
-    [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil)];
+    [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && self.selectedMessageThreadID == nil)];
+    [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && self.selectedMessageThreadID == nil && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
+    [self.sendTextField setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && self.selectedChatID != nil && self.selectedMessageThreadID == nil)];
     [self.sendMessageButton setEnabled:NO];
     if (busy) {
         [self.authButton setEnabled:NO];
@@ -4620,13 +4718,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([notification object] != self.chatTableView) {
         return;
     }
+    if (self.suppressChatSelectionHandling) {
+        return;
+    }
 
     NSNumber *previousChatID = [self.selectedChatID retain];
+    NSNumber *previousThreadID = [self.selectedMessageThreadID retain];
     NSInteger row = [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
-        [self.selectedChatField setStringValue:@"Select a chat"];
+        self.selectedChatTypeSummary = nil;
+        self.selectedChatAvatarLocalPath = nil;
+        self.selectedMessageThreadID = nil;
+        [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
         [self.sendTextField setStringValue:@""];
@@ -4634,11 +4739,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.autoOlderMessagesLoadArmed = YES;
         [self updateAuthControlsForState:self.currentAuthState];
         [previousChatID release];
+        [previousThreadID release];
         return;
     }
 
-    TGChatItem *item = [self.chatItems objectAtIndex:(NSUInteger)row];
-    id chatID = [item chatID];
+    TGChatItem *item = [[self.chatItems objectAtIndex:(NSUInteger)row] retain];
+    BOOL selectedForumTopic = [item isForumTopic];
+    id chatID = selectedForumTopic ? [item parentChatID] : [item chatID];
     id title = [item title];
     NSNumber *newChatID = nil;
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
@@ -4647,9 +4754,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     } else {
         self.selectedChatID = nil;
     }
-    BOOL selectionChanged = !((previousChatID && newChatID) && ([previousChatID longLongValue] == [newChatID longLongValue]));
+    NSNumber *newThreadID = nil;
+    if (selectedForumTopic && [[item messageThreadID] respondsToSelector:@selector(longLongValue)]) {
+        newThreadID = [NSNumber numberWithLongLong:[[item messageThreadID] longLongValue]];
+    }
+    self.selectedMessageThreadID = newThreadID;
+
+    BOOL sameChat = ((previousChatID && newChatID) && ([previousChatID longLongValue] == [newChatID longLongValue]));
+    BOOL sameThread = ((!previousThreadID && !newThreadID) ||
+                       (previousThreadID && newThreadID && [previousThreadID longLongValue] == [newThreadID longLongValue]));
+    BOOL selectionChanged = !(sameChat && sameThread);
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"Selected chat";
-    [self.selectedChatField setStringValue:self.selectedChatTitle ? self.selectedChatTitle : @"Selected chat"];
+    self.selectedChatTypeSummary = [item typeSummary];
+    self.selectedChatAvatarLocalPath = [item avatarLocalPath];
+    [self refreshSelectedChatHeaderDisplay];
     if (selectionChanged) {
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
@@ -4658,10 +4776,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.autoOlderMessagesLoadArmed = YES;
     }
     [self updateAuthControlsForState:self.currentAuthState];
-    if (newChatID && (selectionChanged || [self.messageItems count] == 0)) {
+    if (selectedForumTopic) {
+        if (newThreadID) {
+            [self appendDetail:[NSString stringWithFormat:@"Forum topic selected: %@ (%lld). Topic history loading is next.", self.selectedChatTitle ? self.selectedChatTitle : @"Topic", [newThreadID longLongValue]]];
+        }
+    } else {
+        [self removeForumTopicRowsPreservingChatID:newChatID];
+        [self loadForumTopicsForChatItem:item];
+    }
+    if (newChatID && !selectedForumTopic && (selectionChanged || [self.messageItems count] == 0)) {
         [self reloadMessagesForChatID:newChatID interactive:NO];
     }
     [previousChatID release];
+    [previousThreadID release];
+    [item release];
 }
 
 - (void)applyChatItems:(NSArray *)items preserveSelection:(BOOL)preserveSelection preferredChatID:(NSNumber *)preferredChatID {
@@ -4701,13 +4829,153 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.chatTableView deselectAll:nil];
     self.selectedChatID = nil;
     self.selectedChatTitle = nil;
-    [self.selectedChatField setStringValue:@"Select a chat"];
+    self.selectedChatTypeSummary = nil;
+    self.selectedChatAvatarLocalPath = nil;
+    self.selectedMessageThreadID = nil;
+    [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
     [self.sendTextField setStringValue:@""];
     self.olderMessagesExhausted = NO;
     self.autoOlderMessagesLoadArmed = YES;
     [self updateAuthControlsForState:self.currentAuthState];
+}
+
+- (BOOL)chatItemsContainForumTopicRows {
+    NSUInteger index = 0;
+    for (index = 0; index < [self.chatItems count]; index++) {
+        id item = [self.chatItems objectAtIndex:index];
+        if ([item isKindOfClass:[TGChatItem class]] && [(TGChatItem *)item isForumTopic]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (NSArray *)chatItemsByRemovingForumTopicRowsFromItems:(NSArray *)items {
+    NSMutableArray *baseItems = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        id item = [items objectAtIndex:index];
+        if ([item isKindOfClass:[TGChatItem class]] && [(TGChatItem *)item isForumTopic]) {
+            continue;
+        }
+        [baseItems addObject:item];
+    }
+    return baseItems;
+}
+
+- (NSUInteger)indexOfChatID:(NSNumber *)chatID inChatItems:(NSArray *)items {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return NSNotFound;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        id item = [items objectAtIndex:index];
+        if (![item isKindOfClass:[TGChatItem class]] || [(TGChatItem *)item isForumTopic]) {
+            continue;
+        }
+        id itemChatID = [(TGChatItem *)item chatID];
+        if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == [chatID longLongValue]) {
+            return index;
+        }
+    }
+    return NSNotFound;
+}
+
+- (void)removeForumTopicRowsPreservingChatID:(NSNumber *)chatID {
+    if (![self chatItemsContainForumTopicRows]) {
+        return;
+    }
+    NSArray *baseItems = [self chatItemsByRemovingForumTopicRowsFromItems:self.chatItems];
+    NSUInteger selectedIndex = [self indexOfChatID:chatID inChatItems:baseItems];
+    self.suppressChatSelectionHandling = YES;
+    [self.chatItems removeAllObjects];
+    [self.chatItems addObjectsFromArray:baseItems];
+    [self.chatTableView reloadData];
+    if (selectedIndex != NSNotFound) {
+        [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:selectedIndex] byExtendingSelection:NO];
+    }
+    self.suppressChatSelectionHandling = NO;
+}
+
+- (void)loadForumTopicsForChatItem:(TGChatItem *)chatItem {
+    if (!chatItem || [chatItem isForumTopic] || self.forumTopicRefreshInFlight) {
+        return;
+    }
+    id chatID = [chatItem chatID];
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    if (![[chatItem typeSummary] isEqualToString:@"Supergroup"]) {
+        return;
+    }
+
+    self.forumTopicRefreshInFlight = YES;
+    NSNumber *chatIDCopy = [[NSNumber numberWithLongLong:[chatID longLongValue]] retain];
+    NSString *parentTitle = [[chatItem title] copy];
+    NSString *parentAvatarPath = [[chatItem avatarLocalPath] copy];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *topicError = nil;
+        NSArray *topics = [[client forumTopicPreviewItemsForChatID:chatIDCopy limit:24 timeout:4.0 error:&topicError] retain];
+        NSString *topicErrorMessage = [[topicError localizedDescription] copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.forumTopicRefreshInFlight = NO;
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && self.selectedMessageThreadID == nil);
+            if (selectionStillCurrent && [topics count] > 0) {
+                NSMutableArray *expandedItems = [NSMutableArray arrayWithArray:[self chatItemsByRemovingForumTopicRowsFromItems:self.chatItems]];
+                NSUInteger parentIndex = [self indexOfChatID:chatIDCopy inChatItems:expandedItems];
+                if (parentIndex != NSNotFound) {
+                    NSUInteger insertIndex = parentIndex + 1;
+                    NSUInteger topicIndex = 0;
+                    for (topicIndex = 0; topicIndex < [topics count]; topicIndex++) {
+                        id topicObject = [topics objectAtIndex:topicIndex];
+                        if (![topicObject isKindOfClass:[NSDictionary class]]) {
+                            continue;
+                        }
+                        NSDictionary *topic = (NSDictionary *)topicObject;
+                        NSString *topicTitle = [topic objectForKey:@"title"];
+                        NSNumber *threadID = [topic objectForKey:@"message_thread_id"];
+                        NSNumber *unreadCount = [topic objectForKey:@"unread_count"];
+                        if (![threadID respondsToSelector:@selector(longLongValue)]) {
+                            continue;
+                        }
+                        NSString *displayTitle = ([topicTitle length] > 0) ? [NSString stringWithFormat:@"  %@", topicTitle] : @"  Topic";
+                        TGChatItem *topicItem = [[[TGChatItem alloc] initWithChatID:chatIDCopy
+                                                                              title:displayTitle
+                                                                        typeSummary:@"Forum topic"
+                                                                        unreadCount:(unreadCount ? unreadCount : [NSNumber numberWithInteger:0])] autorelease];
+                        [topicItem setForumTopic:YES];
+                        [topicItem setParentChatID:chatIDCopy];
+                        [topicItem setMessageThreadID:[NSNumber numberWithLongLong:[threadID longLongValue]]];
+                        [topicItem setAvatarLocalPath:parentAvatarPath];
+                        [expandedItems insertObject:topicItem atIndex:insertIndex];
+                        insertIndex++;
+                    }
+                    self.suppressChatSelectionHandling = YES;
+                    [self.chatItems removeAllObjects];
+                    [self.chatItems addObjectsFromArray:expandedItems];
+                    [self.chatTableView reloadData];
+                    [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:parentIndex] byExtendingSelection:NO];
+                    self.suppressChatSelectionHandling = NO;
+                    [self appendDetail:[NSString stringWithFormat:@"Forum topics: found %lu topics in %@", (unsigned long)[topics count], parentTitle ? parentTitle : @"selected chat"]];
+                }
+            } else if (selectionStillCurrent && [topicErrorMessage length] > 0) {
+                [self appendDetail:[NSString stringWithFormat:@"Forum topics: %@", topicErrorMessage]];
+            }
+            [topics release];
+            [topicErrorMessage release];
+            [chatIDCopy release];
+            [parentTitle release];
+            [parentAvatarPath release];
+            [client release];
+        });
+
+        [pool drain];
+    });
 }
 
 - (NSNumber *)oldestLoadedMessageID {
@@ -5252,6 +5520,24 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
+- (void)scheduleMessageItemsReadForChatID:(NSNumber *)chatID items:(NSArray *)items {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![items isKindOfClass:[NSArray class]] || [items count] == 0) {
+        return;
+    }
+
+    NSNumber *chatIDCopy = [chatID retain];
+    NSArray *itemsCopy = [items copy];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.85 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && self.selectedMessageThreadID == nil);
+        BOOL messagePaneVisible = ([self.messageScrollView window] != nil && ![self.messageScrollView isHidden]);
+        if (selectionStillCurrent && messagePaneVisible && [self.currentAuthState isEqualToString:@"ready"]) {
+            [self markMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
+        }
+        [chatIDCopy release];
+        [itemsCopy release];
+    });
+}
+
 - (void)markMessageItemsReadForChatID:(NSNumber *)chatID items:(NSArray *)items {
     if (![self.currentAuthState isEqualToString:@"ready"] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         return;
@@ -5503,7 +5789,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             } else if (itemsCopy) {
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
-                [self markMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
+                [self scheduleMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
                     [self appendDetail:[NSString stringWithFormat:@"TDLib messages: loaded %lu previews for selected chat", (unsigned long)[itemsCopy count]]];
@@ -5938,6 +6224,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)loadMessages:(id)sender {
     (void)sender;
+    if (self.selectedMessageThreadID != nil) {
+        [self appendDetail:@"Forum topic history loading is not enabled in this build yet."];
+        return;
+    }
     self.olderMessagesExhausted = NO;
     self.autoOlderMessagesLoadArmed = YES;
     [self reloadMessagesForChatID:self.selectedChatID interactive:YES];
@@ -5950,7 +6240,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)sendMessage:(id)sender {
     (void)sender;
-    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
+    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID || self.selectedMessageThreadID != nil) {
         [self appendDetail:@"Select a chat after sign-in is ready before sending."];
         return;
     }
@@ -6064,11 +6354,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self.messageTableView reloadData];
                 self.selectedChatID = nil;
                 self.selectedChatTitle = nil;
+                self.selectedChatTypeSummary = nil;
+                self.selectedChatAvatarLocalPath = nil;
+                self.selectedMessageThreadID = nil;
                 self.chatsExhausted = NO;
                 self.olderMessagesExhausted = NO;
                 self.autoChatListLoadArmed = YES;
                 self.autoOlderMessagesLoadArmed = YES;
-                [self.selectedChatField setStringValue:@"Select a chat"];
+                [self refreshSelectedChatHeaderDisplay];
                 [self.sendTextField setStringValue:@""];
                 [self updateAuthControlsForState:@"closed"];
                 [self setControlsBusy:NO];
@@ -6154,6 +6447,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_chatsLabel release];
     [_messagesLabel release];
     [_selectedChatField release];
+    [_selectedChatAvatarView release];
+    [_selectedChatProfileButton release];
     [_chatScrollSurfaceView release];
     [_chatScrollView release];
     [_chatTableView release];
@@ -6194,6 +6489,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_aboutLinkField release];
     [_selectedChatID release];
     [_selectedChatTitle release];
+    [_selectedChatTypeSummary release];
+    [_selectedChatAvatarLocalPath release];
+    [_selectedMessageThreadID release];
     [_selectedChatFilterID release];
     [_client release];
     [_currentAuthState release];
