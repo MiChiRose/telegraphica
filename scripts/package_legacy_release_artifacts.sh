@@ -1,0 +1,143 @@
+#!/bin/bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
+APP_PATH="build-legacy/Release/Telegraphica.app"
+APP_NAME="Telegraphica.app"
+ARCH="x86_64"
+DEPLOYMENT_TARGET="10.9"
+
+usage() {
+    cat <<USAGE
+Usage: $0 [--tdjson /path/to/libtdjson.dylib]
+
+Builds Telegraphica with bundled TDLib on the legacy Mac, then creates release
+artifacts in dist/:
+
+  - Telegraphica-v<VERSION>-macos10.9-x86_64.dmg
+  - Telegraphica-v<VERSION>-macos10.9-x86_64.app.zip
+  - matching .sha256 files
+
+The script refuses to package a public installer unless libtdjson.dylib is
+bundled inside Telegraphica.app.
+USAGE
+}
+
+TDJSON_PATH="${TELEGRAPHICA_TDJSON_PATH:-}"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --tdjson)
+            shift
+            if [ "$#" -eq 0 ]; then
+                echo "--tdjson requires a path."
+                exit 1
+            fi
+            TDJSON_PATH="$1"
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+find_tdjson() {
+    local candidate
+    for candidate in \
+        "$PWD/build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib" \
+        "$PWD/build-tdlib-legacy/stage/Frameworks/libtdjson.dylib" \
+        "$HOME/Desktop/Telegraphica-current/build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib" \
+        "$HOME/Desktop/Telegraphica-current/build-tdlib-legacy/stage/Frameworks/libtdjson.dylib"
+    do
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    find "$HOME/Desktop" -path "*/stage/Frameworks/libtdjson.dylib" -print 2>/dev/null | head -n 1
+}
+
+if [ -z "$TDJSON_PATH" ]; then
+    TDJSON_PATH="$(find_tdjson)"
+fi
+
+if [ -z "$TDJSON_PATH" ] || [ ! -f "$TDJSON_PATH" ]; then
+    echo "libtdjson.dylib was not found."
+    echo "Pass it explicitly:"
+    echo "  $0 --tdjson /path/to/libtdjson.dylib"
+    exit 1
+fi
+
+if [ -n "${PYTHON:-}" ]; then
+    PYTHON_BIN="$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python)"
+else
+    PYTHON_BIN=""
+fi
+
+if [ -n "$PYTHON_BIN" ]; then
+    "$PYTHON_BIN" scripts/check_legacy_compat.py
+fi
+
+scripts/check_tdjson_legacy.sh "$TDJSON_PATH"
+
+echo "Building Telegraphica with bundled TDLib:"
+echo "$TDJSON_PATH"
+TELEGRAPHICA_TDJSON_PATH="$TDJSON_PATH" ./build_legacy.sh
+
+BUNDLED_TDJSON="$APP_PATH/Contents/Frameworks/libtdjson.dylib"
+if [ ! -f "$BUNDLED_TDJSON" ]; then
+    echo "Build finished, but bundled TDLib is missing:"
+    echo "$BUNDLED_TDJSON"
+    exit 1
+fi
+
+TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON"
+
+INFO_PLIST="$APP_PATH/Contents/Info.plist"
+APP_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || true)"
+if [ -z "$APP_VERSION" ]; then
+    APP_VERSION="0.0.0"
+fi
+
+mkdir -p "$DIST_DIR"
+
+scripts/package_release_installer.sh "$APP_PATH"
+
+DMG_SRC="$DIST_DIR/Telegraphica-v${APP_VERSION}-installer.dmg"
+DMG_FINAL="$DIST_DIR/Telegraphica-v${APP_VERSION}-macos${DEPLOYMENT_TARGET}-${ARCH}.dmg"
+APP_ZIP="$DIST_DIR/Telegraphica-v${APP_VERSION}-macos${DEPLOYMENT_TARGET}-${ARCH}.app.zip"
+
+if [ ! -f "$DMG_SRC" ]; then
+    echo "Expected DMG was not created:"
+    echo "$DMG_SRC"
+    exit 1
+fi
+
+mv -f "$DMG_SRC" "$DMG_FINAL"
+rm -f "$APP_ZIP"
+ditto -c -k --norsrc --keepParent "$APP_PATH" "$APP_ZIP"
+
+for artifact in "$DMG_FINAL" "$APP_ZIP"; do
+    rm -f "$artifact.sha256"
+    shasum -a 256 "$artifact" > "$artifact.sha256"
+done
+
+echo
+echo "Created release artifacts:"
+echo "$DMG_FINAL"
+echo "$APP_ZIP"
+echo "$DMG_FINAL.sha256"
+echo "$APP_ZIP.sha256"

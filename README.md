@@ -77,8 +77,12 @@ It is still rough, but the core loop works.
 ### ⚠️ Known Alpha Gaps
 
 - Sticker and GIF rendering is still incomplete and can fall back to emoji.
-- The DMG is HFS+-formatted for Mavericks, but it is not notarized.
-- A Mavericks-compatible `libtdjson.dylib` is required.
+- The DMG must be HFS+-formatted for Mavericks and is not notarized.
+- A public drag-and-drop DMG is considered complete only when
+  `Telegraphica.app` already bundles a Mavericks-compatible
+  `Contents/Frameworks/libtdjson.dylib`.
+- DMGs without bundled TDLib are development images, not out-of-the-box
+  installers.
 - Release confidence still comes from OS X 10.9.5 / Xcode 6.2 HITL testing.
 - The project is moving fast, so UI details and release packaging may change.
 
@@ -94,7 +98,7 @@ Latest alpha assets:
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.3.0-alpha.2-installer.dmg` | Quick app install | HFS+ DMG for Mavericks. Drag `Telegraphica.app` to Applications. Not notarized. |
+| `Telegraphica-v0.3.0-alpha.2-installer.dmg` | Installer-format test | HFS+ DMG for Mavericks. This alpha image fixes mounting, but it is not a complete out-of-box Telegram installer unless the app bundle includes `Contents/Frameworks/libtdjson.dylib`. |
 | `Telegraphica-develop-...-hfs-dmg-hotfix.zip` | Old-Mac source/build handoff | Use this when building with a local Mavericks TDLib setup. |
 
 ### First Launch
@@ -141,6 +145,22 @@ Create a DMG from the built app:
 ```sh
 ./scripts/package_release_installer.sh
 ```
+
+The installer packager refuses to create a public DMG unless the built app
+contains `Telegraphica.app/Contents/Frameworks/libtdjson.dylib`. A
+development-only TDLib-less image can be forced with
+`TELEGRAPHICA_ALLOW_TDLIBLESS_INSTALLER=1`, but that image should not be
+published as an end-user installer.
+
+On the legacy Mac, build the complete release artifacts in one pass:
+
+```sh
+./scripts/package_legacy_release_artifacts.sh --tdjson /path/to/libtdjson.dylib
+```
+
+That command rebuilds Telegraphica, bundles TDLib, creates an HFS+ DMG, creates
+an app zip, and writes SHA256 files into `dist/`. These are the artifacts that
+should be uploaded to GitHub for an out-of-the-box Mavericks alpha.
 
 The build script targets `MACOSX_DEPLOYMENT_TARGET=10.9`, builds `x86_64`,
 stamps `LSMinimumSystemVersion`, checks the resulting binary with `file`,
