@@ -5,6 +5,7 @@
 #import "../Services/TGLogger.h"
 #import <ImageIO/ImageIO.h>
 #import <AVFoundation/AVFoundation.h>
+#include <math.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
@@ -1088,6 +1089,22 @@ static BOOL TGMediaItemIsPlayable(NSDictionary *mediaItem) {
     return ([mimeType hasPrefix:@"video/"] || [mimeType hasPrefix:@"audio/"]);
 }
 
+static BOOL TGMediaItemIsAudioOnlyPlayable(NSDictionary *mediaItem) {
+    NSString *contentType = TGMediaItemContentType(mediaItem);
+    if ([contentType isEqualToString:@"messageVideo"] ||
+        [contentType isEqualToString:@"messageVideoNote"] ||
+        [contentType isEqualToString:@"messageAnimation"]) {
+        return NO;
+    }
+    if ([contentType isEqualToString:@"messageVoiceNote"] ||
+        [contentType isEqualToString:@"messageAudio"]) {
+        return YES;
+    }
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
+    return [mimeType hasPrefix:@"audio/"];
+}
+
 static NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
     id path = [mediaItem objectForKey:@"playable_local_path"];
     if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
@@ -1490,6 +1507,20 @@ static BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item) {
     return ([item isKindOfClass:[TGMessageItem class]] &&
             [item isPlayableMediaMessage] &&
             ![item isVisualMediaMessage]);
+}
+
+static BOOL TGMessageItemIsAudioOnlyPlayableMedia(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return NO;
+    }
+    if ([item isVoiceNoteMessage] || [[item contentType] isEqualToString:@"messageAudio"]) {
+        return YES;
+    }
+    if ([item isVideoNoteMessage] || [[item contentType] isEqualToString:@"messageVideo"] || [[item contentType] isEqualToString:@"messageAnimation"]) {
+        return NO;
+    }
+    NSString *mimeType = [[item mediaMimeType] lowercaseString];
+    return [mimeType hasPrefix:@"audio/"];
 }
 
 static BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item) {
@@ -3471,8 +3502,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *mediaPlaybackContainerView;
 @property (nonatomic, retain) NSTextField *mediaPlaybackTitleField;
 @property (nonatomic, retain) NSButton *mediaPlaybackPlayPauseButton;
+@property (nonatomic, retain) NSSlider *mediaPlaybackProgressSlider;
+@property (nonatomic, retain) NSTextField *mediaPlaybackTimeField;
+@property (nonatomic, retain) NSButton *mediaPlaybackCloseButton;
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
+@property (nonatomic, retain) NSTimer *mediaPlaybackTimer;
 @property (nonatomic, retain) NSWindow *photoSendPreviewWindow;
 @property (nonatomic, retain) NSImageView *photoSendPreviewImageView;
 @property (nonatomic, retain) NSView *photoSendCaptionBackgroundView;
@@ -3539,6 +3574,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL showingForumTopicList;
 @property (nonatomic, assign) CGFloat mediaPreviewZoomScale;
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
+@property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
+@property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
 @property (nonatomic, retain) NSNumber *typingChatID;
 @property (nonatomic, copy) NSString *typingIndicatorText;
 @property (nonatomic, retain) NSTimer *typingClearTimer;
@@ -3695,8 +3732,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize mediaPlaybackContainerView = _mediaPlaybackContainerView;
 @synthesize mediaPlaybackTitleField = _mediaPlaybackTitleField;
 @synthesize mediaPlaybackPlayPauseButton = _mediaPlaybackPlayPauseButton;
+@synthesize mediaPlaybackProgressSlider = _mediaPlaybackProgressSlider;
+@synthesize mediaPlaybackTimeField = _mediaPlaybackTimeField;
+@synthesize mediaPlaybackCloseButton = _mediaPlaybackCloseButton;
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
+@synthesize mediaPlaybackTimer = _mediaPlaybackTimer;
 @synthesize photoSendPreviewWindow = _photoSendPreviewWindow;
 @synthesize photoSendPreviewImageView = _photoSendPreviewImageView;
 @synthesize photoSendCaptionBackgroundView = _photoSendCaptionBackgroundView;
@@ -3768,6 +3809,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize showingForumTopicList = _showingForumTopicList;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
 @synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
+@synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
+@synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -5527,6 +5570,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(88, 88, 284, 18)
+                                              text:@"Voice message"
+                                              font:[NSFont boldSystemFontOfSize:12.0]];
+    [titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:titleField];
+    self.mediaPlaybackTitleField = titleField;
+
     NSView *containerView = [[[NSView alloc] initWithFrame:NSMakeRect(24, 64, 472, 272)] autorelease];
     [containerView setWantsLayer:YES];
     [containerView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -5545,11 +5595,159 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:playPauseButton];
     self.mediaPlaybackPlayPauseButton = playPauseButton;
 
+    NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(88, 61, 220, 22)] autorelease];
+    [progressSlider setMinValue:0.0];
+    [progressSlider setMaxValue:1.0];
+    [progressSlider setDoubleValue:0.0];
+    [progressSlider setContinuous:YES];
+    [progressSlider setTarget:self];
+    [progressSlider setAction:@selector(mediaPlaybackSliderChanged:)];
+    [progressSlider setEnabled:NO];
+    [progressSlider setAutoresizingMask:NSViewWidthSizable];
+    [contentView addSubview:progressSlider];
+    self.mediaPlaybackProgressSlider = progressSlider;
+
+    NSTextField *timeField = [self labelWithFrame:NSMakeRect(88, 41, 220, 18)
+                                             text:@"0:00 / 0:00"
+                                             font:[NSFont systemFontOfSize:12.0]];
+    [self applyMutedLabelStyle:timeField];
+    [timeField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:timeField];
+    self.mediaPlaybackTimeField = timeField;
+
     NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(376, 18, 120, 30)];
     [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:closeButton];
+    self.mediaPlaybackCloseButton = closeButton;
 
     self.mediaPlaybackWindow = window;
+}
+
+- (NSTimeInterval)secondsFromMediaPlaybackTime:(CMTime)time {
+    if (CMTIME_IS_INVALID(time) || CMTIME_IS_INDEFINITE(time)) {
+        return 0.0;
+    }
+    Float64 seconds = CMTimeGetSeconds(time);
+    if (!isfinite(seconds) || seconds < 0.0) {
+        return 0.0;
+    }
+    return seconds;
+}
+
+- (NSTimeInterval)currentMediaPlaybackDuration {
+    NSTimeInterval duration = self.mediaPlaybackKnownDuration;
+    AVPlayerItem *item = [self.mediaPlaybackPlayer currentItem];
+    if (item) {
+        NSTimeInterval itemDuration = [self secondsFromMediaPlaybackTime:[item duration]];
+        if (itemDuration > 0.0) {
+            duration = itemDuration;
+        }
+    }
+    return duration;
+}
+
+- (void)updateMediaPlaybackTimelineWithCurrentTime:(NSTimeInterval)currentTime duration:(NSTimeInterval)duration {
+    if (duration < 0.1) {
+        duration = 0.0;
+    }
+    if (currentTime < 0.0) {
+        currentTime = 0.0;
+    }
+    if (duration > 0.0 && currentTime > duration) {
+        currentTime = duration;
+    }
+
+    CGFloat sliderMaximum = (duration > 0.0) ? duration : 1.0;
+    [self.mediaPlaybackProgressSlider setMinValue:0.0];
+    [self.mediaPlaybackProgressSlider setMaxValue:sliderMaximum];
+    [self.mediaPlaybackProgressSlider setDoubleValue:currentTime];
+    [self.mediaPlaybackProgressSlider setEnabled:(duration > 0.0 && self.mediaPlaybackPlayer != nil)];
+    [self.mediaPlaybackTimeField setStringValue:[NSString stringWithFormat:@"%@ / %@",
+                                                  TGVoicePreviewTimeString(currentTime),
+                                                  TGVoicePreviewTimeString(duration)]];
+}
+
+- (void)invalidateMediaPlaybackTimer {
+    [self.mediaPlaybackTimer invalidate];
+    self.mediaPlaybackTimer = nil;
+}
+
+- (void)mediaPlaybackTimerDidFire:(NSTimer *)timer {
+    (void)timer;
+    if (!self.mediaPlaybackPlayer) {
+        [self invalidateMediaPlaybackTimer];
+        [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:0.0];
+        return;
+    }
+
+    NSTimeInterval duration = [self currentMediaPlaybackDuration];
+    NSTimeInterval currentTime = [self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]];
+    if (duration > 0.0 && currentTime >= duration - 0.05 && [self.mediaPlaybackPlayer rate] == 0.0) {
+        [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(0.0, 600)];
+        self.mediaPlaybackPlaying = NO;
+        [self updateMediaPlaybackButton];
+        [self invalidateMediaPlaybackTimer];
+        [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:duration];
+        return;
+    }
+    [self updateMediaPlaybackTimelineWithCurrentTime:currentTime duration:duration];
+}
+
+- (void)startMediaPlaybackTimer {
+    [self invalidateMediaPlaybackTimer];
+    NSTimer *timer = [NSTimer timerWithTimeInterval:0.2
+                                             target:self
+                                           selector:@selector(mediaPlaybackTimerDidFire:)
+                                           userInfo:nil
+                                            repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+    self.mediaPlaybackTimer = timer;
+}
+
+- (void)mediaPlaybackSliderChanged:(id)sender {
+    if (!self.mediaPlaybackPlayer) {
+        return;
+    }
+    NSTimeInterval duration = [self currentMediaPlaybackDuration];
+    NSTimeInterval value = [sender respondsToSelector:@selector(doubleValue)] ? [sender doubleValue] : 0.0;
+    if (duration > 0.0 && value > duration) {
+        value = duration;
+    }
+    if (value < 0.0) {
+        value = 0.0;
+    }
+    [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(value, 600)];
+    [self updateMediaPlaybackTimelineWithCurrentTime:value duration:duration];
+}
+
+- (void)layoutMediaPlaybackWindowForAudioOnly:(BOOL)audioOnly title:(NSString *)title {
+    [self ensureMediaPlaybackWindow];
+    self.mediaPlaybackAudioOnly = audioOnly;
+
+    if (audioOnly) {
+        [self.mediaPlaybackWindow setMinSize:NSMakeSize(360.0, 128.0)];
+        [self.mediaPlaybackWindow setContentSize:NSMakeSize(430.0, 128.0)];
+        [self.mediaPlaybackContainerView setHidden:YES];
+        [self.mediaPlaybackTitleField setHidden:NO];
+        [self.mediaPlaybackTitleField setStringValue:([title length] > 0 ? title : @"Voice message")];
+        [self.mediaPlaybackTitleField setFrame:NSMakeRect(88.0, 91.0, 260.0, 18.0)];
+        [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(22.0, 38.0, 48.0, 48.0)];
+        [self.mediaPlaybackProgressSlider setHidden:NO];
+        [self.mediaPlaybackProgressSlider setFrame:NSMakeRect(88.0, 61.0, 220.0, 22.0)];
+        [self.mediaPlaybackTimeField setHidden:NO];
+        [self.mediaPlaybackTimeField setFrame:NSMakeRect(88.0, 39.0, 220.0, 18.0)];
+        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(318.0, 18.0, 88.0, 28.0)];
+    } else {
+        [self.mediaPlaybackWindow setMinSize:NSMakeSize(360.0, 260.0)];
+        [self.mediaPlaybackWindow setContentSize:NSMakeSize(520.0, 360.0)];
+        [self.mediaPlaybackContainerView setHidden:NO];
+        [self.mediaPlaybackContainerView setFrame:NSMakeRect(24.0, 64.0, 472.0, 272.0)];
+        [self.mediaPlaybackTitleField setHidden:YES];
+        [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(24.0, 18.0, 42.0, 30.0)];
+        [self.mediaPlaybackProgressSlider setHidden:YES];
+        [self.mediaPlaybackTimeField setHidden:YES];
+        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(376.0, 18.0, 120.0, 30.0)];
+    }
 }
 
 - (void)updateMediaPlaybackButton {
@@ -5566,12 +5764,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)resetMediaPlaybackState {
+    [self invalidateMediaPlaybackTimer];
     [self.mediaPlaybackPlayer pause];
     [self.mediaPlaybackLayer removeFromSuperlayer];
     self.mediaPlaybackPlayer = nil;
     self.mediaPlaybackLayer = nil;
     self.mediaPlaybackPlaying = NO;
+    self.mediaPlaybackKnownDuration = 0.0;
     [self updateMediaPlaybackButton];
+    [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:0.0];
 }
 
 - (void)toggleMediaPlayback:(id)sender {
@@ -5582,14 +5783,25 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (self.mediaPlaybackPlaying) {
         [self.mediaPlaybackPlayer pause];
         self.mediaPlaybackPlaying = NO;
+        [self invalidateMediaPlaybackTimer];
     } else {
+        NSTimeInterval duration = [self currentMediaPlaybackDuration];
+        NSTimeInterval currentTime = [self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]];
+        if (duration > 0.0 && currentTime >= duration - 0.05) {
+            [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(0.0, 600)];
+        }
         [self.mediaPlaybackPlayer play];
         self.mediaPlaybackPlaying = YES;
+        if (self.mediaPlaybackAudioOnly) {
+            [self startMediaPlaybackTimer];
+        }
     }
     [self updateMediaPlaybackButton];
+    [self updateMediaPlaybackTimelineWithCurrentTime:[self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]]
+                                            duration:[self currentMediaPlaybackDuration]];
 }
 
-- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title {
+- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {
     if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
         [self appendDetail:@"Playable media file is not available yet."];
         return NO;
@@ -5597,6 +5809,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self ensureMediaPlaybackWindow];
     [self resetMediaPlaybackState];
+    [self layoutMediaPlaybackWindowForAudioOnly:audioOnly title:title];
+    self.mediaPlaybackKnownDuration = ([duration respondsToSelector:@selector(doubleValue)] && [duration doubleValue] > 0.0) ? [duration doubleValue] : 0.0;
 
     NSURL *url = [NSURL fileURLWithPath:path];
     AVPlayer *player = [[[AVPlayer alloc] initWithURL:url] autorelease];
@@ -5605,20 +5819,25 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return NO;
     }
 
-    AVPlayerLayer *layer = [AVPlayerLayer playerLayerWithPlayer:player];
-    [layer setVideoGravity:AVLayerVideoGravityResizeAspect];
-    [layer setFrame:[self.mediaPlaybackContainerView bounds]];
-    [[self.mediaPlaybackContainerView layer] addSublayer:layer];
-
     self.mediaPlaybackPlayer = player;
-    self.mediaPlaybackLayer = layer;
+    if (!audioOnly) {
+        AVPlayerLayer *layer = [AVPlayerLayer playerLayerWithPlayer:player];
+        [layer setVideoGravity:AVLayerVideoGravityResizeAspect];
+        [layer setFrame:[self.mediaPlaybackContainerView bounds]];
+        [[self.mediaPlaybackContainerView layer] addSublayer:layer];
+        self.mediaPlaybackLayer = layer;
+    }
     self.mediaPlaybackPlaying = YES;
     [self updateMediaPlaybackButton];
     [self.mediaPlaybackWindow setTitle:([title length] > 0 ? title : @"Media")];
     [self.mediaPlaybackWindow center];
     [self.mediaPlaybackWindow makeKeyAndOrderFront:nil];
     [self layoutMediaPlaybackLayer];
+    [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:[self currentMediaPlaybackDuration]];
     [self.mediaPlaybackPlayer play];
+    if (audioOnly) {
+        [self startMediaPlaybackTimer];
+    }
     return YES;
 }
 
@@ -5661,7 +5880,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         path = TGMediaItemLocalPath(mediaItem);
     }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        [self openPlayableMediaAtPath:path title:[self titleForMediaItem:mediaItem]];
+        [self openPlayableMediaAtPath:path
+                                title:[self titleForMediaItem:mediaItem]
+                             duration:[mediaItem objectForKey:@"duration"]
+                            audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)];
         return;
     }
 
@@ -5684,7 +5906,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if ([downloadedPath length] > 0) {
                 [self setOfflineModeActive:NO reason:nil];
                 [self.statusField setStringValue:@"Connected"];
-                [self openPlayableMediaAtPath:downloadedPath title:titleCopy];
+                [self openPlayableMediaAtPath:downloadedPath
+                                        title:titleCopy
+                                     duration:[mediaItem objectForKey:@"duration"]
+                                    audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {
@@ -5711,7 +5936,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSString *path = [item mediaLocalPath];
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        [self openPlayableMediaAtPath:path title:TGPlayableMediaTitleForMessageItem(item)];
+        [self openPlayableMediaAtPath:path
+                                title:TGPlayableMediaTitleForMessageItem(item)
+                             duration:[item mediaDuration]
+                            audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)];
         return;
     }
 
@@ -5734,7 +5962,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if ([downloadedPath length] > 0) {
                 [self setOfflineModeActive:NO reason:nil];
                 [self.statusField setStringValue:@"Connected"];
-                [self openPlayableMediaAtPath:downloadedPath title:titleCopy];
+                [self openPlayableMediaAtPath:downloadedPath
+                                        title:titleCopy
+                                     duration:[item mediaDuration]
+                                    audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {
@@ -6886,6 +7117,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
+    [self applyNotificationApplicationIconToNotification:notification];
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
         [userInfo setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
@@ -7654,6 +7886,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.mediaPlaybackContainerView = nil;
         self.mediaPlaybackTitleField = nil;
         self.mediaPlaybackPlayPauseButton = nil;
+        self.mediaPlaybackProgressSlider = nil;
+        self.mediaPlaybackTimeField = nil;
+        self.mediaPlaybackCloseButton = nil;
         self.mediaPlaybackWindow = nil;
     }
     if ([notification object] == self.voicePreviewWindow) {
@@ -12463,6 +12698,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPreviewWindow close];
     [_mediaPlaybackWindow setDelegate:nil];
     [_mediaPlaybackPlayer pause];
+    [_mediaPlaybackTimer invalidate];
     [_mediaPlaybackLayer removeFromSuperlayer];
     [_mediaPlaybackWindow close];
     [_photoSendPreviewWindow setDelegate:nil];
@@ -12485,8 +12721,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_mediaPlaybackContainerView release];
     [_mediaPlaybackTitleField release];
     [_mediaPlaybackPlayPauseButton release];
+    [_mediaPlaybackProgressSlider release];
+    [_mediaPlaybackTimeField release];
+    [_mediaPlaybackCloseButton release];
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackLayer release];
+    [_mediaPlaybackTimer release];
     [_photoSendPreviewWindow release];
     [_photoSendPreviewImageView release];
     [_photoSendCaptionBackgroundView release];
