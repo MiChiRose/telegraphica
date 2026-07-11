@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.3.0--alpha.1-blue" alt="version v0.3.0-alpha.1" />
+    <img src="https://img.shields.io/badge/version-v0.3.0--alpha.2-blue" alt="version v0.3.0-alpha.2" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -49,7 +49,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Alpha: `v0.3.0-alpha.1`
+## Current Alpha: `v0.3.0-alpha.2`
 
 This alpha is the first public build that is useful enough for live feedback.
 It is still rough, but the core loop works.
@@ -77,7 +77,7 @@ It is still rough, but the core loop works.
 ### ⚠️ Known Alpha Gaps
 
 - Sticker and GIF rendering is still incomplete and can fall back to emoji.
-- The DMG is not notarized.
+- The DMG is HFS+-formatted for Mavericks, but it is not notarized.
 - A Mavericks-compatible `libtdjson.dylib` is required.
 - Release confidence still comes from OS X 10.9.5 / Xcode 6.2 HITL testing.
 - The project is moving fast, so UI details and release packaging may change.
@@ -94,8 +94,8 @@ Latest alpha assets:
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.3.0-alpha.1-installer.dmg` | Quick app install | Drag `Telegraphica.app` to Applications. Not notarized. |
-| `Telegraphica-develop-e0455ae-alpha-release.zip` | Old-Mac source/build handoff | Use this when building with a local Mavericks TDLib setup. |
+| `Telegraphica-v0.3.0-alpha.2-installer.dmg` | Quick app install | HFS+ DMG for Mavericks. Drag `Telegraphica.app` to Applications. Not notarized. |
+| `Telegraphica-develop-...-hfs-dmg-hotfix.zip` | Old-Mac source/build handoff | Use this when building with a local Mavericks TDLib setup. |
 
 ### First Launch
 
