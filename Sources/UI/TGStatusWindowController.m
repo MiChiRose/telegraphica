@@ -1602,6 +1602,18 @@ static CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
     return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 11.0 : 0.0;
 }
 
+static CGFloat TGComposerMinimumInputHeight(void) {
+    return 20.0;
+}
+
+static CGFloat TGComposerMaximumInputHeight(void) {
+    return 84.0;
+}
+
+static CGFloat TGComposerLineHeight(void) {
+    return 16.0;
+}
+
 static NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item) {
     if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing]) {
         return @"";
@@ -3255,38 +3267,46 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         TGDrawAvatarInRect([item senderAvatarLocalPath], [item senderDisplayName], avatarRect, NO, [controlView isFlipped]);
     }
 
-    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    BOOL flipped = [controlView isFlipped];
+    CGFloat contentTop = flipped ? (NSMinY(bubbleRect) + 9.0) : (NSMaxY(bubbleRect) - 9.0);
     if (senderHeaderHeight > 0.0) {
         NSString *senderName = [item senderDisplayName];
         NSDictionary *senderAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                           [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
                                           TGClassicNavigationSelectedColor(0.90), NSForegroundColorAttributeName,
                                           nil];
-        NSRect senderRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
-                                       contentTop - 13.0,
-                                       NSWidth(bubbleRect) - 24.0,
-                                       14.0);
+        NSRect senderRect = flipped ? NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                                 contentTop,
+                                                 NSWidth(bubbleRect) - 24.0,
+                                                 14.0)
+                                    : NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                                 contentTop - 13.0,
+                                                 NSWidth(bubbleRect) - 24.0,
+                                                 14.0);
         [senderName drawInRect:senderRect withAttributes:senderAttributes];
-        contentTop -= senderHeaderHeight;
+        contentTop += flipped ? senderHeaderHeight : -senderHeaderHeight;
     }
 
     if (nonVisualPlayable) {
         NSRect playableRect = bubbleRect;
         if (senderHeaderHeight > 0.0) {
+            if (flipped) {
+                playableRect.origin.y += senderHeaderHeight;
+            }
             playableRect.size.height -= senderHeaderHeight;
         }
-        TGDrawPlayableMediaContentForItem(item, playableRect, [controlView isFlipped]);
+        TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
     }
 
-    if ([controlView isFlipped] && reactionBandHeight > 0.0) {
+    if (!flipped && reactionBandHeight > 0.0) {
         contentTop -= reactionBandHeight;
     }
-    if ([controlView isFlipped] && visualMediaMessage && [messageText length] == 0 && mediaFooterHeight > 0.0) {
+    if (!flipped && visualMediaMessage && [messageText length] == 0 && mediaFooterHeight > 0.0) {
         contentTop -= mediaFooterHeight;
     }
     if (visualMediaMessage) {
         NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
-                                      contentTop - photoSize.height,
+                                      flipped ? contentTop : (contentTop - photoSize.height),
                                       photoSize.width,
                                       photoSize.height);
         NSArray *mediaItems = [item visualMediaItems];
@@ -3324,13 +3344,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                 placeholderSize.height);
             [placeholder drawInRect:placeholderRect withAttributes:placeholderAttributes];
         }
-        contentTop = NSMinY(imageRect) - 8.0;
+        contentTop = flipped ? (NSMaxY(imageRect) + 8.0) : (NSMinY(imageRect) - 8.0);
     }
 
     if ([messageText length] > 0) {
         CGFloat textHeight = ceil(NSHeight(measuredRect));
         NSRect textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
-                                     contentTop - textHeight,
+                                     flipped ? contentTop : (contentTop - textHeight),
                                      NSWidth(bubbleRect) - 24.0,
                                      textHeight + 2.0);
         [attributedMessageText drawWithRect:textRect
@@ -4926,6 +4946,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.sendTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(76, 54, 500, 24)] autorelease];
     [self.sendTextField setEnabled:NO];
     [self applyComposerTextFieldStyle:self.sendTextField];
+    [[self.sendTextField cell] setUsesSingleLineMode:NO];
+    [[self.sendTextField cell] setWraps:YES];
+    [[self.sendTextField cell] setScrollable:NO];
+    [[self.sendTextField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [[self.sendTextField cell] setPlaceholderString:@"Message"];
     [self.sendTextField setDelegate:(id)self];
     [self.sendTextField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
@@ -7405,6 +7429,50 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.checkButton visible:NO];
 }
 
+- (CGFloat)composerInputHeightForWidth:(CGFloat)width {
+    if (width < 80.0) {
+        width = 80.0;
+    }
+
+    NSString *text = [self.sendTextField stringValue];
+    if ([text length] == 0) {
+        return TGComposerMinimumInputHeight();
+    }
+
+    NSFont *font = [self.sendTextField font];
+    if (!font) {
+        font = [NSFont systemFontOfSize:13.0];
+    }
+
+    NSMutableParagraphStyle *paragraphStyle = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraphStyle setLineBreakMode:NSLineBreakByWordWrapping];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                font, NSFontAttributeName,
+                                paragraphStyle, NSParagraphStyleAttributeName,
+                                nil];
+    NSRect measuredRect = [text boundingRectWithSize:NSMakeSize(width, 1000.0)
+                                             options:NSStringDrawingUsesLineFragmentOrigin
+                                          attributes:attributes];
+    CGFloat measuredHeight = ceil(NSHeight(measuredRect)) + 4.0;
+
+    NSUInteger explicitLines = 1;
+    NSUInteger index = 0;
+    for (index = 0; index < [text length]; index++) {
+        if ([text characterAtIndex:index] == '\n') {
+            explicitLines++;
+        }
+    }
+    CGFloat explicitHeight = 4.0 + ((CGFloat)explicitLines * TGComposerLineHeight());
+    CGFloat height = MAX(measuredHeight, explicitHeight);
+    if (height < TGComposerMinimumInputHeight()) {
+        height = TGComposerMinimumInputHeight();
+    }
+    if (height > TGComposerMaximumInputHeight()) {
+        height = TGComposerMaximumInputHeight();
+    }
+    return height;
+}
+
 - (void)layoutContentView {
     NSView *contentView = [[self window] contentView];
     NSRect bounds = [contentView bounds];
@@ -7629,7 +7697,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                         selectedAvatarSize + 4.0)];
 
     BOOL voiceRecordingActive = [self.voiceRecorder isRecording];
-    CGFloat composerHeight = voiceRecordingActive ? 60.0 : 42.0;
+    CGFloat estimatedSendFieldWidth = conversationWidth - 198.0;
+    if (estimatedSendFieldWidth < 160.0) {
+        estimatedSendFieldWidth = 160.0;
+    }
+    CGFloat composerInputHeight = [self composerInputHeightForWidth:(estimatedSendFieldWidth - 16.0)];
+    CGFloat composerHeight = composerInputHeight + 16.0;
+    if (composerHeight < 42.0) {
+        composerHeight = 42.0;
+    }
+    if (voiceRecordingActive && composerHeight < 60.0) {
+        composerHeight = 60.0;
+    }
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
     CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -7670,17 +7749,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
     }
+    CGFloat composerInnerHeight = composerInputHeight + 10.0;
+    CGFloat composerControlY = composerY + floor((composerHeight - 32.0) / 2.0);
+    CGFloat composerInputBackgroundY = composerY + floor((composerHeight - composerInnerHeight) / 2.0);
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
-    [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerY + 5.0, attachButtonWidth, 32.0)];
-    [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerY + 6.0, sendFieldWidth, 30.0)];
-    [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerY + 11.0, sendFieldWidth - 16.0, 20.0)];
-    [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerY + 5.0, smallComposerButtonWidth, 32.0)];
-    [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerY + 5.0, smallComposerButtonWidth, 32.0)];
-    [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerY + 5.0, sendButtonWidth, 32.0)];
+    [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerControlY, attachButtonWidth, 32.0)];
+    [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerInputBackgroundY, sendFieldWidth, composerInnerHeight)];
+    [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerInputBackgroundY + 5.0, sendFieldWidth - 16.0, composerInputHeight)];
+    [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
+    [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
+    [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerControlY, sendButtonWidth, 32.0)];
     if (voiceRecordingActive) {
-        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + 41.0, conversationWidth - (sendFieldX - conversationX) - 28.0, 16.0)];
+        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, conversationWidth - (sendFieldX - conversationX) - 28.0, 16.0)];
     } else {
-        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + 41.0, 0.0, 0.0)];
+        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, 0.0, 0.0)];
     }
 
     CGFloat panelTitleY = headerLabelY;
@@ -8081,6 +8163,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.sendTextField setStringValue:(text ? text : @"")];
     self.suppressComposerDraftSave = previousSuppress;
     [self updateSendControls];
+    [self layoutContentView];
 }
 
 - (void)saveComposerDraftForChatID:(NSNumber *)chatID
@@ -8446,6 +8529,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([notification object] == self.sendTextField) {
         [self saveCurrentComposerDraft];
         [self updateSendControls];
+        [self layoutContentView];
     } else if ([notification object] == self.authTextField || [notification object] == self.authSecureField) {
         if (self.loginErrorVisible) {
             [self setLoginErrorMessage:nil];
@@ -8455,8 +8539,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector {
-    (void)textView;
-    if (control == self.sendTextField && commandSelector == @selector(insertNewline:)) {
+    if (control == self.sendTextField &&
+        (commandSelector == @selector(insertNewline:) ||
+         commandSelector == @selector(insertLineBreak:) ||
+         commandSelector == @selector(insertNewlineIgnoringFieldEditor:))) {
+        NSUInteger modifierFlags = [[[NSApplication sharedApplication] currentEvent] modifierFlags];
+        BOOL wantsLineBreak = (commandSelector == @selector(insertLineBreak:) ||
+                               (modifierFlags & NSShiftKeyMask) != 0);
+        if (wantsLineBreak) {
+            [textView insertNewline:nil];
+            [self layoutContentView];
+            [self updateSendControls];
+            return YES;
+        }
         [self sendMessage:control];
         return YES;
     }

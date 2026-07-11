@@ -3341,8 +3341,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     if ([type isEqualToString:@"messageDocument"]) {
         NSDictionary *document = [content objectForKey:@"document"];
-        if ([document isKindOfClass:[NSDictionary class]] && [self isVisualDocumentObject:document]) {
-            label = [self documentVisualLabelFromObject:document];
+        if ([document isKindOfClass:[NSDictionary class]]) {
+            if ([self isVisualDocumentObject:document]) {
+                label = [self documentVisualLabelFromObject:document];
+            } else {
+                id fileNameObject = [document objectForKey:@"file_name"];
+                if ([fileNameObject isKindOfClass:[NSString class]] && [(NSString *)fileNameObject length] > 0) {
+                    label = (NSString *)fileNameObject;
+                }
+            }
         }
     }
 
