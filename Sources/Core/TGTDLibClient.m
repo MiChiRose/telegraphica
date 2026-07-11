@@ -86,6 +86,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableSet *_waitingResponseExtras;
     NSMutableArray *_pendingUpdateSummaries;
     NSArray *_chatFilterInfos;
+    NSMutableDictionary *_senderSummaryCache;
     NSString *_latestAuthorizationStateSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
@@ -124,6 +125,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
+- (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
+- (NSDictionary *)userSenderSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)photoInfoFromChatPhotoObject:(id)photoObject
                                downloadMissing:(BOOL)downloadMissing
                                        timeout:(NSTimeInterval)timeout
@@ -161,6 +164,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _pendingResponseExtras = [[NSMutableArray alloc] init];
         _waitingResponseExtras = [[NSMutableSet alloc] init];
         _pendingUpdateSummaries = [[NSMutableArray alloc] init];
+        _senderSummaryCache = [[NSMutableDictionary alloc] init];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -212,6 +216,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_pendingResponseExtras removeAllObjects];
         [_waitingResponseExtras removeAllObjects];
         [_pendingUpdateSummaries removeAllObjects];
+        [_senderSummaryCache removeAllObjects];
         [_chatFilterInfos release];
         _chatFilterInfos = nil;
         _chatFilterInfosKnown = NO;
@@ -244,6 +249,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_pendingResponseExtras removeAllObjects];
     [_waitingResponseExtras removeAllObjects];
     [_pendingUpdateSummaries removeAllObjects];
+    [_senderSummaryCache removeAllObjects];
     [_chatFilterInfos release];
     _chatFilterInfos = nil;
     _chatFilterInfosKnown = NO;
@@ -285,6 +291,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_waitingResponseExtras release];
     [_pendingUpdateSummaries release];
     [_chatFilterInfos release];
+    [_senderSummaryCache release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
     [_receiverThread release];
@@ -3169,6 +3176,122 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                       didRequestDownload:didRequestDownload];
 }
 
+- (NSDictionary *)userSenderSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout {
+    if (![userID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getUser" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"user_id"];
+
+    NSDictionary *userResponse = [self sendTDLibRequestAndWaitForExtra:request
+                                                           extraPrefix:@"telegraphica-message-sender-user"
+                                                               timeout:timeout
+                                                             errorCode:86
+                                                                 error:NULL];
+    id userType = [userResponse objectForKey:@"@type"];
+    if (![userType isKindOfClass:[NSString class]] || ![(NSString *)userType isEqualToString:@"user"]) {
+        return nil;
+    }
+
+    id firstName = [userResponse objectForKey:@"first_name"];
+    id lastName = [userResponse objectForKey:@"last_name"];
+    id username = [userResponse objectForKey:@"username"];
+    NSMutableArray *nameParts = [NSMutableArray array];
+    if ([firstName isKindOfClass:[NSString class]] && [(NSString *)firstName length] > 0) {
+        [nameParts addObject:firstName];
+    }
+    if ([lastName isKindOfClass:[NSString class]] && [(NSString *)lastName length] > 0) {
+        [nameParts addObject:lastName];
+    }
+
+    NSString *displayName = ([nameParts count] > 0) ? [nameParts componentsJoinedByString:@" "] : nil;
+    if ([displayName length] == 0 && [username isKindOfClass:[NSString class]] && [(NSString *)username length] > 0) {
+        displayName = [NSString stringWithFormat:@"@%@", username];
+    }
+    if ([displayName length] == 0) {
+        displayName = [NSString stringWithFormat:@"User %lld", [userID longLongValue]];
+    }
+
+    NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+    [summary setObject:userID forKey:@"sender_id"];
+    [summary setObject:@"messageSenderUser" forKey:@"sender_type"];
+    [summary setObject:[self singleLineTrimmedString:displayName maximumLength:80] forKey:@"display_name"];
+
+    BOOL didRequestAvatarDownload = NO;
+    NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[userResponse objectForKey:@"profile_photo"]
+                                                  downloadMissing:YES
+                                                          timeout:0.7
+                                               didRequestDownload:&didRequestAvatarDownload];
+    NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+    if ([avatarPath length] > 0) {
+        [summary setObject:avatarPath forKey:@"avatar_local_path"];
+    }
+    return summary;
+}
+
+- (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout {
+    if (![messageObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id senderObject = [messageObject objectForKey:@"sender_id"];
+    if (![senderObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSString *senderType = [(NSDictionary *)senderObject objectForKey:@"@type"];
+    id senderIDObject = nil;
+    if ([senderType isEqualToString:@"messageSenderUser"]) {
+        senderIDObject = [(NSDictionary *)senderObject objectForKey:@"user_id"];
+    } else if ([senderType isEqualToString:@"messageSenderChat"]) {
+        senderIDObject = [(NSDictionary *)senderObject objectForKey:@"chat_id"];
+    }
+    if (![senderType isKindOfClass:[NSString class]] || ![senderIDObject respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+
+    NSNumber *senderID = [NSNumber numberWithLongLong:[senderIDObject longLongValue]];
+    NSString *cacheKey = [NSString stringWithFormat:@"%@:%lld", senderType, [senderID longLongValue]];
+    @synchronized (self) {
+        NSDictionary *cached = [_senderSummaryCache objectForKey:cacheKey];
+        if (cached) {
+            return cached;
+        }
+    }
+
+    NSDictionary *summary = nil;
+    NSTimeInterval safeTimeout = timeout;
+    if (safeTimeout <= 0.0 || safeTimeout > 1.0) {
+        safeTimeout = 1.0;
+    }
+    if ([senderType isEqualToString:@"messageSenderUser"]) {
+        summary = [self userSenderSummaryForUserID:senderID timeout:safeTimeout];
+    } else if ([senderType isEqualToString:@"messageSenderChat"]) {
+        NSError *chatError = nil;
+        summary = [self chatSummaryForChatID:senderID downloadAvatar:YES timeout:safeTimeout error:&chatError];
+        if (summary) {
+            NSMutableDictionary *chatSummary = [NSMutableDictionary dictionaryWithDictionary:summary];
+            NSString *title = [chatSummary objectForKey:@"title"];
+            if ([title length] > 0) {
+                [chatSummary setObject:title forKey:@"display_name"];
+            }
+            [chatSummary setObject:senderID forKey:@"sender_id"];
+            [chatSummary setObject:senderType forKey:@"sender_type"];
+            summary = chatSummary;
+        }
+    }
+
+    if ([summary count] == 0) {
+        return nil;
+    }
+    NSDictionary *summaryCopy = [[summary copy] autorelease];
+    @synchronized (self) {
+        [_senderSummaryCache setObject:summaryCopy forKey:cacheKey];
+    }
+    return summaryCopy;
+}
+
 - (NSString *)messageContentPreviewForObject:(id)contentObject {
     if (![contentObject isKindOfClass:[NSDictionary class]]) {
         return @"[Message]";
@@ -3378,6 +3501,21 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        if (!outgoing) {
+            NSDictionary *senderSummary = [self senderSummaryFromMessageObject:message timeout:0.9];
+            id senderID = [senderSummary objectForKey:@"sender_id"];
+            if ([senderID respondsToSelector:@selector(longLongValue)]) {
+                [item setSenderID:[NSNumber numberWithLongLong:[senderID longLongValue]]];
+            }
+            NSString *senderName = [senderSummary objectForKey:@"display_name"];
+            if ([senderName length] > 0) {
+                [item setSenderDisplayName:senderName];
+            }
+            NSString *senderAvatar = [senderSummary objectForKey:@"avatar_local_path"];
+            if ([senderAvatar length] > 0) {
+                [item setSenderAvatarLocalPath:senderAvatar];
+            }
+        }
         [item setSending:([[message objectForKey:@"sending_state"] isKindOfClass:[NSDictionary class]])];
         NSDictionary *reactionInfo = [self reactionInfoFromMessageObject:message];
         id reactionSummary = [reactionInfo objectForKey:@"summary"];

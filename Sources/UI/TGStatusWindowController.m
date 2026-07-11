@@ -1490,6 +1490,7 @@ static void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL out
 }
 
 static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
+static CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
 
 static CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
     CGFloat widthRatio = ([item isVisualMediaMessage] ? 0.78 : 0.68);
@@ -1590,6 +1591,13 @@ static CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
     return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
 }
 
+static CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails) {
+    if (!showSenderDetails || ![item isKindOfClass:[TGMessageItem class]] || [item outgoing]) {
+        return 0.0;
+    }
+    return ([[item senderDisplayName] length] > 0) ? 17.0 : 0.0;
+}
+
 static CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
     return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 11.0 : 0.0;
 }
@@ -1649,7 +1657,7 @@ static CGFloat TGMessageMediaFooterHeightForItem(TGMessageItem *item) {
     return ([TGShortTimeStringFromDateValue([item date]) length] > 0) ? 18.0 : 0.0;
 }
 
-static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth) {
+static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth, BOOL showSenderDetails) {
     if (!item) {
         return 48.0;
     }
@@ -1687,13 +1695,14 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
         textHeight = ceil(NSHeight(textRect));
     }
 
-    CGFloat height = textHeight + 26.0;
+    CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+    CGFloat height = textHeight + 26.0 + senderHeaderHeight;
     if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-        height = TGPlayableMediaBubbleHeightForItem(item);
+        height = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
     }
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
-        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
+        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
     }
     if (height < 42.0) {
         height = 42.0;
@@ -1704,7 +1713,7 @@ static CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availab
     return height + 10.0;
 }
 
-static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) {
+static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails) {
     if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
         return NSZeroRect;
     }
@@ -1712,6 +1721,7 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
+    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
@@ -1775,12 +1785,13 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
         bubbleWidth = maximumBubbleWidth;
     }
 
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
     if (nonVisualPlayable) {
-        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item);
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
     }
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
@@ -1792,7 +1803,7 @@ static NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame) 
         bubbleHeight += TGReactionBandHeightForMessageItem(item);
     }
 
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
 }
 
@@ -3093,18 +3104,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @interface TGMessageBubbleCell : NSTextFieldCell {
     TGMessageItem *_messageItem;
+    BOOL _showSenderDetails;
 }
 @property (nonatomic, retain) TGMessageItem *messageItem;
+@property (nonatomic, assign) BOOL showSenderDetails;
 @end
 
 @implementation TGMessageBubbleCell
 
 @synthesize messageItem = _messageItem;
+@synthesize showSenderDetails = _showSenderDetails;
 
 - (id)copyWithZone:(NSZone *)zone {
     TGMessageBubbleCell *cell = [super copyWithZone:zone];
     cell->_messageItem = nil;
     [cell setMessageItem:self.messageItem];
+    [cell setShowSenderDetails:self.showSenderDetails];
     return cell;
 }
 
@@ -3133,6 +3148,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
+    BOOL showSenderDetails = self.showSenderDetails;
+    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
@@ -3198,15 +3215,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (bubbleWidth > maximumBubbleWidth) {
         bubbleWidth = maximumBubbleWidth;
     }
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
     }
     if (nonVisualPlayable) {
-        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item);
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
     }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
@@ -3216,7 +3234,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         bubbleHeight += reactionBandHeight;
     }
 
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     NSBezierPath *bubblePath = [NSBezierPath bezierPathWithRoundedRect:bubbleRect xRadius:13.0 yRadius:13.0];
 
@@ -3229,11 +3247,37 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
 
-    if (nonVisualPlayable) {
-        TGDrawPlayableMediaContentForItem(item, bubbleRect, [controlView isFlipped]);
+    if (showSenderDetails && !outgoing) {
+        NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + sidePadding,
+                                       NSMaxY(bubbleRect) - 25.0,
+                                       24.0,
+                                       24.0);
+        TGDrawAvatarInRect([item senderAvatarLocalPath], [item senderDisplayName], avatarRect, NO, [controlView isFlipped]);
     }
 
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    if (senderHeaderHeight > 0.0) {
+        NSString *senderName = [item senderDisplayName];
+        NSDictionary *senderAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                          [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                          TGClassicNavigationSelectedColor(0.90), NSForegroundColorAttributeName,
+                                          nil];
+        NSRect senderRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                       contentTop - 13.0,
+                                       NSWidth(bubbleRect) - 24.0,
+                                       14.0);
+        [senderName drawInRect:senderRect withAttributes:senderAttributes];
+        contentTop -= senderHeaderHeight;
+    }
+
+    if (nonVisualPlayable) {
+        NSRect playableRect = bubbleRect;
+        if (senderHeaderHeight > 0.0) {
+            playableRect.size.height -= senderHeaderHeight;
+        }
+        TGDrawPlayableMediaContentForItem(item, playableRect, [controlView isFlipped]);
+    }
+
     if ([controlView isFlipped] && reactionBandHeight > 0.0) {
         contentTop -= reactionBandHeight;
     }
@@ -8480,6 +8524,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
+    BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -8534,7 +8580,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
-    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight;
+    CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
     if (NSHeight(measuredRect) > 0.0) {
         bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
     }
@@ -8543,9 +8590,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     bubbleHeight += TGReactionBandHeightForMessageItem(item);
 
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    contentTop -= senderHeaderHeight;
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
     contentTop -= reactionBandHeight;
     if ([messageText length] == 0 && mediaFooterHeight > 0.0) {
@@ -8592,6 +8640,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
+    BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -8644,9 +8694,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         bubbleWidth = maximumBubbleWidth;
     }
 
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0;
+    CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0;
+        bubbleHeight = photoSize.height + 24.0 + senderHeaderHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
@@ -8656,9 +8707,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     bubbleHeight += TGReactionBandHeightForMessageItem(item);
 
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding);
+    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
+    contentTop -= senderHeaderHeight;
     if (visualMediaMessage) {
         NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
                                       contentTop - photoSize.height,
@@ -8731,7 +8783,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
     if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
-        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame);
+        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
         if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
             [self openPlayableMediaForMessageItem:(TGMessageItem *)item];
             return;
@@ -8779,7 +8831,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return NO;
     }
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
-    NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame);
+    NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:item]);
     return (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect));
 }
 
@@ -8796,7 +8848,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return YES;
     }
     if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame);
+        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:item]);
         if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
             return YES;
         }
@@ -9322,6 +9374,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return (NSInteger)[self.chatItems count];
 }
 
+- (BOOL)shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] || [item outgoing] || [[item senderDisplayName] length] == 0) {
+        return NO;
+    }
+    NSString *type = [self.selectedChatTypeSummary lowercaseString];
+    if ([type length] == 0 && !self.selectedMessageThreadID) {
+        return NO;
+    }
+    BOOL groupLike = ([type rangeOfString:@"group"].location != NSNotFound ||
+                      [type rangeOfString:@"forum"].location != NSNotFound ||
+                      [type rangeOfString:@"thread"].location != NSNotFound ||
+                      [type rangeOfString:@"topic"].location != NSNotFound ||
+                      self.selectedMessageThreadID != nil);
+    return groupLike;
+}
+
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
     if (tableView != self.messageTableView) {
         return [tableView rowHeight];
@@ -9335,7 +9403,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     CGFloat availableWidth = bubbleColumn ? [bubbleColumn width] : NSWidth([self.messageScrollView frame]);
-    return TGMessageBubbleHeightForItem((TGMessageItem *)item, availableWidth);
+    return TGMessageBubbleHeightForItem((TGMessageItem *)item, availableWidth, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
 }
 
 - (NSString *)tableView:(NSTableView *)tableView
@@ -9363,7 +9431,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return TGMediaItemIsPlayable(mediaItem) ? @"Play media" : @"Open media preview";
     }
     if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
-        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame);
+        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
         if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(mouseLocation, bubbleRect)) {
             return @"Play media";
         }
@@ -9448,6 +9516,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             }
         }
         [(TGMessageBubbleCell *)cell setMessageItem:messageItem];
+        [(TGMessageBubbleCell *)cell setShowSenderDetails:[self shouldShowGroupSenderDetailsForMessageItem:messageItem]];
         return;
     }
     [textCell setAlignment:NSLeftTextAlignment];
@@ -10884,7 +10953,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             } else if (itemsCopy) {
                 self.chatPreviewLimit = [itemsCopy count];
                 self.chatsExhausted = chatsExhausted;
-                [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:preferredChatID];
+                NSNumber *effectivePreferredChatID = preferredChatID;
+                if (preserveSelection &&
+                    preferredChatID &&
+                    self.selectedChatID &&
+                    [self.selectedChatID longLongValue] != [preferredChatID longLongValue]) {
+                    effectivePreferredChatID = self.selectedChatID;
+                }
+                [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:effectivePreferredChatID];
                 [self setOfflineModeActive:NO reason:nil];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
@@ -11144,7 +11220,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
 
-    if (self.pendingLiveChatRefresh && !self.backgroundChatRefreshInFlight && !self.showingForumTopicList) {
+    if (self.pendingLiveChatRefresh && !self.backgroundChatRefreshInFlight && !self.backgroundMessageRefreshInFlight && !self.showingForumTopicList) {
         self.pendingLiveChatRefresh = NO;
         [self reloadChatsInteractive:NO preserveSelection:YES];
     }

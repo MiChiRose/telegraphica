@@ -22,6 +22,9 @@
 @property (nonatomic, retain) NSNumber *downloadFileSize;
 @property (nonatomic, copy) NSString *reactionSummary;
 @property (nonatomic, copy) NSArray *chosenReactionEmojis;
+@property (nonatomic, retain) NSNumber *senderID;
+@property (nonatomic, copy) NSString *senderDisplayName;
+@property (nonatomic, copy) NSString *senderAvatarLocalPath;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
