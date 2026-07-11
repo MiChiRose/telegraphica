@@ -57,6 +57,8 @@ hdiutil create \
     -srcfolder "$STAGE_DIR" \
     -ov \
     -format UDZO \
+    -fs HFS+ \
+    -layout SPUD \
     "$DMG_PATH"
 
 echo "Created $DMG_NAME at $DMG_PATH"
