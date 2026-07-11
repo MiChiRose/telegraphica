@@ -152,6 +152,16 @@ development-only TDLib-less image can be forced with
 `TELEGRAPHICA_ALLOW_TDLIBLESS_INSTALLER=1`, but that image should not be
 published as an end-user installer.
 
+On the legacy Mac, build the complete release artifacts in one pass:
+
+```sh
+./scripts/package_legacy_release_artifacts.sh --tdjson /path/to/libtdjson.dylib
+```
+
+That command rebuilds Telegraphica, bundles TDLib, creates an HFS+ DMG, creates
+an app zip, and writes SHA256 files into `dist/`. These are the artifacts that
+should be uploaded to GitHub for an out-of-the-box Mavericks alpha.
+
 The build script targets `MACOSX_DEPLOYMENT_TARGET=10.9`, builds `x86_64`,
 stamps `LSMinimumSystemVersion`, checks the resulting binary with `file`,
 `lipo`, and `otool`, then writes release artifacts into `dist/`.

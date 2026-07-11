@@ -355,3 +355,13 @@ A public installer must be created from an app bundle that already contains a
 Mavericks-compatible `Contents/Frameworks/libtdjson.dylib`. Do not publish a DMG
 that asks end users to install CMake, MacPorts, OpenSSL, or TDLib separately:
 those are build inputs, not normal runtime installation steps.
+
+For the public release handoff, run the legacy release packager on the old Mac:
+
+```bash
+./scripts/package_legacy_release_artifacts.sh --tdjson /path/to/libtdjson.dylib
+```
+
+It rebuilds Telegraphica, validates and bundles TDLib, creates the Mavericks
+HFS+ installer DMG, creates an app zip, and writes SHA256 files into `dist/`.
+Transfer those files back to the publishing machine for the GitHub release.
