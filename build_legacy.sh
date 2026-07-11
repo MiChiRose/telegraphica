@@ -66,6 +66,10 @@ APP_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$
 if [ -z "$APP_VERSION" ]; then
     APP_VERSION="0.1.0"
 fi
+APP_BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_SOURCE" 2>/dev/null || true)"
+if [ -z "$APP_BUILD" ]; then
+    APP_BUILD="$APP_VERSION"
+fi
 DIST_ZIP="$DIST_DIR/Telegraphica_v${APP_VERSION}.zip"
 
 rm -rf "$BUILD_ROOT" "$APP_NAME"
@@ -137,8 +141,8 @@ BINARY_PATH="$APP_NAME/Contents/MacOS/$EXECUTABLE_NAME"
     /usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string $DEPLOYMENT_TARGET" "$INFO_PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" "$INFO_PLIST" 2>/dev/null || \
     /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_VERSION" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" "$INFO_PLIST" 2>/dev/null || \
-    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_BUILD" "$INFO_PLIST" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD" "$INFO_PLIST"
 
 MIN_PLIST=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$INFO_PLIST")
 if [ "$MIN_PLIST" != "$DEPLOYMENT_TARGET" ]; then

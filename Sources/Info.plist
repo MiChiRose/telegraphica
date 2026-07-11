@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>
-	<string>Telegraphica</string>
+	<string>TelegraphicaAppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.michirose.Telegraphica</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -17,17 +17,19 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.3.0-alpha.1</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.0</string>
+	<string>3001</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.9</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2026 Telegraphica contributors. Released under the project license.</string>
+	<string>Copyright 2026 Yura Menschikov. All rights reserved.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Telegraphica uses the microphone only when you record a voice message.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>
