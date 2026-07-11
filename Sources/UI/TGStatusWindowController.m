@@ -246,6 +246,15 @@ static NSArray *TGNumericVersionComponents(NSString *version) {
     return numbers;
 }
 
+static NSString *TGVersionPrereleaseSuffix(NSString *version) {
+    NSString *clean = TGVersionWithoutLeadingV(version);
+    NSRange separatorRange = [clean rangeOfString:@"-"];
+    if (separatorRange.location == NSNotFound || NSMaxRange(separatorRange) >= [clean length]) {
+        return @"";
+    }
+    return [clean substringFromIndex:NSMaxRange(separatorRange)];
+}
+
 static BOOL TGVersionStringIsNewer(NSString *candidate, NSString *current) {
     NSArray *candidateNumbers = TGNumericVersionComponents(candidate);
     NSArray *currentNumbers = TGNumericVersionComponents(current);
@@ -261,7 +270,25 @@ static BOOL TGVersionStringIsNewer(NSString *candidate, NSString *current) {
             return NO;
         }
     }
-    return ([TGVersionWithoutLeadingV(candidate) compare:TGVersionWithoutLeadingV(current) options:NSNumericSearch] == NSOrderedDescending);
+
+    NSString *candidatePrerelease = TGVersionPrereleaseSuffix(candidate);
+    NSString *currentPrerelease = TGVersionPrereleaseSuffix(current);
+    BOOL candidateIsPrerelease = ([candidatePrerelease length] > 0);
+    BOOL currentIsPrerelease = ([currentPrerelease length] > 0);
+    if (!candidateIsPrerelease && currentIsPrerelease) {
+        return YES;
+    }
+    if (candidateIsPrerelease && !currentIsPrerelease) {
+        return NO;
+    }
+    if (candidateIsPrerelease && currentIsPrerelease) {
+        NSComparisonResult prereleaseCompare = [candidatePrerelease compare:currentPrerelease options:(NSCaseInsensitiveSearch | NSNumericSearch)];
+        if (prereleaseCompare != NSOrderedSame) {
+            return prereleaseCompare == NSOrderedDescending;
+        }
+    }
+
+    return ([TGVersionWithoutLeadingV(candidate) compare:TGVersionWithoutLeadingV(current) options:(NSCaseInsensitiveSearch | NSNumericSearch)] == NSOrderedDescending);
 }
 
 static BOOL TGUserDefaultBoolWithDefault(NSString *key, BOOL defaultValue) {
@@ -7030,6 +7057,37 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return ([version length] > 0) ? version : @"0.0.0";
 }
 
+- (NSString *)updateCheckUserAgentString {
+    NSString *version = [self currentApplicationVersionString];
+    if ([version length] == 0) {
+        version = @"unknown";
+    }
+    return [NSString stringWithFormat:@"Telegraphica/%@ (Mac OS X; Mavericks-compatible)", version];
+}
+
+- (void)openProjectReleasesPage {
+    NSURL *releaseURL = [NSURL URLWithString:TGProjectReleasesURLString];
+    if (releaseURL) {
+        [[NSWorkspace sharedWorkspace] openURL:releaseURL];
+    }
+}
+
+- (NSString *)githubErrorMessageFromData:(NSData *)data fallback:(NSString *)fallback {
+    if ([data length] == 0) {
+        return fallback;
+    }
+    NSError *jsonError = nil;
+    id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+    if ([object isKindOfClass:[NSDictionary class]]) {
+        id messageObject = [(NSDictionary *)object objectForKey:@"message"];
+        NSString *message = [messageObject isKindOfClass:[NSString class]] ? messageObject : nil;
+        if ([message length] > 0) {
+            return message;
+        }
+    }
+    return fallback;
+}
+
 - (NSDictionary *)latestGitHubReleaseInfoWithError:(NSError **)error {
     NSURL *url = [NSURL URLWithString:TGUpdateAPIURLString];
     if (!url) {
@@ -7041,13 +7099,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return nil;
     }
 
-    NSURLRequest *request = [NSURLRequest requestWithURL:url
-                                             cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
-                                         timeoutInterval:12.0];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
+                                                           cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                                       timeoutInterval:18.0];
+    [request setHTTPMethod:@"GET"];
+    [request setValue:[self updateCheckUserAgentString] forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"application/vnd.github+json" forHTTPHeaderField:@"Accept"];
+    [request setValue:@"no-cache" forHTTPHeaderField:@"Cache-Control"];
+
     NSURLResponse *response = nil;
     NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:error];
     if (![data isKindOfClass:[NSData class]] || [data length] == 0) {
         return nil;
+    }
+
+    if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+        NSInteger statusCode = [(NSHTTPURLResponse *)response statusCode];
+        if (statusCode < 200 || statusCode >= 300) {
+            if (error) {
+                NSString *fallback = [NSString stringWithFormat:@"GitHub returned HTTP %ld.", (long)statusCode];
+                NSString *message = [self githubErrorMessageFromData:data fallback:fallback];
+                *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                             code:statusCode
+                                         userInfo:[NSDictionary dictionaryWithObject:message forKey:NSLocalizedDescriptionKey]];
+            }
+            return nil;
+        }
     }
 
     id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
@@ -7072,13 +7149,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         if ([draft respondsToSelector:@selector(boolValue)] && [draft boolValue]) {
             continue;
         }
-        NSString *tagName = [release objectForKey:@"tag_name"];
-        NSString *name = [release objectForKey:@"name"];
+        id tagNameObject = [release objectForKey:@"tag_name"];
+        id nameObject = [release objectForKey:@"name"];
+        NSString *tagName = [tagNameObject isKindOfClass:[NSString class]] ? tagNameObject : nil;
+        NSString *name = [nameObject isKindOfClass:[NSString class]] ? nameObject : nil;
         NSString *version = ([tagName length] > 0) ? tagName : name;
         if ([version length] == 0) {
             continue;
         }
-        NSString *htmlURL = [release objectForKey:@"html_url"];
+        id htmlURLObject = [release objectForKey:@"html_url"];
+        NSString *htmlURL = [htmlURLObject isKindOfClass:[NSString class]] ? htmlURLObject : nil;
         if ([htmlURL length] == 0) {
             htmlURL = TGProjectReleasesURLString;
         }
@@ -7102,8 +7182,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             NSAlert *alert = [[[NSAlert alloc] init] autorelease];
             [alert setMessageText:TGLoc(@"settings.update")];
             [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.failed"), errorMessage]];
+            [alert addButtonWithTitle:TGLoc(@"update.open")];
             [alert addButtonWithTitle:@"OK"];
-            [alert runModal];
+            NSInteger result = [alert runModal];
+            if (result == NSAlertFirstButtonReturn) {
+                [self openProjectReleasesPage];
+            }
         } else {
             [self appendDetail:[NSString stringWithFormat:@"Update check: %@", errorMessage]];
         }
@@ -7137,6 +7221,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSURL *releaseURL = [NSURL URLWithString:urlString];
         if (releaseURL) {
             [[NSWorkspace sharedWorkspace] openURL:releaseURL];
+        } else {
+            [self openProjectReleasesPage];
         }
     }
 }
@@ -7152,8 +7238,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
 
+    NSString *previousStatus = nil;
     if (manual) {
+        previousStatus = [[self.statusField stringValue] copy];
         [self.statusField setStringValue:@"Checking for updates..."];
+        [self.settingsCheckUpdatesButton setEnabled:NO];
     }
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -7163,11 +7252,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *errorMessage = [[updateError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (manual) {
-                [self.statusField setStringValue:@"Connected"];
+                [self.statusField setStringValue:([previousStatus length] > 0 ? previousStatus : @"")];
+                [self.settingsCheckUpdatesButton setEnabled:YES];
             }
             [self showUpdateCheckResult:releaseInfo errorMessage:errorMessage manual:manual];
             [releaseInfo release];
             [errorMessage release];
+            [previousStatus release];
         });
         [pool drain];
     });
