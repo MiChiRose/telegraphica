@@ -124,6 +124,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
+- (NSDictionary *)photoInfoFromChatPhotoObject:(id)photoObject
+                               downloadMissing:(BOOL)downloadMissing
+                                       timeout:(NSTimeInterval)timeout
+                            didRequestDownload:(BOOL *)didRequestDownload;
 - (NSDictionary *)stickerPreviewInfoFromStickerObject:(id)stickerObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -1991,6 +1995,63 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return items;
+}
+
+- (NSDictionary *)chatSummaryForChatID:(NSNumber *)chatID downloadAvatar:(BOOL)downloadAvatar timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:82];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *getChatRequest = [NSMutableDictionary dictionary];
+    [getChatRequest setObject:@"getChat" forKey:@"@type"];
+    [getChatRequest setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+
+    NSTimeInterval safeTimeout = timeout;
+    if (safeTimeout <= 0.0 || safeTimeout > 1.5) {
+        safeTimeout = 1.5;
+    }
+
+    NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:getChatRequest
+                                                            extraPrefix:@"telegraphica-notification-chat"
+                                                                timeout:safeTimeout
+                                                              errorCode:83
+                                                                  error:error];
+    if (!chatResponse) {
+        return nil;
+    }
+
+    id responseType = [chatResponse objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chat"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib getChat returned an unexpected response." code:84];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    id titleValue = [chatResponse objectForKey:@"title"];
+    if ([titleValue isKindOfClass:[NSString class]] && [(NSString *)titleValue length] > 0) {
+        [info setObject:titleValue forKey:@"title"];
+    }
+
+    BOOL didRequestAvatarDownload = NO;
+    NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[chatResponse objectForKey:@"photo"]
+                                                  downloadMissing:downloadAvatar
+                                                          timeout:0.9
+                                               didRequestDownload:&didRequestAvatarDownload];
+    NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+    if ([avatarPath length] > 0) {
+        [info setObject:avatarPath forKey:@"avatar_local_path"];
+    }
+
+    if ([self chatNotificationsMutedFromObject:chatResponse]) {
+        [info setObject:[NSNumber numberWithBool:YES] forKey:@"notifications_muted"];
+    }
+
+    return ([info count] > 0) ? info : nil;
 }
 
 - (NSArray *)chatFilterChatIDsForFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error {

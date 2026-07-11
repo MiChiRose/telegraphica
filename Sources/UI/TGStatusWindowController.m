@@ -3581,6 +3581,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTimer *typingClearTimer;
 @property (nonatomic, retain) NSNumber *pendingNotificationChatID;
 @property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
+@property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
 @end
 
 @implementation TGStatusWindowController
@@ -3805,6 +3806,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize typingClearTimer = _typingClearTimer;
 @synthesize pendingNotificationChatID = _pendingNotificationChatID;
 @synthesize pendingNotificationThreadID = _pendingNotificationThreadID;
+@synthesize notificationChatInfoByChatID = _notificationChatInfoByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
@@ -3830,6 +3832,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
+        self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
@@ -6525,6 +6528,113 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return [NSNumber numberWithLongLong:[chatID longLongValue]];
 }
 
+- (NSString *)notificationCacheKeyForChatID:(NSNumber *)chatID {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%lld", [chatID longLongValue]];
+}
+
+- (TGChatItem *)chatItemForNotificationChatID:(NSNumber *)chatID {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    long long targetChatID = [chatID longLongValue];
+    NSMutableArray *sources = [NSMutableArray array];
+    if (self.chatItems) {
+        [sources addObject:self.chatItems];
+    }
+    if (self.chatItemsBeforeTopicList) {
+        [sources addObject:self.chatItemsBeforeTopicList];
+    }
+
+    NSUInteger sourceIndex = 0;
+    for (sourceIndex = 0; sourceIndex < [sources count]; sourceIndex++) {
+        NSArray *items = [sources objectAtIndex:sourceIndex];
+        NSUInteger index = 0;
+        for (index = 0; index < [items count]; index++) {
+            id candidate = [items objectAtIndex:index];
+            if (![candidate isKindOfClass:[TGChatItem class]]) {
+                continue;
+            }
+            TGChatItem *item = (TGChatItem *)candidate;
+            NSNumber *itemChatID = [self notificationChatIDForChatItem:item];
+            if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == targetChatID) {
+                return item;
+            }
+        }
+    }
+    return nil;
+}
+
+- (NSDictionary *)notificationChatInfoForChatID:(NSNumber *)chatID {
+    NSString *cacheKey = [self notificationCacheKeyForChatID:chatID];
+    if ([cacheKey length] == 0) {
+        return nil;
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    TGChatItem *item = [self chatItemForNotificationChatID:chatID];
+    if ([item isKindOfClass:[TGChatItem class]]) {
+        NSString *title = [item title];
+        NSString *avatarPath = [item avatarLocalPath];
+        if ([title length] > 0) {
+            [info setObject:title forKey:@"title"];
+        }
+        if ([avatarPath length] > 0) {
+            [info setObject:avatarPath forKey:@"avatar_local_path"];
+        }
+    }
+
+    NSDictionary *cachedInfo = [self.notificationChatInfoByChatID objectForKey:cacheKey];
+    if ([cachedInfo isKindOfClass:[NSDictionary class]]) {
+        NSString *cachedTitle = [cachedInfo objectForKey:@"title"];
+        NSString *cachedAvatarPath = [cachedInfo objectForKey:@"avatar_local_path"];
+        id cachedMuted = [cachedInfo objectForKey:@"notifications_muted"];
+        if ([[info objectForKey:@"title"] length] == 0 && [cachedTitle length] > 0) {
+            [info setObject:cachedTitle forKey:@"title"];
+        }
+        if ([[info objectForKey:@"avatar_local_path"] length] == 0 && [cachedAvatarPath length] > 0) {
+            [info setObject:cachedAvatarPath forKey:@"avatar_local_path"];
+        }
+        if (cachedMuted) {
+            [info setObject:cachedMuted forKey:@"notifications_muted"];
+        }
+    }
+
+    BOOL needsFetch = ([[info objectForKey:@"title"] length] == 0 || [[info objectForKey:@"avatar_local_path"] length] == 0);
+    if (needsFetch && [self.client respondsToSelector:@selector(chatSummaryForChatID:downloadAvatar:timeout:error:)]) {
+        NSError *chatInfoError = nil;
+        NSDictionary *fetchedInfo = [self.client chatSummaryForChatID:chatID
+                                                       downloadAvatar:YES
+                                                              timeout:1.2
+                                                                error:&chatInfoError];
+        if ([fetchedInfo isKindOfClass:[NSDictionary class]]) {
+            NSString *fetchedTitle = [fetchedInfo objectForKey:@"title"];
+            NSString *fetchedAvatarPath = [fetchedInfo objectForKey:@"avatar_local_path"];
+            id fetchedMuted = [fetchedInfo objectForKey:@"notifications_muted"];
+            if ([fetchedTitle length] > 0) {
+                [info setObject:fetchedTitle forKey:@"title"];
+            }
+            if ([fetchedAvatarPath length] > 0) {
+                [info setObject:fetchedAvatarPath forKey:@"avatar_local_path"];
+            }
+            if (fetchedMuted) {
+                [info setObject:fetchedMuted forKey:@"notifications_muted"];
+            }
+        }
+        if ([chatInfoError localizedDescription]) {
+            [self appendDetail:[NSString stringWithFormat:@"Notification chat info fallback: %@", [chatInfoError localizedDescription]]];
+        }
+    }
+
+    if ([info count] > 0) {
+        [self.notificationChatInfoByChatID setObject:[NSDictionary dictionaryWithDictionary:info] forKey:cacheKey];
+        return info;
+    }
+    return nil;
+}
+
 - (NSString *)chatMuteDefaultsKeyForChatID:(NSNumber *)chatID {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         return nil;
@@ -7011,47 +7121,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (NSString *)titleForChatID:(NSNumber *)chatID fallback:(NSString *)fallback {
-    if (![chatID respondsToSelector:@selector(longLongValue)]) {
-        return fallback;
-    }
-    NSUInteger index = 0;
-    for (index = 0; index < [self.chatItems count]; index++) {
-        id candidate = [self.chatItems objectAtIndex:index];
-        if (![candidate isKindOfClass:[TGChatItem class]]) {
-            continue;
-        }
-        TGChatItem *item = (TGChatItem *)candidate;
-        NSNumber *itemChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
-        if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == [chatID longLongValue]) {
-            NSString *title = [item title];
-            if ([title length] > 0) {
-                return title;
-            }
-        }
+    NSDictionary *info = [self notificationChatInfoForChatID:chatID];
+    NSString *title = [info objectForKey:@"title"];
+    if ([title length] > 0) {
+        return title;
     }
     return fallback;
 }
 
 - (NSString *)avatarLocalPathForChatID:(NSNumber *)chatID {
-    if (![chatID respondsToSelector:@selector(longLongValue)]) {
-        return nil;
-    }
-    NSUInteger index = 0;
-    for (index = 0; index < [self.chatItems count]; index++) {
-        id candidate = [self.chatItems objectAtIndex:index];
-        if (![candidate isKindOfClass:[TGChatItem class]]) {
-            continue;
-        }
-        TGChatItem *item = (TGChatItem *)candidate;
-        NSNumber *itemChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
-        if ([itemChatID respondsToSelector:@selector(longLongValue)] && [itemChatID longLongValue] == [chatID longLongValue]) {
-            NSString *avatarPath = [item avatarLocalPath];
-            if ([avatarPath length] > 0) {
-                return avatarPath;
-            }
-        }
-    }
-    return nil;
+    NSDictionary *info = [self notificationChatInfoForChatID:chatID];
+    NSString *avatarPath = [info objectForKey:@"avatar_local_path"];
+    return ([avatarPath length] > 0) ? avatarPath : nil;
 }
 
 - (NSImage *)notificationAvatarImageForChatID:(NSNumber *)chatID {
@@ -7065,32 +7146,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     [avatarImage setSize:NSMakeSize(64.0, 64.0)];
     return avatarImage;
-}
-
-- (NSImage *)notificationApplicationIconImage {
-    NSImage *image = [NSImage imageNamed:@"TelegraphicaNotificationIcon"];
-    if (!image) {
-        image = [NSImage imageNamed:@"Telegraphica"];
-    }
-    if (image) {
-        [image setSize:NSMakeSize(64.0, 64.0)];
-    }
-    return image;
-}
-
-- (void)applyNotificationApplicationIconToNotification:(NSUserNotification *)notification {
-    NSImage *applicationIcon = [self notificationApplicationIconImage];
-    if (!applicationIcon) {
-        return;
-    }
-
-    @try {
-        [notification setValue:applicationIcon forKey:@"_identityImage"];
-        [notification setValue:[NSNumber numberWithBool:NO] forKey:@"_identityImageHasBorder"];
-    }
-    @catch (NSException *exception) {
-        (void)exception;
-    }
 }
 
 - (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {
@@ -7109,7 +7164,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([self isChatIDMutedForNotifications:chatID]) {
         return;
     }
-    NSString *title = [self titleForChatID:chatID fallback:@"Telegram"];
+    NSDictionary *notificationChatInfo = [self notificationChatInfoForChatID:chatID];
+    id serverMuted = [notificationChatInfo objectForKey:@"notifications_muted"];
+    if ([serverMuted respondsToSelector:@selector(boolValue)] && [serverMuted boolValue]) {
+        return;
+    }
+    NSString *title = [notificationChatInfo objectForKey:@"title"];
+    if ([title length] == 0) {
+        title = @"New message";
+    }
     NSString *preview = [summary objectForKey:@"preview"];
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
         preview = @"New message";
@@ -7117,7 +7180,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
-    [self applyNotificationApplicationIconToNotification:notification];
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
         [userInfo setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
@@ -12625,6 +12687,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_messageDropOverlayView release];
     [_messageItems release];
     [_composerDraftsByTargetKey release];
+    [_notificationChatInfoByChatID release];
     [_profileTitleField release];
     [_profileNameField release];
     [_profileUsernameField release];
