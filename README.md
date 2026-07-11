@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.3.0--alpha.2-blue" alt="version v0.3.0-alpha.2" />
+    <img src="https://img.shields.io/badge/version-v0.3.0--alpha.3-blue" alt="version v0.3.0-alpha.3" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -49,7 +49,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Alpha: `v0.3.0-alpha.2`
+## Current Alpha: `v0.3.0-alpha.3`
 
 This alpha is the first public build that is useful enough for live feedback.
 It is still rough, but the core loop works.
@@ -98,8 +98,8 @@ Latest alpha assets:
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.3.0-alpha.2-installer.dmg` | Installer-format test | HFS+ DMG for Mavericks. This alpha image fixes mounting, but it is not a complete out-of-box Telegram installer unless the app bundle includes `Contents/Frameworks/libtdjson.dylib`. |
-| `Telegraphica-develop-...-hfs-dmg-hotfix.zip` | Old-Mac source/build handoff | Use this when building with a local Mavericks TDLib setup. |
+| `Telegraphica-v0.3.0-alpha.3-macos10.9-x86_64.dmg` | Complete Mavericks installer candidate | Must be built on the legacy Mac and must include `Contents/Frameworks/libtdjson.dylib`. |
+| `Telegraphica-develop-...-legacy-release-packager.zip` | Old-Mac release artifact handoff | Use this to build the alpha.3 DMG/app zip with a local Mavericks TDLib setup. |
 
 ### First Launch
 
