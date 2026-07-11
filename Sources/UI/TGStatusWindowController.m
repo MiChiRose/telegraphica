@@ -3622,6 +3622,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
 @property (nonatomic, assign) BOOL autoOlderMessagesLoadArmed;
 @property (nonatomic, assign) BOOL autoChatListLoadArmed;
+@property (nonatomic, assign) BOOL autoChatListRefreshArmed;
 @property (nonatomic, assign) BOOL forceMessageScrollToNewest;
 @property (nonatomic, assign) BOOL initialConnectStarted;
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
@@ -3853,6 +3854,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
 @synthesize autoOlderMessagesLoadArmed = _autoOlderMessagesLoadArmed;
 @synthesize autoChatListLoadArmed = _autoChatListLoadArmed;
+@synthesize autoChatListRefreshArmed = _autoChatListRefreshArmed;
 @synthesize forceMessageScrollToNewest = _forceMessageScrollToNewest;
 @synthesize initialConnectStarted = _initialConnectStarted;
 @synthesize profileSummaryLoaded = _profileSummaryLoaded;
@@ -3902,6 +3904,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.activeSection = TGSectionChats;
         self.mediaPreviewZoomScale = 1.0;
         self.autoChatListLoadArmed = YES;
+        self.autoChatListRefreshArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
@@ -4216,6 +4219,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginTitleField setTextColor:TGClassicInkColor()];
     [self.sendLabel setTextColor:TGClassicInkColor()];
     [self.profileNameField setTextColor:TGClassicInkColor()];
+    [self.profileNameField setFont:[NSFont boldSystemFontOfSize:17.0]];
+    [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
@@ -4403,12 +4408,65 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self clearTypingIndicator];
 }
 
-- (NSString *)typingIndicatorTextForSelectedChat {
+- (NSString *)typingActionTextForSummary:(NSDictionary *)summary {
+    NSString *actionType = [summary objectForKey:@"action_type"];
+    if (![actionType isKindOfClass:[NSString class]]) {
+        return @"пишет...";
+    }
+    if ([actionType isEqualToString:@"chatActionRecordingVoiceNote"]) {
+        return @"записывает голосовое...";
+    }
+    if ([actionType isEqualToString:@"chatActionUploadingPhoto"]) {
+        return @"отправляет фото...";
+    }
+    if ([actionType isEqualToString:@"chatActionUploadingVideo"]) {
+        return @"отправляет видео...";
+    }
+    if ([actionType isEqualToString:@"chatActionUploadingDocument"]) {
+        return @"отправляет файл...";
+    }
+    if ([actionType isEqualToString:@"chatActionRecordingVideoNote"]) {
+        return @"записывает кружок...";
+    }
+    if ([actionType isEqualToString:@"chatActionUploadingVideoNote"]) {
+        return @"отправляет кружок...";
+    }
+    if ([actionType isEqualToString:@"chatActionChoosingSticker"]) {
+        return @"выбирает стикер...";
+    }
+    return @"пишет...";
+}
+
+- (NSString *)typingSenderNameForSummary:(NSDictionary *)summary {
     NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"";
     if ([self.selectedChatTypeSummary isEqualToString:@"Private"] && [title length] > 0) {
-        return [NSString stringWithFormat:@"%@ пишет...", title];
+        return title;
     }
-    return @"Кто-то пишет...";
+
+    NSNumber *senderID = [summary objectForKey:@"sender_id"];
+    if ([senderID respondsToSelector:@selector(longLongValue)]) {
+        NSEnumerator *enumerator = [self.messageItems reverseObjectEnumerator];
+        TGMessageItem *item = nil;
+        while ((item = [enumerator nextObject])) {
+            if (![item isKindOfClass:[TGMessageItem class]]) {
+                continue;
+            }
+            NSNumber *itemSenderID = [item senderID];
+            if ([itemSenderID respondsToSelector:@selector(longLongValue)] &&
+                [itemSenderID longLongValue] == [senderID longLongValue] &&
+                [[item senderDisplayName] length] > 0) {
+                return [item senderDisplayName];
+            }
+        }
+    }
+
+    return @"Кто-то";
+}
+
+- (NSString *)typingIndicatorTextForSummary:(NSDictionary *)summary {
+    NSString *senderName = [self typingSenderNameForSummary:summary];
+    NSString *actionText = [self typingActionTextForSummary:summary];
+    return [NSString stringWithFormat:@"%@ %@", senderName, actionText];
 }
 
 - (void)handleTypingUpdateSummary:(NSDictionary *)summary {
@@ -4442,7 +4500,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     self.typingChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
-    self.typingIndicatorText = [self typingIndicatorTextForSelectedChat];
+    self.typingIndicatorText = [self typingIndicatorTextForSummary:summary];
     [self.typingClearTimer invalidate];
     self.typingClearTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
                                                              target:self
@@ -5590,6 +5648,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.chatsExhausted = NO;
     self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
     self.autoChatListLoadArmed = YES;
+    self.autoChatListRefreshArmed = YES;
     if (!self.selectedChatFilterID) {
         [self.client invalidateMainChatListExhaustion];
     }
@@ -7327,12 +7386,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.chatsLabel visible:showChats];
     [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList)];
     [self showView:self.loadChatsButton visible:showChats];
-    [self showView:self.loadMoreChatsButton visible:(showChats && !self.showingForumTopicList)];
+    [self showView:self.loadMoreChatsButton visible:NO];
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
     [self showView:self.loadMessagesButton visible:showChats];
-    [self showView:self.loadOlderMessagesButton visible:showChats];
+    [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.selectedChatField visible:showChats];
     [self showView:self.typingIndicatorField visible:(showChats && [[self.typingIndicatorField stringValue] length] > 0)];
     BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
@@ -7638,13 +7697,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVisualOffset;
     CGFloat chatHeaderTitleX = self.showingForumTopicList ? (mainX + 52.0) : (mainX + 16.0);
     [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, sidebarWidth - (chatHeaderTitleX - mainX) - 96.0, 20.0)];
+    [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, sidebarWidth - (chatHeaderTitleX - mainX) - 58.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    if (self.showingForumTopicList) {
-        [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    } else {
-        [self.loadChatsButton setFrame:NSMakeRect(NSMinX([self.loadMoreChatsButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    }
+    [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
     CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -7670,7 +7725,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.loadMessagesButton setFrame:NSMakeRect(NSMinX([self.loadOlderMessagesButton frame]) - 8.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
     CGFloat selectedAvatarSize = 24.0;
     CGFloat selectedAvatarX = conversationX + 16.0;
@@ -7777,31 +7832,31 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat groupedX = mainX + floor((mainWidth - groupedWidth) / 2.0);
 
     [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    CGFloat profileSummaryHeight = 124.0;
-    CGFloat profileSummaryY = contentTop - profileSummaryHeight - 22.0;
+    CGFloat profileSummaryHeight = 132.0;
+    CGFloat profileSummaryY = contentTop - profileSummaryHeight - 18.0;
     [self.profileSummaryCardView setFrame:NSMakeRect(groupedX, profileSummaryY, groupedWidth, profileSummaryHeight)];
-    CGFloat profileAvatarSize = 78.0;
-    CGFloat profileAvatarX = groupedX + 26.0;
+    CGFloat profileAvatarSize = 88.0;
+    CGFloat profileAvatarX = groupedX + 24.0;
     CGFloat profileAvatarY = profileSummaryY + floor((profileSummaryHeight - profileAvatarSize) / 2.0);
     [self.profileAvatarView setFrame:NSMakeRect(profileAvatarX,
                                                 profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
-    CGFloat profileTextX = NSMaxX([self.profileAvatarView frame]) + 24.0;
-    CGFloat profileTextWidth = groupedWidth - (profileTextX - groupedX) - 26.0;
+    CGFloat profileTextX = NSMaxX([self.profileAvatarView frame]) + 22.0;
+    CGFloat profileTextWidth = groupedWidth - (profileTextX - groupedX) - 24.0;
     if (profileTextWidth < 180.0) {
         profileTextWidth = groupedWidth - 52.0;
         profileTextX = groupedX + 26.0;
     }
-    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 68.0, profileTextWidth, 24.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 40.0, profileTextWidth, 22.0)];
+    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 76.0, profileTextWidth, 24.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 48.0, profileTextWidth, 22.0)];
 
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
     BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
     BOOL profileHasID = ([[self.profileIDRowValueField stringValue] length] > 0);
     NSUInteger profileDetailRows = (profileHasUsername ? 1 : 0) + (profileHasPhone ? 1 : 0) + (profileHasID ? 1 : 0);
-    CGFloat profileNextTop = profileSummaryY - 14.0;
+    CGFloat profileNextTop = profileSummaryY - 18.0;
 
     if (profileHasBio) {
         [self.profileAboutSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop - 18.0, groupedWidth - 40.0, 16.0)];
@@ -7820,10 +7875,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         if (profileInfoHeight > 112.0) {
             profileInfoHeight = 112.0;
         }
-        CGFloat profileInfoY = profileNextTop - 18.0 - profileInfoHeight - 8.0;
+        CGFloat profileInfoY = profileNextTop - 18.0 - profileInfoHeight - 9.0;
         [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileInfoY, groupedWidth, profileInfoHeight)];
         [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileInfoY + 14.0, groupedWidth - 48.0, profileInfoHeight - 26.0)];
-        profileNextTop = profileInfoY - 14.0;
+        profileNextTop = profileInfoY - 18.0;
     } else {
         [self.profileAboutSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop, groupedWidth - 40.0, 0.0)];
         [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileNextTop, groupedWidth, 0.0)];
@@ -7831,10 +7886,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     if (profileDetailRows > 0) {
-        CGFloat rowHeight = 42.0;
-        CGFloat detailsHeight = ((CGFloat)profileDetailRows * rowHeight) + 12.0;
+        CGFloat rowHeight = 44.0;
+        CGFloat detailsHeight = ((CGFloat)profileDetailRows * rowHeight) + 14.0;
         CGFloat accountSectionY = profileNextTop - 18.0;
-        CGFloat detailsY = accountSectionY - detailsHeight - 8.0;
+        CGFloat detailsY = accountSectionY - detailsHeight - 9.0;
         [self.profileAccountSectionField setFrame:NSMakeRect(groupedX + 20.0, accountSectionY, groupedWidth - 40.0, 16.0)];
         [self.profileDetailsCardView setFrame:NSMakeRect(groupedX, detailsY, groupedWidth, detailsHeight)];
 
@@ -7845,7 +7900,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             rowValueX = groupedX + 150.0;
             rowValueWidth = groupedWidth - 174.0;
         }
-        CGFloat rowY = detailsY + detailsHeight - 31.0;
+        CGFloat rowY = detailsY + detailsHeight - 33.0;
         NSUInteger laidOutRows = 0;
         CGFloat separatorOneY = 0.0;
         CGFloat separatorTwoY = 0.0;
@@ -7854,7 +7909,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [self.profileUsernameRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 150.0, 20.0)];
             [self.profileUsernameRowValueField setFrame:NSMakeRect(rowValueX, rowY, rowValueWidth, 20.0)];
             laidOutRows++;
-            separatorOneY = rowY - 11.0;
+            separatorOneY = rowY - 12.0;
             rowY -= rowHeight;
         } else {
             [self.profileUsernameRowTitleField setFrame:NSMakeRect(rowTitleX, rowY, 0.0, 0.0)];
@@ -7865,9 +7920,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [self.profilePhoneRowValueField setFrame:NSMakeRect(rowValueX, rowY, rowValueWidth, 20.0)];
             laidOutRows++;
             if (laidOutRows == 1) {
-                separatorOneY = rowY - 11.0;
+                separatorOneY = rowY - 12.0;
             } else {
-                separatorTwoY = rowY - 11.0;
+                separatorTwoY = rowY - 12.0;
             }
             rowY -= rowHeight;
         } else {
@@ -7891,7 +7946,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             }
             [self.profileDetailsSeparatorTwo setFrame:NSMakeRect(groupedX + 24.0, separatorTwoY, groupedWidth - 48.0, 1.0)];
         }
-        profileNextTop = detailsY - 14.0;
+        profileNextTop = detailsY - 18.0;
     } else {
         [self.profileAccountSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop, groupedWidth - 40.0, 0.0)];
         [self.profileDetailsCardView setFrame:NSMakeRect(groupedX, profileNextTop, groupedWidth, 0.0)];
@@ -7903,10 +7958,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.profileIDRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
     }
 
-    CGFloat profileActionsHeight = 54.0;
+    CGFloat profileActionsHeight = 56.0;
     CGFloat profileActionsY = profileNextTop - profileActionsHeight;
     [self.profileActionsCardView setFrame:NSMakeRect(groupedX, profileActionsY, groupedWidth, profileActionsHeight)];
-    [self.logoutButton setFrame:NSMakeRect(groupedX + 22.0, profileActionsY + 12.0, groupedWidth - 44.0, 30.0)];
+    [self.logoutButton setFrame:NSMakeRect(groupedX + 22.0, profileActionsY + 13.0, groupedWidth - 44.0, 30.0)];
     [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileActionsY, 0.0, 0.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
@@ -8355,6 +8410,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.chatsExhausted = NO;
         [self.client invalidateMainChatListExhaustion];
         self.autoChatListLoadArmed = YES;
+        self.autoChatListRefreshArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self refreshSelectedChatHeaderDisplay];
@@ -8469,10 +8525,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
-    [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
+    [self.loadMoreChatsButton setEnabled:NO];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
-    [self.loadOlderMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
+    [self.loadOlderMessagesButton setEnabled:NO];
     [self.logoutButton setEnabled:([state isEqualToString:@"ready"] && !self.controlsBusy)];
     [self updateSendControls];
     [self refreshProfileDisplay];
@@ -8491,10 +8547,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.logoutButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self updateNavigationButtonsForSection:(self.activeSection ? self.activeSection : TGSectionChats) enabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
-    [self.loadMoreChatsButton setEnabled:[self canLoadMoreChats]];
+    [self.loadMoreChatsButton setEnabled:NO];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
-    [self.loadOlderMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget && [self.messageItems count] > 0 && !self.olderMessagesExhausted)];
+    [self.loadOlderMessagesButton setEnabled:NO];
     [self.attachPhotoButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.stickerButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.voiceRecordButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
@@ -9860,6 +9916,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.chatTableView reloadData];
     [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;
+    self.autoChatListRefreshArmed = NO;
 
     if (self.pendingNotificationChatID) {
         NSNumber *pendingChatID = [self.pendingNotificationChatID retain];
@@ -9990,6 +10047,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loadChatsButton setToolTip:@"Refresh topics"];
     self.chatsExhausted = YES;
     self.autoChatListLoadArmed = NO;
+    self.autoChatListRefreshArmed = NO;
 
     NSMutableArray *topicItems = [NSMutableArray array];
     NSUInteger index = 0;
@@ -10043,6 +10101,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
     self.chatsExhausted = NO;
+    self.autoChatListRefreshArmed = YES;
 
     NSArray *restoreItems = self.chatItemsBeforeTopicList ? self.chatItemsBeforeTopicList : [NSArray array];
     NSUInteger selectedIndex = [self indexOfChatID:parentChatID inChatItems:restoreItems];
@@ -10541,6 +10600,44 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return (distanceFromBottom <= 48.0);
 }
 
+- (BOOL)isChatListScrollable {
+    if ([self.chatItems count] == 0) {
+        return NO;
+    }
+
+    NSClipView *clipView = [self.chatScrollView contentView];
+    NSView *documentView = [self.chatScrollView documentView];
+    if (!clipView || !documentView) {
+        return NO;
+    }
+
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    CGFloat estimatedRowsHeight = ([self.chatTableView rowHeight] + [self.chatTableView intercellSpacing].height) * (CGFloat)[self.chatItems count];
+    CGFloat documentHeight = NSHeight(documentBounds);
+    if (estimatedRowsHeight > documentHeight) {
+        documentHeight = estimatedRowsHeight;
+    }
+    return (documentHeight > (NSHeight(visibleRect) + 16.0));
+}
+
+- (BOOL)isChatListNearTop {
+    if ([self.chatItems count] == 0 || self.showingForumTopicList || ![self isChatListScrollable]) {
+        return NO;
+    }
+
+    NSClipView *clipView = [self.chatScrollView contentView];
+    NSView *documentView = [self.chatScrollView documentView];
+    if (!clipView || !documentView) {
+        return NO;
+    }
+
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    CGFloat distanceFromTop = NSMinY(visibleRect) - NSMinY(documentBounds);
+    return (distanceFromTop <= 18.0);
+}
+
 - (void)chatScrollViewDidScroll:(NSNotification *)notification {
     if ([notification object] != [self.chatScrollView contentView]) {
         return;
@@ -10549,8 +10646,21 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         self.controlsBusy ||
         self.backgroundChatRefreshInFlight ||
-        self.chatsExhausted ||
         [self.chatItems count] == 0) {
+        return;
+    }
+
+    if ([self isChatListNearTop]) {
+        if (self.autoChatListRefreshArmed) {
+            self.autoChatListRefreshArmed = NO;
+            [self reloadChatsInteractive:NO preserveSelection:YES];
+        }
+        return;
+    }
+
+    self.autoChatListRefreshArmed = YES;
+
+    if (self.chatsExhausted) {
         return;
     }
 
@@ -11632,6 +11742,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
     self.autoChatListLoadArmed = YES;
+    self.autoChatListRefreshArmed = YES;
     [self reloadChatsInteractive:YES preserveSelection:YES];
 }
 
@@ -12725,6 +12836,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 self.chatsExhausted = NO;
                 self.olderMessagesExhausted = NO;
                 self.autoChatListLoadArmed = YES;
+                self.autoChatListRefreshArmed = YES;
                 self.autoOlderMessagesLoadArmed = YES;
                 [self refreshSelectedChatHeaderDisplay];
                 [self.composerDraftsByTargetKey removeAllObjects];
