@@ -1126,6 +1126,16 @@ static NSString *TGDurationStringFromSecondsValue(id durationValue) {
     return [NSString stringWithFormat:@"%ld:%02ld", (long)minutes, (long)remainder];
 }
 
+static NSString *TGVoicePreviewTimeString(NSTimeInterval seconds) {
+    if (seconds < 0.0) {
+        seconds = 0.0;
+    }
+    NSInteger totalSeconds = (NSInteger)floor(seconds);
+    NSInteger minutes = totalSeconds / 60;
+    NSInteger remainder = totalSeconds % 60;
+    return [NSString stringWithFormat:@"%ld:%02ld", (long)minutes, (long)remainder];
+}
+
 static NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem) {
     id placeholder = [mediaItem objectForKey:@"placeholder"];
     if ([placeholder isKindOfClass:[NSString class]] && [(NSString *)placeholder length] > 0) {
@@ -3486,8 +3496,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSWindow *voicePreviewWindow;
 @property (nonatomic, retain) NSTextField *voicePreviewTitleField;
 @property (nonatomic, retain) NSButton *voicePreviewPlayButton;
+@property (nonatomic, retain) NSSlider *voicePreviewProgressSlider;
+@property (nonatomic, retain) NSTextField *voicePreviewTimeField;
 @property (nonatomic, retain) NSButton *voicePreviewSendButton;
 @property (nonatomic, retain) NSTextField *voicePreviewErrorField;
+@property (nonatomic, retain) NSTimer *voicePreviewTimer;
 @property (nonatomic, retain) NSTextField *voiceRecordingIndicatorField;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, retain) NSMenu *chatContextMenu;
@@ -3707,8 +3720,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize voicePreviewWindow = _voicePreviewWindow;
 @synthesize voicePreviewTitleField = _voicePreviewTitleField;
 @synthesize voicePreviewPlayButton = _voicePreviewPlayButton;
+@synthesize voicePreviewProgressSlider = _voicePreviewProgressSlider;
+@synthesize voicePreviewTimeField = _voicePreviewTimeField;
 @synthesize voicePreviewSendButton = _voicePreviewSendButton;
 @synthesize voicePreviewErrorField = _voicePreviewErrorField;
+@synthesize voicePreviewTimer = _voicePreviewTimer;
 @synthesize voiceRecordingIndicatorField = _voiceRecordingIndicatorField;
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize chatContextMenu = _chatContextMenu;
@@ -4203,10 +4219,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     } else {
         [self.profileNameField setStringValue:@"Profile"];
     }
-    [self.settingsStateField setStringValue:@""];
+    [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
 
     BOOL hasProfileUserID = [self.profileUserID respondsToSelector:@selector(longLongValue)];
-    [self.settingsLibraryField setStringValue:@""];
+    [self.settingsLibraryField setStringValue:TGLoc(@"settings.appearance")];
 
     if ([self.profileUsername length] > 0) {
         [self.profileUsernameRowValueField setStringValue:[NSString stringWithFormat:@"@%@", self.profileUsername]];
@@ -7639,6 +7655,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.mediaPlaybackTitleField = nil;
         self.mediaPlaybackPlayPauseButton = nil;
         self.mediaPlaybackWindow = nil;
+    }
+    if ([notification object] == self.voicePreviewWindow) {
+        [self invalidateVoicePreviewTimer];
+        [self.voicePreviewPlayer stop];
+        self.voicePreviewPlayer = nil;
+        if ([self.voiceRecordingPath length] > 0) {
+            [[NSFileManager defaultManager] removeItemAtPath:self.voiceRecordingPath error:NULL];
+        }
+        self.voiceRecordingPath = nil;
+        self.voiceRecordingStartDate = nil;
+        [self.voicePreviewWindow setDelegate:nil];
+        self.voicePreviewWindow = nil;
     }
 }
 
@@ -11659,29 +11687,124 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return [directory stringByAppendingPathComponent:name];
 }
 
+- (void)invalidateVoicePreviewTimer {
+    [self.voicePreviewTimer invalidate];
+    self.voicePreviewTimer = nil;
+}
+
+- (void)updateVoicePreviewTimelineWithCurrentTime:(NSTimeInterval)currentTime duration:(NSTimeInterval)duration {
+    if (duration < 0.1) {
+        duration = 0.0;
+    }
+    if (currentTime < 0.0) {
+        currentTime = 0.0;
+    }
+    if (duration > 0.0 && currentTime > duration) {
+        currentTime = duration;
+    }
+
+    CGFloat sliderMaximum = (duration > 0.0) ? duration : 1.0;
+    [self.voicePreviewProgressSlider setMinValue:0.0];
+    [self.voicePreviewProgressSlider setMaxValue:sliderMaximum];
+    [self.voicePreviewProgressSlider setDoubleValue:currentTime];
+    [self.voicePreviewProgressSlider setEnabled:(duration > 0.0)];
+
+    NSString *timeText = [NSString stringWithFormat:@"%@ / %@",
+                          TGVoicePreviewTimeString(currentTime),
+                          TGVoicePreviewTimeString(duration)];
+    [self.voicePreviewTimeField setStringValue:timeText];
+}
+
+- (NSTimeInterval)prepareVoicePreviewPlayerIfNeeded {
+    if ([self.voiceRecordingPath length] == 0) {
+        return 0.0;
+    }
+    if (!self.voicePreviewPlayer) {
+        NSError *playError = nil;
+        AVAudioPlayer *player = [[[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:self.voiceRecordingPath] error:&playError] autorelease];
+        if (!player) {
+            [self appendDetail:[NSString stringWithFormat:@"Voice preview: %@", [playError localizedDescription] ? [playError localizedDescription] : @"could not play"]];
+            if (self.voicePreviewErrorField) {
+                [self.voicePreviewErrorField setStringValue:([playError localizedDescription] ? [playError localizedDescription] : @"Could not play voice preview.")];
+                [self.voicePreviewErrorField setHidden:NO];
+            }
+            return 0.0;
+        }
+        [player prepareToPlay];
+        self.voicePreviewPlayer = player;
+    }
+    return [self.voicePreviewPlayer duration];
+}
+
+- (void)voicePreviewTimerDidFire:(NSTimer *)timer {
+    (void)timer;
+    AVAudioPlayer *player = self.voicePreviewPlayer;
+    if (!player) {
+        [self invalidateVoicePreviewTimer];
+        [self.voicePreviewPlayButton setTitle:@"Play"];
+        [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:0.0];
+        return;
+    }
+
+    NSTimeInterval duration = [player duration];
+    NSTimeInterval currentTime = [player currentTime];
+    if (![player isPlaying] && duration > 0.0 && currentTime >= duration - 0.05) {
+        [player setCurrentTime:0.0];
+        [self.voicePreviewPlayButton setTitle:@"Play"];
+        [self invalidateVoicePreviewTimer];
+        [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:duration];
+        return;
+    }
+    [self updateVoicePreviewTimelineWithCurrentTime:currentTime duration:duration];
+}
+
+- (void)startVoicePreviewTimer {
+    [self invalidateVoicePreviewTimer];
+    NSTimer *timer = [NSTimer timerWithTimeInterval:0.2
+                                             target:self
+                                           selector:@selector(voicePreviewTimerDidFire:)
+                                           userInfo:nil
+                                            repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+    self.voicePreviewTimer = timer;
+}
+
+- (void)voicePreviewSliderChanged:(id)sender {
+    NSTimeInterval value = [sender respondsToSelector:@selector(doubleValue)] ? [sender doubleValue] : 0.0;
+    NSTimeInterval duration = [self prepareVoicePreviewPlayerIfNeeded];
+    if (self.voicePreviewPlayer && duration > 0.0) {
+        if (value > duration) {
+            value = duration;
+        }
+        [self.voicePreviewPlayer setCurrentTime:value];
+    }
+    [self updateVoicePreviewTimelineWithCurrentTime:value duration:duration];
+}
+
 - (void)ensureVoicePreviewWindow {
     if (self.voicePreviewWindow) {
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 420, 170);
+    NSRect frame = NSMakeRect(0, 0, 380, 148);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@"Voice message"];
     [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
     NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
     [window setContentView:contentView];
 
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 112, 372, 24)
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20, 104, 340, 22)
                                               text:@"Voice message ready"
                                               font:[NSFont boldSystemFontOfSize:15.0]];
     [titleField setAlignment:NSCenterTextAlignment];
     [contentView addSubview:titleField];
     self.voicePreviewTitleField = titleField;
 
-    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(42, 54, 84, 30)] autorelease];
+    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 58, 72, 28)] autorelease];
     [playButton setTitle:@"Play"];
     [playButton setTarget:self];
     [playButton setAction:@selector(toggleVoicePreviewPlayback:)];
@@ -11689,13 +11812,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:playButton];
     self.voicePreviewPlayButton = playButton;
 
-    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(178, 24, 92, 30)];
+    NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(104, 61, 164, 22)] autorelease];
+    [progressSlider setMinValue:0.0];
+    [progressSlider setMaxValue:1.0];
+    [progressSlider setDoubleValue:0.0];
+    [progressSlider setContinuous:YES];
+    [progressSlider setTarget:self];
+    [progressSlider setAction:@selector(voicePreviewSliderChanged:)];
+    [progressSlider setEnabled:NO];
+    [contentView addSubview:progressSlider];
+    self.voicePreviewProgressSlider = progressSlider;
+
+    NSTextField *timeField = [self labelWithFrame:NSMakeRect(276, 60, 82, 20)
+                                             text:@"0:00 / 0:00"
+                                             font:[NSFont systemFontOfSize:11.0]];
+    [timeField setAlignment:NSRightTextAlignment];
+    [self applyMutedLabelStyle:timeField];
+    [contentView addSubview:timeField];
+    self.voicePreviewTimeField = timeField;
+
+    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(158, 20, 92, 28)];
     [cancelButton setTitle:TGLoc(@"cancel")];
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelVoicePreview:)];
     [contentView addSubview:cancelButton];
 
-    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(286, 24, 92, 30)] autorelease];
+    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(266, 20, 92, 28)] autorelease];
     [sendButton setTitle:TGLoc(@"send")];
     [sendButton setTarget:self];
     [sendButton setAction:@selector(sendVoicePreview:)];
@@ -11703,7 +11845,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:sendButton];
     self.voicePreviewSendButton = sendButton;
 
-    NSTextField *errorField = [self labelWithFrame:NSMakeRect(24, 92, 372, 16)
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(20, 88, 340, 14)
                                               text:@""
                                               font:[NSFont systemFontOfSize:11.0]];
     [errorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
@@ -11751,12 +11893,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.voiceRecordingIndicatorField setHidden:YES];
         [self ensureVoicePreviewWindow];
         NSTimeInterval duration = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
+        self.voicePreviewPlayer = nil;
         [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
         [self.voicePreviewPlayButton setTitle:@"Play"];
         [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
         [self.voicePreviewSendButton setEnabled:YES];
         [self.voicePreviewErrorField setStringValue:@""];
         [self.voicePreviewErrorField setHidden:YES];
+        [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:duration];
         [self.voicePreviewWindow center];
         [self.voicePreviewWindow makeKeyAndOrderFront:nil];
         [self layoutContentView];
@@ -11767,6 +11911,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![self ensureMicrophoneConsent]) {
         return;
     }
+
+    [self invalidateVoicePreviewTimer];
+    [self.voicePreviewPlayer stop];
+    self.voicePreviewPlayer = nil;
 
     NSString *path = [self temporaryVoiceRecordingPath];
     NSURL *url = [NSURL fileURLWithPath:path];
@@ -11804,24 +11952,30 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([self.voicePreviewPlayer isPlaying]) {
         [self.voicePreviewPlayer pause];
         [self.voicePreviewPlayButton setTitle:@"Play"];
+        [self invalidateVoicePreviewTimer];
+        [self updateVoicePreviewTimelineWithCurrentTime:[self.voicePreviewPlayer currentTime] duration:[self.voicePreviewPlayer duration]];
         return;
     }
     if ([self.voiceRecordingPath length] == 0) {
         return;
     }
-    NSError *playError = nil;
-    AVAudioPlayer *player = [[[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:self.voiceRecordingPath] error:&playError] autorelease];
+    NSTimeInterval duration = [self prepareVoicePreviewPlayerIfNeeded];
+    AVAudioPlayer *player = self.voicePreviewPlayer;
     if (!player) {
-        [self appendDetail:[NSString stringWithFormat:@"Voice preview: %@", [playError localizedDescription] ? [playError localizedDescription] : @"could not play"]];
         return;
     }
-    self.voicePreviewPlayer = player;
-    [self.voicePreviewPlayer play];
+    if (duration > 0.0 && [player currentTime] >= duration - 0.05) {
+        [player setCurrentTime:0.0];
+    }
+    [player play];
     [self.voicePreviewPlayButton setTitle:@"Pause"];
+    [self updateVoicePreviewTimelineWithCurrentTime:[player currentTime] duration:[player duration]];
+    [self startVoicePreviewTimer];
 }
 
 - (void)cancelVoicePreview:(id)sender {
     (void)sender;
+    [self invalidateVoicePreviewTimer];
     [self.voicePreviewPlayer stop];
     self.voicePreviewPlayer = nil;
     if ([self.voiceRecordingPath length] > 0) {
@@ -11829,6 +11983,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     self.voiceRecordingPath = nil;
     self.voiceRecordingStartDate = nil;
+    [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:0.0];
     [self.voicePreviewWindow orderOut:nil];
     [self requestComposerRefocus];
 }
@@ -11841,10 +11996,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSString *path = [self.voiceRecordingPath copy];
     NSTimeInterval durationInterval = 0.0;
-    AVAudioPlayer *durationPlayer = [[[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:path] error:NULL] autorelease];
-    if (durationPlayer) {
-        durationInterval = [durationPlayer duration];
-    } else if (self.voiceRecordingStartDate) {
+    if (self.voicePreviewPlayer) {
+        durationInterval = [self.voicePreviewPlayer duration];
+    }
+    if (durationInterval <= 0.0) {
+        AVAudioPlayer *durationPlayer = [[[AVAudioPlayer alloc] initWithContentsOfURL:[NSURL fileURLWithPath:path] error:NULL] autorelease];
+        if (durationPlayer) {
+            durationInterval = [durationPlayer duration];
+        }
+    }
+    if (durationInterval <= 0.0 && self.voiceRecordingStartDate) {
         durationInterval = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
     }
     NSNumber *duration = [NSNumber numberWithInteger:(NSInteger)ceil(durationInterval)];
@@ -11857,6 +12018,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.voicePreviewErrorField setHidden:YES];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending voice..."];
+    [self invalidateVoicePreviewTimer];
+    [self.voicePreviewPlayer stop];
 
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -11889,6 +12052,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self.voicePreviewErrorField setHidden:YES];
                 self.voiceRecordingPath = nil;
                 self.voiceRecordingStartDate = nil;
+                self.voicePreviewPlayer = nil;
+                [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:0.0];
             } else {
                 [self.statusField setStringValue:@"Voice send failed"];
                 [self appendDetail:([errorMessage length] > 0 ? errorMessage : @"Voice send was not confirmed.")];
@@ -12307,6 +12472,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_stickerPickerWindow close];
     [_voiceRecorder stop];
     [_voicePreviewPlayer stop];
+    [_voicePreviewTimer invalidate];
     [_voicePreviewWindow setDelegate:nil];
     [_voicePreviewWindow close];
     [_logsWindow release];
@@ -12344,8 +12510,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_voicePreviewWindow release];
     [_voicePreviewTitleField release];
     [_voicePreviewPlayButton release];
+    [_voicePreviewProgressSlider release];
+    [_voicePreviewTimeField release];
     [_voicePreviewSendButton release];
     [_voicePreviewErrorField release];
+    [_voicePreviewTimer release];
     [_voiceRecordingIndicatorField release];
     [_messageContextMenu release];
     [_chatContextMenu release];
