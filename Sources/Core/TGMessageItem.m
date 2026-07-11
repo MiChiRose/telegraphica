@@ -81,6 +81,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize downloadFileSize = _downloadFileSize;
 @synthesize reactionSummary = _reactionSummary;
 @synthesize chosenReactionEmojis = _chosenReactionEmojis;
+@synthesize senderID = _senderID;
+@synthesize senderDisplayName = _senderDisplayName;
+@synthesize senderAvatarLocalPath = _senderAvatarLocalPath;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -296,6 +299,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setDownloadFileSize:_downloadFileSize];
     [copy setReactionSummary:_reactionSummary];
     [copy setChosenReactionEmojis:_chosenReactionEmojis];
+    [copy setSenderID:_senderID];
+    [copy setSenderDisplayName:_senderDisplayName];
+    [copy setSenderAvatarLocalPath:_senderAvatarLocalPath];
     return copy;
 }
 
@@ -336,6 +342,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_downloadFileSize release];
     [_reactionSummary release];
     [_chosenReactionEmojis release];
+    [_senderID release];
+    [_senderDisplayName release];
+    [_senderAvatarLocalPath release];
     [super dealloc];
 }
 
