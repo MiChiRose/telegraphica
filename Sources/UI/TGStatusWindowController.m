@@ -4219,7 +4219,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginTitleField setTextColor:TGClassicInkColor()];
     [self.sendLabel setTextColor:TGClassicInkColor()];
     [self.profileNameField setTextColor:TGClassicInkColor()];
-    [self.profileNameField setFont:[NSFont boldSystemFontOfSize:17.0]];
+    [self.profileNameField setFont:[NSFont boldSystemFontOfSize:16.0]];
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
@@ -4238,8 +4238,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyMutedLabelStyle:self.profileStateField];
     [self applyMutedLabelStyle:self.profileAboutSectionField];
     [self applyMutedLabelStyle:self.profileAccountSectionField];
-    [self.profileAboutSectionField setFont:[NSFont systemFontOfSize:11.0]];
-    [self.profileAccountSectionField setFont:[NSFont systemFontOfSize:11.0]];
+    [self.profileStateField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profileAboutSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profileAccountSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profileUsernameRowTitleField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profileUsernameRowValueField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profilePhoneRowTitleField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profilePhoneRowValueField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profileIDRowTitleField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.profileIDRowValueField setFont:[NSFont systemFontOfSize:13.0]];
     [self.profileUsernameRowTitleField setTextColor:TGClassicInkColor()];
     [self.profilePhoneRowTitleField setTextColor:TGClassicInkColor()];
     [self.profileIDRowTitleField setTextColor:TGClassicInkColor()];
@@ -7829,78 +7836,93 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (groupedWidth < 360.0) {
         groupedWidth = mainWidth - 32.0;
     }
-    CGFloat groupedX = mainX + floor((mainWidth - groupedWidth) / 2.0);
-
     [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
-    CGFloat profileSummaryHeight = 132.0;
-    CGFloat profileSummaryY = contentTop - profileSummaryHeight - 18.0;
-    [self.profileSummaryCardView setFrame:NSMakeRect(groupedX, profileSummaryY, groupedWidth, profileSummaryHeight)];
-    CGFloat profileAvatarSize = 88.0;
-    CGFloat profileAvatarX = groupedX + 24.0;
+    CGFloat profileDocWidth = mainWidth - 34.0;
+    if (profileDocWidth < 340.0) {
+        profileDocWidth = mainWidth - 16.0;
+    }
+    CGFloat profileGroupedWidth = profileDocWidth - 56.0;
+    if (profileGroupedWidth > 760.0) {
+        profileGroupedWidth = 760.0;
+    }
+    if (profileGroupedWidth < 300.0) {
+        profileGroupedWidth = profileDocWidth - 24.0;
+    }
+    CGFloat profileGroupedX = mainX + 8.0 + floor((profileDocWidth - profileGroupedWidth) / 2.0);
+    CGFloat profileLabelHeight = 16.0;
+    CGFloat profileLabelGap = 7.0;
+    CGFloat profileGroupGap = 12.0;
+    CGFloat profileTop = contentTop - 18.0;
+
+    CGFloat profileSummaryHeight = 118.0;
+    CGFloat profileSummaryY = profileTop - profileSummaryHeight;
+    [self.profileSummaryCardView setFrame:NSMakeRect(profileGroupedX, profileSummaryY, profileGroupedWidth, profileSummaryHeight)];
+    CGFloat profileAvatarSize = 76.0;
+    CGFloat profileAvatarX = profileGroupedX + 22.0;
     CGFloat profileAvatarY = profileSummaryY + floor((profileSummaryHeight - profileAvatarSize) / 2.0);
     [self.profileAvatarView setFrame:NSMakeRect(profileAvatarX,
                                                 profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
     CGFloat profileTextX = NSMaxX([self.profileAvatarView frame]) + 22.0;
-    CGFloat profileTextWidth = groupedWidth - (profileTextX - groupedX) - 24.0;
+    CGFloat profileTextWidth = profileGroupedWidth - (profileTextX - profileGroupedX) - 22.0;
     if (profileTextWidth < 180.0) {
-        profileTextWidth = groupedWidth - 52.0;
-        profileTextX = groupedX + 26.0;
+        profileTextWidth = profileGroupedWidth - 44.0;
+        profileTextX = profileGroupedX + 22.0;
     }
-    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 76.0, profileTextWidth, 24.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 48.0, profileTextWidth, 22.0)];
+    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 66.0, profileTextWidth, 24.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 42.0, profileTextWidth, 22.0)];
 
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
     BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
     BOOL profileHasID = ([[self.profileIDRowValueField stringValue] length] > 0);
     NSUInteger profileDetailRows = (profileHasUsername ? 1 : 0) + (profileHasPhone ? 1 : 0) + (profileHasID ? 1 : 0);
-    CGFloat profileNextTop = profileSummaryY - 18.0;
+    CGFloat profileNextTop = profileSummaryY - profileGroupGap;
 
     if (profileHasBio) {
-        [self.profileAboutSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop - 18.0, groupedWidth - 40.0, 16.0)];
+        [self.profileAboutSectionField setFrame:NSMakeRect(profileGroupedX + 20.0, profileNextTop - profileLabelHeight, profileGroupedWidth - 40.0, profileLabelHeight)];
         NSDictionary *bioAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                        [NSFont systemFontOfSize:13.0], NSFontAttributeName,
                                        nil];
         NSString *bioText = [self.profileStateField stringValue];
-        NSRect bioRect = [bioText boundingRectWithSize:NSMakeSize(groupedWidth - 48.0, 1000.0)
+        NSRect bioRect = [bioText boundingRectWithSize:NSMakeSize(profileGroupedWidth - 44.0, 1000.0)
                                                options:NSStringDrawingUsesLineFragmentOrigin
                                             attributes:bioAttributes];
         CGFloat bioTextHeight = ceil(NSHeight(bioRect));
-        CGFloat profileInfoHeight = bioTextHeight + 30.0;
-        if (profileInfoHeight < 58.0) {
-            profileInfoHeight = 58.0;
+        CGFloat profileInfoHeight = bioTextHeight + 28.0;
+        if (profileInfoHeight < 54.0) {
+            profileInfoHeight = 54.0;
         }
         if (profileInfoHeight > 112.0) {
             profileInfoHeight = 112.0;
         }
-        CGFloat profileInfoY = profileNextTop - 18.0 - profileInfoHeight - 9.0;
-        [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileInfoY, groupedWidth, profileInfoHeight)];
-        [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileInfoY + 14.0, groupedWidth - 48.0, profileInfoHeight - 26.0)];
-        profileNextTop = profileInfoY - 18.0;
+        CGFloat profileInfoY = profileNextTop - profileLabelHeight - profileLabelGap - profileInfoHeight;
+        [self.profileInfoCardView setFrame:NSMakeRect(profileGroupedX, profileInfoY, profileGroupedWidth, profileInfoHeight)];
+        [self.profileStateField setFrame:NSMakeRect(profileGroupedX + 22.0, profileInfoY + 13.0, profileGroupedWidth - 44.0, profileInfoHeight - 26.0)];
+        profileNextTop = profileInfoY - profileGroupGap;
     } else {
-        [self.profileAboutSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop, groupedWidth - 40.0, 0.0)];
-        [self.profileInfoCardView setFrame:NSMakeRect(groupedX, profileNextTop, groupedWidth, 0.0)];
-        [self.profileStateField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, groupedWidth - 48.0, 0.0)];
+        [self.profileAboutSectionField setFrame:NSMakeRect(profileGroupedX + 20.0, profileNextTop, profileGroupedWidth - 40.0, 0.0)];
+        [self.profileInfoCardView setFrame:NSMakeRect(profileGroupedX, profileNextTop, profileGroupedWidth, 0.0)];
+        [self.profileStateField setFrame:NSMakeRect(profileGroupedX + 22.0, profileNextTop, profileGroupedWidth - 44.0, 0.0)];
     }
 
     if (profileDetailRows > 0) {
         CGFloat rowHeight = 44.0;
-        CGFloat detailsHeight = ((CGFloat)profileDetailRows * rowHeight) + 14.0;
-        CGFloat accountSectionY = profileNextTop - 18.0;
-        CGFloat detailsY = accountSectionY - detailsHeight - 9.0;
-        [self.profileAccountSectionField setFrame:NSMakeRect(groupedX + 20.0, accountSectionY, groupedWidth - 40.0, 16.0)];
-        [self.profileDetailsCardView setFrame:NSMakeRect(groupedX, detailsY, groupedWidth, detailsHeight)];
+        CGFloat detailsHeight = ((CGFloat)profileDetailRows * rowHeight) + 10.0;
+        CGFloat accountSectionY = profileNextTop - profileLabelHeight;
+        CGFloat detailsY = accountSectionY - profileLabelGap - detailsHeight;
+        [self.profileAccountSectionField setFrame:NSMakeRect(profileGroupedX + 20.0, accountSectionY, profileGroupedWidth - 40.0, profileLabelHeight)];
+        [self.profileDetailsCardView setFrame:NSMakeRect(profileGroupedX, detailsY, profileGroupedWidth, detailsHeight)];
 
-        CGFloat rowTitleX = groupedX + 24.0;
-        CGFloat rowValueX = groupedX + 210.0;
-        CGFloat rowValueWidth = groupedWidth - 234.0;
+        CGFloat rowTitleX = profileGroupedX + 22.0;
+        CGFloat rowValueX = profileGroupedX + 208.0;
+        CGFloat rowValueWidth = profileGroupedWidth - 230.0;
         if (rowValueWidth < 160.0) {
-            rowValueX = groupedX + 150.0;
-            rowValueWidth = groupedWidth - 174.0;
+            rowValueX = profileGroupedX + 148.0;
+            rowValueWidth = profileGroupedWidth - 170.0;
         }
-        CGFloat rowY = detailsY + detailsHeight - 33.0;
+        CGFloat rowY = detailsY + detailsHeight - 31.0;
         NSUInteger laidOutRows = 0;
         CGFloat separatorOneY = 0.0;
         CGFloat separatorTwoY = 0.0;
@@ -7938,31 +7960,31 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             [self.profileIDRowValueField setFrame:NSMakeRect(rowValueX, rowY, 0.0, 0.0)];
         }
         if (profileDetailRows > 1) {
-            [self.profileDetailsSeparatorOne setFrame:NSMakeRect(groupedX + 24.0, separatorOneY, groupedWidth - 48.0, 1.0)];
+            [self.profileDetailsSeparatorOne setFrame:NSMakeRect(profileGroupedX + 22.0, separatorOneY, profileGroupedWidth - 44.0, 1.0)];
         }
         if (profileDetailRows > 2) {
             if (separatorTwoY <= 0.0) {
                 separatorTwoY = separatorOneY - rowHeight;
             }
-            [self.profileDetailsSeparatorTwo setFrame:NSMakeRect(groupedX + 24.0, separatorTwoY, groupedWidth - 48.0, 1.0)];
+            [self.profileDetailsSeparatorTwo setFrame:NSMakeRect(profileGroupedX + 22.0, separatorTwoY, profileGroupedWidth - 44.0, 1.0)];
         }
-        profileNextTop = detailsY - 18.0;
+        profileNextTop = detailsY - profileGroupGap;
     } else {
-        [self.profileAccountSectionField setFrame:NSMakeRect(groupedX + 20.0, profileNextTop, groupedWidth - 40.0, 0.0)];
-        [self.profileDetailsCardView setFrame:NSMakeRect(groupedX, profileNextTop, groupedWidth, 0.0)];
-        [self.profileUsernameRowTitleField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, 0.0, 0.0)];
-        [self.profileUsernameRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
-        [self.profilePhoneRowTitleField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, 0.0, 0.0)];
-        [self.profilePhoneRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
-        [self.profileIDRowTitleField setFrame:NSMakeRect(groupedX + 24.0, profileNextTop, 0.0, 0.0)];
-        [self.profileIDRowValueField setFrame:NSMakeRect(groupedX + 210.0, profileNextTop, 0.0, 0.0)];
+        [self.profileAccountSectionField setFrame:NSMakeRect(profileGroupedX + 20.0, profileNextTop, profileGroupedWidth - 40.0, 0.0)];
+        [self.profileDetailsCardView setFrame:NSMakeRect(profileGroupedX, profileNextTop, profileGroupedWidth, 0.0)];
+        [self.profileUsernameRowTitleField setFrame:NSMakeRect(profileGroupedX + 22.0, profileNextTop, 0.0, 0.0)];
+        [self.profileUsernameRowValueField setFrame:NSMakeRect(profileGroupedX + 208.0, profileNextTop, 0.0, 0.0)];
+        [self.profilePhoneRowTitleField setFrame:NSMakeRect(profileGroupedX + 22.0, profileNextTop, 0.0, 0.0)];
+        [self.profilePhoneRowValueField setFrame:NSMakeRect(profileGroupedX + 208.0, profileNextTop, 0.0, 0.0)];
+        [self.profileIDRowTitleField setFrame:NSMakeRect(profileGroupedX + 22.0, profileNextTop, 0.0, 0.0)];
+        [self.profileIDRowValueField setFrame:NSMakeRect(profileGroupedX + 208.0, profileNextTop, 0.0, 0.0)];
     }
 
     CGFloat profileActionsHeight = 56.0;
     CGFloat profileActionsY = profileNextTop - profileActionsHeight;
-    [self.profileActionsCardView setFrame:NSMakeRect(groupedX, profileActionsY, groupedWidth, profileActionsHeight)];
-    [self.logoutButton setFrame:NSMakeRect(groupedX + 22.0, profileActionsY + 13.0, groupedWidth - 44.0, 30.0)];
-    [self.profileIDField setFrame:NSMakeRect(groupedX + 22.0, profileActionsY, 0.0, 0.0)];
+    [self.profileActionsCardView setFrame:NSMakeRect(profileGroupedX, profileActionsY, profileGroupedWidth, profileActionsHeight)];
+    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 13.0, profileGroupedWidth - 44.0, 30.0)];
+    [self.profileIDField setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
 
     [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
 
