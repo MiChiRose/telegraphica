@@ -103,9 +103,8 @@ Latest alpha assets:
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.1-alpha.1-macos10.9-x86_64.dmg` | Complete Mavericks installer candidate | Must be built on the legacy Mac and must include `Contents/Frameworks/libtdjson.dylib`. |
+| `Telegraphica-v0.4.1-alpha.1-macos10.9-x86_64.dmg` | Drag-and-drop installer | Recommended for most Mavericks testers. |
 | `Telegraphica-v0.4.1-alpha.1-macos10.9-x86_64.app.zip` | Zipped app bundle | Useful when the DMG is inconvenient to transfer. |
-| `Telegraphica-develop-...-0.4.1-alpha.1-api-credentials-onboarding.zip` | Old-Mac release artifact handoff | Use this to build the alpha DMG/app zip with a local Mavericks TDLib setup. |
 
 ### First Launch
 
@@ -113,7 +112,7 @@ Because Telegraphica is distributed directly and is not notarized yet, macOS may
 warn on first launch.
 
 1. Download a release asset.
-2. Open the DMG or unpack the source handoff.
+2. Open the DMG or unpack the app zip.
 3. If Gatekeeper blocks the app, right-click / Control-click the app and choose
    **Open**.
 4. If Telegraphica asks for Telegram API setup, enter your `api_id` and
@@ -256,9 +255,8 @@ PRODUCT.md                     Product and design direction
 - 🔌 **Dynamic TDLib boundary:** the app can launch without vendoring TDLib.
 - 🔐 **Local data discipline:** credentials and sessions stay outside git.
 - 🧪 **HITL-driven:** Mavericks/Xcode 6.2 testing remains the source of truth.
-- 🧹 **Clean release artifacts:** source handoff archives are built from tracked
-  files and exclude `.git`, `dist`, build outputs, TDLib trees, credentials, and
-  sessions.
+- 🧹 **Clean release artifacts:** public builds exclude `.git`, `dist`, build
+  outputs, TDLib source trees, credentials, and sessions.
 
 ---
 
