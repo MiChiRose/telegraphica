@@ -202,6 +202,35 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
 fi
 
+if [ -n "${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH" ]; then
+        echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH does not point to a file: $TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH"
+        exit 1
+    fi
+
+    API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH" 2>/dev/null || true)"
+    API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH" 2>/dev/null || true)"
+    if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
+        echo "Bundled TDLib config must contain api_id and api_hash."
+        exit 1
+    fi
+    if ! echo "$API_ID" | grep -E -q '^[0-9]+$'; then
+        echo "Bundled TDLib config api_id must be numeric."
+        exit 1
+    fi
+
+    RESOURCES_DIR="$APP_NAME/Contents/Resources"
+    BUNDLED_CONFIG_DEST="$RESOURCES_DIR/TelegraphicaTDLibDefaults.plist"
+    mkdir -p "$RESOURCES_DIR"
+    rm -f "$BUNDLED_CONFIG_DEST"
+    /usr/libexec/PlistBuddy -c "Add :api_id integer $API_ID" "$BUNDLED_CONFIG_DEST"
+    /usr/libexec/PlistBuddy -c "Add :api_hash string $API_HASH" "$BUNDLED_CONFIG_DEST"
+    /usr/libexec/PlistBuddy -c "Add :tdlib_parameters_schema string auto" "$BUNDLED_CONFIG_DEST"
+    /usr/libexec/PlistBuddy -c "Add :use_test_dc bool false" "$BUNDLED_CONFIG_DEST"
+    chmod 0644 "$BUNDLED_CONFIG_DEST"
+    echo "Bundled sanitized TDLib app config: $BUNDLED_CONFIG_DEST"
+fi
+
 xattr -cr "$APP_NAME" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --deep --sign - "$APP_NAME"
