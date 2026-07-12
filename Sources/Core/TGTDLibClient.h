@@ -7,6 +7,7 @@
 - (NSString *)authorizationStateSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)setLocalTDLibParametersWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)localTDLibConfigurationPathWithError:(NSError **)error;
+- (NSString *)bundledTDLibConfigurationPath;
 - (BOOL)writeLocalTDLibConfigurationWithAPIID:(NSString *)apiID apiHash:(NSString *)apiHash error:(NSError **)error;
 - (NSString *)checkDatabaseEncryptionKeyWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;

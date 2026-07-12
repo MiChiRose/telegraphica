@@ -17,6 +17,7 @@ static NSString * const TGTDLibTDLibCodeErrorKey = @"TelegraphicaTDLibCode";
 static NSString * const TGTDLibTDLibMessageErrorKey = @"TelegraphicaTDLibMessage";
 static NSString * const TGTDLibTDLibResponseErrorKey = @"TelegraphicaTDLibResponse";
 static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_encryption_key";
+static NSString * const TGTDLibBundledConfigurationName = @"TelegraphicaTDLibDefaults";
 static NSUInteger const TGTDLibMaxPendingResponses = 64;
 static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
@@ -957,22 +958,51 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [supportPath stringByAppendingPathComponent:@"tdlib-config.plist"];
 }
 
-- (NSDictionary *)localTDLibConfigurationWithError:(NSError **)error {
-    NSString *configPath = [self localTDLibConfigurationPathWithError:error];
-    if (!configPath) {
-        return nil;
+- (NSString *)bundledTDLibConfigurationPath {
+    NSString *path = [[NSBundle mainBundle] pathForResource:TGTDLibBundledConfigurationName ofType:@"plist"];
+    if ([path length] > 0) {
+        return path;
     }
+    return nil;
+}
 
+- (NSDictionary *)tdLibConfigurationAtPath:(NSString *)configPath label:(NSString *)label error:(NSError **)error {
     NSDictionary *configuration = [NSDictionary dictionaryWithContentsOfFile:configPath];
     if (![configuration isKindOfClass:[NSDictionary class]]) {
         if (error) {
-            NSString *message = [NSString stringWithFormat:@"Local TDLib config was not found or is not a plist dictionary: %@", configPath];
+            NSString *message = [NSString stringWithFormat:@"%@ TDLib config was not found or is not a plist dictionary: %@", label, configPath];
             *error = [self errorWithDescription:message code:12];
         }
         return nil;
     }
 
     return configuration;
+}
+
+- (NSDictionary *)localTDLibConfigurationWithError:(NSError **)error {
+    NSString *configPath = [self localTDLibConfigurationPathWithError:error];
+    if (!configPath) {
+        return nil;
+    }
+
+    NSDictionary *configuration = [self tdLibConfigurationAtPath:configPath label:@"Local" error:NULL];
+    if (configuration) {
+        return configuration;
+    }
+
+    NSString *bundledPath = [self bundledTDLibConfigurationPath];
+    if ([bundledPath length] > 0) {
+        NSDictionary *bundledConfiguration = [self tdLibConfigurationAtPath:bundledPath label:@"Bundled" error:error];
+        if (bundledConfiguration) {
+            return bundledConfiguration;
+        }
+    }
+
+    if (error) {
+        NSString *message = [NSString stringWithFormat:@"TDLib config was not found locally or in the app bundle. Local path: %@", configPath];
+        *error = [self errorWithDescription:message code:12];
+    }
+    return nil;
 }
 
 - (BOOL)writeLocalTDLibConfigurationWithAPIID:(NSString *)apiID apiHash:(NSString *)apiHash error:(NSError **)error {
