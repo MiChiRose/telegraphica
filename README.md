@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.4.0--alpha.1-blue" alt="version v0.4.0-alpha.1" />
+    <img src="https://img.shields.io/badge/version-v0.4.1--alpha.1-blue" alt="version v0.4.1-alpha.1" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -49,7 +49,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Alpha: `v0.4.0-alpha.1`
+## Current Alpha: `v0.4.1-alpha.1`
 
 This alpha is the first release candidate we are comfortable putting in front
 of real legacy-Mac testers. It is still alpha software, but the everyday loop is
@@ -59,6 +59,8 @@ media, and keep the app updated from GitHub Releases.
 ### ✅ Working In This Alpha
 
 - 🔐 TDLib login flow: phone number, login code, and 2FA password.
+- 🧾 First-run Telegram API setup inside the app when `api_id` / `api_hash`
+  are not configured yet.
 - 💬 Chat list with unread badges, muted indicators, avatars, and selected chat
   state.
 - 🧵 Supergroup topics / forum-style subchat selection.
@@ -101,9 +103,9 @@ Latest alpha assets:
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.0-alpha.1-macos10.9-x86_64.dmg` | Complete Mavericks installer candidate | Must be built on the legacy Mac and must include `Contents/Frameworks/libtdjson.dylib`. |
-| `Telegraphica-v0.4.0-alpha.1-macos10.9-x86_64.app.zip` | Zipped app bundle | Useful when the DMG is inconvenient to transfer. |
-| `Telegraphica-develop-...-0.4.0-alpha.1-release-packager.zip` | Old-Mac release artifact handoff | Use this to build the alpha DMG/app zip with a local Mavericks TDLib setup. |
+| `Telegraphica-v0.4.1-alpha.1-macos10.9-x86_64.dmg` | Complete Mavericks installer candidate | Must be built on the legacy Mac and must include `Contents/Frameworks/libtdjson.dylib`. |
+| `Telegraphica-v0.4.1-alpha.1-macos10.9-x86_64.app.zip` | Zipped app bundle | Useful when the DMG is inconvenient to transfer. |
+| `Telegraphica-develop-...-0.4.1-alpha.1-api-credentials-onboarding.zip` | Old-Mac release artifact handoff | Use this to build the alpha DMG/app zip with a local Mavericks TDLib setup. |
 
 ### First Launch
 
@@ -114,7 +116,8 @@ warn on first launch.
 2. Open the DMG or unpack the source handoff.
 3. If Gatekeeper blocks the app, right-click / Control-click the app and choose
    **Open**.
-4. Configure your local TDLib credentials outside the repository.
+4. If Telegraphica asks for Telegram API setup, enter your `api_id` and
+   `api_hash` from `my.telegram.org`; they are saved locally on that Mac only.
 5. Sign in with your phone number, Telegram code, and 2FA password if needed.
 
 ---
