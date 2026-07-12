@@ -5499,7 +5499,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.aboutCopyrightField];
 
     self.aboutLinkField = [self labelWithFrame:NSMakeRect(240, 260, 500, 22)
-                                          text:@"Project page: coming soon"
+                                          text:@"GitHub: https://github.com/MiChiRose/telegraphica"
                                           font:[NSFont systemFontOfSize:12.0]];
     [self.aboutLinkField setAlignment:NSCenterTextAlignment];
     [self.aboutLinkField setSelectable:YES];
@@ -6688,7 +6688,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [contentView addSubview:copyrightField];
 
         NSTextField *linkField = [self labelWithFrame:NSMakeRect(70, 104, 340, 22)
-                                                 text:@"Project page: coming soon"
+                                                 text:@"GitHub: https://github.com/MiChiRose/telegraphica"
                                                  font:[NSFont systemFontOfSize:12.0]];
         [linkField setAlignment:NSCenterTextAlignment];
         [linkField setSelectable:YES];

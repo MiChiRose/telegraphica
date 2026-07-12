@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.3.0--alpha.3-blue" alt="version v0.3.0-alpha.3" />
+    <img src="https://img.shields.io/badge/version-v0.4.0--alpha.1-blue" alt="version v0.4.0-alpha.1" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -49,10 +49,12 @@ In plain language, the goal is:
 
 ---
 
-## Current Alpha: `v0.3.0-alpha.3`
+## Current Alpha: `v0.4.0-alpha.1`
 
-This alpha is the first public build that is useful enough for live feedback.
-It is still rough, but the core loop works.
+This alpha is the first release candidate we are comfortable putting in front
+of real legacy-Mac testers. It is still alpha software, but the everyday loop is
+now useful enough for live feedback: sign in, read chats, send messages, handle
+media, and keep the app updated from GitHub Releases.
 
 ### ✅ Working In This Alpha
 
@@ -72,6 +74,7 @@ It is still rough, but the core loop works.
 - 🔔 Notification Center alerts, Dock unread badges, sound, and click-through to
   the source chat.
 - 👤 Profile, settings, themes, language selector, diagnostics, and about panel.
+- 🔄 Manual and launch-time update checks against GitHub Releases.
 - 🧹 Build/release hygiene scripts for the old-Mac workflow.
 
 ### ⚠️ Known Alpha Gaps
@@ -98,8 +101,9 @@ Latest alpha assets:
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.3.0-alpha.3-macos10.9-x86_64.dmg` | Complete Mavericks installer candidate | Must be built on the legacy Mac and must include `Contents/Frameworks/libtdjson.dylib`. |
-| `Telegraphica-develop-...-legacy-release-packager.zip` | Old-Mac release artifact handoff | Use this to build the alpha.3 DMG/app zip with a local Mavericks TDLib setup. |
+| `Telegraphica-v0.4.0-alpha.1-macos10.9-x86_64.dmg` | Complete Mavericks installer candidate | Must be built on the legacy Mac and must include `Contents/Frameworks/libtdjson.dylib`. |
+| `Telegraphica-v0.4.0-alpha.1-macos10.9-x86_64.app.zip` | Zipped app bundle | Useful when the DMG is inconvenient to transfer. |
+| `Telegraphica-develop-...-0.4.0-alpha.1-release-packager.zip` | Old-Mac release artifact handoff | Use this to build the alpha DMG/app zip with a local Mavericks TDLib setup. |
 
 ### First Launch
 
