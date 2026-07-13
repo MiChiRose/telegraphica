@@ -1704,7 +1704,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
     if ([authorizationState isEqualToString:@"closed"]) {
         [self destroyTDLibClient];
-        authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
+        return authorizationState;
     }
 
     if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
