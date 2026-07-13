@@ -124,11 +124,18 @@ chflags hidden "$MOUNT_DIR/.background" || true
 LAYOUT_SCRIPT="$STAGE_DIR/layout.applescript"
 cat > "$LAYOUT_SCRIPT" <<'APPLESCRIPT'
 on run argv
-    set mountPath to item 1 of argv
-    set mountedFolder to POSIX file mountPath as alias
+    set volumeName to item 1 of argv
     using terms from application "Finder"
         tell application "Finder"
-            set targetDisk to disk of mountedFolder
+            set matchingDisks to every disk whose name is volumeName
+            repeat with attemptNumber from 1 to 40
+                if (count of matchingDisks) is greater than 0 then exit repeat
+                delay 0.25
+                set matchingDisks to every disk whose name is volumeName
+            end repeat
+            if (count of matchingDisks) is 0 then error "Finder could not find mounted disk " & volumeName
+            if (count of matchingDisks) is greater than 1 then error "More than one Finder disk is named " & volumeName & ". Eject the older installer volume and try again."
+            set targetDisk to item 1 of matchingDisks
             tell targetDisk
                 open
                 set current view of container window to icon view
@@ -154,7 +161,7 @@ on run argv
 end run
 APPLESCRIPT
 
-osascript "$LAYOUT_SCRIPT" "$MOUNT_DIR"
+osascript "$LAYOUT_SCRIPT" "$VOLUME_NAME"
 sync
 sleep 2
 
