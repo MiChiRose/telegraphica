@@ -95,25 +95,39 @@ media, and keep the app updated from GitHub Releases.
 
 ## Download & Run
 
-Compiled prereleases live in:
+Compiled alpha builds live in:
 
 ➡️ **[GitHub Releases](https://github.com/MiChiRose/telegraphica/releases)**
 
-Latest alpha assets:
+### For Normal Users
+
+1. Open the latest release page.
+2. Click **Assets** if the download list is collapsed.
+3. Download **`Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg`**.
+4. Open the downloaded DMG.
+5. Drag **Telegraphica.app** into **Applications**.
+6. Launch Telegraphica and sign in with your Telegram phone number.
+
+If you are not sure which file to download, choose the file ending in
+**`.dmg`**. The `.app.zip` and `.sha256` files are mainly for troubleshooting,
+manual transfer, and checksum verification.
+
+### Release Files
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg` | Drag-and-drop installer | Recommended for most Mavericks testers. |
-| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.app.zip` | Zipped app bundle | Useful when the DMG is inconvenient to transfer. |
+| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg` | Normal installation | Download this one if you just want to install the app. |
+| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
+| `.sha256` files | Checksum verification | Optional technical files; most users can ignore them. |
 
 ### First Launch
 
 Because Telegraphica is distributed directly and is not notarized yet, macOS may
 warn on first launch.
 
-1. Download a release asset.
-2. Open the DMG or unpack the app zip.
-3. If Gatekeeper blocks the app, right-click / Control-click the app and choose
+1. Download the `.dmg` file from the release assets.
+2. Open the DMG and drag **Telegraphica.app** into **Applications**.
+3. If macOS blocks the app, right-click / Control-click the app and choose
    **Open**.
 4. Sign in with your phone number, Telegram code, and 2FA password if needed.
 
