@@ -28,10 +28,6 @@ static BOOL TGTDLibObjectIsBoolean(id object) {
     return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
 }
 
-static BOOL TGTDLibObjectIsNumber(id object) {
-    return [object isKindOfClass:[NSNumber class]] && !TGTDLibObjectIsBoolean(object);
-}
-
 static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
         return YES;
@@ -5120,15 +5116,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     id sessionsObject = [response objectForKey:@"sessions"];
     id inactiveSessionTTLDays = [response objectForKey:@"inactive_session_ttl_days"];
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"sessions"] ||
-        ![sessionsObject isKindOfClass:[NSArray class]] || !TGTDLibObjectIsNumber(inactiveSessionTTLDays)) {
+        ![sessionsObject isKindOfClass:[NSArray class]]) {
         if (error) {
             *error = [self errorWithDescription:@"TDLib getActiveSessions returned an unexpected response." code:93];
         }
         return nil;
     }
 
-    NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"log_in_date", @"last_active_date", nil];
-    NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", @"is_password_pending", @"can_accept_calls", @"can_accept_secret_chats", nil];
+    NSArray *numberKeys = [NSArray arrayWithObjects:@"last_active_date", nil];
+    NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", nil];
     NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"location", nil];
     NSMutableArray *safeSessions = [NSMutableArray arrayWithCapacity:[(NSArray *)sessionsObject count]];
     NSUInteger sessionIndex = 0;
@@ -5148,46 +5144,53 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         for (keyIndex = 0; keyIndex < [numberKeys count]; keyIndex++) {
             NSString *key = [numberKeys objectAtIndex:keyIndex];
             id value = [session objectForKey:key];
-            if (!TGTDLibObjectIsNumber(value)) {
-                if (error) {
-                    NSString *message = [NSString stringWithFormat:@"TDLib session at index %lu has an invalid numeric field '%@'.", (unsigned long)sessionIndex, key];
-                    *error = [self errorWithDescription:message code:93];
-                }
-                return nil;
+            if (![value isKindOfClass:[NSNumber class]] || TGTDLibObjectIsBoolean(value)) {
+                continue;
             }
-            [safeSession setObject:value forKey:key];
+            [safeSession setObject:[NSNumber numberWithLongLong:[value longLongValue]] forKey:key];
         }
         for (keyIndex = 0; keyIndex < [booleanKeys count]; keyIndex++) {
             NSString *key = [booleanKeys objectAtIndex:keyIndex];
             id value = [session objectForKey:key];
             if (!TGTDLibObjectIsBoolean(value)) {
-                if (error) {
-                    NSString *message = [NSString stringWithFormat:@"TDLib session at index %lu has an invalid boolean field '%@'.", (unsigned long)sessionIndex, key];
-                    *error = [self errorWithDescription:message code:93];
-                }
-                return nil;
+                continue;
             }
-            [safeSession setObject:value forKey:key];
+            [safeSession setObject:[NSNumber numberWithBool:[value boolValue]] forKey:key];
         }
         for (keyIndex = 0; keyIndex < [stringKeys count]; keyIndex++) {
             NSString *key = [stringKeys objectAtIndex:keyIndex];
             id value = [session objectForKey:key];
             if (![value isKindOfClass:[NSString class]]) {
-                if (error) {
-                    NSString *message = [NSString stringWithFormat:@"TDLib session at index %lu has an invalid string field '%@'.", (unsigned long)sessionIndex, key];
-                    *error = [self errorWithDescription:message code:93];
-                }
-                return nil;
+                continue;
             }
             [safeSession setObject:value forKey:key];
+        }
+        if (![[safeSession objectForKey:@"location"] length]) {
+            NSMutableArray *locationParts = [NSMutableArray array];
+            id region = [session objectForKey:@"region"];
+            id country = [session objectForKey:@"country"];
+            if ([region isKindOfClass:[NSString class]] && [(NSString *)region length] > 0) {
+                [locationParts addObject:region];
+            }
+            if ([country isKindOfClass:[NSString class]] && [(NSString *)country length] > 0 &&
+                ![country isEqual:region]) {
+                [locationParts addObject:country];
+            }
+            if ([locationParts count] > 0) {
+                [safeSession setObject:[locationParts componentsJoinedByString:@", "] forKey:@"location"];
+            }
         }
         [safeSessions addObject:[NSDictionary dictionaryWithDictionary:safeSession]];
     }
 
-    return [NSDictionary dictionaryWithObjectsAndKeys:
-            [NSArray arrayWithArray:safeSessions], @"sessions",
-            inactiveSessionTTLDays, @"inactive_session_ttl_days",
-            nil];
+    NSMutableDictionary *safeSummary = [NSMutableDictionary dictionaryWithObject:[NSArray arrayWithArray:safeSessions]
+                                                                           forKey:@"sessions"];
+    if ([inactiveSessionTTLDays isKindOfClass:[NSNumber class]] &&
+        !TGTDLibObjectIsBoolean(inactiveSessionTTLDays)) {
+        [safeSummary setObject:[NSNumber numberWithInteger:[inactiveSessionTTLDays integerValue]]
+                        forKey:@"inactive_session_ttl_days"];
+    }
+    return [NSDictionary dictionaryWithDictionary:safeSummary];
 }
 
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {

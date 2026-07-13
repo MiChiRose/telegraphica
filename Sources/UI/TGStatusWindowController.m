@@ -1,4 +1,5 @@
 #import "TGStatusWindowController.h"
+#import "TGActiveSessionsPresentation.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGTDLibClient.h"
@@ -3888,6 +3889,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL forceMessageScrollToNewest;
 @property (nonatomic, assign) BOOL initialConnectStarted;
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
+@property (nonatomic, assign) BOOL profileSummaryLoading;
 @property (nonatomic, assign) BOOL drawerOpen;
 @property (nonatomic, assign) BOOL suppressComposerDraftSave;
 @property (nonatomic, assign) BOOL loginErrorVisible;
@@ -4142,6 +4144,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize forceMessageScrollToNewest = _forceMessageScrollToNewest;
 @synthesize initialConnectStarted = _initialConnectStarted;
 @synthesize profileSummaryLoaded = _profileSummaryLoaded;
+@synthesize profileSummaryLoading = _profileSummaryLoading;
 @synthesize drawerOpen = _drawerOpen;
 @synthesize suppressComposerDraftSave = _suppressComposerDraftSave;
 @synthesize loginErrorVisible = _loginErrorVisible;
@@ -6103,6 +6106,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.activeSection = [self sectionIdentifierForNavigationTag:navigationTag];
     }
     [self updateVisibleSection];
+    if ([self.activeSection isEqualToString:TGSectionProfile] &&
+        !self.profileSummaryLoaded && !self.profileSummaryLoading &&
+        [self.currentAuthState isEqualToString:@"ready"] && !self.controlsBusy) {
+        [self reloadProfileSummaryIfReady];
+    }
 }
 
 - (void)folderFilterChanged:(id)sender {
@@ -6916,22 +6924,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [alert runModal];
 }
 
-- (NSString *)activeSessionDateTextForTimestamp:(NSNumber *)timestamp {
-    if (![timestamp respondsToSelector:@selector(doubleValue)] || [timestamp doubleValue] <= 0.0) {
-        return @"";
-    }
-    NSDate *date = [NSDate dateWithTimeIntervalSince1970:[timestamp doubleValue]];
-    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
-    NSString *languageCode = TGLanguageCode();
-    NSString *localeIdentifier = [languageCode isEqualToString:@"ru"] ? @"ru_RU" :
-                                 ([languageCode isEqualToString:@"be"] ? @"be_BY" : @"en_US");
-    NSLocale *locale = [[[NSLocale alloc] initWithLocaleIdentifier:localeIdentifier] autorelease];
-    [formatter setLocale:locale];
-    [formatter setDateStyle:NSDateFormatterMediumStyle];
-    [formatter setTimeStyle:NSDateFormatterShortStyle];
-    return [formatter stringFromDate:date];
-}
-
 - (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {
     [self.activeSessionsRefreshButton setEnabled:YES];
     if ([errorMessage length] > 0 || ![summary isKindOfClass:[NSDictionary class]]) {
@@ -6942,68 +6934,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
 
-    NSArray *sessions = [summary objectForKey:@"sessions"];
-    NSNumber *ttlDays = [summary objectForKey:@"inactive_session_ttl_days"];
-    NSString *statusText = [NSString stringWithFormat:TGLoc(@"settings.sessions.count"), (unsigned long)[sessions count]];
-    if ([ttlDays respondsToSelector:@selector(integerValue)]) {
-        statusText = [statusText stringByAppendingFormat:@"  •  %@",
-                      [NSString stringWithFormat:TGLoc(@"settings.sessions.ttl"), (long)[ttlDays integerValue]]];
-    }
-    [self.activeSessionsStatusField setStringValue:statusText];
-
-    NSMutableAttributedString *output = [[[NSMutableAttributedString alloc] init] autorelease];
-    NSUInteger index = 0;
-    for (index = 0; index < [sessions count]; index++) {
-        NSDictionary *session = [sessions objectAtIndex:index];
-        NSString *device = [session objectForKey:@"device_model"];
-        NSString *application = [session objectForKey:@"application_name"];
-        NSString *version = [session objectForKey:@"application_version"];
-        NSString *platform = [session objectForKey:@"platform"];
-        NSString *systemVersion = [session objectForKey:@"system_version"];
-        NSString *location = [session objectForKey:@"location"];
-        BOOL current = [[session objectForKey:@"is_current"] boolValue];
-        NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : TGLoc(@"settings.sessions.unknownDevice"));
-        if (current) {
-            title = [title stringByAppendingFormat:@"  —  %@", TGLoc(@"settings.sessions.current")];
-        }
-        if (index > 0) {
-            [output appendAttributedString:[[[NSAttributedString alloc] initWithString:@"\n"] autorelease]];
-        }
-        NSAttributedString *titleLine = [[[NSAttributedString alloc] initWithString:[title stringByAppendingString:@"\n"]
-                                                                          attributes:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                                                      [NSFont boldSystemFontOfSize:14.0], NSFontAttributeName,
-                                                                                      TGClassicInkColor(), NSForegroundColorAttributeName,
-                                                                                      nil]] autorelease];
-        [output appendAttributedString:titleLine];
-
-        NSMutableArray *applicationParts = [NSMutableArray array];
-        if ([application length] > 0) [applicationParts addObject:application];
-        if ([version length] > 0) [applicationParts addObject:version];
-        NSMutableArray *systemParts = [NSMutableArray array];
-        if ([platform length] > 0) [systemParts addObject:platform];
-        if ([systemVersion length] > 0) [systemParts addObject:systemVersion];
-        NSString *lastActive = [self activeSessionDateTextForTimestamp:[session objectForKey:@"last_active_date"]];
-
-        NSMutableArray *detailLines = [NSMutableArray array];
-        if ([applicationParts count] > 0) [detailLines addObject:[applicationParts componentsJoinedByString:@" "]];
-        if ([systemParts count] > 0) [detailLines addObject:[systemParts componentsJoinedByString:@" • "]];
-        if ([location length] > 0) [detailLines addObject:location];
-        if ([lastActive length] > 0) [detailLines addObject:[NSString stringWithFormat:TGLoc(@"settings.sessions.lastActive"), lastActive]];
-        NSString *details = [[detailLines componentsJoinedByString:@"\n"] stringByAppendingString:@"\n"];
-        NSAttributedString *detailText = [[[NSAttributedString alloc] initWithString:details
-                                                                           attributes:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                                                       [NSFont systemFontOfSize:12.0], NSFontAttributeName,
-                                                                                       TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                                                                       nil]] autorelease];
-        [output appendAttributedString:detailText];
-    }
-    if ([sessions count] == 0) {
-        [output appendAttributedString:[[[NSAttributedString alloc] initWithString:TGLoc(@"settings.sessions.empty")
-                                                                         attributes:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                                                     [NSFont systemFontOfSize:13.0], NSFontAttributeName,
-                                                                                     TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                                                                     nil]] autorelease]];
-    }
+    TGActiveSessionsLocalizationBlock localize = ^NSString *(NSString *key) {
+        return TGLoc(key);
+    };
+    [self.activeSessionsStatusField setStringValue:[TGActiveSessionsPresentation statusTextForSummary:summary
+                                                                                              localize:localize]];
+    NSAttributedString *output = [TGActiveSessionsPresentation detailsTextForSummary:summary
+                                                                         languageCode:TGLanguageCode()
+                                                                             localize:localize
+                                                                            textColor:TGClassicInkColor()
+                                                                           mutedColor:TGClassicMutedInkColor()];
     [[self.activeSessionsTextView textStorage] setAttributedString:output];
 }
 
@@ -8317,7 +8257,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.profileIDRowValueField visible:(showProfile && profileHasID)];
     [self showView:self.profileDetailsSeparatorOne visible:(showProfileDetails && profileDetailRows > 1)];
     [self showView:self.profileDetailsSeparatorTwo visible:(showProfileDetails && profileDetailRows > 2)];
-    [self showView:self.profileRefreshButton visible:showProfile];
+    [self showView:self.profileRefreshButton visible:NO];
     [self showView:self.logoutButton visible:showProfile];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
@@ -8881,11 +8821,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.profileIDRowValueField setFrame:NSMakeRect(profileGroupedX + 208.0, profileNextY, 0.0, 0.0)];
     }
 
-    CGFloat profileActionsHeight = 94.0;
+    CGFloat profileActionsHeight = 52.0;
     CGFloat profileActionsY = profileNextY;
     [self.profileActionsCardView setFrame:NSMakeRect(profileGroupedX, profileActionsY, profileGroupedWidth, profileActionsHeight)];
-    [self.profileRefreshButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 11.0, profileGroupedWidth - 44.0, 30.0)];
-    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 53.0, profileGroupedWidth - 44.0, 30.0)];
+    [self.profileRefreshButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
+    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 11.0, profileGroupedWidth - 44.0, 30.0)];
     [self.profileIDField setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
     profileNextY = profileActionsY + profileActionsHeight + 18.0;
 
@@ -12038,10 +11978,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)reloadProfileSummaryIfReady {
-    if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy) {
+    if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy || self.profileSummaryLoading) {
         return;
     }
 
+    self.profileSummaryLoading = YES;
+    [self.profileRefreshButton setEnabled:NO];
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -12051,6 +11993,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.client != client || ![self.currentAuthState isEqualToString:@"ready"]) {
+                self.profileSummaryLoading = NO;
                 [self.profileRefreshButton setEnabled:YES];
                 [profile release];
                 [profileErrorMessage release];
@@ -12090,11 +12033,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [self refreshProfileDisplay];
                 [self layoutContentView];
                 [self updateVisibleSection];
-                self.profileSummaryLoaded = YES;
+                self.profileSummaryLoaded = NO;
                 if (profileErrorMessage) {
                     [self appendDetail:[NSString stringWithFormat:@"Profile: %@", profileErrorMessage]];
                 }
             }
+            self.profileSummaryLoading = NO;
             [self.profileRefreshButton setEnabled:YES];
             [profile release];
             [profileErrorMessage release];

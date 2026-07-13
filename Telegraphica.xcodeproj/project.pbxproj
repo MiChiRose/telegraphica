@@ -21,6 +21,7 @@
 		111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111223 /* TelegraphicaAppIcon.icns */; };
 		111111111111111111111113 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111232 /* AVFoundation.framework */; };
 		111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111224 /* TelegraphicaNotificationIcon.png */; };
+		111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111217 /* TGActiveSessionsPresentation.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,8 @@
 		111111111111111111111213 /* TGChatItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatItem.m; sourceTree = "<group>"; };
 		111111111111111111111214 /* TGMessageItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageItem.h; sourceTree = "<group>"; };
 		111111111111111111111215 /* TGMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageItem.m; sourceTree = "<group>"; };
+		111111111111111111111216 /* TGActiveSessionsPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGActiveSessionsPresentation.h; sourceTree = "<group>"; };
+		111111111111111111111217 /* TGActiveSessionsPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGActiveSessionsPresentation.m; sourceTree = "<group>"; };
 		111111111111111111111221 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111222 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111223 /* TelegraphicaAppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = TelegraphicaAppIcon.icns; sourceTree = "<group>"; };
@@ -133,6 +136,8 @@
 		111111111111111111111406 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
+				111111111111111111111217 /* TGActiveSessionsPresentation.m */,
 				111111111111111111111210 /* TGStatusWindowController.h */,
 				111111111111111111111211 /* TGStatusWindowController.m */,
 			);
@@ -222,6 +227,7 @@
 				111111111111111111111106 /* TGStatusWindowController.m in Sources */,
 				111111111111111111111111 /* TGChatItem.m in Sources */,
 				111111111111111111111112 /* TGMessageItem.m in Sources */,
+				111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
