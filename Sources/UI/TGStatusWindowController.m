@@ -27,8 +27,11 @@ static NSString * const TGThemeDefaultsKey = @"TelegraphicaThemeIdentifier";
 static NSString * const TGNotificationsEnabledDefaultsKey = @"TelegraphicaNotificationsEnabled";
 static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNotificationSoundEnabled";
 static NSString * const TGNotificationBadgeEnabledDefaultsKey = @"TelegraphicaNotificationBadgeEnabled";
+static NSString * const TGNotificationPreviewEnabledDefaultsKey = @"TelegraphicaNotificationPreviewEnabled";
+static NSString * const TGNotificationsWhenActiveDefaultsKey = @"TelegraphicaNotificationsWhenActive";
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
+static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
 static NSString * const TGLanguageDefaultsKey = @"TelegraphicaLanguageCode";
 static NSString * const TGDownloadFolderDefaultsKey = @"TelegraphicaDownloadFolderPath";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
@@ -73,7 +76,10 @@ static NSString *TGLoc(NSString *key) {
                         @"Показывать уведомления", @"settings.notifications",
                         @"Звук уведомлений", @"settings.sound",
                         @"Бейдж непрочитанных в Dock", @"settings.badge",
+                        @"Показывать текст сообщения", @"settings.preview",
+                        @"Уведомлять, когда Telegraphica открыта", @"settings.whenActive",
                         @"Скрыть боковую панель", @"settings.drawer",
+                        @"Показывать, когда собеседник печатает", @"settings.typing",
                         @"Тема", @"settings.theme",
                         @"Оформление", @"settings.appearance",
                         @"Папка загрузок", @"settings.downloads",
@@ -82,11 +88,26 @@ static NSString *TGLoc(NSString *key) {
                         @"Диагностические логи", @"settings.logs",
                         @"О Telegraphica", @"settings.about",
                         @"Уведомления", @"settings.section.notifications",
-                        @"Боковая панель", @"settings.section.drawer",
+                        @"Общие", @"settings.section.drawer",
+                        @"Активные сессии", @"settings.section.sessions",
                         @"Интерфейс", @"settings.section.interface",
                         @"Файлы", @"settings.section.files",
                         @"Справка", @"settings.section.help",
                         @"Выберите папку, в которой будут сохраняться загруженные файлы", @"settings.downloads.help",
+                        @"Устройства, на которых выполнен вход в этот аккаунт", @"settings.sessions.help",
+                        @"Открыть активные сессии", @"settings.sessions.open",
+                        @"Обновить", @"settings.sessions.refresh",
+                        @"Загрузка активных сессий...", @"settings.sessions.loading",
+                        @"Сессии недоступны: %@", @"settings.sessions.failed",
+                        @"Активных устройств: %lu", @"settings.sessions.count",
+                        @"Автозавершение неактивных сессий: %ld дн.", @"settings.sessions.ttl",
+                        @"Последняя активность: %@", @"settings.sessions.lastActive",
+                        @"Неизвестное устройство", @"settings.sessions.unknownDevice",
+                        @"неизвестная ошибка", @"settings.sessions.unknownError",
+                        @"Текущее устройство", @"settings.sessions.current",
+                        @"Нет других активных сессий", @"settings.sessions.empty",
+                        @"Закрыть", @"close",
+                        @"Новое сообщение", @"notification.hiddenPreview",
                         @"Начать запись голоса?", @"voice.permission.title",
                         @"Telegraphica сможет использовать микрофон для записи голосовых сообщений. Запись начинается только после нажатия кнопки голоса.", @"voice.permission.message",
                         @"Записывается...", @"voice.recording",
@@ -110,6 +131,7 @@ static NSString *TGLoc(NSString *key) {
                         @"Телефон", @"profile.phone",
                         @"Telegram ID", @"profile.id",
                         @"Выйти", @"profile.logout",
+                        @"Обновить профиль", @"profile.refresh",
                         @"Войти", @"login.title",
                         @"Введите номер телефона, связанный с аккаунтом Telegram, вместе с кодом страны.", @"login.phone.hint",
                         @"Номер телефона", @"login.phone.label",
@@ -155,7 +177,10 @@ static NSString *TGLoc(NSString *key) {
                         @"Паказваць апавяшчэнні", @"settings.notifications",
                         @"Гук апавяшчэнняў", @"settings.sound",
                         @"Бэйдж непрачытаных у Dock", @"settings.badge",
+                        @"Паказваць тэкст паведамлення", @"settings.preview",
+                        @"Апавяшчаць, калі Telegraphica адкрыта", @"settings.whenActive",
                         @"Схаваць бакавую панэль", @"settings.drawer",
+                        @"Паказваць, калі суразмоўца друкуе", @"settings.typing",
                         @"Тэма", @"settings.theme",
                         @"Афармленне", @"settings.appearance",
                         @"Папка загрузак", @"settings.downloads",
@@ -164,11 +189,26 @@ static NSString *TGLoc(NSString *key) {
                         @"Дыягнастычныя логі", @"settings.logs",
                         @"Пра Telegraphica", @"settings.about",
                         @"Апавяшчэнні", @"settings.section.notifications",
-                        @"Бакавая панэль", @"settings.section.drawer",
+                        @"Агульныя", @"settings.section.drawer",
+                        @"Актыўныя сеансы", @"settings.section.sessions",
                         @"Інтэрфейс", @"settings.section.interface",
                         @"Файлы", @"settings.section.files",
                         @"Даведка", @"settings.section.help",
                         @"Выберыце папку, у якой будуць захоўвацца спампаваныя файлы", @"settings.downloads.help",
+                        @"Прылады, на якіх выкананы ўваход у гэты акаўнт", @"settings.sessions.help",
+                        @"Адкрыць актыўныя сеансы", @"settings.sessions.open",
+                        @"Абнавіць", @"settings.sessions.refresh",
+                        @"Загрузка актыўных сеансаў...", @"settings.sessions.loading",
+                        @"Сеансы недаступныя: %@", @"settings.sessions.failed",
+                        @"Актыўных прылад: %lu", @"settings.sessions.count",
+                        @"Аўтазавяршэнне неактыўных сеансаў: %ld дз.", @"settings.sessions.ttl",
+                        @"Апошняя актыўнасць: %@", @"settings.sessions.lastActive",
+                        @"Невядомая прылада", @"settings.sessions.unknownDevice",
+                        @"невядомая памылка", @"settings.sessions.unknownError",
+                        @"Бягучая прылада", @"settings.sessions.current",
+                        @"Няма іншых актыўных сеансаў", @"settings.sessions.empty",
+                        @"Закрыць", @"close",
+                        @"Новае паведамленне", @"notification.hiddenPreview",
                         @"Пачаць запіс голасу?", @"voice.permission.title",
                         @"Telegraphica зможа выкарыстоўваць мікрафон для запісу галасавых паведамленняў. Запіс пачынаецца толькі пасля націску кнопкі голасу.", @"voice.permission.message",
                         @"Запісваецца...", @"voice.recording",
@@ -192,6 +232,7 @@ static NSString *TGLoc(NSString *key) {
                         @"Тэлефон", @"profile.phone",
                         @"Telegram ID", @"profile.id",
                         @"Выйсці", @"profile.logout",
+                        @"Абнавіць профіль", @"profile.refresh",
                         @"Увайсці", @"login.title",
                         @"Увядзіце нумар тэлефона, звязаны з акаўнтам Telegram, разам з кодам краіны.", @"login.phone.hint",
                         @"Нумар тэлефона", @"login.phone.label",
@@ -237,7 +278,10 @@ static NSString *TGLoc(NSString *key) {
                         @"Show message notifications", @"settings.notifications",
                         @"Play notification sound", @"settings.sound",
                         @"Show unread badge in Dock", @"settings.badge",
+                        @"Show message preview", @"settings.preview",
+                        @"Notify while Telegraphica is active", @"settings.whenActive",
                         @"Hide side drawer", @"settings.drawer",
+                        @"Show when someone is typing", @"settings.typing",
                         @"Theme", @"settings.theme",
                         @"Appearance", @"settings.appearance",
                         @"Downloads folder", @"settings.downloads",
@@ -246,11 +290,26 @@ static NSString *TGLoc(NSString *key) {
                         @"Diagnostic Logs", @"settings.logs",
                         @"About Telegraphica", @"settings.about",
                         @"Notifications", @"settings.section.notifications",
-                        @"Side Drawer", @"settings.section.drawer",
+                        @"General", @"settings.section.drawer",
+                        @"Active Sessions", @"settings.section.sessions",
                         @"Interface", @"settings.section.interface",
                         @"Files", @"settings.section.files",
                         @"Help", @"settings.section.help",
                         @"Choose where downloaded files will be saved", @"settings.downloads.help",
+                        @"Devices currently signed in to this account", @"settings.sessions.help",
+                        @"Open Active Sessions", @"settings.sessions.open",
+                        @"Refresh", @"settings.sessions.refresh",
+                        @"Loading active sessions...", @"settings.sessions.loading",
+                        @"Sessions are unavailable: %@", @"settings.sessions.failed",
+                        @"Active devices: %lu", @"settings.sessions.count",
+                        @"Inactive sessions expire after %ld days", @"settings.sessions.ttl",
+                        @"Last active: %@", @"settings.sessions.lastActive",
+                        @"Unknown device", @"settings.sessions.unknownDevice",
+                        @"unknown error", @"settings.sessions.unknownError",
+                        @"This device", @"settings.sessions.current",
+                        @"No other active sessions", @"settings.sessions.empty",
+                        @"Close", @"close",
+                        @"New message", @"notification.hiddenPreview",
                         @"Start voice recording?", @"voice.permission.title",
                         @"Telegraphica can use the microphone to record voice messages. Recording starts only after you press the voice button.", @"voice.permission.message",
                         @"Recording...", @"voice.recording",
@@ -274,6 +333,7 @@ static NSString *TGLoc(NSString *key) {
                         @"Phone", @"profile.phone",
                         @"Telegram ID", @"profile.id",
                         @"Logout", @"profile.logout",
+                        @"Refresh Profile", @"profile.refresh",
                         @"Sign in", @"login.title",
                         @"Enter the phone number connected to your Telegram account, including country code.", @"login.phone.hint",
                         @"Phone number", @"login.phone.label",
@@ -3708,7 +3768,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *settingsNotificationsEnabledButton;
 @property (nonatomic, retain) NSButton *settingsNotificationSoundButton;
 @property (nonatomic, retain) NSButton *settingsNotificationBadgeButton;
+@property (nonatomic, retain) NSButton *settingsNotificationPreviewButton;
+@property (nonatomic, retain) NSButton *settingsNotificationsWhenActiveButton;
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
+@property (nonatomic, retain) NSButton *settingsTypingIndicatorsButton;
+@property (nonatomic, retain) NSButton *settingsActiveSessionsButton;
+@property (nonatomic, retain) NSTextField *settingsActiveSessionsDetailField;
 @property (nonatomic, retain) NSTextField *settingsLanguageLabel;
 @property (nonatomic, retain) NSPopUpButton *settingsLanguagePopUpButton;
 @property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
@@ -3718,6 +3783,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSButton *settingsLogsButton;
 @property (nonatomic, retain) NSButton *settingsAboutButton;
 @property (nonatomic, retain) NSButton *logoutButton;
+@property (nonatomic, retain) NSButton *profileRefreshButton;
 @property (nonatomic, retain) NSImageView *aboutIconView;
 @property (nonatomic, retain) NSTextField *aboutTitleField;
 @property (nonatomic, retain) NSTextField *aboutVersionField;
@@ -3746,6 +3812,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSWindow *logsWindow;
 @property (nonatomic, retain) NSWindow *aboutWindow;
 @property (nonatomic, retain) NSWindow *appearanceWindow;
+@property (nonatomic, retain) NSWindow *activeSessionsWindow;
+@property (nonatomic, retain) NSTextView *activeSessionsTextView;
+@property (nonatomic, retain) NSTextField *activeSessionsStatusField;
+@property (nonatomic, retain) NSButton *activeSessionsRefreshButton;
+@property (nonatomic, retain) NSButton *activeSessionsCloseButton;
+@property (nonatomic, assign) NSUInteger activeSessionsRequestGeneration;
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
@@ -3950,7 +4022,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsNotificationsEnabledButton = _settingsNotificationsEnabledButton;
 @synthesize settingsNotificationSoundButton = _settingsNotificationSoundButton;
 @synthesize settingsNotificationBadgeButton = _settingsNotificationBadgeButton;
+@synthesize settingsNotificationPreviewButton = _settingsNotificationPreviewButton;
+@synthesize settingsNotificationsWhenActiveButton = _settingsNotificationsWhenActiveButton;
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
+@synthesize settingsTypingIndicatorsButton = _settingsTypingIndicatorsButton;
+@synthesize settingsActiveSessionsButton = _settingsActiveSessionsButton;
+@synthesize settingsActiveSessionsDetailField = _settingsActiveSessionsDetailField;
 @synthesize settingsLanguageLabel = _settingsLanguageLabel;
 @synthesize settingsLanguagePopUpButton = _settingsLanguagePopUpButton;
 @synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
@@ -3960,6 +4037,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize settingsLogsButton = _settingsLogsButton;
 @synthesize settingsAboutButton = _settingsAboutButton;
 @synthesize logoutButton = _logoutButton;
+@synthesize profileRefreshButton = _profileRefreshButton;
 @synthesize aboutIconView = _aboutIconView;
 @synthesize aboutTitleField = _aboutTitleField;
 @synthesize aboutVersionField = _aboutVersionField;
@@ -3988,6 +4066,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize logsWindow = _logsWindow;
 @synthesize aboutWindow = _aboutWindow;
 @synthesize appearanceWindow = _appearanceWindow;
+@synthesize activeSessionsWindow = _activeSessionsWindow;
+@synthesize activeSessionsTextView = _activeSessionsTextView;
+@synthesize activeSessionsStatusField = _activeSessionsStatusField;
+@synthesize activeSessionsRefreshButton = _activeSessionsRefreshButton;
+@synthesize activeSessionsCloseButton = _activeSessionsCloseButton;
+@synthesize activeSessionsRequestGeneration = _activeSessionsRequestGeneration;
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
@@ -4388,7 +4472,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginHintField setStringValue:hint];
     [self.authLabel setStringValue:label];
     [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
-    if ([state isEqualToString:@"waitPhoneNumber"] || [state isEqualToString:@"waitCode"]) {
+    if ([state isEqualToString:@"waitPhoneNumber"]) {
+        [[self.authTextField cell] setPlaceholderString:@"+123456789"];
+    } else if ([state isEqualToString:@"waitCode"]) {
         [[self.authTextField cell] setPlaceholderString:label];
     } else if ([state isEqualToString:@"waitPassword"]) {
         [[self.authSecureField cell] setPlaceholderString:label];
@@ -4413,15 +4499,25 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsNotificationsEnabledButton setTitle:TGLoc(@"settings.notifications")];
     [self.settingsNotificationSoundButton setTitle:TGLoc(@"settings.sound")];
     [self.settingsNotificationBadgeButton setTitle:TGLoc(@"settings.badge")];
+    [self.settingsNotificationPreviewButton setTitle:TGLoc(@"settings.preview")];
+    [self.settingsNotificationsWhenActiveButton setTitle:TGLoc(@"settings.whenActive")];
     [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
+    [self.settingsTypingIndicatorsButton setTitle:TGLoc(@"settings.typing")];
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
     [self.settingsDrawerSectionField setStringValue:TGLoc(@"settings.section.drawer")];
     [self.settingsLibraryField setStringValue:TGLoc(@"settings.appearance")];
+    [self.settingsStorageField setStringValue:TGLoc(@"settings.section.sessions")];
     [self.settingsFilesSectionField setStringValue:TGLoc(@"settings.section.files")];
     [self.settingsHelpSectionField setStringValue:TGLoc(@"settings.section.help")];
     [self.settingsThemeLabel setStringValue:TGLoc(@"settings.theme")];
     [self.settingsLanguageLabel setStringValue:TGLoc(@"settings.language")];
     [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
+    [self.settingsActiveSessionsDetailField setStringValue:TGLoc(@"settings.sessions.help")];
+    [self.settingsActiveSessionsButton setTitle:TGLoc(@"settings.sessions.open")];
+    [self.activeSessionsWindow setTitle:TGLoc(@"settings.section.sessions")];
+    [self.activeSessionsRefreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
+    [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
+    [self.profileRefreshButton setTitle:TGLoc(@"profile.refresh")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
     [self.settingsAppearanceButton setTitle:@""];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
@@ -4470,6 +4566,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
+    [self applyMutedLabelStyle:self.settingsStorageField];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
     [self.aboutTitleField setTextColor:TGClassicInkColor()];
@@ -4504,6 +4601,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self applyMutedLabelStyle:self.settingsDownloadFolderHelpField];
+    [self applyMutedLabelStyle:self.settingsActiveSessionsDetailField];
     [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
     [self.settingsLanguageLabel setTextColor:TGClassicInkColor()];
     [self applyMutedLabelStyle:self.aboutVersionField];
@@ -4525,9 +4623,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAboutButton setNeedsDisplay:YES];
     [self.settingsDownloadFolderButton setNeedsDisplay:YES];
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
+    [self.settingsActiveSessionsButton setNeedsDisplay:YES];
+    [self.profileRefreshButton setNeedsDisplay:YES];
     [self.settingsAccountCardView setNeedsDisplay:YES];
     [self.settingsDrawerCardView setNeedsDisplay:YES];
     [self.settingsThemeCardView setNeedsDisplay:YES];
+    [self.settingsSessionCardView setNeedsDisplay:YES];
     [self.settingsFilesCardView setNeedsDisplay:YES];
     [self.settingsHelpCardView setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
@@ -4629,14 +4730,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self.profileIDField setStringValue:@""];
     [self.profileStateField setStringValue:([self.profileBio length] > 0) ? self.profileBio : @""];
-    [self.settingsStorageField setStringValue:@""];
+    [self.settingsStorageField setStringValue:TGLoc(@"settings.section.sessions")];
 }
 
 - (void)refreshSelectedChatHeaderDisplay {
     NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Select a chat";
     [self.selectedChatField setStringValue:title];
     NSString *typingText = @"";
-    if ([self.typingIndicatorText length] > 0 &&
+    if (TGUserDefaultBoolWithDefault(TGTypingIndicatorsEnabledDefaultsKey, YES) &&
+        [self.typingIndicatorText length] > 0 &&
         [self.typingChatID respondsToSelector:@selector(longLongValue)] &&
         [self.selectedChatID respondsToSelector:@selector(longLongValue)] &&
         [self.typingChatID longLongValue] == [self.selectedChatID longLongValue]) {
@@ -4938,10 +5040,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     self.loginIconView = [[[NSImageView alloc] initWithFrame:NSMakeRect(454, 548, 72, 72)] autorelease];
     [self.loginIconView setImageScaling:NSImageScaleProportionallyUpOrDown];
-    NSString *loginIconPath = [[NSBundle mainBundle] pathForResource:@"Telegraphica" ofType:@"icns"];
+    NSString *loginIconPath = [[NSBundle mainBundle] pathForResource:@"TelegraphicaAppIcon" ofType:@"icns"];
     if ([loginIconPath length] > 0) {
         NSImage *loginIcon = [[[NSImage alloc] initWithContentsOfFile:loginIconPath] autorelease];
         [self.loginIconView setImage:loginIcon];
+    } else {
+        [self.loginIconView setImage:[NSImage imageNamed:@"NSApplicationIcon"]];
     }
     [self.loginIconView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin)];
     [contentView addSubview:self.loginIconView];
@@ -5559,6 +5663,26 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsNotificationBadgeButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsNotificationBadgeButton];
 
+    self.settingsNotificationPreviewButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 228, 340, 22)] autorelease];
+    [self.settingsNotificationPreviewButton setButtonType:NSSwitchButton];
+    [self.settingsNotificationPreviewButton setTitle:@"Show message preview"];
+    [self.settingsNotificationPreviewButton setTarget:self];
+    [self.settingsNotificationPreviewButton setAction:@selector(notificationSettingChanged:)];
+    [self.settingsNotificationPreviewButton setState:TGUserDefaultBoolWithDefault(TGNotificationPreviewEnabledDefaultsKey, YES) ? NSOnState : NSOffState];
+    [self.settingsNotificationPreviewButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsNotificationPreviewButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsNotificationPreviewButton];
+
+    self.settingsNotificationsWhenActiveButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 204, 400, 22)] autorelease];
+    [self.settingsNotificationsWhenActiveButton setButtonType:NSSwitchButton];
+    [self.settingsNotificationsWhenActiveButton setTitle:@"Notify while Telegraphica is active"];
+    [self.settingsNotificationsWhenActiveButton setTarget:self];
+    [self.settingsNotificationsWhenActiveButton setAction:@selector(notificationSettingChanged:)];
+    [self.settingsNotificationsWhenActiveButton setState:TGUserDefaultBoolWithDefault(TGNotificationsWhenActiveDefaultsKey, NO) ? NSOnState : NSOffState];
+    [self.settingsNotificationsWhenActiveButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsNotificationsWhenActiveButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsNotificationsWhenActiveButton];
+
     self.settingsDrawerHiddenButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 228, 260, 22)] autorelease];
     [self.settingsDrawerHiddenButton setButtonType:NSSwitchButton];
     [self.settingsDrawerHiddenButton setTitle:@"Hide side drawer"];
@@ -5568,6 +5692,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsDrawerHiddenButton setFont:[NSFont systemFontOfSize:13.0]];
     [self.settingsDrawerHiddenButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsDrawerHiddenButton];
+
+    self.settingsTypingIndicatorsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 204, 360, 22)] autorelease];
+    [self.settingsTypingIndicatorsButton setButtonType:NSSwitchButton];
+    [self.settingsTypingIndicatorsButton setTitle:@"Show when someone is typing"];
+    [self.settingsTypingIndicatorsButton setTarget:self];
+    [self.settingsTypingIndicatorsButton setAction:@selector(interfaceSettingChanged:)];
+    [self.settingsTypingIndicatorsButton setState:TGUserDefaultBoolWithDefault(TGTypingIndicatorsEnabledDefaultsKey, YES) ? NSOnState : NSOffState];
+    [self.settingsTypingIndicatorsButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsTypingIndicatorsButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsTypingIndicatorsButton];
 
     self.settingsLanguageLabel = [self labelWithFrame:NSMakeRect(64, 204, 100, 22)
                                                  text:@"Language"
@@ -5585,6 +5719,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsLanguagePopUpButton setAction:@selector(languageSelectionChanged:)];
     [self.settingsLanguagePopUpButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLanguagePopUpButton];
+
+    self.settingsActiveSessionsDetailField = [self labelWithFrame:NSMakeRect(64, 174, 420, 18)
+                                                              text:@"Devices currently signed in to this account"
+                                                              font:[NSFont systemFontOfSize:11.0]];
+    [self applyMutedLabelStyle:self.settingsActiveSessionsDetailField];
+    [contentView addSubview:self.settingsActiveSessionsDetailField];
+
+    self.settingsActiveSessionsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 146, 260, 28)] autorelease];
+    [self.settingsActiveSessionsButton setTitle:@"Open Active Sessions"];
+    [self.settingsActiveSessionsButton setTarget:self];
+    [self.settingsActiveSessionsButton setAction:@selector(showActiveSessionsWindow:)];
+    [self applyUtilityButtonStyle:self.settingsActiveSessionsButton];
+    [self.settingsActiveSessionsButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsActiveSessionsButton];
 
     self.settingsDownloadFolderHelpField = [self labelWithFrame:NSMakeRect(64, 198, 360, 18)
                                                            text:@"Choose where downloaded files will be saved"
@@ -5653,9 +5801,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                      self.settingsNotificationsEnabledButton,
                                      self.settingsNotificationSoundButton,
                                      self.settingsNotificationBadgeButton,
+                                     self.settingsNotificationPreviewButton,
+                                     self.settingsNotificationsWhenActiveButton,
                                      self.settingsDrawerHiddenButton,
+                                     self.settingsTypingIndicatorsButton,
                                      self.settingsLanguageLabel,
                                      self.settingsLanguagePopUpButton,
+                                     self.settingsActiveSessionsDetailField,
+                                     self.settingsActiveSessionsButton,
                                      self.settingsDownloadFolderHelpField,
                                      self.settingsDownloadFolderButton,
                                      self.settingsCheckUpdatesButton,
@@ -5678,6 +5831,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.logoutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.logoutButton];
 
+    self.profileRefreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 314, 220, 30)] autorelease];
+    [self.profileRefreshButton setTitle:TGLoc(@"profile.refresh")];
+    [self.profileRefreshButton setTarget:self];
+    [self.profileRefreshButton setAction:@selector(refreshProfile:)];
+    [self applyUtilityButtonStyle:self.profileRefreshButton];
+    [self.profileRefreshButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.profileRefreshButton];
+
     NSArray *profileContentViews = [NSArray arrayWithObjects:
                                     self.profileSummaryCardView,
                                     self.profileInfoCardView,
@@ -5698,6 +5859,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                     self.profileIDRowValueField,
                                     self.profileDetailsSeparatorOne,
                                     self.profileDetailsSeparatorTwo,
+                                    self.profileRefreshButton,
                                     self.logoutButton,
                                     nil];
     NSUInteger profileViewIndex = 0;
@@ -6754,6 +6916,201 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [alert runModal];
 }
 
+- (NSString *)activeSessionDateTextForTimestamp:(NSNumber *)timestamp {
+    if (![timestamp respondsToSelector:@selector(doubleValue)] || [timestamp doubleValue] <= 0.0) {
+        return @"";
+    }
+    NSDate *date = [NSDate dateWithTimeIntervalSince1970:[timestamp doubleValue]];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    NSString *languageCode = TGLanguageCode();
+    NSString *localeIdentifier = [languageCode isEqualToString:@"ru"] ? @"ru_RU" :
+                                 ([languageCode isEqualToString:@"be"] ? @"be_BY" : @"en_US");
+    NSLocale *locale = [[[NSLocale alloc] initWithLocaleIdentifier:localeIdentifier] autorelease];
+    [formatter setLocale:locale];
+    [formatter setDateStyle:NSDateFormatterMediumStyle];
+    [formatter setTimeStyle:NSDateFormatterShortStyle];
+    return [formatter stringFromDate:date];
+}
+
+- (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {
+    [self.activeSessionsRefreshButton setEnabled:YES];
+    if ([errorMessage length] > 0 || ![summary isKindOfClass:[NSDictionary class]]) {
+        NSString *message = [NSString stringWithFormat:TGLoc(@"settings.sessions.failed"),
+                             ([errorMessage length] > 0 ? errorMessage : TGLoc(@"settings.sessions.unknownError"))];
+        [self.activeSessionsStatusField setStringValue:message];
+        [self.activeSessionsTextView setString:@""];
+        return;
+    }
+
+    NSArray *sessions = [summary objectForKey:@"sessions"];
+    NSNumber *ttlDays = [summary objectForKey:@"inactive_session_ttl_days"];
+    NSString *statusText = [NSString stringWithFormat:TGLoc(@"settings.sessions.count"), (unsigned long)[sessions count]];
+    if ([ttlDays respondsToSelector:@selector(integerValue)]) {
+        statusText = [statusText stringByAppendingFormat:@"  •  %@",
+                      [NSString stringWithFormat:TGLoc(@"settings.sessions.ttl"), (long)[ttlDays integerValue]]];
+    }
+    [self.activeSessionsStatusField setStringValue:statusText];
+
+    NSMutableAttributedString *output = [[[NSMutableAttributedString alloc] init] autorelease];
+    NSUInteger index = 0;
+    for (index = 0; index < [sessions count]; index++) {
+        NSDictionary *session = [sessions objectAtIndex:index];
+        NSString *device = [session objectForKey:@"device_model"];
+        NSString *application = [session objectForKey:@"application_name"];
+        NSString *version = [session objectForKey:@"application_version"];
+        NSString *platform = [session objectForKey:@"platform"];
+        NSString *systemVersion = [session objectForKey:@"system_version"];
+        NSString *location = [session objectForKey:@"location"];
+        BOOL current = [[session objectForKey:@"is_current"] boolValue];
+        NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : TGLoc(@"settings.sessions.unknownDevice"));
+        if (current) {
+            title = [title stringByAppendingFormat:@"  —  %@", TGLoc(@"settings.sessions.current")];
+        }
+        if (index > 0) {
+            [output appendAttributedString:[[[NSAttributedString alloc] initWithString:@"\n"] autorelease]];
+        }
+        NSAttributedString *titleLine = [[[NSAttributedString alloc] initWithString:[title stringByAppendingString:@"\n"]
+                                                                          attributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                                                      [NSFont boldSystemFontOfSize:14.0], NSFontAttributeName,
+                                                                                      TGClassicInkColor(), NSForegroundColorAttributeName,
+                                                                                      nil]] autorelease];
+        [output appendAttributedString:titleLine];
+
+        NSMutableArray *applicationParts = [NSMutableArray array];
+        if ([application length] > 0) [applicationParts addObject:application];
+        if ([version length] > 0) [applicationParts addObject:version];
+        NSMutableArray *systemParts = [NSMutableArray array];
+        if ([platform length] > 0) [systemParts addObject:platform];
+        if ([systemVersion length] > 0) [systemParts addObject:systemVersion];
+        NSString *lastActive = [self activeSessionDateTextForTimestamp:[session objectForKey:@"last_active_date"]];
+
+        NSMutableArray *detailLines = [NSMutableArray array];
+        if ([applicationParts count] > 0) [detailLines addObject:[applicationParts componentsJoinedByString:@" "]];
+        if ([systemParts count] > 0) [detailLines addObject:[systemParts componentsJoinedByString:@" • "]];
+        if ([location length] > 0) [detailLines addObject:location];
+        if ([lastActive length] > 0) [detailLines addObject:[NSString stringWithFormat:TGLoc(@"settings.sessions.lastActive"), lastActive]];
+        NSString *details = [[detailLines componentsJoinedByString:@"\n"] stringByAppendingString:@"\n"];
+        NSAttributedString *detailText = [[[NSAttributedString alloc] initWithString:details
+                                                                           attributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                                                       [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                                                                       TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                                                                       nil]] autorelease];
+        [output appendAttributedString:detailText];
+    }
+    if ([sessions count] == 0) {
+        [output appendAttributedString:[[[NSAttributedString alloc] initWithString:TGLoc(@"settings.sessions.empty")
+                                                                         attributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                                                     [NSFont systemFontOfSize:13.0], NSFontAttributeName,
+                                                                                     TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                                                                     nil]] autorelease]];
+    }
+    [[self.activeSessionsTextView textStorage] setAttributedString:output];
+}
+
+- (void)reloadActiveSessions:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self.activeSessionsRefreshButton setEnabled:YES];
+        return;
+    }
+    NSUInteger requestGeneration = self.activeSessionsRequestGeneration + 1;
+    self.activeSessionsRequestGeneration = requestGeneration;
+    [self.activeSessionsStatusField setStringValue:TGLoc(@"settings.sessions.loading")];
+    [self.activeSessionsRefreshButton setEnabled:NO];
+    [self.activeSessionsTextView setString:@""];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sessionsError = nil;
+        NSDictionary *summary = [[client activeSessionsSummaryWithTimeout:8.0 error:&sessionsError] retain];
+        NSString *errorMessage = [[sessionsError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (requestGeneration == self.activeSessionsRequestGeneration &&
+                self.client == client &&
+                [self.currentAuthState isEqualToString:@"ready"]) {
+                [self renderActiveSessionsSummary:summary errorMessage:errorMessage];
+            } else if (requestGeneration == self.activeSessionsRequestGeneration) {
+                [self.activeSessionsRefreshButton setEnabled:YES];
+            }
+            [summary release];
+            [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)showActiveSessionsWindow:(id)sender {
+    (void)sender;
+    if (!self.activeSessionsWindow) {
+        NSRect frame = NSMakeRect(0, 0, 620, 480);
+        NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                        styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask)
+                                                          backing:NSBackingStoreBuffered
+                                                            defer:NO] autorelease];
+        [window setTitle:TGLoc(@"settings.section.sessions")];
+        [window setMinSize:NSMakeSize(500.0, 360.0)];
+        [window setReleasedWhenClosed:NO];
+        TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
+        [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [window setContentView:contentView];
+
+        NSTextField *statusField = [self labelWithFrame:NSMakeRect(24, 438, 440, 20)
+                                                    text:TGLoc(@"settings.sessions.loading")
+                                                    font:[NSFont systemFontOfSize:12.0]];
+        [self applyMutedLabelStyle:statusField];
+        [statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [contentView addSubview:statusField];
+        self.activeSessionsStatusField = statusField;
+
+        TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 58, 584, 366)] autorelease];
+        [cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [contentView addSubview:cardView];
+        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30, 70, 560, 342)] autorelease];
+        [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [self applySkeuomorphicScrollStyle:scrollView];
+        NSTextView *textView = [[[NSTextView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
+        [textView setEditable:NO];
+        [textView setSelectable:YES];
+        [textView setDrawsBackground:NO];
+        [scrollView setDocumentView:textView];
+        [contentView addSubview:scrollView];
+        self.activeSessionsTextView = textView;
+
+        NSButton *refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(350, 18, 120, 30)] autorelease];
+        [refreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
+        [refreshButton setTarget:self];
+        [refreshButton setAction:@selector(reloadActiveSessions:)];
+        [self applyUtilityButtonStyle:refreshButton];
+        [refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+        [contentView addSubview:refreshButton];
+        self.activeSessionsRefreshButton = refreshButton;
+
+        NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(482, 18, 120, 30)];
+        [closeButton setTitle:TGLoc(@"close")];
+        [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+        [contentView addSubview:closeButton];
+        self.activeSessionsCloseButton = closeButton;
+        self.activeSessionsWindow = window;
+    }
+    [self.activeSessionsWindow setTitle:TGLoc(@"settings.section.sessions")];
+    [self.activeSessionsRefreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
+    [self.activeSessionsWindow center];
+    [self.activeSessionsWindow makeKeyAndOrderFront:nil];
+    [self reloadActiveSessions:nil];
+}
+
+- (void)refreshProfile:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy) {
+        [self.profileRefreshButton setEnabled:YES];
+        return;
+    }
+    self.profileSummaryLoaded = NO;
+    [self.profileRefreshButton setEnabled:NO];
+    [self reloadProfileSummaryIfReady];
+}
+
 - (void)showAppearanceWindow:(id)sender {
     (void)sender;
     if (!self.appearanceWindow) {
@@ -7310,6 +7667,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                             forKey:TGNotificationSoundEnabledDefaultsKey];
     [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationBadgeButton state] == NSOnState)
                                             forKey:TGNotificationBadgeEnabledDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationPreviewButton state] == NSOnState)
+                                            forKey:TGNotificationPreviewEnabledDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationsWhenActiveButton state] == NSOnState)
+                                            forKey:TGNotificationsWhenActiveDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [self updateApplicationBadge];
 }
@@ -7318,12 +7679,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     (void)sender;
     BOOL drawerHidden = ([self.settingsDrawerHiddenButton state] == NSOnState);
     [[NSUserDefaults standardUserDefaults] setBool:drawerHidden forKey:TGDrawerHiddenDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsTypingIndicatorsButton state] == NSOnState)
+                                            forKey:TGTypingIndicatorsEnabledDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
     if (drawerHidden) {
         self.drawerOpen = NO;
     }
     [self layoutContentView];
     [self updateVisibleSection];
+    [self refreshSelectedChatHeaderDisplay];
 }
 
 - (void)languageSelectionChanged:(id)sender {
@@ -7359,6 +7723,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     [visibleErrorKey release];
     [self refreshProfileDisplay];
+    if ([self.activeSessionsWindow isVisible]) {
+        [self reloadActiveSessions:nil];
+    }
     [self layoutContentView];
     [self updateVisibleSection];
     [self refreshThemeAppearance];
@@ -7629,7 +7996,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
     (void)center;
     (void)notification;
-    return TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES);
+    if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
+        return NO;
+    }
+    if ([NSApp isActive]) {
+        return TGUserDefaultBoolWithDefault(TGNotificationsWhenActiveDefaultsKey, NO);
+    }
+    return YES;
 }
 
 - (BOOL)selectChatFromNotificationWithChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID {
@@ -7798,6 +8171,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
         preview = @"New message";
     }
+    if (!TGUserDefaultBoolWithDefault(TGNotificationPreviewEnabledDefaultsKey, YES)) {
+        preview = TGLoc(@"notification.hiddenPreview");
+    }
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:title];
     [notification setInformativeText:preview];
@@ -7941,6 +8317,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.profileIDRowValueField visible:(showProfile && profileHasID)];
     [self showView:self.profileDetailsSeparatorOne visible:(showProfileDetails && profileDetailRows > 1)];
     [self showView:self.profileDetailsSeparatorTwo visible:(showProfileDetails && profileDetailRows > 2)];
+    [self showView:self.profileRefreshButton visible:showProfile];
     [self showView:self.logoutButton visible:showProfile];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
@@ -7951,22 +8328,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.settingsThemeCardView visible:showSettings];
     [self showView:self.settingsFilesCardView visible:showSettings];
     [self showView:self.settingsHelpCardView visible:showSettings];
-    [self showView:self.settingsSessionCardView visible:NO];
+    [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
     [self showView:self.settingsFilesSectionField visible:showSettings];
     [self showView:self.settingsHelpSectionField visible:showSettings];
-    [self showView:self.settingsStorageField visible:NO];
+    [self showView:self.settingsStorageField visible:showSettings];
     [self showView:self.settingsThemeLabel visible:showSettings];
     [self showView:self.themePopUpButton visible:showSettings];
     [self showView:self.settingsNotificationsEnabledButton visible:showSettings];
     [self showView:self.settingsNotificationSoundButton visible:showSettings];
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
+    [self showView:self.settingsNotificationPreviewButton visible:showSettings];
+    [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
+    [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
     [self showView:self.settingsLanguageLabel visible:showSettings];
     [self showView:self.settingsLanguagePopUpButton visible:showSettings];
+    [self showView:self.settingsActiveSessionsDetailField visible:showSettings];
+    [self showView:self.settingsActiveSessionsButton visible:showSettings];
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
@@ -8179,7 +8561,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginHintField setFrame:NSMakeRect(loginX + 54.0, loginY + loginHeight - 112.0, loginWidth - 108.0, 44.0)];
     [self.authLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 114.0, loginWidth - 108.0, 18.0)];
     [self.authSecondaryLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 94.0, loginWidth - 108.0, 18.0)];
-    [self.authStateField setFrame:NSMakeRect(loginX + 54.0, loginY + 54.0, loginWidth - 108.0, 34.0)];
     CGFloat loginButtonWidth = 92.0;
     CGFloat loginInputX = loginX + 54.0;
     CGFloat loginButtonX = loginX + loginWidth - 54.0 - loginButtonWidth;
@@ -8189,6 +8570,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     CGFloat primaryInputY = loginY + 82.0;
     CGFloat secondaryInputY = loginY + 62.0;
+    CGFloat loginErrorHeight = 28.0;
+    CGFloat loginErrorGap = 4.0;
+    CGFloat loginErrorY = primaryInputY - loginErrorGap - loginErrorHeight;
+    [self.authStateField setFrame:NSMakeRect(loginX + 54.0, loginErrorY, loginWidth - 108.0, loginErrorHeight)];
     [self.authTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, primaryInputY, loginInputWidth, 32.0)];
     [self.authTextField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authSecondaryTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, secondaryInputY, loginInputWidth, 32.0)];
@@ -8374,20 +8759,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat profileGroupGap = 12.0;
     CGFloat profileNextY = 18.0;
 
-    CGFloat profileSummaryHeight = 172.0;
+    CGFloat profileSummaryHeight = 190.0;
     CGFloat profileSummaryY = profileNextY;
     [self.profileSummaryCardView setFrame:NSMakeRect(profileGroupedX, profileSummaryY, profileGroupedWidth, profileSummaryHeight)];
-    CGFloat profileAvatarSize = 88.0;
+    CGFloat profileAvatarSize = 96.0;
     CGFloat profileAvatarX = profileGroupedX + floor((profileGroupedWidth - profileAvatarSize) / 2.0);
-    CGFloat profileAvatarY = profileSummaryY + 16.0;
+    CGFloat profileAvatarY = profileSummaryY + 18.0;
     [self.profileAvatarView setFrame:NSMakeRect(profileAvatarX,
                                                 profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
     CGFloat profileTextX = profileGroupedX + 22.0;
     CGFloat profileTextWidth = profileGroupedWidth - 44.0;
-    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 108.0, profileTextWidth, 26.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 136.0, profileTextWidth, 20.0)];
+    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 124.0, profileTextWidth, 26.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 154.0, profileTextWidth, 20.0)];
 
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
@@ -8496,10 +8881,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.profileIDRowValueField setFrame:NSMakeRect(profileGroupedX + 208.0, profileNextY, 0.0, 0.0)];
     }
 
-    CGFloat profileActionsHeight = 56.0;
+    CGFloat profileActionsHeight = 94.0;
     CGFloat profileActionsY = profileNextY;
     [self.profileActionsCardView setFrame:NSMakeRect(profileGroupedX, profileActionsY, profileGroupedWidth, profileActionsHeight)];
-    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 13.0, profileGroupedWidth - 44.0, 30.0)];
+    [self.profileRefreshButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 11.0, profileGroupedWidth - 44.0, 30.0)];
+    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 53.0, profileGroupedWidth - 44.0, 30.0)];
     [self.profileIDField setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
     profileNextY = profileActionsY + profileActionsHeight + 18.0;
 
@@ -8531,7 +8917,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (settingsDocWidth < 340.0) {
         settingsDocWidth = settingsScrollWidth;
     }
-    CGFloat settingsDocHeight = 620.0;
+    CGFloat settingsDocHeight = 850.0;
     if (settingsDocHeight < settingsScrollHeight) {
         settingsDocHeight = settingsScrollHeight;
     }
@@ -8552,20 +8938,23 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat rowWidth = settingsGroupedWidth - 44.0;
     CGFloat settingsNextY = 18.0;
 
-    CGFloat notificationCardHeight = 92.0;
+    CGFloat notificationCardHeight = 140.0;
     [self.settingsStateField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat notificationCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsAccountCardView setFrame:NSMakeRect(settingsGroupedX, notificationCardY, settingsGroupedWidth, notificationCardHeight)];
     [self.settingsNotificationsEnabledButton setFrame:NSMakeRect(rowLeft, notificationCardY + 12.0, rowWidth, 22.0)];
     [self.settingsNotificationSoundButton setFrame:NSMakeRect(rowLeft, notificationCardY + 36.0, rowWidth, 22.0)];
     [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 60.0, rowWidth, 22.0)];
+    [self.settingsNotificationPreviewButton setFrame:NSMakeRect(rowLeft, notificationCardY + 84.0, rowWidth, 22.0)];
+    [self.settingsNotificationsWhenActiveButton setFrame:NSMakeRect(rowLeft, notificationCardY + 108.0, rowWidth, 22.0)];
     settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
 
     [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat drawerCardHeight = 54.0;
+    CGFloat drawerCardHeight = 78.0;
     CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsDrawerCardView setFrame:NSMakeRect(settingsGroupedX, drawerCardY, settingsGroupedWidth, drawerCardHeight)];
-    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 16.0, rowWidth, 22.0)];
+    [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 12.0, rowWidth, 22.0)];
+    [self.settingsTypingIndicatorsButton setFrame:NSMakeRect(rowLeft, drawerCardY + 42.0, rowWidth, 22.0)];
     settingsNextY = drawerCardY + drawerCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
@@ -8586,6 +8975,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 46.0, popupWidth, 28.0)];
     settingsNextY = interfaceCardY + interfaceCardHeight + settingsGroupGap;
 
+    [self.settingsStorageField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat sessionsCardHeight = 72.0;
+    CGFloat sessionsCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsSessionCardView setFrame:NSMakeRect(settingsGroupedX, sessionsCardY, settingsGroupedWidth, sessionsCardHeight)];
+    [self.settingsActiveSessionsDetailField setFrame:NSMakeRect(rowLeft, sessionsCardY + 10.0, rowWidth, 18.0)];
+    [self.settingsActiveSessionsButton setFrame:NSMakeRect(rowLeft, sessionsCardY + 34.0, rowWidth, 28.0)];
+    settingsNextY = sessionsCardY + sessionsCardHeight + settingsGroupGap;
+
     [self.settingsFilesSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat filesCardHeight = 76.0;
     CGFloat filesCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
@@ -8598,7 +8995,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat helpCardHeight = 112.0;
     CGFloat helpCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsHelpCardView setFrame:NSMakeRect(settingsGroupedX, helpCardY, settingsGroupedWidth, helpCardHeight)];
-    [self.settingsSessionCardView setFrame:NSMakeRect(settingsGroupedX, helpCardY, 0.0, 0.0)];
     [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
@@ -9045,7 +9441,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.loginTitleField setStringValue:TGLoc(@"login.title")];
         [self.loginHintField setStringValue:TGLoc(@"login.phone.hint")];
         [self.authLabel setStringValue:TGLoc(@"login.phone.label")];
-        [[self.authTextField cell] setPlaceholderString:@"+375 29 123 45 67"];
+        [[self.authTextField cell] setPlaceholderString:@"+123456789"];
         [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:NO];
@@ -11655,6 +12051,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.client != client || ![self.currentAuthState isEqualToString:@"ready"]) {
+                [self.profileRefreshButton setEnabled:YES];
                 [profile release];
                 [profileErrorMessage release];
                 return;
@@ -11698,6 +12095,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                     [self appendDetail:[NSString stringWithFormat:@"Profile: %@", profileErrorMessage]];
                 }
             }
+            [self.profileRefreshButton setEnabled:YES];
             [profile release];
             [profileErrorMessage release];
         });
@@ -13657,13 +14055,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_settingsNotificationsEnabledButton release];
     [_settingsNotificationSoundButton release];
     [_settingsNotificationBadgeButton release];
+    [_settingsNotificationPreviewButton release];
+    [_settingsNotificationsWhenActiveButton release];
     [_settingsDrawerHiddenButton release];
+    [_settingsTypingIndicatorsButton release];
+    [_settingsActiveSessionsButton release];
+    [_settingsActiveSessionsDetailField release];
     [_settingsLanguageLabel release];
     [_settingsLanguagePopUpButton release];
     [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
     [_settingsCheckUpdatesButton release];
     [_logoutButton release];
+    [_profileRefreshButton release];
     [_aboutIconView release];
     [_aboutTitleField release];
     [_aboutVersionField release];
@@ -13696,6 +14100,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_logsWindow close];
     [_aboutWindow close];
     [_appearanceWindow close];
+    [_activeSessionsWindow close];
     [_mediaPreviewWindow setDelegate:nil];
     [_mediaPreviewWindow close];
     [_mediaPlaybackWindow setDelegate:nil];
@@ -13716,6 +14121,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_logsWindow release];
     [_aboutWindow release];
     [_appearanceWindow release];
+    [_activeSessionsWindow release];
+    [_activeSessionsTextView release];
+    [_activeSessionsStatusField release];
+    [_activeSessionsRefreshButton release];
+    [_activeSessionsCloseButton release];
     [_mediaPreviewWindow release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];

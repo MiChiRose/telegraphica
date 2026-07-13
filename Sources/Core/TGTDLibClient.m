@@ -5096,7 +5096,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    NSString *authorizationState = [self cachedAuthorizationStateSummary];
     if (![authorizationState isEqualToString:@"ready"]) {
         if (error) {
             NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load active sessions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
@@ -5129,7 +5129,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"log_in_date", @"last_active_date", nil];
     NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", @"is_password_pending", @"can_accept_calls", @"can_accept_secret_chats", nil];
-    NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"ip", @"country", @"region", nil];
+    NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"location", nil];
     NSMutableArray *safeSessions = [NSMutableArray arrayWithCapacity:[(NSArray *)sessionsObject count]];
     NSUInteger sessionIndex = 0;
     for (sessionIndex = 0; sessionIndex < [(NSArray *)sessionsObject count]; sessionIndex++) {
