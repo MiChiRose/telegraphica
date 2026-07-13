@@ -2981,10 +2981,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                     didRequestDownload:didRequestDownload];
     }
     if ([type isEqualToString:@"messageSticker"]) {
-        return [self visualMediaInfoFromContainerObject:[content objectForKey:@"sticker"]
-                                        downloadMissing:downloadMissing
-                                                timeout:timeout
-                                     didRequestDownload:didRequestDownload];
+        return [self stickerPreviewInfoFromStickerObject:[content objectForKey:@"sticker"]
+                                         downloadMissing:downloadMissing
+                                                 timeout:timeout
+                                      didRequestDownload:didRequestDownload];
     }
     if ([type isEqualToString:@"messageAnimation"]) {
         return [self visualMediaInfoFromContainerObject:[content objectForKey:@"animation"]
@@ -3213,10 +3213,32 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *info = mediaInfo ? [NSMutableDictionary dictionaryWithDictionary:mediaInfo] : [NSMutableDictionary dictionary];
     NSDictionary *stickerFile = [self mediaFileObjectFromContainerObject:sticker];
     NSNumber *fileID = [self fileIDFromFileObject:stickerFile];
+    NSDictionary *formatObject = [[sticker objectForKey:@"format"] isKindOfClass:[NSDictionary class]] ? [sticker objectForKey:@"format"] : nil;
+    NSString *formatType = [[formatObject objectForKey:@"@type"] isKindOfClass:[NSString class]] ? [formatObject objectForKey:@"@type"] : @"";
+    if ([formatType length] > 0) {
+        [info setObject:formatType forKey:@"sticker_format"];
+    }
     if (fileID) {
         [info setObject:fileID forKey:@"file_id"];
         [info setObject:fileID forKey:@"full_file_id"];
     }
+
+    NSString *fullLocalPath = [self completedLocalPathFromFileObject:stickerFile];
+    if ([formatType isEqualToString:@"stickerFormatWebp"] &&
+        [fullLocalPath length] == 0 && downloadMissing && fileID) {
+        if (didRequestDownload) {
+            *didRequestDownload = YES;
+        }
+        NSDictionary *downloadedInfo = [self downloadedFileInfoForFileID:fileID timeout:timeout];
+        fullLocalPath = [downloadedInfo objectForKey:@"local_path"];
+    }
+    if ([fullLocalPath length] > 0) {
+        [info setObject:fullLocalPath forKey:@"local_path"];
+        [info setObject:fullLocalPath forKey:@"full_local_path"];
+    }
+
+    /* TODO: Add a Mavericks-compatible TGS renderer in a later media iteration. */
+    /* TODO: Add a Mavericks-compatible WEBM sticker renderer after TGS support. */
     id emojiObject = [sticker objectForKey:@"emoji"];
     if ([emojiObject isKindOfClass:[NSString class]] && [(NSString *)emojiObject length] > 0) {
         [info setObject:emojiObject forKey:@"emoji"];
@@ -4569,7 +4591,6 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"getRecentStickers" forKey:@"@type"];
     [request setObject:[NSNumber numberWithBool:NO] forKey:@"is_attached"];
-    [request setObject:[NSNumber numberWithUnsignedInteger:safeLimit] forKey:@"limit"];
 
     NSError *stickerError = nil;
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
@@ -4600,7 +4621,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
     NSUInteger downloadsRemaining = 18;
-    for (index = 0; index < [(NSArray *)stickersObject count]; index++) {
+    for (index = 0; index < [(NSArray *)stickersObject count] && [items count] < safeLimit; index++) {
         BOOL didRequestDownload = NO;
         NSDictionary *info = [self stickerPreviewInfoFromStickerObject:[(NSArray *)stickersObject objectAtIndex:index]
                                                        downloadMissing:(downloadsRemaining > 0)

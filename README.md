@@ -81,7 +81,8 @@ Releases.
 
 ### ⚠️ Known Alpha Gaps
 
-- Sticker and GIF rendering is still incomplete and can fall back to emoji.
+- Static WEBP stickers render natively. Animated TGS and WEBM stickers still
+  use a safe emoji fallback until their Mavericks-compatible renderers land.
 - The DMG must be HFS+-formatted for Mavericks and is not notarized.
 - A public drag-and-drop DMG is considered complete only when
   `Telegraphica.app` already bundles a Mavericks-compatible
@@ -273,7 +274,8 @@ PRODUCT.md                     Product and design direction
 
 ## Roadmap
 
-- Better sticker and GIF rendering.
+- Add Mavericks-compatible TGS and WEBM sticker renderers and improve GIF
+  playback.
 - More complete document download and preview handling.
 - Richer contact/profile views.
 - More polished skeuomorphic theme variants.
