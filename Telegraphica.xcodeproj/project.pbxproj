@@ -22,6 +22,10 @@
 		111111111111111111111113 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111232 /* AVFoundation.framework */; };
 		111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111224 /* TelegraphicaNotificationIcon.png */; };
 		111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111217 /* TGActiveSessionsPresentation.m */; };
+		111111111111111111111116 /* TGLocalization.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111219 /* TGLocalization.m */; };
+		111111111111111111111117 /* TGWebPDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111226 /* TGWebPDecoder.m */; };
+		111111111111111111111118 /* TGMediaImageLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111228 /* TGMediaImageLoader.m */; };
+		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,10 +47,17 @@
 		111111111111111111111215 /* TGMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageItem.m; sourceTree = "<group>"; };
 		111111111111111111111216 /* TGActiveSessionsPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGActiveSessionsPresentation.h; sourceTree = "<group>"; };
 		111111111111111111111217 /* TGActiveSessionsPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGActiveSessionsPresentation.m; sourceTree = "<group>"; };
+		111111111111111111111218 /* TGLocalization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocalization.h; sourceTree = "<group>"; };
+		111111111111111111111219 /* TGLocalization.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocalization.m; sourceTree = "<group>"; };
 		111111111111111111111221 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111222 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111223 /* TelegraphicaAppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = TelegraphicaAppIcon.icns; sourceTree = "<group>"; };
 		111111111111111111111224 /* TelegraphicaNotificationIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = TelegraphicaNotificationIcon.png; sourceTree = "<group>"; };
+		111111111111111111111225 /* TGWebPDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGWebPDecoder.h; sourceTree = "<group>"; };
+		111111111111111111111226 /* TGWebPDecoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGWebPDecoder.m; sourceTree = "<group>"; };
+		111111111111111111111227 /* TGMediaImageLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaImageLoader.h; sourceTree = "<group>"; };
+		111111111111111111111228 /* TGMediaImageLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaImageLoader.m; sourceTree = "<group>"; };
+		111111111111111111111229 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -86,6 +97,7 @@
 				111111111111111111111404 /* Core */,
 				111111111111111111111405 /* Services */,
 				111111111111111111111406 /* UI */,
+				111111111111111111111408 /* Media */,
 				111111111111111111111407 /* Resources */,
 			);
 			path = Sources;
@@ -138,10 +150,23 @@
 			children = (
 				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
 				111111111111111111111217 /* TGActiveSessionsPresentation.m */,
+				111111111111111111111218 /* TGLocalization.h */,
+				111111111111111111111219 /* TGLocalization.m */,
 				111111111111111111111210 /* TGStatusWindowController.h */,
 				111111111111111111111211 /* TGStatusWindowController.m */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		111111111111111111111408 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				111111111111111111111225 /* TGWebPDecoder.h */,
+				111111111111111111111226 /* TGWebPDecoder.m */,
+				111111111111111111111227 /* TGMediaImageLoader.h */,
+				111111111111111111111228 /* TGMediaImageLoader.m */,
+			);
+			path = Media;
 			sourceTree = "<group>";
 		};
 		111111111111111111111407 /* Resources */ = {
@@ -150,6 +175,7 @@
 				111111111111111111111220 /* Localizable.strings */,
 				111111111111111111111223 /* TelegraphicaAppIcon.icns */,
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
+				111111111111111111111229 /* ThirdPartyNotices.txt */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -209,6 +235,7 @@
 				111111111111111111111107 /* Localizable.strings in Resources */,
 				111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */,
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
+				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -228,6 +255,9 @@
 				111111111111111111111111 /* TGChatItem.m in Sources */,
 				111111111111111111111112 /* TGMessageItem.m in Sources */,
 				111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */,
+				111111111111111111111116 /* TGLocalization.m in Sources */,
+				111111111111111111111117 /* TGWebPDecoder.m in Sources */,
+				111111111111111111111118 /* TGMediaImageLoader.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

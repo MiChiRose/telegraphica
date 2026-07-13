@@ -129,6 +129,14 @@ fi
 
 rm -rf "$BUILD_ROOT" "$APP_NAME"
 
+WEBP_BUILD_DIR="$BUILD_ROOT/Vendor/libwebp"
+scripts/build_webp_legacy.sh "$ARCH" "$WEBP_BUILD_DIR"
+WEBP_STATIC_LIBRARY="$PWD/$WEBP_BUILD_DIR/libwebpdecoder.a"
+if [ ! -f "$WEBP_STATIC_LIBRARY" ]; then
+    echo "WebP decoder library was not produced: $WEBP_STATIC_LIBRARY"
+    exit 1
+fi
+
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
     "VALID_ARCHS=$ARCH"
@@ -149,6 +157,8 @@ COMMON_SETTINGS=(
     "CODE_SIGNING_ALLOWED=NO"
     "CODE_SIGNING_REQUIRED=NO"
     "CODE_SIGN_IDENTITY="
+	"HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src"
+	"OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY"
     "SYMROOT=$BUILD_ROOT"
     "OBJROOT=$BUILD_ROOT/Intermediates"
     "DSTROOT=$BUILD_ROOT/Install"
