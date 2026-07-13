@@ -1,6 +1,8 @@
 #import "TGStatusWindowController.h"
 #import "TGActiveSessionsPresentation.h"
 #import "TGLocalization.h"
+#import "TGTheme.h"
+#import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
@@ -25,7 +27,6 @@ static NSString * const TGSectionSettings = @"settings";
 static NSString * const TGSectionAbout = @"about";
 static NSString * const TGSectionLogs = @"logs";
 
-static NSString * const TGThemeDefaultsKey = @"TelegraphicaThemeIdentifier";
 static NSString * const TGNotificationsEnabledDefaultsKey = @"TelegraphicaNotificationsEnabled";
 static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNotificationSoundEnabled";
 static NSString * const TGNotificationBadgeEnabledDefaultsKey = @"TelegraphicaNotificationBadgeEnabled";
@@ -37,13 +38,6 @@ static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTyp
 static NSString * const TGDownloadFolderDefaultsKey = @"TelegraphicaDownloadFolderPath";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
-static NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
-static NSString * const TGThemeIdentifierCoffee = @"coffee-brass";
-static NSString * const TGThemeIdentifierCoralPlum = @"coral-plum";
-static NSString * const TGThemeIdentifierIceNavy = @"ice-navy";
-static NSString * const TGThemeIdentifierRubyObsidian = @"ruby-obsidian";
-static NSString * const TGThemeIdentifierEggshellBurgundy = @"eggshell-burgundy";
-static NSString * const TGThemeIdentifierMelonOlive = @"melon-olive";
 static NSString * const TGUpdateAPIURLString = @"https://api.github.com/repos/MiChiRose/telegraphica/releases?per_page=10";
 static NSString * const TGProjectReleasesURLString = @"https://github.com/MiChiRose/telegraphica/releases";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
@@ -182,355 +176,6 @@ static BOOL TGStatusErrorLooksOffline(NSString *message) {
     return NO;
 }
 
-typedef struct {
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-} TGRGBColor;
-
-typedef struct {
-    TGRGBColor window;
-    TGRGBColor panel;
-    TGRGBColor header;
-    TGRGBColor tablePaper;
-    TGRGBColor ink;
-    TGRGBColor mutedInk;
-    TGRGBColor railStroke;
-    TGRGBColor headerSeparator;
-    TGRGBColor panelStroke;
-    TGRGBColor navigationSelected;
-    TGRGBColor navigationHighlighted;
-    TGRGBColor navigationNormal;
-    TGRGBColor navigationSelectedStroke;
-    TGRGBColor navigationNormalStroke;
-    TGRGBColor navigationText;
-    TGRGBColor navigationMutedText;
-    TGRGBColor selectedRow;
-    TGRGBColor selectedRowText;
-    TGRGBColor unreadText;
-    TGRGBColor outgoingBubble;
-    TGRGBColor incomingBubble;
-    TGRGBColor outgoingBubbleStroke;
-    TGRGBColor incomingBubbleStroke;
-    TGRGBColor timeText;
-    TGRGBColor tableGrid;
-    TGRGBColor tableHeader;
-    TGRGBColor link;
-} TGThemePalette;
-
-static NSString *TGActiveThemeIdentifier = nil;
-
-static TGRGBColor TGRGBMake(NSUInteger hex) {
-    TGRGBColor color;
-    color.red = (CGFloat)((hex >> 16) & 0xff) / 255.0;
-    color.green = (CGFloat)((hex >> 8) & 0xff) / 255.0;
-    color.blue = (CGFloat)(hex & 0xff) / 255.0;
-    return color;
-}
-
-static NSColor *TGColorFromRGB(TGRGBColor color) {
-    return [NSColor colorWithCalibratedRed:color.red green:color.green blue:color.blue alpha:1.0];
-}
-
-static NSColor *TGColorFromRGBWithAlpha(TGRGBColor color, CGFloat alpha) {
-    return [NSColor colorWithCalibratedRed:color.red green:color.green blue:color.blue alpha:alpha];
-}
-
-
-static NSArray *TGThemeIdentifiers(void) {
-    return [NSArray arrayWithObjects:
-            TGThemeIdentifierVKBlue,
-            TGThemeIdentifierCoffee,
-            TGThemeIdentifierCoralPlum,
-            TGThemeIdentifierIceNavy,
-            TGThemeIdentifierRubyObsidian,
-            TGThemeIdentifierEggshellBurgundy,
-            TGThemeIdentifierMelonOlive,
-            nil];
-}
-
-static BOOL TGThemeIdentifierIsValid(NSString *identifier) {
-    return (identifier && [TGThemeIdentifiers() containsObject:identifier]);
-}
-
-static NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
-    if ([identifier isEqualToString:TGThemeIdentifierCoffee]) {
-        return @"Coffee & Brass";
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierCoralPlum]) {
-        return @"Electric Coral / Deep Plum";
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierIceNavy]) {
-        return @"Ice Blue / Deep Navy";
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierRubyObsidian]) {
-        return @"Neon Ruby / Obsidian";
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierEggshellBurgundy]) {
-        return @"Eggshell Cream / Burgundy";
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierMelonOlive]) {
-        return @"Soft Melon / Olive Slate";
-    }
-    return @"VK Blue";
-}
-
-static TGThemePalette TGThemePaletteMake(NSUInteger window,
-                                         NSUInteger panel,
-                                         NSUInteger header,
-                                         NSUInteger tablePaper,
-                                         NSUInteger ink,
-                                         NSUInteger mutedInk,
-                                         NSUInteger line,
-                                         NSUInteger selectedRow,
-                                         NSUInteger selectedRowText,
-                                         NSUInteger unreadText,
-                                         NSUInteger outgoingBubble,
-                                         NSUInteger incomingBubble,
-                                         NSUInteger outgoingBubbleStroke,
-                                         NSUInteger incomingBubbleStroke,
-                                         NSUInteger timeText,
-                                         NSUInteger tableHeader,
-                                         NSUInteger link,
-                                         NSUInteger navigationText,
-                                         NSUInteger navigationMutedText) {
-    TGThemePalette palette;
-    palette.window = TGRGBMake(window);
-    palette.panel = TGRGBMake(panel);
-    palette.header = TGRGBMake(header);
-    palette.tablePaper = TGRGBMake(tablePaper);
-    palette.ink = TGRGBMake(ink);
-    palette.mutedInk = TGRGBMake(mutedInk);
-    palette.railStroke = TGRGBMake(line);
-    palette.headerSeparator = TGRGBMake(window);
-    palette.panelStroke = TGRGBMake(line);
-    palette.navigationSelected = TGRGBMake(header);
-    palette.navigationHighlighted = TGRGBMake(line);
-    palette.navigationNormal = TGRGBMake(window);
-    palette.navigationSelectedStroke = TGRGBMake(window);
-    palette.navigationNormalStroke = TGRGBMake(line);
-    palette.navigationText = TGRGBMake(navigationText);
-    palette.navigationMutedText = TGRGBMake(navigationMutedText);
-    palette.selectedRow = TGRGBMake(selectedRow);
-    palette.selectedRowText = TGRGBMake(selectedRowText);
-    palette.unreadText = TGRGBMake(unreadText);
-    palette.outgoingBubble = TGRGBMake(outgoingBubble);
-    palette.incomingBubble = TGRGBMake(incomingBubble);
-    palette.outgoingBubbleStroke = TGRGBMake(outgoingBubbleStroke);
-    palette.incomingBubbleStroke = TGRGBMake(incomingBubbleStroke);
-    palette.timeText = TGRGBMake(timeText);
-    palette.tableGrid = TGRGBMake(line);
-    palette.tableHeader = TGRGBMake(tableHeader);
-    palette.link = TGRGBMake(link);
-    return palette;
-}
-
-static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
-    if ([identifier isEqualToString:TGThemeIdentifierCoffee]) {
-        return TGThemePaletteMake(0x33291f, 0xe7ddc6, 0x6a5437, 0xf5ecd8, 0x21170f, 0x6b563b,
-                                  0x92734a, 0xd8bd83, 0x20160e, 0x7a5524, 0xd7b46e, 0xfffbf1,
-                                  0x9a7440, 0xc8b899, 0x6c5a44, 0xead8b4, 0x6f4b22, 0xfffbef, 0xf0dcc0);
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierCoralPlum]) {
-        return TGThemePaletteMake(0x22092c, 0xf7e7e5, 0xc94e42, 0xfff7f4, 0x22092c, 0x775060,
-                                  0xd38378, 0xf7c0b5, 0x22092c, 0xa23d36, 0xf3aa9e, 0xfffbf8,
-                                  0xc46f64, 0xdfc7c0, 0x775060, 0xf4d6d0, 0x9d392f, 0xfff7f0, 0xf8d9d2);
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierIceNavy]) {
-        return TGThemePaletteMake(0x141a29, 0xeef4ff, 0x536e99, 0xf9fbff, 0x141a29, 0x536176,
-                                  0x9aabc4, 0xd6e4ff, 0x141a29, 0x355780, 0xd6e4ff, 0xffffff,
-                                  0x7895c1, 0xc6d1e2, 0x526174, 0xdfe9fb, 0x315f96, 0xf7fbff, 0xdce8ff);
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierRubyObsidian]) {
-        return TGThemePaletteMake(0x0d0c1d, 0xf4edf2, 0xb50944, 0xfff8fb, 0x0d0c1d, 0x62546a,
-                                  0xc87396, 0xffb9cf, 0x160716, 0xb50944, 0xffb9cf, 0xffffff,
-                                  0xcc6c91, 0xd7c4cf, 0x62546a, 0xf5d7e2, 0xb50944, 0xfff5fa, 0xf7d7e4);
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierEggshellBurgundy]) {
-        return TGThemePaletteMake(0x4a0010, 0xfff5e4, 0x71152a, 0xfffbf1, 0x4a0010, 0x7a4c53,
-                                  0xb38673, 0xf4d9c3, 0x4a0010, 0x7a1228, 0xf0d0b7, 0xfffdf7,
-                                  0xba806b, 0xe0cbb8, 0x7a4c53, 0xf6e3cb, 0x7a1228, 0xfffbf1, 0xf8dfc9);
-    }
-    if ([identifier isEqualToString:TGThemeIdentifierMelonOlive]) {
-        return TGThemePaletteMake(0x3c4826, 0xfff1cc, 0x5a6a36, 0xfff7df, 0x263018, 0x687247,
-                                  0xa79562, 0xffd289, 0x263018, 0x5a6a36, 0xffd289, 0xfffdf3,
-                                  0xbc8f48, 0xd7c7a2, 0x687247, 0xf6dda1, 0x52612f, 0xfff7df, 0xf5dfb2);
-    }
-    return TGThemePaletteMake(0x182537, 0xecf3fb, 0x3c5d8a, 0xf8fbfe, 0x0e141d, 0x4e637c,
-                              0x8ca6c4, 0xb3cce9, 0x091321, 0x305d96, 0xc2ddf8, 0xffffff,
-                              0x5b88bd, 0xaabace, 0x465d77, 0xd6e4f4, 0x2d5d96, 0xf8fbff, 0xdce9f7);
-}
-
-static void TGSetActiveThemeIdentifier(NSString *identifier) {
-    NSString *validIdentifier = TGThemeIdentifierIsValid(identifier) ? identifier : TGThemeIdentifierVKBlue;
-    if (TGActiveThemeIdentifier && [TGActiveThemeIdentifier isEqualToString:validIdentifier]) {
-        return;
-    }
-    [TGActiveThemeIdentifier release];
-    TGActiveThemeIdentifier = [validIdentifier copy];
-}
-
-static NSString *TGCurrentThemeIdentifier(void) {
-    if (!TGActiveThemeIdentifier) {
-        TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
-    }
-    return TGActiveThemeIdentifier ? TGActiveThemeIdentifier : TGThemeIdentifierVKBlue;
-}
-
-static TGThemePalette TGCurrentThemePalette(void) {
-    return TGThemePaletteForIdentifier(TGCurrentThemeIdentifier());
-}
-
-static NSColor *TGClassicWindowBottomColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.window);
-}
-
-static NSColor *TGClassicPanelBottomColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.panel);
-}
-
-static NSColor *TGClassicHeaderBottomColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.header);
-}
-
-static NSColor *TGClassicTablePaperColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.tablePaper);
-}
-
-static NSColor *TGClassicInkColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.ink);
-}
-
-static NSColor *TGClassicMutedInkColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.mutedInk);
-}
-
-static NSColor *TGClassicOutgoingBubbleBottomColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.outgoingBubble);
-}
-
-static NSColor *TGClassicIncomingBubbleBottomColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.incomingBubble);
-}
-
-static NSColor *TGClassicRailStrokeColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.railStroke);
-}
-
-static NSColor *TGClassicHeaderSeparatorColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.headerSeparator);
-}
-
-static NSColor *TGClassicPanelStrokeColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.panelStroke);
-}
-
-static NSColor *TGClassicNavigationSelectedColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationSelected, alpha);
-}
-
-static NSColor *TGClassicNavigationHighlightedColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationHighlighted, alpha);
-}
-
-static NSColor *TGClassicNavigationNormalColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationNormal, alpha);
-}
-
-static NSColor *TGClassicNavigationSelectedStrokeColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationSelectedStroke, alpha);
-}
-
-static NSColor *TGClassicNavigationNormalStrokeColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationNormalStroke, alpha);
-}
-
-static NSColor *TGClassicNavigationTextColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationText, alpha);
-}
-
-static NSColor *TGClassicNavigationMutedTextColor(CGFloat alpha) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.navigationMutedText, alpha);
-}
-
-static NSColor *TGClassicSelectedRowColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.selectedRow);
-}
-
-static NSColor *TGClassicSelectedRowTextColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.selectedRowText);
-}
-
-static NSColor *TGClassicUnreadTextColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.unreadText);
-}
-
-static NSColor *TGClassicOutgoingBubbleStrokeColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.outgoingBubbleStroke, 0.85);
-}
-
-static NSColor *TGClassicIncomingBubbleStrokeColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.incomingBubbleStroke, 0.72);
-}
-
-static NSColor *TGClassicTimeTextColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGBWithAlpha(palette.timeText, 1.0);
-}
-
-static NSColor *TGClassicTableGridColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.tableGrid);
-}
-
-static NSColor *TGClassicTableHeaderColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.tableHeader);
-}
-
-static NSColor *TGClassicLinkColor(void) {
-    TGThemePalette palette = TGCurrentThemePalette();
-    return TGColorFromRGB(palette.link);
-}
-
-static NSColor *TGClassicHeaderTextColor(CGFloat alpha) {
-    if ([TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierCoralPlum]) {
-        TGThemePalette palette = TGCurrentThemePalette();
-        return TGColorFromRGBWithAlpha(palette.ink, alpha);
-    }
-    return [NSColor colorWithCalibratedWhite:0.99 alpha:alpha];
-}
-
-static NSColor *TGClassicHeaderDetailTextColor(CGFloat alpha) {
-    if ([TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierCoralPlum]) {
-        TGThemePalette palette = TGCurrentThemePalette();
-        return TGColorFromRGBWithAlpha(palette.ink, alpha);
-    }
-    return [NSColor colorWithCalibratedWhite:0.94 alpha:alpha];
-}
 
 static NSString *TGCurrentYearString(void) {
     NSDateComponents *components = [[NSCalendar currentCalendar] components:NSYearCalendarUnit fromDate:[NSDate date]];
@@ -601,7 +246,7 @@ static NSColor *TGAvatarColorForTitle(NSString *title) {
     if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
         index = [title hash] % count;
     }
-    return TGColorFromRGB(TGRGBMake(colors[index]));
+    return TGColorFromHex(colors[index]);
 }
 
 static void TGDrawImageInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView) {
@@ -934,6 +579,39 @@ static NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
             [extension isEqualToString:@"ogg"] ||
             [extension isEqualToString:@"opus"]) {
             return (NSString *)path;
+        }
+    }
+    return nil;
+}
+
+static NSString *TGInlinePlaybackPathForMediaItem(NSDictionary *mediaItem) {
+    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSString *playablePath = TGMediaItemPlayableLocalPath(mediaItem);
+    NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
+    NSString *localPath = TGMediaItemLocalPath(mediaItem);
+    NSArray *candidatePaths = [NSArray arrayWithObjects:
+                               playablePath ? playablePath : @"",
+                               fullPath ? fullPath : @"",
+                               localPath ? localPath : @"",
+                               nil];
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : @"";
+    BOOL animationContent = TGMediaItemIsAnimation(mediaItem);
+    NSUInteger index = 0;
+    for (index = 0; index < [candidatePaths count]; index++) {
+        NSString *path = [candidatePaths objectAtIndex:index];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+            continue;
+        }
+        NSString *extension = [[path pathExtension] lowercaseString];
+        BOOL supported = ([extension isEqualToString:@"gif"] ||
+                          [extension isEqualToString:@"mp4"] ||
+                          [extension isEqualToString:@"mov"] ||
+                          [extension isEqualToString:@"m4v"]);
+        if (supported || (animationContent && ([mimeType isEqualToString:@"image/gif"] || [mimeType isEqualToString:@"video/mp4"]))) {
+            return path;
         }
     }
     return nil;
@@ -3341,6 +3019,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
+@property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
@@ -3450,6 +3129,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *stickerPickerContentView;
 @property (nonatomic, copy) NSArray *stickerPickerItems;
 @property (nonatomic, retain) NSTextField *stickerPickerStatusField;
+@property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *stickerPickerPlaybackCoordinator;
 @property (nonatomic, assign) NSUInteger stickerPickerLoadGeneration;
 @property (nonatomic, retain) AVAudioRecorder *voiceRecorder;
 @property (nonatomic, retain) AVAudioPlayer *voicePreviewPlayer;
@@ -3599,6 +3279,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize messageScrollSurfaceView = _messageScrollSurfaceView;
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
+@synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
@@ -3708,6 +3389,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize stickerPickerContentView = _stickerPickerContentView;
 @synthesize stickerPickerItems = _stickerPickerItems;
 @synthesize stickerPickerStatusField = _stickerPickerStatusField;
+@synthesize stickerPickerPlaybackCoordinator = _stickerPickerPlaybackCoordinator;
 @synthesize stickerPickerLoadGeneration = _stickerPickerLoadGeneration;
 @synthesize voiceRecorder = _voiceRecorder;
 @synthesize voicePreviewPlayer = _voicePreviewPlayer;
@@ -4944,6 +4626,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.messageTableView addTableColumn:bubbleColumn];
 
     [self.messageScrollView setDocumentView:self.messageTableView];
+    self.inlineMediaPlaybackCoordinator = [[[TGInlineMediaPlaybackCoordinator alloc] initWithHostView:self.messageTableView
+                                                                                  maximumActiveItems:5] autorelease];
     [[self.messageScrollView contentView] setPostsBoundsChangedNotifications:YES];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(messageScrollViewDidScroll:)
@@ -7819,6 +7503,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
+    if (showChats) {
+        [self scheduleInlineMediaPlaybackRefresh];
+    } else {
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    }
     if (!showChats) {
         self.messageDropOverlayVisible = NO;
     }
@@ -8580,6 +8269,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self layoutContentView];
     [self.messageTableView reloadData];
     [self updateVisibleSection];
+    [self scheduleInlineMediaPlaybackRefresh];
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification {
@@ -8636,6 +8326,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.voiceRecordingStartDate = nil;
         [self.voicePreviewWindow setDelegate:nil];
         self.voicePreviewWindow = nil;
+    }
+    if ([notification object] == self.stickerPickerWindow) {
+        [self.stickerPickerPlaybackCoordinator removeAllPlayback];
     }
 }
 
@@ -9310,9 +9003,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
 }
 
-- (NSDictionary *)mediaItemForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
+- (NSArray *)mediaLayoutEntriesForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame {
     if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage] || NSIsEmptyRect(cellFrame)) {
-        return nil;
+        return [NSArray array];
     }
 
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
@@ -9397,27 +9090,106 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                   contentTop - photoSize.height,
                                   photoSize.width,
                                   photoSize.height);
-    if (!NSPointInRect(tablePoint, imageRect)) {
-        return nil;
-    }
-
     NSArray *mediaItems = [item visualMediaItems];
     NSArray *tileRects = TGMediaTileRectsForMessageItem(item, imageRect);
+    NSMutableArray *entries = [NSMutableArray array];
     NSUInteger tileIndex = 0;
     NSUInteger tileCount = [tileRects count];
     NSUInteger mediaCount = [mediaItems count];
     for (tileIndex = 0; tileIndex < tileCount && tileIndex < mediaCount; tileIndex++) {
         NSRect tileRect = [[tileRects objectAtIndex:tileIndex] rectValue];
-        if (!NSPointInRect(tablePoint, tileRect)) {
-            continue;
-        }
         id mediaObject = [mediaItems objectAtIndex:tileIndex];
         if (![mediaObject isKindOfClass:[NSDictionary class]]) {
-            return nil;
+            continue;
         }
-        return (NSDictionary *)mediaObject;
+        [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                            mediaObject, @"media_item",
+                            [NSValue valueWithRect:tileRect], @"frame",
+                            [NSNumber numberWithUnsignedInteger:tileIndex], @"tile_index",
+                            nil]];
+    }
+    return entries;
+}
+
+- (NSDictionary *)mediaItemForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
+    NSArray *entries = [self mediaLayoutEntriesForItem:item inCellFrame:cellFrame];
+    NSUInteger index = 0;
+    for (index = 0; index < [entries count]; index++) {
+        NSDictionary *entry = [entries objectAtIndex:index];
+        NSRect tileRect = [[entry objectForKey:@"frame"] rectValue];
+        if (NSPointInRect(tablePoint, tileRect)) {
+            return [entry objectForKey:@"media_item"];
+        }
     }
     return nil;
+}
+
+- (void)scheduleInlineMediaPlaybackRefresh {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(refreshInlineMediaPlayback)
+                                               object:nil];
+    [self performSelector:@selector(refreshInlineMediaPlayback) withObject:nil afterDelay:0.0];
+}
+
+- (void)refreshInlineMediaPlayback {
+    BOOL chatsVisible = ([self.currentAuthState isEqualToString:@"ready"] &&
+                         [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
+                         ![self.messageScrollView isHidden] &&
+                         ![self.messageTableView isHidden]);
+    if (!chatsVisible || [self.messageItems count] == 0) {
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+        return;
+    }
+
+    NSRect visibleRect = [[self.messageScrollView contentView] bounds];
+    NSRange visibleRows = [self.messageTableView rowsInRect:visibleRect];
+    if (visibleRows.location == NSNotFound || visibleRows.length == 0) {
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+        return;
+    }
+
+    NSMutableArray *descriptors = [NSMutableArray array];
+    NSUInteger lastRow = NSMaxRange(visibleRows);
+    if (lastRow > [self.messageItems count]) {
+        lastRow = [self.messageItems count];
+    }
+    NSUInteger row = 0;
+    for (row = visibleRows.location; row < lastRow && [descriptors count] < 5; row++) {
+        id candidate = [self.messageItems objectAtIndex:row];
+        if (![candidate isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+        TGMessageItem *item = (TGMessageItem *)candidate;
+        NSArray *entries = [self mediaLayoutEntriesForItem:item inCellFrame:[self messageBubbleCellFrameForRow:(NSInteger)row]];
+        NSUInteger entryIndex = 0;
+        for (entryIndex = 0; entryIndex < [entries count] && [descriptors count] < 5; entryIndex++) {
+            NSDictionary *entry = [entries objectAtIndex:entryIndex];
+            NSDictionary *mediaItem = [entry objectForKey:@"media_item"];
+            NSRect frame = [[entry objectForKey:@"frame"] rectValue];
+            NSString *path = TGInlinePlaybackPathForMediaItem(mediaItem);
+            NSString *contentType = TGMediaItemContentType(mediaItem);
+            NSString *extension = [[path pathExtension] lowercaseString];
+            BOOL animation = ([contentType isEqualToString:@"messageAnimation"] || [extension isEqualToString:@"gif"]);
+            if (!animation || [path length] == 0 || !NSIntersectsRect(frame, visibleRect)) {
+                continue;
+            }
+            id messageID = [mediaItem objectForKey:@"message_id"];
+            if (![messageID respondsToSelector:@selector(longLongValue)]) {
+                messageID = [item messageID];
+            }
+            NSNumber *tileIndex = [entry objectForKey:@"tile_index"];
+            NSString *identifier = [NSString stringWithFormat:@"%@:%@:%@",
+                                    messageID ? messageID : [NSNumber numberWithUnsignedInteger:row],
+                                    tileIndex ? tileIndex : [NSNumber numberWithUnsignedInteger:entryIndex],
+                                    path];
+            [descriptors addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                    identifier, TGInlineMediaIdentifierKey,
+                                    path, TGInlineMediaPathKey,
+                                    [NSValue valueWithRect:frame], TGInlineMediaFrameKey,
+                                    nil]];
+        }
+    }
+    [self.inlineMediaPlaybackCoordinator updateWithDescriptors:descriptors];
 }
 
 - (NSURL *)messageLinkURLForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame atPoint:(NSPoint)tablePoint {
@@ -10311,6 +10083,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         }
         [(TGMessageBubbleCell *)cell setMessageItem:messageItem];
         [(TGMessageBubbleCell *)cell setShowSenderDetails:[self shouldShowGroupSenderDetailsForMessageItem:messageItem]];
+        [self scheduleInlineMediaPlaybackRefresh];
         return;
     }
     [textCell setAlignment:NSLeftTextAlignment];
@@ -11403,6 +11176,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([notification object] != [self.messageScrollView contentView]) {
         return;
     }
+
+    [self scheduleInlineMediaPlaybackRefresh];
 
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||
@@ -12768,6 +12543,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                                         defer:NO] autorelease];
     [window setTitle:TGLoc(@"stickers")];
     [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
 
     NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -12787,10 +12563,62 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 376, 360)] autorelease];
     [scrollView setDocumentView:gridView];
+    [[scrollView contentView] setPostsBoundsChangedNotifications:YES];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(stickerPickerScrollViewDidScroll:)
+                                                 name:NSViewBoundsDidChangeNotification
+                                               object:[scrollView contentView]];
     [contentView addSubview:scrollView];
     self.stickerPickerScrollView = scrollView;
     self.stickerPickerContentView = gridView;
+    self.stickerPickerPlaybackCoordinator = [[[TGInlineMediaPlaybackCoordinator alloc] initWithHostView:gridView
+                                                                                           maximumActiveItems:25] autorelease];
     self.stickerPickerWindow = window;
+}
+
+- (void)stickerPickerScrollViewDidScroll:(NSNotification *)notification {
+    if ([notification object] != [self.stickerPickerScrollView contentView]) {
+        return;
+    }
+    [self refreshStickerPickerPlayback];
+}
+
+- (void)refreshStickerPickerPlayback {
+    if (![self.stickerPickerWindow isVisible] || !self.stickerPickerContentView) {
+        [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+        return;
+    }
+
+    NSRect visibleRect = [[self.stickerPickerScrollView contentView] bounds];
+    NSMutableArray *descriptors = [NSMutableArray array];
+    NSArray *subviews = [self.stickerPickerContentView subviews];
+    NSUInteger index = 0;
+    for (index = 0; index < [subviews count]; index++) {
+        NSView *candidateView = [subviews objectAtIndex:index];
+        if (![candidateView isKindOfClass:[NSButton class]] || !NSIntersectsRect([candidateView frame], visibleRect)) {
+            continue;
+        }
+        NSInteger stickerIndex = [(NSButton *)candidateView tag];
+        if (stickerIndex < 0 || (NSUInteger)stickerIndex >= [self.stickerPickerItems count]) {
+            continue;
+        }
+        id candidateItem = [self.stickerPickerItems objectAtIndex:(NSUInteger)stickerIndex];
+        if (![candidateItem isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString *path = TGInlinePlaybackPathForMediaItem((NSDictionary *)candidateItem);
+        if ([path length] == 0) {
+            continue;
+        }
+        NSString *identifier = [NSString stringWithFormat:@"sticker-picker-%ld-%@", (long)stickerIndex, path];
+        NSRect playbackFrame = NSInsetRect([candidateView frame], 4.0, 4.0);
+        [descriptors addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                identifier, TGInlineMediaIdentifierKey,
+                                path, TGInlineMediaPathKey,
+                                [NSValue valueWithRect:playbackFrame], TGInlineMediaFrameKey,
+                                nil]];
+    }
+    [self.stickerPickerPlaybackCoordinator updateWithDescriptors:descriptors];
 }
 
 - (void)rebuildStickerPickerGrid {
@@ -12860,6 +12688,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         }
         [gridView addSubview:button];
     }
+    [self refreshStickerPickerPlayback];
 }
 
 - (void)reloadStickerPickerItems {
@@ -12935,6 +12764,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *width = [[sticker objectForKey:@"width"] retain];
     NSNumber *height = [[sticker objectForKey:@"height"] retain];
     [self.stickerPickerWindow orderOut:nil];
+    [self.stickerPickerPlaybackCoordinator removeAllPlayback];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending sticker..."];
 
@@ -13605,7 +13435,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(markCurrentSelectionReadAfterNotification)
                                                object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(refreshInlineMediaPlayback)
+                                               object:nil];
     [self stopLiveUpdateTimer];
+    [self.inlineMediaPlaybackCoordinator invalidate];
+    [self.stickerPickerPlaybackCoordinator invalidate];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
     [_chatTableView setDataSource:nil];
@@ -13695,6 +13530,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
     }
+    [_inlineMediaPlaybackCoordinator release];
     [_messageTableView release];
     [_messageDropOverlayView release];
     [_messageItems release];
@@ -13831,6 +13667,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_stickerPickerContentView release];
     [_stickerPickerItems release];
     [_stickerPickerStatusField release];
+    [_stickerPickerPlaybackCoordinator release];
     [_voiceRecorder release];
     [_voicePreviewPlayer release];
     [_voiceRecordingPath release];

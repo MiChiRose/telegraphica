@@ -3095,7 +3095,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     if ([type isEqualToString:@"messageAnimation"]) {
         return [self playableMediaInfoFromContainerObject:[content objectForKey:@"animation"]
-                                          downloadMissing:NO
+                                          downloadMissing:downloadMissing
                                                   timeout:timeout
                                        didRequestDownload:didRequestDownload];
     }
@@ -3215,6 +3215,17 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSNumber *fileID = [self fileIDFromFileObject:stickerFile];
     NSDictionary *formatObject = [[sticker objectForKey:@"format"] isKindOfClass:[NSDictionary class]] ? [sticker objectForKey:@"format"] : nil;
     NSString *formatType = [[formatObject objectForKey:@"@type"] isKindOfClass:[NSString class]] ? [formatObject objectForKey:@"@type"] : @"";
+    if ([formatType length] == 0) {
+        id isAnimatedObject = [sticker objectForKey:@"is_animated"];
+        id isVideoObject = [sticker objectForKey:@"is_video"];
+        if ([isVideoObject respondsToSelector:@selector(boolValue)] && [isVideoObject boolValue]) {
+            formatType = @"stickerFormatWebm";
+        } else if ([isAnimatedObject respondsToSelector:@selector(boolValue)] && [isAnimatedObject boolValue]) {
+            formatType = @"stickerFormatTgs";
+        } else {
+            formatType = @"stickerFormatWebp";
+        }
+    }
     if ([formatType length] > 0) {
         [info setObject:formatType forKey:@"sticker_format"];
     }
@@ -3233,8 +3244,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         fullLocalPath = [downloadedInfo objectForKey:@"local_path"];
     }
     if ([fullLocalPath length] > 0) {
-        [info setObject:fullLocalPath forKey:@"local_path"];
         [info setObject:fullLocalPath forKey:@"full_local_path"];
+        if ([formatType isEqualToString:@"stickerFormatWebp"] || [[info objectForKey:@"local_path"] length] == 0) {
+            [info setObject:fullLocalPath forKey:@"local_path"];
+        }
     }
 
     /* TODO: Add a Mavericks-compatible TGS renderer in a later media iteration. */
