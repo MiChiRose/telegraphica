@@ -21,6 +21,11 @@ if grep -E -q 'const[[:space:]]+std::string[[:space:]]*&[[:space:]]*[A-Za-z_][A-
     exit 1
 fi
 
+if grep -E -q 'Animation::loadFromFile\(path\)|Animation::loadFromData\(data,[[:space:]]*key,[[:space:]]*resourcePath\)|setValue<[^>]+>\(keypath' "$SOURCE_DIR/src/binding/c/lottieanimation_capi.cpp"; then
+    echo "rlottie C API contains implicit C-string conversions that Mavericks libc++ cannot compile."
+    exit 1
+fi
+
 rm -rf "$BUILD_DIR"
 mkdir -p "$OBJECT_DIR" "$CONFIG_DIR"
 printf '%s\n' '/* Telegraphica legacy rlottie configuration. */' > "$CONFIG_DIR/config.h"
@@ -32,7 +37,7 @@ COMMON_FLAGS=(
     -arch "$ARCH"
     -isysroot "$SDK_PATH"
     -mmacosx-version-min=10.9
-    -std=c++1y
+    -std=c++11
     -stdlib=libc++
     -Os
     -DNDEBUG
@@ -42,6 +47,7 @@ COMMON_FLAGS=(
     -fno-unwind-tables
     -fno-asynchronous-unwind-tables
     -Wno-unused-parameter
+    -include "$SOURCE_DIR/src/telegraphica/cxx11_compat.h"
     -I"$CONFIG_DIR"
     -I"$SOURCE_DIR/inc"
     -I"$SOURCE_DIR/src/vector"
