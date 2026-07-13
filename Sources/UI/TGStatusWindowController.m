@@ -119,13 +119,14 @@ static NSString *TGLoc(NSString *key) {
                         @"Двухэтапная аутентификация", @"login.password.title",
                         @"Введите облачный пароль Telegram. Telegraphica не записывает его в логи.", @"login.password.hint",
                         @"Пароль", @"login.password.label",
-                        @"Настройка Telegram API", @"login.api.title",
-                        @"Введите api_id и api_hash приложения Telegram. Они сохраняются только локально на этом Mac.", @"login.api.hint",
-                        @"Сохранить", @"login.save",
                         @"Отправить", @"login.send",
                         @"Отправка...", @"login.sending",
                         @"Логи", @"login.logs",
                         @"Статус", @"login.status",
+                        @"Подключение", @"login.connecting.title",
+                        @"Telegraphica устанавливает безопасное соединение с Telegram. Это может занять несколько секунд.", @"login.connecting.hint",
+                        @"Не удалось подготовить вход", @"login.config.title",
+                        @"В этой сборке отсутствует внутренняя конфигурация подключения. Подробности доступны в логах.", @"login.config.missing",
                         @"Проверьте номер телефона и попробуйте снова.", @"login.error.phone",
                         @"Этот код не принят. Проверьте Telegram и попробуйте снова.", @"login.error.code",
                         @"Этот пароль не принят. Попробуйте снова.", @"login.error.password",
@@ -133,8 +134,6 @@ static NSString *TGLoc(NSString *key) {
                         @"Введите номер телефона, чтобы продолжить.", @"login.empty.phone",
                         @"Введите код входа из Telegram.", @"login.empty.code",
                         @"Введите пароль двухэтапной аутентификации.", @"login.empty.password",
-                        @"Введите api_id и api_hash.", @"login.empty.api",
-                        @"Для входа сначала нужны данные Telegram API.", @"login.api.required",
                         @"Нет соединения. Подробности доступны в логах.", @"login.connection.unavailable",
                         @"О Telegraphica", @"about.title",
                         @"Версия %@ (%@)", @"about.version",
@@ -202,13 +201,14 @@ static NSString *TGLoc(NSString *key) {
                         @"Двухэтапная аўтэнтыфікацыя", @"login.password.title",
                         @"Увядзіце воблачны пароль Telegram. Telegraphica не запісвае яго ў логі.", @"login.password.hint",
                         @"Пароль", @"login.password.label",
-                        @"Наладжванне Telegram API", @"login.api.title",
-                        @"Увядзіце api_id і api_hash праграмы Telegram. Яны захоўваюцца толькі лакальна на гэтым Mac.", @"login.api.hint",
-                        @"Захаваць", @"login.save",
                         @"Адправіць", @"login.send",
                         @"Адпраўка...", @"login.sending",
                         @"Логі", @"login.logs",
                         @"Статус", @"login.status",
+                        @"Падключэнне", @"login.connecting.title",
+                        @"Telegraphica ўсталёўвае бяспечнае злучэнне з Telegram. Гэта можа заняць некалькі секунд.", @"login.connecting.hint",
+                        @"Не атрымалася падрыхтаваць уваход", @"login.config.title",
+                        @"У гэтай зборцы адсутнічае ўнутраная канфігурацыя падключэння. Падрабязнасці даступныя ў логах.", @"login.config.missing",
                         @"Праверце нумар тэлефона і паспрабуйце зноў.", @"login.error.phone",
                         @"Гэты код не прыняты. Праверце Telegram і паспрабуйце зноў.", @"login.error.code",
                         @"Гэты пароль не прыняты. Паспрабуйце зноў.", @"login.error.password",
@@ -216,8 +216,6 @@ static NSString *TGLoc(NSString *key) {
                         @"Увядзіце нумар тэлефона, каб працягнуць.", @"login.empty.phone",
                         @"Увядзіце код уваходу з Telegram.", @"login.empty.code",
                         @"Увядзіце пароль двухэтапнай аўтэнтыфікацыі.", @"login.empty.password",
-                        @"Увядзіце api_id і api_hash.", @"login.empty.api",
-                        @"Для ўваходу спачатку патрэбныя даныя Telegram API.", @"login.api.required",
                         @"Няма злучэння. Падрабязнасці даступныя ў логах.", @"login.connection.unavailable",
                         @"Пра Telegraphica", @"about.title",
                         @"Версія %@ (%@)", @"about.version",
@@ -285,13 +283,14 @@ static NSString *TGLoc(NSString *key) {
                         @"Two-step password", @"login.password.title",
                         @"Enter your Telegram cloud password. Telegraphica does not write it to logs.", @"login.password.hint",
                         @"Password", @"login.password.label",
-                        @"Telegram API setup", @"login.api.title",
-                        @"Enter the Telegram application api_id and api_hash. They are stored locally on this Mac only.", @"login.api.hint",
-                        @"Save", @"login.save",
                         @"Send", @"login.send",
                         @"Sending...", @"login.sending",
                         @"Logs", @"login.logs",
                         @"Status", @"login.status",
+                        @"Connecting", @"login.connecting.title",
+                        @"Telegraphica is establishing a secure Telegram connection. This can take a few seconds.", @"login.connecting.hint",
+                        @"Sign-in could not be prepared", @"login.config.title",
+                        @"This build is missing its internal connection configuration. Details are available in Logs.", @"login.config.missing",
                         @"Check the phone number and try again.", @"login.error.phone",
                         @"That login code was not accepted. Check Telegram and try again.", @"login.error.code",
                         @"That password was not accepted. Try again.", @"login.error.password",
@@ -299,8 +298,6 @@ static NSString *TGLoc(NSString *key) {
                         @"Enter your phone number to continue.", @"login.empty.phone",
                         @"Enter the login code from Telegram.", @"login.empty.code",
                         @"Enter your two-step password.", @"login.empty.password",
-                        @"Enter both api_id and api_hash.", @"login.empty.api",
-                        @"Telegram API details are required before sign-in.", @"login.api.required",
                         @"Connection unavailable. Open Logs for details.", @"login.connection.unavailable",
                         @"About Telegraphica", @"about.title",
                         @"Version %@ (%@)", @"about.version",
@@ -4364,6 +4361,40 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsDownloadFolderButton setToolTip:path];
 }
 
+- (void)refreshLoginLocalizedText {
+    NSString *state = self.currentAuthState;
+    NSString *title = TGLoc(@"login.connecting.title");
+    NSString *hint = TGLoc(@"login.connecting.hint");
+    NSString *label = TGLoc(@"login.status");
+
+    if ([state isEqualToString:@"waitPhoneNumber"]) {
+        title = TGLoc(@"login.title");
+        hint = TGLoc(@"login.phone.hint");
+        label = TGLoc(@"login.phone.label");
+    } else if ([state isEqualToString:@"waitCode"]) {
+        title = TGLoc(@"login.code.title");
+        hint = TGLoc(@"login.code.hint");
+        label = TGLoc(@"login.code.label");
+    } else if ([state isEqualToString:@"waitPassword"]) {
+        title = TGLoc(@"login.password.title");
+        hint = TGLoc(@"login.password.hint");
+        label = TGLoc(@"login.password.label");
+    } else if ([state isEqualToString:@"waitApiCredentials"]) {
+        title = TGLoc(@"login.config.title");
+        hint = TGLoc(@"login.config.missing");
+    }
+
+    [self.loginTitleField setStringValue:title];
+    [self.loginHintField setStringValue:hint];
+    [self.authLabel setStringValue:label];
+    [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
+    if ([state isEqualToString:@"waitPhoneNumber"] || [state isEqualToString:@"waitCode"]) {
+        [[self.authTextField cell] setPlaceholderString:label];
+    } else if ([state isEqualToString:@"waitPassword"]) {
+        [[self.authSecureField cell] setPlaceholderString:label];
+    }
+}
+
 - (void)refreshLocalizedText {
     [self.chatsLabel setStringValue:TGLoc(@"chats")];
     [self.profileTitleField setStringValue:TGLoc(@"profile.title")];
@@ -4397,6 +4428,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAboutButton setTitle:TGLoc(@"settings.about")];
     [self.loginLogsButton setTitle:TGLoc(@"login.logs")];
     [self.loginLogsButton setToolTip:TGLoc(@"settings.logs")];
+    [self refreshLoginLocalizedText];
     [self refreshDownloadFolderButtonTitle];
     [self selectLanguagePopUpItemForCode:TGLanguageCode()];
     [self refreshLoginLanguageButtons];
@@ -7322,7 +7354,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSString *visibleErrorKey = [self.loginErrorLocalizationKey copy];
     [self refreshLocalizedText];
-    [self updateAuthControlsForState:self.currentAuthState];
     if ([visibleErrorKey length] > 0) {
         [self setLoginErrorWithLocalizationKey:visibleErrorKey];
     }
@@ -7340,9 +7371,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSButton *button = [self.loginLanguageButtons objectAtIndex:index];
         NSString *buttonCode = ([button tag] == 1) ? @"en" : (([button tag] == 2) ? @"be" : @"ru");
         BOOL selected = [buttonCode isEqualToString:currentCode];
-        [button setBezelStyle:(selected ? NSTexturedRoundedBezelStyle : NSRoundedBezelStyle)];
+        [button setBezelStyle:NSRoundedBezelStyle];
         [button setFont:(selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0])];
-        [button setState:(selected ? NSOnState : NSOffState)];
+        [button setState:NSOffState];
         [button setNeedsDisplay:YES];
     }
 }
@@ -7838,10 +7869,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.authLabel visible:showLogin];
     [self showView:self.authStateField visible:(showLogin && self.loginErrorVisible)];
     [self showView:self.authTextFieldBackgroundView visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
-    [self showView:self.authTextField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitApiCredentials"] || [self.currentAuthState isEqualToString:@"waitPhoneNumber"] || [self.currentAuthState isEqualToString:@"waitCode"]))];
-    [self showView:self.authSecondaryLabel visible:(showLogin && [self.currentAuthState isEqualToString:@"waitApiCredentials"])];
-    [self showView:self.authSecondaryTextFieldBackgroundView visible:(showLogin && [self.currentAuthState isEqualToString:@"waitApiCredentials"])];
-    [self showView:self.authSecureField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitApiCredentials"] || [self.currentAuthState isEqualToString:@"waitPassword"]))];
+    [self showView:self.authTextField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitPhoneNumber"] || [self.currentAuthState isEqualToString:@"waitCode"]))];
+    [self showView:self.authSecondaryLabel visible:NO];
+    [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
+    [self showView:self.authSecureField visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPassword"])];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
     [self showView:self.loginLogsButton visible:showLogin];
     NSUInteger loginLanguageIndex = 0;
@@ -8121,8 +8152,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (loginWidth < 390.0) {
         loginWidth = loginAreaWidth - 24.0;
     }
-    BOOL apiCredentialsState = [self.currentAuthState isEqualToString:@"waitApiCredentials"];
-    CGFloat loginHeight = apiCredentialsState ? 336.0 : 276.0;
+    CGFloat loginHeight = 276.0;
     CGFloat loginX = loginAreaX + floor((loginAreaWidth - loginWidth) / 2.0);
     CGFloat centeredLoginY = loginAreaY + floor((loginAreaHeight - loginHeight) / 2.0) - 8.0;
     CGFloat brandIconSide = 68.0;
@@ -8147,9 +8177,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginPanelView setFrame:NSMakeRect(loginX, loginY, loginWidth, loginHeight)];
     [self.loginTitleField setFrame:NSMakeRect(loginX + 36.0, loginY + loginHeight - 58.0, loginWidth - 72.0, 28.0)];
     [self.loginHintField setFrame:NSMakeRect(loginX + 54.0, loginY + loginHeight - 112.0, loginWidth - 108.0, 44.0)];
-    [self.authLabel setFrame:NSMakeRect(loginX + 54.0, loginY + (apiCredentialsState ? 154.0 : 114.0), loginWidth - 108.0, 18.0)];
+    [self.authLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 114.0, loginWidth - 108.0, 18.0)];
     [self.authSecondaryLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 94.0, loginWidth - 108.0, 18.0)];
-    [self.authStateField setFrame:NSMakeRect(loginX + 54.0, loginY + (apiCredentialsState ? 36.0 : 54.0), loginWidth - 108.0, 34.0)];
+    [self.authStateField setFrame:NSMakeRect(loginX + 54.0, loginY + 54.0, loginWidth - 108.0, 34.0)];
     CGFloat loginButtonWidth = 92.0;
     CGFloat loginInputX = loginX + 54.0;
     CGFloat loginButtonX = loginX + loginWidth - 54.0 - loginButtonWidth;
@@ -8157,18 +8187,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (loginInputWidth < 180.0) {
         loginInputWidth = 180.0;
     }
-    CGFloat primaryInputY = loginY + (apiCredentialsState ? 122.0 : 82.0);
+    CGFloat primaryInputY = loginY + 82.0;
     CGFloat secondaryInputY = loginY + 62.0;
     [self.authTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, primaryInputY, loginInputWidth, 32.0)];
     [self.authTextField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authSecondaryTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, secondaryInputY, loginInputWidth, 32.0)];
-    if (apiCredentialsState) {
-        [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, secondaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
-        [self.authButton setFrame:NSMakeRect(loginButtonX, secondaryInputY, loginButtonWidth, 32.0)];
-    } else {
-        [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
-        [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
-    }
+    [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
+    [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
     CGFloat loginLanguageX = margin;
     NSUInteger loginLanguageIndex = 0;
@@ -8703,8 +8728,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (BOOL)isAuthInputState:(NSString *)state {
-    return [state isEqualToString:@"waitApiCredentials"] ||
-           [state isEqualToString:@"waitPhoneNumber"] ||
+    return [state isEqualToString:@"waitPhoneNumber"] ||
            [state isEqualToString:@"waitCode"] ||
            [state isEqualToString:@"waitPassword"];
 }
@@ -8999,25 +9023,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     if ([state isEqualToString:@"waitApiCredentials"]) {
-        [self.statusField setStringValue:@"API setup required"];
-        [self.loginTitleField setStringValue:TGLoc(@"login.api.title")];
-        [self.loginHintField setStringValue:TGLoc(@"login.api.hint")];
-        [self.authLabel setStringValue:@"API ID"];
-        [self.authSecondaryLabel setStringValue:@"API Hash"];
-        [[self.authTextField cell] setPlaceholderString:@"123456"];
-        [[self.authSecureField cell] setPlaceholderString:@"api_hash"];
-        [self.authStateField setHidden:YES];
-        [self.authTextField setHidden:NO];
-        [self.authSecureField setHidden:NO];
-        [self.authSecondaryLabel setHidden:NO];
-        [self.authSecondaryTextFieldBackgroundView setHidden:NO];
-        [self.authTextField setEnabled:authInputsEnabled];
-        [self.authSecureField setEnabled:authInputsEnabled];
-        [self.authButton setTitle:TGLoc(@"login.save")];
-        [self.authButton setEnabled:authInputsEnabled];
-        [self.authButton setHidden:NO];
+        [self.statusField setStringValue:TGLoc(@"login.config.title")];
+        [self refreshLoginLocalizedText];
+        [self.authStateField setStringValue:TGLoc(@"login.config.missing")];
+        [self.authStateField setHidden:NO];
+        [self.authTextField setHidden:YES];
+        [self.authSecureField setHidden:YES];
+        [self.authSecondaryLabel setHidden:YES];
+        [self.authSecondaryTextFieldBackgroundView setHidden:YES];
+        [self.authTextField setEnabled:NO];
+        [self.authSecureField setEnabled:NO];
+        [self.authButton setEnabled:NO];
+        [self.authButton setHidden:YES];
         [self updateVisibleSection];
-        [self scheduleLoginInputFocus];
         [previousState release];
         return;
     }
@@ -9128,7 +9146,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     _controlsBusy = busy;
     NSUInteger loginLanguageIndex = 0;
     for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
-        [[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] setEnabled:!busy];
+        [[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] setEnabled:YES];
     }
     [self.checkButton setEnabled:!busy];
     [self.logsCheckButton setEnabled:!busy];
@@ -12160,7 +12178,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
                 parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
             }
-            if ([authorizationState isEqualToString:@"waitTdlibParameters"] && parametersError) {
+            NSInteger parametersErrorCode = [parametersError code];
+            BOOL missingInternalConfiguration = parametersError &&
+                (parametersErrorCode == 12 || parametersErrorCode == 13 || parametersErrorCode == 14);
+            if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
                 finalAuthorizationState = @"waitApiCredentials";
             }
             if ([authorizationState isEqualToString:@"waitEncryptionKey"] || [parametersSummary length] > 0) {
@@ -12227,7 +12248,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 }
                 [self updateAuthControlsForState:finalAuthorizationState];
                 if ([finalAuthorizationState isEqualToString:@"waitApiCredentials"]) {
-                    [self setLoginErrorWithLocalizationKey:@"login.api.required"];
+                    [self setLoginErrorWithLocalizationKey:@"login.config.missing"];
                     [self updateVisibleSection];
                 }
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
@@ -12258,45 +12279,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![self isAuthInputState:state]) {
         [state release];
         [self appendDetail:@"Login input is not available for the current connection state."];
-        return;
-    }
-
-    if ([state isEqualToString:@"waitApiCredentials"]) {
-        NSString *apiID = [[self.authTextField stringValue] copy];
-        NSString *apiHash = [[self.authSecureField stringValue] copy];
-        NSString *trimmedAPIID = [apiID stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        NSString *trimmedAPIHash = [apiHash stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if ([trimmedAPIID length] == 0 || [trimmedAPIHash length] == 0) {
-            [self setLoginErrorWithLocalizationKey:@"login.empty.api"];
-            [self updateVisibleSection];
-            [apiID release];
-            [apiHash release];
-            [state release];
-            [self appendDetail:@"Telegram API setup is incomplete."];
-            return;
-        }
-
-        NSError *writeError = nil;
-        if (![self.client writeLocalTDLibConfigurationWithAPIID:trimmedAPIID apiHash:trimmedAPIHash error:&writeError]) {
-            NSString *message = [writeError localizedDescription] ? [writeError localizedDescription] : @"Could not save Telegram API credentials.";
-            [self setLoginErrorMessage:message];
-            [self updateVisibleSection];
-            [apiID release];
-            [apiHash release];
-            [state release];
-            [self appendDetail:@"Telegram API setup could not be saved."];
-            return;
-        }
-
-        [self.authTextField setStringValue:@""];
-        [self.authSecureField setStringValue:@""];
-        [self setLoginErrorMessage:nil];
-        [self appendDetail:@"Telegram API credentials saved locally."];
-        [self.statusField setStringValue:@"Connecting..."];
-        [apiID release];
-        [apiHash release];
-        [state release];
-        [self checkTDLib:nil];
         return;
     }
 

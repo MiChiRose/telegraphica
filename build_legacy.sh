@@ -72,6 +72,61 @@ if [ -z "$APP_BUILD" ]; then
 fi
 DIST_ZIP="$DIST_DIR/Telegraphica_v${APP_VERSION}.zip"
 
+valid_tdlib_config() {
+    local config_path="$1"
+    local api_id=""
+    local api_hash=""
+
+    if [ ! -f "$config_path" ]; then
+        return 1
+    fi
+    api_id="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$config_path" 2>/dev/null || true)"
+    api_hash="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$config_path" 2>/dev/null || true)"
+    if ! echo "$api_id" | grep -E -q '^[1-9][0-9]*$'; then
+        return 1
+    fi
+    echo "$api_hash" | grep -E -q '^[[:xdigit:]]{32}$'
+}
+
+BUNDLED_TDLIB_CONFIG_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}"
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && ! valid_tdlib_config "$BUNDLED_TDLIB_CONFIG_SOURCE"; then
+    echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH is missing or does not contain valid api_id and api_hash."
+    exit 1
+fi
+
+if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+    for CONFIG_CANDIDATE in \
+        "$HOME/Library/Application Support/Telegraphica/tdlib-config.plist" \
+        "$BUILD_ROOT/Release/$APP_NAME/Contents/Resources/TelegraphicaTDLibDefaults.plist" \
+        "$APP_NAME/Contents/Resources/TelegraphicaTDLibDefaults.plist" \
+        "/Applications/$APP_NAME/Contents/Resources/TelegraphicaTDLibDefaults.plist"
+    do
+        if valid_tdlib_config "$CONFIG_CANDIDATE"; then
+            BUNDLED_TDLIB_CONFIG_SOURCE="$CONFIG_CANDIDATE"
+            break
+        fi
+    done
+fi
+
+BUNDLED_TDLIB_CONFIG_TEMP=""
+cleanup_bundled_tdlib_config() {
+    if [ -n "$BUNDLED_TDLIB_CONFIG_TEMP" ]; then
+        rm -f "$BUNDLED_TDLIB_CONFIG_TEMP"
+    fi
+}
+trap cleanup_bundled_tdlib_config EXIT
+
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+    BUNDLED_TDLIB_CONFIG_TEMP="$(mktemp /tmp/telegraphica-tdlib-config.XXXXXX)"
+    ditto "$BUNDLED_TDLIB_CONFIG_SOURCE" "$BUNDLED_TDLIB_CONFIG_TEMP"
+    chmod 0600 "$BUNDLED_TDLIB_CONFIG_TEMP"
+    BUNDLED_TDLIB_CONFIG_SOURCE="$BUNDLED_TDLIB_CONFIG_TEMP"
+    echo "Preserved the existing internal Telegram connection configuration."
+else
+    echo "Warning: no internal Telegram connection configuration was found."
+    echo "This development build will not be able to start a new Telegram sign-in."
+fi
+
 rm -rf "$BUILD_ROOT" "$APP_NAME"
 
 COMMON_SETTINGS=(
@@ -202,15 +257,10 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
 fi
 
-if [ -n "${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}" ]; then
-    if [ ! -f "$TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH" ]; then
-        echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH does not point to a file: $TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH"
-        exit 1
-    fi
-
-    API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH" 2>/dev/null || true)"
-    API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH" 2>/dev/null || true)"
-    if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+    API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$BUNDLED_TDLIB_CONFIG_SOURCE" 2>/dev/null || true)"
+    API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$BUNDLED_TDLIB_CONFIG_SOURCE" 2>/dev/null || true)"
+    if [ -z "$API_ID" ] || ! echo "$API_HASH" | grep -E -q '^[[:xdigit:]]{32}$'; then
         echo "Bundled TDLib config must contain api_id and api_hash."
         exit 1
     fi

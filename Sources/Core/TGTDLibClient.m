@@ -996,6 +996,23 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return configuration;
 }
 
+- (BOOL)configurationContainsValidAPICredentials:(NSDictionary *)configuration {
+    if (![configuration isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+
+    id apiIDValue = [configuration objectForKey:@"api_id"];
+    NSInteger apiID = [apiIDValue respondsToSelector:@selector(integerValue)] ? [apiIDValue integerValue] : 0;
+    id apiHashValue = [configuration objectForKey:@"api_hash"];
+    if (apiID <= 0 || ![apiHashValue isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+
+    NSString *apiHash = [(NSString *)apiHashValue stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSCharacterSet *nonHexadecimalCharacters = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
+    return [apiHash length] == 32 && [apiHash rangeOfCharacterFromSet:nonHexadecimalCharacters].location == NSNotFound;
+}
+
 - (NSDictionary *)localTDLibConfigurationWithError:(NSError **)error {
     NSString *configPath = [self localTDLibConfigurationPathWithError:error];
     if (!configPath) {
@@ -1003,14 +1020,14 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSDictionary *configuration = [self tdLibConfigurationAtPath:configPath label:@"Local" error:NULL];
-    if (configuration) {
+    if ([self configurationContainsValidAPICredentials:configuration]) {
         return configuration;
     }
 
     NSString *bundledPath = [self bundledTDLibConfigurationPath];
     if ([bundledPath length] > 0) {
         NSDictionary *bundledConfiguration = [self tdLibConfigurationAtPath:bundledPath label:@"Bundled" error:error];
-        if (bundledConfiguration) {
+        if ([self configurationContainsValidAPICredentials:bundledConfiguration]) {
             return bundledConfiguration;
         }
     }
@@ -1020,57 +1037,6 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         *error = [self errorWithDescription:message code:12];
     }
     return nil;
-}
-
-- (BOOL)writeLocalTDLibConfigurationWithAPIID:(NSString *)apiID apiHash:(NSString *)apiHash error:(NSError **)error {
-    NSString *trimmedAPIID = [apiID stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    NSString *trimmedAPIHash = [apiHash stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if ([trimmedAPIID length] == 0 || [trimmedAPIHash length] == 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"Both api_id and api_hash are required." code:101];
-        }
-        return NO;
-    }
-
-    NSInteger integerAPIID = [trimmedAPIID integerValue];
-    if (integerAPIID <= 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"api_id must be a positive number." code:102];
-        }
-        return NO;
-    }
-
-    NSString *configPath = [self localTDLibConfigurationPathWithError:error];
-    if ([configPath length] == 0) {
-        return NO;
-    }
-
-    NSDictionary *existingConfiguration = [NSDictionary dictionaryWithContentsOfFile:configPath];
-    NSMutableDictionary *configuration = nil;
-    if ([existingConfiguration isKindOfClass:[NSDictionary class]]) {
-        configuration = [NSMutableDictionary dictionaryWithDictionary:existingConfiguration];
-    } else {
-        configuration = [NSMutableDictionary dictionary];
-    }
-
-    [configuration setObject:[NSNumber numberWithInteger:integerAPIID] forKey:@"api_id"];
-    [configuration setObject:trimmedAPIHash forKey:@"api_hash"];
-    if (![configuration objectForKey:@"tdlib_parameters_schema"]) {
-        [configuration setObject:@"auto" forKey:@"tdlib_parameters_schema"];
-    }
-    if (![configuration objectForKey:@"use_test_dc"]) {
-        [configuration setObject:[NSNumber numberWithBool:NO] forKey:@"use_test_dc"];
-    }
-
-    if (![configuration writeToFile:configPath atomically:YES]) {
-        if (error) {
-            NSString *message = [NSString stringWithFormat:@"Could not save TDLib config to %@", configPath];
-            *error = [self errorWithDescription:message code:103];
-        }
-        return NO;
-    }
-
-    return YES;
 }
 
 - (NSString *)stringValueForKey:(NSString *)key inConfiguration:(NSDictionary *)configuration required:(BOOL)required error:(NSError **)error {

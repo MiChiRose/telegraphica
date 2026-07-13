@@ -95,7 +95,12 @@ scripts/check_tdjson_legacy.sh "$TDJSON_PATH"
 
 echo "Building Telegraphica with bundled TDLib:"
 echo "$TDJSON_PATH"
-TELEGRAPHICA_TDJSON_PATH="$TDJSON_PATH" ./build_legacy.sh
+BUILD_DIST_DIR="$(mktemp -d /tmp/telegraphica-release-build.XXXXXX)"
+cleanup_build_dist() {
+    rm -rf "$BUILD_DIST_DIR"
+}
+trap cleanup_build_dist EXIT
+TELEGRAPHICA_DIST_DIR="$BUILD_DIST_DIR" TELEGRAPHICA_TDJSON_PATH="$TDJSON_PATH" ./build_legacy.sh
 
 BUNDLED_TDJSON="$APP_PATH/Contents/Frameworks/libtdjson.dylib"
 if [ ! -f "$BUNDLED_TDJSON" ]; then
@@ -105,6 +110,15 @@ if [ ! -f "$BUNDLED_TDJSON" ]; then
 fi
 
 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON"
+
+BUNDLED_CONFIG="$APP_PATH/Contents/Resources/TelegraphicaTDLibDefaults.plist"
+BUNDLED_API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$BUNDLED_CONFIG" 2>/dev/null || true)"
+BUNDLED_API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$BUNDLED_CONFIG" 2>/dev/null || true)"
+if ! echo "$BUNDLED_API_ID" | grep -E -q '^[1-9][0-9]*$' || ! echo "$BUNDLED_API_HASH" | grep -E -q '^[[:xdigit:]]{32}$'; then
+    echo "Refusing to create release artifacts without a valid internal Telegram connection configuration."
+    echo "Rebuild with TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH pointing to the private build config."
+    exit 1
+fi
 
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 APP_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || true)"
