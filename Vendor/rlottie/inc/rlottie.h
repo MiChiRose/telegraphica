@@ -23,9 +23,15 @@
 #ifndef _RLOTTIE_H_
 #define _RLOTTIE_H_
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <future>
-#include <vector>
 #include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <vector>
 
 #if defined _WIN32 || defined __CYGWIN__
   #ifdef RLOTTIE_BUILD
