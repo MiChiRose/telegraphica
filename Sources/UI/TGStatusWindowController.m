@@ -42,6 +42,8 @@ static NSString * const TGThemeIdentifierEggshellBurgundy = @"eggshell-burgundy"
 static NSString * const TGThemeIdentifierMelonOlive = @"melon-olive";
 static NSString * const TGUpdateAPIURLString = @"https://api.github.com/repos/MiChiRose/telegraphica/releases?per_page=10";
 static NSString * const TGProjectReleasesURLString = @"https://github.com/MiChiRose/telegraphica/releases";
+static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
+static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 
 static NSString *TGLanguageCode(void) {
     NSString *code = [[NSUserDefaults standardUserDefaults] stringForKey:TGLanguageDefaultsKey];
@@ -100,6 +102,45 @@ static NSString *TGLoc(NSString *key) {
                         @"Установлена версия %@", @"update.noneMessage",
                         @"Доступна версия %@. Открыть страницу загрузки?", @"update.availableMessage",
                         @"Не удалось проверить обновления: %@", @"update.failed",
+                        @"Профиль", @"profile.title",
+                        @"Профиль", @"profile.fallback",
+                        @"О себе", @"profile.about",
+                        @"Аккаунт", @"profile.account",
+                        @"Имя пользователя", @"profile.username",
+                        @"Телефон", @"profile.phone",
+                        @"Telegram ID", @"profile.id",
+                        @"Выйти", @"profile.logout",
+                        @"Войти", @"login.title",
+                        @"Введите номер телефона, связанный с аккаунтом Telegram, вместе с кодом страны.", @"login.phone.hint",
+                        @"Номер телефона", @"login.phone.label",
+                        @"Введите код", @"login.code.title",
+                        @"Код придёт в Telegram. Введите его здесь, чтобы продолжить вход.", @"login.code.hint",
+                        @"Код входа", @"login.code.label",
+                        @"Двухэтапная аутентификация", @"login.password.title",
+                        @"Введите облачный пароль Telegram. Telegraphica не записывает его в логи.", @"login.password.hint",
+                        @"Пароль", @"login.password.label",
+                        @"Настройка Telegram API", @"login.api.title",
+                        @"Введите api_id и api_hash приложения Telegram. Они сохраняются только локально на этом Mac.", @"login.api.hint",
+                        @"Сохранить", @"login.save",
+                        @"Отправить", @"login.send",
+                        @"Отправка...", @"login.sending",
+                        @"Логи", @"login.logs",
+                        @"Статус", @"login.status",
+                        @"Проверьте номер телефона и попробуйте снова.", @"login.error.phone",
+                        @"Этот код не принят. Проверьте Telegram и попробуйте снова.", @"login.error.code",
+                        @"Этот пароль не принят. Попробуйте снова.", @"login.error.password",
+                        @"Не удалось войти. Попробуйте снова.", @"login.error.general",
+                        @"Введите номер телефона, чтобы продолжить.", @"login.empty.phone",
+                        @"Введите код входа из Telegram.", @"login.empty.code",
+                        @"Введите пароль двухэтапной аутентификации.", @"login.empty.password",
+                        @"Введите api_id и api_hash.", @"login.empty.api",
+                        @"Для входа сначала нужны данные Telegram API.", @"login.api.required",
+                        @"Нет соединения. Подробности доступны в логах.", @"login.connection.unavailable",
+                        @"О Telegraphica", @"about.title",
+                        @"Версия %@ (%@)", @"about.version",
+                        @"Все права защищены.", @"about.rights",
+                        @"Автор: Yura Menschikov", @"about.author",
+                        @"Проект на GitHub", @"about.project",
                         nil];
     NSDictionary *be = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Чаты", @"chats",
@@ -144,6 +185,45 @@ static NSString *TGLoc(NSString *key) {
                         @"Усталявана версія %@", @"update.noneMessage",
                         @"Даступная версія %@. Адкрыць старонку загрузкі?", @"update.availableMessage",
                         @"Не атрымалася праверыць абнаўленні: %@", @"update.failed",
+                        @"Профіль", @"profile.title",
+                        @"Профіль", @"profile.fallback",
+                        @"Пра сябе", @"profile.about",
+                        @"Акаўнт", @"profile.account",
+                        @"Імя карыстальніка", @"profile.username",
+                        @"Тэлефон", @"profile.phone",
+                        @"Telegram ID", @"profile.id",
+                        @"Выйсці", @"profile.logout",
+                        @"Увайсці", @"login.title",
+                        @"Увядзіце нумар тэлефона, звязаны з акаўнтам Telegram, разам з кодам краіны.", @"login.phone.hint",
+                        @"Нумар тэлефона", @"login.phone.label",
+                        @"Увядзіце код", @"login.code.title",
+                        @"Код прыйдзе ў Telegram. Увядзіце яго тут, каб працягнуць уваход.", @"login.code.hint",
+                        @"Код уваходу", @"login.code.label",
+                        @"Двухэтапная аўтэнтыфікацыя", @"login.password.title",
+                        @"Увядзіце воблачны пароль Telegram. Telegraphica не запісвае яго ў логі.", @"login.password.hint",
+                        @"Пароль", @"login.password.label",
+                        @"Наладжванне Telegram API", @"login.api.title",
+                        @"Увядзіце api_id і api_hash праграмы Telegram. Яны захоўваюцца толькі лакальна на гэтым Mac.", @"login.api.hint",
+                        @"Захаваць", @"login.save",
+                        @"Адправіць", @"login.send",
+                        @"Адпраўка...", @"login.sending",
+                        @"Логі", @"login.logs",
+                        @"Статус", @"login.status",
+                        @"Праверце нумар тэлефона і паспрабуйце зноў.", @"login.error.phone",
+                        @"Гэты код не прыняты. Праверце Telegram і паспрабуйце зноў.", @"login.error.code",
+                        @"Гэты пароль не прыняты. Паспрабуйце зноў.", @"login.error.password",
+                        @"Не атрымалася ўвайсці. Паспрабуйце зноў.", @"login.error.general",
+                        @"Увядзіце нумар тэлефона, каб працягнуць.", @"login.empty.phone",
+                        @"Увядзіце код уваходу з Telegram.", @"login.empty.code",
+                        @"Увядзіце пароль двухэтапнай аўтэнтыфікацыі.", @"login.empty.password",
+                        @"Увядзіце api_id і api_hash.", @"login.empty.api",
+                        @"Для ўваходу спачатку патрэбныя даныя Telegram API.", @"login.api.required",
+                        @"Няма злучэння. Падрабязнасці даступныя ў логах.", @"login.connection.unavailable",
+                        @"Пра Telegraphica", @"about.title",
+                        @"Версія %@ (%@)", @"about.version",
+                        @"Усе правы абаронены.", @"about.rights",
+                        @"Аўтар: Yura Menschikov", @"about.author",
+                        @"Праект на GitHub", @"about.project",
                         nil];
     NSDictionary *en = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Chats", @"chats",
@@ -188,6 +268,45 @@ static NSString *TGLoc(NSString *key) {
                         @"Version %@ is installed.", @"update.noneMessage",
                         @"Version %@ is available. Open the download page?", @"update.availableMessage",
                         @"Could not check for updates: %@", @"update.failed",
+                        @"Profile", @"profile.title",
+                        @"Profile", @"profile.fallback",
+                        @"About", @"profile.about",
+                        @"Account", @"profile.account",
+                        @"Username", @"profile.username",
+                        @"Phone", @"profile.phone",
+                        @"Telegram ID", @"profile.id",
+                        @"Logout", @"profile.logout",
+                        @"Sign in", @"login.title",
+                        @"Enter the phone number connected to your Telegram account, including country code.", @"login.phone.hint",
+                        @"Phone number", @"login.phone.label",
+                        @"Enter login code", @"login.code.title",
+                        @"The code arrives in Telegram. Enter it here to continue sign-in.", @"login.code.hint",
+                        @"Login code", @"login.code.label",
+                        @"Two-step password", @"login.password.title",
+                        @"Enter your Telegram cloud password. Telegraphica does not write it to logs.", @"login.password.hint",
+                        @"Password", @"login.password.label",
+                        @"Telegram API setup", @"login.api.title",
+                        @"Enter the Telegram application api_id and api_hash. They are stored locally on this Mac only.", @"login.api.hint",
+                        @"Save", @"login.save",
+                        @"Send", @"login.send",
+                        @"Sending...", @"login.sending",
+                        @"Logs", @"login.logs",
+                        @"Status", @"login.status",
+                        @"Check the phone number and try again.", @"login.error.phone",
+                        @"That login code was not accepted. Check Telegram and try again.", @"login.error.code",
+                        @"That password was not accepted. Try again.", @"login.error.password",
+                        @"Sign-in was not accepted. Try again.", @"login.error.general",
+                        @"Enter your phone number to continue.", @"login.empty.phone",
+                        @"Enter the login code from Telegram.", @"login.empty.code",
+                        @"Enter your two-step password.", @"login.empty.password",
+                        @"Enter both api_id and api_hash.", @"login.empty.api",
+                        @"Telegram API details are required before sign-in.", @"login.api.required",
+                        @"Connection unavailable. Open Logs for details.", @"login.connection.unavailable",
+                        @"About Telegraphica", @"about.title",
+                        @"Version %@ (%@)", @"about.version",
+                        @"All rights reserved.", @"about.rights",
+                        @"Author: Yura Menschikov", @"about.author",
+                        @"Project on GitHub", @"about.project",
                         nil];
     NSDictionary *dictionary = [language isEqualToString:@"be"] ? be : ([language isEqualToString:@"en"] ? en : ru);
     NSString *value = [dictionary objectForKey:key];
@@ -2713,13 +2832,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
-@interface TGNavigationButtonCell : NSButtonCell
+@interface TGNavigationButtonCell : NSButtonCell {
+    NSString *_badgeText;
+}
+@property (nonatomic, copy) NSString *badgeText;
 @end
 
 @implementation TGNavigationButtonCell
 
+@synthesize badgeText = _badgeText;
+
 - (id)copyWithZone:(NSZone *)zone {
     TGNavigationButtonCell *cell = [super copyWithZone:zone];
+    [cell setBadgeText:self.badgeText];
     return cell;
 }
 
@@ -2768,6 +2893,39 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                   titleSize.width,
                                   titleSize.height);
     [title drawInRect:titleRect withAttributes:attributes];
+
+    if ([self.badgeText length] > 0) {
+        NSFont *badgeFont = [NSFont boldSystemFontOfSize:8.5];
+        NSDictionary *badgeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                         badgeFont, NSFontAttributeName,
+                                         [NSColor whiteColor], NSForegroundColorAttributeName,
+                                         nil];
+        NSSize badgeTextSize = [self.badgeText sizeWithAttributes:badgeAttributes];
+        CGFloat badgeHeight = 15.0;
+        CGFloat badgeWidth = ceil(badgeTextSize.width) + 8.0;
+        if (badgeWidth < badgeHeight) {
+            badgeWidth = badgeHeight;
+        }
+        NSRect badgeRect = NSMakeRect(NSMaxX(cellFrame) - badgeWidth - 4.0,
+                                     flipped ? (NSMinY(cellFrame) + 3.0) : (NSMaxY(cellFrame) - badgeHeight - 3.0),
+                                     badgeWidth,
+                                     badgeHeight);
+        NSBezierPath *badgePath = [NSBezierPath bezierPathWithRoundedRect:badgeRect
+                                                                  xRadius:(badgeHeight / 2.0)
+                                                                  yRadius:(badgeHeight / 2.0)];
+        [[NSColor colorWithCalibratedRed:0.820 green:0.180 blue:0.170 alpha:alpha] set];
+        [badgePath fill];
+        NSRect badgeTextRect = NSMakeRect(NSMinX(badgeRect) + floor((badgeWidth - badgeTextSize.width) / 2.0),
+                                         NSMinY(badgeRect) + floor((badgeHeight - badgeTextSize.height) / 2.0) - 0.5,
+                                         badgeTextSize.width,
+                                         badgeTextSize.height);
+        [self.badgeText drawInRect:badgeTextRect withAttributes:badgeAttributes];
+    }
+}
+
+- (void)dealloc {
+    [_badgeText release];
+    [super dealloc];
 }
 
 @end
@@ -3508,6 +3666,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
 @property (nonatomic, retain) NSButton *loginLogsButton;
+@property (nonatomic, retain) NSArray *loginLanguageButtons;
 @property (nonatomic, retain) NSTextField *chatsLabel;
 @property (nonatomic, retain) NSTextField *messagesLabel;
 @property (nonatomic, retain) NSTextField *selectedChatField;
@@ -3644,6 +3803,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, copy) NSString *activeSection;
 @property (nonatomic, retain) NSTimer *liveUpdateTimer;
 @property (nonatomic, assign) BOOL controlsBusy;
+@property (nonatomic, assign) BOOL authSubmissionInFlight;
+@property (nonatomic, assign) NSUInteger accountUnreadCount;
+@property (nonatomic, assign) BOOL hasAccountUnreadCount;
 @property (nonatomic, assign) BOOL backgroundChatRefreshInFlight;
 @property (nonatomic, assign) BOOL backgroundMessageRefreshInFlight;
 @property (nonatomic, assign) BOOL pendingLiveChatRefresh;
@@ -3660,6 +3822,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, assign) BOOL drawerOpen;
 @property (nonatomic, assign) BOOL suppressComposerDraftSave;
 @property (nonatomic, assign) BOOL loginErrorVisible;
+@property (nonatomic, copy) NSString *loginErrorLocalizationKey;
 @property (nonatomic, assign) BOOL composerRefocusPending;
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
 @property (nonatomic, assign) BOOL offlineModeActive;
@@ -3678,6 +3841,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSNumber *pendingNotificationChatID;
 @property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
 @property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
+@property (nonatomic, retain) NSMutableDictionary *localMuteUnreadCountsByChatID;
 @end
 
 @implementation TGStatusWindowController
@@ -3744,6 +3908,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize authSecondaryTextFieldBackgroundView = _authSecondaryTextFieldBackgroundView;
 @synthesize authButton = _authButton;
 @synthesize loginLogsButton = _loginLogsButton;
+@synthesize loginLanguageButtons = _loginLanguageButtons;
 @synthesize chatsLabel = _chatsLabel;
 @synthesize messagesLabel = _messagesLabel;
 @synthesize selectedChatField = _selectedChatField;
@@ -3880,6 +4045,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize activeSection = _activeSection;
 @synthesize liveUpdateTimer = _liveUpdateTimer;
 @synthesize controlsBusy = _controlsBusy;
+@synthesize authSubmissionInFlight = _authSubmissionInFlight;
+@synthesize accountUnreadCount = _accountUnreadCount;
+@synthesize hasAccountUnreadCount = _hasAccountUnreadCount;
 @synthesize backgroundChatRefreshInFlight = _backgroundChatRefreshInFlight;
 @synthesize backgroundMessageRefreshInFlight = _backgroundMessageRefreshInFlight;
 @synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
@@ -3896,6 +4064,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize drawerOpen = _drawerOpen;
 @synthesize suppressComposerDraftSave = _suppressComposerDraftSave;
 @synthesize loginErrorVisible = _loginErrorVisible;
+@synthesize loginErrorLocalizationKey = _loginErrorLocalizationKey;
 @synthesize composerRefocusPending = _composerRefocusPending;
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
 @synthesize offlineModeActive = _offlineModeActive;
@@ -3908,6 +4077,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize pendingNotificationChatID = _pendingNotificationChatID;
 @synthesize pendingNotificationThreadID = _pendingNotificationThreadID;
 @synthesize notificationChatInfoByChatID = _notificationChatInfoByChatID;
+@synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
@@ -3934,6 +4104,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         self.messageItems = [NSMutableArray array];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
+        self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
@@ -4037,7 +4208,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                 [NSFont systemFontOfSize:14.0], NSFontAttributeName,
                                 [NSColor colorWithCalibratedRed:0.920 green:0.140 blue:0.140 alpha:1.0], NSForegroundColorAttributeName,
                                 nil];
-    NSAttributedString *title = [[[NSAttributedString alloc] initWithString:@"Logout" attributes:attributes] autorelease];
+    NSAttributedString *title = [[[NSAttributedString alloc] initWithString:TGLoc(@"profile.logout") attributes:attributes] autorelease];
     [button setAttributedTitle:title];
 }
 
@@ -4195,7 +4366,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)refreshLocalizedText {
     [self.chatsLabel setStringValue:TGLoc(@"chats")];
-    [self.profileTitleField setStringValue:TGLoc(@"profile")];
+    [self.profileTitleField setStringValue:TGLoc(@"profile.title")];
+    [self.profileAboutSectionField setStringValue:TGLoc(@"profile.about")];
+    [self.profileAccountSectionField setStringValue:TGLoc(@"profile.account")];
+    [self.profileUsernameRowTitleField setStringValue:TGLoc(@"profile.username")];
+    [self.profilePhoneRowTitleField setStringValue:TGLoc(@"profile.phone")];
+    [self.profileIDRowTitleField setStringValue:TGLoc(@"profile.id")];
+    [self applyDestructiveSettingsButtonStyle:self.logoutButton];
     [self.settingsTitleField setStringValue:TGLoc(@"settings")];
     [[self.sendTextField cell] setPlaceholderString:TGLoc(@"message.placeholder")];
     [self.attachPhotoButton setToolTip:TGLoc(@"attach.photo")];
@@ -4218,9 +4395,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.settingsAppearanceButton setTitle:@""];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
     [self.settingsAboutButton setTitle:TGLoc(@"settings.about")];
-    [self.loginLogsButton setTitle:@"Logs"];
+    [self.loginLogsButton setTitle:TGLoc(@"login.logs")];
+    [self.loginLogsButton setToolTip:TGLoc(@"settings.logs")];
     [self refreshDownloadFolderButtonTitle];
     [self selectLanguagePopUpItemForCode:TGLanguageCode()];
+    [self refreshLoginLanguageButtons];
 
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
@@ -4236,6 +4415,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         } else if ([button tag] == 2) {
             [button setTitle:TGLoc(@"settings")];
         }
+        [button setToolTip:[button title]];
         [button setNeedsDisplay:YES];
     }
 }
@@ -4254,7 +4434,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.loginTitleField setTextColor:TGClassicInkColor()];
     [self.sendLabel setTextColor:TGClassicInkColor()];
     [self.profileNameField setTextColor:TGClassicInkColor()];
-    [self.profileNameField setFont:[NSFont boldSystemFontOfSize:16.0]];
+    [self.profileNameField setFont:[NSFont boldSystemFontOfSize:18.0]];
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
@@ -4374,9 +4554,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         } else {
             fullName = self.profileDisplayName;
         }
-        [self.profileNameField setStringValue:fullName ? fullName : @"Profile"];
+        [self.profileNameField setStringValue:fullName ? fullName : TGLoc(@"profile.fallback")];
     } else {
-        [self.profileNameField setStringValue:@"Profile"];
+        [self.profileNameField setStringValue:TGLoc(@"profile.fallback")];
     }
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
 
@@ -4804,12 +4984,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.authSecondaryTextFieldBackgroundView];
 
     self.authButton = [[[NSButton alloc] initWithFrame:NSMakeRect(356, 366, 116, 32)] autorelease];
-    [self.authButton setTitle:@"Send"];
+    [self.authButton setTitle:TGLoc(@"login.send")];
     [self.authButton setTarget:self];
     [self.authButton setAction:@selector(submitAuthInput:)];
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
-    [self applySkeuomorphicButtonStyle:self.authButton isPrimary:NO];
+    [self applySkeuomorphicButtonStyle:self.authButton isPrimary:YES];
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
@@ -4821,6 +5001,23 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self applyUtilityButtonStyle:self.loginLogsButton];
     [self.loginLogsButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:self.loginLogsButton];
+
+    NSArray *loginLanguageTitles = [NSArray arrayWithObjects:@"RU", @"EN", @"BE", nil];
+    NSMutableArray *loginLanguageButtons = [NSMutableArray arrayWithCapacity:[loginLanguageTitles count]];
+    NSUInteger loginLanguageIndex = 0;
+    for (loginLanguageIndex = 0; loginLanguageIndex < [loginLanguageTitles count]; loginLanguageIndex++) {
+        NSButton *languageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18.0 + (loginLanguageIndex * 48.0), 26.0, 42.0, 26.0)] autorelease];
+        [languageButton setTitle:[loginLanguageTitles objectAtIndex:loginLanguageIndex]];
+        [languageButton setTag:(NSInteger)loginLanguageIndex];
+        [languageButton setTarget:self];
+        [languageButton setAction:@selector(loginLanguageChanged:)];
+        [languageButton setToolTip:(loginLanguageIndex == 0 ? @"Русский" : (loginLanguageIndex == 1 ? @"English" : @"Беларуская"))];
+        [self applyUtilityButtonStyle:languageButton];
+        [languageButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
+        [contentView addSubview:languageButton];
+        [loginLanguageButtons addObject:languageButton];
+    }
+    self.loginLanguageButtons = loginLanguageButtons;
 
     self.chatsLabel = [self labelWithFrame:NSMakeRect(24, 338, 76, 22)
                                       text:@"Chats"
@@ -5121,22 +5318,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.profileAvatarView];
 
     self.profileTitleField = [self labelWithFrame:NSMakeRect(40, 520, 400, 28)
-                                             text:@"My Profile"
+                                             text:TGLoc(@"profile.title")
                                              font:[NSFont boldSystemFontOfSize:18.0]];
     [self applyPanelHeaderLabelStyle:self.profileTitleField];
     [contentView addSubview:self.profileTitleField];
 
     self.profileNameField = [self labelWithFrame:NSMakeRect(64, 458, 620, 24)
-                                            text:@"Profile"
-                                            font:[NSFont boldSystemFontOfSize:16.0]];
-    [self.profileNameField setAlignment:NSLeftTextAlignment];
+                                            text:TGLoc(@"profile.fallback")
+                                            font:[NSFont boldSystemFontOfSize:18.0]];
+    [self.profileNameField setAlignment:NSCenterTextAlignment];
     [[self.profileNameField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [contentView addSubview:self.profileNameField];
 
     self.profileUsernameField = [self labelWithFrame:NSMakeRect(64, 424, 620, 24)
                                                 text:@""
                                                 font:[NSFont systemFontOfSize:13.0]];
-    [self.profileUsernameField setAlignment:NSLeftTextAlignment];
+    [self.profileUsernameField setAlignment:NSCenterTextAlignment];
     [[self.profileUsernameField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self applyMutedLabelStyle:self.profileUsernameField];
     [contentView addSubview:self.profileUsernameField];
@@ -5156,19 +5353,19 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.profileStateField];
 
     self.profileAboutSectionField = [self labelWithFrame:NSMakeRect(64, 320, 620, 18)
-                                                    text:@"About"
-                                                    font:[NSFont systemFontOfSize:11.0]];
+                                                    text:TGLoc(@"profile.about")
+                                                    font:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.profileAboutSectionField];
     [contentView addSubview:self.profileAboutSectionField];
 
     self.profileAccountSectionField = [self labelWithFrame:NSMakeRect(64, 250, 620, 18)
-                                                      text:@"Account"
-                                                      font:[NSFont systemFontOfSize:11.0]];
+                                                      text:TGLoc(@"profile.account")
+                                                      font:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.profileAccountSectionField];
     [contentView addSubview:self.profileAccountSectionField];
 
     self.profileUsernameRowTitleField = [self labelWithFrame:NSMakeRect(64, 248, 180, 20)
-                                                        text:@"Username"
+                                                        text:TGLoc(@"profile.username")
                                                         font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.profileUsernameRowTitleField];
     self.profileUsernameRowValueField = [self labelWithFrame:NSMakeRect(260, 248, 360, 20)
@@ -5180,7 +5377,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.profileUsernameRowValueField];
 
     self.profilePhoneRowTitleField = [self labelWithFrame:NSMakeRect(64, 206, 180, 20)
-                                                     text:@"Phone"
+                                                     text:TGLoc(@"profile.phone")
                                                      font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.profilePhoneRowTitleField];
     self.profilePhoneRowValueField = [self labelWithFrame:NSMakeRect(260, 206, 360, 20)
@@ -5192,7 +5389,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [contentView addSubview:self.profilePhoneRowValueField];
 
     self.profileIDRowTitleField = [self labelWithFrame:NSMakeRect(64, 164, 180, 20)
-                                                  text:@"Telegram ID"
+                                                  text:TGLoc(@"profile.id")
                                                   font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.profileIDRowTitleField];
     self.profileIDRowValueField = [self labelWithFrame:NSMakeRect(260, 164, 360, 20)
@@ -5442,7 +5639,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     self.logoutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 276, 132, 32)] autorelease];
-    [self.logoutButton setTitle:@"Logout"];
+    [self.logoutButton setTitle:TGLoc(@"profile.logout")];
     [self.logoutButton setTarget:self];
     [self.logoutButton setAction:@selector(logout:)];
     [self applyDestructiveSettingsButtonStyle:self.logoutButton];
@@ -6653,23 +6850,23 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (void)showAboutWindow:(id)sender {
     (void)sender;
     if (!self.aboutWindow) {
-        NSRect frame = NSMakeRect(0, 0, 480, 420);
+        NSRect frame = NSMakeRect(0, 0, 480, 440);
         NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                         styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                           backing:NSBackingStoreBuffered
                                                             defer:NO] autorelease];
-        [window setTitle:@"About Telegraphica"];
+        [window setTitle:TGLoc(@"about.title")];
         [window setReleasedWhenClosed:NO];
 
         TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
         [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [window setContentView:contentView];
 
-        TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(30, 54, 420, 332)] autorelease];
+        TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(30, 54, 420, 352)] autorelease];
         [cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [contentView addSubview:cardView];
 
-        NSImageView *iconView = [[[NSImageView alloc] initWithFrame:NSMakeRect(180, 246, 120, 120)] autorelease];
+        NSImageView *iconView = [[[NSImageView alloc] initWithFrame:NSMakeRect(190, 280, 100, 100)] autorelease];
         NSImage *appIcon = [NSImage imageNamed:@"Telegraphica"];
         if (!appIcon) {
             appIcon = [NSImage imageNamed:@"NSApplicationIcon"];
@@ -6679,7 +6876,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [iconView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin)];
         [contentView addSubview:iconView];
 
-        NSTextField *titleField = [self labelWithFrame:NSMakeRect(70, 206, 340, 30)
+        NSTextField *titleField = [self labelWithFrame:NSMakeRect(70, 242, 340, 30)
                                                   text:@"Telegraphica"
                                                   font:[NSFont boldSystemFontOfSize:22.0]];
         [titleField setAlignment:NSCenterTextAlignment];
@@ -6688,16 +6885,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
         NSString *version = [info objectForKey:@"CFBundleShortVersionString"];
         NSString *build = [info objectForKey:@"CFBundleVersion"];
-        NSString *versionText = [NSString stringWithFormat:@"Version %@ (%@)", version ? version : @"0.1.0", build ? build : @"0.1.0"];
-        NSTextField *versionField = [self labelWithFrame:NSMakeRect(70, 176, 340, 22)
+        NSString *versionText = [NSString stringWithFormat:TGLoc(@"about.version"), version ? version : @"0.1.0", build ? build : @"0.1.0"];
+        NSTextField *versionField = [self labelWithFrame:NSMakeRect(70, 212, 340, 22)
                                                     text:versionText
                                                     font:[NSFont systemFontOfSize:12.0]];
         [versionField setAlignment:NSCenterTextAlignment];
         [self applyMutedLabelStyle:versionField];
         [contentView addSubview:versionField];
 
-        NSString *copyrightText = [NSString stringWithFormat:@"Copyright %@ Yura Menschikov. All rights reserved.", TGCurrentYearString()];
-        NSTextField *copyrightField = [self labelWithFrame:NSMakeRect(60, 136, 360, 36)
+        NSString *copyrightText = [NSString stringWithFormat:@"Copyright %@. %@", TGCurrentYearString(), TGLoc(@"about.rights")];
+        NSTextField *copyrightField = [self labelWithFrame:NSMakeRect(60, 178, 360, 22)
                                                       text:copyrightText
                                                       font:[NSFont systemFontOfSize:12.0]];
         [copyrightField setAlignment:NSCenterTextAlignment];
@@ -6705,13 +6902,30 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self applyMutedLabelStyle:copyrightField];
         [contentView addSubview:copyrightField];
 
-        NSTextField *linkField = [self labelWithFrame:NSMakeRect(70, 104, 340, 22)
-                                                 text:@"GitHub: https://github.com/MiChiRose/telegraphica"
-                                                 font:[NSFont systemFontOfSize:12.0]];
-        [linkField setAlignment:NSCenterTextAlignment];
-        [linkField setSelectable:YES];
-        [linkField setTextColor:TGClassicLinkColor()];
-        [contentView addSubview:linkField];
+        NSDictionary *linkAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                        TGClassicLinkColor(), NSForegroundColorAttributeName,
+                                        [NSNumber numberWithInteger:NSUnderlineStyleSingle], NSUnderlineStyleAttributeName,
+                                        nil];
+        NSButton *authorButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 140, 340, 24)] autorelease];
+        [authorButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.author") attributes:linkAttributes] autorelease]];
+        [authorButton setBordered:NO];
+        [authorButton setButtonType:NSMomentaryPushInButton];
+        [authorButton setTarget:self];
+        [authorButton setAction:@selector(openAuthorPage:)];
+        [authorButton setToolTip:TGAuthorURLString];
+        [[authorButton cell] setAlignment:NSCenterTextAlignment];
+        [contentView addSubview:authorButton];
+
+        NSButton *projectButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 108, 340, 24)] autorelease];
+        [projectButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.project") attributes:linkAttributes] autorelease]];
+        [projectButton setBordered:NO];
+        [projectButton setButtonType:NSMomentaryPushInButton];
+        [projectButton setTarget:self];
+        [projectButton setAction:@selector(openProjectPage:)];
+        [projectButton setToolTip:TGProjectURLString];
+        [[projectButton cell] setAlignment:NSCenterTextAlignment];
+        [contentView addSubview:projectButton];
 
         NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(180, 18, 120, 30)];
         [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin)];
@@ -6722,6 +6936,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self.aboutWindow center];
     [self.aboutWindow makeKeyAndOrderFront:nil];
+}
+
+- (void)openProjectPage:(id)sender {
+    (void)sender;
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGProjectURLString]];
+}
+
+- (void)openAuthorPage:(id)sender {
+    (void)sender;
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGAuthorURLString]];
 }
 
 - (void)themeSelectionChanged:(id)sender {
@@ -6918,8 +7142,40 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             continue;
         }
         TGChatItem *item = (TGChatItem *)candidate;
+        NSNumber *chatID = [self notificationChatIDForChatItem:item];
+        NSString *chatKey = [self chatMuteDefaultsKeyForChatID:chatID];
+        BOOL locallyMuted = [self isChatIDLocallyMuted:chatID];
+        if ([chatKey length] > 0 && ![item isForumTopic]) {
+            NSNumber *unreadCount = [item unreadCount];
+            if (locallyMuted && ![item serverNotificationsMuted]) {
+                NSUInteger localUnreadCount = [unreadCount respondsToSelector:@selector(unsignedIntegerValue)] ? [unreadCount unsignedIntegerValue] : 0;
+                [self.localMuteUnreadCountsByChatID setObject:[NSNumber numberWithUnsignedInteger:localUnreadCount] forKey:chatKey];
+            } else {
+                [self.localMuteUnreadCountsByChatID removeObjectForKey:chatKey];
+            }
+        }
         [item setNotificationsMuted:[self isChatItemEffectivelyMuted:item]];
     }
+}
+
+- (NSUInteger)localMuteUnreadAdjustment {
+    NSUInteger total = 0;
+    NSArray *chatKeys = [[self.localMuteUnreadCountsByChatID allKeys] copy];
+    NSUInteger index = 0;
+    for (index = 0; index < [chatKeys count]; index++) {
+        NSString *chatKey = [chatKeys objectAtIndex:index];
+        NSNumber *chatID = [NSNumber numberWithLongLong:[chatKey longLongValue]];
+        if (![self isChatIDLocallyMuted:chatID]) {
+            [self.localMuteUnreadCountsByChatID removeObjectForKey:chatKey];
+            continue;
+        }
+        id unreadCount = [self.localMuteUnreadCountsByChatID objectForKey:chatKey];
+        if ([unreadCount respondsToSelector:@selector(unsignedIntegerValue)]) {
+            total += [unreadCount unsignedIntegerValue];
+        }
+    }
+    [chatKeys release];
+    return total;
 }
 
 - (BOOL)isChatIDMutedForNotifications:(NSNumber *)chatID {
@@ -6988,19 +7244,30 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)updateApplicationBadge {
-    if (!TGUserDefaultBoolWithDefault(TGNotificationBadgeEnabledDefaultsKey, YES)) {
-        [[[NSApplication sharedApplication] dockTile] setBadgeLabel:nil];
-        return;
+    NSUInteger unreadCount = self.hasAccountUnreadCount ? self.accountUnreadCount : [self totalUnreadCountFromChatItems];
+    if (self.hasAccountUnreadCount) {
+        NSUInteger localMuteAdjustment = [self localMuteUnreadAdjustment];
+        unreadCount = (localMuteAdjustment < unreadCount) ? (unreadCount - localMuteAdjustment) : 0;
     }
-
-    NSUInteger unreadCount = [self totalUnreadCountFromChatItems];
     NSString *badge = nil;
     if (unreadCount > 999) {
         badge = @"999+";
     } else if (unreadCount > 0) {
         badge = [NSString stringWithFormat:@"%lu", (unsigned long)unreadCount];
     }
-    [[[NSApplication sharedApplication] dockTile] setBadgeLabel:badge];
+    NSString *dockBadge = TGUserDefaultBoolWithDefault(TGNotificationBadgeEnabledDefaultsKey, YES) ? badge : nil;
+    [[[NSApplication sharedApplication] dockTile] setBadgeLabel:dockBadge];
+
+    NSUInteger index = 0;
+    for (index = 0; index < [self.navigationButtons count]; index++) {
+        NSButton *button = [self.navigationButtons objectAtIndex:index];
+        if ([button tag] != 0 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
+            continue;
+        }
+        [(TGNavigationButtonCell *)[button cell] setBadgeText:badge];
+        [button setNeedsDisplay:YES];
+        break;
+    }
 }
 
 - (void)notificationSettingChanged:(id)sender {
@@ -7033,14 +7300,51 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![code isKindOfClass:[NSString class]] || [code length] == 0) {
         code = @"ru";
     }
+    [self applyLanguageCode:code];
+    (void)sender;
+}
+
+- (void)loginLanguageChanged:(id)sender {
+    NSInteger tag = [sender respondsToSelector:@selector(tag)] ? [sender tag] : 0;
+    NSString *code = (tag == 1) ? @"en" : ((tag == 2) ? @"be" : @"ru");
+    [self applyLanguageCode:code];
+}
+
+- (void)applyLanguageCode:(NSString *)code {
+    if (![code isEqualToString:@"ru"] && ![code isEqualToString:@"en"] && ![code isEqualToString:@"be"]) {
+        code = @"ru";
+    }
     [[NSUserDefaults standardUserDefaults] setObject:code forKey:TGLanguageDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
+    if (self.aboutWindow) {
+        [self.aboutWindow close];
+        self.aboutWindow = nil;
+    }
+    NSString *visibleErrorKey = [self.loginErrorLocalizationKey copy];
     [self refreshLocalizedText];
     [self updateAuthControlsForState:self.currentAuthState];
+    if ([visibleErrorKey length] > 0) {
+        [self setLoginErrorWithLocalizationKey:visibleErrorKey];
+    }
+    [visibleErrorKey release];
+    [self refreshProfileDisplay];
     [self layoutContentView];
     [self updateVisibleSection];
     [self refreshThemeAppearance];
-    (void)sender;
+}
+
+- (void)refreshLoginLanguageButtons {
+    NSString *currentCode = TGLanguageCode();
+    NSUInteger index = 0;
+    for (index = 0; index < [self.loginLanguageButtons count]; index++) {
+        NSButton *button = [self.loginLanguageButtons objectAtIndex:index];
+        NSString *buttonCode = ([button tag] == 1) ? @"en" : (([button tag] == 2) ? @"be" : @"ru");
+        BOOL selected = [buttonCode isEqualToString:currentCode];
+        [button setBezelStyle:(selected ? NSTexturedRoundedBezelStyle : NSRoundedBezelStyle)];
+        [button setFont:(selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0])];
+        [button setState:(selected ? NSOnState : NSOffState)];
+        [button setNeedsDisplay:YES];
+    }
 }
 
 - (void)chooseDownloadFolder:(id)sender {
@@ -7540,6 +7844,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self showView:self.authSecureField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitApiCredentials"] || [self.currentAuthState isEqualToString:@"waitPassword"]))];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
     [self showView:self.loginLogsButton visible:showLogin];
+    NSUInteger loginLanguageIndex = 0;
+    for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
+        [self showView:[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] visible:showLogin];
+    }
 
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     [self showView:self.sidebarPanelView visible:showChats];
@@ -7862,6 +8170,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
     }
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
+    CGFloat loginLanguageX = margin;
+    NSUInteger loginLanguageIndex = 0;
+    for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
+        NSButton *languageButton = [self.loginLanguageButtons objectAtIndex:loginLanguageIndex];
+        [languageButton setFrame:NSMakeRect(loginLanguageX + (loginLanguageIndex * 48.0), margin + 6.0, 42.0, 28.0)];
+    }
 
     CGFloat headerButtonSize = 30.0;
     CGFloat sectionHeaderVisualOffset = -2.0;
@@ -8035,24 +8349,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     CGFloat profileGroupGap = 12.0;
     CGFloat profileNextY = 18.0;
 
-    CGFloat profileSummaryHeight = 118.0;
+    CGFloat profileSummaryHeight = 172.0;
     CGFloat profileSummaryY = profileNextY;
     [self.profileSummaryCardView setFrame:NSMakeRect(profileGroupedX, profileSummaryY, profileGroupedWidth, profileSummaryHeight)];
-    CGFloat profileAvatarSize = 76.0;
-    CGFloat profileAvatarX = profileGroupedX + 22.0;
-    CGFloat profileAvatarY = profileSummaryY + floor((profileSummaryHeight - profileAvatarSize) / 2.0);
+    CGFloat profileAvatarSize = 88.0;
+    CGFloat profileAvatarX = profileGroupedX + floor((profileGroupedWidth - profileAvatarSize) / 2.0);
+    CGFloat profileAvatarY = profileSummaryY + 16.0;
     [self.profileAvatarView setFrame:NSMakeRect(profileAvatarX,
                                                 profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
-    CGFloat profileTextX = NSMaxX([self.profileAvatarView frame]) + 22.0;
-    CGFloat profileTextWidth = profileGroupedWidth - (profileTextX - profileGroupedX) - 22.0;
-    if (profileTextWidth < 180.0) {
-        profileTextWidth = profileGroupedWidth - 44.0;
-        profileTextX = profileGroupedX + 22.0;
-    }
-    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 28.0, profileTextWidth, 24.0)];
-    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 52.0, profileTextWidth, 22.0)];
+    CGFloat profileTextX = profileGroupedX + 22.0;
+    CGFloat profileTextWidth = profileGroupedWidth - 44.0;
+    [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 108.0, profileTextWidth, 26.0)];
+    [self.profileUsernameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 136.0, profileTextWidth, 20.0)];
 
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
@@ -8307,6 +8617,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self updateVisibleSection];
 }
 
+- (void)windowDidBecomeKey:(NSNotification *)notification {
+    if ([notification object] == [self window] && ![self.currentAuthState isEqualToString:@"ready"]) {
+        [self scheduleLoginInputFocus];
+    }
+}
+
 - (void)tearDownClosedMediaPreviewWindow:(NSWindow *)closingWindow {
     if (closingWindow != self.mediaPreviewWindow) {
         return;
@@ -8558,6 +8874,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 - (void)setLoginErrorMessage:(NSString *)message {
+    self.loginErrorLocalizationKey = nil;
     BOOL hasMessage = ([message length] > 0);
     self.loginErrorVisible = hasMessage;
     [self.authStateField setStringValue:(hasMessage ? message : @"")];
@@ -8574,31 +8891,50 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 }
 
-- (NSString *)loginErrorMessageForAuthState:(NSString *)state fallback:(NSString *)fallback {
+- (void)setLoginErrorWithLocalizationKey:(NSString *)key {
+    [self setLoginErrorMessage:([key length] > 0 ? TGLoc(key) : nil)];
+    self.loginErrorLocalizationKey = key;
+}
+
+- (NSString *)loginErrorLocalizationKeyForAuthState:(NSString *)state {
     if ([state isEqualToString:@"waitPhoneNumber"]) {
-        return @"Check the phone number and try again.";
+        return @"login.error.phone";
     }
     if ([state isEqualToString:@"waitCode"]) {
-        return @"That login code was not accepted. Check Telegram and try again.";
+        return @"login.error.code";
     }
     if ([state isEqualToString:@"waitPassword"]) {
-        return @"That password was not accepted. Try again.";
+        return @"login.error.password";
     }
-    if ([fallback length] > 0) {
-        return fallback;
+    return @"login.error.general";
+}
+
+- (void)focusLoginInputIfNeeded {
+    if (self.controlsBusy || [self.currentAuthState isEqualToString:@"ready"]) {
+        return;
     }
-    return @"Sign-in was not accepted. Try again.";
+    NSTextField *inputField = [self.currentAuthState isEqualToString:@"waitPassword"] ? (NSTextField *)self.authSecureField : self.authTextField;
+    if (!inputField || [inputField isHidden] || ![inputField isEnabled]) {
+        return;
+    }
+    [[self window] makeFirstResponder:inputField];
+}
+
+- (void)scheduleLoginInputFocus {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(focusLoginInputIfNeeded) object:nil];
+    [self performSelector:@selector(focusLoginInputIfNeeded) withObject:nil afterDelay:0.05];
 }
 
 - (void)updateAuthControlsForState:(NSString *)state {
     NSString *previousState = [self.currentAuthState copy];
     self.currentAuthState = state;
     BOOL authStateChanged = (!previousState || ![previousState isEqualToString:state]);
+    BOOL authInputsEnabled = !(self.controlsBusy || self.authSubmissionInFlight);
     if (authStateChanged) {
         [self setLoginErrorMessage:nil];
+        [self.authTextField setStringValue:@""];
+        [self.authSecureField setStringValue:@""];
     }
-    [self.authTextField setStringValue:@""];
-    [self.authSecureField setStringValue:@""];
     [self.loadChatsButton setEnabled:NO];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.loadMessagesButton setEnabled:NO];
@@ -8613,6 +8949,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.chatTableView deselectAll:nil];
         [self.chatTableView reloadData];
         [self.messageTableView reloadData];
+        [self updateApplicationBadge];
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
         self.selectedChatTypeSummary = nil;
@@ -8633,6 +8970,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
 
     if (![state isEqualToString:@"ready"]) {
+        self.accountUnreadCount = 0;
+        self.hasAccountUnreadCount = NO;
+        [self.localMuteUnreadCountsByChatID removeAllObjects];
+        [self updateApplicationBadge];
         self.activeSection = TGSectionChats;
         self.drawerOpen = NO;
         [self clearForumTopicListState];
@@ -8659,8 +9000,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     if ([state isEqualToString:@"waitApiCredentials"]) {
         [self.statusField setStringValue:@"API setup required"];
-        [self.loginTitleField setStringValue:@"Telegram API setup"];
-        [self.loginHintField setStringValue:@"Enter your Telegram api_id and api_hash from my.telegram.org. Telegraphica saves them locally on this Mac only."];
+        [self.loginTitleField setStringValue:TGLoc(@"login.api.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.api.hint")];
         [self.authLabel setStringValue:@"API ID"];
         [self.authSecondaryLabel setStringValue:@"API Hash"];
         [[self.authTextField cell] setPlaceholderString:@"123456"];
@@ -8670,77 +9011,81 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.authSecureField setHidden:NO];
         [self.authSecondaryLabel setHidden:NO];
         [self.authSecondaryTextFieldBackgroundView setHidden:NO];
-        [self.authTextField setEnabled:YES];
-        [self.authSecureField setEnabled:YES];
-        [self.authButton setTitle:@"Save"];
-        [self.authButton setEnabled:YES];
+        [self.authTextField setEnabled:authInputsEnabled];
+        [self.authSecureField setEnabled:authInputsEnabled];
+        [self.authButton setTitle:TGLoc(@"login.save")];
+        [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
+        [self scheduleLoginInputFocus];
         [previousState release];
         return;
     }
 
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self.statusField setStringValue:@"Sign in required"];
-        [self.loginTitleField setStringValue:@"Sign in"];
-        [self.loginHintField setStringValue:@"Enter the phone number connected to your Telegram account, including country code."];
-        [self.authLabel setStringValue:@"Phone number"];
+        [self.loginTitleField setStringValue:TGLoc(@"login.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.phone.hint")];
+        [self.authLabel setStringValue:TGLoc(@"login.phone.label")];
         [[self.authTextField cell] setPlaceholderString:@"+375 29 123 45 67"];
         [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:NO];
         [self.authSecureField setHidden:YES];
-        [self.authTextField setEnabled:YES];
+        [self.authTextField setEnabled:authInputsEnabled];
         [self.authSecureField setEnabled:NO];
-        [self.authButton setTitle:@"Send"];
-        [self.authButton setEnabled:YES];
+        [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
+        [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
+        [self scheduleLoginInputFocus];
         [previousState release];
         return;
     }
 
     if ([state isEqualToString:@"waitCode"]) {
         [self.statusField setStringValue:@"Login code required"];
-        [self.loginTitleField setStringValue:@"Enter login code"];
-        [self.loginHintField setStringValue:@"The code arrives in Telegram. Enter it here to finish sign-in."];
-        [self.authLabel setStringValue:@"Login code"];
+        [self.loginTitleField setStringValue:TGLoc(@"login.code.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.code.hint")];
+        [self.authLabel setStringValue:TGLoc(@"login.code.label")];
         [[self.authTextField cell] setPlaceholderString:@"12345"];
         [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:NO];
         [self.authSecureField setHidden:YES];
-        [self.authTextField setEnabled:YES];
+        [self.authTextField setEnabled:authInputsEnabled];
         [self.authSecureField setEnabled:NO];
-        [self.authButton setTitle:@"Send"];
-        [self.authButton setEnabled:YES];
+        [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
+        [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
+        [self scheduleLoginInputFocus];
         [previousState release];
         return;
     }
 
     if ([state isEqualToString:@"waitPassword"]) {
         [self.statusField setStringValue:@"Password required"];
-        [self.loginTitleField setStringValue:@"Two-step password"];
-        [self.loginHintField setStringValue:@"Enter your Telegram cloud password. Telegraphica will not write it to logs."];
-        [self.authLabel setStringValue:@"Password"];
+        [self.loginTitleField setStringValue:TGLoc(@"login.password.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.password.hint")];
+        [self.authLabel setStringValue:TGLoc(@"login.password.label")];
         [[self.authTextField cell] setPlaceholderString:@""];
-        [[self.authSecureField cell] setPlaceholderString:@"Password"];
+        [[self.authSecureField cell] setPlaceholderString:TGLoc(@"login.password.label")];
         [self.authStateField setHidden:YES];
         [self.authTextField setHidden:YES];
         [self.authSecureField setHidden:NO];
         [self.authTextField setEnabled:NO];
-        [self.authSecureField setEnabled:YES];
-        [self.authButton setTitle:@"Send"];
-        [self.authButton setEnabled:YES];
+        [self.authSecureField setEnabled:authInputsEnabled];
+        [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
+        [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
         [self updateVisibleSection];
+        [self scheduleLoginInputFocus];
         [previousState release];
         return;
     }
 
-    [self.authLabel setStringValue:@"Status"];
+    [self.authLabel setStringValue:TGLoc(@"login.status")];
     if ([state isEqualToString:@"ready"]) {
         [self.statusField setStringValue:@"Connected"];
         [self.authStateField setStringValue:@""];
@@ -8760,7 +9105,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [self.authSecureField setEnabled:NO];
     [[self.authTextField cell] setPlaceholderString:@""];
     [[self.authSecureField cell] setPlaceholderString:@""];
-    [self.authButton setTitle:@"Send"];
+    [self.authButton setTitle:TGLoc(@"login.send")];
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
@@ -8781,6 +9126,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)setControlsBusy:(BOOL)busy {
     _controlsBusy = busy;
+    NSUInteger loginLanguageIndex = 0;
+    for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
+        [[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] setEnabled:!busy];
+    }
     [self.checkButton setEnabled:!busy];
     [self.logsCheckButton setEnabled:!busy];
     [self.logoutButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
@@ -11147,6 +11496,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     long long targetChatID = [chatID longLongValue];
     long long targetThreadID = wantsTopic ? [messageThreadID longLongValue] : 0;
     BOOL didClear = NO;
+    NSUInteger clearedUnreadCount = 0;
     NSUInteger index = 0;
     for (index = 0; index < [self.chatItems count]; index++) {
         id candidate = [self.chatItems objectAtIndex:index];
@@ -11174,12 +11524,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             }
         }
         if ([[item unreadCount] respondsToSelector:@selector(integerValue)] && [[item unreadCount] integerValue] > 0) {
+            clearedUnreadCount += [[item unreadCount] unsignedIntegerValue];
             [item setUnreadCount:[NSNumber numberWithInteger:0]];
             didClear = YES;
         }
     }
 
     if (didClear) {
+        NSString *chatKey = [self chatMuteDefaultsKeyForChatID:chatID];
+        NSNumber *cachedUnreadCount = ([chatKey length] > 0) ? [self.localMuteUnreadCountsByChatID objectForKey:chatKey] : nil;
+        if (cachedUnreadCount) {
+            NSUInteger cachedValue = [cachedUnreadCount unsignedIntegerValue];
+            NSUInteger updatedValue = (clearedUnreadCount >= cachedValue) ? 0 : (cachedValue - clearedUnreadCount);
+            [self.localMuteUnreadCountsByChatID setObject:[NSNumber numberWithUnsignedInteger:updatedValue] forKey:chatKey];
+        }
         [self.chatTableView reloadData];
         [self updateApplicationBadge];
     }
@@ -11708,6 +12066,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             self.chatsExhausted = NO;
             [self.client invalidateMainChatListExhaustion];
             if ([kind isEqualToString:@"new_message"]) {
+                id direction = [summary objectForKey:@"direction"];
+                id incomingChatID = [summary objectForKey:@"chat_id"];
+                NSString *incomingChatKey = [self chatMuteDefaultsKeyForChatID:incomingChatID];
+                NSNumber *knownLocalUnreadCount = ([incomingChatKey length] > 0) ? [self.localMuteUnreadCountsByChatID objectForKey:incomingChatKey] : nil;
+                if ([direction isEqualToString:@"Incoming"] && knownLocalUnreadCount) {
+                    NSUInteger updatedLocalUnreadCount = [knownLocalUnreadCount unsignedIntegerValue] + 1;
+                    [self.localMuteUnreadCountsByChatID setObject:[NSNumber numberWithUnsignedInteger:updatedLocalUnreadCount] forKey:incomingChatKey];
+                    [self updateApplicationBadge];
+                }
                 [self presentNotificationForUpdateSummary:summary];
             }
             id chatID = [summary objectForKey:@"chat_id"];
@@ -11722,6 +12089,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             }
         } else if ([kind isEqualToString:@"chat_action"]) {
             [self handleTypingUpdateSummary:summary];
+        } else if ([kind isEqualToString:@"account_unread"]) {
+            id unreadCount = [summary objectForKey:@"count"];
+            if ([unreadCount respondsToSelector:@selector(unsignedIntegerValue)]) {
+                self.accountUnreadCount = [unreadCount unsignedIntegerValue];
+                self.hasAccountUnreadCount = YES;
+                [self updateApplicationBadge];
+            }
         } else if ([kind isEqualToString:@"chat_filters"]) {
             needsChatFilterRefresh = YES;
         }
@@ -11853,7 +12227,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 }
                 [self updateAuthControlsForState:finalAuthorizationState];
                 if ([finalAuthorizationState isEqualToString:@"waitApiCredentials"]) {
-                    [self setLoginErrorMessage:@"Telegram API credentials are required before sign-in."];
+                    [self setLoginErrorWithLocalizationKey:@"login.api.required"];
                     [self updateVisibleSection];
                 }
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
@@ -11862,7 +12236,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 NSString *message = [probeError localizedDescription] ? [probeError localizedDescription] : @"Unknown TDLib error.";
                 [self setControlsBusy:NO];
                 [self.statusField setStringValue:@"Connection unavailable"];
-                [self setLoginErrorMessage:@"Connection unavailable. Open Logs for details."];
+                [self setLoginErrorWithLocalizationKey:@"login.connection.unavailable"];
                 [self updateVisibleSection];
                 [self appendDetail:message];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe failed: %@", message]];
@@ -11877,6 +12251,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)submitAuthInput:(id)sender {
     (void)sender;
+    if (self.controlsBusy || self.authSubmissionInFlight) {
+        return;
+    }
     NSString *state = [self.currentAuthState copy];
     if (![self isAuthInputState:state]) {
         [state release];
@@ -11890,7 +12267,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *trimmedAPIID = [apiID stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         NSString *trimmedAPIHash = [apiHash stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if ([trimmedAPIID length] == 0 || [trimmedAPIHash length] == 0) {
-            [self setLoginErrorMessage:@"Enter both api_id and api_hash from my.telegram.org."];
+            [self setLoginErrorWithLocalizationKey:@"login.empty.api"];
             [self updateVisibleSection];
             [apiID release];
             [apiHash release];
@@ -11925,17 +12302,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSTextField *inputField = [state isEqualToString:@"waitPassword"] ? (NSTextField *)self.authSecureField : self.authTextField;
     NSString *input = [[inputField stringValue] copy];
-    [inputField setStringValue:@""];
     if ([input length] == 0) {
-        NSString *emptyMessage = nil;
+        NSString *emptyErrorKey = @"login.empty.password";
         if ([state isEqualToString:@"waitPhoneNumber"]) {
-            emptyMessage = @"Enter your phone number to continue.";
+            emptyErrorKey = @"login.empty.phone";
         } else if ([state isEqualToString:@"waitCode"]) {
-            emptyMessage = @"Enter the login code from Telegram.";
-        } else {
-            emptyMessage = @"Enter your two-step password.";
+            emptyErrorKey = @"login.empty.code";
         }
-        [self setLoginErrorMessage:emptyMessage];
+        [self setLoginErrorWithLocalizationKey:emptyErrorKey];
         [self updateVisibleSection];
         [input release];
         [state release];
@@ -11945,7 +12319,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     [self setLoginErrorMessage:nil];
     [self updateVisibleSection];
+    self.authSubmissionInFlight = YES;
     [self setControlsBusy:YES];
+    [self.authButton setTitle:TGLoc(@"login.sending")];
     [self.statusField setStringValue:@"Signing in..."];
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self appendDetail:@"Submitting phone number to TDLib..."];
@@ -11979,6 +12355,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            self.authSubmissionInFlight = NO;
+            if (!authSummary && [state isEqualToString:@"waitCode"]) {
+                [self.authTextField setStringValue:@""];
+            } else if (!authSummary && [state isEqualToString:@"waitPassword"]) {
+                [self.authSecureField setStringValue:@""];
+            }
             if (authSummary) {
                 [self.statusField setStringValue:@"Sign-in step submitted"];
                 [self setLoginErrorMessage:nil];
@@ -11997,18 +12379,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 }
                 [self updateAuthControlsForState:finalAuthorizationState];
                 if (!authSummary) {
-                    [self setLoginErrorMessage:[self loginErrorMessageForAuthState:finalAuthorizationState fallback:nil]];
+                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:finalAuthorizationState]];
                 }
             } else if (stateError) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", [stateError localizedDescription]]];
                 [self updateAuthControlsForState:state];
                 if (!authSummary) {
-                    [self setLoginErrorMessage:[self loginErrorMessageForAuthState:state fallback:nil]];
+                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:state]];
                 }
             } else {
                 [self updateAuthControlsForState:state];
                 if (!authSummary) {
-                    [self setLoginErrorMessage:[self loginErrorMessageForAuthState:state fallback:nil]];
+                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:state]];
                 }
             }
             [self updateVisibleSection];
@@ -13239,6 +13621,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_authSecureField release];
     [_authButton release];
     [_loginLogsButton release];
+    [_loginLanguageButtons release];
+    [_loginErrorLocalizationKey release];
     [_chatsLabel release];
     [_messagesLabel release];
     [_selectedChatField release];
@@ -13260,6 +13644,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [_messageItems release];
     [_composerDraftsByTargetKey release];
     [_notificationChatInfoByChatID release];
+    [_localMuteUnreadCountsByChatID release];
     [_profileTitleField release];
     [_profileNameField release];
     [_profileUsernameField release];
