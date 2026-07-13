@@ -71,7 +71,8 @@ RLOTTIE_API void lottie_shutdown(void)
 
 RLOTTIE_API Lottie_Animation_S *lottie_animation_from_file(const char *path)
 {
-    if (auto animation = Animation::loadFromFile(path) ) {
+    const std::string filePath(path ? path : "");
+    if (auto animation = Animation::loadFromFile(filePath) ) {
         Lottie_Animation_S *handle = new Lottie_Animation_S();
         handle->mAnimation = std::move(animation);
         return handle;
@@ -82,7 +83,10 @@ RLOTTIE_API Lottie_Animation_S *lottie_animation_from_file(const char *path)
 
 RLOTTIE_API Lottie_Animation_S *lottie_animation_from_data(const char *data, const char *key, const char *resourcePath)
 {
-    if (auto animation = Animation::loadFromData(data, key, resourcePath) ) {
+    std::string jsonData(data ? data : "");
+    const std::string cacheKey(key ? key : "");
+    const std::string externalResourcePath(resourcePath ? resourcePath : "");
+    if (auto animation = Animation::loadFromData(std::move(jsonData), cacheKey, externalResourcePath) ) {
         Lottie_Animation_S *handle = new Lottie_Animation_S();
         handle->mAnimation = std::move(animation);
         return handle;
@@ -201,6 +205,8 @@ lottie_animation_property_override(Lottie_Animation_S *animation,
                                    const char *keypath,
                                    ...)
 {
+    if (!animation || !keypath) return;
+    const std::string keyPathString(keypath);
     va_list prop;
     va_start(prop, keypath);
     const int arg_count = [type](){
@@ -234,13 +240,13 @@ lottie_animation_property_override(Lottie_Animation_S *animation,
         double g = v[1];
         double b = v[2];
         if (r > 1 || r < 0 || g > 1 || g < 0 || b > 1 || b < 0) break;
-        animation->mAnimation->setValue<rlottie::Property::FillColor>(keypath, rlottie::Color(r, g, b));
+        animation->mAnimation->setValue<rlottie::Property::FillColor>(keyPathString, rlottie::Color(r, g, b));
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_FILLOPACITY: {
         double opacity = v[0];
         if (opacity > 100 || opacity < 0) break;
-        animation->mAnimation->setValue<rlottie::Property::FillOpacity>(keypath, (float)opacity);
+        animation->mAnimation->setValue<rlottie::Property::FillOpacity>(keyPathString, (float)opacity);
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_STROKECOLOR: {
@@ -248,49 +254,49 @@ lottie_animation_property_override(Lottie_Animation_S *animation,
         double g = v[1];
         double b = v[2];
         if (r > 1 || r < 0 || g > 1 || g < 0 || b > 1 || b < 0) break;
-        animation->mAnimation->setValue<rlottie::Property::StrokeColor>(keypath, rlottie::Color(r, g, b));
+        animation->mAnimation->setValue<rlottie::Property::StrokeColor>(keyPathString, rlottie::Color(r, g, b));
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_STROKEOPACITY: {
         double opacity = v[0];
         if (opacity > 100 || opacity < 0) break;
-        animation->mAnimation->setValue<rlottie::Property::StrokeOpacity>(keypath, (float)opacity);
+        animation->mAnimation->setValue<rlottie::Property::StrokeOpacity>(keyPathString, (float)opacity);
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_STROKEWIDTH: {
         double width = v[0];
         if (width < 0) break;
-        animation->mAnimation->setValue<rlottie::Property::StrokeWidth>(keypath, (float)width);
+        animation->mAnimation->setValue<rlottie::Property::StrokeWidth>(keyPathString, (float)width);
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_TR_POSITION: {
         double x = v[0];
         double y = v[1];
-        animation->mAnimation->setValue<rlottie::Property::TrPosition>(keypath, rlottie::Point((float)x, (float)y));
+        animation->mAnimation->setValue<rlottie::Property::TrPosition>(keyPathString, rlottie::Point((float)x, (float)y));
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_TR_SCALE: {
         double w = v[0];
         double h = v[1];
-        animation->mAnimation->setValue<rlottie::Property::TrScale>(keypath, rlottie::Size((float)w, (float)h));
+        animation->mAnimation->setValue<rlottie::Property::TrScale>(keyPathString, rlottie::Size((float)w, (float)h));
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_TR_ROTATION: {
         double r = v[0];
-        animation->mAnimation->setValue<rlottie::Property::TrRotation>(keypath, (float)r);
+        animation->mAnimation->setValue<rlottie::Property::TrRotation>(keyPathString, (float)r);
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_TRIM_PATH_START: {
         double start = v[0];
         if (start < 0 || start > 100) break;
-        animation->mAnimation->setValue<rlottie::Property::TrimStart>(keypath, (float)start);
+        animation->mAnimation->setValue<rlottie::Property::TrimStart>(keyPathString, (float)start);
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_TRIM_PATH_END: {
         double start = v[0];
         double end = v[1];
         if (start < 0 || start > 100 || end < 0 || end > 100) break;
-        animation->mAnimation->setValue<rlottie::Property::TrimEnd>(keypath, rlottie::Point((float)start, (float)end));
+        animation->mAnimation->setValue<rlottie::Property::TrimEnd>(keyPathString, rlottie::Point((float)start, (float)end));
         break;
     }
     case LOTTIE_ANIMATION_PROPERTY_TR_ANCHOR:
