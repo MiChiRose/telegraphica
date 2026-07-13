@@ -24,6 +24,14 @@ static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
 static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
 static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 
+static BOOL TGTDLibObjectIsBoolean(id object) {
+    return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
+}
+
+static BOOL TGTDLibObjectIsNumber(id object) {
+    return [object isKindOfClass:[NSNumber class]] && !TGTDLibObjectIsBoolean(object);
+}
+
 static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
         return YES;
@@ -5085,6 +5093,101 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [summary setObject:avatarPath forKey:@"avatar_path"];
     }
     return summary;
+}
+
+- (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load active sessions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:92];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getActiveSessions" forKey:@"@type"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-active-sessions"
+                                                            timeout:timeout
+                                                          errorCode:93
+                                                              error:error];
+    if (!response) {
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    id sessionsObject = [response objectForKey:@"sessions"];
+    id inactiveSessionTTLDays = [response objectForKey:@"inactive_session_ttl_days"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"sessions"] ||
+        ![sessionsObject isKindOfClass:[NSArray class]] || !TGTDLibObjectIsNumber(inactiveSessionTTLDays)) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib getActiveSessions returned an unexpected response." code:93];
+        }
+        return nil;
+    }
+
+    NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"log_in_date", @"last_active_date", nil];
+    NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", @"is_password_pending", @"can_accept_calls", @"can_accept_secret_chats", nil];
+    NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"ip", @"country", @"region", nil];
+    NSMutableArray *safeSessions = [NSMutableArray arrayWithCapacity:[(NSArray *)sessionsObject count]];
+    NSUInteger sessionIndex = 0;
+    for (sessionIndex = 0; sessionIndex < [(NSArray *)sessionsObject count]; sessionIndex++) {
+        id sessionObject = [(NSArray *)sessionsObject objectAtIndex:sessionIndex];
+        if (![sessionObject isKindOfClass:[NSDictionary class]]) {
+            if (error) {
+                NSString *message = [NSString stringWithFormat:@"TDLib getActiveSessions returned a non-dictionary session at index %lu.", (unsigned long)sessionIndex];
+                *error = [self errorWithDescription:message code:93];
+            }
+            return nil;
+        }
+
+        NSDictionary *session = (NSDictionary *)sessionObject;
+        NSMutableDictionary *safeSession = [NSMutableDictionary dictionary];
+        NSUInteger keyIndex = 0;
+        for (keyIndex = 0; keyIndex < [numberKeys count]; keyIndex++) {
+            NSString *key = [numberKeys objectAtIndex:keyIndex];
+            id value = [session objectForKey:key];
+            if (!TGTDLibObjectIsNumber(value)) {
+                if (error) {
+                    NSString *message = [NSString stringWithFormat:@"TDLib session at index %lu has an invalid numeric field '%@'.", (unsigned long)sessionIndex, key];
+                    *error = [self errorWithDescription:message code:93];
+                }
+                return nil;
+            }
+            [safeSession setObject:value forKey:key];
+        }
+        for (keyIndex = 0; keyIndex < [booleanKeys count]; keyIndex++) {
+            NSString *key = [booleanKeys objectAtIndex:keyIndex];
+            id value = [session objectForKey:key];
+            if (!TGTDLibObjectIsBoolean(value)) {
+                if (error) {
+                    NSString *message = [NSString stringWithFormat:@"TDLib session at index %lu has an invalid boolean field '%@'.", (unsigned long)sessionIndex, key];
+                    *error = [self errorWithDescription:message code:93];
+                }
+                return nil;
+            }
+            [safeSession setObject:value forKey:key];
+        }
+        for (keyIndex = 0; keyIndex < [stringKeys count]; keyIndex++) {
+            NSString *key = [stringKeys objectAtIndex:keyIndex];
+            id value = [session objectForKey:key];
+            if (![value isKindOfClass:[NSString class]]) {
+                if (error) {
+                    NSString *message = [NSString stringWithFormat:@"TDLib session at index %lu has an invalid string field '%@'.", (unsigned long)sessionIndex, key];
+                    *error = [self errorWithDescription:message code:93];
+                }
+                return nil;
+            }
+            [safeSession setObject:value forKey:key];
+        }
+        [safeSessions addObject:[NSDictionary dictionaryWithDictionary:safeSession]];
+    }
+
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            [NSArray arrayWithArray:safeSessions], @"sessions",
+            inactiveSessionTTLDays, @"inactive_session_ttl_days",
+            nil];
 }
 
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
