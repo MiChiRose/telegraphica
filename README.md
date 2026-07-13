@@ -51,10 +51,10 @@ In plain language, the goal is:
 
 ## Current Alpha: `v0.4.1-alpha.2`
 
-This alpha is the first release candidate we are comfortable putting in front
-of real legacy-Mac testers. It is still alpha software, but the everyday loop is
-now useful enough for live feedback: sign in, read chats, send messages, handle
-media, and keep the app updated from GitHub Releases.
+This public alpha is ready for real legacy-Mac testers. It is still alpha
+software, but the everyday loop is now useful enough for live feedback: sign in,
+read chats, send messages, handle media, and keep the app updated from GitHub
+Releases.
 
 ### ✅ Working In This Alpha
 
