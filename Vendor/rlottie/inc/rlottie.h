@@ -308,7 +308,7 @@ public:
      */
     static std::unique_ptr<Animation>
     loadFromData(std::string jsonData, const std::string &key,
-                 const std::string &resourcePath="", bool cachePolicy=true);
+                 const std::string &resourcePath, bool cachePolicy=true);
 
     /**
      *  @brief Constructs an animation object from JSON string data and update.

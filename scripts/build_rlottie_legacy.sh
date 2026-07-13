@@ -16,6 +16,11 @@ if [ ! -d "$SOURCE_DIR/src" ] || [ ! -f "$SOURCE_DIR/inc/rlottie_capi.h" ]; then
     exit 1
 fi
 
+if grep -E -q 'const[[:space:]]+std::string[[:space:]]*&[[:space:]]*[A-Za-z_][A-Za-z_0-9]*[[:space:]]*=[[:space:]]*""' "$SOURCE_DIR/inc/rlottie.h"; then
+    echo "rlottie contains an empty-string reference default that AppleClang 6.0 cannot parse."
+    exit 1
+fi
+
 rm -rf "$BUILD_DIR"
 mkdir -p "$OBJECT_DIR" "$CONFIG_DIR"
 printf '%s\n' '/* Telegraphica legacy rlottie configuration. */' > "$CONFIG_DIR/config.h"
