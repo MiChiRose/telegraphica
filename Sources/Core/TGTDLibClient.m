@@ -581,6 +581,23 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return summary;
     }
 
+    if ([type isEqualToString:@"updateUnreadMessageCount"]) {
+        id chatListObject = [dictionary objectForKey:@"chat_list"];
+        NSString *chatListType = [chatListObject isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)chatListObject objectForKey:@"@type"] : nil;
+        if ([chatListType length] == 0 || [chatListType isEqualToString:@"chatListMain"]) {
+            id unreadValue = [dictionary objectForKey:@"unread_unmuted_count"];
+            if (![unreadValue respondsToSelector:@selector(unsignedIntegerValue)]) {
+                unreadValue = [dictionary objectForKey:@"unread_count"];
+            }
+            if ([unreadValue respondsToSelector:@selector(unsignedIntegerValue)]) {
+                return [NSDictionary dictionaryWithObjectsAndKeys:
+                        @"account_unread", @"kind",
+                        [NSNumber numberWithUnsignedInteger:[unreadValue unsignedIntegerValue]], @"count",
+                        nil];
+            }
+        }
+    }
+
     if ([type isEqualToString:@"updateMessageSendSucceeded"] || [type isEqualToString:@"updateMessageSendFailed"]) {
         id messageObject = [dictionary objectForKey:@"message"];
         if ([messageObject isKindOfClass:[NSDictionary class]]) {
