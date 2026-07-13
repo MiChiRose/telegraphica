@@ -1,16 +1,24 @@
 #import "TGInlineMediaPlaybackCoordinator.h"
+#import "TGTGSAnimationView.h"
 #import <AVFoundation/AVFoundation.h>
 
 NSString * const TGInlineMediaIdentifierKey = @"identifier";
 NSString * const TGInlineMediaPathKey = @"path";
 NSString * const TGInlineMediaFrameKey = @"frame";
+NSString * const TGInlineMediaKindKey = @"kind";
+
+NSString * const TGInlineMediaKindGIF = @"gif";
+NSString * const TGInlineMediaKindVideo = @"video";
+NSString * const TGInlineMediaKindTGS = @"tgs";
 
 @interface TGInlineMediaPlaybackView : NSView
 @property (nonatomic, retain) AVPlayer *player;
 @property (nonatomic, retain) AVPlayerLayer *playerLayer;
 @property (nonatomic, retain) NSImageView *imageView;
+@property (nonatomic, retain) TGTGSAnimationView *tgsView;
 @property (nonatomic, copy) NSString *mediaPath;
-- (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath;
+@property (nonatomic, copy) NSString *mediaKind;
+- (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath mediaKind:(NSString *)mediaKind;
 - (void)setPlaybackActive:(BOOL)active;
 @end
 
@@ -19,7 +27,9 @@ NSString * const TGInlineMediaFrameKey = @"frame";
 @synthesize player = _player;
 @synthesize playerLayer = _playerLayer;
 @synthesize imageView = _imageView;
+@synthesize tgsView = _tgsView;
 @synthesize mediaPath = _mediaPath;
+@synthesize mediaKind = _mediaKind;
 
 static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     if ([[[path pathExtension] lowercaseString] isEqualToString:@"gif"]) {
@@ -35,19 +45,28 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     return [signature isEqualToString:@"GIF87a"] || [signature isEqualToString:@"GIF89a"];
 }
 
-- (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath {
+- (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath mediaKind:(NSString *)mediaKind {
     self = [super initWithFrame:frame];
     if (!self) {
         return nil;
     }
 
     self.mediaPath = mediaPath;
+    self.mediaKind = mediaKind;
     [self setAutoresizingMask:NSViewNotSizable];
     [self setWantsLayer:YES];
     [[self layer] setMasksToBounds:YES];
     [[self layer] setCornerRadius:7.0];
 
-    if (TGInlineMediaPathContainsGIF(mediaPath)) {
+    if ([mediaKind isEqualToString:TGInlineMediaKindTGS]) {
+        TGTGSAnimationView *tgsView = [[[TGTGSAnimationView alloc] initWithFrame:[self bounds]
+                                                                        tgsPath:mediaPath] autorelease];
+        if ([tgsView isAnimationValid]) {
+            [tgsView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+            [self addSubview:tgsView];
+            self.tgsView = tgsView;
+        }
+    } else if ([mediaKind isEqualToString:TGInlineMediaKindGIF] || TGInlineMediaPathContainsGIF(mediaPath)) {
         NSImage *image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
         if (image) {
             NSImageView *imageView = [[[NSImageView alloc] initWithFrame:[self bounds]] autorelease];
@@ -88,6 +107,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [super setFrame:frame];
     [self.playerLayer setFrame:[self bounds]];
     [self.imageView setFrame:[self bounds]];
+    [self.tgsView setFrame:[self bounds]];
 }
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
@@ -101,9 +121,11 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 - (void)setPlaybackActive:(BOOL)active {
     if (active) {
         [self.imageView setAnimates:YES];
+        [self.tgsView setPlaybackActive:YES];
         [self.player play];
     } else {
         [self.imageView setAnimates:NO];
+        [self.tgsView setPlaybackActive:NO];
         [self.player pause];
     }
 }
@@ -115,7 +137,9 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [_playerLayer removeFromSuperlayer];
     [_playerLayer release];
     [_imageView release];
+    [_tgsView release];
     [_mediaPath release];
+    [_mediaKind release];
     [super dealloc];
 }
 
@@ -188,12 +212,16 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         NSDictionary *descriptor = (NSDictionary *)candidate;
         NSString *identifier = [descriptor objectForKey:TGInlineMediaIdentifierKey];
         NSString *path = [descriptor objectForKey:TGInlineMediaPathKey];
+        NSString *kind = [descriptor objectForKey:TGInlineMediaKindKey];
         NSValue *frameValue = [descriptor objectForKey:TGInlineMediaFrameKey];
         if (![identifier isKindOfClass:[NSString class]] || [identifier length] == 0 ||
             ![path isKindOfClass:[NSString class]] || [path length] == 0 ||
             ![frameValue isKindOfClass:[NSValue class]] ||
             ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
             continue;
+        }
+        if (![kind isKindOfClass:[NSString class]] || [kind length] == 0) {
+            kind = TGInlineMediaKindVideo;
         }
 
         NSRect frame = [frameValue rectValue];
@@ -202,14 +230,14 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         }
 
         TGInlineMediaPlaybackView *view = [self.viewsByIdentifier objectForKey:identifier];
-        if (view && ![[view mediaPath] isEqualToString:path]) {
+        if (view && (![[view mediaPath] isEqualToString:path] || ![[view mediaKind] isEqualToString:kind])) {
             [view removeFromSuperview];
             [self.viewsByIdentifier removeObjectForKey:identifier];
             view = nil;
         }
         if (!view) {
-            view = [[[TGInlineMediaPlaybackView alloc] initWithFrame:frame mediaPath:path] autorelease];
-            if (![view player] && ![view imageView]) {
+            view = [[[TGInlineMediaPlaybackView alloc] initWithFrame:frame mediaPath:path mediaKind:kind] autorelease];
+            if (![view player] && ![view imageView] && ![view tgsView]) {
                 continue;
             }
             [self.hostView addSubview:view];

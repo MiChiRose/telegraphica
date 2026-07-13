@@ -3235,7 +3235,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSString *fullLocalPath = [self completedLocalPathFromFileObject:stickerFile];
-    if ([formatType isEqualToString:@"stickerFormatWebp"] &&
+    BOOL shouldDownloadFullSticker = ([formatType isEqualToString:@"stickerFormatWebp"] ||
+                                      [formatType isEqualToString:@"stickerFormatTgs"]);
+    if (shouldDownloadFullSticker &&
         [fullLocalPath length] == 0 && downloadMissing && fileID) {
         if (didRequestDownload) {
             *didRequestDownload = YES;
@@ -3250,8 +3252,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         }
     }
 
-    /* TODO: Add a Mavericks-compatible TGS renderer in a later media iteration. */
-    /* TODO: Add a Mavericks-compatible WEBM sticker renderer after TGS support. */
+    /* TODO: Add a Mavericks-compatible WEBM/VP9 sticker renderer. */
     id emojiObject = [sticker objectForKey:@"emoji"];
     if ([emojiObject isKindOfClass:[NSString class]] && [(NSString *)emojiObject length] > 0) {
         [info setObject:emojiObject forKey:@"emoji"];
@@ -4633,7 +4634,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
-    NSUInteger downloadsRemaining = 18;
+    NSUInteger downloadsRemaining = safeLimit;
     for (index = 0; index < [(NSArray *)stickersObject count] && [items count] < safeLimit; index++) {
         BOOL didRequestDownload = NO;
         NSDictionary *info = [self stickerPreviewInfoFromStickerObject:[(NSArray *)stickersObject objectAtIndex:index]
