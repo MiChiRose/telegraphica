@@ -3477,6 +3477,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @property (nonatomic, retain) NSTimer *liveUpdateTimer;
 @property (nonatomic, assign) BOOL controlsBusy;
 @property (nonatomic, assign) BOOL authSubmissionInFlight;
+@property (nonatomic, assign) BOOL authClientRecoveryInFlight;
+@property (nonatomic, assign) NSUInteger authClientRecoveryAttemptCount;
 @property (nonatomic, assign) NSUInteger accountUnreadCount;
 @property (nonatomic, assign) BOOL hasAccountUnreadCount;
 @property (nonatomic, assign) BOOL backgroundChatRefreshInFlight;
@@ -3733,6 +3735,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @synthesize liveUpdateTimer = _liveUpdateTimer;
 @synthesize controlsBusy = _controlsBusy;
 @synthesize authSubmissionInFlight = _authSubmissionInFlight;
+@synthesize authClientRecoveryInFlight = _authClientRecoveryInFlight;
+@synthesize authClientRecoveryAttemptCount = _authClientRecoveryAttemptCount;
 @synthesize accountUnreadCount = _accountUnreadCount;
 @synthesize hasAccountUnreadCount = _hasAccountUnreadCount;
 @synthesize backgroundChatRefreshInFlight = _backgroundChatRefreshInFlight;
@@ -8669,6 +8673,82 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
            [state isEqualToString:@"waitPassword"];
 }
 
+- (BOOL)isTerminalAuthorizationState:(NSString *)state {
+    return [state isEqualToString:@"loggingOut"] ||
+           [state isEqualToString:@"closing"] ||
+           [state isEqualToString:@"closed"];
+}
+
+- (void)recoverTDLibClientAfterAuthorizationState:(NSString *)state
+                                    expectedClient:(TGTDLibClient *)expectedClient {
+    if (![self isTerminalAuthorizationState:state] || !expectedClient || self.client != expectedClient || self.authClientRecoveryInFlight) {
+        return;
+    }
+
+    if (self.authClientRecoveryAttemptCount >= 3) {
+        [self.statusField setStringValue:@"Sign-in restart required"];
+        [self appendDetail:@"TDLib sign-in recovery paused after three attempts. Use Try Again to retry without deleting local configuration."];
+        [self updateAuthControlsForState:state];
+        [self setControlsBusy:NO];
+        return;
+    }
+
+    self.authClientRecoveryInFlight = YES;
+    self.authClientRecoveryAttemptCount++;
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:@"Restarting Telegram connection..."];
+    [self appendDetail:[NSString stringWithFormat:@"TDLib auth state %@ requires a fresh client (attempt %lu of 3).",
+                        state,
+                        (unsigned long)self.authClientRecoveryAttemptCount]];
+
+    TGTDLibClient *clientToRecover = [expectedClient retain];
+    NSString *initialState = [state copy];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSString *observedState = initialState;
+        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:6.0];
+
+        while ([self isTerminalAuthorizationState:observedState] &&
+               ![observedState isEqualToString:@"closed"] &&
+               [[NSDate date] compare:deadline] == NSOrderedAscending) {
+            NSError *stateError = nil;
+            NSString *nextState = [clientToRecover authorizationStateSummaryWithTimeout:1.0 error:&stateError];
+            if ([nextState length] > 0) {
+                observedState = nextState;
+            } else if ([[stateError localizedDescription] rangeOfString:@"shutting down" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+                break;
+            }
+            if (![observedState isEqualToString:@"closed"]) {
+                [NSThread sleepForTimeInterval:0.15];
+            }
+        }
+
+        [clientToRecover shutdownWithTimeout:1.0];
+        [NSThread sleepForTimeInterval:0.2 * self.authClientRecoveryAttemptCount];
+        TGTDLibClient *replacementClient = [[[TGTDLibClient alloc] init] autorelease];
+        NSString *lastObservedState = [observedState copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client == clientToRecover) {
+                self.client = replacementClient;
+                self.initialConnectStarted = NO;
+                self.authClientRecoveryInFlight = NO;
+                [self appendDetail:[NSString stringWithFormat:@"TDLib client recreated after auth state %@.",
+                                    [lastObservedState length] > 0 ? lastObservedState : initialState]];
+                [self setControlsBusy:NO];
+                [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            } else {
+                self.authClientRecoveryInFlight = NO;
+            }
+        });
+
+        [lastObservedState release];
+        [initialState release];
+        [clientToRecover release];
+        [pool drain];
+    });
+}
+
 - (void)updateSendControls {
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     BOOL canTargetChat = [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget;
@@ -8971,6 +9051,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [self.authSecureField setEnabled:NO];
         [self.authButton setEnabled:NO];
         [self.authButton setHidden:YES];
+        [self updateVisibleSection];
+        [previousState release];
+        return;
+    }
+
+    if ([self isTerminalAuthorizationState:state]) {
+        [self.statusField setStringValue:@"Restarting Telegram connection..."];
+        [self.loginTitleField setStringValue:TGLoc(@"login.connecting.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.recovering.hint")];
+        [self.authLabel setStringValue:TGLoc(@"login.status")];
+        [self.authStateField setStringValue:@""];
+        [self.authStateField setHidden:YES];
+        [self.authTextField setHidden:YES];
+        [self.authSecureField setHidden:YES];
+        [self.authSecondaryLabel setHidden:YES];
+        [self.authSecondaryTextFieldBackgroundView setHidden:YES];
+        [self.authTextField setEnabled:NO];
+        [self.authSecureField setEnabled:NO];
+        [self.authButton setTitle:TGLoc(@"login.retry")];
+        [self.authButton setEnabled:(!self.controlsBusy && !self.authClientRecoveryInFlight && self.authClientRecoveryAttemptCount >= 3)];
+        [self.authButton setHidden:(self.authClientRecoveryAttemptCount < 3)];
         [self updateVisibleSection];
         [previousState release];
         return;
@@ -12063,6 +12164,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     if ([latestAuthorizationState length] > 0 && ![latestAuthorizationState isEqualToString:self.currentAuthState]) {
         [self updateAuthControlsForState:latestAuthorizationState];
+        if ([self isTerminalAuthorizationState:latestAuthorizationState]) {
+            [self recoverTDLibClientAfterAuthorizationState:latestAuthorizationState expectedClient:self.client];
+        } else {
+            self.authClientRecoveryAttemptCount = 0;
+        }
     }
 
     if (needsChatRefresh) {
@@ -12155,6 +12261,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *receiverSummary = [[client receiverStatusSummary] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client != client) {
+                return;
+            }
             if (probeSummary) {
                 [self.statusField setStringValue:[finalAuthorizationState isEqualToString:@"ready"] ? @"Connected" : @"Login required"];
                 [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPath ? loadedPath : @"unknown path"]];
@@ -12195,6 +12304,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 }
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
                 [self setControlsBusy:NO];
+                if ([self isTerminalAuthorizationState:finalAuthorizationState]) {
+                    [self recoverTDLibClientAfterAuthorizationState:finalAuthorizationState expectedClient:client];
+                } else {
+                    self.authClientRecoveryAttemptCount = 0;
+                }
             } else {
                 NSString *message = [probeError localizedDescription] ? [probeError localizedDescription] : @"Unknown TDLib error.";
                 [self setControlsBusy:NO];
@@ -12214,6 +12328,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 - (void)submitAuthInput:(id)sender {
     (void)sender;
+    if ([self isTerminalAuthorizationState:self.currentAuthState]) {
+        if (!self.authClientRecoveryInFlight) {
+            self.authClientRecoveryAttemptCount = 0;
+            [self recoverTDLibClientAfterAuthorizationState:self.currentAuthState expectedClient:self.client];
+        }
+        return;
+    }
     if (self.controlsBusy || self.authSubmissionInFlight) {
         return;
     }
@@ -13420,6 +13541,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                 [[TGLogger sharedLogger] log:@"TDLib logout accepted."];
                 self.client = [[[TGTDLibClient alloc] init] autorelease];
                 self.initialConnectStarted = NO;
+                self.authClientRecoveryInFlight = NO;
+                self.authClientRecoveryAttemptCount = 0;
                 self.profileSummaryLoaded = NO;
                 self.pendingLiveChatRefresh = NO;
                 self.pendingLiveMessageRefresh = NO;
