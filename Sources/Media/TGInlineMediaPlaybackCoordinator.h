@@ -3,6 +3,11 @@
 extern NSString * const TGInlineMediaIdentifierKey;
 extern NSString * const TGInlineMediaPathKey;
 extern NSString * const TGInlineMediaFrameKey;
+extern NSString * const TGInlineMediaKindKey;
+
+extern NSString * const TGInlineMediaKindGIF;
+extern NSString * const TGInlineMediaKindVideo;
+extern NSString * const TGInlineMediaKindTGS;
 
 @interface TGInlineMediaPlaybackCoordinator : NSObject
 

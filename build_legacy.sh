@@ -61,6 +61,8 @@ if "$XCODEBUILD" -showsdks 2>/dev/null | grep -q "macosx10\.9"; then
 fi
 SDK_ARGS=(-sdk "$SDK_NAME")
 
+scripts/check_media_item_support.sh "$ARCH" "$BUILD_ROOT/Tests/media-item-support" "$SDK_NAME"
+
 INFO_SOURCE="Sources/Info.plist"
 APP_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_SOURCE" 2>/dev/null || true)"
 if [ -z "$APP_VERSION" ]; then
@@ -137,6 +139,15 @@ if [ ! -f "$WEBP_STATIC_LIBRARY" ]; then
     exit 1
 fi
 
+RLOTTIE_BUILD_DIR="$BUILD_ROOT/Vendor/rlottie"
+scripts/build_rlottie_legacy.sh "$ARCH" "$RLOTTIE_BUILD_DIR" "$SDK_NAME"
+RLOTTIE_STATIC_LIBRARY="$PWD/$RLOTTIE_BUILD_DIR/librlottie.a"
+if [ ! -f "$RLOTTIE_STATIC_LIBRARY" ]; then
+    echo "rlottie library was not produced: $RLOTTIE_STATIC_LIBRARY"
+    exit 1
+fi
+scripts/check_tgs_legacy.sh "$ARCH" "$RLOTTIE_BUILD_DIR" "$SDK_NAME"
+
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
     "VALID_ARCHS=$ARCH"
@@ -157,8 +168,8 @@ COMMON_SETTINGS=(
     "CODE_SIGNING_ALLOWED=NO"
     "CODE_SIGNING_REQUIRED=NO"
     "CODE_SIGN_IDENTITY="
-	"HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src"
-	"OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY"
+    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc"
+    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY -lc++ -lz"
     "SYMROOT=$BUILD_ROOT"
     "OBJROOT=$BUILD_ROOT/Intermediates"
     "DSTROOT=$BUILD_ROOT/Install"

@@ -4,6 +4,7 @@
 #import "TGTheme.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGMediaImageLoader.h"
+#import "../Media/TGMediaItemSupport.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGTDLibClient.h"
@@ -480,141 +481,6 @@ static NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionar
         [attributed addAttribute:NSUnderlineStyleAttributeName value:[NSNumber numberWithInteger:NSUnderlineStyleSingle] range:[result range]];
     }
     return attributed;
-}
-
-static NSString *TGMediaItemLocalPath(NSDictionary *mediaItem) {
-    id path = [mediaItem objectForKey:@"local_path"];
-    return [path isKindOfClass:[NSString class]] ? (NSString *)path : nil;
-}
-
-static NSString *TGMediaItemFullLocalPath(NSDictionary *mediaItem) {
-    id path = [mediaItem objectForKey:@"full_local_path"];
-    return [path isKindOfClass:[NSString class]] ? (NSString *)path : nil;
-}
-
-static NSData *TGMediaItemMiniThumbnailData(NSDictionary *mediaItem) {
-    id data = [mediaItem objectForKey:@"minithumbnail_data"];
-    return [data isKindOfClass:[NSData class]] ? (NSData *)data : nil;
-}
-
-static NSNumber *TGMediaItemFullFileID(NSDictionary *mediaItem) {
-    id fileID = [mediaItem objectForKey:@"full_file_id"];
-    if ([fileID respondsToSelector:@selector(integerValue)]) {
-        return [NSNumber numberWithInteger:[fileID integerValue]];
-    }
-    fileID = [mediaItem objectForKey:@"playable_file_id"];
-    if ([fileID respondsToSelector:@selector(integerValue)]) {
-        return [NSNumber numberWithInteger:[fileID integerValue]];
-    }
-    fileID = [mediaItem objectForKey:@"file_id"];
-    if ([fileID respondsToSelector:@selector(integerValue)]) {
-        return [NSNumber numberWithInteger:[fileID integerValue]];
-    }
-    return nil;
-}
-
-static NSString *TGMediaItemContentType(NSDictionary *mediaItem) {
-    id contentType = [mediaItem objectForKey:@"content_type"];
-    return [contentType isKindOfClass:[NSString class]] ? (NSString *)contentType : nil;
-}
-
-static BOOL TGMediaItemIsAnimation(NSDictionary *mediaItem) {
-    return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageAnimation"];
-}
-
-static BOOL TGMediaItemIsVideo(NSDictionary *mediaItem) {
-    NSString *contentType = TGMediaItemContentType(mediaItem);
-    return ([contentType isEqualToString:@"messageVideo"] ||
-            [contentType isEqualToString:@"messageVideoNote"]);
-}
-
-static BOOL TGMediaItemIsPlayable(NSDictionary *mediaItem) {
-    NSString *contentType = TGMediaItemContentType(mediaItem);
-    if ([contentType isEqualToString:@"messageAnimation"] ||
-        [contentType isEqualToString:@"messageVideo"] ||
-        [contentType isEqualToString:@"messageVideoNote"]) {
-        return YES;
-    }
-    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
-    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
-    return ([mimeType hasPrefix:@"video/"] || [mimeType hasPrefix:@"audio/"]);
-}
-
-static BOOL TGMediaItemIsAudioOnlyPlayable(NSDictionary *mediaItem) {
-    NSString *contentType = TGMediaItemContentType(mediaItem);
-    if ([contentType isEqualToString:@"messageVideo"] ||
-        [contentType isEqualToString:@"messageVideoNote"] ||
-        [contentType isEqualToString:@"messageAnimation"]) {
-        return NO;
-    }
-    if ([contentType isEqualToString:@"messageVoiceNote"] ||
-        [contentType isEqualToString:@"messageAudio"]) {
-        return YES;
-    }
-    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
-    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : nil;
-    return [mimeType hasPrefix:@"audio/"];
-}
-
-static NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
-    id path = [mediaItem objectForKey:@"playable_local_path"];
-    if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
-        return (NSString *)path;
-    }
-    path = [mediaItem objectForKey:@"full_local_path"];
-    if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
-        return (NSString *)path;
-    }
-    path = TGMediaItemLocalPath(mediaItem);
-    if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
-        NSString *extension = [[(NSString *)path pathExtension] lowercaseString];
-        if ([extension isEqualToString:@"mp4"] ||
-            [extension isEqualToString:@"mov"] ||
-            [extension isEqualToString:@"m4v"] ||
-            [extension isEqualToString:@"webm"] ||
-            [extension isEqualToString:@"gif"] ||
-            [extension isEqualToString:@"mp3"] ||
-            [extension isEqualToString:@"m4a"] ||
-            [extension isEqualToString:@"aac"] ||
-            [extension isEqualToString:@"ogg"] ||
-            [extension isEqualToString:@"opus"]) {
-            return (NSString *)path;
-        }
-    }
-    return nil;
-}
-
-static NSString *TGInlinePlaybackPathForMediaItem(NSDictionary *mediaItem) {
-    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-    NSString *playablePath = TGMediaItemPlayableLocalPath(mediaItem);
-    NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
-    NSString *localPath = TGMediaItemLocalPath(mediaItem);
-    NSArray *candidatePaths = [NSArray arrayWithObjects:
-                               playablePath ? playablePath : @"",
-                               fullPath ? fullPath : @"",
-                               localPath ? localPath : @"",
-                               nil];
-    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
-    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : @"";
-    BOOL animationContent = TGMediaItemIsAnimation(mediaItem);
-    NSUInteger index = 0;
-    for (index = 0; index < [candidatePaths count]; index++) {
-        NSString *path = [candidatePaths objectAtIndex:index];
-        if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
-            continue;
-        }
-        NSString *extension = [[path pathExtension] lowercaseString];
-        BOOL supported = ([extension isEqualToString:@"gif"] ||
-                          [extension isEqualToString:@"mp4"] ||
-                          [extension isEqualToString:@"mov"] ||
-                          [extension isEqualToString:@"m4v"]);
-        if (supported || (animationContent && ([mimeType isEqualToString:@"image/gif"] || [mimeType isEqualToString:@"video/mp4"]))) {
-            return path;
-        }
-    }
-    return nil;
 }
 
 static NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -6100,6 +5966,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if (![mediaItem isKindOfClass:[NSDictionary class]]) {
         return;
     }
+    if (!TGMediaItemSupportsPreview(mediaItem)) {
+        return;
+    }
     if (TGMediaItemIsPlayable(mediaItem)) {
         [self openPlayableMediaForMediaItem:mediaItem];
         return;
@@ -8329,6 +8198,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     if ([notification object] == self.stickerPickerWindow) {
         [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+        [self scheduleInlineMediaPlaybackRefresh];
     }
 }
 
@@ -9136,7 +9006,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                          [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
                          ![self.messageScrollView isHidden] &&
                          ![self.messageTableView isHidden]);
-    if (!chatsVisible || [self.messageItems count] == 0) {
+    if (!chatsVisible || [self.messageItems count] == 0 || [self.stickerPickerWindow isVisible]) {
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         return;
     }
@@ -9169,7 +9039,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             NSString *path = TGInlinePlaybackPathForMediaItem(mediaItem);
             NSString *contentType = TGMediaItemContentType(mediaItem);
             NSString *extension = [[path pathExtension] lowercaseString];
-            BOOL animation = ([contentType isEqualToString:@"messageAnimation"] || [extension isEqualToString:@"gif"]);
+            NSString *playbackKind = TGInlinePlaybackKindForMediaItem(mediaItem);
+            BOOL animation = ([contentType isEqualToString:@"messageAnimation"] ||
+                              [extension isEqualToString:@"gif"] ||
+                              [playbackKind isEqualToString:TGInlineMediaKindTGS]);
             if (!animation || [path length] == 0 || !NSIntersectsRect(frame, visibleRect)) {
                 continue;
             }
@@ -9186,6 +9059,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                     identifier, TGInlineMediaIdentifierKey,
                                     path, TGInlineMediaPathKey,
                                     [NSValue valueWithRect:frame], TGInlineMediaFrameKey,
+                                    playbackKind, TGInlineMediaKindKey,
                                     nil]];
         }
     }
@@ -9411,7 +9285,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     }
     NSDictionary *mediaItem = [self mediaItemForItem:item inCellFrame:cellFrame atPoint:tablePoint];
     if (mediaItem) {
-        return YES;
+        return TGMediaItemSupportsPreview(mediaItem);
     }
     if (TGMessageItemIsNonVisualPlayableMedia(item)) {
         NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:item]);
@@ -9994,6 +9868,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                         inCellFrame:cellFrame
                                             atPoint:mouseLocation];
     if (mediaItem) {
+        if (!TGMediaItemSupportsPreview(mediaItem)) {
+            return nil;
+        }
         return TGMediaItemIsPlayable(mediaItem) ? @"Play media" : @"Open media preview";
     }
     if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
@@ -12572,7 +12449,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     self.stickerPickerScrollView = scrollView;
     self.stickerPickerContentView = gridView;
     self.stickerPickerPlaybackCoordinator = [[[TGInlineMediaPlaybackCoordinator alloc] initWithHostView:gridView
-                                                                                           maximumActiveItems:25] autorelease];
+                                                                                           maximumActiveItems:5] autorelease];
     self.stickerPickerWindow = window;
 }
 
@@ -12611,11 +12488,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             continue;
         }
         NSString *identifier = [NSString stringWithFormat:@"sticker-picker-%ld-%@", (long)stickerIndex, path];
+        NSString *playbackKind = TGInlinePlaybackKindForMediaItem((NSDictionary *)candidateItem);
         NSRect playbackFrame = NSInsetRect([candidateView frame], 4.0, 4.0);
         [descriptors addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                                 identifier, TGInlineMediaIdentifierKey,
                                 path, TGInlineMediaPathKey,
                                 [NSValue valueWithRect:playbackFrame], TGInlineMediaFrameKey,
+                                playbackKind, TGInlineMediaKindKey,
                                 nil]];
     }
     [self.stickerPickerPlaybackCoordinator updateWithDescriptors:descriptors];
@@ -12732,6 +12611,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
     [self ensureStickerPickerWindow];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.stickerPickerWindow setTitle:TGLoc(@"stickers")];
     [self.stickerPickerWindow center];
     [self.stickerPickerWindow makeKeyAndOrderFront:nil];
@@ -12765,6 +12645,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSNumber *height = [[sticker objectForKey:@"height"] retain];
     [self.stickerPickerWindow orderOut:nil];
     [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+    [self scheduleInlineMediaPlaybackRefresh];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending sticker..."];
 
