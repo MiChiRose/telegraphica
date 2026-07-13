@@ -99,7 +99,7 @@ Compiled alpha builds live in:
 
 ➡️ **[GitHub Releases](https://github.com/MiChiRose/telegraphica/releases)**
 
-### For Normal Users
+### For Users
 
 1. Open the latest release page.
 2. Click **Assets** if the download list is collapsed.
@@ -109,16 +109,15 @@ Compiled alpha builds live in:
 6. Launch Telegraphica and sign in with your Telegram phone number.
 
 If you are not sure which file to download, choose the file ending in
-**`.dmg`**. The `.app.zip` and `.sha256` files are mainly for troubleshooting,
-manual transfer, and checksum verification.
+**`.dmg`**.
 
-### Release Files
+### For Developers / Troubleshooting
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg` | Normal installation | Download this one if you just want to install the app. |
+| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
 | `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
-| `.sha256` files | Checksum verification | Optional technical files; most users can ignore them. |
+| `.sha256` files | Checksum verification | You do not need these files to install Telegraphica. |
 
 ### First Launch
 
