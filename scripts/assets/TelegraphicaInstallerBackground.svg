@@ -2,8 +2,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#315f86"/>
-      <stop offset="1" stop-color="#173650"/>
+      <stop offset="0" stop-color="#b6cfdf"/>
+      <stop offset="1" stop-color="#93b3c8"/>
     </linearGradient>
     <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#c7d9e8"/>
@@ -21,10 +21,10 @@
   <rect x="23" y="23" width="554" height="42" rx="11" fill="#234966" opacity="0.9"/>
   <rect x="23" y="52" width="554" height="13" fill="#234966" opacity="0.9"/>
   <text x="48" y="50" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold">Telegraphica</text>
-  <text x="48" y="86" fill="#d8e5ef" font-family="Helvetica, Arial, sans-serif" font-size="13">Drag Telegraphica to Applications</text>
+  <text x="48" y="86" fill="#234966" font-family="Helvetica, Arial, sans-serif" font-size="13">Drag Telegraphica to Applications</text>
   <path d="M251 190 H326 L309 173 L322 160 L363 201 L322 242 L309 229 L326 212 H251 Z"
         fill="url(#arrow)" stroke="#123047" stroke-width="2" filter="url(#shadow)"/>
   <circle cx="132" cy="205" r="73" fill="#0f2b42" opacity="0.22"/>
   <circle cx="468" cy="205" r="73" fill="#0f2b42" opacity="0.22"/>
-  <text x="300" y="354" text-anchor="middle" fill="#adc4d6" font-family="Helvetica, Arial, sans-serif" font-size="12">OS X 10.9 Mavericks and later</text>
+  <text x="300" y="354" text-anchor="middle" fill="#173650" font-family="Helvetica, Arial, sans-serif" font-size="12">OS X 10.9 Mavericks and later</text>
 </svg>

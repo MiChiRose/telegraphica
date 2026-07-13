@@ -39,6 +39,14 @@ if [ ! -f "$TDJSON_BUNDLED_PATH" ]; then
     fi
 fi
 
+BUNDLED_CONFIG_PATH="$APP_PATH/Contents/Resources/TelegraphicaTDLibDefaults.plist"
+BUNDLED_API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$BUNDLED_CONFIG_PATH" 2>/dev/null || true)"
+BUNDLED_API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$BUNDLED_CONFIG_PATH" 2>/dev/null || true)"
+if ! echo "$BUNDLED_API_ID" | grep -E -q '^[1-9][0-9]*$' || ! echo "$BUNDLED_API_HASH" | grep -E -q '^[[:xdigit:]]{32}$'; then
+    echo "Refusing to create an installer without a valid internal Telegram connection configuration."
+    exit 1
+fi
+
 mkdir -p "$DIST_DIR"
 
 DMG_NAME="Telegraphica-v${APP_VERSION}-installer.dmg"
