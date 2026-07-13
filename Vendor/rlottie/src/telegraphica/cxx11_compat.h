@@ -1,10 +1,31 @@
 #ifndef TELEGRAPHICA_RLOTTIE_CXX11_COMPAT_H
 #define TELEGRAPHICA_RLOTTIE_CXX11_COMPAT_H
 
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <condition_variable>
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <functional>
+#include <future>
+#include <limits>
+#include <list>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <set>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <tuple>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 #if __cplusplus < 201402L
 namespace std {

@@ -26,6 +26,13 @@ if grep -E -q 'Animation::loadFromFile\(path\)|Animation::loadFromData\(data,[[:
     exit 1
 fi
 
+for required_header in cstddef cstdint functional future memory string tuple type_traits vector; do
+    if ! grep -F -q "#include <$required_header>" "$SOURCE_DIR/inc/rlottie.h"; then
+        echo "rlottie public header is missing <$required_header>; Xcode 6 libc++ cannot rely on transitive includes."
+        exit 1
+    fi
+done
+
 rm -rf "$BUILD_DIR"
 mkdir -p "$OBJECT_DIR" "$CONFIG_DIR"
 printf '%s\n' '/* Telegraphica legacy rlottie configuration. */' > "$CONFIG_DIR/config.h"

@@ -24,6 +24,10 @@ The private renderer build uses C++11 and force-includes
 `src/telegraphica/cxx11_compat.h`, which backports `make_unique` and
 `enable_if_t`. Keeping the full renderer in C++11 mode makes the source-level
 language requirement explicit and testable against the Xcode 6.2 generation.
+The compatibility header also supplies a complete standard-library baseline
+because the Mavericks libc++ headers expose fewer transitive includes than
+current libc++. The public `rlottie.h` explicitly includes every standard type
+it exposes, including `string`, `tuple`, and `function`.
 
 Upstream: https://github.com/Samsung/rlottie
 
