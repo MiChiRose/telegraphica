@@ -31,8 +31,10 @@ static void TGInlineMediaPlaybackPostDiagnostic(NSString *message) {
 @property (nonatomic, copy) NSString *mediaPath;
 @property (nonatomic, copy) NSString *mediaKind;
 @property (nonatomic, copy) NSString *failureReason;
+@property (nonatomic, assign) BOOL playbackActive;
 - (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath mediaKind:(NSString *)mediaKind;
 - (void)setPlaybackActive:(BOOL)active;
+- (NSString *)diagnosticSummary;
 - (NSRect)contentFrame;
 @end
 
@@ -45,6 +47,7 @@ static void TGInlineMediaPlaybackPostDiagnostic(NSString *message) {
 @synthesize mediaPath = _mediaPath;
 @synthesize mediaKind = _mediaKind;
 @synthesize failureReason = _failureReason;
+@synthesize playbackActive = _playbackActive;
 
 static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     if ([[[path pathExtension] lowercaseString] isEqualToString:@"gif"]) {
@@ -80,6 +83,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             [tgsView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
             [self addSubview:tgsView];
             self.tgsView = tgsView;
+            TGInlineMediaPlaybackPostDiagnostic([NSString stringWithFormat:@"Media Playback: TGS renderer created file=%@", [mediaPath lastPathComponent]]);
         } else {
             self.failureReason = @"TGS renderer rejected sticker data.";
         }
@@ -150,6 +154,26 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     return nil;
 }
 
+- (NSString *)diagnosticSummary {
+    if (self.tgsView) {
+        return [NSString stringWithFormat:@"tgs frames=%lu last=%lu checksum=%llu active=%@ file=%@",
+                (unsigned long)[self.tgsView renderedFrameCount],
+                (unsigned long)[self.tgsView lastAppliedFrame],
+                [self.tgsView currentFrameChecksum],
+                _playbackActive ? @"yes" : @"no",
+                [self.mediaPath lastPathComponent]];
+    }
+    if (self.imageView) {
+        return [NSString stringWithFormat:@"gif imageView=yes active=%@ file=%@", _playbackActive ? @"yes" : @"no", [self.mediaPath lastPathComponent]];
+    }
+    if (self.player) {
+        return [NSString stringWithFormat:@"video player=yes active=%@ file=%@", _playbackActive ? @"yes" : @"no", [self.mediaPath lastPathComponent]];
+    }
+    return [NSString stringWithFormat:@"missing playback view reason=%@ file=%@",
+            [self.failureReason length] > 0 ? self.failureReason : @"unknown",
+            [self.mediaPath lastPathComponent]];
+}
+
 - (void)setFrame:(NSRect)frame {
     [super setFrame:frame];
     [self.playerLayer setFrame:[self bounds]];
@@ -198,6 +222,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 @property (nonatomic, retain) NSMutableDictionary *viewsByIdentifier;
 @property (nonatomic, assign) NSUInteger maximumActiveItems;
 @property (nonatomic, assign) BOOL applicationActive;
+- (void)reportTGSPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view;
 @end
 
 @implementation TGInlineMediaPlaybackCoordinator
@@ -293,6 +318,9 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             }
             [self.hostView addSubview:view];
             [self.viewsByIdentifier setObject:view forKey:identifier];
+            if ([[view mediaKind] isEqualToString:TGInlineMediaKindTGS]) {
+                [self performSelector:@selector(reportTGSPlaybackDiagnosticForView:) withObject:view afterDelay:1.2];
+            }
         } else if ([view superview] != self.hostView) {
             [view removeFromSuperview];
             [self.hostView addSubview:view];
@@ -315,6 +343,13 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         [self.viewsByIdentifier removeObjectForKey:identifier];
     }
     [existingIdentifiers release];
+}
+
+- (void)reportTGSPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view {
+    if (![view isKindOfClass:[TGInlineMediaPlaybackView class]] || [view superview] != self.hostView) {
+        return;
+    }
+    TGInlineMediaPlaybackPostDiagnostic([NSString stringWithFormat:@"Media Playback: %@", [view diagnosticSummary]]);
 }
 
 - (void)removeAllPlayback {

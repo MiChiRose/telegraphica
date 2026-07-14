@@ -339,11 +339,17 @@
         }
         NSString *path = TGInlinePlaybackPathForMediaItem((NSDictionary *)candidateItem);
         if ([path length] == 0) {
+            NSString *diagnosticKey = [NSString stringWithFormat:@"picker-missing-%ld", (long)stickerIndex];
+            [self logInlinePlaybackDiagnosticOnceForKey:diagnosticKey
+                                                message:[NSString stringWithFormat:@"Media Playback: picker skipped %@", TGMediaItemInlinePlaybackDiagnosticSummary((NSDictionary *)candidateItem)]];
             continue;
         }
         NSString *identifier = [NSString stringWithFormat:@"sticker-picker-%ld-%@", (long)stickerIndex, path];
         NSString *playbackKind = TGInlinePlaybackKindForMediaItem((NSDictionary *)candidateItem);
         NSRect playbackFrame = TGStickerPickerContentRectForButtonFrame([candidateView frame]);
+        [self logInlinePlaybackDiagnosticOnceForKey:[NSString stringWithFormat:@"picker-descriptor-%@", identifier]
+                                            message:[NSString stringWithFormat:@"Media Playback: picker descriptor queued kind=%@ file=%@",
+                                                     playbackKind, [path lastPathComponent]]];
         [descriptors addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                                 identifier, TGInlineMediaIdentifierKey,
                                 path, TGInlineMediaPathKey,

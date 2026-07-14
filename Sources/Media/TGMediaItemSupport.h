@@ -15,4 +15,5 @@ BOOL TGMediaItemIsAudioOnlyPlayable(NSDictionary *mediaItem);
 NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem);
 NSString *TGInlinePlaybackPathForMediaItem(NSDictionary *mediaItem);
 NSString *TGInlinePlaybackKindForMediaItem(NSDictionary *mediaItem);
+NSString *TGMediaItemInlinePlaybackDiagnosticSummary(NSDictionary *mediaItem);
 BOOL TGMediaItemSupportsPreview(NSDictionary *mediaItem);

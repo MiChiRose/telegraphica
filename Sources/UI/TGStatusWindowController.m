@@ -129,6 +129,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
+@property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
@@ -389,6 +390,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
+@synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
@@ -585,6 +587,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
         self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
@@ -2448,6 +2451,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
     }
     [_inlineMediaPlaybackCoordinator release];
+    [_inlineMediaPlaybackDiagnosticKeys release];
     [_messageTableView release];
     [_messageDropOverlayView release];
     [_messageItems release];

@@ -177,6 +177,33 @@ NSString *TGInlinePlaybackKindForMediaItem(NSDictionary *mediaItem) {
     return TGInlineMediaKindVideo;
 }
 
+NSString *TGMediaItemInlinePlaybackDiagnosticSummary(NSDictionary *mediaItem) {
+    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return @"media item is missing";
+    }
+    NSString *contentType = TGMediaItemContentType(mediaItem);
+    NSString *stickerFormat = TGMediaItemStickerFormat(mediaItem);
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? (NSString *)mimeTypeObject : @"";
+    NSString *localPath = TGMediaItemLocalPath(mediaItem);
+    NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
+    NSString *playablePath = TGMediaItemPlayableLocalPath(mediaItem);
+    NSString *inlinePath = TGInlinePlaybackPathForMediaItem(mediaItem);
+    NSString *kind = TGInlinePlaybackKindForMediaItem(mediaItem);
+    BOOL inlinePathExists = ([inlinePath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:inlinePath]);
+    NSString *fileName = [inlinePath length] > 0 ? [inlinePath lastPathComponent] : @"missing";
+    return [NSString stringWithFormat:@"content=%@ format=%@ mime=%@ kind=%@ inline=%@ exists=%@ local=%@ full=%@ playable=%@",
+            [contentType length] > 0 ? contentType : @"unknown",
+            [stickerFormat length] > 0 ? stickerFormat : @"none",
+            [mimeType length] > 0 ? mimeType : @"none",
+            [kind length] > 0 ? kind : @"unknown",
+            fileName,
+            inlinePathExists ? @"yes" : @"no",
+            [localPath length] > 0 ? [localPath lastPathComponent] : @"missing",
+            [fullPath length] > 0 ? [fullPath lastPathComponent] : @"missing",
+            [playablePath length] > 0 ? [playablePath lastPathComponent] : @"missing"];
+}
+
 BOOL TGMediaItemSupportsPreview(NSDictionary *mediaItem) {
     NSString *contentType = TGMediaItemContentType(mediaItem);
     return ([contentType isEqualToString:@"messagePhoto"] ||
