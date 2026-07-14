@@ -89,13 +89,15 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat titleX = NSMaxX(avatarRect) + 9.0;
     CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
     CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
-    CGFloat titleAvailableWidth = titleRight - titleX - ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0);
+    CGFloat pinIconWidth = [item isPinned] ? 10.0 : 0.0;
+    CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) + ([item isPinned] ? (pinIconWidth + 4.0) : 0.0);
+    CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
     if (titleAvailableWidth < 40.0) {
         titleAvailableWidth = 40.0;
     }
     NSSize titleSize = [[item title] sizeWithAttributes:titleAttributes];
     CGFloat titleDrawWidth = titleAvailableWidth;
-    if ([item notificationsMuted] && titleSize.width < titleAvailableWidth) {
+    if (([item notificationsMuted] || [item isPinned]) && titleSize.width < titleAvailableWidth) {
         titleDrawWidth = titleSize.width;
     }
     NSRect titleRect = NSMakeRect(titleX,
@@ -103,8 +105,30 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                   titleDrawWidth,
                                   16.0);
     [[item title] drawInRect:titleRect withAttributes:titleAttributes];
+    CGFloat iconX = NSMaxX(titleRect) + 4.0;
+    if ([item isPinned]) {
+        NSRect pinRect = NSMakeRect(iconX,
+                                    NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 12.0) / 2.0),
+                                    10.0,
+                                    12.0);
+        NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
+        [pinColor set];
+        NSBezierPath *pinPath = [NSBezierPath bezierPath];
+        CGFloat midX = NSMidX(pinRect);
+        CGFloat topY = [controlView isFlipped] ? NSMinY(pinRect) + 2.0 : NSMaxY(pinRect) - 2.0;
+        CGFloat bottomY = [controlView isFlipped] ? NSMaxY(pinRect) - 2.0 : NSMinY(pinRect) + 2.0;
+        [pinPath moveToPoint:NSMakePoint(midX - 3.0, topY)];
+        [pinPath lineToPoint:NSMakePoint(midX + 3.0, topY)];
+        [pinPath moveToPoint:NSMakePoint(midX, topY)];
+        [pinPath lineToPoint:NSMakePoint(midX, bottomY)];
+        [pinPath moveToPoint:NSMakePoint(midX - 2.0, bottomY - ([controlView isFlipped] ? 2.0 : -2.0))];
+        [pinPath lineToPoint:NSMakePoint(midX + 2.0, bottomY - ([controlView isFlipped] ? 2.0 : -2.0))];
+        [pinPath setLineWidth:1.4];
+        [pinPath stroke];
+        iconX = NSMaxX(pinRect) + 4.0;
+    }
     if ([item notificationsMuted]) {
-        NSRect muteRect = NSMakeRect(NSMaxX(titleRect) + 4.0,
+        NSRect muteRect = NSMakeRect(iconX,
                                      NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
                                      15.0,
                                      15.0);

@@ -247,6 +247,14 @@
     [markReadItem setTarget:self];
     [markReadItem setEnabled:([[item unreadCount] respondsToSelector:@selector(integerValue)] && [[item unreadCount] integerValue] > 0)];
     [menu addItem:markReadItem];
+
+    NSMenuItem *pinItem = [[[NSMenuItem alloc] initWithTitle:([item isPinned] ? TGLoc(@"chat.unpin") : TGLoc(@"chat.pin"))
+                                                      action:@selector(toggleChatPinnedFromMenu:)
+                                               keyEquivalent:@""] autorelease];
+    [pinItem setRepresentedObject:item];
+    [pinItem setTarget:self];
+    [pinItem setEnabled:(![item isForumTopic])];
+    [menu addItem:pinItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
     if ([item serverNotificationsMuted]) {
@@ -567,6 +575,57 @@
     });
 }
 
+- (void)toggleChatPinnedFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]] || [item isForumTopic] || ![[item chatID] respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Pinning chats is available only after sign-in is ready."];
+        return;
+    }
+
+    BOOL targetPinned = ![item isPinned];
+    TGChatItem *itemCopy = [item retain];
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSNumber *chatFilterID = [self.selectedChatFilterID retain];
+    NSString *title = [[item title] copy];
+    TGTDLibClient *client = [self.client retain];
+
+    [item setPinned:targetPinned];
+    [self.chatTableView reloadData];
+    [self.statusField setStringValue:(targetPinned ? TGLoc(@"chat.pin") : TGLoc(@"chat.unpin"))];
+    [self appendDetail:[NSString stringWithFormat:@"%@ %@...", targetPinned ? @"Pinning" : @"Unpinning", [title length] > 0 ? title : @"chat"]];
+    [[TGLogger sharedLogger] log:(targetPinned ? @"TDLib chat pin requested." : @"TDLib chat unpin requested.")];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *pinError = nil;
+        BOOL succeeded = [client toggleChatPinnedForChatID:chatID chatFilterID:chatFilterID pinned:targetPinned timeout:6.0 error:&pinError];
+        NSString *errorMessage = [[pinError localizedDescription] copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:(targetPinned ? TGLoc(@"chat.pin") : TGLoc(@"chat.unpin"))];
+                [self appendDetail:[NSString stringWithFormat:@"%@ accepted for %@.", targetPinned ? @"Pin" : @"Unpin", [title length] > 0 ? title : @"chat"]];
+                [self reloadChatsInteractive:NO preserveSelection:YES];
+            } else {
+                [itemCopy setPinned:!targetPinned];
+                [self.chatTableView reloadData];
+                [self.statusField setStringValue:@"Pin unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib pin chat: %@", [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [itemCopy release];
+            [chatID release];
+            [chatFilterID release];
+            [title release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)muteChatFromMenu:(id)sender {
     id payload = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
     if (![payload isKindOfClass:[NSDictionary class]]) {
@@ -720,4 +779,3 @@
         [self submitReactionEmoji:@"👍" toMessageItem:item removing:NO];
     }
 }
-

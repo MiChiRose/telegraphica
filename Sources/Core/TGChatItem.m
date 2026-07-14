@@ -7,9 +7,11 @@
 @synthesize typeSummary = _typeSummary;
 @synthesize unreadCount = _unreadCount;
 @synthesize lastReadOutboxMessageID = _lastReadOutboxMessageID;
+@synthesize chatListOrder = _chatListOrder;
 @synthesize avatarLocalPath = _avatarLocalPath;
 @synthesize serverNotificationsMuted = _serverNotificationsMuted;
 @synthesize notificationsMuted = _notificationsMuted;
+@synthesize pinned = _pinned;
 @synthesize forumTopic = _forumTopic;
 @synthesize parentChatID = _parentChatID;
 @synthesize messageThreadID = _messageThreadID;
@@ -42,6 +44,12 @@
     if ([identifier isEqual:@"last_read_outbox_message_id"]) {
         return self.lastReadOutboxMessageID;
     }
+    if ([identifier isEqual:@"chat_list_order"]) {
+        return self.chatListOrder;
+    }
+    if ([identifier isEqual:@"is_pinned"]) {
+        return [NSNumber numberWithBool:self.pinned];
+    }
     if ([identifier isEqual:@"notifications_muted"]) {
         return [NSNumber numberWithBool:self.notificationsMuted];
     }
@@ -66,6 +74,7 @@
     [_typeSummary release];
     [_unreadCount release];
     [_lastReadOutboxMessageID release];
+    [_chatListOrder release];
     [_avatarLocalPath release];
     [_parentChatID release];
     [_messageThreadID release];
