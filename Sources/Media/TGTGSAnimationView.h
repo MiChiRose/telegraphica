@@ -13,6 +13,8 @@
     NSUInteger _pixelWidth;
     NSUInteger _pixelHeight;
     CGFloat _frameRate;
+    NSUInteger _renderedFrameCount;
+    NSUInteger _lastAppliedFrame;
     BOOL _renderPending;
     BOOL _playbackActive;
 }
@@ -20,5 +22,8 @@
 - (instancetype)initWithFrame:(NSRect)frame tgsPath:(NSString *)path;
 - (BOOL)isAnimationValid;
 - (void)setPlaybackActive:(BOOL)active;
+- (NSUInteger)renderedFrameCount;
+- (NSUInteger)lastAppliedFrame;
+- (unsigned long long)currentFrameChecksum;
 
 @end
