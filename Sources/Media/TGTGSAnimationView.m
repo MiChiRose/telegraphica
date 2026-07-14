@@ -4,9 +4,9 @@
 #include <math.h>
 #include <string.h>
 
-static const NSUInteger TGTGSMaximumFrameCount = 180;
+static const NSUInteger TGTGSMaximumFrameCount = 360;
 static const CGFloat TGTGSMaximumFrameRate = 60.0;
-static const CGFloat TGTGSMaximumDuration = 3.1;
+static const CGFloat TGTGSMaximumDuration = 6.1;
 
 static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     static NSOperationQueue *queue = nil;

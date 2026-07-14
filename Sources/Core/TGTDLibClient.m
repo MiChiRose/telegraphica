@@ -3295,7 +3295,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     NSString *fullLocalPath = [self completedLocalPathFromFileObject:stickerFile];
     BOOL shouldDownloadFullSticker = ([formatType isEqualToString:@"stickerFormatWebp"] ||
-                                      [formatType isEqualToString:@"stickerFormatTgs"]);
+                                      [formatType isEqualToString:@"stickerFormatTgs"] ||
+                                      [formatType isEqualToString:@"stickerFormatWebm"]);
     if (shouldDownloadFullSticker &&
         [fullLocalPath length] == 0 && downloadMissing && fileID) {
         if (didRequestDownload) {
@@ -3306,12 +3307,16 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     if ([fullLocalPath length] > 0) {
         [info setObject:fullLocalPath forKey:@"full_local_path"];
-        if ([formatType isEqualToString:@"stickerFormatWebp"] || [[info objectForKey:@"local_path"] length] == 0) {
+        if ([formatType isEqualToString:@"stickerFormatWebm"]) {
+            [info setObject:fullLocalPath forKey:@"playable_local_path"];
+        }
+        if ([formatType isEqualToString:@"stickerFormatWebp"] ||
+            [[info objectForKey:@"local_path"] length] == 0) {
             [info setObject:fullLocalPath forKey:@"local_path"];
         }
     }
 
-    /* TODO: Add a Mavericks-compatible WEBM/VP9 sticker renderer. */
+    /* TODO: Add a Mavericks-compatible WEBM/VP9 renderer if AVFoundation cannot play a given video sticker. */
     id emojiObject = [sticker objectForKey:@"emoji"];
     if ([emojiObject isKindOfClass:[NSString class]] && [(NSString *)emojiObject length] > 0) {
         [info setObject:emojiObject forKey:@"emoji"];

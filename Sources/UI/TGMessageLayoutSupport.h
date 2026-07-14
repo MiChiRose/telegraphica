@@ -24,6 +24,7 @@ void TGDrawMediaPlayBadge(NSRect rect, BOOL flipped);
 NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth);
 NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth);
 NSArray *TGMediaTileRectsForMessageItem(TGMessageItem *item, NSRect imageRect);
+NSRect TGStickerAdjustedMediaRect(NSDictionary *mediaItem, NSRect rect, BOOL drawingInFlippedView);
 void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, BOOL flipped, BOOL aspectFill, NSUInteger overflowCount);
 CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth);
 BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item);

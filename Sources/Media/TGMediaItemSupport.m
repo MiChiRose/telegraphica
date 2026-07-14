@@ -37,6 +37,11 @@ NSString *TGMediaItemContentType(NSDictionary *mediaItem) {
     return [contentType isKindOfClass:[NSString class]] ? (NSString *)contentType : nil;
 }
 
+NSString *TGMediaItemStickerFormat(NSDictionary *mediaItem) {
+    id stickerFormat = [mediaItem objectForKey:@"sticker_format"];
+    return [stickerFormat isKindOfClass:[NSString class]] ? (NSString *)stickerFormat : @"";
+}
+
 BOOL TGMediaItemIsAnimation(NSDictionary *mediaItem) {
     return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageAnimation"];
 }
@@ -45,6 +50,31 @@ BOOL TGMediaItemIsVideo(NSDictionary *mediaItem) {
     NSString *contentType = TGMediaItemContentType(mediaItem);
     return ([contentType isEqualToString:@"messageVideo"] ||
             [contentType isEqualToString:@"messageVideoNote"]);
+}
+
+static BOOL TGMediaItemIsStickerContent(NSDictionary *mediaItem) {
+    return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageSticker"];
+}
+
+BOOL TGMediaItemIsTGSSticker(NSDictionary *mediaItem) {
+    return (TGMediaItemIsStickerContent(mediaItem) &&
+            [TGMediaItemStickerFormat(mediaItem) isEqualToString:@"stickerFormatTgs"]);
+}
+
+BOOL TGMediaItemIsWebMSticker(NSDictionary *mediaItem) {
+    NSString *stickerFormat = TGMediaItemStickerFormat(mediaItem);
+    if (TGMediaItemIsStickerContent(mediaItem) && [stickerFormat isEqualToString:@"stickerFormatWebm"]) {
+        return YES;
+    }
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? [(NSString *)mimeTypeObject lowercaseString] : @"";
+    NSString *localPath = TGMediaItemFullLocalPath(mediaItem);
+    if ([localPath length] == 0) {
+        localPath = TGMediaItemLocalPath(mediaItem);
+    }
+    return (TGMediaItemIsStickerContent(mediaItem) &&
+            ([mimeType isEqualToString:@"video/webm"] ||
+             [[[localPath pathExtension] lowercaseString] isEqualToString:@"webm"]));
 }
 
 BOOL TGMediaItemIsPlayable(NSDictionary *mediaItem) {
@@ -101,10 +131,7 @@ NSString *TGInlinePlaybackPathForMediaItem(NSDictionary *mediaItem) {
         return nil;
     }
     NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
-    id stickerFormatObject = [mediaItem objectForKey:@"sticker_format"];
-    NSString *stickerFormat = [stickerFormatObject isKindOfClass:[NSString class]] ? (NSString *)stickerFormatObject : @"";
-    if ([TGMediaItemContentType(mediaItem) isEqualToString:@"messageSticker"] &&
-        [stickerFormat isEqualToString:@"stickerFormatTgs"]) {
+    if (TGMediaItemIsTGSSticker(mediaItem)) {
         return [[NSFileManager defaultManager] fileExistsAtPath:fullPath] ? fullPath : nil;
     }
 
@@ -126,10 +153,13 @@ NSString *TGInlinePlaybackPathForMediaItem(NSDictionary *mediaItem) {
         }
         NSString *extension = [[path pathExtension] lowercaseString];
         BOOL supported = ([extension isEqualToString:@"gif"] ||
+                          [extension isEqualToString:@"webm"] ||
                           [extension isEqualToString:@"mp4"] ||
                           [extension isEqualToString:@"mov"] ||
                           [extension isEqualToString:@"m4v"]);
-        if (supported || (animationContent && ([mimeType isEqualToString:@"image/gif"] || [mimeType isEqualToString:@"video/mp4"]))) {
+        if (supported || (animationContent && ([mimeType isEqualToString:@"image/gif"] ||
+                                               [mimeType isEqualToString:@"video/mp4"] ||
+                                               [mimeType isEqualToString:@"video/webm"]))) {
             return path;
         }
     }
@@ -137,17 +167,45 @@ NSString *TGInlinePlaybackPathForMediaItem(NSDictionary *mediaItem) {
 }
 
 NSString *TGInlinePlaybackKindForMediaItem(NSDictionary *mediaItem) {
-    id stickerFormatObject = [mediaItem objectForKey:@"sticker_format"];
-    NSString *stickerFormat = [stickerFormatObject isKindOfClass:[NSString class]] ? (NSString *)stickerFormatObject : @"";
-    if ([TGMediaItemContentType(mediaItem) isEqualToString:@"messageSticker"] &&
-        [stickerFormat isEqualToString:@"stickerFormatTgs"]) {
+    if (TGMediaItemIsTGSSticker(mediaItem)) {
         return TGInlineMediaKindTGS;
     }
     NSString *path = TGInlinePlaybackPathForMediaItem(mediaItem);
     if ([[[path pathExtension] lowercaseString] isEqualToString:@"gif"]) {
         return TGInlineMediaKindGIF;
     }
+    if ([[[path pathExtension] lowercaseString] isEqualToString:@"webm"] ||
+        TGMediaItemIsWebMSticker(mediaItem)) {
+        return TGInlineMediaKindWebM;
+    }
     return TGInlineMediaKindVideo;
+}
+
+NSString *TGMediaItemInlinePlaybackDiagnosticSummary(NSDictionary *mediaItem) {
+    if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+        return @"media item is missing";
+    }
+    NSString *contentType = TGMediaItemContentType(mediaItem);
+    NSString *stickerFormat = TGMediaItemStickerFormat(mediaItem);
+    id mimeTypeObject = [mediaItem objectForKey:@"mime_type"];
+    NSString *mimeType = [mimeTypeObject isKindOfClass:[NSString class]] ? (NSString *)mimeTypeObject : @"";
+    NSString *localPath = TGMediaItemLocalPath(mediaItem);
+    NSString *fullPath = TGMediaItemFullLocalPath(mediaItem);
+    NSString *playablePath = TGMediaItemPlayableLocalPath(mediaItem);
+    NSString *inlinePath = TGInlinePlaybackPathForMediaItem(mediaItem);
+    NSString *kind = TGInlinePlaybackKindForMediaItem(mediaItem);
+    BOOL inlinePathExists = ([inlinePath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:inlinePath]);
+    NSString *fileName = [inlinePath length] > 0 ? [inlinePath lastPathComponent] : @"missing";
+    return [NSString stringWithFormat:@"content=%@ format=%@ mime=%@ kind=%@ inline=%@ exists=%@ local=%@ full=%@ playable=%@",
+            [contentType length] > 0 ? contentType : @"unknown",
+            [stickerFormat length] > 0 ? stickerFormat : @"none",
+            [mimeType length] > 0 ? mimeType : @"none",
+            [kind length] > 0 ? kind : @"unknown",
+            fileName,
+            inlinePathExists ? @"yes" : @"no",
+            [localPath length] > 0 ? [localPath lastPathComponent] : @"missing",
+            [fullPath length] > 0 ? [fullPath lastPathComponent] : @"missing",
+            [playablePath length] > 0 ? [playablePath lastPathComponent] : @"missing"];
 }
 
 BOOL TGMediaItemSupportsPreview(NSDictionary *mediaItem) {

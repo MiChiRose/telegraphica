@@ -182,6 +182,9 @@ NSString *TGLogSectionForDetail(NSString *detail) {
     if ([detail hasPrefix:@"Theme changed"] || [detail hasPrefix:@"Opened message link"]) {
         return @"Interface";
     }
+    if ([detail hasPrefix:@"Media Playback"] || [detail hasPrefix:@"Sticker"]) {
+        return @"Media Playback";
+    }
     if ([detail hasPrefix:@"Profile"]) {
         return @"Profile";
     }

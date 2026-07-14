@@ -112,6 +112,7 @@
         if (![mediaObject isKindOfClass:[NSDictionary class]]) {
             continue;
         }
+        tileRect = TGStickerAdjustedMediaRect((NSDictionary *)mediaObject, tileRect, [self.messageTableView isFlipped]);
         [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                             mediaObject, @"media_item",
                             [NSValue valueWithRect:tileRect], @"frame",
@@ -139,6 +140,20 @@
                                              selector:@selector(refreshInlineMediaPlayback)
                                                object:nil];
     [self performSelector:@selector(refreshInlineMediaPlayback) withObject:nil afterDelay:0.0];
+}
+
+- (void)logInlinePlaybackDiagnosticOnceForKey:(NSString *)key message:(NSString *)message {
+    if ([key length] == 0 || [message length] == 0) {
+        return;
+    }
+    if (!self.inlineMediaPlaybackDiagnosticKeys) {
+        self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
+    }
+    if ([self.inlineMediaPlaybackDiagnosticKeys containsObject:key]) {
+        return;
+    }
+    [self.inlineMediaPlaybackDiagnosticKeys addObject:key];
+    [[TGLogger sharedLogger] log:message];
 }
 
 - (void)refreshInlineMediaPlayback {
@@ -182,7 +197,25 @@
             NSString *playbackKind = TGInlinePlaybackKindForMediaItem(mediaItem);
             BOOL animation = ([contentType isEqualToString:@"messageAnimation"] ||
                               [extension isEqualToString:@"gif"] ||
+                              [extension isEqualToString:@"webm"] ||
                               [playbackKind isEqualToString:TGInlineMediaKindTGS]);
+            if ([contentType isEqualToString:@"messageSticker"]) {
+                id messageID = [mediaItem objectForKey:@"message_id"];
+                if (![messageID respondsToSelector:@selector(longLongValue)]) {
+                    messageID = [item messageID];
+                }
+                NSString *format = TGMediaItemStickerFormat(mediaItem);
+                NSString *diagnosticKey = [NSString stringWithFormat:@"chat-sticker-%@-%@-%@",
+                                           messageID ? messageID : [NSNumber numberWithUnsignedInteger:row],
+                                           format ? format : @"unknown",
+                                           path ? [path lastPathComponent] : @"missing"];
+                if ([playbackKind isEqualToString:TGInlineMediaKindTGS] ||
+                    [extension isEqualToString:@"gif"] ||
+                    [extension isEqualToString:@"webm"]) {
+                    [self logInlinePlaybackDiagnosticOnceForKey:diagnosticKey
+                                                        message:[NSString stringWithFormat:@"Media Playback: chat candidate %@", TGMediaItemInlinePlaybackDiagnosticSummary(mediaItem)]];
+                }
+            }
             if (!animation || [path length] == 0 || !NSIntersectsRect(frame, visibleRect)) {
                 continue;
             }
@@ -195,6 +228,9 @@
                                     messageID ? messageID : [NSNumber numberWithUnsignedInteger:row],
                                     tileIndex ? tileIndex : [NSNumber numberWithUnsignedInteger:entryIndex],
                                     path];
+            [self logInlinePlaybackDiagnosticOnceForKey:[NSString stringWithFormat:@"chat-descriptor-%@", identifier]
+                                                message:[NSString stringWithFormat:@"Media Playback: chat descriptor queued kind=%@ file=%@",
+                                                         playbackKind, [path lastPathComponent]]];
             [descriptors addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                                     identifier, TGInlineMediaIdentifierKey,
                                     path, TGInlineMediaPathKey,
@@ -382,4 +418,3 @@
         [self appendDetail:@"Could not open message link in default browser."];
     }
 }
-

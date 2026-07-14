@@ -7,7 +7,10 @@ extern NSString * const TGInlineMediaKindKey;
 
 extern NSString * const TGInlineMediaKindGIF;
 extern NSString * const TGInlineMediaKindVideo;
+extern NSString * const TGInlineMediaKindWebM;
 extern NSString * const TGInlineMediaKindTGS;
+extern NSString * const TGInlineMediaPlaybackDiagnosticNotification;
+extern NSString * const TGInlineMediaPlaybackDiagnosticMessageKey;
 
 @interface TGInlineMediaPlaybackCoordinator : NSObject
 
