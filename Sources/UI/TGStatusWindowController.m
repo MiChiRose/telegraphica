@@ -12,6 +12,7 @@
 #import "TGStatusWindowStyling.h"
 #import "TGTheme.h"
 #import "TGTypingIndicatorPresentation.h"
+#import "TGUpdateSupport.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
@@ -45,8 +46,6 @@ static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
-static NSString * const TGUpdateAPIURLString = @"https://api.github.com/repos/MiChiRose/telegraphica/releases?per_page=10";
-static NSString * const TGProjectReleasesURLString = @"https://github.com/MiChiRose/telegraphica/releases";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 
@@ -3833,131 +3832,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self refreshDownloadFolderButtonTitle];
 }
 
-- (NSString *)currentApplicationVersionString {
-    NSString *version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-    if ([version length] == 0) {
-        version = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"];
-    }
-    return ([version length] > 0) ? version : @"0.0.0";
-}
-
-- (NSString *)updateCheckUserAgentString {
-    NSString *version = [self currentApplicationVersionString];
-    if ([version length] == 0) {
-        version = @"unknown";
-    }
-    return [NSString stringWithFormat:@"Telegraphica/%@ (Mac OS X; Mavericks-compatible)", version];
-}
-
 - (void)openProjectReleasesPage {
-    NSURL *releaseURL = [NSURL URLWithString:TGProjectReleasesURLString];
+    NSURL *releaseURL = TGUpdateProjectReleasesURL();
     if (releaseURL) {
         [[NSWorkspace sharedWorkspace] openURL:releaseURL];
     }
-}
-
-- (NSString *)githubErrorMessageFromData:(NSData *)data fallback:(NSString *)fallback {
-    if ([data length] == 0) {
-        return fallback;
-    }
-    NSError *jsonError = nil;
-    id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
-    if ([object isKindOfClass:[NSDictionary class]]) {
-        id messageObject = [(NSDictionary *)object objectForKey:@"message"];
-        NSString *message = [messageObject isKindOfClass:[NSString class]] ? messageObject : nil;
-        if ([message length] > 0) {
-            return message;
-        }
-    }
-    return fallback;
-}
-
-- (NSDictionary *)latestGitHubReleaseInfoWithError:(NSError **)error {
-    NSURL *url = [NSURL URLWithString:TGUpdateAPIURLString];
-    if (!url) {
-        if (error) {
-            *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
-                                         code:1
-                                     userInfo:[NSDictionary dictionaryWithObject:@"Update URL is invalid." forKey:NSLocalizedDescriptionKey]];
-        }
-        return nil;
-    }
-
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
-                                                           cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
-                                                       timeoutInterval:18.0];
-    [request setHTTPMethod:@"GET"];
-    [request setValue:[self updateCheckUserAgentString] forHTTPHeaderField:@"User-Agent"];
-    [request setValue:@"application/vnd.github+json" forHTTPHeaderField:@"Accept"];
-    [request setValue:@"no-cache" forHTTPHeaderField:@"Cache-Control"];
-
-    NSURLResponse *response = nil;
-    NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:error];
-    if (![data isKindOfClass:[NSData class]] || [data length] == 0) {
-        return nil;
-    }
-
-    if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-        NSInteger statusCode = [(NSHTTPURLResponse *)response statusCode];
-        if (statusCode < 200 || statusCode >= 300) {
-            if (error) {
-                NSString *fallback = [NSString stringWithFormat:@"GitHub returned HTTP %ld.", (long)statusCode];
-                NSString *message = [self githubErrorMessageFromData:data fallback:fallback];
-                *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
-                                             code:statusCode
-                                         userInfo:[NSDictionary dictionaryWithObject:message forKey:NSLocalizedDescriptionKey]];
-            }
-            return nil;
-        }
-    }
-
-    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
-    if (![json isKindOfClass:[NSArray class]]) {
-        if (error) {
-            *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
-                                         code:2
-                                     userInfo:[NSDictionary dictionaryWithObject:@"GitHub did not return a release list." forKey:NSLocalizedDescriptionKey]];
-        }
-        return nil;
-    }
-
-    NSArray *releases = (NSArray *)json;
-    NSUInteger index = 0;
-    for (index = 0; index < [releases count]; index++) {
-        id releaseObject = [releases objectAtIndex:index];
-        if (![releaseObject isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-        NSDictionary *release = (NSDictionary *)releaseObject;
-        id draft = [release objectForKey:@"draft"];
-        if ([draft respondsToSelector:@selector(boolValue)] && [draft boolValue]) {
-            continue;
-        }
-        id tagNameObject = [release objectForKey:@"tag_name"];
-        id nameObject = [release objectForKey:@"name"];
-        NSString *tagName = [tagNameObject isKindOfClass:[NSString class]] ? tagNameObject : nil;
-        NSString *name = [nameObject isKindOfClass:[NSString class]] ? nameObject : nil;
-        NSString *version = ([tagName length] > 0) ? tagName : name;
-        if ([version length] == 0) {
-            continue;
-        }
-        id htmlURLObject = [release objectForKey:@"html_url"];
-        NSString *htmlURL = [htmlURLObject isKindOfClass:[NSString class]] ? htmlURLObject : nil;
-        if ([htmlURL length] == 0) {
-            htmlURL = TGProjectReleasesURLString;
-        }
-        return [NSDictionary dictionaryWithObjectsAndKeys:
-                version, @"version",
-                htmlURL, @"url",
-                nil];
-    }
-
-    if (error) {
-        *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
-                                     code:3
-                                 userInfo:[NSDictionary dictionaryWithObject:@"No GitHub releases were found." forKey:NSLocalizedDescriptionKey]];
-    }
-    return nil;
 }
 
 - (void)showUpdateCheckResult:(NSDictionary *)releaseInfo errorMessage:(NSString *)errorMessage manual:(BOOL)manual {
@@ -3979,7 +3858,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     }
 
     NSString *remoteVersion = [releaseInfo objectForKey:@"version"];
-    NSString *currentVersion = [self currentApplicationVersionString];
+    NSString *currentVersion = TGCurrentApplicationVersionString();
     if (![remoteVersion isKindOfClass:[NSString class]] || !TGVersionStringIsNewer(remoteVersion, currentVersion)) {
         if (manual) {
             NSAlert *alert = [[[NSAlert alloc] init] autorelease];
@@ -3993,7 +3872,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
     NSString *urlString = [releaseInfo objectForKey:@"url"];
     if ([urlString length] == 0) {
-        urlString = TGProjectReleasesURLString;
+        urlString = TGUpdateProjectReleasesURLString();
     }
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
     [alert setMessageText:TGLoc(@"update.title")];
@@ -4032,7 +3911,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *updateError = nil;
-        NSDictionary *releaseInfo = [[self latestGitHubReleaseInfoWithError:&updateError] retain];
+        NSDictionary *releaseInfo = [TGLatestGitHubReleaseInfoWithError(&updateError) retain];
         NSString *errorMessage = [[updateError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (manual) {
