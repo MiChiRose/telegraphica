@@ -4435,6 +4435,52 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return YES;
 }
 
+- (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:94];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to update pinned chats. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:95];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
+    if ([chatFilterID respondsToSelector:@selector(longLongValue)]) {
+        [chatList setObject:@"chatListFilter" forKey:@"@type"];
+        [chatList setObject:[NSNumber numberWithLongLong:[chatFilterID longLongValue]] forKey:@"chat_filter_id"];
+    } else {
+        [chatList setObject:@"chatListMain" forKey:@"@type"];
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"toggleChatIsPinned" forKey:@"@type"];
+    [request setObject:chatList forKey:@"chat_list"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithBool:pinned] forKey:@"is_pinned"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-toggle-chat-pinned"
+                                                           timeout:timeout
+                                                         errorCode:96
+                                                             error:error];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = [self errorWithDescription:@"TDLib toggleChatIsPinned returned an unexpected response." code:97];
+        }
+        return NO;
+    }
+    return YES;
+}
+
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self sendTextMessageToChatID:chatID messageThreadID:nil text:text timeout:timeout error:error];
 }
