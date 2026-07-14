@@ -37,6 +37,27 @@ static BOOL TGTDLibDictionaryHasKey(NSDictionary *dictionary, NSString *key) {
     return ([dictionary isKindOfClass:[NSDictionary class]] && [dictionary objectForKey:key] != nil);
 }
 
+static NSComparisonResult TGTDLibCompareChatItemsByPinnedOrder(id leftObject, id rightObject, void *context) {
+    (void)context;
+    if (![leftObject isKindOfClass:[TGChatItem class]] || ![rightObject isKindOfClass:[TGChatItem class]]) {
+        return NSOrderedSame;
+    }
+
+    TGChatItem *left = (TGChatItem *)leftObject;
+    TGChatItem *right = (TGChatItem *)rightObject;
+    if ([left isPinned] != [right isPinned]) {
+        return [left isPinned] ? NSOrderedAscending : NSOrderedDescending;
+    }
+
+    long long leftOrder = [[left chatListOrder] respondsToSelector:@selector(longLongValue)] ? [[left chatListOrder] longLongValue] : 0;
+    long long rightOrder = [[right chatListOrder] respondsToSelector:@selector(longLongValue)] ? [[right chatListOrder] longLongValue] : 0;
+    if (leftOrder != rightOrder) {
+        return (leftOrder > rightOrder) ? NSOrderedAscending : NSOrderedDescending;
+    }
+
+    return [[left title] localizedCaseInsensitiveCompare:[right title]];
+}
+
 static NSDictionary *TGTDLibMessageCapabilitiesFromObject(NSDictionary *object) {
     if (![object isKindOfClass:[NSDictionary class]]) {
         return nil;
@@ -161,6 +182,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
+- (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
+- (void)applyChatPositionFromChatObject:(NSDictionary *)chatObject toChatItem:(TGChatItem *)item chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
 - (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)userSenderSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout;
@@ -2035,6 +2058,67 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return @"Chat";
 }
 
+- (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID {
+    if (![chatObject isKindOfClass:[NSDictionary class]] || [chatListType length] == 0) {
+        return nil;
+    }
+
+    id positionsObject = [chatObject objectForKey:@"positions"];
+    if (![positionsObject isKindOfClass:[NSArray class]]) {
+        return nil;
+    }
+
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)positionsObject count]; index++) {
+        id positionObject = [(NSArray *)positionsObject objectAtIndex:index];
+        if (![positionObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSDictionary *position = (NSDictionary *)positionObject;
+        id listObject = [position objectForKey:@"list"];
+        if (![listObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+
+        NSDictionary *list = (NSDictionary *)listObject;
+        id typeObject = [list objectForKey:@"@type"];
+        if (![typeObject isKindOfClass:[NSString class]] || ![(NSString *)typeObject isEqualToString:chatListType]) {
+            continue;
+        }
+
+        if ([chatListType isEqualToString:@"chatListFilter"]) {
+            id candidateFilterID = [list objectForKey:@"chat_filter_id"];
+            if (![candidateFilterID respondsToSelector:@selector(longLongValue)] ||
+                ![filterID respondsToSelector:@selector(longLongValue)] ||
+                [candidateFilterID longLongValue] != [filterID longLongValue]) {
+                continue;
+            }
+        }
+
+        return position;
+    }
+
+    return nil;
+}
+
+- (void)applyChatPositionFromChatObject:(NSDictionary *)chatObject toChatItem:(TGChatItem *)item chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID {
+    if (!item) {
+        return;
+    }
+
+    NSDictionary *position = [self chatPositionFromChatObject:chatObject chatListType:chatListType filterID:filterID];
+    id orderObject = [position objectForKey:@"order"];
+    if ([orderObject respondsToSelector:@selector(longLongValue)]) {
+        [item setChatListOrder:[NSNumber numberWithLongLong:[orderObject longLongValue]]];
+    } else {
+        [item setChatListOrder:nil];
+    }
+
+    id pinnedObject = [position objectForKey:@"is_pinned"];
+    [item setPinned:([pinnedObject respondsToSelector:@selector(boolValue)] && [pinnedObject boolValue])];
+}
+
 - (NSArray *)mainChatPreviewItemsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {
@@ -2099,6 +2183,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:@"chatListMain" filterID:nil];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
@@ -2128,6 +2213,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
+    [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
     return items;
 }
 
@@ -2366,6 +2452,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:@"chatListFilter" filterID:filterID];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
@@ -2395,6 +2482,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
+    [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
     return items;
 }
 
@@ -4341,6 +4429,52 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
         if (error) {
             *error = [self errorWithDescription:@"TDLib viewMessages returned an unexpected response." code:60];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:94];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to update pinned chats. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:95];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
+    if ([chatFilterID respondsToSelector:@selector(longLongValue)]) {
+        [chatList setObject:@"chatListFilter" forKey:@"@type"];
+        [chatList setObject:[NSNumber numberWithLongLong:[chatFilterID longLongValue]] forKey:@"chat_filter_id"];
+    } else {
+        [chatList setObject:@"chatListMain" forKey:@"@type"];
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"toggleChatIsPinned" forKey:@"@type"];
+    [request setObject:chatList forKey:@"chat_list"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithBool:pinned] forKey:@"is_pinned"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-toggle-chat-pinned"
+                                                           timeout:timeout
+                                                         errorCode:96
+                                                             error:error];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = [self errorWithDescription:@"TDLib toggleChatIsPinned returned an unexpected response." code:97];
         }
         return NO;
     }
