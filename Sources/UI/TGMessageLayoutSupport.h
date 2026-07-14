@@ -1,0 +1,48 @@
+#import <Cocoa/Cocoa.h>
+
+@class TGMessageItem;
+
+NSString *TGInitialsForTitle(NSString *title);
+NSColor *TGAvatarColorForTitle(NSString *title);
+void TGDrawImageInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView);
+void TGDrawImageAspectFillInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView);
+void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected, BOOL drawingInFlippedView);
+NSString *TGShortTimeStringFromDateValue(NSNumber *dateValue);
+NSString *TGDisplayTextForMessageItem(TGMessageItem *item);
+NSTextCheckingResult *TGFirstLinkResultInString(NSString *text);
+NSURL *TGFirstURLInMessageItem(TGMessageItem *item);
+BOOL TGIsSupportedPhotoPath(NSString *path);
+NSString *TGFirstSupportedPhotoPathFromPasteboard(NSPasteboard *pasteboard);
+NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex);
+NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *baseAttributes);
+NSString *TGDurationStringFromSecondsValue(id durationValue);
+NSString *TGVoicePreviewTimeString(NSTimeInterval seconds);
+NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem);
+BOOL TGMediaItemIsSticker(NSDictionary *mediaItem);
+void TGDrawMediaKindBadge(NSString *badgeText, NSRect rect, BOOL flipped);
+void TGDrawMediaPlayBadge(NSRect rect, BOOL flipped);
+NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth);
+NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth);
+NSArray *TGMediaTileRectsForMessageItem(TGMessageItem *item, NSRect imageRect);
+void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, BOOL flipped, BOOL aspectFill, NSUInteger overflowCount);
+CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth);
+BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item);
+BOOL TGMessageItemIsAudioOnlyPlayableMedia(TGMessageItem *item);
+BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item);
+NSString *TGPlayableMediaTitleForMessageItem(TGMessageItem *item);
+CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
+CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item);
+CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
+CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
+CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item);
+CGFloat TGComposerMinimumInputHeight(void);
+CGFloat TGComposerMaximumInputHeight(void);
+CGFloat TGComposerLineHeight(void);
+NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item);
+void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL flipped);
+CGFloat TGMessageMediaFooterHeightForItem(TGMessageItem *item);
+CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth, BOOL showSenderDetails);
+NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails);
+void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
+long long TGMessageSortValue(id value);
+NSInteger TGCompareMessageItemsAscending(id left, id right, void *context);
