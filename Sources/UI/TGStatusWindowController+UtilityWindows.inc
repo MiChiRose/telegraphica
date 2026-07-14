@@ -226,6 +226,13 @@
     [self.appearanceWindow makeKeyAndOrderFront:nil];
 }
 
+- (void)showStorageUsageWindow:(id)sender {
+    if (!self.storageUsageWindowController) {
+        self.storageUsageWindowController = [[[TGStorageUsageWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [self.storageUsageWindowController showWindow:sender];
+}
+
 - (void)showLogsWindow:(id)sender {
     (void)sender;
     if (!self.logsWindow) {

@@ -10,6 +10,7 @@
 #import "TGStatusSupport.h"
 #import "TGStickerPickerLayout.h"
 #import "TGStatusWindowStyling.h"
+#import "TGStorageUsageWindowController.h"
 #import "TGTheme.h"
 #import "TGTypingIndicatorPresentation.h"
 #import "TGUpdateSupport.h"
@@ -80,6 +81,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) TGGroupedCardView *settingsDrawerCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsFilesCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsHelpCardView;
+@property (nonatomic, retain) TGStorageUsageWindowController *storageUsageWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
@@ -170,6 +172,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSPopUpButton *settingsLanguagePopUpButton;
 @property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
+@property (nonatomic, retain) NSButton *settingsStorageUsageButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
@@ -341,6 +344,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsDrawerCardView = _settingsDrawerCardView;
 @synthesize settingsFilesCardView = _settingsFilesCardView;
 @synthesize settingsHelpCardView = _settingsHelpCardView;
+@synthesize storageUsageWindowController = _storageUsageWindowController;
 @synthesize aboutCardView = _aboutCardView;
 @synthesize logsCardView = _logsCardView;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
@@ -431,6 +435,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsLanguagePopUpButton = _settingsLanguagePopUpButton;
 @synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
+@synthesize settingsStorageUsageButton = _settingsStorageUsageButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
@@ -750,6 +755,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
     [self.settingsActiveSessionsDetailField setStringValue:TGLoc(@"settings.sessions.help")];
     [self.settingsActiveSessionsButton setTitle:TGLoc(@"settings.sessions.open")];
+    [self.settingsStorageUsageButton setTitle:TGLoc(@"storage.open")];
     [self.activeSessionsWindow setTitle:TGLoc(@"settings.section.sessions")];
     [self.activeSessionsRefreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
     [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
@@ -858,6 +864,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
     [self.settingsDownloadFolderButton setNeedsDisplay:YES];
+    [self.settingsStorageUsageButton setNeedsDisplay:YES];
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
     [self.settingsActiveSessionsButton setNeedsDisplay:YES];
     [self.profileRefreshButton setNeedsDisplay:YES];
@@ -1890,6 +1897,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDownloadFolderButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsDownloadFolderButton];
 
+    self.settingsStorageUsageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 150, 260, 22)] autorelease];
+    [self.settingsStorageUsageButton setTitle:@"Storage usage"];
+    [self.settingsStorageUsageButton setTarget:self];
+    [self.settingsStorageUsageButton setAction:@selector(showStorageUsageWindow:)];
+    [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
+    [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsStorageUsageButton];
+
     self.settingsCheckUpdatesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 152, 260, 22)] autorelease];
     [self.settingsCheckUpdatesButton setTitle:@"Check for Updates"];
     [self.settingsCheckUpdatesButton setTarget:self];
@@ -1953,6 +1968,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                      self.settingsActiveSessionsButton,
                                      self.settingsDownloadFolderHelpField,
                                      self.settingsDownloadFolderButton,
+                                     self.settingsStorageUsageButton,
                                      self.settingsCheckUpdatesButton,
                                      self.settingsAppearanceButton,
                                      self.settingsLogsButton,
@@ -2498,7 +2514,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsLanguagePopUpButton release];
     [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
+    [_settingsStorageUsageButton release];
     [_settingsCheckUpdatesButton release];
+    [_storageUsageWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_aboutIconView release];
