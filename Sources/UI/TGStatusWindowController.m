@@ -40,7 +40,6 @@ static NSString * const TGNotificationsWhenActiveDefaultsKey = @"TelegraphicaNot
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
-static NSString * const TGDownloadFolderDefaultsKey = @"TelegraphicaDownloadFolderPath";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGUpdateAPIURLString = @"https://api.github.com/repos/MiChiRose/telegraphica/releases?per_page=10";
@@ -48,22 +47,6 @@ static NSString * const TGProjectReleasesURLString = @"https://github.com/MiChiR
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 
-
-static NSString *TGDefaultDownloadFolderPath(void) {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDownloadsDirectory, NSUserDomainMask, YES);
-    if ([paths count] > 0) {
-        return [paths objectAtIndex:0];
-    }
-    return [@"~/Downloads" stringByExpandingTildeInPath];
-}
-
-static NSString *TGConfiguredDownloadFolderPath(void) {
-    NSString *path = [[NSUserDefaults standardUserDefaults] stringForKey:TGDownloadFolderDefaultsKey];
-    if ([path length] == 0) {
-        path = TGDefaultDownloadFolderPath();
-    }
-    return [path stringByStandardizingPath];
-}
 
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
@@ -844,20 +827,9 @@ static NSString *TGConfiguredDownloadFolderPath(void) {
     }
 }
 
-- (NSString *)displayPathForDownloadFolder:(NSString *)path {
-    if ([path length] == 0) {
-        return @"Downloads";
-    }
-    NSString *home = NSHomeDirectory();
-    if ([home length] > 0 && [path hasPrefix:home]) {
-        return [@"~" stringByAppendingString:[path substringFromIndex:[home length]]];
-    }
-    return path;
-}
-
 - (void)refreshDownloadFolderButtonTitle {
     NSString *path = TGConfiguredDownloadFolderPath();
-    NSString *displayPath = [self displayPathForDownloadFolder:path];
+    NSString *displayPath = TGDisplayPathForDownloadFolder(path);
     [self.settingsDownloadFolderButton setTitle:[NSString stringWithFormat:@"%@: %@", TGLoc(@"settings.downloads"), displayPath]];
     [self.settingsDownloadFolderButton setToolTip:path];
 }
@@ -4119,8 +4091,7 @@ static NSString *TGConfiguredDownloadFolderPath(void) {
         return;
     }
 
-    [[NSUserDefaults standardUserDefaults] setObject:[path stringByStandardizingPath] forKey:TGDownloadFolderDefaultsKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    TGSetConfiguredDownloadFolderPath(path);
     [self refreshDownloadFolderButtonTitle];
 }
 
