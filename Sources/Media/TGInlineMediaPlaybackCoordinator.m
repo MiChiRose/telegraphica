@@ -20,6 +20,7 @@ NSString * const TGInlineMediaKindTGS = @"tgs";
 @property (nonatomic, copy) NSString *mediaKind;
 - (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath mediaKind:(NSString *)mediaKind;
 - (void)setPlaybackActive:(BOOL)active;
+- (NSRect)contentFrame;
 @end
 
 @implementation TGInlineMediaPlaybackView
@@ -59,10 +60,13 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [[self layer] setCornerRadius:7.0];
 
     if ([mediaKind isEqualToString:TGInlineMediaKindTGS]) {
-        TGTGSAnimationView *tgsView = [[[TGTGSAnimationView alloc] initWithFrame:[self bounds]
+        TGTGSAnimationView *tgsView = [[[TGTGSAnimationView alloc] initWithFrame:[self contentFrame]
                                                                         tgsPath:mediaPath] autorelease];
         if ([tgsView isAnimationValid]) {
             [tgsView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+            [tgsView setWantsLayer:YES];
+            [[tgsView layer] setMasksToBounds:YES];
+            [[tgsView layer] setCornerRadius:6.0];
             [self addSubview:tgsView];
             self.tgsView = tgsView;
         }
@@ -98,6 +102,15 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     return self;
 }
 
+- (NSRect)contentFrame {
+    if ([self.mediaKind isEqualToString:TGInlineMediaKindTGS]) {
+        NSRect frame = NSInsetRect([self bounds], 4.0, 4.0);
+        frame.origin.y += 2.0;
+        return frame;
+    }
+    return [self bounds];
+}
+
 - (BOOL)isOpaque {
     return [self.mediaKind isEqualToString:TGInlineMediaKindTGS];
 }
@@ -119,7 +132,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [super setFrame:frame];
     [self.playerLayer setFrame:[self bounds]];
     [self.imageView setFrame:[self bounds]];
-    [self.tgsView setFrame:[self bounds]];
+    [self.tgsView setFrame:[self contentFrame]];
 }
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
