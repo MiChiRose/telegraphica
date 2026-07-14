@@ -7,6 +7,7 @@
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusSupport.h"
+#import "TGStickerPickerLayout.h"
 #import "TGTheme.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGMediaImageLoader.h"
@@ -62,10 +63,6 @@ static NSString *TGConfiguredDownloadFolderPath(void) {
         path = TGDefaultDownloadFolderPath();
     }
     return [path stringByStandardizingPath];
-}
-
-static NSRect TGStickerPickerContentRectForButtonFrame(NSRect buttonFrame) {
-    return NSInsetRect(NSInsetRect(buttonFrame, 1.0, 1.0), 6.0, 6.0);
 }
 
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
@@ -9955,37 +9952,11 @@ static NSRect TGStickerPickerContentRectForButtonFrame(NSRect buttonFrame) {
         NSUInteger column = index % columns;
         CGFloat x = gap + (CGFloat)column * (buttonSide + gap);
         CGFloat y = contentHeight - gap - buttonSide - (CGFloat)row * (buttonSide + gap);
-        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(x, y, buttonSide, buttonSide)] autorelease];
-        TGStickerPickerButtonCell *cell = [[[TGStickerPickerButtonCell alloc] init] autorelease];
-        [button setCell:cell];
-        [button setButtonType:NSMomentaryPushInButton];
-        [button setBordered:NO];
-        [button setTarget:self];
-        [button setAction:@selector(sendStickerFromPickerButton:)];
-        [button setTag:(NSInteger)index];
-        NSString *localPath = TGMediaItemLocalPath(item);
-        NSImage *image = nil;
-        if ([localPath length] > 0) {
-            image = TGImageWithCorrectOrientationFromFile(localPath);
-            if (!image) {
-                image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
-            }
-        }
-        if (!image) {
-            NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(item);
-            if ([miniThumbnailData length] > 0) {
-                image = [[[NSImage alloc] initWithData:miniThumbnailData] autorelease];
-            }
-        }
-        if (image) {
-            [button setImage:image];
-            [button setImageScaling:NSImageScaleProportionallyUpOrDown];
-            [button setImagePosition:NSImageOnly];
-        } else {
-            NSString *emoji = [item objectForKey:@"emoji"];
-            [button setTitle:([emoji length] > 0 ? emoji : @"☺")];
-            [button setFont:[NSFont systemFontOfSize:28.0]];
-        }
+        NSButton *button = TGStickerPickerButtonWithFrame(NSMakeRect(x, y, buttonSide, buttonSide),
+                                                          item,
+                                                          (NSInteger)index,
+                                                          self,
+                                                          @selector(sendStickerFromPickerButton:));
         [gridView addSubview:button];
     }
     [self refreshStickerPickerPlayback];

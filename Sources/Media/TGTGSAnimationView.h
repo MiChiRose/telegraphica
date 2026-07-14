@@ -4,6 +4,7 @@
 @private
     void *_animation;
     NSImageView *_imageView;
+    NSImage *_renderedImage;
     NSBitmapImageRep *_bitmapRepresentation;
     NSOperationQueue *_renderQueue;
     NSTimer *_frameTimer;

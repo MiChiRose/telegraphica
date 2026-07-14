@@ -64,9 +64,6 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
                                                                         tgsPath:mediaPath] autorelease];
         if ([tgsView isAnimationValid]) {
             [tgsView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-            [tgsView setWantsLayer:YES];
-            [[tgsView layer] setMasksToBounds:YES];
-            [[tgsView layer] setCornerRadius:6.0];
             [self addSubview:tgsView];
             self.tgsView = tgsView;
         }
