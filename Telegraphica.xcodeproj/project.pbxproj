@@ -38,6 +38,7 @@
 		111111111111111111111129 /* TGStatusViewCells.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111254 /* TGStatusViewCells.m */; };
 		111111111111111111111130 /* TGStatusSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111256 /* TGStatusSupport.m */; };
 		111111111111111111111131 /* TGStickerPickerLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111258 /* TGStickerPickerLayout.m */; };
+		111111111111111111111132 /* TGTypingIndicatorPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111260 /* TGTypingIndicatorPresentation.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -94,6 +95,8 @@
 		111111111111111111111256 /* TGStatusSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusSupport.m; sourceTree = "<group>"; };
 		111111111111111111111257 /* TGStickerPickerLayout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStickerPickerLayout.h; sourceTree = "<group>"; };
 		111111111111111111111258 /* TGStickerPickerLayout.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStickerPickerLayout.m; sourceTree = "<group>"; };
+		111111111111111111111259 /* TGTypingIndicatorPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTypingIndicatorPresentation.h; sourceTree = "<group>"; };
+		111111111111111111111260 /* TGTypingIndicatorPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTypingIndicatorPresentation.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -198,6 +201,8 @@
 				111111111111111111111252 /* TGStatusButtonCells.m */,
 				111111111111111111111257 /* TGStickerPickerLayout.h */,
 				111111111111111111111258 /* TGStickerPickerLayout.m */,
+				111111111111111111111259 /* TGTypingIndicatorPresentation.h */,
+				111111111111111111111260 /* TGTypingIndicatorPresentation.m */,
 				111111111111111111111253 /* TGStatusViewCells.h */,
 				111111111111111111111254 /* TGStatusViewCells.m */,
 				111111111111111111111255 /* TGStatusSupport.h */,
@@ -330,6 +335,7 @@
 				111111111111111111111129 /* TGStatusViewCells.m in Sources */,
 				111111111111111111111130 /* TGStatusSupport.m in Sources */,
 				111111111111111111111131 /* TGStickerPickerLayout.m in Sources */,
+				111111111111111111111132 /* TGTypingIndicatorPresentation.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
