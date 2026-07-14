@@ -282,7 +282,21 @@
     }
 
     [self.logsCheckButton setEnabled:!self.controlsBusy];
-    [self.logsWindowDetailsView setString:(self.detailsView ? [self.detailsView string] : @"")];
+    NSMutableString *logText = [NSMutableString string];
+    NSString *visibleDetails = self.detailsView ? [self.detailsView string] : @"";
+    if ([visibleDetails length] > 0) {
+        [logText appendString:visibleDetails];
+    }
+    NSString *runtimeLog = [[TGLogger sharedLogger] currentLog];
+    if ([runtimeLog length] > 0) {
+        if ([logText length] > 0) {
+            [logText appendString:@"\n"];
+        }
+        [logText appendString:@"Runtime Component Logs\n"];
+        [logText appendString:runtimeLog];
+        [logText appendString:@"\n"];
+    }
+    [self.logsWindowDetailsView setString:logText];
     NSRange endRange = NSMakeRange([[self.logsWindowDetailsView string] length], 0);
     [self.logsWindowDetailsView scrollRangeToVisible:endRange];
     [self.logsWindow center];
@@ -404,4 +418,3 @@
     [self refreshThemeAppearance];
     [self appendDetail:[NSString stringWithFormat:@"Theme changed: %@", TGThemeDisplayNameForIdentifier(themeIdentifier)]];
 }
-

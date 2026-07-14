@@ -412,6 +412,7 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL resultIsCurrent = (generation == self.stickerPickerLoadGeneration && client == self.client);
             if (!resultIsCurrent) {
+                [[TGLogger sharedLogger] log:@"Stickers: ignored stale recent stickers response."];
                 [items release];
                 [errorMessage release];
                 [client release];
@@ -420,9 +421,11 @@
             if ([items count] > 0) {
                 self.stickerPickerItems = items;
                 [self.stickerPickerStatusField setStringValue:@"Recent stickers"];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded recent stickers count=%lu", (unsigned long)[items count]]];
             } else {
                 self.stickerPickerItems = [NSArray array];
                 [self.stickerPickerStatusField setStringValue:([errorMessage length] > 0 ? errorMessage : @"No recent stickers yet")];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: recent stickers unavailable: %@", [errorMessage length] > 0 ? errorMessage : @"empty response"]];
             }
             [self rebuildStickerPickerGrid];
             [items release];
@@ -464,6 +467,7 @@
     }
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
         [self appendDetail:@"Sticker file id is not available."];
+        [[TGLogger sharedLogger] log:@"Stickers: send aborted because file id is missing."];
         return;
     }
     NSNumber *chatID = [self.selectedChatID retain];
@@ -479,6 +483,7 @@
     [self.statusField setStringValue:@"Sending sticker..."];
 
     TGTDLibClient *client = [self.client retain];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: send requested format=%@ file=%@", TGMediaItemStickerFormat(sticker), fileID]];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *sendError = nil;
@@ -495,6 +500,7 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             if ([summary length] > 0) {
                 [self.statusField setStringValue:@"Sticker sent"];
+                [[TGLogger sharedLogger] log:@"Stickers: send accepted."];
                 self.forceMessageScrollToNewest = YES;
                 self.pendingLiveChatRefresh = YES;
                 self.pendingLiveMessageRefresh = YES;
@@ -502,6 +508,7 @@
             } else {
                 [self.statusField setStringValue:@"Sticker send failed"];
                 [self appendDetail:([errorMessage length] > 0 ? errorMessage : @"Sticker send was not confirmed.")];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: send failed: %@", [errorMessage length] > 0 ? errorMessage : @"not confirmed"]];
             }
             [self setControlsBusy:NO];
             [self requestComposerRefocus];
@@ -1045,4 +1052,3 @@
         [pool drain];
     });
 }
-

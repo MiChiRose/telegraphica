@@ -596,6 +596,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         self.autoChatListRefreshArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handleInlineMediaPlaybackDiagnostic:)
+                                                     name:TGInlineMediaPlaybackDiagnosticNotification
+                                                   object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self startLiveUpdateTimerIfNeeded];
@@ -603,6 +607,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
     }
     return self;
+}
+
+- (void)handleInlineMediaPlaybackDiagnostic:(NSNotification *)notification {
+    id message = [[notification userInfo] objectForKey:TGInlineMediaPlaybackDiagnosticMessageKey];
+    if ([message isKindOfClass:[NSString class]] && [(NSString *)message length] > 0) {
+        [[TGLogger sharedLogger] log:(NSString *)message];
+    }
 }
 
 - (void)applyTransparentChatTableStyle {
