@@ -31,6 +31,7 @@
 		111111111111111111111122 /* TGTGSAnimationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111238 /* TGTGSAnimationView.m */; };
 		111111111111111111111123 /* TGMediaItemSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111242 /* TGMediaItemSupport.m */; };
 		111111111111111111111124 /* TGTGSFileValidator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111244 /* TGTGSFileValidator.m */; };
+		111111111111111111111125 /* TGMessageActionDialogs.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111246 /* TGMessageActionDialogs.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -73,6 +74,8 @@
 		111111111111111111111242 /* TGMediaItemSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaItemSupport.m; sourceTree = "<group>"; };
 		111111111111111111111243 /* TGTGSFileValidator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTGSFileValidator.h; sourceTree = "<group>"; };
 		111111111111111111111244 /* TGTGSFileValidator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTGSFileValidator.m; sourceTree = "<group>"; };
+		111111111111111111111245 /* TGMessageActionDialogs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageActionDialogs.h; sourceTree = "<group>"; };
+		111111111111111111111246 /* TGMessageActionDialogs.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageActionDialogs.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -167,6 +170,8 @@
 				111111111111111111111236 /* TGTheme.m */,
 				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
 				111111111111111111111217 /* TGActiveSessionsPresentation.m */,
+				111111111111111111111245 /* TGMessageActionDialogs.h */,
+				111111111111111111111246 /* TGMessageActionDialogs.m */,
 				111111111111111111111218 /* TGLocalization.h */,
 				111111111111111111111219 /* TGLocalization.m */,
 				111111111111111111111210 /* TGStatusWindowController.h */,
@@ -288,6 +293,7 @@
 				111111111111111111111122 /* TGTGSAnimationView.m in Sources */,
 				111111111111111111111123 /* TGMediaItemSupport.m in Sources */,
 				111111111111111111111124 /* TGTGSFileValidator.m in Sources */,
+				111111111111111111111125 /* TGMessageActionDialogs.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
