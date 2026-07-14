@@ -84,6 +84,12 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize senderID = _senderID;
 @synthesize senderDisplayName = _senderDisplayName;
 @synthesize senderAvatarLocalPath = _senderAvatarLocalPath;
+@synthesize capabilitiesKnown = _capabilitiesKnown;
+@synthesize canBeEdited = _canBeEdited;
+@synthesize canBeDeletedOnlyForSelf = _canBeDeletedOnlyForSelf;
+@synthesize canBeDeletedForAllUsers = _canBeDeletedForAllUsers;
+@synthesize editDate = _editDate;
+@synthesize editableText = _editableText;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -302,6 +308,12 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setSenderID:_senderID];
     [copy setSenderDisplayName:_senderDisplayName];
     [copy setSenderAvatarLocalPath:_senderAvatarLocalPath];
+    [copy setCapabilitiesKnown:_capabilitiesKnown];
+    [copy setCanBeEdited:_canBeEdited];
+    [copy setCanBeDeletedOnlyForSelf:_canBeDeletedOnlyForSelf];
+    [copy setCanBeDeletedForAllUsers:_canBeDeletedForAllUsers];
+    [copy setEditDate:_editDate];
+    [copy setEditableText:_editableText];
     return copy;
 }
 
@@ -345,6 +357,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_senderID release];
     [_senderDisplayName release];
     [_senderAvatarLocalPath release];
+    [_editDate release];
+    [_editableText release];
     [super dealloc];
 }
 

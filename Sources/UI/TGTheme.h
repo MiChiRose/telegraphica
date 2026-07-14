@@ -1,0 +1,47 @@
+#import <Cocoa/Cocoa.h>
+
+extern NSString * const TGThemeDefaultsKey;
+extern NSString * const TGThemeIdentifierVKBlue;
+extern NSString * const TGThemeIdentifierCoffee;
+extern NSString * const TGThemeIdentifierCoralPlum;
+extern NSString * const TGThemeIdentifierIceNavy;
+extern NSString * const TGThemeIdentifierRubyObsidian;
+extern NSString * const TGThemeIdentifierEggshellBurgundy;
+extern NSString * const TGThemeIdentifierMelonOlive;
+
+NSArray *TGThemeIdentifiers(void);
+BOOL TGThemeIdentifierIsValid(NSString *identifier);
+NSString *TGThemeDisplayNameForIdentifier(NSString *identifier);
+void TGSetActiveThemeIdentifier(NSString *identifier);
+NSString *TGCurrentThemeIdentifier(void);
+
+NSColor *TGColorFromHex(NSUInteger hex);
+NSColor *TGClassicWindowBottomColor(void);
+NSColor *TGClassicPanelBottomColor(void);
+NSColor *TGClassicHeaderBottomColor(void);
+NSColor *TGClassicTablePaperColor(void);
+NSColor *TGClassicInkColor(void);
+NSColor *TGClassicMutedInkColor(void);
+NSColor *TGClassicOutgoingBubbleBottomColor(void);
+NSColor *TGClassicIncomingBubbleBottomColor(void);
+NSColor *TGClassicRailStrokeColor(void);
+NSColor *TGClassicHeaderSeparatorColor(void);
+NSColor *TGClassicPanelStrokeColor(void);
+NSColor *TGClassicNavigationSelectedColor(CGFloat alpha);
+NSColor *TGClassicNavigationHighlightedColor(CGFloat alpha);
+NSColor *TGClassicNavigationNormalColor(CGFloat alpha);
+NSColor *TGClassicNavigationSelectedStrokeColor(CGFloat alpha);
+NSColor *TGClassicNavigationNormalStrokeColor(CGFloat alpha);
+NSColor *TGClassicNavigationTextColor(CGFloat alpha);
+NSColor *TGClassicNavigationMutedTextColor(CGFloat alpha);
+NSColor *TGClassicSelectedRowColor(void);
+NSColor *TGClassicSelectedRowTextColor(void);
+NSColor *TGClassicUnreadTextColor(void);
+NSColor *TGClassicOutgoingBubbleStrokeColor(void);
+NSColor *TGClassicIncomingBubbleStrokeColor(void);
+NSColor *TGClassicTimeTextColor(void);
+NSColor *TGClassicTableGridColor(void);
+NSColor *TGClassicTableHeaderColor(void);
+NSColor *TGClassicLinkColor(void);
+NSColor *TGClassicHeaderTextColor(CGFloat alpha);
+NSColor *TGClassicHeaderDetailTextColor(CGFloat alpha);

@@ -21,6 +21,23 @@
 		111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111223 /* TelegraphicaAppIcon.icns */; };
 		111111111111111111111113 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111232 /* AVFoundation.framework */; };
 		111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111224 /* TelegraphicaNotificationIcon.png */; };
+		111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111217 /* TGActiveSessionsPresentation.m */; };
+		111111111111111111111116 /* TGLocalization.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111219 /* TGLocalization.m */; };
+		111111111111111111111117 /* TGWebPDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111226 /* TGWebPDecoder.m */; };
+		111111111111111111111118 /* TGMediaImageLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111228 /* TGMediaImageLoader.m */; };
+		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
+		111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */; };
+		111111111111111111111121 /* TGTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111236 /* TGTheme.m */; };
+		111111111111111111111122 /* TGTGSAnimationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111238 /* TGTGSAnimationView.m */; };
+		111111111111111111111123 /* TGMediaItemSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111242 /* TGMediaItemSupport.m */; };
+		111111111111111111111124 /* TGTGSFileValidator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111244 /* TGTGSFileValidator.m */; };
+		111111111111111111111125 /* TGMessageActionDialogs.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111246 /* TGMessageActionDialogs.m */; };
+		111111111111111111111126 /* TGMessageLayoutSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111248 /* TGMessageLayoutSupport.m */; };
+		111111111111111111111127 /* TGStatusViewComponents.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111250 /* TGStatusViewComponents.m */; };
+		111111111111111111111128 /* TGStatusButtonCells.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111252 /* TGStatusButtonCells.m */; };
+		111111111111111111111129 /* TGStatusViewCells.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111254 /* TGStatusViewCells.m */; };
+		111111111111111111111130 /* TGStatusSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111256 /* TGStatusSupport.m */; };
+		111111111111111111111131 /* TGStickerPickerLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111258 /* TGStickerPickerLayout.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,10 +57,43 @@
 		111111111111111111111213 /* TGChatItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatItem.m; sourceTree = "<group>"; };
 		111111111111111111111214 /* TGMessageItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageItem.h; sourceTree = "<group>"; };
 		111111111111111111111215 /* TGMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageItem.m; sourceTree = "<group>"; };
+		111111111111111111111216 /* TGActiveSessionsPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGActiveSessionsPresentation.h; sourceTree = "<group>"; };
+		111111111111111111111217 /* TGActiveSessionsPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGActiveSessionsPresentation.m; sourceTree = "<group>"; };
+		111111111111111111111218 /* TGLocalization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocalization.h; sourceTree = "<group>"; };
+		111111111111111111111219 /* TGLocalization.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocalization.m; sourceTree = "<group>"; };
 		111111111111111111111221 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111222 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		111111111111111111111223 /* TelegraphicaAppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = TelegraphicaAppIcon.icns; sourceTree = "<group>"; };
 		111111111111111111111224 /* TelegraphicaNotificationIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = TelegraphicaNotificationIcon.png; sourceTree = "<group>"; };
+		111111111111111111111225 /* TGWebPDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGWebPDecoder.h; sourceTree = "<group>"; };
+		111111111111111111111226 /* TGWebPDecoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGWebPDecoder.m; sourceTree = "<group>"; };
+		111111111111111111111227 /* TGMediaImageLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaImageLoader.h; sourceTree = "<group>"; };
+		111111111111111111111228 /* TGMediaImageLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaImageLoader.m; sourceTree = "<group>"; };
+		111111111111111111111229 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
+		111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGInlineMediaPlaybackCoordinator.h; sourceTree = "<group>"; };
+		111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGInlineMediaPlaybackCoordinator.m; sourceTree = "<group>"; };
+		111111111111111111111235 /* TGTheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTheme.h; sourceTree = "<group>"; };
+		111111111111111111111236 /* TGTheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTheme.m; sourceTree = "<group>"; };
+		111111111111111111111237 /* TGTGSAnimationView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTGSAnimationView.h; sourceTree = "<group>"; };
+		111111111111111111111238 /* TGTGSAnimationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTGSAnimationView.m; sourceTree = "<group>"; };
+		111111111111111111111239 /* TGMediaItemSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaItemSupport.h; sourceTree = "<group>"; };
+		111111111111111111111242 /* TGMediaItemSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaItemSupport.m; sourceTree = "<group>"; };
+		111111111111111111111243 /* TGTGSFileValidator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTGSFileValidator.h; sourceTree = "<group>"; };
+		111111111111111111111244 /* TGTGSFileValidator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTGSFileValidator.m; sourceTree = "<group>"; };
+		111111111111111111111245 /* TGMessageActionDialogs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageActionDialogs.h; sourceTree = "<group>"; };
+		111111111111111111111246 /* TGMessageActionDialogs.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageActionDialogs.m; sourceTree = "<group>"; };
+		111111111111111111111247 /* TGMessageLayoutSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageLayoutSupport.h; sourceTree = "<group>"; };
+		111111111111111111111248 /* TGMessageLayoutSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageLayoutSupport.m; sourceTree = "<group>"; };
+		111111111111111111111249 /* TGStatusViewComponents.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusViewComponents.h; sourceTree = "<group>"; };
+		111111111111111111111250 /* TGStatusViewComponents.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusViewComponents.m; sourceTree = "<group>"; };
+		111111111111111111111251 /* TGStatusButtonCells.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusButtonCells.h; sourceTree = "<group>"; };
+		111111111111111111111252 /* TGStatusButtonCells.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusButtonCells.m; sourceTree = "<group>"; };
+		111111111111111111111253 /* TGStatusViewCells.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusViewCells.h; sourceTree = "<group>"; };
+		111111111111111111111254 /* TGStatusViewCells.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusViewCells.m; sourceTree = "<group>"; };
+		111111111111111111111255 /* TGStatusSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusSupport.h; sourceTree = "<group>"; };
+		111111111111111111111256 /* TGStatusSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusSupport.m; sourceTree = "<group>"; };
+		111111111111111111111257 /* TGStickerPickerLayout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStickerPickerLayout.h; sourceTree = "<group>"; };
+		111111111111111111111258 /* TGStickerPickerLayout.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStickerPickerLayout.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -83,6 +133,7 @@
 				111111111111111111111404 /* Core */,
 				111111111111111111111405 /* Services */,
 				111111111111111111111406 /* UI */,
+				111111111111111111111408 /* Media */,
 				111111111111111111111407 /* Resources */,
 			);
 			path = Sources;
@@ -133,10 +184,49 @@
 		111111111111111111111406 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				111111111111111111111235 /* TGTheme.h */,
+				111111111111111111111236 /* TGTheme.m */,
+				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
+				111111111111111111111217 /* TGActiveSessionsPresentation.m */,
+				111111111111111111111245 /* TGMessageActionDialogs.h */,
+				111111111111111111111246 /* TGMessageActionDialogs.m */,
+				111111111111111111111247 /* TGMessageLayoutSupport.h */,
+				111111111111111111111248 /* TGMessageLayoutSupport.m */,
+				111111111111111111111249 /* TGStatusViewComponents.h */,
+				111111111111111111111250 /* TGStatusViewComponents.m */,
+				111111111111111111111251 /* TGStatusButtonCells.h */,
+				111111111111111111111252 /* TGStatusButtonCells.m */,
+				111111111111111111111257 /* TGStickerPickerLayout.h */,
+				111111111111111111111258 /* TGStickerPickerLayout.m */,
+				111111111111111111111253 /* TGStatusViewCells.h */,
+				111111111111111111111254 /* TGStatusViewCells.m */,
+				111111111111111111111255 /* TGStatusSupport.h */,
+				111111111111111111111256 /* TGStatusSupport.m */,
+				111111111111111111111218 /* TGLocalization.h */,
+				111111111111111111111219 /* TGLocalization.m */,
 				111111111111111111111210 /* TGStatusWindowController.h */,
 				111111111111111111111211 /* TGStatusWindowController.m */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		111111111111111111111408 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				111111111111111111111239 /* TGMediaItemSupport.h */,
+				111111111111111111111242 /* TGMediaItemSupport.m */,
+				111111111111111111111243 /* TGTGSFileValidator.h */,
+				111111111111111111111244 /* TGTGSFileValidator.m */,
+				111111111111111111111237 /* TGTGSAnimationView.h */,
+				111111111111111111111238 /* TGTGSAnimationView.m */,
+				111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */,
+				111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */,
+				111111111111111111111225 /* TGWebPDecoder.h */,
+				111111111111111111111226 /* TGWebPDecoder.m */,
+				111111111111111111111227 /* TGMediaImageLoader.h */,
+				111111111111111111111228 /* TGMediaImageLoader.m */,
+			);
+			path = Media;
 			sourceTree = "<group>";
 		};
 		111111111111111111111407 /* Resources */ = {
@@ -145,6 +235,7 @@
 				111111111111111111111220 /* Localizable.strings */,
 				111111111111111111111223 /* TelegraphicaAppIcon.icns */,
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
+				111111111111111111111229 /* ThirdPartyNotices.txt */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -204,6 +295,7 @@
 				111111111111111111111107 /* Localizable.strings in Resources */,
 				111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */,
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
+				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -222,6 +314,22 @@
 				111111111111111111111106 /* TGStatusWindowController.m in Sources */,
 				111111111111111111111111 /* TGChatItem.m in Sources */,
 				111111111111111111111112 /* TGMessageItem.m in Sources */,
+				111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */,
+				111111111111111111111116 /* TGLocalization.m in Sources */,
+				111111111111111111111117 /* TGWebPDecoder.m in Sources */,
+				111111111111111111111118 /* TGMediaImageLoader.m in Sources */,
+				111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */,
+				111111111111111111111121 /* TGTheme.m in Sources */,
+				111111111111111111111122 /* TGTGSAnimationView.m in Sources */,
+				111111111111111111111123 /* TGMediaItemSupport.m in Sources */,
+				111111111111111111111124 /* TGTGSFileValidator.m in Sources */,
+				111111111111111111111125 /* TGMessageActionDialogs.m in Sources */,
+				111111111111111111111126 /* TGMessageLayoutSupport.m in Sources */,
+				111111111111111111111127 /* TGStatusViewComponents.m in Sources */,
+				111111111111111111111128 /* TGStatusButtonCells.m in Sources */,
+				111111111111111111111129 /* TGStatusViewCells.m in Sources */,
+				111111111111111111111130 /* TGStatusSupport.m in Sources */,
+				111111111111111111111131 /* TGStickerPickerLayout.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
