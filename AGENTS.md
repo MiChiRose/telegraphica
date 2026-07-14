@@ -30,4 +30,5 @@ These project rules apply to Codex work in this repository.
 - Target toolchain: Xcode 6.2-compatible where possible.
 - Use Objective-C, Cocoa, and AppKit.
 - Do not use Swift, SwiftUI, official Telegram branding/logo/assets, or macOS 10.10+ APIs without a Mavericks-safe fallback.
+- When adding UI or feature code, prefer focused component/helper files over growing large controllers such as `TGStatusWindowController.m`; keep new modules cohesive and import them from the owning controller.
 - Do not commit Telegram `api_id`, `api_hash`, sessions, phone numbers, login codes, TDLib databases, generated database keys, or local credentials.

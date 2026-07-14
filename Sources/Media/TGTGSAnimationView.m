@@ -62,6 +62,10 @@ static void TGTGSConvertBGRAPremultipliedToRGBA(const unsigned char *source,
     }
 }
 
+static NSColor *TGTGSStickerBackgroundColor(void) {
+    return [NSColor colorWithCalibratedRed:0.965 green:0.980 blue:0.990 alpha:1.0];
+}
+
 @interface TGTGSAnimationView ()
 - (void)scheduleRenderFrame:(NSUInteger)frameIndex;
 - (void)renderFrameInBackground:(NSNumber *)frameNumber;
@@ -151,16 +155,8 @@ static void TGTGSConvertBGRAPremultipliedToRGBA(const unsigned char *source,
         return self;
     }
 
-    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(_pixelWidth, _pixelHeight)] autorelease];
-    [image addRepresentation:_bitmapRepresentation];
-    _imageView = [[NSImageView alloc] initWithFrame:[self bounds]];
-    [_imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [_imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
-    [_imageView setImage:image];
-    [_imageView setWantsLayer:YES];
-    [[_imageView layer] setMasksToBounds:YES];
-    [[_imageView layer] setCornerRadius:6.0];
-    [self addSubview:_imageView];
+    _renderedImage = [[NSImage alloc] initWithSize:NSMakeSize(_pixelWidth, _pixelHeight)];
+    [_renderedImage addRepresentation:_bitmapRepresentation];
     _renderQueue = [TGTGSSharedRenderQueue() retain];
     _lastScheduledFrame = NSNotFound;
     _lastAppliedFrame = NSNotFound;
@@ -220,7 +216,7 @@ static void TGTGSConvertBGRAPremultipliedToRGBA(const unsigned char *source,
     NSUInteger expectedLength = _pixelWidth * _pixelHeight * 4;
     if ([self isAnimationValid] && [pixels length] == expectedLength) {
         memcpy([_bitmapRepresentation bitmapData], [pixels bytes], expectedLength);
-        [_imageView setNeedsDisplay:YES];
+        [self setNeedsDisplay:YES];
         _renderedFrameCount++;
         _lastAppliedFrame = [[payload objectForKey:@"frame"] unsignedIntegerValue];
     }
@@ -257,6 +253,31 @@ static void TGTGSConvertBGRAPremultipliedToRGBA(const unsigned char *source,
     NSTimeInterval elapsed = -[_playbackStartDate timeIntervalSinceNow];
     NSUInteger frameIndex = ((NSUInteger)floor(elapsed * _frameRate)) % _frameCount;
     [self scheduleRenderFrame:frameIndex];
+}
+
+- (BOOL)isOpaque {
+    return YES;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSBezierPath *clipPath = [NSBezierPath bezierPathWithRoundedRect:bounds xRadius:6.0 yRadius:6.0];
+    [TGTGSStickerBackgroundColor() setFill];
+    [clipPath fill];
+    if (!_renderedImage || ![self isAnimationValid]) {
+        return;
+    }
+
+    [NSGraphicsContext saveGraphicsState];
+    [clipPath addClip];
+    [_renderedImage drawInRect:bounds
+                      fromRect:NSMakeRect(0, 0, (CGFloat)_pixelWidth, (CGFloat)_pixelHeight)
+                     operation:NSCompositeSourceOver
+                      fraction:1.0
+                respectFlipped:YES
+                         hints:nil];
+    [NSGraphicsContext restoreGraphicsState];
 }
 
 - (void)startFrameTimer {
@@ -314,6 +335,7 @@ static void TGTGSConvertBGRAPremultipliedToRGBA(const unsigned char *source,
     }
     [_playbackStartDate release];
     [_imageView release];
+    [_renderedImage release];
     [_bitmapRepresentation release];
     [super dealloc];
 }
