@@ -64,6 +64,10 @@ static NSString *TGConfiguredDownloadFolderPath(void) {
     return [path stringByStandardizingPath];
 }
 
+static NSRect TGStickerPickerContentRectForButtonFrame(NSRect buttonFrame) {
+    return NSInsetRect(NSInsetRect(buttonFrame, 1.0, 1.0), 6.0, 6.0);
+}
+
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
@@ -9905,7 +9909,7 @@ static NSString *TGConfiguredDownloadFolderPath(void) {
         }
         NSString *identifier = [NSString stringWithFormat:@"sticker-picker-%ld-%@", (long)stickerIndex, path];
         NSString *playbackKind = TGInlinePlaybackKindForMediaItem((NSDictionary *)candidateItem);
-        NSRect playbackFrame = NSInsetRect([candidateView frame], 4.0, 4.0);
+        NSRect playbackFrame = TGStickerPickerContentRectForButtonFrame([candidateView frame]);
         [descriptors addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                                 identifier, TGInlineMediaIdentifierKey,
                                 path, TGInlineMediaPathKey,
@@ -9952,9 +9956,10 @@ static NSString *TGConfiguredDownloadFolderPath(void) {
         CGFloat x = gap + (CGFloat)column * (buttonSide + gap);
         CGFloat y = contentHeight - gap - buttonSide - (CGFloat)row * (buttonSide + gap);
         NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(x, y, buttonSide, buttonSide)] autorelease];
+        TGStickerPickerButtonCell *cell = [[[TGStickerPickerButtonCell alloc] init] autorelease];
+        [button setCell:cell];
         [button setButtonType:NSMomentaryPushInButton];
-        [button setBezelStyle:NSRegularSquareBezelStyle];
-        [button setBordered:YES];
+        [button setBordered:NO];
         [button setTarget:self];
         [button setAction:@selector(sendStickerFromPickerButton:)];
         [button setTag:(NSInteger)index];
