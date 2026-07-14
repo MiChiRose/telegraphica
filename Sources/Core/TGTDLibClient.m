@@ -3307,8 +3307,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     if ([fullLocalPath length] > 0) {
         [info setObject:fullLocalPath forKey:@"full_local_path"];
+        if ([formatType isEqualToString:@"stickerFormatWebm"]) {
+            [info setObject:fullLocalPath forKey:@"playable_local_path"];
+        }
         if ([formatType isEqualToString:@"stickerFormatWebp"] ||
-            [formatType isEqualToString:@"stickerFormatWebm"] ||
             [[info objectForKey:@"local_path"] length] == 0) {
             [info setObject:fullLocalPath forKey:@"local_path"];
         }
