@@ -7,9 +7,11 @@
 @property (nonatomic, copy) NSString *typeSummary;
 @property (nonatomic, retain) NSNumber *unreadCount;
 @property (nonatomic, retain) NSNumber *lastReadOutboxMessageID;
+@property (nonatomic, retain) NSNumber *chatListOrder;
 @property (nonatomic, copy) NSString *avatarLocalPath;
 @property (nonatomic, assign) BOOL serverNotificationsMuted;
 @property (nonatomic, assign) BOOL notificationsMuted;
+@property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
 @property (nonatomic, retain) NSNumber *parentChatID;
 @property (nonatomic, retain) NSNumber *messageThreadID;
