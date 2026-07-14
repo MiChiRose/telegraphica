@@ -182,6 +182,7 @@
             NSString *playbackKind = TGInlinePlaybackKindForMediaItem(mediaItem);
             BOOL animation = ([contentType isEqualToString:@"messageAnimation"] ||
                               [extension isEqualToString:@"gif"] ||
+                              [extension isEqualToString:@"webm"] ||
                               [playbackKind isEqualToString:TGInlineMediaKindTGS]);
             if (!animation || [path length] == 0 || !NSIntersectsRect(frame, visibleRect)) {
                 continue;
@@ -382,4 +383,3 @@
         [self appendDetail:@"Could not open message link in default browser."];
     }
 }
-

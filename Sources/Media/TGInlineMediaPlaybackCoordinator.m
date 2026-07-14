@@ -80,6 +80,12 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         }
     } else {
         NSURL *url = [NSURL fileURLWithPath:mediaPath];
+        if ([[[mediaPath pathExtension] lowercaseString] isEqualToString:@"webm"]) {
+            AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:nil];
+            if (![asset isPlayable]) {
+                return self;
+            }
+        }
         AVPlayer *player = [[[AVPlayer alloc] initWithURL:url] autorelease];
         if (player) {
             [player setActionAtItemEnd:AVPlayerActionAtItemEndNone];
