@@ -3,6 +3,7 @@
 
 NSString * const TGInlineMediaKindGIF = @"gif";
 NSString * const TGInlineMediaKindVideo = @"video";
+NSString * const TGInlineMediaKindWebM = @"webm";
 NSString * const TGInlineMediaKindTGS = @"tgs";
 
 static NSDictionary *TGItem(NSString *contentType) {

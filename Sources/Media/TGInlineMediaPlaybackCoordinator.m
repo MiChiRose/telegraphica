@@ -9,6 +9,7 @@ NSString * const TGInlineMediaKindKey = @"kind";
 
 NSString * const TGInlineMediaKindGIF = @"gif";
 NSString * const TGInlineMediaKindVideo = @"video";
+NSString * const TGInlineMediaKindWebM = @"webm";
 NSString * const TGInlineMediaKindTGS = @"tgs";
 NSString * const TGInlineMediaPlaybackDiagnosticNotification = @"TGInlineMediaPlaybackDiagnosticNotification";
 NSString * const TGInlineMediaPlaybackDiagnosticMessageKey = @"message";
@@ -101,6 +102,15 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             self.failureReason = @"GIF image could not be decoded.";
         }
     } else {
+        if ([mediaKind isEqualToString:TGInlineMediaKindWebM]) {
+            /*
+             Modern Telegram video stickers are WebM/VP9. AVFoundation on
+             Mavericks cannot decode them, so keep the downloaded thumbnail as
+             the visible fallback until Telegraphica bundles a WebM decoder.
+             */
+            self.failureReason = @"WebM animation requires a bundled WebM/VP9 decoder; AVFoundation on OS X 10.9 cannot play it.";
+            return self;
+        }
         NSURL *url = [NSURL fileURLWithPath:mediaPath];
         if ([[[mediaPath pathExtension] lowercaseString] isEqualToString:@"webm"]) {
             AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:nil];
@@ -220,6 +230,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 @interface TGInlineMediaPlaybackCoordinator ()
 @property (nonatomic, assign) NSView *hostView;
 @property (nonatomic, retain) NSMutableDictionary *viewsByIdentifier;
+@property (nonatomic, retain) NSMutableSet *failedIdentifiers;
 @property (nonatomic, assign) NSUInteger maximumActiveItems;
 @property (nonatomic, assign) BOOL applicationActive;
 - (void)reportTGSPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view;
@@ -229,6 +240,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 
 @synthesize hostView = _hostView;
 @synthesize viewsByIdentifier = _viewsByIdentifier;
+@synthesize failedIdentifiers = _failedIdentifiers;
 @synthesize maximumActiveItems = _maximumActiveItems;
 @synthesize applicationActive = _applicationActive;
 
@@ -240,6 +252,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     self.hostView = hostView;
     self.maximumActiveItems = maximumActiveItems > 0 ? maximumActiveItems : 1;
     self.viewsByIdentifier = [NSMutableDictionary dictionary];
+    self.failedIdentifiers = [NSMutableSet set];
     self.applicationActive = [NSApp isActive];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(applicationDidBecomeActive:)
@@ -297,6 +310,9 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         if (![kind isKindOfClass:[NSString class]] || [kind length] == 0) {
             kind = TGInlineMediaKindVideo;
         }
+        if ([self.failedIdentifiers containsObject:identifier]) {
+            continue;
+        }
 
         NSRect frame = [frameValue rectValue];
         if (NSIsEmptyRect(frame)) {
@@ -314,6 +330,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             view = [[[TGInlineMediaPlaybackView alloc] initWithFrame:frame mediaPath:path mediaKind:kind] autorelease];
             if (![view player] && ![view imageView] && ![view tgsView]) {
                 TGInlineMediaPlaybackPostDiagnostic([NSString stringWithFormat:@"Media Playback: failed to create inline playback kind=%@ file=%@ reason=%@", kind, [path lastPathComponent], [view failureReason] ? [view failureReason] : @"unknown"]);
+                [self.failedIdentifiers addObject:identifier];
                 continue;
             }
             [self.hostView addSubview:view];
@@ -371,6 +388,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 - (void)dealloc {
     [self invalidate];
     [_viewsByIdentifier release];
+    [_failedIdentifiers release];
     [super dealloc];
 }
 

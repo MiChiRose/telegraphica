@@ -174,6 +174,10 @@ NSString *TGInlinePlaybackKindForMediaItem(NSDictionary *mediaItem) {
     if ([[[path pathExtension] lowercaseString] isEqualToString:@"gif"]) {
         return TGInlineMediaKindGIF;
     }
+    if ([[[path pathExtension] lowercaseString] isEqualToString:@"webm"] ||
+        TGMediaItemIsWebMSticker(mediaItem)) {
+        return TGInlineMediaKindWebM;
+    }
     return TGInlineMediaKindVideo;
 }
 
