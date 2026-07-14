@@ -3,6 +3,7 @@
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGProfilePresentation.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
@@ -893,62 +894,24 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)refreshProfileDisplay {
-    NSString *displayName = ([self.profileDisplayName length] > 0) ? self.profileDisplayName : @"Telegraphica";
+    NSString *displayName = TGProfileDisplayName(self.profileDisplayName);
     [self.accountBadgeView setDisplayName:displayName];
     [self.accountBadgeView setAvatarLocalPath:self.profileAvatarLocalPath];
     [self.accountBadgeView setConnected:[self.currentAuthState isEqualToString:@"ready"]];
     [self.profileAvatarView setDisplayName:displayName];
     [self.profileAvatarView setAvatarLocalPath:self.profileAvatarLocalPath];
 
-    if ([self.profileDisplayName length] > 0) {
-        NSString *fullName = nil;
-        if ([self.profileFirstName length] > 0 && [self.profileLastName length] > 0) {
-            fullName = [NSString stringWithFormat:@"%@ %@", self.profileFirstName, self.profileLastName];
-        } else if ([self.profileFirstName length] > 0) {
-            fullName = self.profileFirstName;
-        } else {
-            fullName = self.profileDisplayName;
-        }
-        [self.profileNameField setStringValue:fullName ? fullName : TGLoc(@"profile.fallback")];
-    } else {
-        [self.profileNameField setStringValue:TGLoc(@"profile.fallback")];
-    }
+    [self.profileNameField setStringValue:TGProfileFullName(self.profileDisplayName,
+                                                            self.profileFirstName,
+                                                            self.profileLastName,
+                                                            TGLoc(@"profile.fallback"))];
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
 
-    BOOL hasProfileUserID = [self.profileUserID respondsToSelector:@selector(longLongValue)];
     [self.settingsLibraryField setStringValue:TGLoc(@"settings.appearance")];
-
-    if ([self.profileUsername length] > 0) {
-        [self.profileUsernameRowValueField setStringValue:[NSString stringWithFormat:@"@%@", self.profileUsername]];
-    } else {
-        [self.profileUsernameRowValueField setStringValue:@""];
-    }
-    if ([self.profilePhoneNumber length] > 0) {
-        NSString *phoneText = self.profilePhoneNumber;
-        if (![phoneText hasPrefix:@"+"]) {
-            phoneText = [@"+" stringByAppendingString:phoneText];
-        }
-        [self.profilePhoneRowValueField setStringValue:phoneText];
-    } else {
-        [self.profilePhoneRowValueField setStringValue:@""];
-    }
-    if (hasProfileUserID) {
-        [self.profileIDRowValueField setStringValue:[NSString stringWithFormat:@"%lld", [self.profileUserID longLongValue]]];
-    } else {
-        [self.profileIDRowValueField setStringValue:@""];
-    }
-
-    NSMutableString *profileSubtitle = [NSMutableString string];
-    if ([self.profileUsername length] > 0) {
-        [profileSubtitle appendFormat:@"@%@", self.profileUsername];
-    }
-    if (hasProfileUserID) {
-        if ([profileSubtitle length] > 0) {
-            [profileSubtitle appendString:@" "];
-        }
-        [profileSubtitle appendFormat:@"(%lld)", [self.profileUserID longLongValue]];
-    }
-    [self.profileUsernameField setStringValue:profileSubtitle ? profileSubtitle : @""];
+    [self.profileUsernameRowValueField setStringValue:TGProfileUsernameText(self.profileUsername)];
+    [self.profilePhoneRowValueField setStringValue:TGProfilePhoneText(self.profilePhoneNumber)];
+    [self.profileIDRowValueField setStringValue:TGProfileIDText(self.profileUserID)];
+    [self.profileUsernameField setStringValue:TGProfileSubtitleText(self.profileUsername, self.profileUserID)];
 
     [self.profileIDField setStringValue:@""];
     [self.profileStateField setStringValue:([self.profileBio length] > 0) ? self.profileBio : @""];
