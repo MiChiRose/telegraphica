@@ -31,3 +31,6 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 
 @interface TGSettingsListButtonCell : NSButtonCell
 @end
+
+@interface TGStickerPickerButtonCell : NSButtonCell
+@end

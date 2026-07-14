@@ -258,6 +258,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @implementation TGDrawerButtonCell
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
     CGFloat alpha = enabled ? 1.0 : 0.46;
@@ -316,6 +317,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @implementation TGAttachButtonCell
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
     CGFloat alpha = enabled ? 1.0 : 0.48;
@@ -600,3 +602,71 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
+@implementation TGStickerPickerButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.52;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
+
+    NSColor *topColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicTablePaperColor();
+    NSColor *bottomColor = highlighted ? TGClassicNavigationNormalColor(alpha) : TGClassicPanelBottomColor();
+    NSGradient *backgroundGradient = [[[NSGradient alloc] initWithStartingColor:topColor
+                                                                    endingColor:bottomColor] autorelease];
+    [backgroundGradient drawInBezierPath:buttonPath angle:90.0];
+    [TGClassicPanelStrokeColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSRect contentRect = NSInsetRect(buttonRect, 6.0, 6.0);
+    NSImage *image = [self image];
+    if (image) {
+        NSSize imageSize = [image size];
+        if (imageSize.width > 0.0 && imageSize.height > 0.0 && !NSIsEmptyRect(contentRect)) {
+            CGFloat scale = MIN(NSWidth(contentRect) / imageSize.width,
+                                NSHeight(contentRect) / imageSize.height);
+            if (scale > 1.0) {
+                scale = 1.0;
+            }
+            NSSize drawSize = NSMakeSize(floor(imageSize.width * scale),
+                                         floor(imageSize.height * scale));
+            NSRect drawRect = NSMakeRect(NSMidX(contentRect) - floor(drawSize.width / 2.0),
+                                         NSMidY(contentRect) - floor(drawSize.height / 2.0),
+                                         drawSize.width,
+                                         drawSize.height);
+            NSBezierPath *clipPath = [NSBezierPath bezierPathWithRoundedRect:contentRect xRadius:4.0 yRadius:4.0];
+            [NSGraphicsContext saveGraphicsState];
+            [clipPath addClip];
+            [image drawInRect:drawRect
+                     fromRect:NSMakeRect(0.0, 0.0, imageSize.width, imageSize.height)
+                    operation:NSCompositeSourceOver
+                     fraction:alpha
+               respectFlipped:YES
+                        hints:nil];
+            [NSGraphicsContext restoreGraphicsState];
+        }
+    } else {
+        NSString *title = [self title];
+        if ([title length] == 0) {
+            title = @"?";
+        }
+        NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [paragraph setAlignment:NSCenterTextAlignment];
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:28.0], NSFontAttributeName,
+                                    [NSColor colorWithCalibratedWhite:0.05 alpha:alpha], NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+        NSSize titleSize = [title sizeWithAttributes:attributes];
+        NSRect titleRect = NSMakeRect(NSMinX(contentRect),
+                                      NSMidY(contentRect) - floor(titleSize.height / 2.0) - 1.0,
+                                      NSWidth(contentRect),
+                                      titleSize.height + 2.0);
+        [title drawInRect:titleRect withAttributes:attributes];
+    }
+}
+
+@end

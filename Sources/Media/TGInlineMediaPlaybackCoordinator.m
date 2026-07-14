@@ -104,9 +104,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 
 - (NSRect)contentFrame {
     if ([self.mediaKind isEqualToString:TGInlineMediaKindTGS]) {
-        NSRect frame = NSInsetRect([self bounds], 4.0, 4.0);
-        frame.origin.y += 2.0;
-        return frame;
+        return [self bounds];
     }
     return [self bounds];
 }
