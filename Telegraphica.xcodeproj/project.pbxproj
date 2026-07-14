@@ -35,6 +35,8 @@
 		111111111111111111111126 /* TGMessageLayoutSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111248 /* TGMessageLayoutSupport.m */; };
 		111111111111111111111127 /* TGStatusViewComponents.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111250 /* TGStatusViewComponents.m */; };
 		111111111111111111111128 /* TGStatusButtonCells.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111252 /* TGStatusButtonCells.m */; };
+		111111111111111111111129 /* TGStatusViewCells.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111254 /* TGStatusViewCells.m */; };
+		111111111111111111111130 /* TGStatusSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111256 /* TGStatusSupport.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -85,6 +87,10 @@
 		111111111111111111111250 /* TGStatusViewComponents.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusViewComponents.m; sourceTree = "<group>"; };
 		111111111111111111111251 /* TGStatusButtonCells.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusButtonCells.h; sourceTree = "<group>"; };
 		111111111111111111111252 /* TGStatusButtonCells.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusButtonCells.m; sourceTree = "<group>"; };
+		111111111111111111111253 /* TGStatusViewCells.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusViewCells.h; sourceTree = "<group>"; };
+		111111111111111111111254 /* TGStatusViewCells.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusViewCells.m; sourceTree = "<group>"; };
+		111111111111111111111255 /* TGStatusSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusSupport.h; sourceTree = "<group>"; };
+		111111111111111111111256 /* TGStatusSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusSupport.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -187,6 +193,10 @@
 				111111111111111111111250 /* TGStatusViewComponents.m */,
 				111111111111111111111251 /* TGStatusButtonCells.h */,
 				111111111111111111111252 /* TGStatusButtonCells.m */,
+				111111111111111111111253 /* TGStatusViewCells.h */,
+				111111111111111111111254 /* TGStatusViewCells.m */,
+				111111111111111111111255 /* TGStatusSupport.h */,
+				111111111111111111111256 /* TGStatusSupport.m */,
 				111111111111111111111218 /* TGLocalization.h */,
 				111111111111111111111219 /* TGLocalization.m */,
 				111111111111111111111210 /* TGStatusWindowController.h */,
@@ -312,6 +322,8 @@
 				111111111111111111111126 /* TGMessageLayoutSupport.m in Sources */,
 				111111111111111111111127 /* TGStatusViewComponents.m in Sources */,
 				111111111111111111111128 /* TGStatusButtonCells.m in Sources */,
+				111111111111111111111129 /* TGStatusViewCells.m in Sources */,
+				111111111111111111111130 /* TGStatusSupport.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
