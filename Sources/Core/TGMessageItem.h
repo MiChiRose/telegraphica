@@ -25,6 +25,12 @@
 @property (nonatomic, retain) NSNumber *senderID;
 @property (nonatomic, copy) NSString *senderDisplayName;
 @property (nonatomic, copy) NSString *senderAvatarLocalPath;
+@property (nonatomic, assign) BOOL capabilitiesKnown;
+@property (nonatomic, assign) BOOL canBeEdited;
+@property (nonatomic, assign) BOOL canBeDeletedOnlyForSelf;
+@property (nonatomic, assign) BOOL canBeDeletedForAllUsers;
+@property (nonatomic, retain) NSNumber *editDate;
+@property (nonatomic, copy) NSString *editableText;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID

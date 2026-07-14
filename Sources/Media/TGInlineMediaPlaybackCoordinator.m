@@ -98,6 +98,18 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     return self;
 }
 
+- (BOOL)isOpaque {
+    return [self.mediaKind isEqualToString:TGInlineMediaKindTGS];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    if ([self.mediaKind isEqualToString:TGInlineMediaKindTGS]) {
+        [[NSColor colorWithCalibratedRed:0.965 green:0.980 blue:0.990 alpha:1.0] setFill];
+        NSRectFill([self bounds]);
+    }
+}
+
 - (NSView *)hitTest:(NSPoint)point {
     (void)point;
     return nil;

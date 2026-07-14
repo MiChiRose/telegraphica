@@ -1,6 +1,7 @@
 #import "TGStatusWindowController.h"
 #import "TGActiveSessionsPresentation.h"
 #import "TGLocalization.h"
+#import "TGMessageActionDialogs.h"
 #import "TGTheme.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGMediaImageLoader.h"
@@ -9552,6 +9553,28 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [menu addItem:downloadItem];
         [menu addItem:[NSMenuItem separatorItem]];
     }
+    BOOL addedMessageAction = NO;
+    if ([item capabilitiesKnown] && [item canBeEdited] && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
+        NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
+                                                           action:@selector(editMessageFromMenu:)
+                                                    keyEquivalent:@""] autorelease];
+        [editItem setRepresentedObject:item];
+        [editItem setTarget:self];
+        [menu addItem:editItem];
+        addedMessageAction = YES;
+    }
+    if ([item capabilitiesKnown] && ([item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers])) {
+        NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.delete")
+                                                             action:@selector(deleteMessageFromMenu:)
+                                                      keyEquivalent:@""] autorelease];
+        [deleteItem setRepresentedObject:item];
+        [deleteItem setTarget:self];
+        [menu addItem:deleteItem];
+        addedMessageAction = YES;
+    }
+    if (addedMessageAction) {
+        [menu addItem:[NSMenuItem separatorItem]];
+    }
     NSArray *emojis = [NSArray arrayWithObjects:@"🔥", @"😁", @"👍", @"👎", @"❤", @"😢", @"😱", nil];
     NSUInteger index = 0;
     for (index = 0; index < [emojis count]; index++) {
@@ -9595,6 +9618,150 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [moreItem setSubmenu:moreMenu];
         [menu addItem:moreItem];
     }
+}
+
+- (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item {
+    NSMutableArray *messageIDs = [NSMutableArray array];
+    if ([item isMediaAlbumMessage]) {
+        NSArray *mediaItems = [item visualMediaItems];
+        NSUInteger index = 0;
+        for (index = 0; index < [mediaItems count]; index++) {
+            id media = [mediaItems objectAtIndex:index];
+            if (![media isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            id messageID = [(NSDictionary *)media objectForKey:@"message_id"];
+            if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
+                NSNumber *safeID = [NSNumber numberWithLongLong:[messageID longLongValue]];
+                if (![messageIDs containsObject:safeID]) {
+                    [messageIDs addObject:safeID];
+                }
+            }
+        }
+    }
+    if ([messageIDs count] == 0 && [item.messageID respondsToSelector:@selector(longLongValue)]) {
+        [messageIDs addObject:[NSNumber numberWithLongLong:[item.messageID longLongValue]]];
+    }
+    return messageIDs;
+}
+
+- (void)editMessageFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)] ||
+        [[item editableText] length] == 0) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Message editing is available only after sign-in is ready."];
+        return;
+    }
+
+    NSString *editedText = [TGMessageActionDialogs editedTextForCurrentText:[item editableText]];
+    if ([editedText length] == 0 || [editedText isEqualToString:[item editableText]]) {
+        return;
+    }
+
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageID = [[item messageID] retain];
+    NSString *text = [editedText copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:@"Editing message..."];
+    [self appendDetail:@"Submitting message edit through TDLib..."];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *capabilitiesError = nil;
+        NSDictionary *capabilities = [client messageActionCapabilitiesForChatID:chatID messageID:messageID timeout:6.0 error:&capabilitiesError];
+        BOOL canEdit = [[capabilities objectForKey:@"can_be_edited"] boolValue];
+        NSError *editError = nil;
+        NSString *editSummary = nil;
+        if (canEdit) {
+            editSummary = [client editTextMessageInChatID:chatID messageID:messageID text:text timeout:8.0 error:&editError];
+        }
+        NSString *errorMessage = [[(canEdit ? editError : capabilitiesError) localizedDescription] copy];
+        BOOL succeeded = ([editSummary length] > 0);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:@"Message edited"];
+                [self appendDetail:@"TDLib message edit accepted."];
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            } else {
+                [self.statusField setStringValue:@"Edit unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib edit message: %@", [errorMessage length] > 0 ? errorMessage : @"message can no longer be edited"]];
+            }
+            [errorMessage release];
+            [chatID release];
+            [messageID release];
+            [text release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)deleteMessageFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Message deletion is available only after sign-in is ready."];
+        return;
+    }
+
+    TGMessageDeleteChoice choice = [TGMessageActionDialogs deleteChoiceWithCanDeleteOnlyForSelf:[item canBeDeletedOnlyForSelf]
+                                                                           canDeleteForAllUsers:[item canBeDeletedForAllUsers]];
+    if (choice == TGMessageDeleteChoiceCancel) {
+        return;
+    }
+
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageID = [[item messageID] retain];
+    NSArray *messageIDs = [[self messageIDsForMessageActionItem:item] retain];
+    BOOL revoke = (choice == TGMessageDeleteChoiceForEveryone);
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:@"Deleting message..."];
+    [self appendDetail:@"Submitting message deletion through TDLib..."];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *capabilitiesError = nil;
+        NSDictionary *capabilities = [client messageActionCapabilitiesForChatID:chatID messageID:messageID timeout:6.0 error:&capabilitiesError];
+        BOOL canDelete = revoke ? [[capabilities objectForKey:@"can_be_deleted_for_all_users"] boolValue] : [[capabilities objectForKey:@"can_be_deleted_only_for_self"] boolValue];
+        NSError *deleteError = nil;
+        NSString *deleteSummary = nil;
+        if (canDelete) {
+            deleteSummary = [client deleteMessagesInChatID:chatID messageIDs:messageIDs revoke:revoke timeout:8.0 error:&deleteError];
+        }
+        NSString *errorMessage = [[(canDelete ? deleteError : capabilitiesError) localizedDescription] copy];
+        BOOL succeeded = ([deleteSummary length] > 0);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:@"Message deleted"];
+                [self appendDetail:@"TDLib message deletion accepted."];
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            } else {
+                [self.statusField setStringValue:@"Delete unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib delete message: %@", [errorMessage length] > 0 ? errorMessage : @"message can no longer be deleted"]];
+            }
+            [errorMessage release];
+            [chatID release];
+            [messageID release];
+            [messageIDs release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)downloadMessageAttachmentFromMenu:(id)sender {

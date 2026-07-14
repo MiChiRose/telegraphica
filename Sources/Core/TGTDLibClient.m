@@ -28,6 +28,38 @@ static BOOL TGTDLibObjectIsBoolean(id object) {
     return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
 }
 
+static BOOL TGTDLibCapabilityBoolFromDictionary(NSDictionary *dictionary, NSString *key) {
+    id value = [dictionary objectForKey:key];
+    return ([value respondsToSelector:@selector(boolValue)] && [value boolValue]);
+}
+
+static BOOL TGTDLibDictionaryHasKey(NSDictionary *dictionary, NSString *key) {
+    return ([dictionary isKindOfClass:[NSDictionary class]] && [dictionary objectForKey:key] != nil);
+}
+
+static NSDictionary *TGTDLibMessageCapabilitiesFromObject(NSDictionary *object) {
+    if (![object isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    BOOL hasEdit = TGTDLibDictionaryHasKey(object, @"can_be_edited");
+    BOOL hasDeleteSelf = TGTDLibDictionaryHasKey(object, @"can_be_deleted_only_for_self");
+    BOOL hasDeleteAll = TGTDLibDictionaryHasKey(object, @"can_be_deleted_for_all_users");
+    if (!hasEdit && !hasDeleteSelf && !hasDeleteAll) {
+        return nil;
+    }
+
+    NSMutableDictionary *capabilities = [NSMutableDictionary dictionary];
+    [capabilities setObject:[NSNumber numberWithBool:YES] forKey:@"known"];
+    [capabilities setObject:[NSNumber numberWithBool:TGTDLibCapabilityBoolFromDictionary(object, @"can_be_edited")] forKey:@"can_be_edited"];
+    [capabilities setObject:[NSNumber numberWithBool:TGTDLibCapabilityBoolFromDictionary(object, @"can_be_deleted_only_for_self")] forKey:@"can_be_deleted_only_for_self"];
+    [capabilities setObject:[NSNumber numberWithBool:TGTDLibCapabilityBoolFromDictionary(object, @"can_be_deleted_for_all_users")] forKey:@"can_be_deleted_for_all_users"];
+    id editDate = [object objectForKey:@"edit_date"];
+    if ([editDate respondsToSelector:@selector(integerValue)]) {
+        [capabilities setObject:[NSNumber numberWithInteger:[editDate integerValue]] forKey:@"edit_date"];
+    }
+    return capabilities;
+}
+
 static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
         return YES;
@@ -3612,6 +3644,20 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        if ([contentType isEqualToString:@"messageText"] && [contentObject isKindOfClass:[NSDictionary class]]) {
+            NSString *editableText = [self textFromFormattedTextObject:[(NSDictionary *)contentObject objectForKey:@"text"]];
+            if ([editableText length] > 0) {
+                [item setEditableText:editableText];
+            }
+        }
+        NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(message);
+        if (capabilities) {
+            [item setCapabilitiesKnown:YES];
+            [item setCanBeEdited:[[capabilities objectForKey:@"can_be_edited"] boolValue]];
+            [item setCanBeDeletedOnlyForSelf:[[capabilities objectForKey:@"can_be_deleted_only_for_self"] boolValue]];
+            [item setCanBeDeletedForAllUsers:[[capabilities objectForKey:@"can_be_deleted_for_all_users"] boolValue]];
+            [item setEditDate:[capabilities objectForKey:@"edit_date"]];
+        }
         if (!outgoing) {
             NSDictionary *senderSummary = [self senderSummaryFromMessageObject:message timeout:0.9];
             id senderID = [senderSummary objectForKey:@"sender_id"];
@@ -4824,6 +4870,188 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     return @"voice submitted";
+}
+
+- (NSDictionary *)messageActionCapabilitiesForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing." code:92];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to inspect message actions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:93];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getMessage" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:messageID forKey:@"message_id"];
+
+    NSError *messageError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-message-actions"
+                                                           timeout:timeout
+                                                         errorCode:94
+                                                             error:&messageError];
+    NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(response);
+    if (capabilities) {
+        return capabilities;
+    }
+
+    NSMutableDictionary *propertiesRequest = [NSMutableDictionary dictionary];
+    [propertiesRequest setObject:@"getMessageProperties" forKey:@"@type"];
+    [propertiesRequest setObject:chatID forKey:@"chat_id"];
+    [propertiesRequest setObject:messageID forKey:@"message_id"];
+    NSError *propertiesError = nil;
+    NSDictionary *propertiesResponse = [self sendTDLibRequestAndWaitForExtra:propertiesRequest
+                                                                  extraPrefix:@"telegraphica-message-properties"
+                                                                      timeout:timeout
+                                                                    errorCode:95
+                                                                        error:&propertiesError];
+    capabilities = TGTDLibMessageCapabilitiesFromObject(propertiesResponse);
+    if (capabilities) {
+        return capabilities;
+    }
+
+    if (error) {
+        *error = messageError ? messageError : (propertiesError ? propertiesError : [self errorWithDescription:@"TDLib did not provide message action capabilities." code:95]);
+    }
+    return nil;
+}
+
+- (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing." code:96];
+        }
+        return nil;
+    }
+    if (![text isKindOfClass:[NSString class]] || [[text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Edited message text is empty." code:97];
+        }
+        return nil;
+    }
+    if ([text length] > 4096) {
+        if (error) {
+            *error = [self errorWithDescription:@"Edited message text is too long." code:98];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to edit messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:99];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
+    [formattedText setObject:@"formattedText" forKey:@"@type"];
+    [formattedText setObject:text forKey:@"text"];
+    [formattedText setObject:[NSArray array] forKey:@"entities"];
+
+    NSMutableDictionary *content = [NSMutableDictionary dictionary];
+    [content setObject:@"inputMessageText" forKey:@"@type"];
+    [content setObject:formattedText forKey:@"text"];
+    [content setObject:[NSNumber numberWithBool:NO] forKey:@"clear_draft"];
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"editMessageText" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:messageID forKey:@"message_id"];
+    [request setObject:[NSNull null] forKey:@"reply_markup"];
+    [request setObject:content forKey:@"input_message_content"];
+
+    NSError *editError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-edit-message-text"
+                                                           timeout:timeout
+                                                         errorCode:100
+                                                             error:&editError];
+    if (!response) {
+        if (error) {
+            *error = editError ? editError : [self errorWithDescription:@"TDLib did not confirm message edit." code:100];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib message edit returned an unexpected response." code:101];
+        }
+        return nil;
+    }
+    return @"message edited";
+}
+
+- (NSString *)deleteMessagesInChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs revoke:(BOOL)revoke timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:102];
+        }
+        return nil;
+    }
+    NSMutableArray *safeMessageIDs = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [messageIDs count]; index++) {
+        id messageID = [messageIDs objectAtIndex:index];
+        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
+            [safeMessageIDs addObject:[NSNumber numberWithLongLong:[messageID longLongValue]]];
+        }
+    }
+    if ([safeMessageIDs count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message identifier is missing." code:103];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to delete messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:104];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"deleteMessages" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:safeMessageIDs forKey:@"message_ids"];
+    [request setObject:[NSNumber numberWithBool:revoke] forKey:@"revoke"];
+
+    NSError *deleteError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-delete-messages"
+                                                           timeout:timeout
+                                                         errorCode:105
+                                                             error:&deleteError];
+    if (!response) {
+        if (error) {
+            *error = deleteError ? deleteError : [self errorWithDescription:@"TDLib did not confirm message deletion." code:105];
+        }
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib message deletion returned an unexpected response." code:106];
+        }
+        return nil;
+    }
+    return @"messages deleted";
 }
 
 - (NSString *)addReactionToChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error {
