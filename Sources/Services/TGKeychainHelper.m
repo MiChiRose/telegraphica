@@ -1,9 +1,18 @@
 #import "TGKeychainHelper.h"
 #import <Security/Security.h>
+#include <string.h>
 
 static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.auth";
 
+@interface TGKeychainHelper ()
+@property (nonatomic, assign) OSStatus lastStatusValue;
+- (OSStatus)legacySaveData:(NSData *)value forAccount:(NSString *)account;
+- (NSData *)legacyReadDataForAccount:(NSString *)account status:(OSStatus *)statusOut;
+@end
+
 @implementation TGKeychainHelper
+
+@synthesize lastStatusValue = _lastStatusValue;
 
 + (instancetype)sharedHelper {
     static TGKeychainHelper *shared = nil;
@@ -15,7 +24,9 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
 }
 
 - (BOOL)saveData:(NSData *)value forAccount:(NSString *)account {
+    self.lastStatusValue = errSecSuccess;
     if ([account length] == 0) {
+        self.lastStatusValue = errSecParam;
         return NO;
     }
     if (!value) {
@@ -37,11 +48,19 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         [item addEntriesFromDictionary:attributes];
         status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
     }
-    return (status == errSecSuccess);
+    if (status == errSecSuccess) {
+        self.lastStatusValue = status;
+        return YES;
+    }
+
+    self.lastStatusValue = [self legacySaveData:value forAccount:account];
+    return (self.lastStatusValue == errSecSuccess);
 }
 
 - (NSData *)readDataForAccount:(NSString *)account {
+    self.lastStatusValue = errSecSuccess;
     if ([account length] == 0) {
+        self.lastStatusValue = errSecParam;
         return nil;
     }
 
@@ -55,13 +74,19 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     CFTypeRef result = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
     if (status == errSecSuccess && result != NULL) {
+        self.lastStatusValue = status;
 #if __has_feature(objc_arc)
         return CFBridgingRelease(result);
 #else
         return [(NSData *)result autorelease];
 #endif
     }
-    return nil;
+    if (result) {
+        CFRelease(result);
+    }
+    NSData *legacyData = [self legacyReadDataForAccount:account status:&status];
+    self.lastStatusValue = status;
+    return legacyData;
 }
 
 - (BOOL)saveString:(NSString *)value forAccount:(NSString *)account {
@@ -94,6 +119,90 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     [query setObject:TGKeychainServiceName forKey:(__bridge id)kSecAttrService];
     [query setObject:account forKey:(__bridge id)kSecAttrAccount];
     SecItemDelete((__bridge CFDictionaryRef)query);
+}
+
+- (OSStatus)lastStatus {
+    return self.lastStatusValue;
+}
+
+- (OSStatus)legacySaveData:(NSData *)value forAccount:(NSString *)account {
+    const char *service = [TGKeychainServiceName UTF8String];
+    const char *accountName = [account UTF8String];
+    if (!service || !accountName || !value) {
+        return errSecParam;
+    }
+
+    UInt32 serviceLength = (UInt32)strlen(service);
+    UInt32 accountLength = (UInt32)strlen(accountName);
+    UInt32 valueLength = (UInt32)[value length];
+    const void *valueBytes = [value bytes];
+
+    SecKeychainItemRef item = NULL;
+    OSStatus status = SecKeychainFindGenericPassword(NULL,
+                                                     serviceLength,
+                                                     service,
+                                                     accountLength,
+                                                     accountName,
+                                                     NULL,
+                                                     NULL,
+                                                     &item);
+    if (status == errSecSuccess && item) {
+        status = SecKeychainItemModifyAttributesAndData(item, NULL, valueLength, valueBytes);
+        CFRelease(item);
+        return status;
+    }
+    if (item) {
+        CFRelease(item);
+    }
+    if (status != errSecItemNotFound) {
+        return status;
+    }
+
+    return SecKeychainAddGenericPassword(NULL,
+                                         serviceLength,
+                                         service,
+                                         accountLength,
+                                         accountName,
+                                         valueLength,
+                                         valueBytes,
+                                         NULL);
+}
+
+- (NSData *)legacyReadDataForAccount:(NSString *)account status:(OSStatus *)statusOut {
+    const char *service = [TGKeychainServiceName UTF8String];
+    const char *accountName = [account UTF8String];
+    if (!service || !accountName) {
+        if (statusOut) {
+            *statusOut = errSecParam;
+        }
+        return nil;
+    }
+
+    UInt32 serviceLength = (UInt32)strlen(service);
+    UInt32 accountLength = (UInt32)strlen(accountName);
+    UInt32 passwordLength = 0;
+    void *passwordData = NULL;
+    OSStatus status = SecKeychainFindGenericPassword(NULL,
+                                                     serviceLength,
+                                                     service,
+                                                     accountLength,
+                                                     accountName,
+                                                     &passwordLength,
+                                                     &passwordData,
+                                                     NULL);
+    if (statusOut) {
+        *statusOut = status;
+    }
+    if (status != errSecSuccess || !passwordData || passwordLength == 0) {
+        if (passwordData) {
+            SecKeychainItemFreeContent(NULL, passwordData);
+        }
+        return nil;
+    }
+
+    NSData *data = [NSData dataWithBytes:passwordData length:passwordLength];
+    SecKeychainItemFreeContent(NULL, passwordData);
+    return data;
 }
 
 @end

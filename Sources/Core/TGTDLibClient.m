@@ -1246,7 +1246,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     if (![keychain saveData:keyData forAccount:TGTDLibDatabaseEncryptionKeyAccount]) {
         if (error) {
-            *error = [self errorWithDescription:@"Could not store TDLib database encryption key in Keychain." code:19];
+            OSStatus keychainStatus = [keychain lastStatus];
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"Could not store TDLib database encryption key in Keychain (OSStatus %ld).", (long)keychainStatus] code:19];
         }
         return nil;
     }
