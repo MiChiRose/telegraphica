@@ -231,6 +231,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 
         TGInlineMediaPlaybackView *view = [self.viewsByIdentifier objectForKey:identifier];
         if (view && (![[view mediaPath] isEqualToString:path] || ![[view mediaKind] isEqualToString:kind])) {
+            [view setPlaybackActive:NO];
             [view removeFromSuperview];
             [self.viewsByIdentifier removeObjectForKey:identifier];
             view = nil;
@@ -242,6 +243,9 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             }
             [self.hostView addSubview:view];
             [self.viewsByIdentifier setObject:view forKey:identifier];
+        } else if ([view superview] != self.hostView) {
+            [view removeFromSuperview];
+            [self.hostView addSubview:view];
         }
         [view setFrame:frame];
         [view setPlaybackActive:self.applicationActive];

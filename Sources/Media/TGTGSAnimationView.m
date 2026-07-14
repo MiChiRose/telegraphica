@@ -13,10 +13,30 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     @synchronized([TGTGSAnimationView class]) {
         if (!queue) {
             queue = [[NSOperationQueue alloc] init];
-            [queue setMaxConcurrentOperationCount:2];
+            [queue setMaxConcurrentOperationCount:1];
         }
     }
     return queue;
+}
+
+static NSLock *TGTGSSharedRenderLock(void) {
+    static NSLock *lock = nil;
+    @synchronized([TGTGSAnimationView class]) {
+        if (!lock) {
+            lock = [[NSLock alloc] init];
+        }
+    }
+    return lock;
+}
+
+static void TGTGSDestroyAnimation(Lottie_Animation *animation) {
+    if (!animation) {
+        return;
+    }
+    NSLock *lock = TGTGSSharedRenderLock();
+    [lock lock];
+    lottie_animation_destroy(animation);
+    [lock unlock];
 }
 
 @interface TGTGSAnimationView ()
@@ -54,20 +74,29 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     NSString *cacheKey = [NSString stringWithFormat:@"telegraphica-tgs-%lu-%lu",
                           (unsigned long)[path hash],
                           (unsigned long)[jsonData length]];
-    Lottie_Animation *animation = lottie_animation_from_data(jsonBytes,
-                                                              [cacheKey UTF8String],
-                                                              "");
+    Lottie_Animation *animation = NULL;
+    NSUInteger frameCount = 0;
+    CGFloat frameRate = 0.0;
+    size_t sourceWidth = 0;
+    size_t sourceHeight = 0;
+    CGFloat duration = 0.0;
+    NSLock *renderLock = TGTGSSharedRenderLock();
+    [renderLock lock];
+    animation = lottie_animation_from_data(jsonBytes, [cacheKey UTF8String], "");
+    if (animation) {
+        frameCount = (NSUInteger)lottie_animation_get_totalframe(animation);
+        frameRate = (CGFloat)lottie_animation_get_framerate(animation);
+        lottie_animation_get_size(animation, &sourceWidth, &sourceHeight);
+        duration = (CGFloat)lottie_animation_get_duration(animation);
+    }
+    [renderLock unlock];
     if (!animation) {
         return self;
     }
 
     _animation = animation;
-    _frameCount = (NSUInteger)lottie_animation_get_totalframe(animation);
-    _frameRate = (CGFloat)lottie_animation_get_framerate(animation);
-    size_t sourceWidth = 0;
-    size_t sourceHeight = 0;
-    lottie_animation_get_size(animation, &sourceWidth, &sourceHeight);
-    CGFloat duration = (CGFloat)lottie_animation_get_duration(animation);
+    _frameCount = frameCount;
+    _frameRate = frameRate;
     BOOL frameCountMatches = (_frameCount == validatedFrameCount || _frameCount == validatedFrameCount + 1);
     if (!frameCountMatches || fabs(_frameRate - validatedFrameRate) > 0.01 ||
         _frameCount == 0 || _frameCount > TGTGSMaximumFrameCount + 1 ||
@@ -75,7 +104,7 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
         duration <= 0.0 || duration > TGTGSMaximumDuration ||
         sourceWidth == 0 || sourceWidth > 512 ||
         sourceHeight == 0 || sourceHeight > 512) {
-        lottie_animation_destroy(animation);
+        TGTGSDestroyAnimation(animation);
         _animation = NULL;
         return self;
     }
@@ -94,7 +123,7 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
                                                                     bytesPerRow:(NSInteger)(_pixelWidth * 4)
                                                                    bitsPerPixel:32];
     if (!_bitmapRepresentation) {
-        lottie_animation_destroy(animation);
+        TGTGSDestroyAnimation(animation);
         _animation = NULL;
         return self;
     }
@@ -108,6 +137,7 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     [self addSubview:_imageView];
     _renderQueue = [TGTGSSharedRenderQueue() retain];
     _lastScheduledFrame = NSNotFound;
+    _lastAppliedFrame = NSNotFound;
     [self scheduleRenderFrame:0];
     return self;
 }
@@ -132,12 +162,15 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSUInteger frameIndex = [frameNumber unsignedIntegerValue];
     NSMutableData *pixels = [[NSMutableData alloc] initWithLength:_pixelWidth * _pixelHeight * 4];
+    NSLock *renderLock = TGTGSSharedRenderLock();
+    [renderLock lock];
     lottie_animation_render((Lottie_Animation *)_animation,
                             frameIndex % _frameCount,
                             (uint32_t *)[pixels mutableBytes],
                             _pixelWidth,
                             _pixelHeight,
                             _pixelWidth * 4);
+    [renderLock unlock];
     NSDictionary *payload = [[NSDictionary alloc] initWithObjectsAndKeys:
                              frameNumber, @"frame",
                              pixels, @"pixels",
@@ -156,8 +189,33 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     if ([self isAnimationValid] && [pixels length] == expectedLength) {
         memcpy([_bitmapRepresentation bitmapData], [pixels bytes], expectedLength);
         [_imageView setNeedsDisplay:YES];
+        _renderedFrameCount++;
+        _lastAppliedFrame = [[payload objectForKey:@"frame"] unsignedIntegerValue];
     }
     _renderPending = NO;
+}
+
+- (NSUInteger)renderedFrameCount {
+    return _renderedFrameCount;
+}
+
+- (NSUInteger)lastAppliedFrame {
+    return _lastAppliedFrame;
+}
+
+- (unsigned long long)currentFrameChecksum {
+    if (!_bitmapRepresentation) {
+        return 0;
+    }
+    const uint32_t *pixels = (const uint32_t *)[_bitmapRepresentation bitmapData];
+    NSUInteger pixelCount = _pixelWidth * _pixelHeight;
+    unsigned long long checksum = 1469598103934665603ULL;
+    NSUInteger index = 0;
+    for (index = 0; index < pixelCount; index++) {
+        checksum ^= pixels[index];
+        checksum *= 1099511628211ULL;
+    }
+    return checksum;
 }
 
 - (void)advanceFrame:(NSTimer *)timer {
@@ -202,6 +260,13 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     }
 }
 
+- (void)viewWillMoveToSuperview:(NSView *)newSuperview {
+    if (!newSuperview) {
+        [self setPlaybackActive:NO];
+    }
+    [super viewWillMoveToSuperview:newSuperview];
+}
+
 - (NSView *)hitTest:(NSPoint)point {
     (void)point;
     return nil;
@@ -212,7 +277,7 @@ static NSOperationQueue *TGTGSSharedRenderQueue(void) {
     [_renderQueue release];
     _renderQueue = nil;
     if (_animation) {
-        lottie_animation_destroy((Lottie_Animation *)_animation);
+        TGTGSDestroyAnimation((Lottie_Animation *)_animation);
         _animation = NULL;
     }
     [_playbackStartDate release];

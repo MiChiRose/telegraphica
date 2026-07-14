@@ -44,10 +44,13 @@ gzip -c "$FIXTURE_JSON" > "$FIXTURE_TGS"
     "$ROOT_DIR/Tests/tgs_view_probe.m" \
     "$ROOT_DIR/Sources/Media/TGTGSFileValidator.m" \
     "$ROOT_DIR/Sources/Media/TGTGSAnimationView.m" \
+    "$ROOT_DIR/Sources/Media/TGInlineMediaPlaybackCoordinator.m" \
     "$RLOTTIE_LIBRARY" \
     -lc++ \
     -lz \
     -framework Cocoa \
+    -framework AVFoundation \
+    -framework CoreMedia \
     -o "$BUILD_DIR/tgs_view_probe"
 
 "$BUILD_DIR/tgs_view_probe" "$FIXTURE_TGS" "$FIXTURE_JSON"
