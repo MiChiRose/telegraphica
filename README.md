@@ -297,7 +297,8 @@ the old Mac lane.
 
 **Security posture:**
 
-- no bundled Telegram API credentials;
+- public builds bundle Telegraphica app-level Telegram API credentials only;
+- no bundled user credentials, phone numbers, login codes, or 2FA passwords;
 - no committed sessions or TDLib databases;
 - diagnostics are redacted where practical;
 - local secrets belong in Application Support and Keychain, not in source;
