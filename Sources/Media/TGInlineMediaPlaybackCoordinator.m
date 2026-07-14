@@ -1,5 +1,6 @@
 #import "TGInlineMediaPlaybackCoordinator.h"
 #import "TGTGSAnimationView.h"
+#import "TGWebMAnimationView.h"
 #import <AVFoundation/AVFoundation.h>
 
 NSString * const TGInlineMediaIdentifierKey = @"identifier";
@@ -29,6 +30,7 @@ static void TGInlineMediaPlaybackPostDiagnostic(NSString *message) {
 @property (nonatomic, retain) AVPlayerLayer *playerLayer;
 @property (nonatomic, retain) NSImageView *imageView;
 @property (nonatomic, retain) TGTGSAnimationView *tgsView;
+@property (nonatomic, retain) TGWebMAnimationView *webmView;
 @property (nonatomic, copy) NSString *mediaPath;
 @property (nonatomic, copy) NSString *mediaKind;
 @property (nonatomic, copy) NSString *failureReason;
@@ -45,6 +47,7 @@ static void TGInlineMediaPlaybackPostDiagnostic(NSString *message) {
 @synthesize playerLayer = _playerLayer;
 @synthesize imageView = _imageView;
 @synthesize tgsView = _tgsView;
+@synthesize webmView = _webmView;
 @synthesize mediaPath = _mediaPath;
 @synthesize mediaKind = _mediaKind;
 @synthesize failureReason = _failureReason;
@@ -88,6 +91,13 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         } else {
             self.failureReason = @"TGS renderer rejected sticker data.";
         }
+    } else if ([mediaKind isEqualToString:TGInlineMediaKindWebM]) {
+        TGWebMAnimationView *webmView = [[[TGWebMAnimationView alloc] initWithFrame:[self contentFrame]
+                                                                            webmPath:mediaPath] autorelease];
+        [webmView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [self addSubview:webmView];
+        self.webmView = webmView;
+        TGInlineMediaPlaybackPostDiagnostic([NSString stringWithFormat:@"Media Playback: WebM renderer created file=%@", [mediaPath lastPathComponent]]);
     } else if ([mediaKind isEqualToString:TGInlineMediaKindGIF] || TGInlineMediaPathContainsGIF(mediaPath)) {
         NSImage *image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
         if (image) {
@@ -102,15 +112,6 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             self.failureReason = @"GIF image could not be decoded.";
         }
     } else {
-        if ([mediaKind isEqualToString:TGInlineMediaKindWebM]) {
-            /*
-             Modern Telegram video stickers are WebM/VP9. AVFoundation on
-             Mavericks cannot decode them, so keep the downloaded thumbnail as
-             the visible fallback until Telegraphica bundles a WebM decoder.
-             */
-            self.failureReason = @"WebM animation requires a bundled WebM/VP9 decoder; AVFoundation on OS X 10.9 cannot play it.";
-            return self;
-        }
         NSURL *url = [NSURL fileURLWithPath:mediaPath];
         if ([[[mediaPath pathExtension] lowercaseString] isEqualToString:@"webm"]) {
             AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:nil];
@@ -148,7 +149,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 }
 
 - (BOOL)isOpaque {
-    return [self.mediaKind isEqualToString:TGInlineMediaKindTGS];
+    return [self.mediaKind isEqualToString:TGInlineMediaKindTGS] ? YES : NO;
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -173,6 +174,15 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
                 _playbackActive ? @"yes" : @"no",
                 [self.mediaPath lastPathComponent]];
     }
+    if (self.webmView) {
+        return [NSString stringWithFormat:@"webm frames=%lu last=%lu checksum=%llu active=%@ valid=%@ file=%@",
+                (unsigned long)[self.webmView renderedFrameCount],
+                (unsigned long)[self.webmView lastAppliedFrame],
+                [self.webmView currentFrameChecksum],
+                _playbackActive ? @"yes" : @"no",
+                [self.webmView isAnimationValid] ? @"yes" : @"no",
+                [self.mediaPath lastPathComponent]];
+    }
     if (self.imageView) {
         return [NSString stringWithFormat:@"gif imageView=yes active=%@ file=%@", _playbackActive ? @"yes" : @"no", [self.mediaPath lastPathComponent]];
     }
@@ -189,6 +199,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [self.playerLayer setFrame:[self bounds]];
     [self.imageView setFrame:[self bounds]];
     [self.tgsView setFrame:[self contentFrame]];
+    [self.webmView setFrame:[self contentFrame]];
 }
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
@@ -203,10 +214,12 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     if (active) {
         [self.imageView setAnimates:YES];
         [self.tgsView setPlaybackActive:YES];
+        [self.webmView setPlaybackActive:YES];
         [self.player play];
     } else {
         [self.imageView setAnimates:NO];
         [self.tgsView setPlaybackActive:NO];
+        [self.webmView setPlaybackActive:NO];
         [self.player pause];
     }
 }
@@ -219,6 +232,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [_playerLayer release];
     [_imageView release];
     [_tgsView release];
+    [_webmView release];
     [_mediaPath release];
     [_mediaKind release];
     [_failureReason release];
@@ -233,7 +247,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 @property (nonatomic, retain) NSMutableSet *failedIdentifiers;
 @property (nonatomic, assign) NSUInteger maximumActiveItems;
 @property (nonatomic, assign) BOOL applicationActive;
-- (void)reportTGSPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view;
+- (void)reportAnimationPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view;
 @end
 
 @implementation TGInlineMediaPlaybackCoordinator
@@ -328,15 +342,15 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         }
         if (!view) {
             view = [[[TGInlineMediaPlaybackView alloc] initWithFrame:frame mediaPath:path mediaKind:kind] autorelease];
-            if (![view player] && ![view imageView] && ![view tgsView]) {
+            if (![view player] && ![view imageView] && ![view tgsView] && ![view webmView]) {
                 TGInlineMediaPlaybackPostDiagnostic([NSString stringWithFormat:@"Media Playback: failed to create inline playback kind=%@ file=%@ reason=%@", kind, [path lastPathComponent], [view failureReason] ? [view failureReason] : @"unknown"]);
                 [self.failedIdentifiers addObject:identifier];
                 continue;
             }
             [self.hostView addSubview:view];
             [self.viewsByIdentifier setObject:view forKey:identifier];
-            if ([[view mediaKind] isEqualToString:TGInlineMediaKindTGS]) {
-                [self performSelector:@selector(reportTGSPlaybackDiagnosticForView:) withObject:view afterDelay:1.2];
+            if ([[view mediaKind] isEqualToString:TGInlineMediaKindTGS] || [[view mediaKind] isEqualToString:TGInlineMediaKindWebM]) {
+                [self performSelector:@selector(reportAnimationPlaybackDiagnosticForView:) withObject:view afterDelay:1.2];
             }
         } else if ([view superview] != self.hostView) {
             [view removeFromSuperview];
@@ -362,7 +376,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     [existingIdentifiers release];
 }
 
-- (void)reportTGSPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view {
+- (void)reportAnimationPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view {
     if (![view isKindOfClass:[TGInlineMediaPlaybackView class]] || [view superview] != self.hostView) {
         return;
     }
