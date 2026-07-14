@@ -499,6 +499,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                     overflowCount = mediaCount - tileCount;
                 }
                 NSRect tileRect = [[tileRects objectAtIndex:tileIndex] rectValue];
+                tileRect = TGStickerAdjustedMediaRect((NSDictionary *)mediaObject, tileRect, [controlView isFlipped]);
                 TGDrawMediaItemInRect((NSDictionary *)mediaObject, tileRect, outgoing, [controlView isFlipped], mediaCount > 1, overflowCount);
             }
         } else {
@@ -591,4 +592,3 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 }
 
 @end
-

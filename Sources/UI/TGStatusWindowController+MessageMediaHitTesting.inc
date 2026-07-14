@@ -112,6 +112,7 @@
         if (![mediaObject isKindOfClass:[NSDictionary class]]) {
             continue;
         }
+        tileRect = TGStickerAdjustedMediaRect((NSDictionary *)mediaObject, tileRect, NO);
         [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                             mediaObject, @"media_item",
                             [NSValue valueWithRect:tileRect], @"frame",

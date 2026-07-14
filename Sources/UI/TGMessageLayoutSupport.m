@@ -549,6 +549,13 @@ NSArray *TGMediaTileRectsForMessageItem(TGMessageItem *item, NSRect imageRect) {
     return rects;
 }
 
+NSRect TGStickerAdjustedMediaRect(NSDictionary *mediaItem, NSRect rect, BOOL drawingInFlippedView) {
+    if (TGMediaItemIsSticker(mediaItem)) {
+        rect.origin.y += drawingInFlippedView ? -3.0 : 3.0;
+    }
+    return rect;
+}
+
 void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, BOOL flipped, BOOL aspectFill, NSUInteger overflowCount) {
     if (![mediaItem isKindOfClass:[NSDictionary class]] || NSIsEmptyRect(rect)) {
         return;
