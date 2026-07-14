@@ -112,7 +112,7 @@
         if (![mediaObject isKindOfClass:[NSDictionary class]]) {
             continue;
         }
-        tileRect = TGStickerAdjustedMediaRect((NSDictionary *)mediaObject, tileRect, NO);
+        tileRect = TGStickerAdjustedMediaRect((NSDictionary *)mediaObject, tileRect, [self.messageTableView isFlipped]);
         [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
                             mediaObject, @"media_item",
                             [NSValue valueWithRect:tileRect], @"frame",

@@ -551,7 +551,7 @@ NSArray *TGMediaTileRectsForMessageItem(TGMessageItem *item, NSRect imageRect) {
 
 NSRect TGStickerAdjustedMediaRect(NSDictionary *mediaItem, NSRect rect, BOOL drawingInFlippedView) {
     if (TGMediaItemIsSticker(mediaItem)) {
-        rect.origin.y += drawingInFlippedView ? -3.0 : 3.0;
+        rect.origin.y += drawingInFlippedView ? 3.0 : -3.0;
     }
     return rect;
 }
