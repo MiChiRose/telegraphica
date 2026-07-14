@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.4.1--alpha.2-blue" alt="version v0.4.1-alpha.2" />
+    <img src="https://img.shields.io/badge/version-v0.4.2--alpha.1-blue" alt="version v0.4.2-alpha.1" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -49,7 +49,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Alpha: `v0.4.1-alpha.2`
+## Current Alpha: `v0.4.2-alpha.1`
 
 This public alpha is ready for real legacy-Mac testers. It is still alpha
 software, but the everyday loop is now useful enough for live feedback: sign in,
@@ -77,12 +77,15 @@ Releases.
   the source chat.
 - 👤 Profile, settings, themes, language selector, diagnostics, and about panel.
 - 🔄 Manual and launch-time update checks against GitHub Releases.
+- 🧩 Native sticker display with WEBP and TGS support, plus safe fallbacks for
+  formats that are still being brought over to Mavericks.
 - 🧹 Build/release hygiene scripts for the old-Mac workflow.
 
 ### ⚠️ Known Alpha Gaps
 
-- Static WEBP stickers render natively. Animated TGS and WEBM stickers still
-  use a safe emoji fallback until their Mavericks-compatible renderers land.
+- WEBP and TGS stickers render in the chat and sticker picker. WEBM/video
+  stickers still use a safe static fallback until a Mavericks-compatible
+  renderer lands.
 - The DMG must be HFS+-formatted for Mavericks and is not notarized.
 - A public drag-and-drop DMG is considered complete only when
   `Telegraphica.app` already bundles a Mavericks-compatible
@@ -104,7 +107,7 @@ Compiled alpha builds live in:
 
 1. Open the latest release page.
 2. Click **Assets** if the download list is collapsed.
-3. Download **`Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg`**.
+3. Download **`Telegraphica-v0.4.2-alpha.1-macos10.9-x86_64.dmg`**.
 4. Open the downloaded DMG.
 5. Drag **Telegraphica.app** into **Applications**.
 6. Launch Telegraphica and sign in with your Telegram phone number.
@@ -116,8 +119,8 @@ If you are not sure which file to download, choose the file ending in
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
-| `Telegraphica-v0.4.1-alpha.2-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
+| `Telegraphica-v0.4.2-alpha.1-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
+| `Telegraphica-v0.4.2-alpha.1-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
 | `.sha256` files | Checksum verification | You do not need these files to install Telegraphica. |
 
 ### First Launch
