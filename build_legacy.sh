@@ -110,13 +110,17 @@ if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     done
 fi
 
+TDJSON_STAGED_PATH=""
 BUNDLED_TDLIB_CONFIG_TEMP=""
-cleanup_bundled_tdlib_config() {
+cleanup_legacy_build_inputs() {
+    if [ -n "$TDJSON_STAGED_PATH" ]; then
+        rm -f "$TDJSON_STAGED_PATH"
+    fi
     if [ -n "$BUNDLED_TDLIB_CONFIG_TEMP" ]; then
         rm -f "$BUNDLED_TDLIB_CONFIG_TEMP"
     fi
 }
-trap cleanup_bundled_tdlib_config EXIT
+trap cleanup_legacy_build_inputs EXIT
 
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     BUNDLED_TDLIB_CONFIG_TEMP="$(mktemp /tmp/telegraphica-tdlib-config.XXXXXX)"
@@ -127,6 +131,18 @@ if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
 else
     echo "Warning: no internal Telegram connection configuration was found."
     echo "This development build will not be able to start a new Telegram sign-in."
+fi
+
+if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_TDJSON_PATH" ]; then
+        echo "TELEGRAPHICA_TDJSON_PATH does not point to a file: $TELEGRAPHICA_TDJSON_PATH"
+        exit 1
+    fi
+    TDJSON_STAGED_PATH="$(mktemp /tmp/telegraphica-tdjson.XXXXXX)"
+    ditto "$TELEGRAPHICA_TDJSON_PATH" "$TDJSON_STAGED_PATH"
+    chmod 0644 "$TDJSON_STAGED_PATH"
+    TELEGRAPHICA_TDJSON_PATH="$TDJSON_STAGED_PATH"
+    echo "Staged TDLib JSON library for rebuild."
 fi
 
 rm -rf "$BUILD_ROOT" "$APP_NAME"
