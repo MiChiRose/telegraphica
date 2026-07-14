@@ -9,6 +9,7 @@
 #import "TGStatusSupport.h"
 #import "TGStickerPickerLayout.h"
 #import "TGTheme.h"
+#import "TGTypingIndicatorPresentation.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
@@ -1155,67 +1156,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self clearTypingIndicator];
 }
 
-- (NSString *)typingActionTextForSummary:(NSDictionary *)summary {
-    NSString *actionType = [summary objectForKey:@"action_type"];
-    if (![actionType isKindOfClass:[NSString class]]) {
-        return @"пишет...";
-    }
-    if ([actionType isEqualToString:@"chatActionRecordingVoiceNote"]) {
-        return @"записывает голосовое...";
-    }
-    if ([actionType isEqualToString:@"chatActionUploadingPhoto"]) {
-        return @"отправляет фото...";
-    }
-    if ([actionType isEqualToString:@"chatActionUploadingVideo"]) {
-        return @"отправляет видео...";
-    }
-    if ([actionType isEqualToString:@"chatActionUploadingDocument"]) {
-        return @"отправляет файл...";
-    }
-    if ([actionType isEqualToString:@"chatActionRecordingVideoNote"]) {
-        return @"записывает кружок...";
-    }
-    if ([actionType isEqualToString:@"chatActionUploadingVideoNote"]) {
-        return @"отправляет кружок...";
-    }
-    if ([actionType isEqualToString:@"chatActionChoosingSticker"]) {
-        return @"выбирает стикер...";
-    }
-    return @"пишет...";
-}
-
-- (NSString *)typingSenderNameForSummary:(NSDictionary *)summary {
-    NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"";
-    if ([self.selectedChatTypeSummary isEqualToString:@"Private"] && [title length] > 0) {
-        return title;
-    }
-
-    NSNumber *senderID = [summary objectForKey:@"sender_id"];
-    if ([senderID respondsToSelector:@selector(longLongValue)]) {
-        NSEnumerator *enumerator = [self.messageItems reverseObjectEnumerator];
-        TGMessageItem *item = nil;
-        while ((item = [enumerator nextObject])) {
-            if (![item isKindOfClass:[TGMessageItem class]]) {
-                continue;
-            }
-            NSNumber *itemSenderID = [item senderID];
-            if ([itemSenderID respondsToSelector:@selector(longLongValue)] &&
-                [itemSenderID longLongValue] == [senderID longLongValue] &&
-                [[item senderDisplayName] length] > 0) {
-                return [item senderDisplayName];
-            }
-        }
-    }
-
-    return @"Кто-то";
-}
-
-- (NSString *)typingIndicatorTextForSummary:(NSDictionary *)summary {
-    NSString *senderName = [self typingSenderNameForSummary:summary];
-    NSString *actionText = [self typingActionTextForSummary:summary];
-    return [NSString stringWithFormat:@"%@ %@", senderName, actionText];
-}
-
 - (void)handleTypingUpdateSummary:(NSDictionary *)summary {
     if (![summary isKindOfClass:[NSDictionary class]]) {
         return;
@@ -1247,7 +1187,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     }
 
     self.typingChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
-    self.typingIndicatorText = [self typingIndicatorTextForSummary:summary];
+    self.typingIndicatorText = TGTypingIndicatorTextForSummary(summary,
+                                                               self.selectedChatTypeSummary,
+                                                               self.selectedChatTitle,
+                                                               self.messageItems);
     [self.typingClearTimer invalidate];
     self.typingClearTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
                                                              target:self
