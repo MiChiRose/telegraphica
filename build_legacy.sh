@@ -162,7 +162,15 @@ if [ ! -f "$RLOTTIE_STATIC_LIBRARY" ]; then
     echo "rlottie library was not produced: $RLOTTIE_STATIC_LIBRARY"
     exit 1
 fi
-scripts/check_tgs_legacy.sh "$ARCH" "$RLOTTIE_BUILD_DIR" "$SDK_NAME"
+
+VPX_BUILD_DIR="$BUILD_ROOT/Vendor/libvpx"
+scripts/build_vpx_legacy.sh "$ARCH" "$VPX_BUILD_DIR" "$SDK_NAME"
+VPX_STATIC_LIBRARY="$PWD/$VPX_BUILD_DIR/libvpxwebmdecoder.a"
+if [ ! -f "$VPX_STATIC_LIBRARY" ]; then
+    echo "VP9/WebM decoder library was not produced: $VPX_STATIC_LIBRARY"
+    exit 1
+fi
+scripts/check_tgs_legacy.sh "$ARCH" "$RLOTTIE_BUILD_DIR" "$SDK_NAME" "$VPX_BUILD_DIR"
 
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
@@ -184,8 +192,8 @@ COMMON_SETTINGS=(
     "CODE_SIGNING_ALLOWED=NO"
     "CODE_SIGNING_REQUIRED=NO"
     "CODE_SIGN_IDENTITY="
-    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc"
-    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY -lc++ -lz"
+    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc $PWD/Vendor/libvpx $PWD/Vendor/libvpx/third_party/libwebm $PWD/$VPX_BUILD_DIR"
+    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY $VPX_STATIC_LIBRARY -lc++ -lz"
     "SYMROOT=$BUILD_ROOT"
     "OBJROOT=$BUILD_ROOT/Intermediates"
     "DSTROOT=$BUILD_ROOT/Install"

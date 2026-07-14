@@ -38,6 +38,11 @@
 		111111111111111111111129 /* TGStatusViewCells.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111254 /* TGStatusViewCells.m */; };
 		111111111111111111111130 /* TGStatusSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111256 /* TGStatusSupport.m */; };
 		111111111111111111111131 /* TGStickerPickerLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111258 /* TGStickerPickerLayout.m */; };
+		111111111111111111111132 /* TGTypingIndicatorPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111260 /* TGTypingIndicatorPresentation.m */; };
+		111111111111111111111133 /* TGStatusWindowStyling.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111262 /* TGStatusWindowStyling.m */; };
+		111111111111111111111134 /* TGProfilePresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111264 /* TGProfilePresentation.m */; };
+		111111111111111111111135 /* TGUpdateSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111266 /* TGUpdateSupport.m */; };
+		111111111111111111111136 /* TGWebMAnimationView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111268 /* TGWebMAnimationView.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -94,6 +99,16 @@
 		111111111111111111111256 /* TGStatusSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusSupport.m; sourceTree = "<group>"; };
 		111111111111111111111257 /* TGStickerPickerLayout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStickerPickerLayout.h; sourceTree = "<group>"; };
 		111111111111111111111258 /* TGStickerPickerLayout.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStickerPickerLayout.m; sourceTree = "<group>"; };
+		111111111111111111111259 /* TGTypingIndicatorPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTypingIndicatorPresentation.h; sourceTree = "<group>"; };
+		111111111111111111111260 /* TGTypingIndicatorPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTypingIndicatorPresentation.m; sourceTree = "<group>"; };
+		111111111111111111111261 /* TGStatusWindowStyling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusWindowStyling.h; sourceTree = "<group>"; };
+		111111111111111111111262 /* TGStatusWindowStyling.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusWindowStyling.m; sourceTree = "<group>"; };
+		111111111111111111111263 /* TGProfilePresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGProfilePresentation.h; sourceTree = "<group>"; };
+		111111111111111111111264 /* TGProfilePresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGProfilePresentation.m; sourceTree = "<group>"; };
+		111111111111111111111265 /* TGUpdateSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGUpdateSupport.h; sourceTree = "<group>"; };
+		111111111111111111111266 /* TGUpdateSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGUpdateSupport.m; sourceTree = "<group>"; };
+		111111111111111111111267 /* TGWebMAnimationView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGWebMAnimationView.h; sourceTree = "<group>"; };
+		111111111111111111111268 /* TGWebMAnimationView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = TGWebMAnimationView.mm; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -198,6 +213,14 @@
 				111111111111111111111252 /* TGStatusButtonCells.m */,
 				111111111111111111111257 /* TGStickerPickerLayout.h */,
 				111111111111111111111258 /* TGStickerPickerLayout.m */,
+				111111111111111111111259 /* TGTypingIndicatorPresentation.h */,
+				111111111111111111111260 /* TGTypingIndicatorPresentation.m */,
+				111111111111111111111261 /* TGStatusWindowStyling.h */,
+				111111111111111111111262 /* TGStatusWindowStyling.m */,
+				111111111111111111111263 /* TGProfilePresentation.h */,
+				111111111111111111111264 /* TGProfilePresentation.m */,
+				111111111111111111111265 /* TGUpdateSupport.h */,
+				111111111111111111111266 /* TGUpdateSupport.m */,
 				111111111111111111111253 /* TGStatusViewCells.h */,
 				111111111111111111111254 /* TGStatusViewCells.m */,
 				111111111111111111111255 /* TGStatusSupport.h */,
@@ -219,6 +242,8 @@
 				111111111111111111111244 /* TGTGSFileValidator.m */,
 				111111111111111111111237 /* TGTGSAnimationView.h */,
 				111111111111111111111238 /* TGTGSAnimationView.m */,
+				111111111111111111111267 /* TGWebMAnimationView.h */,
+				111111111111111111111268 /* TGWebMAnimationView.mm */,
 				111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */,
 				111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */,
 				111111111111111111111225 /* TGWebPDecoder.h */,
@@ -330,6 +355,11 @@
 				111111111111111111111129 /* TGStatusViewCells.m in Sources */,
 				111111111111111111111130 /* TGStatusSupport.m in Sources */,
 				111111111111111111111131 /* TGStickerPickerLayout.m in Sources */,
+				111111111111111111111132 /* TGTypingIndicatorPresentation.m in Sources */,
+				111111111111111111111133 /* TGStatusWindowStyling.m in Sources */,
+				111111111111111111111134 /* TGProfilePresentation.m in Sources */,
+				111111111111111111111135 /* TGUpdateSupport.m in Sources */,
+				111111111111111111111136 /* TGWebMAnimationView.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

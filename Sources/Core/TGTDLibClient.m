@@ -1228,7 +1228,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
 }
 
-- (NSData *)databaseEncryptionKeyDataWithError:(NSError **)error {
+- (NSData *)databaseEncryptionKeyDataFromKeychainWithError:(NSError **)error {
     TGKeychainHelper *keychain = [TGKeychainHelper sharedHelper];
     NSData *existingKey = [keychain readDataForAccount:TGTDLibDatabaseEncryptionKeyAccount];
     if ([existingKey length] > 0) {
@@ -1246,12 +1246,39 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     if (![keychain saveData:keyData forAccount:TGTDLibDatabaseEncryptionKeyAccount]) {
         if (error) {
-            *error = [self errorWithDescription:@"Could not store TDLib database encryption key in Keychain." code:19];
+            OSStatus keychainStatus = [keychain lastStatus];
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"Could not store TDLib database encryption key in Keychain (OSStatus %ld).", (long)keychainStatus] code:19];
         }
         return nil;
     }
 
     return keyData;
+}
+
+- (NSData *)databaseEncryptionKeyDataWithError:(NSError **)error {
+    if ([NSThread isMainThread]) {
+        return [self databaseEncryptionKeyDataFromKeychainWithError:error];
+    }
+
+    __block NSData *result = nil;
+    __block NSError *mainThreadError = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSData *keyData = [self databaseEncryptionKeyDataFromKeychainWithError:&mainThreadError];
+#if __has_feature(objc_arc)
+        result = keyData;
+#else
+        result = [keyData retain];
+#endif
+    });
+
+    if (!result && error) {
+        *error = mainThreadError;
+    }
+#if __has_feature(objc_arc)
+    return result;
+#else
+    return [result autorelease];
+#endif
 }
 
 - (NSString *)databaseEncryptionKeyStringWithError:(NSError **)error {
@@ -3268,7 +3295,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     NSString *fullLocalPath = [self completedLocalPathFromFileObject:stickerFile];
     BOOL shouldDownloadFullSticker = ([formatType isEqualToString:@"stickerFormatWebp"] ||
-                                      [formatType isEqualToString:@"stickerFormatTgs"]);
+                                      [formatType isEqualToString:@"stickerFormatTgs"] ||
+                                      [formatType isEqualToString:@"stickerFormatWebm"]);
     if (shouldDownloadFullSticker &&
         [fullLocalPath length] == 0 && downloadMissing && fileID) {
         if (didRequestDownload) {
@@ -3279,12 +3307,16 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     if ([fullLocalPath length] > 0) {
         [info setObject:fullLocalPath forKey:@"full_local_path"];
-        if ([formatType isEqualToString:@"stickerFormatWebp"] || [[info objectForKey:@"local_path"] length] == 0) {
+        if ([formatType isEqualToString:@"stickerFormatWebm"]) {
+            [info setObject:fullLocalPath forKey:@"playable_local_path"];
+        }
+        if ([formatType isEqualToString:@"stickerFormatWebp"] ||
+            [[info objectForKey:@"local_path"] length] == 0) {
             [info setObject:fullLocalPath forKey:@"local_path"];
         }
     }
 
-    /* TODO: Add a Mavericks-compatible WEBM/VP9 sticker renderer. */
+    /* TODO: Add a Mavericks-compatible WEBM/VP9 renderer if AVFoundation cannot play a given video sticker. */
     id emojiObject = [sticker objectForKey:@"emoji"];
     if ([emojiObject isKindOfClass:[NSString class]] && [(NSString *)emojiObject length] > 0) {
         [info setObject:emojiObject forKey:@"emoji"];

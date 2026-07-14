@@ -5,9 +5,9 @@
 
 static const NSUInteger TGTGSMaximumCompressedBytes = 64 * 1024;
 static const NSUInteger TGTGSMaximumInflatedBytes = 1024 * 1024;
-static const NSUInteger TGTGSMaximumFrameCount = 180;
+static const NSUInteger TGTGSMaximumFrameCount = 360;
 static const CGFloat TGTGSMaximumFrameRate = 60.0;
-static const CGFloat TGTGSMaximumDuration = 3.1;
+static const CGFloat TGTGSMaximumDuration = 6.1;
 
 static NSData *TGTGSInflatedData(NSData *compressedData) {
     if (![compressedData isKindOfClass:[NSData class]] ||

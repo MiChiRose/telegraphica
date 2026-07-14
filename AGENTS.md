@@ -31,4 +31,6 @@ These project rules apply to Codex work in this repository.
 - Use Objective-C, Cocoa, and AppKit.
 - Do not use Swift, SwiftUI, official Telegram branding/logo/assets, or macOS 10.10+ APIs without a Mavericks-safe fallback.
 - When adding UI or feature code, prefer focused component/helper files over growing large controllers such as `TGStatusWindowController.m`; keep new modules cohesive and import them from the owning controller.
+- Do not let one file become a broad mixed-responsibility dump. If a feature adds a meaningful amount of UI, media, data-flow, presentation, or TDLib orchestration code, split that area into a small focused file during the same task.
+- For refactors of oversized files, prefer substantial cohesive moves of complete method groups or helper responsibilities over tiny cosmetic reductions. Verify with local checks and, when relevant, the remote Mavericks HITL build flow.
 - Do not commit Telegram `api_id`, `api_hash`, sessions, phone numbers, login codes, TDLib databases, generated database keys, or local credentials.

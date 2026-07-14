@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <Security/Security.h>
 
 @interface TGKeychainHelper : NSObject
 
@@ -8,5 +9,6 @@
 - (BOOL)saveString:(NSString *)value forAccount:(NSString *)account;
 - (NSString *)readStringForAccount:(NSString *)account;
 - (void)deleteForAccount:(NSString *)account;
+- (OSStatus)lastStatus;
 
 @end

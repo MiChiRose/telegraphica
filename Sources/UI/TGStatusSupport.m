@@ -1,5 +1,7 @@
 #import "TGStatusSupport.h"
 
+static NSString * const TGDownloadFolderDefaultsKey = @"TelegraphicaDownloadFolderPath";
+
 static NSString *TGVersionWithoutLeadingV(NSString *version) {
     if (![version isKindOfClass:[NSString class]]) {
         return @"";
@@ -116,6 +118,42 @@ BOOL TGStatusErrorLooksOffline(NSString *message) {
     return NO;
 }
 
+NSString *TGDefaultDownloadFolderPath(void) {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDownloadsDirectory, NSUserDomainMask, YES);
+    if ([paths count] > 0) {
+        return [paths objectAtIndex:0];
+    }
+    return [@"~/Downloads" stringByExpandingTildeInPath];
+}
+
+NSString *TGConfiguredDownloadFolderPath(void) {
+    NSString *path = [[NSUserDefaults standardUserDefaults] stringForKey:TGDownloadFolderDefaultsKey];
+    if ([path length] == 0) {
+        path = TGDefaultDownloadFolderPath();
+    }
+    return [path stringByStandardizingPath];
+}
+
+NSString *TGDisplayPathForDownloadFolder(NSString *path) {
+    if ([path length] == 0) {
+        return @"Downloads";
+    }
+    NSString *home = NSHomeDirectory();
+    if ([home length] > 0 && [path hasPrefix:home]) {
+        return [@"~" stringByAppendingString:[path substringFromIndex:[home length]]];
+    }
+    return path;
+}
+
+void TGSetConfiguredDownloadFolderPath(NSString *path) {
+    NSString *standardPath = [path stringByStandardizingPath];
+    if ([standardPath length] == 0) {
+        return;
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:standardPath forKey:TGDownloadFolderDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
 
 NSString *TGCurrentYearString(void) {
     NSDateComponents *components = [[NSCalendar currentCalendar] components:NSYearCalendarUnit fromDate:[NSDate date]];
@@ -143,6 +181,9 @@ NSString *TGLogSectionForDetail(NSString *detail) {
     }
     if ([detail hasPrefix:@"Theme changed"] || [detail hasPrefix:@"Opened message link"]) {
         return @"Interface";
+    }
+    if ([detail hasPrefix:@"Media Playback"] || [detail hasPrefix:@"Sticker"]) {
+        return @"Media Playback";
     }
     if ([detail hasPrefix:@"Profile"]) {
         return @"Profile";
