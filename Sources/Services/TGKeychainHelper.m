@@ -6,6 +6,8 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
 
 @interface TGKeychainHelper ()
 @property (nonatomic, assign) OSStatus lastStatusValue;
+- (void)prepareForKeychainInteraction;
+- (BOOL)unlockDefaultKeychainAfterInteractionStatus:(OSStatus)status;
 - (OSStatus)legacySaveData:(NSData *)value forAccount:(NSString *)account;
 - (NSData *)legacyReadDataForAccount:(NSString *)account status:(OSStatus *)statusOut;
 @end
@@ -33,6 +35,7 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         [self deleteForAccount:account];
         return YES;
     }
+    [self prepareForKeychainInteraction];
 
     NSMutableDictionary *query = [NSMutableDictionary dictionary];
     [query setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
@@ -47,6 +50,14 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         NSMutableDictionary *item = [NSMutableDictionary dictionaryWithDictionary:query];
         [item addEntriesFromDictionary:attributes];
         status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+    }
+    if (status == errSecInteractionNotAllowed && [self unlockDefaultKeychainAfterInteractionStatus:status]) {
+        status = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)attributes);
+        if (status == errSecItemNotFound) {
+            NSMutableDictionary *item = [NSMutableDictionary dictionaryWithDictionary:query];
+            [item addEntriesFromDictionary:attributes];
+            status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+        }
     }
     if (status == errSecSuccess) {
         self.lastStatusValue = status;
@@ -63,6 +74,7 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         self.lastStatusValue = errSecParam;
         return nil;
     }
+    [self prepareForKeychainInteraction];
 
     NSMutableDictionary *query = [NSMutableDictionary dictionary];
     [query setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
@@ -73,6 +85,9 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
 
     CFTypeRef result = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    if (status == errSecInteractionNotAllowed && [self unlockDefaultKeychainAfterInteractionStatus:status]) {
+        status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    }
     if (status == errSecSuccess && result != NULL) {
         self.lastStatusValue = status;
 #if __has_feature(objc_arc)
@@ -113,6 +128,7 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     if ([account length] == 0) {
         return;
     }
+    [self prepareForKeychainInteraction];
 
     NSMutableDictionary *query = [NSMutableDictionary dictionary];
     [query setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
@@ -125,12 +141,25 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     return self.lastStatusValue;
 }
 
+- (void)prepareForKeychainInteraction {
+    SecKeychainSetUserInteractionAllowed(TRUE);
+}
+
+- (BOOL)unlockDefaultKeychainAfterInteractionStatus:(OSStatus)status {
+    if (status != errSecInteractionNotAllowed) {
+        return NO;
+    }
+    [self prepareForKeychainInteraction];
+    return (SecKeychainUnlock(NULL, 0, NULL, TRUE) == errSecSuccess);
+}
+
 - (OSStatus)legacySaveData:(NSData *)value forAccount:(NSString *)account {
     const char *service = [TGKeychainServiceName UTF8String];
     const char *accountName = [account UTF8String];
     if (!service || !accountName || !value) {
         return errSecParam;
     }
+    [self prepareForKeychainInteraction];
 
     UInt32 serviceLength = (UInt32)strlen(service);
     UInt32 accountLength = (UInt32)strlen(accountName);
@@ -138,16 +167,29 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     const void *valueBytes = [value bytes];
 
     SecKeychainItemRef item = NULL;
-    OSStatus status = SecKeychainFindGenericPassword(NULL,
-                                                     serviceLength,
-                                                     service,
-                                                     accountLength,
-                                                     accountName,
-                                                     NULL,
-                                                     NULL,
-                                                     &item);
+    BOOL didRetry = NO;
+    OSStatus status = errSecSuccess;
+retryLegacySave:
+    status = SecKeychainFindGenericPassword(NULL,
+                                            serviceLength,
+                                            service,
+                                            accountLength,
+                                            accountName,
+                                            NULL,
+                                            NULL,
+                                            &item);
+    if (status == errSecInteractionNotAllowed && !didRetry && [self unlockDefaultKeychainAfterInteractionStatus:status]) {
+        didRetry = YES;
+        goto retryLegacySave;
+    }
     if (status == errSecSuccess && item) {
         status = SecKeychainItemModifyAttributesAndData(item, NULL, valueLength, valueBytes);
+        if (status == errSecInteractionNotAllowed && !didRetry && [self unlockDefaultKeychainAfterInteractionStatus:status]) {
+            CFRelease(item);
+            item = NULL;
+            didRetry = YES;
+            goto retryLegacySave;
+        }
         CFRelease(item);
         return status;
     }
@@ -158,14 +200,19 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         return status;
     }
 
-    return SecKeychainAddGenericPassword(NULL,
-                                         serviceLength,
-                                         service,
-                                         accountLength,
-                                         accountName,
-                                         valueLength,
-                                         valueBytes,
-                                         NULL);
+    status = SecKeychainAddGenericPassword(NULL,
+                                           serviceLength,
+                                           service,
+                                           accountLength,
+                                           accountName,
+                                           valueLength,
+                                           valueBytes,
+                                           NULL);
+    if (status == errSecInteractionNotAllowed && !didRetry && [self unlockDefaultKeychainAfterInteractionStatus:status]) {
+        didRetry = YES;
+        goto retryLegacySave;
+    }
+    return status;
 }
 
 - (NSData *)legacyReadDataForAccount:(NSString *)account status:(OSStatus *)statusOut {
@@ -177,19 +224,27 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         }
         return nil;
     }
+    [self prepareForKeychainInteraction];
 
     UInt32 serviceLength = (UInt32)strlen(service);
     UInt32 accountLength = (UInt32)strlen(accountName);
     UInt32 passwordLength = 0;
     void *passwordData = NULL;
-    OSStatus status = SecKeychainFindGenericPassword(NULL,
-                                                     serviceLength,
-                                                     service,
-                                                     accountLength,
-                                                     accountName,
-                                                     &passwordLength,
-                                                     &passwordData,
-                                                     NULL);
+    BOOL didRetry = NO;
+    OSStatus status = errSecSuccess;
+retryLegacyRead:
+    status = SecKeychainFindGenericPassword(NULL,
+                                            serviceLength,
+                                            service,
+                                            accountLength,
+                                            accountName,
+                                            &passwordLength,
+                                            &passwordData,
+                                            NULL);
+    if (status == errSecInteractionNotAllowed && !didRetry && [self unlockDefaultKeychainAfterInteractionStatus:status]) {
+        didRetry = YES;
+        goto retryLegacyRead;
+    }
     if (statusOut) {
         *statusOut = status;
     }

@@ -1228,7 +1228,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
 }
 
-- (NSData *)databaseEncryptionKeyDataWithError:(NSError **)error {
+- (NSData *)databaseEncryptionKeyDataFromKeychainWithError:(NSError **)error {
     TGKeychainHelper *keychain = [TGKeychainHelper sharedHelper];
     NSData *existingKey = [keychain readDataForAccount:TGTDLibDatabaseEncryptionKeyAccount];
     if ([existingKey length] > 0) {
@@ -1253,6 +1253,32 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return keyData;
+}
+
+- (NSData *)databaseEncryptionKeyDataWithError:(NSError **)error {
+    if ([NSThread isMainThread]) {
+        return [self databaseEncryptionKeyDataFromKeychainWithError:error];
+    }
+
+    __block NSData *result = nil;
+    __block NSError *mainThreadError = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        NSData *keyData = [self databaseEncryptionKeyDataFromKeychainWithError:&mainThreadError];
+#if __has_feature(objc_arc)
+        result = keyData;
+#else
+        result = [keyData retain];
+#endif
+    });
+
+    if (!result && error) {
+        *error = mainThreadError;
+    }
+#if __has_feature(objc_arc)
+    return result;
+#else
+    return [result autorelease];
+#endif
 }
 
 - (NSString *)databaseEncryptionKeyStringWithError:(NSError **)error {
