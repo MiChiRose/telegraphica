@@ -9554,7 +9554,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [menu addItem:[NSMenuItem separatorItem]];
     }
     BOOL addedMessageAction = NO;
-    if ([item capabilitiesKnown] && [item canBeEdited] && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
+    if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
         NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
                                                            action:@selector(editMessageFromMenu:)
                                                     keyEquivalent:@""] autorelease];
@@ -9563,7 +9563,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [menu addItem:editItem];
         addedMessageAction = YES;
     }
-    if ([item capabilitiesKnown] && ([item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers])) {
+    if ([item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
         NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.delete")
                                                              action:@selector(deleteMessageFromMenu:)
                                                       keyEquivalent:@""] autorelease];
@@ -9580,7 +9580,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     for (index = 0; index < [emojis count]; index++) {
         NSString *emoji = [emojis objectAtIndex:index];
         BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
-        NSString *title = [NSString stringWithFormat:@"%@ %@", emoji, chosen ? @"Remove" : @"React"];
+        NSString *title = chosen ? [NSString stringWithFormat:@"%@ %@", emoji, @"✓"] : emoji;
         NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
                                                           action:@selector(reactToMessageFromMenu:)
                                                    keyEquivalent:@""] autorelease];
@@ -9600,7 +9600,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         for (index = 0; index < [moreEmojis count]; index++) {
             NSString *emoji = [moreEmojis objectAtIndex:index];
             BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
-            NSString *title = [NSString stringWithFormat:@"%@ %@", emoji, chosen ? @"Remove" : @"React"];
+            NSString *title = chosen ? [NSString stringWithFormat:@"%@ %@", emoji, @"✓"] : emoji;
             NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
                                                               action:@selector(reactToMessageFromMenu:)
                                                        keyEquivalent:@""] autorelease];
@@ -9716,14 +9716,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         return;
     }
 
-    TGMessageDeleteChoice choice = [TGMessageActionDialogs deleteChoiceWithCanDeleteOnlyForSelf:[item canBeDeletedOnlyForSelf]
-                                                                           canDeleteForAllUsers:[item canBeDeletedForAllUsers]];
+    BOOL hasKnownDeleteOptions = ([item capabilitiesKnown] && ([item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers]));
+    TGMessageDeleteChoice choice = [TGMessageActionDialogs deleteChoiceWithCanDeleteOnlyForSelf:(hasKnownDeleteOptions ? [item canBeDeletedOnlyForSelf] : YES)
+                                                                           canDeleteForAllUsers:(hasKnownDeleteOptions ? [item canBeDeletedForAllUsers] : YES)];
     if (choice == TGMessageDeleteChoiceCancel) {
         return;
     }
 
     NSNumber *chatID = [[item chatID] retain];
-    NSNumber *messageID = [[item messageID] retain];
     NSArray *messageIDs = [[self messageIDsForMessageActionItem:item] retain];
     BOOL revoke = (choice == TGMessageDeleteChoiceForEveryone);
     TGTDLibClient *client = [self.client retain];
@@ -9732,15 +9732,9 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *capabilitiesError = nil;
-        NSDictionary *capabilities = [client messageActionCapabilitiesForChatID:chatID messageID:messageID timeout:6.0 error:&capabilitiesError];
-        BOOL canDelete = revoke ? [[capabilities objectForKey:@"can_be_deleted_for_all_users"] boolValue] : [[capabilities objectForKey:@"can_be_deleted_only_for_self"] boolValue];
         NSError *deleteError = nil;
-        NSString *deleteSummary = nil;
-        if (canDelete) {
-            deleteSummary = [client deleteMessagesInChatID:chatID messageIDs:messageIDs revoke:revoke timeout:8.0 error:&deleteError];
-        }
-        NSString *errorMessage = [[(canDelete ? deleteError : capabilitiesError) localizedDescription] copy];
+        NSString *deleteSummary = [client deleteMessagesInChatID:chatID messageIDs:messageIDs revoke:revoke timeout:8.0 error:&deleteError];
+        NSString *errorMessage = [[deleteError localizedDescription] copy];
         BOOL succeeded = ([deleteSummary length] > 0);
 
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -9756,7 +9750,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             }
             [errorMessage release];
             [chatID release];
-            [messageID release];
             [messageIDs release];
             [client release];
         });

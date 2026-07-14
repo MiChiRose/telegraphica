@@ -39,6 +39,29 @@ static void TGTGSDestroyAnimation(Lottie_Animation *animation) {
     [lock unlock];
 }
 
+static void TGTGSConvertBGRAPremultipliedToRGBA(const unsigned char *source,
+                                                 unsigned char *destination,
+                                                 NSUInteger pixelCount) {
+    NSUInteger index = 0;
+    for (index = 0; index < pixelCount; index++) {
+        const unsigned char *sourcePixel = source + index * 4;
+        unsigned char *destinationPixel = destination + index * 4;
+        unsigned int blue = sourcePixel[0];
+        unsigned int green = sourcePixel[1];
+        unsigned int red = sourcePixel[2];
+        unsigned int alpha = sourcePixel[3];
+        if (alpha > 0 && alpha < 255) {
+            red = MIN(255U, (red * 255U) / alpha);
+            green = MIN(255U, (green * 255U) / alpha);
+            blue = MIN(255U, (blue * 255U) / alpha);
+        }
+        destinationPixel[0] = (unsigned char)red;
+        destinationPixel[1] = (unsigned char)green;
+        destinationPixel[2] = (unsigned char)blue;
+        destinationPixel[3] = (unsigned char)alpha;
+    }
+}
+
 @interface TGTGSAnimationView ()
 - (void)scheduleRenderFrame:(NSUInteger)frameIndex;
 - (void)renderFrameInBackground:(NSNumber *)frameNumber;
@@ -118,8 +141,8 @@ static void TGTGSDestroyAnimation(Lottie_Animation *animation) {
                                                                samplesPerPixel:4
                                                                       hasAlpha:YES
                                                                       isPlanar:NO
-                                                                colorSpaceName:NSDeviceRGBColorSpace
-                                                                   bitmapFormat:NSAlphaFirstBitmapFormat
+                                                                colorSpaceName:NSCalibratedRGBColorSpace
+                                                                   bitmapFormat:NSAlphaNonpremultipliedBitmapFormat
                                                                     bytesPerRow:(NSInteger)(_pixelWidth * 4)
                                                                    bitsPerPixel:32];
     if (!_bitmapRepresentation) {
@@ -134,6 +157,9 @@ static void TGTGSDestroyAnimation(Lottie_Animation *animation) {
     [_imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [_imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
     [_imageView setImage:image];
+    [_imageView setWantsLayer:YES];
+    [[_imageView layer] setMasksToBounds:YES];
+    [[_imageView layer] setCornerRadius:6.0];
     [self addSubview:_imageView];
     _renderQueue = [TGTGSSharedRenderQueue() retain];
     _lastScheduledFrame = NSNotFound;
@@ -161,16 +187,21 @@ static void TGTGSDestroyAnimation(Lottie_Animation *animation) {
 - (void)renderFrameInBackground:(NSNumber *)frameNumber {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSUInteger frameIndex = [frameNumber unsignedIntegerValue];
-    NSMutableData *pixels = [[NSMutableData alloc] initWithLength:_pixelWidth * _pixelHeight * 4];
+    NSUInteger expectedLength = _pixelWidth * _pixelHeight * 4;
+    NSMutableData *renderedPixels = [[NSMutableData alloc] initWithLength:expectedLength];
+    NSMutableData *pixels = [[NSMutableData alloc] initWithLength:expectedLength];
     NSLock *renderLock = TGTGSSharedRenderLock();
     [renderLock lock];
     lottie_animation_render((Lottie_Animation *)_animation,
                             frameIndex % _frameCount,
-                            (uint32_t *)[pixels mutableBytes],
+                            (uint32_t *)[renderedPixels mutableBytes],
                             _pixelWidth,
                             _pixelHeight,
                             _pixelWidth * 4);
     [renderLock unlock];
+    TGTGSConvertBGRAPremultipliedToRGBA((const unsigned char *)[renderedPixels bytes],
+                                        (unsigned char *)[pixels mutableBytes],
+                                        _pixelWidth * _pixelHeight);
     NSDictionary *payload = [[NSDictionary alloc] initWithObjectsAndKeys:
                              frameNumber, @"frame",
                              pixels, @"pixels",
@@ -180,6 +211,7 @@ static void TGTGSDestroyAnimation(Lottie_Animation *animation) {
                         waitUntilDone:NO];
     [payload release];
     [pixels release];
+    [renderedPixels release];
     [pool drain];
 }
 
