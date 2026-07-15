@@ -247,6 +247,8 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 @property (nonatomic, retain) NSMutableSet *failedIdentifiers;
 @property (nonatomic, assign) NSUInteger maximumActiveItems;
 @property (nonatomic, assign) BOOL applicationActive;
+@property (nonatomic, assign) BOOL autoplayEnabled;
+@property (nonatomic, assign) BOOL stopWhenApplicationInactive;
 - (void)reportAnimationPlaybackDiagnosticForView:(TGInlineMediaPlaybackView *)view;
 @end
 
@@ -257,6 +259,8 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 @synthesize failedIdentifiers = _failedIdentifiers;
 @synthesize maximumActiveItems = _maximumActiveItems;
 @synthesize applicationActive = _applicationActive;
+@synthesize autoplayEnabled = _autoplayEnabled;
+@synthesize stopWhenApplicationInactive = _stopWhenApplicationInactive;
 
 - (instancetype)initWithHostView:(NSView *)hostView maximumActiveItems:(NSUInteger)maximumActiveItems {
     self = [super init];
@@ -265,6 +269,8 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     }
     self.hostView = hostView;
     self.maximumActiveItems = maximumActiveItems > 0 ? maximumActiveItems : 1;
+    self.autoplayEnabled = YES;
+    self.stopWhenApplicationInactive = YES;
     self.viewsByIdentifier = [NSMutableDictionary dictionary];
     self.failedIdentifiers = [NSMutableSet set];
     self.applicationActive = [NSApp isActive];
@@ -282,6 +288,9 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
     (void)notification;
     self.applicationActive = YES;
+    if (!self.autoplayEnabled) {
+        return;
+    }
     for (TGInlineMediaPlaybackView *view in [self.viewsByIdentifier allValues]) {
         [view setPlaybackActive:YES];
     }
@@ -290,13 +299,40 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 - (void)applicationDidResignActive:(NSNotification *)notification {
     (void)notification;
     self.applicationActive = NO;
+    if (!self.stopWhenApplicationInactive) {
+        return;
+    }
     for (TGInlineMediaPlaybackView *view in [self.viewsByIdentifier allValues]) {
         [view setPlaybackActive:NO];
     }
 }
 
+- (void)setMaximumActiveItems:(NSUInteger)maximumActiveItems {
+    _maximumActiveItems = maximumActiveItems > 0 ? maximumActiveItems : 1;
+}
+
+- (void)setAutoplayEnabled:(BOOL)enabled {
+    _autoplayEnabled = enabled;
+    if (!enabled) {
+        [self removeAllPlayback];
+    }
+}
+
+- (void)setStopWhenApplicationInactive:(BOOL)enabled {
+    _stopWhenApplicationInactive = enabled;
+    if (!enabled && self.applicationActive && self.autoplayEnabled) {
+        for (TGInlineMediaPlaybackView *view in [self.viewsByIdentifier allValues]) {
+            [view setPlaybackActive:YES];
+        }
+    }
+}
+
 - (void)updateWithDescriptors:(NSArray *)descriptors {
     if (!self.hostView) {
+        [self removeAllPlayback];
+        return;
+    }
+    if (!self.autoplayEnabled) {
         [self removeAllPlayback];
         return;
     }
@@ -357,7 +393,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             [self.hostView addSubview:view];
         }
         [view setFrame:frame];
-        [view setPlaybackActive:self.applicationActive];
+        [view setPlaybackActive:(self.applicationActive || !self.stopWhenApplicationInactive)];
         [retainedIdentifiers addObject:identifier];
         accepted++;
     }

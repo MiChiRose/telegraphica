@@ -1,5 +1,9 @@
 - (void)showView:(NSView *)view visible:(BOOL)visible {
+    if (!view) {
+        return;
+    }
     [view setHidden:!visible];
+    [view setAlphaValue:1.0];
 }
 
 - (void)showMessageDropOverlay:(BOOL)visible {
@@ -44,6 +48,7 @@
     [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
     [self showView:self.authSecureField visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPassword"])];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
+    [self showView:self.busySpinner visible:(showLogin && self.controlsBusy)];
     [self showView:self.loginLogsButton visible:showLogin];
     NSUInteger loginLanguageIndex = 0;
     for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
@@ -57,11 +62,13 @@
     [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList)];
     [self showView:self.loadChatsButton visible:showChats];
     [self showView:self.loadMoreChatsButton visible:NO];
+    [self showView:self.chatSearchButton visible:showChats];
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:NO];
+    [self showView:self.conversationSearchButton visible:showChats];
     [self showView:self.selectedChatField visible:showChats];
     [self showView:self.typingIndicatorField visible:(showChats && [[self.typingIndicatorField stringValue] length] > 0)];
     BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
@@ -69,6 +76,21 @@
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
+    [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
+    BOOL showSearchPanel = (showChats && self.searchPanelVisible);
+    [self showView:self.searchPanelView visible:showSearchPanel];
+    [self showView:self.searchTextField visible:showSearchPanel];
+    [self showView:self.searchScopePopUpButton visible:showSearchPanel];
+    [self showView:self.searchFilterPopUpButton visible:showSearchPanel];
+    [self showView:self.searchCloseButton visible:showSearchPanel];
+    [self showView:self.searchStatusField visible:showSearchPanel];
+    [self showView:self.searchResultsScrollView visible:showSearchPanel];
+    [self showView:self.searchResultsTableView visible:showSearchPanel];
+    BOOL showPinnedPanel = (showChats && !self.searchPanelVisible && self.pinnedMessageItem != nil);
+    [self showView:self.pinnedMessagePanelView visible:showPinnedPanel];
+    [self showView:self.pinnedMessageLabelField visible:showPinnedPanel];
+    [self showView:self.pinnedMessageTextField visible:showPinnedPanel];
+    [self showView:self.pinnedMessageButton visible:showPinnedPanel];
     if (showChats) {
         [self scheduleInlineMediaPlaybackRefresh];
     } else {
@@ -82,7 +104,7 @@
     [self showView:self.attachPhotoButton visible:showChats];
     [self showView:self.stickerButton visible:showChats];
     [self showView:self.voiceRecordButton visible:showChats];
-    [self showView:self.voiceRecordingIndicatorField visible:(showChats && [self.voiceRecorder isRecording])];
+    [self showView:self.voiceRecordingIndicatorField visible:NO];
     [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
@@ -124,6 +146,7 @@
     [self showView:self.settingsScrollView visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
+    [self showView:self.settingsResourceCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
     [self showView:self.settingsFilesCardView visible:showSettings];
     [self showView:self.settingsHelpCardView visible:showSettings];
@@ -131,6 +154,7 @@
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
+    [self showView:self.settingsResourceSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
     [self showView:self.settingsFilesSectionField visible:showSettings];
     [self showView:self.settingsHelpSectionField visible:showSettings];
@@ -144,12 +168,26 @@
     [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
+    [self showView:self.settingsEconomyModeButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadDocumentsButton visible:showSettings];
+    [self showView:self.settingsAutoplayAnimatedStickersButton visible:showSettings];
+    [self showView:self.settingsStopInactiveAnimationsButton visible:showSettings];
+    [self showView:self.settingsMaxAutoDownloadLabel visible:showSettings];
+    [self showView:self.settingsMaxAutoDownloadPopUpButton visible:showSettings];
+    [self showView:self.settingsMaxAnimationsLabel visible:showSettings];
+    [self showView:self.settingsMaxAnimationsPopUpButton visible:showSettings];
+    [self showView:self.settingsMediaCacheLimitLabel visible:showSettings];
+    [self showView:self.settingsMediaCacheLimitPopUpButton visible:showSettings];
+    [self showView:self.settingsResourceHintField visible:showSettings];
     [self showView:self.settingsLanguageLabel visible:showSettings];
     [self showView:self.settingsLanguagePopUpButton visible:showSettings];
     [self showView:self.settingsActiveSessionsDetailField visible:showSettings];
     [self showView:self.settingsActiveSessionsButton visible:showSettings];
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
+    [self showView:self.settingsStorageUsageButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsAppearanceButton visible:NO];
     [self showView:self.settingsLogsButton visible:showSettings];
@@ -378,6 +416,7 @@
     [self.authSecondaryTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, secondaryInputY, loginInputWidth, 32.0)];
     [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
+    [self.busySpinner setFrame:NSMakeRect(loginX + loginWidth - 36.0, primaryInputY + 8.0, 16.0, 16.0)];
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
     CGFloat loginLanguageX = margin;
     NSUInteger loginLanguageIndex = 0;
@@ -395,6 +434,7 @@
     [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, sidebarWidth - (chatHeaderTitleX - mainX) - 58.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.chatSearchButton setFrame:NSMakeRect(mainX + sidebarWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
     CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -421,6 +461,7 @@
 
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.conversationSearchButton setFrame:NSMakeRect(conversationX + conversationWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
     CGFloat selectedAvatarSize = 24.0;
     CGFloat selectedAvatarX = conversationX + 16.0;
@@ -446,7 +487,6 @@
                                                         NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
                                                         selectedAvatarSize + 4.0)];
 
-    BOOL voiceRecordingActive = [self.voiceRecorder isRecording];
     CGFloat estimatedSendFieldWidth = conversationWidth - 198.0;
     if (estimatedSendFieldWidth < 160.0) {
         estimatedSendFieldWidth = 160.0;
@@ -456,24 +496,57 @@
     if (composerHeight < 42.0) {
         composerHeight = 42.0;
     }
-    if (voiceRecordingActive && composerHeight < 60.0) {
-        composerHeight = 60.0;
-    }
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
     CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat panelInsetX = conversationX + 8.0;
+    CGFloat panelWidth = conversationWidth - 16.0;
+    if (panelWidth < 260.0) {
+        panelWidth = 260.0;
+    }
+    if (self.searchPanelVisible) {
+        CGFloat searchHeight = 174.0;
+        CGFloat searchY = messageTop - searchHeight;
+        [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
+        [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, panelWidth - 326.0, 24.0)];
+        [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 306.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
+        [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 168.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
+        [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
+        [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
+        [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
+        NSTableColumn *searchColumn = [self.searchResultsTableView tableColumnWithIdentifier:@"search"];
+        if (searchColumn) {
+            [self.searchResultsScrollView tile];
+            [searchColumn setWidth:NSWidth([[self.searchResultsScrollView contentView] bounds])];
+        }
+        messageTop = searchY - 6.0;
+    }
+    BOOL hasPinnedPanel = (self.pinnedMessageItem != nil && !self.searchPanelVisible);
+    if (hasPinnedPanel) {
+        CGFloat pinnedHeight = 48.0;
+        CGFloat pinnedY = messageTop - pinnedHeight;
+        [self.pinnedMessagePanelView setFrame:NSMakeRect(panelInsetX, pinnedY, panelWidth, pinnedHeight)];
+        [self.pinnedMessageLabelField setFrame:NSMakeRect(panelInsetX + 16.0, pinnedY + 27.0, 120.0, 15.0)];
+        [self.pinnedMessageTextField setFrame:NSMakeRect(panelInsetX + 16.0, pinnedY + 9.0, panelWidth - 32.0, 18.0)];
+        [self.pinnedMessageButton setFrame:NSMakeRect(panelInsetX, pinnedY, panelWidth, pinnedHeight)];
+        messageTop = pinnedY - 6.0;
+    }
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
     }
-    CGFloat messageScrollX = conversationX + 8.0;
-    CGFloat messageScrollWidth = conversationWidth - 16.0;
+    CGFloat messageScrollX = panelInsetX;
+    CGFloat messageScrollWidth = panelWidth;
     if (messageScrollWidth < 260.0) {
         messageScrollWidth = 260.0;
     }
     NSRect messageSurfaceFrame = NSMakeRect(messageScrollX, messageBottom, messageScrollWidth, messageHeight);
     [self.messageScrollSurfaceView setFrame:messageSurfaceFrame];
     [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 5.0, 5.0)];
+    [self.messageLoadingSpinner setFrame:NSMakeRect(NSMidX(messageSurfaceFrame) - 12.0,
+                                                    NSMidY(messageSurfaceFrame) - 12.0,
+                                                    24.0,
+                                                    24.0)];
     CGFloat dropOverlayInset = (NSHeight(messageSurfaceFrame) > 130.0) ? 24.0 : 12.0;
     [self.messageDropOverlayView setFrame:NSInsetRect(messageSurfaceFrame, dropOverlayInset, dropOverlayInset)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
@@ -509,11 +582,7 @@
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
     [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerControlY, sendButtonWidth, 32.0)];
-    if (voiceRecordingActive) {
-        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, conversationWidth - (sendFieldX - conversationX) - 28.0, 16.0)];
-    } else {
-        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, 0.0, 0.0)];
-    }
+    [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, 0.0, 0.0)];
 
     CGFloat panelTitleY = headerLabelY;
     CGFloat contentTop = mainTop - TGPanelHeaderHeight;
@@ -716,7 +785,7 @@
     if (settingsDocWidth < 340.0) {
         settingsDocWidth = settingsScrollWidth;
     }
-    CGFloat settingsDocHeight = 850.0;
+    CGFloat settingsDocHeight = 1120.0;
     if (settingsDocHeight < settingsScrollHeight) {
         settingsDocHeight = settingsScrollHeight;
     }
@@ -756,6 +825,32 @@
     [self.settingsTypingIndicatorsButton setFrame:NSMakeRect(rowLeft, drawerCardY + 42.0, rowWidth, 22.0)];
     settingsNextY = drawerCardY + drawerCardHeight + settingsGroupGap;
 
+    [self.settingsResourceSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat resourceCardHeight = 276.0;
+    CGFloat resourceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsResourceCardView setFrame:NSMakeRect(settingsGroupedX, resourceCardY, settingsGroupedWidth, resourceCardHeight)];
+    [self.settingsEconomyModeButton setFrame:NSMakeRect(rowLeft, resourceCardY + 12.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadPhotosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 42.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadVideosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 70.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadDocumentsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 98.0, rowWidth, 22.0)];
+    CGFloat resourcePopupWidth = 190.0;
+    if (resourcePopupWidth > rowWidth - 180.0) {
+        resourcePopupWidth = rowWidth - 180.0;
+    }
+    if (resourcePopupWidth < 120.0) {
+        resourcePopupWidth = 120.0;
+    }
+    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 128.0, 170.0, 22.0)];
+    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 124.0, resourcePopupWidth, 28.0)];
+    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 158.0, rowWidth, 22.0)];
+    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 188.0, 170.0, 22.0)];
+    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 184.0, resourcePopupWidth, 28.0)];
+    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 218.0, rowWidth, 22.0)];
+    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 248.0, 170.0, 22.0)];
+    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 244.0, resourcePopupWidth, 28.0)];
+    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 126.0, MAX(160.0, rowWidth - 390.0), 54.0)];
+    settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
+
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat interfaceCardHeight = 88.0;
     CGFloat interfaceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
@@ -783,11 +878,12 @@
     settingsNextY = sessionsCardY + sessionsCardHeight + settingsGroupGap;
 
     [self.settingsFilesSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat filesCardHeight = 76.0;
+    CGFloat filesCardHeight = 108.0;
     CGFloat filesCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
     [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
     [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 38.0, rowWidth, 28.0)];
+    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
     settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
     [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
@@ -882,6 +978,12 @@
         self.mediaPlaybackWindow = nil;
     }
     if ([notification object] == self.voicePreviewWindow) {
+        if ([self.voiceRecorder isRecording]) {
+            [self.voiceRecorder stop];
+            self.voiceRecorder = nil;
+            [self.voiceRecordButton setToolTip:@"Record voice message"];
+            [self.statusField setStringValue:@"Voice recording cancelled"];
+        }
         [self invalidateVoicePreviewTimer];
         [self.voicePreviewPlayer stop];
         self.voicePreviewPlayer = nil;
@@ -890,12 +992,22 @@
         }
         self.voiceRecordingPath = nil;
         self.voiceRecordingStartDate = nil;
+        [self.voiceRecordingIndicatorField setStringValue:@""];
+        [self.voiceRecordingIndicatorField setHidden:YES];
         [self.voicePreviewWindow setDelegate:nil];
+        self.voicePreviewTitleField = nil;
+        self.voicePreviewPlayButton = nil;
+        self.voicePreviewStopButton = nil;
+        self.voicePreviewProgressSlider = nil;
+        self.voicePreviewTimeField = nil;
+        self.voicePreviewCancelButton = nil;
+        self.voicePreviewSendButton = nil;
+        self.voicePreviewErrorField = nil;
         self.voicePreviewWindow = nil;
+        [self updateVisibleSection];
     }
     if ([notification object] == self.stickerPickerWindow) {
         [self.stickerPickerPlaybackCoordinator removeAllPlayback];
         [self scheduleInlineMediaPlaybackRefresh];
     }
 }
-

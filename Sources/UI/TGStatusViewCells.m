@@ -1,5 +1,7 @@
 #import "TGStatusViewCells.h"
+#import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
 #import "TGTheme.h"
 #import "../Core/TGChatItem.h"
@@ -89,7 +91,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat titleX = NSMaxX(avatarRect) + 9.0;
     CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
     CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
-    CGFloat pinIconWidth = [item isPinned] ? 10.0 : 0.0;
+    CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
     CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) + ([item isPinned] ? (pinIconWidth + 4.0) : 0.0);
     CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
     if (titleAvailableWidth < 40.0) {
@@ -109,22 +111,10 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if ([item isPinned]) {
         NSRect pinRect = NSMakeRect(iconX,
                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 12.0) / 2.0),
-                                    10.0,
+                                    12.0,
                                     12.0);
         NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
-        [pinColor set];
-        NSBezierPath *pinPath = [NSBezierPath bezierPath];
-        CGFloat midX = NSMidX(pinRect);
-        CGFloat topY = [controlView isFlipped] ? NSMinY(pinRect) + 2.0 : NSMaxY(pinRect) - 2.0;
-        CGFloat bottomY = [controlView isFlipped] ? NSMaxY(pinRect) - 2.0 : NSMinY(pinRect) + 2.0;
-        [pinPath moveToPoint:NSMakePoint(midX - 3.0, topY)];
-        [pinPath lineToPoint:NSMakePoint(midX + 3.0, topY)];
-        [pinPath moveToPoint:NSMakePoint(midX, topY)];
-        [pinPath lineToPoint:NSMakePoint(midX, bottomY)];
-        [pinPath moveToPoint:NSMakePoint(midX - 2.0, bottomY - ([controlView isFlipped] ? 2.0 : -2.0))];
-        [pinPath lineToPoint:NSMakePoint(midX + 2.0, bottomY - ([controlView isFlipped] ? 2.0 : -2.0))];
-        [pinPath setLineWidth:1.4];
-        [pinPath stroke];
+        TGDrawTemplateIconAsset(@"flag-triangle", pinRect, pinColor, 0.9, [controlView isFlipped]);
         iconX = NSMaxX(pinRect) + 4.0;
     }
     if ([item notificationsMuted]) {
@@ -133,7 +123,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      15.0,
                                      15.0);
         NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
-        TGDrawMutedSpeakerIconInRect(muteRect, muteColor, [controlView isFlipped]);
+        TGDrawTemplateIconAsset(@"sound-off", muteRect, muteColor, 1.0, [controlView isFlipped]);
     }
     if ([unreadString length] > 0) {
         NSBezierPath *unreadPath = [NSBezierPath bezierPathWithRoundedRect:unreadRect

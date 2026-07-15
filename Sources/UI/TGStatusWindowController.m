@@ -3,23 +3,32 @@
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGAnimationSupport.h"
+#import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
 #import "TGStatusButtonCells.h"
+#import "TGSectionTitleField.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusSupport.h"
 #import "TGStickerPickerLayout.h"
 #import "TGStatusWindowStyling.h"
+#import "TGStorageUsageWindowController.h"
 #import "TGTheme.h"
 #import "TGTypingIndicatorPresentation.h"
 #import "TGUpdateSupport.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
+#import "../Media/TGAttachmentDescriptor.h"
+#import "../Media/TGFileTransferState.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
+#import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
+#import "../Services/TGResourcePolicy.h"
 #import <AVFoundation/AVFoundation.h>
 #include <math.h>
 
@@ -78,8 +87,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) TGGroupedCardView *settingsThemeCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsSessionCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsDrawerCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsResourceCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsFilesCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsHelpCardView;
+@property (nonatomic, retain) TGStorageUsageWindowController *storageUsageWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
@@ -93,6 +104,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *topicBackButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
+@property (nonatomic, retain) NSButton *chatSearchButton;
+@property (nonatomic, retain) NSButton *conversationSearchButton;
+@property (nonatomic, retain) TGGroupedCardView *searchPanelView;
+@property (nonatomic, retain) NSTextField *searchTextField;
+@property (nonatomic, retain) NSPopUpButton *searchScopePopUpButton;
+@property (nonatomic, retain) NSPopUpButton *searchFilterPopUpButton;
+@property (nonatomic, retain) NSButton *searchCloseButton;
+@property (nonatomic, retain) NSTextField *searchStatusField;
+@property (nonatomic, retain) NSScrollView *searchResultsScrollView;
+@property (nonatomic, retain) NSTableView *searchResultsTableView;
+@property (nonatomic, retain) NSMutableArray *searchResultItems;
+@property (nonatomic, retain) NSTimer *searchDebounceTimer;
+@property (nonatomic, copy) NSString *globalSearchOffset;
+@property (nonatomic, assign) BOOL searchPanelVisible;
+@property (nonatomic, assign) BOOL searchLoading;
+@property (nonatomic, assign) BOOL searchEndReached;
+@property (nonatomic, assign) NSUInteger searchGeneration;
+@property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
+@property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
+@property (nonatomic, retain) NSTextField *pinnedMessageTextField;
+@property (nonatomic, retain) NSButton *pinnedMessageButton;
+@property (nonatomic, retain) TGMessageItem *pinnedMessageItem;
+@property (nonatomic, assign) NSUInteger pinnedMessageGeneration;
+@property (nonatomic, retain) NSNumber *highlightedSearchMessageID;
+@property (nonatomic, retain) NSTimer *searchHighlightTimer;
 @property (nonatomic, retain) NSTextField *sendLabel;
 @property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
@@ -112,6 +148,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *authSecondaryLabel;
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
+@property (nonatomic, retain) NSProgressIndicator *busySpinner;
 @property (nonatomic, retain) NSButton *loginLogsButton;
 @property (nonatomic, retain) NSArray *loginLanguageButtons;
 @property (nonatomic, retain) NSTextField *chatsLabel;
@@ -128,6 +165,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
+@property (nonatomic, retain) NSProgressIndicator *messageLoadingSpinner;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
@@ -153,6 +191,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *settingsLibraryField;
 @property (nonatomic, retain) NSTextField *settingsStorageField;
 @property (nonatomic, retain) NSTextField *settingsDrawerSectionField;
+@property (nonatomic, retain) NSTextField *settingsResourceSectionField;
 @property (nonatomic, retain) NSTextField *settingsFilesSectionField;
 @property (nonatomic, retain) NSTextField *settingsHelpSectionField;
 @property (nonatomic, retain) NSTextField *settingsThemeLabel;
@@ -164,12 +203,26 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *settingsNotificationsWhenActiveButton;
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
 @property (nonatomic, retain) NSButton *settingsTypingIndicatorsButton;
+@property (nonatomic, retain) NSButton *settingsEconomyModeButton;
+@property (nonatomic, retain) NSButton *settingsAutoDownloadPhotosButton;
+@property (nonatomic, retain) NSButton *settingsAutoDownloadVideosButton;
+@property (nonatomic, retain) NSButton *settingsAutoDownloadDocumentsButton;
+@property (nonatomic, retain) NSButton *settingsAutoplayAnimatedStickersButton;
+@property (nonatomic, retain) NSButton *settingsStopInactiveAnimationsButton;
+@property (nonatomic, retain) NSTextField *settingsMaxAutoDownloadLabel;
+@property (nonatomic, retain) NSPopUpButton *settingsMaxAutoDownloadPopUpButton;
+@property (nonatomic, retain) NSTextField *settingsMaxAnimationsLabel;
+@property (nonatomic, retain) NSPopUpButton *settingsMaxAnimationsPopUpButton;
+@property (nonatomic, retain) NSTextField *settingsMediaCacheLimitLabel;
+@property (nonatomic, retain) NSPopUpButton *settingsMediaCacheLimitPopUpButton;
+@property (nonatomic, retain) NSTextField *settingsResourceHintField;
 @property (nonatomic, retain) NSButton *settingsActiveSessionsButton;
 @property (nonatomic, retain) NSTextField *settingsActiveSessionsDetailField;
 @property (nonatomic, retain) NSTextField *settingsLanguageLabel;
 @property (nonatomic, retain) NSPopUpButton *settingsLanguagePopUpButton;
 @property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
+@property (nonatomic, retain) NSButton *settingsStorageUsageButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
@@ -229,8 +282,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *photoSendCaptionField;
 @property (nonatomic, retain) NSTextField *photoSendTitleField;
 @property (nonatomic, retain) NSTextField *photoSendErrorField;
+@property (nonatomic, retain) NSTextField *photoSendMetaField;
 @property (nonatomic, retain) NSButton *photoSendSendButton;
 @property (nonatomic, copy) NSString *pendingPhotoSendPath;
+@property (nonatomic, retain) TGAttachmentDescriptor *pendingAttachmentDescriptor;
+@property (nonatomic, retain) TGFileTransferState *pendingAttachmentTransferState;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendChatID;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendThreadID;
 @property (nonatomic, copy) NSString *pendingPhotoSendTopicKind;
@@ -248,8 +304,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *voicePreviewWindow;
 @property (nonatomic, retain) NSTextField *voicePreviewTitleField;
 @property (nonatomic, retain) NSButton *voicePreviewPlayButton;
+@property (nonatomic, retain) NSButton *voicePreviewStopButton;
 @property (nonatomic, retain) NSSlider *voicePreviewProgressSlider;
 @property (nonatomic, retain) NSTextField *voicePreviewTimeField;
+@property (nonatomic, retain) NSButton *voicePreviewCancelButton;
 @property (nonatomic, retain) NSButton *voicePreviewSendButton;
 @property (nonatomic, retain) NSTextField *voicePreviewErrorField;
 @property (nonatomic, retain) NSTimer *voicePreviewTimer;
@@ -273,6 +331,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL hasAccountUnreadCount;
 @property (nonatomic, assign) BOOL backgroundChatRefreshInFlight;
 @property (nonatomic, assign) BOOL backgroundMessageRefreshInFlight;
+@property (nonatomic, assign) BOOL messageLoadingIndicatorVisible;
+@property (nonatomic, assign) NSUInteger messageLoadingGeneration;
 @property (nonatomic, assign) BOOL pendingLiveChatRefresh;
 @property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
@@ -339,8 +399,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsThemeCardView = _settingsThemeCardView;
 @synthesize settingsSessionCardView = _settingsSessionCardView;
 @synthesize settingsDrawerCardView = _settingsDrawerCardView;
+@synthesize settingsResourceCardView = _settingsResourceCardView;
 @synthesize settingsFilesCardView = _settingsFilesCardView;
 @synthesize settingsHelpCardView = _settingsHelpCardView;
+@synthesize storageUsageWindowController = _storageUsageWindowController;
 @synthesize aboutCardView = _aboutCardView;
 @synthesize logsCardView = _logsCardView;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
@@ -354,6 +416,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize topicBackButton = _topicBackButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
+@synthesize chatSearchButton = _chatSearchButton;
+@synthesize conversationSearchButton = _conversationSearchButton;
+@synthesize searchPanelView = _searchPanelView;
+@synthesize searchTextField = _searchTextField;
+@synthesize searchScopePopUpButton = _searchScopePopUpButton;
+@synthesize searchFilterPopUpButton = _searchFilterPopUpButton;
+@synthesize searchCloseButton = _searchCloseButton;
+@synthesize searchStatusField = _searchStatusField;
+@synthesize searchResultsScrollView = _searchResultsScrollView;
+@synthesize searchResultsTableView = _searchResultsTableView;
+@synthesize searchResultItems = _searchResultItems;
+@synthesize searchDebounceTimer = _searchDebounceTimer;
+@synthesize globalSearchOffset = _globalSearchOffset;
+@synthesize searchPanelVisible = _searchPanelVisible;
+@synthesize searchLoading = _searchLoading;
+@synthesize searchEndReached = _searchEndReached;
+@synthesize searchGeneration = _searchGeneration;
+@synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
+@synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
+@synthesize pinnedMessageTextField = _pinnedMessageTextField;
+@synthesize pinnedMessageButton = _pinnedMessageButton;
+@synthesize pinnedMessageItem = _pinnedMessageItem;
+@synthesize pinnedMessageGeneration = _pinnedMessageGeneration;
+@synthesize highlightedSearchMessageID = _highlightedSearchMessageID;
+@synthesize searchHighlightTimer = _searchHighlightTimer;
 @synthesize sendLabel = _sendLabel;
 @synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
@@ -373,6 +460,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize authSecondaryLabel = _authSecondaryLabel;
 @synthesize authSecondaryTextFieldBackgroundView = _authSecondaryTextFieldBackgroundView;
 @synthesize authButton = _authButton;
+@synthesize busySpinner = _busySpinner;
 @synthesize loginLogsButton = _loginLogsButton;
 @synthesize loginLanguageButtons = _loginLanguageButtons;
 @synthesize chatsLabel = _chatsLabel;
@@ -389,6 +477,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageScrollSurfaceView = _messageScrollSurfaceView;
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
+@synthesize messageLoadingSpinner = _messageLoadingSpinner;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
@@ -414,6 +503,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsLibraryField = _settingsLibraryField;
 @synthesize settingsStorageField = _settingsStorageField;
 @synthesize settingsDrawerSectionField = _settingsDrawerSectionField;
+@synthesize settingsResourceSectionField = _settingsResourceSectionField;
 @synthesize settingsFilesSectionField = _settingsFilesSectionField;
 @synthesize settingsHelpSectionField = _settingsHelpSectionField;
 @synthesize settingsThemeLabel = _settingsThemeLabel;
@@ -425,12 +515,26 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsNotificationsWhenActiveButton = _settingsNotificationsWhenActiveButton;
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
 @synthesize settingsTypingIndicatorsButton = _settingsTypingIndicatorsButton;
+@synthesize settingsEconomyModeButton = _settingsEconomyModeButton;
+@synthesize settingsAutoDownloadPhotosButton = _settingsAutoDownloadPhotosButton;
+@synthesize settingsAutoDownloadVideosButton = _settingsAutoDownloadVideosButton;
+@synthesize settingsAutoDownloadDocumentsButton = _settingsAutoDownloadDocumentsButton;
+@synthesize settingsAutoplayAnimatedStickersButton = _settingsAutoplayAnimatedStickersButton;
+@synthesize settingsStopInactiveAnimationsButton = _settingsStopInactiveAnimationsButton;
+@synthesize settingsMaxAutoDownloadLabel = _settingsMaxAutoDownloadLabel;
+@synthesize settingsMaxAutoDownloadPopUpButton = _settingsMaxAutoDownloadPopUpButton;
+@synthesize settingsMaxAnimationsLabel = _settingsMaxAnimationsLabel;
+@synthesize settingsMaxAnimationsPopUpButton = _settingsMaxAnimationsPopUpButton;
+@synthesize settingsMediaCacheLimitLabel = _settingsMediaCacheLimitLabel;
+@synthesize settingsMediaCacheLimitPopUpButton = _settingsMediaCacheLimitPopUpButton;
+@synthesize settingsResourceHintField = _settingsResourceHintField;
 @synthesize settingsActiveSessionsButton = _settingsActiveSessionsButton;
 @synthesize settingsActiveSessionsDetailField = _settingsActiveSessionsDetailField;
 @synthesize settingsLanguageLabel = _settingsLanguageLabel;
 @synthesize settingsLanguagePopUpButton = _settingsLanguagePopUpButton;
 @synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
+@synthesize settingsStorageUsageButton = _settingsStorageUsageButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
@@ -490,8 +594,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize photoSendCaptionField = _photoSendCaptionField;
 @synthesize photoSendTitleField = _photoSendTitleField;
 @synthesize photoSendErrorField = _photoSendErrorField;
+@synthesize photoSendMetaField = _photoSendMetaField;
 @synthesize photoSendSendButton = _photoSendSendButton;
 @synthesize pendingPhotoSendPath = _pendingPhotoSendPath;
+@synthesize pendingAttachmentDescriptor = _pendingAttachmentDescriptor;
+@synthesize pendingAttachmentTransferState = _pendingAttachmentTransferState;
 @synthesize pendingPhotoSendChatID = _pendingPhotoSendChatID;
 @synthesize pendingPhotoSendThreadID = _pendingPhotoSendThreadID;
 @synthesize pendingPhotoSendTopicKind = _pendingPhotoSendTopicKind;
@@ -509,8 +616,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize voicePreviewWindow = _voicePreviewWindow;
 @synthesize voicePreviewTitleField = _voicePreviewTitleField;
 @synthesize voicePreviewPlayButton = _voicePreviewPlayButton;
+@synthesize voicePreviewStopButton = _voicePreviewStopButton;
 @synthesize voicePreviewProgressSlider = _voicePreviewProgressSlider;
 @synthesize voicePreviewTimeField = _voicePreviewTimeField;
+@synthesize voicePreviewCancelButton = _voicePreviewCancelButton;
 @synthesize voicePreviewSendButton = _voicePreviewSendButton;
 @synthesize voicePreviewErrorField = _voicePreviewErrorField;
 @synthesize voicePreviewTimer = _voicePreviewTimer;
@@ -534,6 +643,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize hasAccountUnreadCount = _hasAccountUnreadCount;
 @synthesize backgroundChatRefreshInFlight = _backgroundChatRefreshInFlight;
 @synthesize backgroundMessageRefreshInFlight = _backgroundMessageRefreshInFlight;
+@synthesize messageLoadingIndicatorVisible = _messageLoadingIndicatorVisible;
+@synthesize messageLoadingGeneration = _messageLoadingGeneration;
 @synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
 @synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
@@ -583,10 +694,12 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     self = [super initWithWindow:window];
     if (self) {
         [[self window] setDelegate:self];
+        TGResourcePolicyApplyDefaultsIfNeeded();
         self.client = [[[TGTDLibClient alloc] init] autorelease];
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.searchResultItems = [NSMutableArray array];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
@@ -603,8 +716,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                  selector:@selector(handleInlineMediaPlaybackDiagnostic:)
                                                      name:TGInlineMediaPlaybackDiagnosticNotification
                                                    object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(resourcePolicyDidChange:)
+                                                     name:TGResourcePolicyDidChangeNotification
+                                                   object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
+        [self applyResourcePolicyToMediaSubsystems];
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
         [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
@@ -741,6 +859,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsTypingIndicatorsButton setTitle:TGLoc(@"settings.typing")];
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
     [self.settingsDrawerSectionField setStringValue:TGLoc(@"settings.section.drawer")];
+    [self.settingsResourceSectionField setStringValue:TGLoc(@"settings.section.resources")];
     [self.settingsLibraryField setStringValue:TGLoc(@"settings.appearance")];
     [self.settingsStorageField setStringValue:TGLoc(@"settings.section.sessions")];
     [self.settingsFilesSectionField setStringValue:TGLoc(@"settings.section.files")];
@@ -750,6 +869,17 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
     [self.settingsActiveSessionsDetailField setStringValue:TGLoc(@"settings.sessions.help")];
     [self.settingsActiveSessionsButton setTitle:TGLoc(@"settings.sessions.open")];
+    [self.settingsStorageUsageButton setTitle:TGLoc(@"storage.open")];
+    [self.settingsEconomyModeButton setTitle:TGLoc(@"settings.resources.economy")];
+    [self.settingsAutoDownloadPhotosButton setTitle:TGLoc(@"settings.resources.photos")];
+    [self.settingsAutoDownloadVideosButton setTitle:TGLoc(@"settings.resources.videos")];
+    [self.settingsAutoDownloadDocumentsButton setTitle:TGLoc(@"settings.resources.documents")];
+    [self.settingsAutoplayAnimatedStickersButton setTitle:TGLoc(@"settings.resources.autoplay")];
+    [self.settingsStopInactiveAnimationsButton setTitle:TGLoc(@"settings.resources.stopInactive")];
+    [self.settingsMaxAutoDownloadLabel setStringValue:TGLoc(@"settings.resources.maxDownload")];
+    [self.settingsMaxAnimationsLabel setStringValue:TGLoc(@"settings.resources.maxAnimations")];
+    [self.settingsMediaCacheLimitLabel setStringValue:TGLoc(@"settings.resources.cacheLimit")];
+    [self.settingsResourceHintField setStringValue:TGLoc(@"settings.resources.hint")];
     [self.activeSessionsWindow setTitle:TGLoc(@"settings.section.sessions")];
     [self.activeSessionsRefreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
     [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
@@ -802,6 +932,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
+    [self applyMutedLabelStyle:self.settingsResourceSectionField];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
@@ -840,6 +971,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyMutedLabelStyle:self.settingsActiveSessionsDetailField];
     [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
     [self.settingsLanguageLabel setTextColor:TGClassicInkColor()];
+    [self.settingsMaxAutoDownloadLabel setTextColor:TGClassicInkColor()];
+    [self.settingsMaxAnimationsLabel setTextColor:TGClassicInkColor()];
+    [self.settingsMediaCacheLimitLabel setTextColor:TGClassicInkColor()];
+    [self applyMutedLabelStyle:self.settingsResourceHintField];
     [self applyMutedLabelStyle:self.aboutVersionField];
     [self applyMutedLabelStyle:self.aboutCopyrightField];
     [self.aboutLinkField setTextColor:TGClassicLinkColor()];
@@ -858,6 +993,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
     [self.settingsDownloadFolderButton setNeedsDisplay:YES];
+    [self.settingsStorageUsageButton setNeedsDisplay:YES];
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
     [self.settingsActiveSessionsButton setNeedsDisplay:YES];
     [self.profileRefreshButton setNeedsDisplay:YES];
@@ -866,6 +1002,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsThemeCardView setNeedsDisplay:YES];
     [self.settingsSessionCardView setNeedsDisplay:YES];
     [self.settingsFilesCardView setNeedsDisplay:YES];
+    [self.settingsResourceCardView setNeedsDisplay:YES];
     [self.settingsHelpCardView setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
     [self.chatScrollSurfaceView setNeedsDisplay:YES];
@@ -1269,6 +1406,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
+    self.busySpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
+    [self.busySpinner setStyle:NSProgressIndicatorSpinningStyle];
+    [self.busySpinner setControlSize:NSSmallControlSize];
+    [self.busySpinner setIndeterminate:YES];
+    [self.busySpinner setDisplayedWhenStopped:NO];
+    [self.busySpinner setHidden:YES];
+    [contentView addSubview:self.busySpinner];
+
     self.loginLogsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(894, 20, 70, 28)] autorelease];
     [self.loginLogsButton setTitle:@"Logs"];
     [self.loginLogsButton setToolTip:@"Open diagnostic logs"];
@@ -1320,6 +1465,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyHeaderIconButtonStyle:self.loadMoreChatsButton];
     [self.loadMoreChatsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadMoreChatsButton];
+
+    self.chatSearchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(188, 332, 32, 32)] autorelease];
+    [self.chatSearchButton setTitle:@"search"];
+    [self.chatSearchButton setToolTip:@"Search all chats"];
+    [self.chatSearchButton setTarget:self];
+    [self.chatSearchButton setAction:@selector(openGlobalSearch:)];
+    [self.chatSearchButton setEnabled:NO];
+    [self applyHeaderIconButtonStyle:self.chatSearchButton];
+    [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.chatSearchButton];
 
     self.topicBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 332, 32, 32)] autorelease];
     [self.topicBackButton setTitle:@"‹"];
@@ -1399,6 +1554,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyHeaderIconButtonStyle:self.loadOlderMessagesButton];
     [self.loadOlderMessagesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadOlderMessagesButton];
+
+    self.conversationSearchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(228, 192, 32, 32)] autorelease];
+    [self.conversationSearchButton setTitle:@"search"];
+    [self.conversationSearchButton setToolTip:@"Search in this chat"];
+    [self.conversationSearchButton setTarget:self];
+    [self.conversationSearchButton setAction:@selector(openChatSearch:)];
+    [self.conversationSearchButton setEnabled:NO];
+    [self applyHeaderIconButtonStyle:self.conversationSearchButton];
+    [self.conversationSearchButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.conversationSearchButton];
 
     self.selectedChatField = [self labelWithFrame:NSMakeRect(264, 198, 472, 22)
                                              text:@"Select a chat"
@@ -1482,10 +1647,112 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                object:[self.messageScrollView contentView]];
     [contentView addSubview:self.messageScrollView];
 
+    self.messageLoadingSpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)] autorelease];
+    [self.messageLoadingSpinner setStyle:NSProgressIndicatorSpinningStyle];
+    [self.messageLoadingSpinner setControlSize:NSSmallControlSize];
+    [self.messageLoadingSpinner setDisplayedWhenStopped:NO];
+    [self.messageLoadingSpinner setIndeterminate:YES];
+    [self.messageLoadingSpinner setHidden:YES];
+    [self.messageLoadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
+    [contentView addSubview:self.messageLoadingSpinner];
+
     self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
     [self.messageDropOverlayView setHidden:YES];
     [self.messageDropOverlayView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.messageDropOverlayView];
+
+    self.pinnedMessagePanelView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 180, 600, 42)] autorelease];
+    [self.pinnedMessagePanelView setHidden:YES];
+    [contentView addSubview:self.pinnedMessagePanelView];
+
+    self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(32, 190, 90, 16)
+                                                   text:@"Pinned"
+                                                   font:[NSFont boldSystemFontOfSize:10.0]];
+    [self.pinnedMessageLabelField setTextColor:TGClassicMutedInkColor()];
+    [contentView addSubview:self.pinnedMessageLabelField];
+
+    self.pinnedMessageTextField = [self labelWithFrame:NSMakeRect(32, 174, 520, 18)
+                                                  text:@""
+                                                  font:[NSFont systemFontOfSize:12.0]];
+    [self.pinnedMessageTextField setTextColor:TGClassicInkColor()];
+    [[self.pinnedMessageTextField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [contentView addSubview:self.pinnedMessageTextField];
+
+    self.pinnedMessageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 180, 600, 42)] autorelease];
+    [self.pinnedMessageButton setTitle:@""];
+    [self.pinnedMessageButton setBordered:NO];
+    [self.pinnedMessageButton setTransparent:YES];
+    [self.pinnedMessageButton setTarget:self];
+    [self.pinnedMessageButton setAction:@selector(jumpToPinnedMessage:)];
+    [self.pinnedMessageButton setToolTip:@"Jump to pinned message"];
+    [self.pinnedMessageButton setHidden:YES];
+    [contentView addSubview:self.pinnedMessageButton];
+
+    self.searchPanelView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 180, 600, 180)] autorelease];
+    [self.searchPanelView setHidden:YES];
+    [contentView addSubview:self.searchPanelView];
+
+    self.searchTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(36, 318, 260, 24)] autorelease];
+    [[self.searchTextField cell] setPlaceholderString:@"Search"];
+    [self.searchTextField setTarget:self];
+    [self.searchTextField setAction:@selector(searchTextCommitted:)];
+    [self.searchTextField setDelegate:(id)self];
+    [self.searchTextField setHidden:YES];
+    [contentView addSubview:self.searchTextField];
+
+    self.searchScopePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(304, 318, 132, 26) pullsDown:NO] autorelease];
+    [self.searchScopePopUpButton addItemWithTitle:@"В этом чате"];
+    [self.searchScopePopUpButton addItemWithTitle:@"Во всех чатах"];
+    [self.searchScopePopUpButton setTarget:self];
+    [self.searchScopePopUpButton setAction:@selector(searchScopeChanged:)];
+    [self.searchScopePopUpButton setHidden:YES];
+    [contentView addSubview:self.searchScopePopUpButton];
+
+    self.searchFilterPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(442, 318, 112, 26) pullsDown:NO] autorelease];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Все"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Фото"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Документы"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Ссылки"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Голосовые"];
+    [self.searchFilterPopUpButton setTarget:self];
+    [self.searchFilterPopUpButton setAction:@selector(searchFilterChanged:)];
+    [self.searchFilterPopUpButton setHidden:YES];
+    [contentView addSubview:self.searchFilterPopUpButton];
+
+    self.searchCloseButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 318, 32, 26)] autorelease];
+    [self.searchCloseButton setTitle:@"×"];
+    [self.searchCloseButton setToolTip:@"Close search"];
+    [self.searchCloseButton setTarget:self];
+    [self.searchCloseButton setAction:@selector(closeSearchPanel:)];
+    [self applyUtilityButtonStyle:self.searchCloseButton];
+    [self.searchCloseButton setHidden:YES];
+    [contentView addSubview:self.searchCloseButton];
+
+    self.searchStatusField = [self labelWithFrame:NSMakeRect(36, 296, 540, 18)
+                                             text:@"Введите запрос"
+                                             font:[NSFont systemFontOfSize:11.0]];
+    [self.searchStatusField setTextColor:TGClassicMutedInkColor()];
+    [self.searchStatusField setHidden:YES];
+    [contentView addSubview:self.searchStatusField];
+
+    self.searchResultsScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(36, 190, 540, 102)] autorelease];
+    [self applySkeuomorphicScrollStyle:self.searchResultsScrollView];
+    [self.searchResultsScrollView setHasVerticalScroller:YES];
+    [self.searchResultsScrollView setHidden:YES];
+    self.searchResultsTableView = [[[NSTableView alloc] initWithFrame:[[self.searchResultsScrollView contentView] bounds]] autorelease];
+    [self.searchResultsTableView setDataSource:self];
+    [self.searchResultsTableView setDelegate:self];
+    [self.searchResultsTableView setTarget:self];
+    [self.searchResultsTableView setAction:@selector(activateSearchResult:)];
+    [self.searchResultsTableView setDoubleAction:@selector(activateSearchResult:)];
+    [self.searchResultsTableView setRowHeight:44.0];
+    [self.searchResultsTableView setHeaderView:nil];
+    NSTableColumn *searchColumn = [[[NSTableColumn alloc] initWithIdentifier:@"search"] autorelease];
+    [[searchColumn headerCell] setStringValue:@"Search"];
+    [searchColumn setWidth:520.0];
+    [self.searchResultsTableView addTableColumn:searchColumn];
+    [self.searchResultsScrollView setDocumentView:self.searchResultsTableView];
+    [contentView addSubview:self.searchResultsScrollView];
 
     self.sendLabel = [self labelWithFrame:NSMakeRect(24, 58, 48, 22)
                                      text:@""
@@ -1704,6 +1971,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDrawerCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.settingsDrawerCardView];
 
+    self.settingsResourceCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 170, 760, 230)] autorelease];
+    [self.settingsResourceCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsResourceCardView];
+
     self.settingsFilesCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 130, 760, 76)] autorelease];
     [self.settingsFilesCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.settingsFilesCardView];
@@ -1718,41 +1989,54 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyPanelHeaderLabelStyle:self.settingsTitleField];
     [contentView addSubview:self.settingsTitleField];
 
-    self.settingsStateField = [self labelWithFrame:NSMakeRect(64, 458, 760, 24)
-                                              text:@"Interface & notifications"
-                                              font:[NSFont systemFontOfSize:13.0]];
+    self.settingsStateField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 458, 760, 24)] autorelease];
+    [self.settingsStateField setStringValue:@"Notifications"];
+    [self.settingsStateField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsStateField setIconName:@"bell"];
     [self applyMutedLabelStyle:self.settingsStateField];
     [contentView addSubview:self.settingsStateField];
 
-    self.settingsLibraryField = [self labelWithFrame:NSMakeRect(64, 424, 760, 24)
-                                                text:@""
-                                                font:[NSFont systemFontOfSize:13.0]];
+    self.settingsLibraryField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 424, 760, 24)] autorelease];
+    [self.settingsLibraryField setStringValue:@"Appearance"];
+    [self.settingsLibraryField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsLibraryField setIconName:@"image"];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [[self.settingsLibraryField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
     [contentView addSubview:self.settingsLibraryField];
 
-    self.settingsStorageField = [self labelWithFrame:NSMakeRect(64, 380, 760, 44)
-                                                text:@""
-                                                font:[NSFont systemFontOfSize:12.0]];
+    self.settingsStorageField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 380, 760, 44)] autorelease];
+    [self.settingsStorageField setStringValue:@"Active Sessions"];
+    [self.settingsStorageField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsStorageField setIconName:@"smartphone"];
     [[self.settingsStorageField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [contentView addSubview:self.settingsStorageField];
 
-    self.settingsDrawerSectionField = [self labelWithFrame:NSMakeRect(64, 356, 760, 18)
-                                                      text:@"Drawer"
-                                                      font:[NSFont systemFontOfSize:13.0]];
+    self.settingsDrawerSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 356, 760, 18)] autorelease];
+    [self.settingsDrawerSectionField setStringValue:@"General"];
+    [self.settingsDrawerSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsDrawerSectionField setIconName:@"suitcase"];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
     [contentView addSubview:self.settingsDrawerSectionField];
 
-    self.settingsFilesSectionField = [self labelWithFrame:NSMakeRect(64, 206, 760, 18)
-                                                     text:@"Files"
-                                                     font:[NSFont systemFontOfSize:13.0]];
+    self.settingsResourceSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 286, 760, 18)] autorelease];
+    [self.settingsResourceSectionField setStringValue:@"Resource management"];
+    [self.settingsResourceSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsResourceSectionField setIconName:@"restore"];
+    [self applyMutedLabelStyle:self.settingsResourceSectionField];
+    [contentView addSubview:self.settingsResourceSectionField];
+
+    self.settingsFilesSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 206, 760, 18)] autorelease];
+    [self.settingsFilesSectionField setStringValue:@"Files"];
+    [self.settingsFilesSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsFilesSectionField setIconName:@"document"];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
     [contentView addSubview:self.settingsFilesSectionField];
 
-    self.settingsHelpSectionField = [self labelWithFrame:NSMakeRect(64, 126, 760, 18)
-                                                    text:@"Help"
-                                                    font:[NSFont systemFontOfSize:13.0]];
+    self.settingsHelpSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 126, 760, 18)] autorelease];
+    [self.settingsHelpSectionField setStringValue:@"Help"];
+    [self.settingsHelpSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsHelpSectionField setIconName:@"info"];
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
     [contentView addSubview:self.settingsHelpSectionField];
 
@@ -1845,6 +2129,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsTypingIndicatorsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsTypingIndicatorsButton];
 
+    [self buildResourceSettingsControlsInContentView:contentView];
+
     self.settingsLanguageLabel = [self labelWithFrame:NSMakeRect(64, 204, 100, 22)
                                                  text:@"Language"
                                                  font:[NSFont systemFontOfSize:13.0]];
@@ -1890,6 +2176,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDownloadFolderButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsDownloadFolderButton];
 
+    self.settingsStorageUsageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 150, 260, 22)] autorelease];
+    [self.settingsStorageUsageButton setTitle:@"Storage usage"];
+    [self.settingsStorageUsageButton setTarget:self];
+    [self.settingsStorageUsageButton setAction:@selector(showStorageUsageWindow:)];
+    [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
+    [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsStorageUsageButton];
+
     self.settingsCheckUpdatesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 152, 260, 22)] autorelease];
     [self.settingsCheckUpdatesButton setTitle:@"Check for Updates"];
     [self.settingsCheckUpdatesButton setTarget:self];
@@ -1930,12 +2224,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                      self.settingsThemeCardView,
                                      self.settingsSessionCardView,
                                      self.settingsDrawerCardView,
+                                     self.settingsResourceCardView,
                                      self.settingsFilesCardView,
                                      self.settingsHelpCardView,
                                      self.settingsStateField,
                                      self.settingsLibraryField,
                                      self.settingsStorageField,
                                      self.settingsDrawerSectionField,
+                                     self.settingsResourceSectionField,
                                      self.settingsFilesSectionField,
                                      self.settingsHelpSectionField,
                                      self.settingsThemeLabel,
@@ -1947,12 +2243,26 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                      self.settingsNotificationsWhenActiveButton,
                                      self.settingsDrawerHiddenButton,
                                      self.settingsTypingIndicatorsButton,
+                                     self.settingsEconomyModeButton,
+                                     self.settingsAutoDownloadPhotosButton,
+                                     self.settingsAutoDownloadVideosButton,
+                                     self.settingsAutoDownloadDocumentsButton,
+                                     self.settingsAutoplayAnimatedStickersButton,
+                                     self.settingsStopInactiveAnimationsButton,
+                                     self.settingsMaxAutoDownloadLabel,
+                                     self.settingsMaxAutoDownloadPopUpButton,
+                                     self.settingsMaxAnimationsLabel,
+                                     self.settingsMaxAnimationsPopUpButton,
+                                     self.settingsMediaCacheLimitLabel,
+                                     self.settingsMediaCacheLimitPopUpButton,
+                                     self.settingsResourceHintField,
                                      self.settingsLanguageLabel,
                                      self.settingsLanguagePopUpButton,
                                      self.settingsActiveSessionsDetailField,
                                      self.settingsActiveSessionsButton,
                                      self.settingsDownloadFolderHelpField,
                                      self.settingsDownloadFolderButton,
+                                     self.settingsStorageUsageButton,
                                      self.settingsCheckUpdatesButton,
                                      self.settingsAppearanceButton,
                                      self.settingsLogsButton,
@@ -2322,11 +2632,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 #include "TGStatusWindowController+SectionLayout.inc"
 
+#include "TGStatusWindowController+ResourceSettings.inc"
+
 #include "TGStatusWindowController+AuthComposerState.inc"
 
 #include "TGStatusWindowController+MessageMediaHitTesting.inc"
 
 #include "TGStatusWindowController+MessageMenus.inc"
+
+#include "TGStatusWindowController+SearchNavigation.inc"
 
 #include "TGStatusWindowController+TableForumFlow.inc"
 
@@ -2367,6 +2681,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_chatTableView setDelegate:nil];
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
+    [_searchResultsTableView setDataSource:nil];
+    [_searchResultsTableView setDelegate:nil];
     [_messageContextMenu setDelegate:nil];
     [_chatContextMenu setDelegate:nil];
     [_sendTextField setDelegate:nil];
@@ -2399,6 +2715,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsThemeCardView release];
     [_settingsSessionCardView release];
     [_settingsDrawerCardView release];
+    [_settingsResourceCardView release];
     [_settingsFilesCardView release];
     [_settingsHelpCardView release];
     [_aboutCardView release];
@@ -2414,6 +2731,28 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_topicBackButton release];
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
+    [_chatSearchButton release];
+    [_conversationSearchButton release];
+    [_searchPanelView release];
+    [_searchTextField release];
+    [_searchScopePopUpButton release];
+    [_searchFilterPopUpButton release];
+    [_searchCloseButton release];
+    [_searchStatusField release];
+    [_searchResultsScrollView release];
+    [_searchResultsTableView release];
+    [_searchResultItems release];
+    [_searchDebounceTimer invalidate];
+    [_searchDebounceTimer release];
+    [_globalSearchOffset release];
+    [_pinnedMessagePanelView release];
+    [_pinnedMessageLabelField release];
+    [_pinnedMessageTextField release];
+    [_pinnedMessageButton release];
+    [_pinnedMessageItem release];
+    [_highlightedSearchMessageID release];
+    [_searchHighlightTimer invalidate];
+    [_searchHighlightTimer release];
     [_sendLabel release];
     [_sendTextFieldBackgroundView release];
     [_sendTextField release];
@@ -2431,6 +2770,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_authTextField release];
     [_authSecureField release];
     [_authButton release];
+    [_busySpinner release];
     [_loginLogsButton release];
     [_loginLanguageButtons release];
     [_loginErrorLocalizationKey release];
@@ -2447,6 +2787,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_chatItemsBeforeTopicList release];
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
+    [_messageLoadingSpinner release];
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
     }
@@ -2478,6 +2819,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsLibraryField release];
     [_settingsStorageField release];
     [_settingsDrawerSectionField release];
+    [_settingsResourceSectionField release];
     [_settingsFilesSectionField release];
     [_settingsHelpSectionField release];
     [_settingsThemeLabel release];
@@ -2492,13 +2834,28 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsNotificationsWhenActiveButton release];
     [_settingsDrawerHiddenButton release];
     [_settingsTypingIndicatorsButton release];
+    [_settingsEconomyModeButton release];
+    [_settingsAutoDownloadPhotosButton release];
+    [_settingsAutoDownloadVideosButton release];
+    [_settingsAutoDownloadDocumentsButton release];
+    [_settingsAutoplayAnimatedStickersButton release];
+    [_settingsStopInactiveAnimationsButton release];
+    [_settingsMaxAutoDownloadLabel release];
+    [_settingsMaxAutoDownloadPopUpButton release];
+    [_settingsMaxAnimationsLabel release];
+    [_settingsMaxAnimationsPopUpButton release];
+    [_settingsMediaCacheLimitLabel release];
+    [_settingsMediaCacheLimitPopUpButton release];
+    [_settingsResourceHintField release];
     [_settingsActiveSessionsButton release];
     [_settingsActiveSessionsDetailField release];
     [_settingsLanguageLabel release];
     [_settingsLanguagePopUpButton release];
     [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
+    [_settingsStorageUsageButton release];
     [_settingsCheckUpdatesButton release];
+    [_storageUsageWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_aboutIconView release];
@@ -2578,8 +2935,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_photoSendCaptionField release];
     [_photoSendTitleField release];
     [_photoSendErrorField release];
+    [_photoSendMetaField release];
     [_photoSendSendButton release];
     [_pendingPhotoSendPath release];
+    [_pendingAttachmentDescriptor release];
+    [_pendingAttachmentTransferState release];
     [_pendingPhotoSendChatID release];
     [_pendingPhotoSendThreadID release];
     [_pendingPhotoSendTopicKind release];
@@ -2596,8 +2956,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_voicePreviewWindow release];
     [_voicePreviewTitleField release];
     [_voicePreviewPlayButton release];
+    [_voicePreviewStopButton release];
     [_voicePreviewProgressSlider release];
     [_voicePreviewTimeField release];
+    [_voicePreviewCancelButton release];
     [_voicePreviewSendButton release];
     [_voicePreviewErrorField release];
     [_voicePreviewTimer release];

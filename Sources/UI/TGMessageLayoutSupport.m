@@ -1,4 +1,5 @@
 #import "TGMessageLayoutSupport.h"
+#import "TGIconAssets.h"
 #import "TGTheme.h"
 #import "../Core/TGMessageItem.h"
 #import "../Media/TGMediaImageLoader.h"
@@ -366,14 +367,31 @@ void TGDrawMediaPlayBadge(NSRect rect, BOOL flipped) {
     [circle setLineWidth:1.0];
     [circle stroke];
 
-    NSRect triangleRect = NSInsetRect(badgeRect, 11.0, 9.0);
-    NSBezierPath *triangle = [NSBezierPath bezierPath];
-    [triangle moveToPoint:NSMakePoint(NSMinX(triangleRect), NSMinY(triangleRect))];
-    [triangle lineToPoint:NSMakePoint(NSMinX(triangleRect), NSMaxY(triangleRect))];
-    [triangle lineToPoint:NSMakePoint(NSMaxX(triangleRect), NSMidY(triangleRect))];
-    [triangle closePath];
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.92] set];
-    [triangle fill];
+    NSRect iconRect = NSInsetRect(badgeRect, 10.0, 10.0);
+    TGDrawTemplateIconAsset(@"play",
+                            iconRect,
+                            [NSColor colorWithCalibratedWhite:1.0 alpha:0.92],
+                            1.0,
+                            flipped);
+}
+
+static NSString *TGMediaFallbackIconNameForPlaceholder(NSString *placeholder) {
+    if ([placeholder isEqualToString:@"Photo"]) {
+        return @"image";
+    }
+    if ([placeholder isEqualToString:@"Sticker"]) {
+        return @"image";
+    }
+    if ([placeholder isEqualToString:@"GIF"]) {
+        return @"play";
+    }
+    if ([placeholder isEqualToString:@"Video"]) {
+        return @"youtube";
+    }
+    if ([placeholder isEqualToString:@"Document"]) {
+        return @"document";
+    }
+    return nil;
 }
 
 NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth) {
@@ -591,6 +609,19 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         [[NSColor colorWithCalibratedWhite:0.96 alpha:0.92] set];
         [mediaPath fill];
         NSString *fallbackText = TGMediaItemPlaceholder(mediaItem);
+        NSString *fallbackIconName = TGMediaFallbackIconNameForPlaceholder(fallbackText);
+        if ([fallbackIconName length] > 0) {
+            CGFloat iconSide = 34.0;
+            NSRect fallbackIconRect = NSMakeRect(NSMidX(rect) - floor(iconSide / 2.0),
+                                                 NSMidY(rect) - floor(iconSide / 2.0) - 7.0,
+                                                 iconSide,
+                                                 iconSide);
+            TGDrawTemplateIconAsset(fallbackIconName,
+                                    fallbackIconRect,
+                                    TGClassicMutedInkColor(),
+                                    0.86,
+                                    flipped);
+        }
         CGFloat fallbackFontSize = ([fallbackText length] <= 4) ? 34.0 : 13.0;
         NSMutableParagraphStyle *fallbackParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
         [fallbackParagraph setAlignment:NSCenterTextAlignment];
@@ -600,8 +631,9 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
                                             fallbackParagraph, NSParagraphStyleAttributeName,
                                             nil];
         NSSize fallbackSize = [fallbackText sizeWithAttributes:fallbackAttributes];
+        CGFloat fallbackTextCenterY = [fallbackIconName length] > 0 ? (NSMidY(rect) + 26.0) : NSMidY(rect);
         NSRect fallbackRect = NSMakeRect(NSMinX(rect) + 4.0,
-                                         NSMidY(rect) - ceil(fallbackSize.height / 2.0) - 1.0,
+                                         fallbackTextCenterY - ceil(fallbackSize.height / 2.0) - 1.0,
                                          NSWidth(rect) - 8.0,
                                          fallbackSize.height + 4.0);
         [fallbackText drawInRect:fallbackRect withAttributes:fallbackAttributes];
@@ -999,14 +1031,8 @@ void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, B
     [circle setLineWidth:1.0];
     [circle stroke];
 
-    NSRect triangleRect = NSInsetRect(playCircleRect, 11.0, 9.0);
-    NSBezierPath *triangle = [NSBezierPath bezierPath];
-    [triangle moveToPoint:NSMakePoint(NSMinX(triangleRect), NSMinY(triangleRect))];
-    [triangle lineToPoint:NSMakePoint(NSMinX(triangleRect), NSMaxY(triangleRect))];
-    [triangle lineToPoint:NSMakePoint(NSMaxX(triangleRect), NSMidY(triangleRect))];
-    [triangle closePath];
-    [TGClassicHeaderTextColor(0.96) set];
-    [triangle fill];
+    NSRect playIconRect = NSInsetRect(playCircleRect, 10.0, 10.0);
+    TGDrawTemplateIconAsset(@"play", playIconRect, TGClassicHeaderTextColor(0.96), 1.0, flipped);
 
     NSString *title = TGPlayableMediaTitleForMessageItem(item);
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:

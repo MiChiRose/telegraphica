@@ -43,6 +43,17 @@
 		111111111111111111111134 /* TGProfilePresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111264 /* TGProfilePresentation.m */; };
 		111111111111111111111135 /* TGUpdateSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111266 /* TGUpdateSupport.m */; };
 		111111111111111111111136 /* TGWebMAnimationView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111268 /* TGWebMAnimationView.mm */; };
+		111111111111111111111137 /* TGStorageUsageWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111270 /* TGStorageUsageWindowController.m */; };
+		111111111111111111111138 /* TGIconDrawing.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111272 /* TGIconDrawing.m */; };
+		111111111111111111111139 /* TGAnimationSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111274 /* TGAnimationSupport.m */; };
+		111111111111111111111140 /* TGIconAssets.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111276 /* TGIconAssets.m */; };
+		111111111111111111111141 /* Icons in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111277 /* Icons */; };
+		111111111111111111111142 /* TGSectionTitleField.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111279 /* TGSectionTitleField.m */; };
+		111111111111111111111143 /* TGResourcePolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111281 /* TGResourcePolicy.m */; };
+		111111111111111111111144 /* TGAttachmentDescriptor.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111283 /* TGAttachmentDescriptor.m */; };
+		111111111111111111111145 /* TGFileTransferState.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111285 /* TGFileTransferState.m */; };
+		111111111111111111111146 /* TGSearchResultItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111287 /* TGSearchResultItem.m */; };
+		111111111111111111111147 /* TGOpusVoiceTranscoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111289 /* TGOpusVoiceTranscoder.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -109,6 +120,27 @@
 		111111111111111111111266 /* TGUpdateSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGUpdateSupport.m; sourceTree = "<group>"; };
 		111111111111111111111267 /* TGWebMAnimationView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGWebMAnimationView.h; sourceTree = "<group>"; };
 		111111111111111111111268 /* TGWebMAnimationView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = TGWebMAnimationView.mm; sourceTree = "<group>"; };
+		111111111111111111111269 /* TGStorageUsageWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStorageUsageWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111270 /* TGStorageUsageWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStorageUsageWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111271 /* TGIconDrawing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGIconDrawing.h; sourceTree = "<group>"; };
+		111111111111111111111272 /* TGIconDrawing.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGIconDrawing.m; sourceTree = "<group>"; };
+		111111111111111111111273 /* TGAnimationSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGAnimationSupport.h; sourceTree = "<group>"; };
+		111111111111111111111274 /* TGAnimationSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAnimationSupport.m; sourceTree = "<group>"; };
+		111111111111111111111275 /* TGIconAssets.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGIconAssets.h; sourceTree = "<group>"; };
+		111111111111111111111276 /* TGIconAssets.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGIconAssets.m; sourceTree = "<group>"; };
+		111111111111111111111277 /* Icons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Icons; sourceTree = "<group>"; };
+		111111111111111111111278 /* TGSectionTitleField.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSectionTitleField.h; sourceTree = "<group>"; };
+		111111111111111111111279 /* TGSectionTitleField.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSectionTitleField.m; sourceTree = "<group>"; };
+		111111111111111111111280 /* TGResourcePolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGResourcePolicy.h; sourceTree = "<group>"; };
+		111111111111111111111281 /* TGResourcePolicy.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGResourcePolicy.m; sourceTree = "<group>"; };
+		111111111111111111111282 /* TGAttachmentDescriptor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGAttachmentDescriptor.h; sourceTree = "<group>"; };
+		111111111111111111111283 /* TGAttachmentDescriptor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAttachmentDescriptor.m; sourceTree = "<group>"; };
+		111111111111111111111284 /* TGFileTransferState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGFileTransferState.h; sourceTree = "<group>"; };
+		111111111111111111111285 /* TGFileTransferState.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGFileTransferState.m; sourceTree = "<group>"; };
+		111111111111111111111286 /* TGSearchResultItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSearchResultItem.h; sourceTree = "<group>"; };
+		111111111111111111111287 /* TGSearchResultItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSearchResultItem.m; sourceTree = "<group>"; };
+		111111111111111111111288 /* TGOpusVoiceTranscoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGOpusVoiceTranscoder.h; sourceTree = "<group>"; };
+		111111111111111111111289 /* TGOpusVoiceTranscoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGOpusVoiceTranscoder.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -181,6 +213,8 @@
 				111111111111111111111213 /* TGChatItem.m */,
 				111111111111111111111214 /* TGMessageItem.h */,
 				111111111111111111111215 /* TGMessageItem.m */,
+				111111111111111111111286 /* TGSearchResultItem.h */,
+				111111111111111111111287 /* TGSearchResultItem.m */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -192,6 +226,8 @@
 				111111111111111111111207 /* TGKeychainHelper.m */,
 				111111111111111111111208 /* TGLogger.h */,
 				111111111111111111111209 /* TGLogger.m */,
+				111111111111111111111280 /* TGResourcePolicy.h */,
+				111111111111111111111281 /* TGResourcePolicy.m */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -201,6 +237,14 @@
 			children = (
 				111111111111111111111235 /* TGTheme.h */,
 				111111111111111111111236 /* TGTheme.m */,
+				111111111111111111111273 /* TGAnimationSupport.h */,
+				111111111111111111111274 /* TGAnimationSupport.m */,
+				111111111111111111111275 /* TGIconAssets.h */,
+				111111111111111111111276 /* TGIconAssets.m */,
+				111111111111111111111278 /* TGSectionTitleField.h */,
+				111111111111111111111279 /* TGSectionTitleField.m */,
+				111111111111111111111271 /* TGIconDrawing.h */,
+				111111111111111111111272 /* TGIconDrawing.m */,
 				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
 				111111111111111111111217 /* TGActiveSessionsPresentation.m */,
 				111111111111111111111245 /* TGMessageActionDialogs.h */,
@@ -221,6 +265,8 @@
 				111111111111111111111264 /* TGProfilePresentation.m */,
 				111111111111111111111265 /* TGUpdateSupport.h */,
 				111111111111111111111266 /* TGUpdateSupport.m */,
+				111111111111111111111269 /* TGStorageUsageWindowController.h */,
+				111111111111111111111270 /* TGStorageUsageWindowController.m */,
 				111111111111111111111253 /* TGStatusViewCells.h */,
 				111111111111111111111254 /* TGStatusViewCells.m */,
 				111111111111111111111255 /* TGStatusSupport.h */,
@@ -246,6 +292,12 @@
 				111111111111111111111268 /* TGWebMAnimationView.mm */,
 				111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */,
 				111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */,
+				111111111111111111111282 /* TGAttachmentDescriptor.h */,
+				111111111111111111111283 /* TGAttachmentDescriptor.m */,
+				111111111111111111111284 /* TGFileTransferState.h */,
+				111111111111111111111285 /* TGFileTransferState.m */,
+				111111111111111111111288 /* TGOpusVoiceTranscoder.h */,
+				111111111111111111111289 /* TGOpusVoiceTranscoder.m */,
 				111111111111111111111225 /* TGWebPDecoder.h */,
 				111111111111111111111226 /* TGWebPDecoder.m */,
 				111111111111111111111227 /* TGMediaImageLoader.h */,
@@ -260,6 +312,7 @@
 				111111111111111111111220 /* Localizable.strings */,
 				111111111111111111111223 /* TelegraphicaAppIcon.icns */,
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
+				111111111111111111111277 /* Icons */,
 				111111111111111111111229 /* ThirdPartyNotices.txt */,
 			);
 			path = Resources;
@@ -320,6 +373,7 @@
 				111111111111111111111107 /* Localizable.strings in Resources */,
 				111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */,
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
+				111111111111111111111141 /* Icons in Resources */,
 				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -360,6 +414,16 @@
 				111111111111111111111134 /* TGProfilePresentation.m in Sources */,
 				111111111111111111111135 /* TGUpdateSupport.m in Sources */,
 				111111111111111111111136 /* TGWebMAnimationView.mm in Sources */,
+				111111111111111111111137 /* TGStorageUsageWindowController.m in Sources */,
+				111111111111111111111138 /* TGIconDrawing.m in Sources */,
+				111111111111111111111139 /* TGAnimationSupport.m in Sources */,
+				111111111111111111111140 /* TGIconAssets.m in Sources */,
+				111111111111111111111142 /* TGSectionTitleField.m in Sources */,
+				111111111111111111111143 /* TGResourcePolicy.m in Sources */,
+				111111111111111111111144 /* TGAttachmentDescriptor.m in Sources */,
+				111111111111111111111145 /* TGFileTransferState.m in Sources */,
+				111111111111111111111146 /* TGSearchResultItem.m in Sources */,
+				111111111111111111111147 /* TGOpusVoiceTranscoder.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

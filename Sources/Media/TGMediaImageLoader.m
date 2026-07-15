@@ -8,6 +8,7 @@ static NSCache *TGMediaImageCache(void) {
         if (!cache) {
             cache = [[NSCache alloc] init];
             [cache setCountLimit:160];
+            [cache setTotalCostLimit:(64 * 1024 * 1024)];
         }
     }
     return cache;
@@ -20,9 +21,21 @@ static NSImage *TGMediaCachedImage(NSString *path) {
 
 static NSImage *TGMediaCacheImage(NSImage *image, NSString *path) {
     if (image && [path length] > 0) {
-        [TGMediaImageCache() setObject:image forKey:path];
+        NSSize imageSize = [image size];
+        NSUInteger cost = 1;
+        if (imageSize.width > 0.0 && imageSize.height > 0.0) {
+            cost = (NSUInteger)MAX(1.0, imageSize.width * imageSize.height * 4.0);
+        }
+        [TGMediaImageCache() setObject:image forKey:path cost:cost];
     }
     return image;
+}
+
+void TGMediaImageLoaderSetCacheLimitBytes(NSUInteger bytes) {
+    NSCache *cache = TGMediaImageCache();
+    NSUInteger limit = bytes > 0 ? bytes : (64 * 1024 * 1024);
+    [cache setTotalCostLimit:limit];
+    [cache setCountLimit:(limit < (128 * 1024 * 1024)) ? 80 : 160];
 }
 
 NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {

@@ -248,10 +248,65 @@
                                             duration:[self currentMediaPlaybackDuration]];
 }
 
-- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {
+static BOOL TGMediaPlaybackPathLooksUnsupportedOnMavericks(NSString *path, BOOL audioOnly) {
+    if (!audioOnly) {
+        return NO;
+    }
+    NSString *extension = [[path pathExtension] lowercaseString];
+    return ([extension isEqualToString:@"ogg"] ||
+            [extension isEqualToString:@"oga"] ||
+            [extension isEqualToString:@"opus"]);
+}
+
+static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, BOOL audioOnly) {
+    if (!audioOnly) {
+        return NO;
+    }
+    NSString *mime = [mimeType isKindOfClass:[NSString class]] ? [mimeType lowercaseString] : @"";
+    return ([mime rangeOfString:@"ogg"].location != NSNotFound ||
+            [mime rangeOfString:@"opus"].location != NSNotFound);
+}
+
+- (BOOL)showUnsupportedMavericksVoicePlaybackForPath:(NSString *)path mimeType:(NSString *)mimeType {
+    NSString *message = @"This voice message uses Ogg/Opus. OS X 10.9 AVFoundation cannot decode it without a bundled Opus decoder.";
+    [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: unsupported audio file=%@ mime=%@ reason=%@",
+                                  [path length] > 0 ? [path lastPathComponent] : @"unknown",
+                                  [mimeType length] > 0 ? mimeType : @"unknown",
+                                  message]];
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:@"Voice message cannot be played yet"];
+    [alert setInformativeText:message];
+    [alert addButtonWithTitle:@"OK"];
+    [alert runModal];
+    return NO;
+}
+
+- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly mimeType:(NSString *)mimeType {
     if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
         [self appendDetail:@"Playable media file is not available yet."];
         return NO;
+    }
+    NSString *playablePath = path;
+    NSError *transcodeError = nil;
+    if (TGVoicePathLooksLikeOggOpus(path, mimeType, audioOnly)) {
+        [self.statusField setStringValue:@"Preparing voice..."];
+        playablePath = TGPlayableVoicePathByTranscodingIfNeeded(path, mimeType, audioOnly, &transcodeError);
+        if ([playablePath length] == 0) {
+            NSString *message = [transcodeError localizedDescription];
+            if ([message length] == 0) {
+                message = @"This voice message uses Ogg/Opus and could not be decoded.";
+            }
+            [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: Opus transcode failed file=%@ mime=%@ reason=%@",
+                                          [path lastPathComponent],
+                                          [mimeType length] > 0 ? mimeType : @"unknown",
+                                          message]];
+            return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
+        }
+    } else if (TGMediaPlaybackPathLooksUnsupportedOnMavericks(path, audioOnly) ||
+               TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
+        return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
     }
 
     [self ensureMediaPlaybackWindow];
@@ -259,7 +314,7 @@
     [self layoutMediaPlaybackWindowForAudioOnly:audioOnly title:title];
     self.mediaPlaybackKnownDuration = ([duration respondsToSelector:@selector(doubleValue)] && [duration doubleValue] > 0.0) ? [duration doubleValue] : 0.0;
 
-    NSURL *url = [NSURL fileURLWithPath:path];
+    NSURL *url = [NSURL fileURLWithPath:playablePath];
     AVPlayer *player = [[[AVPlayer alloc] initWithURL:url] autorelease];
     if (!player) {
         [self appendDetail:@"Could not create media player."];
@@ -286,6 +341,10 @@
         [self startMediaPlaybackTimer];
     }
     return YES;
+}
+
+- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {
+    return [self openPlayableMediaAtPath:path title:title duration:duration audioOnly:audioOnly mimeType:nil];
 }
 
 - (NSString *)titleForMediaItem:(NSDictionary *)mediaItem {
@@ -330,7 +389,8 @@
         [self openPlayableMediaAtPath:path
                                 title:[self titleForMediaItem:mediaItem]
                              duration:[mediaItem objectForKey:@"duration"]
-                            audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)];
+                            audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)
+                              mimeType:[mediaItem objectForKey:@"mime_type"]];
         return;
     }
 
@@ -356,7 +416,8 @@
                 [self openPlayableMediaAtPath:downloadedPath
                                         title:titleCopy
                                      duration:[mediaItem objectForKey:@"duration"]
-                                    audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)];
+                                    audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)
+                                      mimeType:[mediaItem objectForKey:@"mime_type"]];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {
@@ -386,7 +447,8 @@
         [self openPlayableMediaAtPath:path
                                 title:TGPlayableMediaTitleForMessageItem(item)
                              duration:[item mediaDuration]
-                            audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)];
+                            audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)
+                              mimeType:[item mediaMimeType]];
         return;
     }
 
@@ -412,7 +474,8 @@
                 [self openPlayableMediaAtPath:downloadedPath
                                         title:titleCopy
                                      duration:[item mediaDuration]
-                                    audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)];
+                                    audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)
+                                      mimeType:[item mediaMimeType]];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {
@@ -710,4 +773,3 @@
         [pool drain];
     });
 }
-
