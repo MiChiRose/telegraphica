@@ -29,6 +29,16 @@
     [contentView addSubview:imageView];
     self.photoSendPreviewImageView = imageView;
 
+    NSTextField *metaField = [self labelWithFrame:NSMakeRect(44, 108, 432, 16)
+                                             text:@""
+                                             font:[NSFont systemFontOfSize:11.0]];
+    [self applyMutedLabelStyle:metaField];
+    [metaField setAlignment:NSCenterTextAlignment];
+    [[metaField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
+    [metaField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:metaField];
+    self.photoSendMetaField = metaField;
+
     TGComposerInputBackgroundView *captionBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(44, 76, 432, 30)] autorelease];
     [captionBackground setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:captionBackground];
@@ -71,37 +81,58 @@
     self.photoSendPreviewWindow = window;
 }
 
-- (void)presentPhotoSendPreviewForPath:(NSString *)path {
+- (NSImage *)previewImageForAttachmentDescriptor:(TGAttachmentDescriptor *)descriptor {
+    if (descriptor.kind == TGAttachmentKindPhoto) {
+        NSImage *image = TGImageWithCorrectOrientationFromFile(descriptor.path);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:descriptor.path] autorelease];
+        }
+        if (image) {
+            return image;
+        }
+    }
+
+    NSImage *icon = [[NSWorkspace sharedWorkspace] iconForFile:descriptor.path];
+    [icon setSize:NSMakeSize(128.0, 128.0)];
+    return icon;
+}
+
+- (void)presentAttachmentPreviewForDescriptor:(TGAttachmentDescriptor *)descriptor {
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
-        [self appendDetail:@"Select a chat after sign-in is ready before sending a photo."];
+        [self appendDetail:@"Select a chat after sign-in is ready before sending a file."];
         return;
     }
     if (self.controlsBusy) {
-        [self appendDetail:@"Wait for the current Telegram operation to finish before sending a photo."];
+        [self appendDetail:@"Wait for the current Telegram operation to finish before sending a file."];
         return;
     }
-    if (!TGIsSupportedPhotoPath(path)) {
-        [self appendDetail:@"Photo send supports local JPG, PNG, and TIFF files."];
+    if (![descriptor isKindOfClass:[TGAttachmentDescriptor class]] || ![descriptor isSupported]) {
+        [self appendDetail:([descriptor.errorMessage length] > 0 ? descriptor.errorMessage : @"This file is not supported.")];
         return;
     }
-
-    NSString *standardPath = [path stringByStandardizingPath];
-    NSImage *image = TGImageWithCorrectOrientationFromFile(standardPath);
-    if (!image) {
-        image = [[[NSImage alloc] initWithContentsOfFile:standardPath] autorelease];
-    }
-    if (!image) {
-        [self appendDetail:@"Could not load the selected photo preview."];
-        return;
+    if ([descriptor isLarge]) {
+        NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+        [alert setMessageText:@"Send large file?"];
+        [alert setInformativeText:[NSString stringWithFormat:@"%@ is %@. Sending may take a while.", descriptor.fileName, [descriptor readableSize]]];
+        [alert addButtonWithTitle:TGLoc(@"send")];
+        [alert addButtonWithTitle:TGLoc(@"cancel")];
+        if ([alert runModal] != NSAlertFirstButtonReturn) {
+            return;
+        }
     }
 
     [self ensurePhotoSendPreviewWindow];
-    self.pendingPhotoSendPath = standardPath;
+    self.pendingAttachmentDescriptor = descriptor;
+    self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStatePreparing progressKnown:NO progress:0.0 message:@"Ready to send"];
+    self.pendingPhotoSendPath = descriptor.path;
     self.pendingPhotoSendChatID = self.selectedChatID;
     self.pendingPhotoSendThreadID = self.selectedMessageThreadID;
     self.pendingPhotoSendTopicKind = self.selectedMessageTopicKind;
-    [self.photoSendPreviewImageView setImage:image];
+    [self.photoSendPreviewWindow setTitle:[NSString stringWithFormat:@"Send %@", [descriptor.typeLabel lowercaseString]]];
+    [self.photoSendTitleField setStringValue:@"1 media"];
+    [self.photoSendPreviewImageView setImage:[self previewImageForAttachmentDescriptor:descriptor]];
+    [self.photoSendMetaField setStringValue:[descriptor summary]];
     [self.photoSendCaptionField setStringValue:@""];
     [[self.photoSendCaptionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
     [self.photoSendErrorField setStringValue:@""];
@@ -113,9 +144,29 @@
     [[self.photoSendPreviewWindow contentView] setNeedsDisplay:YES];
 }
 
+- (void)presentPhotoSendPreviewForPath:(NSString *)path {
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
+        [self appendDetail:@"Select a chat after sign-in is ready before sending a photo."];
+        return;
+    }
+    if (self.controlsBusy) {
+        [self appendDetail:@"Wait for the current Telegram operation to finish before sending a photo."];
+        return;
+    }
+    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:path];
+    if (descriptor.kind != TGAttachmentKindPhoto) {
+        [self appendDetail:@"Photo send supports local JPG, PNG, TIFF, GIF, and WebP files."];
+        return;
+    }
+    [self presentAttachmentPreviewForDescriptor:descriptor];
+}
+
 - (void)cancelPendingPhotoSend:(id)sender {
     (void)sender;
     self.pendingPhotoSendPath = nil;
+    self.pendingAttachmentDescriptor = nil;
+    self.pendingAttachmentTransferState = nil;
     self.pendingPhotoSendChatID = nil;
     self.pendingPhotoSendThreadID = nil;
     self.pendingPhotoSendTopicKind = nil;
@@ -238,6 +289,115 @@
     [chatID release];
 }
 
+- (void)submitAttachmentDescriptor:(TGAttachmentDescriptor *)descriptor caption:(NSString *)caption chatID:(NSNumber *)targetChatID messageThreadID:(NSNumber *)targetThreadID messageTopicKind:(NSString *)targetTopicKind {
+    if (![descriptor isKindOfClass:[TGAttachmentDescriptor class]] || ![targetChatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (descriptor.kind == TGAttachmentKindPhoto) {
+        [self submitPhotoAtPath:descriptor.path caption:caption chatID:targetChatID messageThreadID:targetThreadID messageTopicKind:targetTopicKind];
+        return;
+    }
+
+    TGAttachmentDescriptor *descriptorCopy = [descriptor retain];
+    NSNumber *chatID = [targetChatID retain];
+    NSNumber *messageThreadID = [targetThreadID retain];
+    NSString *messageTopicKind = [targetTopicKind copy];
+    NSString *safeCaption = [caption isKindOfClass:[NSString class]] ? caption : @"";
+    NSString *attachmentCaption = [safeCaption copy];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:[NSString stringWithFormat:@"Sending %@...", [descriptorCopy.typeLabel lowercaseString]]];
+    self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSending progressKnown:NO progress:0.0 message:@"Sending"];
+    [self appendDetail:[NSString stringWithFormat:@"Submitting %@ to TDLib: %@", [descriptorCopy.typeLabel lowercaseString], descriptorCopy.fileName]];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSString *summary = nil;
+        if (descriptorCopy.kind == TGAttachmentKindVideo) {
+            summary = [[client sendVideoMessageToChatID:chatID
+                                        messageThreadID:messageThreadID
+                                       messageTopicKind:messageTopicKind
+                                              localPath:descriptorCopy.path
+                                                caption:attachmentCaption
+                                                timeout:24.0
+                                                  error:&sendError] copy];
+        } else if (descriptorCopy.kind == TGAttachmentKindAudio) {
+            summary = [[client sendAudioMessageToChatID:chatID
+                                        messageThreadID:messageThreadID
+                                       messageTopicKind:messageTopicKind
+                                              localPath:descriptorCopy.path
+                                                caption:attachmentCaption
+                                                timeout:24.0
+                                                  error:&sendError] copy];
+        } else {
+            summary = [[client sendDocumentMessageToChatID:chatID
+                                           messageThreadID:messageThreadID
+                                          messageTopicKind:messageTopicKind
+                                                 localPath:descriptorCopy.path
+                                                   caption:attachmentCaption
+                                                   timeout:24.0
+                                                     error:&sendError] copy];
+        }
+        NSString *errorMessage = [[sendError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadID) ||
+                               (self.selectedMessageThreadID && messageThreadID && [self.selectedMessageThreadID longLongValue] == [messageThreadID longLongValue]));
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKind) ||
+                                  (self.selectedMessageTopicKind && messageTopicKind && [self.selectedMessageTopicKind isEqualToString:messageTopicKind]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
+            if ([summary length] > 0) {
+                self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSucceeded progressKnown:NO progress:1.0 message:@"Sent"];
+                [self.statusField setStringValue:@"File sent"];
+                [self appendDetail:@"TDLib send: file message accepted by TDLib."];
+                self.pendingPhotoSendPath = nil;
+                self.pendingAttachmentDescriptor = nil;
+                self.pendingAttachmentTransferState = nil;
+                self.pendingPhotoSendChatID = nil;
+                self.pendingPhotoSendThreadID = nil;
+                self.pendingPhotoSendTopicKind = nil;
+                [self.photoSendPreviewWindow orderOut:nil];
+                [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                [self.photoSendSendButton setEnabled:YES];
+                [self.photoSendErrorField setStringValue:@""];
+                [self.photoSendErrorField setHidden:YES];
+                if (selectionStillCurrent) {
+                    self.forceMessageScrollToNewest = YES;
+                    self.pendingLiveChatRefresh = YES;
+                    self.pendingLiveMessageRefresh = YES;
+                    [self handlePendingLiveRefreshesIfPossible];
+                    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                             selector:@selector(refreshSelectedMessagesAfterMediaSend)
+                                                               object:nil];
+                    [self performSelector:@selector(refreshSelectedMessagesAfterMediaSend) withObject:nil afterDelay:1.25];
+                }
+            } else {
+                NSString *message = ([errorMessage length] > 0) ? errorMessage : @"File send was not confirmed.";
+                self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateFailed progressKnown:NO progress:0.0 message:message];
+                [self.statusField setStringValue:@"File send failed"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@", message]];
+                if (self.photoSendPreviewWindow && [self.photoSendPreviewWindow isVisible]) {
+                    [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                    [self.photoSendSendButton setEnabled:YES];
+                    [self.photoSendErrorField setStringValue:message];
+                    [self.photoSendErrorField setHidden:NO];
+                }
+            }
+            [self setControlsBusy:NO];
+            [self requestComposerRefocus];
+            [summary release];
+            [errorMessage release];
+            [descriptorCopy release];
+            [chatID release];
+            [messageThreadID release];
+            [messageTopicKind release];
+            [attachmentCaption release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)sendPendingPhotoPreview:(id)sender {
     (void)sender;
     NSString *path = [self.pendingPhotoSendPath copy];
@@ -245,21 +405,28 @@
     NSNumber *chatID = [self.pendingPhotoSendChatID retain];
     NSNumber *threadID = [self.pendingPhotoSendThreadID retain];
     NSString *topicKind = [self.pendingPhotoSendTopicKind copy];
-    if (![path length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
-        [self.photoSendErrorField setStringValue:@"Photo target is no longer available."];
+    TGAttachmentDescriptor *descriptor = [self.pendingAttachmentDescriptor retain];
+    NSString *effectivePath = [path length] > 0 ? path : [descriptor path];
+    if (![effectivePath length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        [self.photoSendErrorField setStringValue:@"Attachment target is no longer available."];
         [self.photoSendErrorField setHidden:NO];
     } else {
         [self.photoSendErrorField setStringValue:@""];
         [self.photoSendErrorField setHidden:YES];
         [self.photoSendSendButton setTitle:TGLoc(@"sending")];
         [self.photoSendSendButton setEnabled:NO];
-        [self submitPhotoAtPath:path caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+        if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+            [self submitAttachmentDescriptor:descriptor caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+        } else {
+            [self submitPhotoAtPath:effectivePath caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+        }
     }
     [path release];
     [caption release];
     [chatID release];
     [threadID release];
     [topicKind release];
+    [descriptor release];
 }
 
 - (void)ensureStickerPickerWindow {
@@ -659,13 +826,24 @@
     [contentView addSubview:titleField];
     self.voicePreviewTitleField = titleField;
 
-    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 58, 72, 28)] autorelease];
+    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 48, 48, 48)] autorelease];
     [playButton setTitle:@"Play"];
+    [playButton setCell:[[[TGMediaPlaybackButtonCell alloc] initTextCell:@"Play"] autorelease]];
+    [playButton setBordered:NO];
+    [playButton setFocusRingType:NSFocusRingTypeNone];
     [playButton setTarget:self];
     [playButton setAction:@selector(toggleVoicePreviewPlayback:)];
-    [self applySkeuomorphicButtonStyle:playButton isPrimary:NO];
     [contentView addSubview:playButton];
     self.voicePreviewPlayButton = playButton;
+
+    NSButton *stopButton = [[[NSButton alloc] initWithFrame:NSMakeRect(144, 54, 92, 30)] autorelease];
+    [stopButton setTitle:@"Stop"];
+    [stopButton setTarget:self];
+    [stopButton setAction:@selector(toggleVoiceRecording:)];
+    [self applySkeuomorphicButtonStyle:stopButton isPrimary:YES];
+    [stopButton setHidden:YES];
+    [contentView addSubview:stopButton];
+    self.voicePreviewStopButton = stopButton;
 
     NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(104, 61, 164, 22)] autorelease];
     [progressSlider setMinValue:0.0];
@@ -691,6 +869,7 @@
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelVoicePreview:)];
     [contentView addSubview:cancelButton];
+    self.voicePreviewCancelButton = cancelButton;
 
     NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(266, 20, 92, 28)] autorelease];
     [sendButton setTitle:TGLoc(@"send")];
@@ -711,6 +890,43 @@
     self.voicePreviewErrorField = errorField;
 
     self.voicePreviewWindow = window;
+}
+
+- (void)configureVoicePreviewWindowForRecording {
+    [self ensureVoicePreviewWindow];
+    [self.voicePreviewTitleField setStringValue:TGLoc(@"voice.recording")];
+    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [self.voicePreviewErrorField setStringValue:@"Press Stop when you finish recording."];
+    [self.voicePreviewErrorField setHidden:NO];
+    [self.voicePreviewPlayButton setHidden:YES];
+    [self.voicePreviewProgressSlider setHidden:YES];
+    [self.voicePreviewTimeField setHidden:YES];
+    [self.voicePreviewCancelButton setHidden:YES];
+    [self.voicePreviewSendButton setHidden:YES];
+    [self.voicePreviewStopButton setHidden:NO];
+    [self.voicePreviewStopButton setEnabled:YES];
+    [self.voicePreviewWindow center];
+    [self.voicePreviewWindow makeKeyAndOrderFront:nil];
+}
+
+- (void)configureVoicePreviewWindowForReadyDuration:(NSTimeInterval)duration {
+    [self ensureVoicePreviewWindow];
+    [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
+    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedWhite:0.08 alpha:1.0]];
+    [self.voicePreviewPlayButton setTitle:@"Play"];
+    [self.voicePreviewPlayButton setHidden:NO];
+    [self.voicePreviewStopButton setHidden:YES];
+    [self.voicePreviewProgressSlider setHidden:NO];
+    [self.voicePreviewTimeField setHidden:NO];
+    [self.voicePreviewCancelButton setHidden:NO];
+    [self.voicePreviewSendButton setHidden:NO];
+    [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
+    [self.voicePreviewSendButton setEnabled:YES];
+    [self.voicePreviewErrorField setStringValue:@""];
+    [self.voicePreviewErrorField setHidden:YES];
+    [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:duration];
+    [self.voicePreviewWindow center];
+    [self.voicePreviewWindow makeKeyAndOrderFront:nil];
 }
 
 - (BOOL)ensureMicrophoneConsent {
@@ -746,18 +962,9 @@
         [self.statusField setStringValue:@"Voice recorded"];
         [self.voiceRecordingIndicatorField setStringValue:@""];
         [self.voiceRecordingIndicatorField setHidden:YES];
-        [self ensureVoicePreviewWindow];
         NSTimeInterval duration = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
         self.voicePreviewPlayer = nil;
-        [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
-        [self.voicePreviewPlayButton setTitle:@"Play"];
-        [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
-        [self.voicePreviewSendButton setEnabled:YES];
-        [self.voicePreviewErrorField setStringValue:@""];
-        [self.voicePreviewErrorField setHidden:YES];
-        [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:duration];
-        [self.voicePreviewWindow center];
-        [self.voicePreviewWindow makeKeyAndOrderFront:nil];
+        [self configureVoicePreviewWindowForReadyDuration:duration];
         [self layoutContentView];
         [self updateVisibleSection];
         return;
@@ -794,10 +1001,10 @@
     self.voiceRecordingStartDate = [NSDate date];
     self.voiceRecorder = recorder;
     [self.statusField setStringValue:TGLoc(@"voice.recording")];
-    [self.voiceRecordingIndicatorField setStringValue:[NSString stringWithFormat:@"%@ %@", TGLoc(@"voice.recording"), TGLoc(@"voice.stopHint")]];
-    [self.voiceRecordingIndicatorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
-    [self.voiceRecordingIndicatorField setHidden:NO];
+    [self.voiceRecordingIndicatorField setStringValue:@""];
+    [self.voiceRecordingIndicatorField setHidden:YES];
     [self.voiceRecordButton setToolTip:TGLoc(@"voice.stopHint")];
+    [self configureVoicePreviewWindowForRecording];
     [self layoutContentView];
     [self updateVisibleSection];
 }
@@ -947,7 +1154,7 @@
     [panel setCanChooseFiles:YES];
     [panel setCanChooseDirectories:NO];
     [panel setAllowsMultipleSelection:NO];
-    [panel setAllowedFileTypes:[NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", nil]];
+    [panel setAllowedFileTypes:[TGAttachmentDescriptor supportedOpenPanelTypes]];
     NSInteger result = [panel runModal];
     if (result != NSOKButton) {
         [self requestComposerRefocus];
@@ -959,8 +1166,8 @@
         return;
     }
     NSURL *url = [urls objectAtIndex:0];
-    NSString *photoPath = [url path];
-    [self sendPhotoAtPath:photoPath];
+    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:[url path]];
+    [self presentAttachmentPreviewForDescriptor:descriptor];
 }
 
 - (void)sendMessage:(id)sender {

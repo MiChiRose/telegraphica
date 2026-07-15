@@ -157,6 +157,20 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     if ([self isVoiceNoteMessage] || [self isVideoNoteMessage]) {
         return YES;
     }
+    if ([self isDocumentMessage]) {
+        NSString *mimeType = [[self mediaMimeType] lowercaseString];
+        if ([mimeType hasPrefix:@"audio/"] || [mimeType hasPrefix:@"video/"]) {
+            return YES;
+        }
+        NSString *extension = [[[self downloadFileName] pathExtension] lowercaseString];
+        if ([extension length] == 0) {
+            extension = [[[self mediaLocalPath] pathExtension] lowercaseString];
+        }
+        NSArray *playableExtensions = [NSArray arrayWithObjects:
+                                       @"mp3", @"m4a", @"aac", @"ogg", @"oga", @"opus",
+                                       @"mp4", @"mov", @"m4v", nil];
+        return ([extension length] > 0 && [playableExtensions containsObject:extension]);
+    }
     return ([self.contentType isEqualToString:@"messageAudio"] ||
             [self.contentType isEqualToString:@"messageVideo"] ||
             [self.contentType isEqualToString:@"messageAnimation"]);

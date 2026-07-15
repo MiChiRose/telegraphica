@@ -4,7 +4,7 @@
 #import "../Media/TGMediaItemSupport.h"
 
 NSRect TGStickerPickerContentRectForButtonFrame(NSRect buttonFrame) {
-    return NSInsetRect(NSInsetRect(buttonFrame, 1.0, 1.0), 6.0, 6.0);
+    return NSInsetRect(NSInsetRect(buttonFrame, 1.0, 1.0), 5.0, 5.0);
 }
 
 NSButton *TGStickerPickerButtonWithFrame(NSRect frame, NSDictionary *item, NSInteger index, id target, SEL action) {

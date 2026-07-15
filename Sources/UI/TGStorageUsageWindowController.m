@@ -2,6 +2,8 @@
 
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
+#import "TGIconAssets.h"
+#import "TGIconDrawing.h"
 #import "TGLocalization.h"
 #import "TGTheme.h"
 #include <math.h>
@@ -86,7 +88,6 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @implementation TGStorageRefreshButtonCell
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    (void)controlView;
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
     CGFloat alpha = enabled ? 1.0 : 0.48;
@@ -101,25 +102,15 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSPoint center = NSMakePoint(NSMidX(cellFrame), NSMidY(cellFrame));
-    CGFloat radius = 7.0;
-    NSBezierPath *arc = [NSBezierPath bezierPath];
-    [arc appendBezierPathWithArcWithCenter:center radius:radius startAngle:35.0 endAngle:315.0 clockwise:NO];
-    [arc setLineWidth:2.0];
-    [arc setLineCapStyle:NSRoundLineCapStyle];
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.92 * alpha] set];
-    [arc stroke];
-
-    NSPoint arrowPoint = NSMakePoint(center.x + 5.6, center.y - 4.2);
-    NSBezierPath *arrow = [NSBezierPath bezierPath];
-    [arrow moveToPoint:arrowPoint];
-    [arrow lineToPoint:NSMakePoint(arrowPoint.x - 1.2, arrowPoint.y - 5.0)];
-    [arrow moveToPoint:arrowPoint];
-    [arrow lineToPoint:NSMakePoint(arrowPoint.x + 4.2, arrowPoint.y - 2.0)];
-    [arrow setLineWidth:2.0];
-    [arrow setLineCapStyle:NSRoundLineCapStyle];
-    [arrow setLineJoinStyle:NSRoundLineJoinStyle];
-    [arrow stroke];
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
+                                 NSMidY(buttonRect) - 9.0,
+                                 18.0,
+                                 18.0);
+    TGDrawTemplateIconAsset(@"refresh",
+                            iconRect,
+                            [NSColor colorWithCalibratedWhite:1.0 alpha:0.92 * alpha],
+                            1.0,
+                            [controlView isFlipped]);
 }
 
 @end

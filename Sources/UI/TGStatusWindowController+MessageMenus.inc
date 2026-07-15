@@ -82,6 +82,24 @@
                              nil];
     [menuItem setRepresentedObject:payload];
     [menuItem setTarget:self];
+    [menuItem setImage:TGTemplateIconAssetImage(@"sound-off", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
+    return menuItem;
+}
+
+- (NSMenuItem *)chatCurrentMuteStateMenuItemForChatItem:(TGChatItem *)item {
+    NSString *title = @"Notifications are on";
+    NSNumber *chatID = [self notificationChatIDForChatItem:item];
+    if ([self isChatIDLocallyMuted:chatID]) {
+        title = @"Notifications are muted locally";
+    } else if ([item serverNotificationsMuted]) {
+        title = @"Muted in Telegram";
+    }
+    NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""] autorelease];
+    [menuItem setEnabled:NO];
+    [menuItem setImage:TGTemplateIconAssetImage(([self isChatIDLocallyMuted:chatID] || [item serverNotificationsMuted]) ? @"sound-off" : @"bell",
+                                                NSMakeSize(16.0, 16.0),
+                                                [NSColor blackColor],
+                                                0.72)];
     return menuItem;
 }
 
@@ -246,6 +264,7 @@
     [markReadItem setRepresentedObject:item];
     [markReadItem setTarget:self];
     [markReadItem setEnabled:([[item unreadCount] respondsToSelector:@selector(integerValue)] && [[item unreadCount] integerValue] > 0)];
+    [markReadItem setImage:TGTemplateIconAssetImage(@"bell", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
     [menu addItem:markReadItem];
 
     NSMenuItem *pinItem = [[[NSMenuItem alloc] initWithTitle:([item isPinned] ? TGLoc(@"chat.unpin") : TGLoc(@"chat.pin"))
@@ -257,11 +276,7 @@
     [menu addItem:pinItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    if ([item serverNotificationsMuted]) {
-        NSMenuItem *serverMutedItem = [[[NSMenuItem alloc] initWithTitle:@"Muted in Telegram" action:nil keyEquivalent:@""] autorelease];
-        [serverMutedItem setEnabled:NO];
-        [menu addItem:serverMutedItem];
-    }
+    [menu addItem:[self chatCurrentMuteStateMenuItemForChatItem:item]];
 
     if ([self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]) {
         NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:@"Enable local notifications"
@@ -269,18 +284,19 @@
                                                       keyEquivalent:@""] autorelease];
         [unmuteItem setRepresentedObject:item];
         [unmuteItem setTarget:self];
+        [unmuteItem setImage:TGTemplateIconAssetImage(@"bell", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
         [menu addItem:unmuteItem];
     }
 
     NSMenu *muteMenu = [[[NSMenu alloc] initWithTitle:@"Mute notifications"] autorelease];
     [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 hour" duration:(60.0 * 60.0) chatItem:item]];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 8 hours" duration:(8.0 * 60.0 * 60.0) chatItem:item]];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 3 days" duration:(3.0 * 24.0 * 60.0 * 60.0) chatItem:item]];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 day" duration:(24.0 * 60.0 * 60.0) chatItem:item]];
     [muteMenu addItem:[NSMenuItem separatorItem]];
     [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"Forever" duration:-1.0 chatItem:item]];
     NSMenuItem *muteRoot = [[[NSMenuItem alloc] initWithTitle:@"Mute notifications"
                                                        action:nil
                                                 keyEquivalent:@""] autorelease];
+    [muteRoot setImage:TGTemplateIconAssetImage(@"sound-off", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
     [muteRoot setSubmenu:muteMenu];
     [menu addItem:muteRoot];
 }
@@ -312,6 +328,7 @@
                                                         keyEquivalent:@""] autorelease];
         [downloadItem setRepresentedObject:item];
         [downloadItem setTarget:self];
+        [downloadItem setImage:TGTemplateIconAssetImage(([item isDocumentMessage] ? @"document" : @"image"), NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
         [menu addItem:downloadItem];
         [menu addItem:[NSMenuItem separatorItem]];
     }
@@ -331,6 +348,7 @@
                                                       keyEquivalent:@""] autorelease];
         [deleteItem setRepresentedObject:item];
         [deleteItem setTarget:self];
+        [deleteItem setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(16.0, 16.0), [NSColor redColor], 0.90)];
         [menu addItem:deleteItem];
         addedMessageAction = YES;
     }

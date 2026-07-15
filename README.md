@@ -4,11 +4,11 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.4.4-blue" alt="version v0.4.4" />
+    <img src="https://img.shields.io/badge/version-v0.4.5--beta-blue" alt="version v0.4.5-beta" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
-    <img src="https://img.shields.io/badge/status-alpha-orange" alt="alpha status" />
+    <img src="https://img.shields.io/badge/status-open%20beta-brightgreen" alt="open beta status" />
     <img src="https://img.shields.io/badge/no-Electron-success" alt="no Electron" />
   </p>
 </div>
@@ -49,14 +49,14 @@ In plain language, the goal is:
 
 ---
 
-## Current Alpha: `v0.4.4`
+## Current Open Beta: `v0.4.5-beta`
 
-This public alpha is ready for real legacy-Mac testers. It is still alpha
-software, but the everyday loop is now useful enough for live feedback: sign in,
-read chats, send messages, handle media, and keep the app updated from GitHub
-Releases.
+This open beta is ready for broader legacy-Mac testing. Telegraphica is still
+young software, but the everyday loop is now useful enough for real feedback:
+sign in, read chats, send messages, handle media, manage pinned dialogs, play
+voice messages, and keep the app updated from GitHub Releases.
 
-### ✅ Working In This Alpha
+### ✅ Working In This Beta
 
 - 🔐 TDLib login flow: phone number, login code, and 2FA password.
 - 🧾 Bundled Telegraphica app credentials for public builds, with local
@@ -69,6 +69,7 @@ Releases.
 - 📨 Text sending with multiline input support.
 - 🖼 Photo sending with preview and optional caption.
 - 🎙 Voice-message recording, preview, sending, and playback.
+- 🔊 Ogg/Opus voice-message playback through a bundled Mavericks-safe helper.
 - 👍 Message reactions with local display and real Telegram sync.
 - 🖼 Grouped photo display, image preview, zoom controls, and pinch-to-zoom.
 - 🎞 Video playback in a resizable native window.
@@ -81,9 +82,11 @@ Releases.
   unpinned from the chat context menu.
 - 🧩 Native sticker display with WEBP, TGS, and animated WEBM/VP9 sticker
   support on Mavericks.
+- 🔍 Chat search/navigation with a native search field.
+- 🧽 Storage usage view with cache cleanup.
 - 🧹 Build/release hygiene scripts for the old-Mac workflow.
 
-### ⚠️ Known Alpha Gaps
+### ⚠️ Known Beta Gaps
 
 - Some sticker packs may still expose edge-case animation/layout bugs; please
   report the sticker format and a screenshot if that happens.
@@ -100,7 +103,7 @@ Releases.
 
 ## Download & Run
 
-Compiled alpha builds live in:
+Compiled beta builds live in:
 
 ➡️ **[GitHub Releases](https://github.com/MiChiRose/telegraphica/releases)**
 
@@ -108,7 +111,7 @@ Compiled alpha builds live in:
 
 1. Open the latest release page.
 2. Click **Assets** if the download list is collapsed.
-3. Download **`Telegraphica-v0.4.4-macos10.9-x86_64.dmg`**.
+3. Download **`Telegraphica-v0.4.5-beta-macos10.9-x86_64.dmg`**.
 4. Open the downloaded DMG.
 5. Drag **Telegraphica.app** into **Applications**.
 6. Launch Telegraphica and sign in with your Telegram phone number.
@@ -120,8 +123,8 @@ If you are not sure which file to download, choose the file ending in
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.4-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
-| `Telegraphica-v0.4.4-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
+| `Telegraphica-v0.4.5-beta-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
+| `Telegraphica-v0.4.5-beta-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
 | `.sha256` files | Checksum verification | You do not need these files to install Telegraphica. |
 
 ### First Launch
@@ -182,7 +185,7 @@ On the legacy Mac, build the complete release artifacts in one pass:
 
 That command rebuilds Telegraphica, bundles TDLib, creates an HFS+ DMG, creates
 an app zip, and writes SHA256 files into `dist/`. These are the artifacts that
-should be uploaded to GitHub for an out-of-the-box Mavericks alpha.
+should be uploaded to GitHub for an out-of-the-box Mavericks beta.
 
 The build script targets `MACOSX_DEPLOYMENT_TARGET=10.9`, builds `x86_64`,
 stamps `LSMinimumSystemVersion`, checks the resulting binary with `file`,
@@ -278,8 +281,7 @@ PRODUCT.md                     Product and design direction
 
 ## Roadmap
 
-- Add Mavericks-compatible TGS and WEBM sticker renderers and improve GIF
-  playback.
+- Improve edge-case animated sticker playback and GIF handling.
 - More complete document download and preview handling.
 - Richer contact/profile views.
 - More polished skeuomorphic theme variants.
@@ -309,7 +311,7 @@ the old Mac lane.
 
 ## Issues & Feedback
 
-This is alpha software. Bugs, UI notes, old-Mac build logs, and compatibility
+This is beta software. Bugs, UI notes, old-Mac build logs, and compatibility
 reports are welcome:
 
 - [GitHub Issues](../../issues)
