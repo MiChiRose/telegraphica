@@ -40,10 +40,15 @@ if [ ! -f "$TDJSON_BUNDLED_PATH" ]; then
 fi
 
 BUNDLED_CONFIG_PATH="$APP_PATH/Contents/Resources/TelegraphicaTDLibDefaults.plist"
-BUNDLED_API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$BUNDLED_CONFIG_PATH" 2>/dev/null || true)"
-BUNDLED_API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$BUNDLED_CONFIG_PATH" 2>/dev/null || true)"
-if ! echo "$BUNDLED_API_ID" | grep -E -q '^[1-9][0-9]*$' || ! echo "$BUNDLED_API_HASH" | grep -E -q '^[[:xdigit:]]{32}$'; then
-    echo "Refusing to create an installer without a valid internal Telegram connection configuration."
+RUNTIME_CONFIG_MARKER="$APP_PATH/Contents/Resources/TelegraphicaTDLibRuntimeDefaults.plist"
+if [ -f "$BUNDLED_CONFIG_PATH" ]; then
+    echo "Refusing to create an installer with plaintext TDLib app credentials in Resources."
+    echo "Unexpected file: $BUNDLED_CONFIG_PATH"
+    exit 1
+fi
+HAS_RUNTIME_CREDENTIALS="$(/usr/libexec/PlistBuddy -c "Print :has_runtime_credentials" "$RUNTIME_CONFIG_MARKER" 2>/dev/null || true)"
+if [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
+    echo "Refusing to create an installer without a runtime Telegram connection configuration marker."
     exit 1
 fi
 

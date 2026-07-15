@@ -238,6 +238,10 @@ docs/local-tdlib-config.example.plist
 Copy that example outside the repository, edit the copy with values from
 `my.telegram.org`, and keep the real file local to your Mac.
 
+Public release builds use a generated runtime app configuration so people can
+sign in without manually entering Telegram API fields. Do not add plaintext
+release credentials to app resources or repository files.
+
 Never commit, upload, paste, or screenshot:
 
 - `api_id` / `api_hash`
