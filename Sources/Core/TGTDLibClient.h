@@ -46,6 +46,8 @@
 - (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)deleteMessagesInChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs revoke:(BOOL)revoke timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)downloadedLocalPathForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)storageUsageSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)submitAuthenticationPhoneNumber:(NSString *)phoneNumber timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)submitAuthenticationCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error;

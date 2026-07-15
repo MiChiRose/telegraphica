@@ -501,8 +501,14 @@
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (succeeded) {
+                BOOL removedDisplayedMessage = NO;
+                for (NSNumber *messageID in messageIDs) {
+                    if ([self removeDisplayedMessageWithID:messageID chatID:chatID]) {
+                        removedDisplayedMessage = YES;
+                    }
+                }
                 [self.statusField setStringValue:@"Message deleted"];
-                [self appendDetail:@"TDLib message deletion accepted."];
+                [self appendDetail:(removedDisplayedMessage ? @"TDLib message deletion accepted; removed from current view." : @"TDLib message deletion accepted.")];
                 self.pendingLiveMessageRefresh = YES;
                 [self handlePendingLiveRefreshesIfPossible];
                 [self requestComposerRefocus];
