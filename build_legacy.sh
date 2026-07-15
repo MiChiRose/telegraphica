@@ -90,6 +90,116 @@ valid_tdlib_config() {
     echo "$api_hash" | grep -E -q '^[[:xdigit:]]{32}$'
 }
 
+generate_tdlib_runtime_credentials_source() {
+    local config_path="$1"
+    local output_path="$2"
+    local output_dir=""
+
+    output_dir="$(dirname "$output_path")"
+    mkdir -p "$output_dir"
+
+    if [ -z "$config_path" ]; then
+        cat > "$output_path" <<'OBJC'
+#import <Foundation/Foundation.h>
+#import "../../Sources/Core/TGTDLibBundledCredentials.h"
+
+BOOL TGTDLibRuntimeBundledConfigurationIsAvailable(void) {
+    return NO;
+}
+
+NSDictionary *TGTDLibRuntimeBundledConfiguration(void) {
+    return nil;
+}
+OBJC
+        return 0
+    fi
+
+    if [ -z "$PYTHON_BIN" ]; then
+        echo "python/python3 is required to generate the runtime TDLib credentials provider."
+        exit 1
+    fi
+
+    "$PYTHON_BIN" - "$config_path" "$output_path" <<'PY'
+from __future__ import print_function
+import plistlib
+import sys
+
+config_path = sys.argv[1]
+output_path = sys.argv[2]
+
+try:
+    if hasattr(plistlib, "load"):
+        with open(config_path, "rb") as fh:
+            config = plistlib.load(fh)
+    else:
+        config = plistlib.readPlist(config_path)
+except Exception as exc:
+    sys.stderr.write("Could not read TDLib config for runtime provider: %s\n" % exc)
+    sys.exit(1)
+
+api_id = str(config.get("api_id", "")).strip()
+api_hash = str(config.get("api_hash", "")).strip()
+if not api_id.isdigit() or int(api_id) <= 0:
+    sys.stderr.write("TDLib config api_id must be numeric.\n")
+    sys.exit(1)
+hex_chars = set("0123456789abcdefABCDEF")
+if len(api_hash) != 32 or any(ch not in hex_chars for ch in api_hash):
+    sys.stderr.write("TDLib config api_hash must be a 32-character hexadecimal string.\n")
+    sys.exit(1)
+
+def encoded_values(value, key):
+    return ", ".join("0x%02x" % (ord(ch) ^ key) for ch in value)
+
+api_id_key = 0x5a
+api_hash_key = 0xa7
+source = """#import <Foundation/Foundation.h>
+#import "../../Sources/Core/TGTDLibBundledCredentials.h"
+
+static NSString *TGTDLibRuntimeDecodeBytes(const unsigned char *bytes, NSUInteger length, unsigned char key) {
+    char buffer[128];
+    NSUInteger index = 0;
+    if (length > sizeof(buffer)) {
+        return nil;
+    }
+    for (index = 0; index < length; index++) {
+        buffer[index] = (char)(bytes[index] ^ key);
+    }
+    return [[[NSString alloc] initWithBytes:buffer length:length encoding:NSUTF8StringEncoding] autorelease];
+}
+
+BOOL TGTDLibRuntimeBundledConfigurationIsAvailable(void) {
+    return YES;
+}
+
+NSDictionary *TGTDLibRuntimeBundledConfiguration(void) {
+    static const unsigned char apiIDBytes[] = { %(api_id_bytes)s };
+    static const unsigned char apiHashBytes[] = { %(api_hash_bytes)s };
+    NSString *apiIDString = TGTDLibRuntimeDecodeBytes(apiIDBytes, sizeof(apiIDBytes), %(api_id_key)d);
+    NSString *apiHash = TGTDLibRuntimeDecodeBytes(apiHashBytes, sizeof(apiHashBytes), %(api_hash_key)d);
+    NSInteger apiID = [apiIDString integerValue];
+    if (apiID <= 0 || [apiHash length] != 32) {
+        return nil;
+    }
+
+    NSMutableDictionary *configuration = [NSMutableDictionary dictionary];
+    [configuration setObject:[NSNumber numberWithInteger:apiID] forKey:@"api_id"];
+    [configuration setObject:apiHash forKey:@"api_hash"];
+    [configuration setObject:@"auto" forKey:@"tdlib_parameters_schema"];
+    [configuration setObject:[NSNumber numberWithBool:NO] forKey:@"use_test_dc"];
+    return configuration;
+}
+""" % {
+    "api_id_bytes": encoded_values(api_id, api_id_key),
+    "api_hash_bytes": encoded_values(api_hash, api_hash_key),
+    "api_id_key": api_id_key,
+    "api_hash_key": api_hash_key,
+}
+
+with open(output_path, "w") as fh:
+    fh.write(source)
+PY
+}
+
 BUNDLED_TDLIB_CONFIG_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}"
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && ! valid_tdlib_config "$BUNDLED_TDLIB_CONFIG_SOURCE"; then
     echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH is missing or does not contain valid api_id and api_hash."
@@ -146,6 +256,10 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
 fi
 
 rm -rf "$BUILD_ROOT" "$APP_NAME"
+
+GENERATED_DIR="$BUILD_ROOT/Generated"
+GENERATED_TDLIB_CREDENTIALS_SOURCE="$GENERATED_DIR/TGTDLibBundledCredentialsGenerated.m"
+generate_tdlib_runtime_credentials_source "$BUNDLED_TDLIB_CONFIG_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
 
 WEBP_BUILD_DIR="$BUILD_ROOT/Vendor/libwebp"
 scripts/build_webp_legacy.sh "$ARCH" "$WEBP_BUILD_DIR"
@@ -310,28 +424,17 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
 fi
 
+RESOURCES_DIR="$APP_NAME/Contents/Resources"
+rm -f "$RESOURCES_DIR/TelegraphicaTDLibDefaults.plist"
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
-    API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$BUNDLED_TDLIB_CONFIG_SOURCE" 2>/dev/null || true)"
-    API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$BUNDLED_TDLIB_CONFIG_SOURCE" 2>/dev/null || true)"
-    if [ -z "$API_ID" ] || ! echo "$API_HASH" | grep -E -q '^[[:xdigit:]]{32}$'; then
-        echo "Bundled TDLib config must contain api_id and api_hash."
-        exit 1
-    fi
-    if ! echo "$API_ID" | grep -E -q '^[0-9]+$'; then
-        echo "Bundled TDLib config api_id must be numeric."
-        exit 1
-    fi
-
-    RESOURCES_DIR="$APP_NAME/Contents/Resources"
-    BUNDLED_CONFIG_DEST="$RESOURCES_DIR/TelegraphicaTDLibDefaults.plist"
+    RUNTIME_CONFIG_MARKER="$RESOURCES_DIR/TelegraphicaTDLibRuntimeDefaults.plist"
     mkdir -p "$RESOURCES_DIR"
-    rm -f "$BUNDLED_CONFIG_DEST"
-    /usr/libexec/PlistBuddy -c "Add :api_id integer $API_ID" "$BUNDLED_CONFIG_DEST"
-    /usr/libexec/PlistBuddy -c "Add :api_hash string $API_HASH" "$BUNDLED_CONFIG_DEST"
-    /usr/libexec/PlistBuddy -c "Add :tdlib_parameters_schema string auto" "$BUNDLED_CONFIG_DEST"
-    /usr/libexec/PlistBuddy -c "Add :use_test_dc bool false" "$BUNDLED_CONFIG_DEST"
-    chmod 0644 "$BUNDLED_CONFIG_DEST"
-    echo "Bundled sanitized TDLib app config: $BUNDLED_CONFIG_DEST"
+    rm -f "$RUNTIME_CONFIG_MARKER"
+    /usr/libexec/PlistBuddy -c "Add :has_runtime_credentials bool true" "$RUNTIME_CONFIG_MARKER"
+    /usr/libexec/PlistBuddy -c "Add :tdlib_parameters_schema string auto" "$RUNTIME_CONFIG_MARKER"
+    /usr/libexec/PlistBuddy -c "Add :use_test_dc bool false" "$RUNTIME_CONFIG_MARKER"
+    chmod 0644 "$RUNTIME_CONFIG_MARKER"
+    echo "Bundled runtime TDLib app configuration marker: $RUNTIME_CONFIG_MARKER"
 fi
 
 HELPERS_DIR="$APP_NAME/Contents/Resources/Helpers"
