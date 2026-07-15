@@ -1,5 +1,6 @@
 #import "TGStatusViewCells.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
 #import "TGTheme.h"
 #import "../Core/TGChatItem.h"
@@ -112,19 +113,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                     10.0,
                                     12.0);
         NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
-        [pinColor set];
-        NSBezierPath *pinPath = [NSBezierPath bezierPath];
-        CGFloat midX = NSMidX(pinRect);
-        CGFloat topY = [controlView isFlipped] ? NSMinY(pinRect) + 2.0 : NSMaxY(pinRect) - 2.0;
-        CGFloat bottomY = [controlView isFlipped] ? NSMaxY(pinRect) - 2.0 : NSMinY(pinRect) + 2.0;
-        [pinPath moveToPoint:NSMakePoint(midX - 3.0, topY)];
-        [pinPath lineToPoint:NSMakePoint(midX + 3.0, topY)];
-        [pinPath moveToPoint:NSMakePoint(midX, topY)];
-        [pinPath lineToPoint:NSMakePoint(midX, bottomY)];
-        [pinPath moveToPoint:NSMakePoint(midX - 2.0, bottomY - ([controlView isFlipped] ? 2.0 : -2.0))];
-        [pinPath lineToPoint:NSMakePoint(midX + 2.0, bottomY - ([controlView isFlipped] ? 2.0 : -2.0))];
-        [pinPath setLineWidth:1.4];
-        [pinPath stroke];
+        TGDrawPinIconInRect(pinRect, pinColor, [controlView isFlipped]);
         iconX = NSMaxX(pinRect) + 4.0;
     }
     if ([item notificationsMuted]) {

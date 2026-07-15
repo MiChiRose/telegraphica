@@ -1,4 +1,5 @@
 #import "TGStatusButtonCells.h"
+#import "TGIconDrawing.h"
 #import "TGTheme.h"
 #include <math.h>
 
@@ -94,10 +95,7 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
     if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
-        NSRect backBubble = TGIconRect(iconRect, 1.0, 5.0, 12.0, 8.0, flipped);
-        NSRect frontBubble = TGIconRect(iconRect, 5.0, 2.0, 13.0, 9.0, flipped);
-        [[NSBezierPath bezierPathWithRoundedRect:backBubble xRadius:3.0 yRadius:3.0] stroke];
-        [[NSBezierPath bezierPathWithRoundedRect:frontBubble xRadius:3.0 yRadius:3.0] fill];
+        TGDrawChatsIconInRect(iconRect, color, flipped);
     } else if ([title isEqualToString:@"Profile"] || [title isEqualToString:@"Профиль"] || [title isEqualToString:@"Профіль"]) {
         NSRect headRect = TGIconRect(iconRect, 5.0, 10.0, 8.0, 8.0, flipped);
         [[NSBezierPath bezierPathWithOvalInRect:headRect] stroke];
@@ -109,12 +107,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                  controlPoint2:TGIconPoint(iconRect, 12.0, 8.0, flipped)];
         [bodyPath stroke];
     } else if ([title isEqualToString:@"Settings"] || [title isEqualToString:@"Настройки"] || [title isEqualToString:@"Налады"]) {
-        TGStrokeLine(TGIconPoint(iconRect, 2.0, 14.0, flipped), TGIconPoint(iconRect, 16.0, 14.0, flipped), 1.4);
-        TGStrokeLine(TGIconPoint(iconRect, 2.0, 9.0, flipped), TGIconPoint(iconRect, 16.0, 9.0, flipped), 1.4);
-        TGStrokeLine(TGIconPoint(iconRect, 2.0, 4.0, flipped), TGIconPoint(iconRect, 16.0, 4.0, flipped), 1.4);
-        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 5.0, 12.0, 4.0, 4.0, flipped)] fill];
-        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 9.0, 7.0, 4.0, 4.0, flipped)] fill];
-        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
+        TGDrawSettingsIconInRect(iconRect, color, flipped);
     } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
         NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
         NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
@@ -360,15 +353,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSColor *iconColor = TGClassicHeaderTextColor(alpha);
     [iconColor set];
     if ([title isEqualToString:@"mic"]) {
-        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 5.0, NSMidY(buttonRect) - 9.0, 10.0, 15.0);
-        NSBezierPath *mic = [NSBezierPath bezierPathWithRoundedRect:micRect xRadius:5.0 yRadius:5.0];
-        [mic stroke];
-        TGStrokeLine(NSMakePoint(NSMidX(buttonRect), NSMidY(buttonRect) + (flipped ? 7.0 : -7.0)),
-                     NSMakePoint(NSMidX(buttonRect), NSMidY(buttonRect) + (flipped ? 11.0 : -11.0)),
-                     1.6);
-        TGStrokeLine(NSMakePoint(NSMidX(buttonRect) - 5.0, NSMidY(buttonRect) + (flipped ? 11.0 : -11.0)),
-                     NSMakePoint(NSMidX(buttonRect) + 5.0, NSMidY(buttonRect) + (flipped ? 11.0 : -11.0)),
-                     1.6);
+        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 10.0, NSMidY(buttonRect) - 10.0, 20.0, 20.0);
+        TGDrawMicrophoneIconInRect(micRect, iconColor, flipped);
         return;
     }
 
@@ -406,6 +392,15 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     NSString *title = [self title] ? [self title] : @"";
+    if ([title isEqualToString:@"↻"]) {
+        BOOL flipped = [controlView isFlipped];
+        NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 8.0,
+                                     NSMidY(buttonRect) - 8.0,
+                                     16.0,
+                                     16.0);
+        TGDrawReloadIconInRect(iconRect, TGClassicHeaderTextColor(alpha), flipped);
+        return;
+    }
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setAlignment:NSCenterTextAlignment];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
