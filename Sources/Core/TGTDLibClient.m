@@ -3,6 +3,7 @@
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
 #import "../Services/TGKeychainHelper.h"
+#import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import <dlfcn.h>
 #import <Security/Security.h>
@@ -19,6 +20,9 @@ static NSString * const TGTDLibTDLibCodeErrorKey = @"TelegraphicaTDLibCode";
 static NSString * const TGTDLibTDLibMessageErrorKey = @"TelegraphicaTDLibMessage";
 static NSString * const TGTDLibTDLibResponseErrorKey = @"TelegraphicaTDLibResponse";
 static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_encryption_key";
+static NSString * const TGTDLibRemoteConfigurationURLInfoKey = @"TelegraphicaRemoteTDLibConfigURL";
+static NSString * const TGTDLibRemoteConfigurationURLEnvironmentKey = @"TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL";
+static NSTimeInterval const TGTDLibRemoteConfigurationTimeout = 8.0;
 static NSUInteger const TGTDLibMaxPendingResponses = 64;
 static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
@@ -1068,6 +1072,172 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return configuration;
 }
 
+- (NSString *)remoteTDLibConfigurationURLString {
+    NSDictionary *environment = [[NSProcessInfo processInfo] environment];
+    NSString *environmentURL = [environment objectForKey:TGTDLibRemoteConfigurationURLEnvironmentKey];
+    if ([environmentURL isKindOfClass:[NSString class]] && [[environmentURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length] > 0) {
+        return [environmentURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+
+    NSString *bundleURL = [[NSBundle mainBundle] objectForInfoDictionaryKey:TGTDLibRemoteConfigurationURLInfoKey];
+    if ([bundleURL isKindOfClass:[NSString class]] && [[bundleURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length] > 0) {
+        return [bundleURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+
+    NSError *supportError = nil;
+    NSString *supportPath = [self applicationSupportPathWithError:&supportError];
+    if ([supportPath length] == 0) {
+        return nil;
+    }
+    NSString *overridePath = [supportPath stringByAppendingPathComponent:@"remote-tdlib-config-url.txt"];
+    NSString *overrideURL = [NSString stringWithContentsOfFile:overridePath encoding:NSUTF8StringEncoding error:NULL];
+    overrideURL = [overrideURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return ([overrideURL length] > 0) ? overrideURL : nil;
+}
+
+- (NSDictionary *)sanitizedTDLibConfigurationFromRemoteDictionary:(NSDictionary *)dictionary error:(NSError **)error {
+    if (![dictionary isKindOfClass:[NSDictionary class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Remote TDLib config response is not a dictionary." code:61];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *configuration = [NSMutableDictionary dictionary];
+    NSArray *allowedKeys = [NSArray arrayWithObjects:
+                            @"api_id",
+                            @"api_hash",
+                            @"tdlib_parameters_schema",
+                            @"use_test_dc",
+                            @"use_file_database",
+                            @"use_chat_info_database",
+                            @"use_message_database",
+                            @"use_secret_chats",
+                            @"enable_storage_optimizer",
+                            @"ignore_file_names",
+                            nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [allowedKeys count]; index++) {
+        NSString *key = [allowedKeys objectAtIndex:index];
+        id value = [dictionary objectForKey:key];
+        if (value) {
+            [configuration setObject:value forKey:key];
+        }
+    }
+
+    if (![self configurationContainsValidAPICredentials:configuration]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Remote TDLib config is missing valid app credentials." code:62];
+        }
+        return nil;
+    }
+
+    return configuration;
+}
+
+- (NSDictionary *)downloadRemoteTDLibConfigurationWithError:(NSError **)error {
+    NSString *urlString = [self remoteTDLibConfigurationURLString];
+    if ([urlString length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Remote TDLib config URL is not configured." code:60];
+        }
+        [[TGLogger sharedLogger] log:@"Remote TDLib config URL is not configured."];
+        return nil;
+    }
+
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (!url || ![[[url scheme] lowercaseString] isEqualToString:@"https"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Remote TDLib config URL must be a valid HTTPS URL." code:60];
+        }
+        [[TGLogger sharedLogger] log:@"Remote TDLib config URL is invalid."];
+        return nil;
+    }
+
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
+                                                           cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData
+                                                       timeoutInterval:TGTDLibRemoteConfigurationTimeout];
+    [request setHTTPMethod:@"GET"];
+    [request setValue:@"application/json, application/x-plist" forHTTPHeaderField:@"Accept"];
+    [request setValue:[self applicationVersionString] forHTTPHeaderField:@"X-Telegraphica-Version"];
+
+    NSURLResponse *response = nil;
+    NSError *requestError = nil;
+    NSData *data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&requestError];
+    if ([data length] == 0 || requestError) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"Remote TDLib config download failed: %@", [requestError localizedDescription] ? [requestError localizedDescription] : @"empty response"];
+            *error = [self errorWithDescription:message code:63];
+        }
+        [[TGLogger sharedLogger] log:@"Remote TDLib config download failed."];
+        return nil;
+    }
+
+    if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+        NSInteger statusCode = [(NSHTTPURLResponse *)response statusCode];
+        if (statusCode < 200 || statusCode >= 300) {
+            if (error) {
+                NSString *message = [NSString stringWithFormat:@"Remote TDLib config server returned HTTP %ld.", (long)statusCode];
+                *error = [self errorWithDescription:message code:63];
+            }
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Remote TDLib config HTTP status: %ld", (long)statusCode]];
+            return nil;
+        }
+    }
+
+    id object = nil;
+    NSError *jsonError = nil;
+    object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+    if (!object) {
+        NSError *plistError = nil;
+        object = [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:&plistError];
+        if (!object) {
+            if (error) {
+                NSString *message = [NSString stringWithFormat:@"Remote TDLib config response could not be parsed: %@", [jsonError localizedDescription] ? [jsonError localizedDescription] : [plistError localizedDescription]];
+                *error = [self errorWithDescription:message code:64];
+            }
+            [[TGLogger sharedLogger] log:@"Remote TDLib config parse failed."];
+            return nil;
+        }
+    }
+
+    NSDictionary *configuration = [self sanitizedTDLibConfigurationFromRemoteDictionary:object error:error];
+    if (!configuration) {
+        [[TGLogger sharedLogger] log:@"Remote TDLib config validation failed."];
+        return nil;
+    }
+
+    [[TGLogger sharedLogger] log:@"Remote TDLib config downloaded and validated."];
+    return configuration;
+}
+
+- (NSDictionary *)downloadAndStoreRemoteTDLibConfigurationWithLocalPath:(NSString *)configPath error:(NSError **)error {
+    NSDictionary *configuration = [self downloadRemoteTDLibConfigurationWithError:error];
+    if (!configuration) {
+        return nil;
+    }
+
+    NSString *parentPath = [configPath stringByDeletingLastPathComponent];
+    NSError *directoryError = nil;
+    if (![self ensureDirectoryAtPath:parentPath error:&directoryError]) {
+        if (error) {
+            *error = directoryError;
+        }
+        return nil;
+    }
+
+    if (![configuration writeToFile:configPath atomically:YES]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Remote TDLib config was downloaded but could not be saved locally." code:65];
+        }
+        [[TGLogger sharedLogger] log:@"Remote TDLib config save failed."];
+        return nil;
+    }
+
+    [[TGLogger sharedLogger] log:@"Remote TDLib config saved locally."];
+    return configuration;
+}
+
 - (BOOL)configurationContainsValidAPICredentials:(NSDictionary *)configuration {
     if (![configuration isKindOfClass:[NSDictionary class]]) {
         return NO;
@@ -1101,8 +1271,18 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return bundledConfiguration;
     }
 
+    NSError *remoteError = nil;
+    NSDictionary *remoteConfiguration = [self downloadAndStoreRemoteTDLibConfigurationWithLocalPath:configPath error:&remoteError];
+    if ([self configurationContainsValidAPICredentials:remoteConfiguration]) {
+        return remoteConfiguration;
+    }
+
     if (error) {
-        NSString *message = [NSString stringWithFormat:@"TDLib config was not found locally or in the app runtime configuration. Local path: %@", configPath];
+        NSString *remoteMessage = [remoteError localizedDescription];
+        NSString *message = [NSString stringWithFormat:@"TDLib config was not found locally, in the app runtime configuration, or from remote bootstrap. Local path: %@%@%@",
+                             configPath,
+                             [remoteMessage length] > 0 ? @"; remote: " : @"",
+                             [remoteMessage length] > 0 ? remoteMessage : @""];
         *error = [self errorWithDescription:message code:12];
     }
     return nil;
