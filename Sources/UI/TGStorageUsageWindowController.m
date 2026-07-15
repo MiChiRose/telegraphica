@@ -101,8 +101,20 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSColor *iconColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.92 * alpha];
-    TGDrawReloadIconInRect(NSInsetRect(buttonRect, 7.0, 7.0), iconColor, [controlView isFlipped]);
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:16.0], NSFontAttributeName,
+                                [NSColor colorWithCalibratedWhite:1.0 alpha:0.92 * alpha], NSForegroundColorAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSString *title = @"↻";
+    NSSize titleSize = [title sizeWithAttributes:attributes];
+    NSRect titleRect = NSMakeRect(NSMinX(buttonRect),
+                                  NSMidY(buttonRect) - floor(titleSize.height / 2.0),
+                                  NSWidth(buttonRect),
+                                  titleSize.height + 2.0);
+    [title drawInRect:titleRect withAttributes:attributes];
 }
 
 @end

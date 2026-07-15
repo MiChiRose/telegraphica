@@ -107,7 +107,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                  controlPoint2:TGIconPoint(iconRect, 12.0, 8.0, flipped)];
         [bodyPath stroke];
     } else if ([title isEqualToString:@"Settings"] || [title isEqualToString:@"Настройки"] || [title isEqualToString:@"Налады"]) {
-        TGDrawSettingsIconInRect(iconRect, color, flipped);
+        TGStrokeLine(TGIconPoint(iconRect, 2.0, 14.0, flipped),
+                     TGIconPoint(iconRect, 16.0, 14.0, flipped),
+                     1.4);
+        TGStrokeLine(TGIconPoint(iconRect, 2.0, 9.0, flipped),
+                     TGIconPoint(iconRect, 16.0, 9.0, flipped),
+                     1.4);
+        TGStrokeLine(TGIconPoint(iconRect, 2.0, 4.0, flipped),
+                     TGIconPoint(iconRect, 16.0, 4.0, flipped),
+                     1.4);
+        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 5.0, 12.0, 4.0, 4.0, flipped)] fill];
+        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 11.0, 7.0, 4.0, 4.0, flipped)] fill];
+        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
     } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
         NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
         NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
@@ -324,10 +335,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     BOOL flipped = [controlView isFlipped];
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 10.5,
-                                 NSMidY(buttonRect) - 10.5,
-                                 21.0,
-                                 21.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 11.5,
+                                 NSMidY(buttonRect) - 11.5,
+                                 23.0,
+                                 23.0);
     TGDrawPaperclipSvgPathInRect(iconRect, flipped, alpha);
 }
 
@@ -392,15 +403,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     NSString *title = [self title] ? [self title] : @"";
-    if ([title isEqualToString:@"↻"]) {
-        BOOL flipped = [controlView isFlipped];
-        NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 8.0,
-                                     NSMidY(buttonRect) - 8.0,
-                                     16.0,
-                                     16.0);
-        TGDrawReloadIconInRect(iconRect, TGClassicHeaderTextColor(alpha), flipped);
-        return;
-    }
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setAlignment:NSCenterTextAlignment];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -616,7 +618,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect contentRect = NSInsetRect(buttonRect, 6.0, 6.0);
+    NSRect contentRect = NSInsetRect(buttonRect, 5.0, 5.0);
     NSImage *image = [self image];
     if (image) {
         NSSize imageSize = [image size];
@@ -651,7 +653,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
         [paragraph setAlignment:NSCenterTextAlignment];
         NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:28.0], NSFontAttributeName,
+                                    [NSFont systemFontOfSize:30.0], NSFontAttributeName,
                                     [NSColor colorWithCalibratedWhite:0.05 alpha:alpha], NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];

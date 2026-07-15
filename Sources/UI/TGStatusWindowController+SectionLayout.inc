@@ -1,5 +1,5 @@
 - (void)showView:(NSView *)view visible:(BOOL)visible {
-    [view setHidden:!visible];
+    TGSetViewVisibleAnimated(view, visible);
 }
 
 - (void)showMessageDropOverlay:(BOOL)visible {

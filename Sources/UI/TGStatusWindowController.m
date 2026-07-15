@@ -3,6 +3,7 @@
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGAnimationSupport.h"
 #import "TGProfilePresentation.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"

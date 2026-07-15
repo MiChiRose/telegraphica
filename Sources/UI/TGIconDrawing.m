@@ -27,39 +27,22 @@ static void TGStrokeIconLine(NSRect rect, CGFloat x1, CGFloat y1, CGFloat x2, CG
 
 void TGDrawChatsIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
-    NSBezierPath *backBubble = [NSBezierPath bezierPathWithRoundedRect:TGIconRect24(iconRect, 2.0, 3.0, 19.0, 13.0, flipped)
-                                                               xRadius:6.0
-                                                               yRadius:6.0];
-    [backBubble setLineWidth:2.0];
-    [backBubble stroke];
+    NSBezierPath *bubble = [NSBezierPath bezierPathWithRoundedRect:TGIconRect24(iconRect, 2.3, 2.5, 19.4, 15.8, flipped)
+                                                           xRadius:5.0
+                                                           yRadius:5.0];
+    [bubble fill];
 
-    NSBezierPath *backTail = [NSBezierPath bezierPath];
-    [backTail setLineWidth:2.0];
-    [backTail setLineJoinStyle:NSRoundLineJoinStyle];
-    [backTail moveToPoint:TGIconPoint24(iconRect, 7.6, 15.2, flipped)];
-    [backTail curveToPoint:TGIconPoint24(iconRect, 3.0, 21.0, flipped)
-             controlPoint1:TGIconPoint24(iconRect, 6.9, 18.0, flipped)
-             controlPoint2:TGIconPoint24(iconRect, 5.6, 19.8, flipped)];
-    [backTail curveToPoint:TGIconPoint24(iconRect, 8.6, 18.0, flipped)
-             controlPoint1:TGIconPoint24(iconRect, 5.3, 21.0, flipped)
-             controlPoint2:TGIconPoint24(iconRect, 7.0, 19.8, flipped)];
-    [backTail stroke];
-
-    NSBezierPath *frontBubble = [NSBezierPath bezierPathWithRoundedRect:TGIconRect24(iconRect, 9.0, 10.5, 13.0, 9.0, flipped)
-                                                                xRadius:4.5
-                                                                yRadius:4.5];
-    [frontBubble fill];
-
-    NSBezierPath *frontTail = [NSBezierPath bezierPath];
-    [frontTail moveToPoint:TGIconPoint24(iconRect, 18.0, 18.2, flipped)];
-    [frontTail curveToPoint:TGIconPoint24(iconRect, 22.0, 21.0, flipped)
-              controlPoint1:TGIconPoint24(iconRect, 19.1, 19.6, flipped)
-              controlPoint2:TGIconPoint24(iconRect, 20.3, 20.5, flipped)];
-    [frontTail curveToPoint:TGIconPoint24(iconRect, 17.6, 19.5, flipped)
-              controlPoint1:TGIconPoint24(iconRect, 20.1, 21.0, flipped)
-              controlPoint2:TGIconPoint24(iconRect, 18.8, 20.4, flipped)];
-    [frontTail closePath];
-    [frontTail fill];
+    NSBezierPath *tail = [NSBezierPath bezierPath];
+    [tail moveToPoint:TGIconPoint24(iconRect, 9.7, 17.0, flipped)];
+    [tail curveToPoint:TGIconPoint24(iconRect, 8.1, 22.0, flipped)
+         controlPoint1:TGIconPoint24(iconRect, 9.5, 19.0, flipped)
+         controlPoint2:TGIconPoint24(iconRect, 8.7, 20.8, flipped)];
+    [tail curveToPoint:TGIconPoint24(iconRect, 13.7, 18.0, flipped)
+         controlPoint1:TGIconPoint24(iconRect, 10.4, 21.9, flipped)
+         controlPoint2:TGIconPoint24(iconRect, 12.4, 20.5, flipped)];
+    [tail lineToPoint:TGIconPoint24(iconRect, 14.3, 16.8, flipped)];
+    [tail closePath];
+    [tail fill];
 }
 
 void TGDrawMicrophoneIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
@@ -88,22 +71,31 @@ void TGDrawMicrophoneIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
 
 void TGDrawPinIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
-    NSBezierPath *head = [NSBezierPath bezierPathWithRoundedRect:TGIconRect24(iconRect, 7.0, 3.0, 10.0, 4.8, flipped)
-                                                         xRadius:1.8
-                                                         yRadius:1.8];
-    [head fill];
-
-    NSBezierPath *body = [NSBezierPath bezierPath];
-    [body setLineJoinStyle:NSRoundLineJoinStyle];
-    [body moveToPoint:TGIconPoint24(iconRect, 9.2, 7.1, flipped)];
-    [body lineToPoint:TGIconPoint24(iconRect, 14.8, 7.1, flipped)];
-    [body lineToPoint:TGIconPoint24(iconRect, 16.4, 13.8, flipped)];
-    [body lineToPoint:TGIconPoint24(iconRect, 7.6, 13.8, flipped)];
-    [body closePath];
-    [body fill];
-
-    TGStrokeIconLine(iconRect, 12.0, 13.0, 12.0, 21.0, flipped, 2.0);
-    TGStrokeIconLine(iconRect, 8.7, 21.0, 15.3, 21.0, flipped, 2.0);
+    NSBezierPath *pin = [NSBezierPath bezierPath];
+    [pin setLineJoinStyle:NSRoundLineJoinStyle];
+    [pin moveToPoint:TGIconPoint24(iconRect, 14.7, 2.8, flipped)];
+    [pin curveToPoint:TGIconPoint24(iconRect, 21.2, 9.2, flipped)
+        controlPoint1:TGIconPoint24(iconRect, 16.7, 1.1, flipped)
+        controlPoint2:TGIconPoint24(iconRect, 22.9, 7.2, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 19.3, 11.2, flipped)];
+    [pin curveToPoint:TGIconPoint24(iconRect, 16.3, 12.4, flipped)
+        controlPoint1:TGIconPoint24(iconRect, 18.3, 11.9, flipped)
+        controlPoint2:TGIconPoint24(iconRect, 17.3, 12.3, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 14.1, 15.2, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 18.2, 19.3, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 16.1, 21.4, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 11.9, 17.3, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 3.2, 22.0, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 8.0, 13.4, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 4.0, 9.3, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 6.1, 7.2, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 10.2, 11.3, flipped)];
+    [pin lineToPoint:TGIconPoint24(iconRect, 13.0, 9.1, flipped)];
+    [pin curveToPoint:TGIconPoint24(iconRect, 14.2, 5.9, flipped)
+        controlPoint1:TGIconPoint24(iconRect, 13.1, 8.0, flipped)
+        controlPoint2:TGIconPoint24(iconRect, 13.5, 6.9, flipped)];
+    [pin closePath];
+    [pin fill];
 }
 
 void TGDrawReloadIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
@@ -163,4 +155,3 @@ void TGDrawSettingsIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
     [inner setLineWidth:2.0];
     [inner stroke];
 }
-
