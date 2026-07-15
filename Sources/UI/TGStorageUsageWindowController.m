@@ -80,6 +80,50 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
 @end
 
+@interface TGStorageRefreshButtonCell : NSButtonCell
+@end
+
+@implementation TGStorageRefreshButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:8.0 yRadius:8.0];
+    NSColor *topColor = highlighted ? TGColorFromHex(0x315f8f) : TGColorFromHex(0x446f9e);
+    NSColor *bottomColor = highlighted ? TGColorFromHex(0x183756) : TGColorFromHex(0x203f62);
+    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[topColor colorWithAlphaComponent:alpha]
+                                                          endingColor:[bottomColor colorWithAlphaComponent:alpha]] autorelease];
+    [gradient drawInBezierPath:buttonPath angle:90.0];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.34 * alpha] set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSPoint center = NSMakePoint(NSMidX(cellFrame), NSMidY(cellFrame));
+    CGFloat radius = 7.0;
+    NSBezierPath *arc = [NSBezierPath bezierPath];
+    [arc appendBezierPathWithArcWithCenter:center radius:radius startAngle:35.0 endAngle:315.0 clockwise:NO];
+    [arc setLineWidth:2.0];
+    [arc setLineCapStyle:NSRoundLineCapStyle];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.92 * alpha] set];
+    [arc stroke];
+
+    NSPoint arrowPoint = NSMakePoint(center.x + 5.6, center.y - 4.2);
+    NSBezierPath *arrow = [NSBezierPath bezierPath];
+    [arrow moveToPoint:arrowPoint];
+    [arrow lineToPoint:NSMakePoint(arrowPoint.x - 1.2, arrowPoint.y - 5.0)];
+    [arrow moveToPoint:arrowPoint];
+    [arrow lineToPoint:NSMakePoint(arrowPoint.x + 4.2, arrowPoint.y - 2.0)];
+    [arrow setLineWidth:2.0];
+    [arrow setLineCapStyle:NSRoundLineCapStyle];
+    [arrow setLineJoinStyle:NSRoundLineJoinStyle];
+    [arrow stroke];
+}
+
+@end
+
 @interface TGStoragePieChartView : NSView
 
 @property (nonatomic, retain) NSArray *segments;
@@ -262,7 +306,6 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @property (nonatomic, retain) NSTextField *hintField;
 @property (nonatomic, retain) NSButton *clearButton;
 @property (nonatomic, retain) NSButton *refreshButton;
-@property (nonatomic, retain) NSButton *closeButton;
 @property (nonatomic, retain) NSProgressIndicator *progressIndicator;
 
 @end
@@ -277,7 +320,6 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @synthesize hintField = _hintField;
 @synthesize clearButton = _clearButton;
 @synthesize refreshButton = _refreshButton;
-@synthesize closeButton = _closeButton;
 @synthesize progressIndicator = _progressIndicator;
 
 + (NSString *)displayStringForBytes:(long long)bytes {
@@ -333,6 +375,13 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [button setBordered:NO];
 }
 
+- (void)styleRefreshButton:(NSButton *)button {
+    TGStorageRefreshButtonCell *cell = [[[TGStorageRefreshButtonCell alloc] initTextCell:@""] autorelease];
+    [cell setButtonType:NSMomentaryPushInButton];
+    [button setCell:cell];
+    [button setBordered:NO];
+}
+
 - (void)buildWindow {
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 640, 560)
                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
@@ -352,17 +401,13 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [self.titleField setAlignment:NSCenterTextAlignment];
     [contentView addSubview:self.titleField];
 
-    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(28, 500, 96, 32)] autorelease];
-    [self.refreshButton setTitle:TGLoc(@"storage.refresh")];
+    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(28, 500, 34, 32)] autorelease];
+    [self.refreshButton setTitle:@""];
+    [self.refreshButton setToolTip:TGLoc(@"storage.refresh")];
+    [self styleRefreshButton:self.refreshButton];
     [self.refreshButton setTarget:self];
     [self.refreshButton setAction:@selector(refreshStorageUsage:)];
     [contentView addSubview:self.refreshButton];
-
-    self.closeButton = [[[NSButton alloc] initWithFrame:NSMakeRect(516, 500, 96, 32)] autorelease];
-    [self.closeButton setTitle:TGLoc(@"close")];
-    [self.closeButton setTarget:self];
-    [self.closeButton setAction:@selector(closeWindow:)];
-    [contentView addSubview:self.closeButton];
 
     self.chartView = [[[TGStoragePieChartView alloc] initWithFrame:NSMakeRect(220, 292, 200, 200)] autorelease];
     [self.chartView setCenterText:@"—"];
@@ -397,9 +442,9 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
     self.clearButton = [[[NSButton alloc] initWithFrame:NSMakeRect(54, 62, 532, 36)] autorelease];
     [self.clearButton setTitle:TGLoc(@"storage.clear")];
+    [self stylePrimaryButton:self.clearButton];
     [self.clearButton setTarget:self];
     [self.clearButton setAction:@selector(clearStorageCache:)];
-    [self stylePrimaryButton:self.clearButton];
     [contentView addSubview:self.clearButton];
 
     self.hintField = [self labelWithFrame:NSMakeRect(72, 22, 496, 34)
@@ -434,7 +479,6 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [_hintField release];
     [_clearButton release];
     [_refreshButton release];
-    [_closeButton release];
     [_progressIndicator release];
     [super dealloc];
 }
@@ -564,8 +608,8 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [self setBusy:NO];
             if (summary) {
-                [self.hintField setStringValue:TGLoc(@"storage.safeHint")];
                 [self applyStorageSummary:summary];
+                [self.hintField setStringValue:TGLoc(@"storage.clearDone")];
             } else {
                 [self.subtitleField setStringValue:TGLoc(@"storage.clearFailed")];
                 [self.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
@@ -576,10 +620,6 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         });
         [pool drain];
     });
-}
-
-- (void)closeWindow:(id)sender {
-    [[self window] orderOut:sender];
 }
 
 @end
