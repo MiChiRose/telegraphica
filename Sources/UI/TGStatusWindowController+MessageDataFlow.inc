@@ -1241,6 +1241,7 @@
     BOOL needsChatRefresh = NO;
     BOOL needsMessageRefresh = NO;
     BOOL needsChatFilterRefresh = NO;
+    BOOL needsPinnedMessageRefresh = NO;
 
     NSUInteger index = 0;
     for (index = 0; index < [updates count]; index++) {
@@ -1286,6 +1287,11 @@
             }
         } else if ([kind isEqualToString:@"chat_action"]) {
             [self handleTypingUpdateSummary:summary];
+        } else if ([kind isEqualToString:@"pinned_message_update"]) {
+            id chatID = [summary objectForKey:@"chat_id"];
+            if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
+                needsPinnedMessageRefresh = YES;
+            }
         } else if ([kind isEqualToString:@"account_unread"]) {
             id unreadCount = [summary objectForKey:@"count"];
             if ([unreadCount respondsToSelector:@selector(unsignedIntegerValue)]) {
@@ -1315,6 +1321,9 @@
     }
     if (needsChatFilterRefresh) {
         [self reloadChatFiltersIfReady];
+    }
+    if (needsPinnedMessageRefresh) {
+        [self loadPinnedMessageForSelectedChat];
     }
 
     [selectedChatID release];

@@ -24,6 +24,7 @@
 #import "../Media/TGMediaItemSupport.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
@@ -102,6 +103,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *topicBackButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
+@property (nonatomic, retain) NSButton *chatSearchButton;
+@property (nonatomic, retain) NSButton *conversationSearchButton;
+@property (nonatomic, retain) TGGroupedCardView *searchPanelView;
+@property (nonatomic, retain) NSTextField *searchTextField;
+@property (nonatomic, retain) NSPopUpButton *searchScopePopUpButton;
+@property (nonatomic, retain) NSPopUpButton *searchFilterPopUpButton;
+@property (nonatomic, retain) NSButton *searchCloseButton;
+@property (nonatomic, retain) NSTextField *searchStatusField;
+@property (nonatomic, retain) NSScrollView *searchResultsScrollView;
+@property (nonatomic, retain) NSTableView *searchResultsTableView;
+@property (nonatomic, retain) NSMutableArray *searchResultItems;
+@property (nonatomic, retain) NSTimer *searchDebounceTimer;
+@property (nonatomic, copy) NSString *globalSearchOffset;
+@property (nonatomic, assign) BOOL searchPanelVisible;
+@property (nonatomic, assign) BOOL searchLoading;
+@property (nonatomic, assign) BOOL searchEndReached;
+@property (nonatomic, assign) NSUInteger searchGeneration;
+@property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
+@property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
+@property (nonatomic, retain) NSTextField *pinnedMessageTextField;
+@property (nonatomic, retain) NSButton *pinnedMessageButton;
+@property (nonatomic, retain) TGMessageItem *pinnedMessageItem;
+@property (nonatomic, assign) NSUInteger pinnedMessageGeneration;
+@property (nonatomic, retain) NSNumber *highlightedSearchMessageID;
+@property (nonatomic, retain) NSTimer *searchHighlightTimer;
 @property (nonatomic, retain) NSTextField *sendLabel;
 @property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
@@ -389,6 +415,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize topicBackButton = _topicBackButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
+@synthesize chatSearchButton = _chatSearchButton;
+@synthesize conversationSearchButton = _conversationSearchButton;
+@synthesize searchPanelView = _searchPanelView;
+@synthesize searchTextField = _searchTextField;
+@synthesize searchScopePopUpButton = _searchScopePopUpButton;
+@synthesize searchFilterPopUpButton = _searchFilterPopUpButton;
+@synthesize searchCloseButton = _searchCloseButton;
+@synthesize searchStatusField = _searchStatusField;
+@synthesize searchResultsScrollView = _searchResultsScrollView;
+@synthesize searchResultsTableView = _searchResultsTableView;
+@synthesize searchResultItems = _searchResultItems;
+@synthesize searchDebounceTimer = _searchDebounceTimer;
+@synthesize globalSearchOffset = _globalSearchOffset;
+@synthesize searchPanelVisible = _searchPanelVisible;
+@synthesize searchLoading = _searchLoading;
+@synthesize searchEndReached = _searchEndReached;
+@synthesize searchGeneration = _searchGeneration;
+@synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
+@synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
+@synthesize pinnedMessageTextField = _pinnedMessageTextField;
+@synthesize pinnedMessageButton = _pinnedMessageButton;
+@synthesize pinnedMessageItem = _pinnedMessageItem;
+@synthesize pinnedMessageGeneration = _pinnedMessageGeneration;
+@synthesize highlightedSearchMessageID = _highlightedSearchMessageID;
+@synthesize searchHighlightTimer = _searchHighlightTimer;
 @synthesize sendLabel = _sendLabel;
 @synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
@@ -647,6 +698,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.searchResultItems = [NSMutableArray array];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
@@ -1413,6 +1465,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.loadMoreChatsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadMoreChatsButton];
 
+    self.chatSearchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(188, 332, 32, 32)] autorelease];
+    [self.chatSearchButton setTitle:@"⌕"];
+    [self.chatSearchButton setToolTip:@"Search all chats"];
+    [self.chatSearchButton setTarget:self];
+    [self.chatSearchButton setAction:@selector(openGlobalSearch:)];
+    [self.chatSearchButton setEnabled:NO];
+    [self applyHeaderIconButtonStyle:self.chatSearchButton];
+    [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.chatSearchButton];
+
     self.topicBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 332, 32, 32)] autorelease];
     [self.topicBackButton setTitle:@"‹"];
     [self.topicBackButton setToolTip:@"Back to chats"];
@@ -1491,6 +1553,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyHeaderIconButtonStyle:self.loadOlderMessagesButton];
     [self.loadOlderMessagesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.loadOlderMessagesButton];
+
+    self.conversationSearchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(228, 192, 32, 32)] autorelease];
+    [self.conversationSearchButton setTitle:@"⌕"];
+    [self.conversationSearchButton setToolTip:@"Search in this chat"];
+    [self.conversationSearchButton setTarget:self];
+    [self.conversationSearchButton setAction:@selector(openChatSearch:)];
+    [self.conversationSearchButton setEnabled:NO];
+    [self applyHeaderIconButtonStyle:self.conversationSearchButton];
+    [self.conversationSearchButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.conversationSearchButton];
 
     self.selectedChatField = [self labelWithFrame:NSMakeRect(264, 198, 472, 22)
                                              text:@"Select a chat"
@@ -1587,6 +1659,99 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageDropOverlayView setHidden:YES];
     [self.messageDropOverlayView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.messageDropOverlayView];
+
+    self.pinnedMessagePanelView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 180, 600, 42)] autorelease];
+    [self.pinnedMessagePanelView setHidden:YES];
+    [contentView addSubview:self.pinnedMessagePanelView];
+
+    self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(32, 190, 90, 16)
+                                                   text:@"Pinned"
+                                                   font:[NSFont boldSystemFontOfSize:10.0]];
+    [self.pinnedMessageLabelField setTextColor:TGClassicMutedInkColor()];
+    [contentView addSubview:self.pinnedMessageLabelField];
+
+    self.pinnedMessageTextField = [self labelWithFrame:NSMakeRect(32, 174, 520, 18)
+                                                  text:@""
+                                                  font:[NSFont systemFontOfSize:12.0]];
+    [self.pinnedMessageTextField setTextColor:TGClassicInkColor()];
+    [[self.pinnedMessageTextField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [contentView addSubview:self.pinnedMessageTextField];
+
+    self.pinnedMessageButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 180, 600, 42)] autorelease];
+    [self.pinnedMessageButton setTitle:@""];
+    [self.pinnedMessageButton setBordered:NO];
+    [self.pinnedMessageButton setTransparent:YES];
+    [self.pinnedMessageButton setTarget:self];
+    [self.pinnedMessageButton setAction:@selector(jumpToPinnedMessage:)];
+    [self.pinnedMessageButton setToolTip:@"Jump to pinned message"];
+    [self.pinnedMessageButton setHidden:YES];
+    [contentView addSubview:self.pinnedMessageButton];
+
+    self.searchPanelView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 180, 600, 180)] autorelease];
+    [self.searchPanelView setHidden:YES];
+    [contentView addSubview:self.searchPanelView];
+
+    self.searchTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(36, 318, 260, 24)] autorelease];
+    [[self.searchTextField cell] setPlaceholderString:@"Search"];
+    [self.searchTextField setTarget:self];
+    [self.searchTextField setAction:@selector(searchTextCommitted:)];
+    [self.searchTextField setDelegate:(id)self];
+    [self.searchTextField setHidden:YES];
+    [contentView addSubview:self.searchTextField];
+
+    self.searchScopePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(304, 318, 132, 26) pullsDown:NO] autorelease];
+    [self.searchScopePopUpButton addItemWithTitle:@"В этом чате"];
+    [self.searchScopePopUpButton addItemWithTitle:@"Во всех чатах"];
+    [self.searchScopePopUpButton setTarget:self];
+    [self.searchScopePopUpButton setAction:@selector(searchScopeChanged:)];
+    [self.searchScopePopUpButton setHidden:YES];
+    [contentView addSubview:self.searchScopePopUpButton];
+
+    self.searchFilterPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(442, 318, 112, 26) pullsDown:NO] autorelease];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Все"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Фото"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Документы"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Ссылки"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Голосовые"];
+    [self.searchFilterPopUpButton setTarget:self];
+    [self.searchFilterPopUpButton setAction:@selector(searchFilterChanged:)];
+    [self.searchFilterPopUpButton setHidden:YES];
+    [contentView addSubview:self.searchFilterPopUpButton];
+
+    self.searchCloseButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 318, 32, 26)] autorelease];
+    [self.searchCloseButton setTitle:@"×"];
+    [self.searchCloseButton setToolTip:@"Close search"];
+    [self.searchCloseButton setTarget:self];
+    [self.searchCloseButton setAction:@selector(closeSearchPanel:)];
+    [self applyUtilityButtonStyle:self.searchCloseButton];
+    [self.searchCloseButton setHidden:YES];
+    [contentView addSubview:self.searchCloseButton];
+
+    self.searchStatusField = [self labelWithFrame:NSMakeRect(36, 296, 540, 18)
+                                             text:@"Введите запрос"
+                                             font:[NSFont systemFontOfSize:11.0]];
+    [self.searchStatusField setTextColor:TGClassicMutedInkColor()];
+    [self.searchStatusField setHidden:YES];
+    [contentView addSubview:self.searchStatusField];
+
+    self.searchResultsScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(36, 190, 540, 102)] autorelease];
+    [self applySkeuomorphicScrollStyle:self.searchResultsScrollView];
+    [self.searchResultsScrollView setHasVerticalScroller:YES];
+    [self.searchResultsScrollView setHidden:YES];
+    self.searchResultsTableView = [[[NSTableView alloc] initWithFrame:[[self.searchResultsScrollView contentView] bounds]] autorelease];
+    [self.searchResultsTableView setDataSource:self];
+    [self.searchResultsTableView setDelegate:self];
+    [self.searchResultsTableView setTarget:self];
+    [self.searchResultsTableView setAction:@selector(activateSearchResult:)];
+    [self.searchResultsTableView setDoubleAction:@selector(activateSearchResult:)];
+    [self.searchResultsTableView setRowHeight:44.0];
+    [self.searchResultsTableView setHeaderView:nil];
+    NSTableColumn *searchColumn = [[[NSTableColumn alloc] initWithIdentifier:@"search"] autorelease];
+    [[searchColumn headerCell] setStringValue:@"Search"];
+    [searchColumn setWidth:520.0];
+    [self.searchResultsTableView addTableColumn:searchColumn];
+    [self.searchResultsScrollView setDocumentView:self.searchResultsTableView];
+    [contentView addSubview:self.searchResultsScrollView];
 
     self.sendLabel = [self labelWithFrame:NSMakeRect(24, 58, 48, 22)
                                      text:@""
@@ -2474,6 +2639,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 #include "TGStatusWindowController+MessageMenus.inc"
 
+#include "TGStatusWindowController+SearchNavigation.inc"
+
 #include "TGStatusWindowController+TableForumFlow.inc"
 
 #include "TGStatusWindowController+MessageDataFlow.inc"
@@ -2513,6 +2680,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_chatTableView setDelegate:nil];
     [_messageTableView setDataSource:nil];
     [_messageTableView setDelegate:nil];
+    [_searchResultsTableView setDataSource:nil];
+    [_searchResultsTableView setDelegate:nil];
     [_messageContextMenu setDelegate:nil];
     [_chatContextMenu setDelegate:nil];
     [_sendTextField setDelegate:nil];
@@ -2561,6 +2730,28 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_topicBackButton release];
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
+    [_chatSearchButton release];
+    [_conversationSearchButton release];
+    [_searchPanelView release];
+    [_searchTextField release];
+    [_searchScopePopUpButton release];
+    [_searchFilterPopUpButton release];
+    [_searchCloseButton release];
+    [_searchStatusField release];
+    [_searchResultsScrollView release];
+    [_searchResultsTableView release];
+    [_searchResultItems release];
+    [_searchDebounceTimer invalidate];
+    [_searchDebounceTimer release];
+    [_globalSearchOffset release];
+    [_pinnedMessagePanelView release];
+    [_pinnedMessageLabelField release];
+    [_pinnedMessageTextField release];
+    [_pinnedMessageButton release];
+    [_pinnedMessageItem release];
+    [_highlightedSearchMessageID release];
+    [_searchHighlightTimer invalidate];
+    [_searchHighlightTimer release];
     [_sendLabel release];
     [_sendTextFieldBackgroundView release];
     [_sendTextField release];

@@ -62,11 +62,13 @@
     [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList)];
     [self showView:self.loadChatsButton visible:showChats];
     [self showView:self.loadMoreChatsButton visible:NO];
+    [self showView:self.chatSearchButton visible:showChats];
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:NO];
+    [self showView:self.conversationSearchButton visible:showChats];
     [self showView:self.selectedChatField visible:showChats];
     [self showView:self.typingIndicatorField visible:(showChats && [[self.typingIndicatorField stringValue] length] > 0)];
     BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
@@ -75,6 +77,20 @@
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
+    BOOL showSearchPanel = (showChats && self.searchPanelVisible);
+    [self showView:self.searchPanelView visible:showSearchPanel];
+    [self showView:self.searchTextField visible:showSearchPanel];
+    [self showView:self.searchScopePopUpButton visible:showSearchPanel];
+    [self showView:self.searchFilterPopUpButton visible:showSearchPanel];
+    [self showView:self.searchCloseButton visible:showSearchPanel];
+    [self showView:self.searchStatusField visible:showSearchPanel];
+    [self showView:self.searchResultsScrollView visible:showSearchPanel];
+    [self showView:self.searchResultsTableView visible:showSearchPanel];
+    BOOL showPinnedPanel = (showChats && !self.searchPanelVisible && self.pinnedMessageItem != nil);
+    [self showView:self.pinnedMessagePanelView visible:showPinnedPanel];
+    [self showView:self.pinnedMessageLabelField visible:showPinnedPanel];
+    [self showView:self.pinnedMessageTextField visible:showPinnedPanel];
+    [self showView:self.pinnedMessageButton visible:showPinnedPanel];
     if (showChats) {
         [self scheduleInlineMediaPlaybackRefresh];
     } else {
@@ -418,6 +434,7 @@
     [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, sidebarWidth - (chatHeaderTitleX - mainX) - 58.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.chatSearchButton setFrame:NSMakeRect(mainX + sidebarWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
     CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -444,6 +461,7 @@
 
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.conversationSearchButton setFrame:NSMakeRect(conversationX + conversationWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
     CGFloat selectedAvatarSize = 24.0;
     CGFloat selectedAvatarX = conversationX + 16.0;
@@ -481,12 +499,44 @@
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
     CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat panelInsetX = conversationX + 8.0;
+    CGFloat panelWidth = conversationWidth - 16.0;
+    if (panelWidth < 260.0) {
+        panelWidth = 260.0;
+    }
+    if (self.searchPanelVisible) {
+        CGFloat searchHeight = 174.0;
+        CGFloat searchY = messageTop - searchHeight;
+        [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
+        [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, panelWidth - 326.0, 24.0)];
+        [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 306.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
+        [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 168.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
+        [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
+        [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
+        [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
+        NSTableColumn *searchColumn = [self.searchResultsTableView tableColumnWithIdentifier:@"search"];
+        if (searchColumn) {
+            [self.searchResultsScrollView tile];
+            [searchColumn setWidth:NSWidth([[self.searchResultsScrollView contentView] bounds])];
+        }
+        messageTop = searchY - 6.0;
+    }
+    BOOL hasPinnedPanel = (self.pinnedMessageItem != nil && !self.searchPanelVisible);
+    if (hasPinnedPanel) {
+        CGFloat pinnedHeight = 48.0;
+        CGFloat pinnedY = messageTop - pinnedHeight;
+        [self.pinnedMessagePanelView setFrame:NSMakeRect(panelInsetX, pinnedY, panelWidth, pinnedHeight)];
+        [self.pinnedMessageLabelField setFrame:NSMakeRect(panelInsetX + 16.0, pinnedY + 27.0, 120.0, 15.0)];
+        [self.pinnedMessageTextField setFrame:NSMakeRect(panelInsetX + 16.0, pinnedY + 9.0, panelWidth - 32.0, 18.0)];
+        [self.pinnedMessageButton setFrame:NSMakeRect(panelInsetX, pinnedY, panelWidth, pinnedHeight)];
+        messageTop = pinnedY - 6.0;
+    }
     CGFloat messageHeight = messageTop - messageBottom;
     if (messageHeight < 160.0) {
         messageHeight = 160.0;
     }
-    CGFloat messageScrollX = conversationX + 8.0;
-    CGFloat messageScrollWidth = conversationWidth - 16.0;
+    CGFloat messageScrollX = panelInsetX;
+    CGFloat messageScrollWidth = panelWidth;
     if (messageScrollWidth < 260.0) {
         messageScrollWidth = 260.0;
     }

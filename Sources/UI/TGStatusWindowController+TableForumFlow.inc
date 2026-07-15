@@ -1,4 +1,7 @@
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    if (tableView == self.searchResultsTableView) {
+        return (NSInteger)[self.searchResultItems count];
+    }
     if (tableView == self.messageTableView) {
         return (NSInteger)[self.messageItems count];
     }
@@ -22,6 +25,9 @@
 }
 
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
+    if (tableView == self.searchResultsTableView) {
+        return 44.0;
+    }
     if (tableView != self.messageTableView) {
         return [tableView rowHeight];
     }
@@ -131,6 +137,16 @@
     }
     NSTextFieldCell *textCell = (NSTextFieldCell *)cell;
     id identifier = [tableColumn identifier];
+    if (tableView == self.searchResultsTableView) {
+        [textCell setFont:[NSFont systemFontOfSize:11.0]];
+        [textCell setTextColor:TGClassicInkColor()];
+        [textCell setDrawsBackground:[tableView isRowSelected:row]];
+        if ([tableView isRowSelected:row]) {
+            [textCell setBackgroundColor:TGClassicSelectedRowColor()];
+        }
+        [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
+        return;
+    }
     if (tableView == self.chatTableView && [identifier isEqual:@"chat"] && [cell isKindOfClass:[TGChatListCell class]]) {
         TGChatItem *chatItem = nil;
         if (row >= 0 && (NSUInteger)row < [self.chatItems count]) {
@@ -198,6 +214,27 @@
 }
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    if (tableView == self.searchResultsTableView) {
+        if (row < 0 || (NSUInteger)row >= [self.searchResultItems count]) {
+            return @"";
+        }
+        id candidate = [self.searchResultItems objectAtIndex:(NSUInteger)row];
+        if (![candidate isKindOfClass:[TGSearchResultItem class]]) {
+            return @"";
+        }
+        TGSearchResultItem *result = (TGSearchResultItem *)candidate;
+        NSString *title = [result displayTitle];
+        NSString *subtitle = [result displaySubtitle];
+        NSString *date = [result dateSummary];
+        NSMutableString *line = [NSMutableString stringWithString:title ? title : @""];
+        if ([date length] > 0) {
+            [line appendFormat:@"  %@", date];
+        }
+        if ([subtitle length] > 0) {
+            [line appendFormat:@"\n%@", subtitle];
+        }
+        return line;
+    }
     NSArray *items = (tableView == self.messageTableView) ? self.messageItems : self.chatItems;
     if (row < 0 || (NSUInteger)row >= [items count]) {
         return @"";
@@ -243,6 +280,9 @@
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
+    if ([notification object] == self.searchResultsTableView) {
+        return;
+    }
     if ([notification object] != self.chatTableView) {
         return;
     }
@@ -266,6 +306,8 @@
         self.selectedChatLastReadOutboxMessageID = nil;
         self.selectedMessageThreadID = nil;
         self.selectedMessageTopicKind = nil;
+        self.pinnedMessageItem = nil;
+        self.searchGeneration++;
         [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
@@ -314,6 +356,8 @@
     BOOL shouldOpenTopicList = (!selectedForumTopic && !self.showingForumTopicList && [[item typeSummary] isEqualToString:@"Supergroup"]);
     if (selectionChanged) {
         [self clearTypingIndicator];
+        self.searchGeneration++;
+        self.pinnedMessageItem = nil;
         [self.messageItems removeAllObjects];
         [self.messageTableView reloadData];
         if (shouldOpenTopicList) {
@@ -327,6 +371,9 @@
         self.autoOlderMessagesLoadArmed = YES;
     }
     [self updateAuthControlsForState:self.currentAuthState];
+    if (selectionChanged || self.pinnedMessageItem == nil) {
+        [self loadPinnedMessageForSelectedChat];
+    }
     if (selectedForumTopic) {
         if (newThreadID) {
             [self appendDetail:[NSString stringWithFormat:@"Forum topic selected: %@ (%lld).", self.selectedChatTitle ? self.selectedChatTitle : @"Topic", [newThreadID longLongValue]]];
@@ -446,6 +493,7 @@
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
     [self refreshSelectedChatHeaderDisplay];
+    [self loadPinnedMessageForSelectedChat];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
     [self setComposerTextWithoutSavingDraft:nil];
@@ -698,6 +746,7 @@
                     [self.chatTableView deselectAll:nil];
                 }
                 [self refreshSelectedChatHeaderDisplay];
+                [self loadPinnedMessageForSelectedChat];
                 [self.messageItems removeAllObjects];
                 [self.messageTableView reloadData];
                 NSString *topicListTitle = ([parentTitle length] > 0 ? parentTitle : @"Topics");

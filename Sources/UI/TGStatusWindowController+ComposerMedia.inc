@@ -406,8 +406,9 @@
     NSNumber *threadID = [self.pendingPhotoSendThreadID retain];
     NSString *topicKind = [self.pendingPhotoSendTopicKind copy];
     TGAttachmentDescriptor *descriptor = [self.pendingAttachmentDescriptor retain];
-    if (![path length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
-        [self.photoSendErrorField setStringValue:@"Photo target is no longer available."];
+    NSString *effectivePath = [path length] > 0 ? path : [descriptor path];
+    if (![effectivePath length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        [self.photoSendErrorField setStringValue:@"Attachment target is no longer available."];
         [self.photoSendErrorField setHidden:NO];
     } else {
         [self.photoSendErrorField setStringValue:@""];
@@ -417,7 +418,7 @@
         if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
             [self submitAttachmentDescriptor:descriptor caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
         } else {
-            [self submitPhotoAtPath:path caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+            [self submitPhotoAtPath:effectivePath caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
         }
     }
     [path release];

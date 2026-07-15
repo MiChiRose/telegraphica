@@ -52,6 +52,7 @@
 		111111111111111111111143 /* TGResourcePolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111281 /* TGResourcePolicy.m */; };
 		111111111111111111111144 /* TGAttachmentDescriptor.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111283 /* TGAttachmentDescriptor.m */; };
 		111111111111111111111145 /* TGFileTransferState.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111285 /* TGFileTransferState.m */; };
+		111111111111111111111146 /* TGSearchResultItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111287 /* TGSearchResultItem.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -135,6 +136,8 @@
 		111111111111111111111283 /* TGAttachmentDescriptor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAttachmentDescriptor.m; sourceTree = "<group>"; };
 		111111111111111111111284 /* TGFileTransferState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGFileTransferState.h; sourceTree = "<group>"; };
 		111111111111111111111285 /* TGFileTransferState.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGFileTransferState.m; sourceTree = "<group>"; };
+		111111111111111111111286 /* TGSearchResultItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSearchResultItem.h; sourceTree = "<group>"; };
+		111111111111111111111287 /* TGSearchResultItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSearchResultItem.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -207,6 +210,8 @@
 				111111111111111111111213 /* TGChatItem.m */,
 				111111111111111111111214 /* TGMessageItem.h */,
 				111111111111111111111215 /* TGMessageItem.m */,
+				111111111111111111111286 /* TGSearchResultItem.h */,
+				111111111111111111111287 /* TGSearchResultItem.m */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -412,6 +417,7 @@
 				111111111111111111111143 /* TGResourcePolicy.m in Sources */,
 				111111111111111111111144 /* TGAttachmentDescriptor.m in Sources */,
 				111111111111111111111145 /* TGFileTransferState.m in Sources */,
+				111111111111111111111146 /* TGSearchResultItem.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

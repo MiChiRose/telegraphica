@@ -146,6 +146,16 @@ NSString *TGResourcePolicyReadableSize(long long bytes) {
     if (bytes <= 0) {
         return @"0 B";
     }
+    if (bytes < 1024) {
+        return [NSString stringWithFormat:@"%lld B", bytes];
+    }
+    double kb = ((double)bytes) / 1024.0;
+    if (kb < 1024.0) {
+        if (kb >= 100.0) {
+            return [NSString stringWithFormat:@"%.0f KB", kb];
+        }
+        return [NSString stringWithFormat:@"%.1f KB", kb];
+    }
     double mb = ((double)bytes) / (1024.0 * 1024.0);
     if (mb >= 1024.0) {
         return [NSString stringWithFormat:@"%.1f GB", mb / 1024.0];

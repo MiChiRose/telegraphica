@@ -524,9 +524,11 @@
     [self.authButton setHidden:YES];
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMoreChatsButton setEnabled:NO];
+    [self.chatSearchButton setEnabled:[state isEqualToString:@"ready"]];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
+    [self.conversationSearchButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.logoutButton setEnabled:([state isEqualToString:@"ready"] && !self.controlsBusy)];
     [self updateSendControls];
     [self refreshProfileDisplay];
@@ -557,9 +559,11 @@
     [self updateNavigationButtonsForSection:(self.activeSection ? self.activeSection : TGSectionChats) enabled:!busy];
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMoreChatsButton setEnabled:NO];
+    [self.chatSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
+    [self.conversationSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.attachPhotoButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.stickerButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.voiceRecordButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
@@ -571,8 +575,10 @@
         [self.authSecureField setEnabled:NO];
         [self.loadChatsButton setEnabled:NO];
         [self.loadMoreChatsButton setEnabled:NO];
+        [self.chatSearchButton setEnabled:NO];
         [self.loadMessagesButton setEnabled:NO];
         [self.loadOlderMessagesButton setEnabled:NO];
+        [self.conversationSearchButton setEnabled:NO];
         [self.logoutButton setEnabled:NO];
         [self.chatTableView setEnabled:NO];
         [self.messageTableView setEnabled:NO];
@@ -591,7 +597,10 @@
 }
 
 - (void)controlTextDidChange:(NSNotification *)notification {
-    if ([notification object] == self.sendTextField) {
+    if ([notification object] == self.searchTextField) {
+        [self scheduleSearchRequest];
+        return;
+    } else if ([notification object] == self.sendTextField) {
         [self saveCurrentComposerDraft];
         [self updateSendControls];
         [self layoutContentView];
@@ -604,6 +613,10 @@
 }
 
 - (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector {
+    if (control == self.searchTextField &&
+        [self control:control textView:textView doSearchCommandBySelector:commandSelector]) {
+        return YES;
+    }
     if (control == self.sendTextField &&
         (commandSelector == @selector(insertNewline:) ||
          commandSelector == @selector(insertLineBreak:) ||
