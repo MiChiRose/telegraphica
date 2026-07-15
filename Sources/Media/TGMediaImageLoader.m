@@ -31,6 +31,13 @@ static NSImage *TGMediaCacheImage(NSImage *image, NSString *path) {
     return image;
 }
 
+void TGMediaImageLoaderSetCacheLimitBytes(NSUInteger bytes) {
+    NSCache *cache = TGMediaImageCache();
+    NSUInteger limit = bytes > 0 ? bytes : (64 * 1024 * 1024);
+    [cache setTotalCostLimit:limit];
+    [cache setCountLimit:(limit < (128 * 1024 * 1024)) ? 80 : 160];
+}
+
 NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
         return nil;

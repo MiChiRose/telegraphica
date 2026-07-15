@@ -2,6 +2,7 @@
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
 #import "../Services/TGKeychainHelper.h"
+#import "../Services/TGResourcePolicy.h"
 #import <dlfcn.h>
 #import <Security/Security.h>
 #import <stdlib.h>
@@ -185,6 +186,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
 - (void)applyChatPositionFromChatObject:(NSDictionary *)chatObject toChatItem:(TGChatItem *)item chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
+- (BOOL)shouldAutoDownloadMessageContentObject:(id)contentObject downloadableInfo:(NSDictionary *)downloadableInfo;
 - (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)userSenderSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)photoInfoFromChatPhotoObject:(id)photoObject
@@ -3424,6 +3426,42 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return info;
 }
 
+- (BOOL)shouldAutoDownloadMessageContentObject:(id)contentObject downloadableInfo:(NSDictionary *)downloadableInfo {
+    if (![contentObject isKindOfClass:[NSDictionary class]]) {
+        return YES;
+    }
+    NSString *contentType = [(NSDictionary *)contentObject objectForKey:@"@type"];
+    if (![contentType isKindOfClass:[NSString class]]) {
+        return YES;
+    }
+
+    TGResourceAutoDownloadType type = TGResourceAutoDownloadPhoto;
+    BOOL policyApplies = YES;
+    if ([contentType isEqualToString:@"messagePhoto"] || [contentType isEqualToString:@"messageSticker"]) {
+        type = TGResourceAutoDownloadPhoto;
+    } else if ([contentType isEqualToString:@"messageVideo"] ||
+               [contentType isEqualToString:@"messageVideoNote"] ||
+               [contentType isEqualToString:@"messageAnimation"]) {
+        type = TGResourceAutoDownloadVideo;
+    } else if ([contentType isEqualToString:@"messageDocument"]) {
+        type = TGResourceAutoDownloadDocument;
+    } else {
+        policyApplies = NO;
+    }
+    if (!policyApplies) {
+        return YES;
+    }
+    if (!TGResourcePolicyAutoDownloadEnabledForType(type)) {
+        return NO;
+    }
+    id fileSizeObject = [downloadableInfo objectForKey:@"file_size"];
+    if ([fileSizeObject respondsToSelector:@selector(longLongValue)] &&
+        [fileSizeObject longLongValue] > TGResourcePolicyMaxAutoDownloadBytes()) {
+        return NO;
+    }
+    return YES;
+}
+
 - (NSDictionary *)stickerPreviewInfoFromStickerObject:(id)stickerObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -3887,9 +3925,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
             [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
         }
+        NSDictionary *downloadInfo = [self downloadableInfoFromMessageContentObject:contentObject];
+        BOOL policyAllowsAutoDownload = [self shouldAutoDownloadMessageContentObject:contentObject downloadableInfo:downloadInfo];
         BOOL didRequestMediaDownload = NO;
         NSDictionary *photoInfo = [self visualMediaInfoFromMessageContentObject:contentObject
-                                                                downloadMissing:(visualMediaDownloadsRemaining > 0)
+                                                                downloadMissing:(policyAllowsAutoDownload && visualMediaDownloadsRemaining > 0)
                                                                         timeout:1.5
                                                              didRequestDownload:&didRequestMediaDownload];
         if (didRequestMediaDownload && visualMediaDownloadsRemaining > 0) {
@@ -3897,7 +3937,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         }
         BOOL didRequestPlayableDownload = NO;
         NSDictionary *playableInfo = [self playableMediaInfoFromMessageContentObject:contentObject
-                                                                     downloadMissing:(playableMediaDownloadsRemaining > 0)
+                                                                     downloadMissing:(policyAllowsAutoDownload && playableMediaDownloadsRemaining > 0)
                                                                              timeout:1.5
                                                                   didRequestDownload:&didRequestPlayableDownload];
         if (didRequestPlayableDownload && playableMediaDownloadsRemaining > 0) {
@@ -3920,7 +3960,6 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if (!playableFileID) {
             playableFileID = [photoInfo objectForKey:@"file_id"];
         }
-        NSDictionary *downloadInfo = [self downloadableInfoFromMessageContentObject:contentObject];
         if (!playableFileID) {
             playableFileID = [downloadInfo objectForKey:@"file_id"];
         }
@@ -4874,6 +4913,164 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return @"photo submitted";
+}
+
+- (BOOL)validateLocalSendFilePath:(NSString *)localPath
+                            label:(NSString *)label
+                         outPath:(NSString **)outPath
+                            error:(NSError **)error
+                             code:(NSInteger)code {
+    if (![localPath isKindOfClass:[NSString class]] || [localPath length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"%@ path is missing.", label] code:code];
+        }
+        return NO;
+    }
+    NSString *standardPath = [localPath stringByStandardizingPath];
+    BOOL isDirectory = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:standardPath isDirectory:&isDirectory] || isDirectory) {
+        if (error) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"%@ file does not exist.", label] code:code];
+        }
+        return NO;
+    }
+    if (outPath) {
+        *outPath = standardPath;
+    }
+    return YES;
+}
+
+- (NSDictionary *)formattedCaptionForSendCaption:(NSString *)caption {
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            @"formattedText", @"@type",
+            ([caption isKindOfClass:[NSString class]] ? caption : @""), @"text",
+            [NSArray array], @"entities",
+            nil];
+}
+
+- (NSDictionary *)inputFileLocalForPath:(NSString *)path {
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            @"inputFileLocal", @"@type",
+            path, @"path",
+            nil];
+}
+
+- (NSString *)sendGenericFileMessageToChatID:(NSNumber *)chatID
+                              messageThreadID:(NSNumber *)messageThreadID
+                             messageTopicKind:(NSString *)messageTopicKind
+                                     localPath:(NSString *)localPath
+                                       caption:(NSString *)caption
+                                   contentType:(NSString *)contentType
+                                        label:(NSString *)label
+                                       timeout:(NSTimeInterval)timeout
+                                         error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:69];
+        }
+        return nil;
+    }
+
+    NSString *standardPath = nil;
+    if (![self validateLocalSendFilePath:localPath label:label outPath:&standardPath error:error code:69]) {
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to send %@. Current auth state: %@", [label lowercaseString], authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:70];
+        }
+        return nil;
+    }
+
+    NSDictionary *inputFile = [self inputFileLocalForPath:standardPath];
+    NSDictionary *formattedCaption = [self formattedCaptionForSendCaption:caption];
+    NSMutableDictionary *content = [NSMutableDictionary dictionary];
+    [content setObject:contentType forKey:@"@type"];
+    if ([contentType isEqualToString:@"inputMessageVideo"]) {
+        [content setObject:inputFile forKey:@"video"];
+        [content setObject:[NSNull null] forKey:@"thumbnail"];
+        [content setObject:[NSArray array] forKey:@"added_sticker_file_ids"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"duration"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"width"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"height"];
+        [content setObject:[NSNumber numberWithBool:NO] forKey:@"supports_streaming"];
+        [content setObject:formattedCaption forKey:@"caption"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"ttl"];
+    } else if ([contentType isEqualToString:@"inputMessageAudio"]) {
+        [content setObject:inputFile forKey:@"audio"];
+        [content setObject:[NSNull null] forKey:@"album_cover_thumbnail"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"duration"];
+        [content setObject:@"" forKey:@"title"];
+        [content setObject:@"" forKey:@"performer"];
+        [content setObject:formattedCaption forKey:@"caption"];
+    } else {
+        [content setObject:@"inputMessageDocument" forKey:@"@type"];
+        [content setObject:inputFile forKey:@"document"];
+        [content setObject:[NSNull null] forKey:@"thumbnail"];
+        [content setObject:[NSNumber numberWithBool:NO] forKey:@"disable_content_type_detection"];
+        [content setObject:formattedCaption forKey:@"caption"];
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"sendMessage" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:content forKey:@"input_message_content"];
+
+    NSError *sendError = nil;
+    NSDictionary *response = [self sendMessageRequest:request
+                                      messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind
+                                          extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@", [label lowercaseString]]
+                                              timeout:timeout
+                                            errorCode:71
+                                                error:&sendError];
+    if (!response && ![contentType isEqualToString:@"inputMessageDocument"]) {
+        NSMutableDictionary *documentContent = [NSMutableDictionary dictionary];
+        [documentContent setObject:@"inputMessageDocument" forKey:@"@type"];
+        [documentContent setObject:inputFile forKey:@"document"];
+        [documentContent setObject:[NSNull null] forKey:@"thumbnail"];
+        [documentContent setObject:[NSNumber numberWithBool:NO] forKey:@"disable_content_type_detection"];
+        [documentContent setObject:formattedCaption forKey:@"caption"];
+        NSMutableDictionary *fallbackRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [fallbackRequest setObject:documentContent forKey:@"input_message_content"];
+        response = [self sendMessageRequest:fallbackRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-document-fallback", [label lowercaseString]]
+                                    timeout:timeout
+                                  errorCode:71
+                                      error:&sendError];
+    }
+
+    if (!response) {
+        if (error) {
+            *error = sendError ? sendError : [self errorWithDescription:[NSString stringWithFormat:@"TDLib did not confirm %@ send.", [label lowercaseString]] code:71];
+        }
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib %@ send returned an unexpected response.", [label lowercaseString]] code:71];
+        }
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%@ submitted", [label lowercaseString]];
+}
+
+- (NSString *)sendDocumentMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageDocument" label:@"Document" timeout:timeout error:error];
+}
+
+- (NSString *)sendVideoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageVideo" label:@"Video" timeout:timeout error:error];
+}
+
+- (NSString *)sendAudioMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageAudio" label:@"Audio" timeout:timeout error:error];
 }
 
 - (NSArray *)recentStickerItemsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {

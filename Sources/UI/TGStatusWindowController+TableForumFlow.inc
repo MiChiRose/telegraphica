@@ -90,9 +90,8 @@
         [self showMessageDropOverlay:NO];
         return NSDragOperationNone;
     }
-    NSString *photoPath = TGFirstSupportedPhotoPathFromPasteboard([info draggingPasteboard]);
-    BOOL canDropPhoto = ([photoPath length] > 0);
-    if (canDropPhoto) {
+    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor firstDescriptorFromPasteboard:[info draggingPasteboard]];
+    if ([descriptor isSupported]) {
         [self.messageTableView setDropRow:-1 dropOperation:NSTableViewDropOn];
         [self showMessageDropOverlay:YES];
         return NSDragOperationCopy;
@@ -115,11 +114,14 @@
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
         return NO;
     }
-    NSString *photoPath = TGFirstSupportedPhotoPathFromPasteboard([info draggingPasteboard]);
-    if ([photoPath length] == 0) {
+    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor firstDescriptorFromPasteboard:[info draggingPasteboard]];
+    if (![descriptor isSupported]) {
+        if ([descriptor.errorMessage length] > 0) {
+            [self appendDetail:descriptor.errorMessage];
+        }
         return NO;
     }
-    [self sendPhotoAtPath:photoPath];
+    [self presentAttachmentPreviewForDescriptor:descriptor];
     return YES;
 }
 

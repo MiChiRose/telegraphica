@@ -130,6 +130,7 @@
     [self showView:self.settingsScrollView visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
+    [self showView:self.settingsResourceCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
     [self showView:self.settingsFilesCardView visible:showSettings];
     [self showView:self.settingsHelpCardView visible:showSettings];
@@ -137,6 +138,7 @@
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
+    [self showView:self.settingsResourceSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
     [self showView:self.settingsFilesSectionField visible:showSettings];
     [self showView:self.settingsHelpSectionField visible:showSettings];
@@ -150,6 +152,19 @@
     [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
+    [self showView:self.settingsEconomyModeButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadDocumentsButton visible:showSettings];
+    [self showView:self.settingsAutoplayAnimatedStickersButton visible:showSettings];
+    [self showView:self.settingsStopInactiveAnimationsButton visible:showSettings];
+    [self showView:self.settingsMaxAutoDownloadLabel visible:showSettings];
+    [self showView:self.settingsMaxAutoDownloadPopUpButton visible:showSettings];
+    [self showView:self.settingsMaxAnimationsLabel visible:showSettings];
+    [self showView:self.settingsMaxAnimationsPopUpButton visible:showSettings];
+    [self showView:self.settingsMediaCacheLimitLabel visible:showSettings];
+    [self showView:self.settingsMediaCacheLimitPopUpButton visible:showSettings];
+    [self showView:self.settingsResourceHintField visible:showSettings];
     [self showView:self.settingsLanguageLabel visible:showSettings];
     [self showView:self.settingsLanguagePopUpButton visible:showSettings];
     [self showView:self.settingsActiveSessionsDetailField visible:showSettings];
@@ -720,7 +735,7 @@
     if (settingsDocWidth < 340.0) {
         settingsDocWidth = settingsScrollWidth;
     }
-    CGFloat settingsDocHeight = 850.0;
+    CGFloat settingsDocHeight = 1120.0;
     if (settingsDocHeight < settingsScrollHeight) {
         settingsDocHeight = settingsScrollHeight;
     }
@@ -759,6 +774,32 @@
     [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 12.0, rowWidth, 22.0)];
     [self.settingsTypingIndicatorsButton setFrame:NSMakeRect(rowLeft, drawerCardY + 42.0, rowWidth, 22.0)];
     settingsNextY = drawerCardY + drawerCardHeight + settingsGroupGap;
+
+    [self.settingsResourceSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
+    CGFloat resourceCardHeight = 276.0;
+    CGFloat resourceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsResourceCardView setFrame:NSMakeRect(settingsGroupedX, resourceCardY, settingsGroupedWidth, resourceCardHeight)];
+    [self.settingsEconomyModeButton setFrame:NSMakeRect(rowLeft, resourceCardY + 12.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadPhotosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 42.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadVideosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 70.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadDocumentsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 98.0, rowWidth, 22.0)];
+    CGFloat resourcePopupWidth = 190.0;
+    if (resourcePopupWidth > rowWidth - 180.0) {
+        resourcePopupWidth = rowWidth - 180.0;
+    }
+    if (resourcePopupWidth < 120.0) {
+        resourcePopupWidth = 120.0;
+    }
+    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 128.0, 170.0, 22.0)];
+    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 124.0, resourcePopupWidth, 28.0)];
+    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 158.0, rowWidth, 22.0)];
+    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 188.0, 170.0, 22.0)];
+    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 184.0, resourcePopupWidth, 28.0)];
+    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 218.0, rowWidth, 22.0)];
+    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 248.0, 170.0, 22.0)];
+    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 244.0, resourcePopupWidth, 28.0)];
+    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 126.0, MAX(160.0, rowWidth - 390.0), 54.0)];
+    settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat interfaceCardHeight = 88.0;

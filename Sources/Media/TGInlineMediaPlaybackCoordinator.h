@@ -15,6 +15,9 @@ extern NSString * const TGInlineMediaPlaybackDiagnosticMessageKey;
 @interface TGInlineMediaPlaybackCoordinator : NSObject
 
 - (instancetype)initWithHostView:(NSView *)hostView maximumActiveItems:(NSUInteger)maximumActiveItems;
+- (void)setMaximumActiveItems:(NSUInteger)maximumActiveItems;
+- (void)setAutoplayEnabled:(BOOL)enabled;
+- (void)setStopWhenApplicationInactive:(BOOL)enabled;
 - (void)updateWithDescriptors:(NSArray *)descriptors;
 - (void)removeAllPlayback;
 - (void)invalidate;

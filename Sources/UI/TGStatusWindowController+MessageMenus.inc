@@ -86,6 +86,23 @@
     return menuItem;
 }
 
+- (NSMenuItem *)chatCurrentMuteStateMenuItemForChatItem:(TGChatItem *)item {
+    NSString *title = @"Notifications are on";
+    NSNumber *chatID = [self notificationChatIDForChatItem:item];
+    if ([self isChatIDLocallyMuted:chatID]) {
+        title = @"Notifications are muted locally";
+    } else if ([item serverNotificationsMuted]) {
+        title = @"Muted in Telegram";
+    }
+    NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""] autorelease];
+    [menuItem setEnabled:NO];
+    [menuItem setImage:TGTemplateIconAssetImage(([self isChatIDLocallyMuted:chatID] || [item serverNotificationsMuted]) ? @"sound-off" : @"bell",
+                                                NSMakeSize(16.0, 16.0),
+                                                [NSColor blackColor],
+                                                0.72)];
+    return menuItem;
+}
+
 - (NSString *)safeDownloadFileNameFromName:(NSString *)name fallback:(NSString *)fallback {
     NSString *candidate = ([name length] > 0) ? name : fallback;
     if ([candidate length] == 0) {
@@ -259,12 +276,7 @@
     [menu addItem:pinItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    if ([item serverNotificationsMuted]) {
-        NSMenuItem *serverMutedItem = [[[NSMenuItem alloc] initWithTitle:@"Muted in Telegram" action:nil keyEquivalent:@""] autorelease];
-        [serverMutedItem setEnabled:NO];
-        [serverMutedItem setImage:TGTemplateIconAssetImage(@"sound-off", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
-        [menu addItem:serverMutedItem];
-    }
+    [menu addItem:[self chatCurrentMuteStateMenuItemForChatItem:item]];
 
     if ([self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]) {
         NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:@"Enable local notifications"
@@ -278,8 +290,7 @@
 
     NSMenu *muteMenu = [[[NSMenu alloc] initWithTitle:@"Mute notifications"] autorelease];
     [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 hour" duration:(60.0 * 60.0) chatItem:item]];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 8 hours" duration:(8.0 * 60.0 * 60.0) chatItem:item]];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 3 days" duration:(3.0 * 24.0 * 60.0 * 60.0) chatItem:item]];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 day" duration:(24.0 * 60.0 * 60.0) chatItem:item]];
     [muteMenu addItem:[NSMenuItem separatorItem]];
     [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"Forever" duration:-1.0 chatItem:item]];
     NSMenuItem *muteRoot = [[[NSMenuItem alloc] initWithTitle:@"Mute notifications"

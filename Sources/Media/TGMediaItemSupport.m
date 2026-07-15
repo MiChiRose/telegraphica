@@ -118,7 +118,7 @@ NSString *TGMediaItemPlayableLocalPath(NSDictionary *mediaItem) {
     if ([path isKindOfClass:[NSString class]] && [(NSString *)path length] > 0) {
         NSString *extension = [[(NSString *)path pathExtension] lowercaseString];
         NSArray *extensions = [NSArray arrayWithObjects:@"mp4", @"mov", @"m4v", @"webm", @"gif",
-                               @"mp3", @"m4a", @"aac", @"ogg", @"opus", nil];
+                               @"mp3", @"m4a", @"aac", @"ogg", @"oga", @"opus", nil];
         if ([extensions containsObject:extension]) {
             return (NSString *)path;
         }
