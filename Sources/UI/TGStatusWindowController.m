@@ -4,6 +4,7 @@
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGAnimationSupport.h"
+#import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
@@ -1881,6 +1882,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsActiveSessionsButton setTarget:self];
     [self.settingsActiveSessionsButton setAction:@selector(showActiveSessionsWindow:)];
     [self applyUtilityButtonStyle:self.settingsActiveSessionsButton];
+    [self.settingsActiveSessionsButton setImagePosition:NSImageLeft];
+    [self.settingsActiveSessionsButton setImage:TGTemplateIconAssetImage(@"contacts", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsActiveSessionsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsActiveSessionsButton];
 
@@ -1895,6 +1898,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDownloadFolderButton setTarget:self];
     [self.settingsDownloadFolderButton setAction:@selector(chooseDownloadFolder:)];
     [self applyUtilityButtonStyle:self.settingsDownloadFolderButton];
+    [self.settingsDownloadFolderButton setImagePosition:NSImageLeft];
+    [self.settingsDownloadFolderButton setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsDownloadFolderButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsDownloadFolderButton];
 
@@ -1903,6 +1908,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsStorageUsageButton setTarget:self];
     [self.settingsStorageUsageButton setAction:@selector(showStorageUsageWindow:)];
     [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
+    [self.settingsStorageUsageButton setImagePosition:NSImageLeft];
+    [self.settingsStorageUsageButton setImage:TGTemplateIconAssetImage(@"archive", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];
 
@@ -1911,6 +1918,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsCheckUpdatesButton setTarget:self];
     [self.settingsCheckUpdatesButton setAction:@selector(checkForUpdatesManually:)];
     [self applyUtilityButtonStyle:self.settingsCheckUpdatesButton];
+    [self.settingsCheckUpdatesButton setImagePosition:NSImageLeft];
+    [self.settingsCheckUpdatesButton setImage:TGTemplateIconAssetImage(@"refresh", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsCheckUpdatesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsCheckUpdatesButton];
 
@@ -1929,6 +1938,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsLogsButton setTarget:self];
     [self.settingsLogsButton setAction:@selector(showLogsWindow:)];
     [self applyUtilityButtonStyle:self.settingsLogsButton];
+    [self.settingsLogsButton setImagePosition:NSImageLeft];
+    [self.settingsLogsButton setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsLogsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLogsButton];
 
@@ -1938,6 +1949,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsAboutButton setTarget:self];
     [self.settingsAboutButton setAction:@selector(showAboutWindow:)];
     [self applyUtilityButtonStyle:self.settingsAboutButton];
+    [self.settingsAboutButton setImagePosition:NSImageLeft];
+    [self.settingsAboutButton setImage:TGTemplateIconAssetImage(@"info", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsAboutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsAboutButton];
 

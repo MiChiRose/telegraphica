@@ -46,6 +46,8 @@
 		111111111111111111111137 /* TGStorageUsageWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111270 /* TGStorageUsageWindowController.m */; };
 		111111111111111111111138 /* TGIconDrawing.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111272 /* TGIconDrawing.m */; };
 		111111111111111111111139 /* TGAnimationSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111274 /* TGAnimationSupport.m */; };
+		111111111111111111111140 /* TGIconAssets.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111276 /* TGIconAssets.m */; };
+		111111111111111111111141 /* Icons in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111277 /* Icons */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -118,6 +120,9 @@
 		111111111111111111111272 /* TGIconDrawing.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGIconDrawing.m; sourceTree = "<group>"; };
 		111111111111111111111273 /* TGAnimationSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGAnimationSupport.h; sourceTree = "<group>"; };
 		111111111111111111111274 /* TGAnimationSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAnimationSupport.m; sourceTree = "<group>"; };
+		111111111111111111111275 /* TGIconAssets.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGIconAssets.h; sourceTree = "<group>"; };
+		111111111111111111111276 /* TGIconAssets.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGIconAssets.m; sourceTree = "<group>"; };
+		111111111111111111111277 /* Icons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Icons; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -212,6 +217,8 @@
 				111111111111111111111236 /* TGTheme.m */,
 				111111111111111111111273 /* TGAnimationSupport.h */,
 				111111111111111111111274 /* TGAnimationSupport.m */,
+				111111111111111111111275 /* TGIconAssets.h */,
+				111111111111111111111276 /* TGIconAssets.m */,
 				111111111111111111111271 /* TGIconDrawing.h */,
 				111111111111111111111272 /* TGIconDrawing.m */,
 				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
@@ -275,6 +282,7 @@
 				111111111111111111111220 /* Localizable.strings */,
 				111111111111111111111223 /* TelegraphicaAppIcon.icns */,
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
+				111111111111111111111277 /* Icons */,
 				111111111111111111111229 /* ThirdPartyNotices.txt */,
 			);
 			path = Resources;
@@ -335,6 +343,7 @@
 				111111111111111111111107 /* Localizable.strings in Resources */,
 				111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */,
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
+				111111111111111111111141 /* Icons in Resources */,
 				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -378,6 +387,7 @@
 				111111111111111111111137 /* TGStorageUsageWindowController.m in Sources */,
 				111111111111111111111138 /* TGIconDrawing.m in Sources */,
 				111111111111111111111139 /* TGAnimationSupport.m in Sources */,
+				111111111111111111111140 /* TGIconAssets.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -659,11 +659,13 @@
     [contentView addSubview:titleField];
     self.voicePreviewTitleField = titleField;
 
-    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 58, 72, 28)] autorelease];
+    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 48, 48, 48)] autorelease];
     [playButton setTitle:@"Play"];
+    [playButton setCell:[[[TGMediaPlaybackButtonCell alloc] initTextCell:@"Play"] autorelease]];
+    [playButton setBordered:NO];
+    [playButton setFocusRingType:NSFocusRingTypeNone];
     [playButton setTarget:self];
     [playButton setAction:@selector(toggleVoicePreviewPlayback:)];
-    [self applySkeuomorphicButtonStyle:playButton isPrimary:NO];
     [contentView addSubview:playButton];
     self.voicePreviewPlayButton = playButton;
 

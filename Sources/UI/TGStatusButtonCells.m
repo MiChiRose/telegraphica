@@ -1,4 +1,5 @@
 #import "TGStatusButtonCells.h"
+#import "TGIconAssets.h"
 #import "TGIconDrawing.h"
 #import "TGTheme.h"
 #include <math.h>
@@ -95,7 +96,7 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
     if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
-        TGDrawChatsIconInRect(iconRect, color, flipped);
+        TGDrawTemplateIconAsset(@"chat", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Profile"] || [title isEqualToString:@"Профиль"] || [title isEqualToString:@"Профіль"]) {
         NSRect headRect = TGIconRect(iconRect, 5.0, 10.0, 8.0, 8.0, flipped);
         [[NSBezierPath bezierPathWithOvalInRect:headRect] stroke];
@@ -305,15 +306,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect planeRect = NSInsetRect(buttonRect, 9.0, 8.0);
-    NSBezierPath *planePath = [NSBezierPath bezierPath];
-    [planePath moveToPoint:NSMakePoint(NSMaxX(planeRect), NSMidY(planeRect))];
-    [planePath lineToPoint:NSMakePoint(NSMinX(planeRect), NSMaxY(planeRect))];
-    [planePath lineToPoint:NSMakePoint(NSMinX(planeRect) + 4.0, NSMidY(planeRect))];
-    [planePath lineToPoint:NSMakePoint(NSMinX(planeRect), NSMinY(planeRect))];
-    [planePath closePath];
-    [TGClassicHeaderTextColor(alpha) set];
-    [planePath fill];
+    NSRect sendRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
+                                 NSMidY(buttonRect) - 9.0,
+                                 18.0,
+                                 18.0);
+    TGDrawTemplateIconAsset(@"send", sendRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
 @end
@@ -364,8 +361,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSColor *iconColor = TGClassicHeaderTextColor(alpha);
     [iconColor set];
     if ([title isEqualToString:@"mic"]) {
-        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 10.0, NSMidY(buttonRect) - 10.0, 20.0, 20.0);
-        TGDrawMicrophoneIconInRect(micRect, iconColor, flipped);
+        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
+        TGDrawTemplateIconAsset(@"microphone", micRect, iconColor, 1.0, flipped);
         return;
     }
 
@@ -403,6 +400,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath stroke];
 
     NSString *title = [self title] ? [self title] : @"";
+    NSString *assetName = nil;
+    if ([title isEqualToString:@"↻"]) {
+        assetName = @"refresh";
+    } else if ([title isEqualToString:@"+"]) {
+        assetName = @"plus";
+    } else if ([title isEqualToString:@"↑"]) {
+        assetName = @"upload";
+    }
+    if ([assetName length] > 0) {
+        NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
+                                     NSMidY(buttonRect) - 9.0,
+                                     18.0,
+                                     18.0);
+        TGDrawTemplateIconAsset(assetName, iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
+        return;
+    }
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setAlignment:NSCenterTextAlignment];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -495,34 +508,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     NSColor *iconColor = TGClassicHeaderTextColor(alpha);
     [iconColor set];
-    BOOL pauseIcon = [[self title] isEqualToString:@"pause"];
+    BOOL pauseIcon = [[[self title] lowercaseString] isEqualToString:@"pause"];
     NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 8.0,
                                  NSMidY(buttonRect) - 8.0,
                                  16.0,
                                  16.0);
-    if (pauseIcon) {
-        NSBezierPath *leftBar = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMinX(iconRect) + 3.0,
-                                                                                   NSMinY(iconRect) + 2.0,
-                                                                                   4.0,
-                                                                                   12.0)
-                                                                 xRadius:1.2
-                                                                 yRadius:1.2];
-        NSBezierPath *rightBar = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMaxX(iconRect) - 7.0,
-                                                                                    NSMinY(iconRect) + 2.0,
-                                                                                    4.0,
-                                                                                    12.0)
-                                                                  xRadius:1.2
-                                                                  yRadius:1.2];
-        [leftBar fill];
-        [rightBar fill];
-    } else {
-        NSBezierPath *playPath = [NSBezierPath bezierPath];
-        [playPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 4.0, NSMinY(iconRect) + 2.0)];
-        [playPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 3.0, NSMidY(iconRect))];
-        [playPath lineToPoint:NSMakePoint(NSMinX(iconRect) + 4.0, NSMaxY(iconRect) - 2.0)];
-        [playPath closePath];
-        [playPath fill];
-    }
+    TGDrawTemplateIconAsset((pauseIcon ? @"pause" : @"play"), iconRect, iconColor, 1.0, [controlView isFlipped]);
 }
 
 @end
@@ -549,6 +540,16 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     return @"i";
 }
 
+- (NSString *)iconNameForTitle:(NSString *)title {
+    if ([title isEqualToString:@"Appearance"]) {
+        return @"image";
+    }
+    if ([title isEqualToString:@"Diagnostic Logs"]) {
+        return @"document";
+    }
+    return @"info";
+}
+
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
     (void)controlView;
     BOOL highlighted = [self isHighlighted];
@@ -569,15 +570,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [[self accentColorForTitle:title alpha:alpha] set];
     [iconPath fill];
 
-    NSDictionary *glyphAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
-                                     [NSColor colorWithCalibratedWhite:1.0 alpha:alpha], NSForegroundColorAttributeName,
-                                     nil];
-    NSString *glyph = [self glyphForTitle:title];
-    NSSize glyphSize = [glyph sizeWithAttributes:glyphAttributes];
-    [glyph drawAtPoint:NSMakePoint(NSMidX(iconRect) - (glyphSize.width / 2.0),
-                                   NSMidY(iconRect) - (glyphSize.height / 2.0) - 0.5)
-        withAttributes:glyphAttributes];
+    NSRect rowIconRect = NSInsetRect(iconRect, 4.0, 4.0);
+    TGDrawTemplateIconAsset([self iconNameForTitle:title],
+                            rowIconRect,
+                            [NSColor colorWithCalibratedWhite:1.0 alpha:alpha],
+                            1.0,
+                            [controlView isFlipped]);
 
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                      [NSFont systemFontOfSize:14.0], NSFontAttributeName,

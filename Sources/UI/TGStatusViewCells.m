@@ -1,4 +1,5 @@
 #import "TGStatusViewCells.h"
+#import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
@@ -122,7 +123,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      15.0,
                                      15.0);
         NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
-        TGDrawMutedSpeakerIconInRect(muteRect, muteColor, [controlView isFlipped]);
+        TGDrawTemplateIconAsset(@"sound-off", muteRect, muteColor, 1.0, [controlView isFlipped]);
     }
     if ([unreadString length] > 0) {
         NSBezierPath *unreadPath = [NSBezierPath bezierPathWithRoundedRect:unreadRect

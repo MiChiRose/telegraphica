@@ -1,4 +1,5 @@
 #import "TGStatusWindowStyling.h"
+#import "TGIconAssets.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGTheme.h"
@@ -82,7 +83,11 @@
     [button setButtonType:NSMomentaryPushInButton];
     [button setBezelStyle:NSRegularSquareBezelStyle];
     [button setBordered:NO];
-    [button setImagePosition:NSNoImage];
+    [button setImagePosition:NSImageLeft];
+    [button setImage:TGTemplateIconAssetImage(@"log-out",
+                                              NSMakeSize(16.0, 16.0),
+                                              [NSColor colorWithCalibratedRed:0.920 green:0.140 blue:0.140 alpha:1.0],
+                                              1.0)];
     [button setFocusRingType:NSFocusRingTypeExterior];
     [button setFont:[NSFont systemFontOfSize:14.0]];
     [[button cell] setAlignment:NSLeftTextAlignment];
