@@ -47,8 +47,10 @@ if [ -f "$BUNDLED_CONFIG_PATH" ]; then
     exit 1
 fi
 HAS_RUNTIME_CREDENTIALS="$(/usr/libexec/PlistBuddy -c "Print :has_runtime_credentials" "$RUNTIME_CONFIG_MARKER" 2>/dev/null || true)"
-if [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
-    echo "Refusing to create an installer without a runtime Telegram connection configuration marker."
+REMOTE_CONFIG_URL="$(/usr/libexec/PlistBuddy -c "Print :TelegraphicaRemoteTDLibConfigURL" "$INFO_PLIST" 2>/dev/null || true)"
+if [ "$HAS_RUNTIME_CREDENTIALS" != "true" ] && ! echo "$REMOTE_CONFIG_URL" | grep -E -q '^https://'; then
+    echo "Refusing to create an installer without a Telegram connection bootstrap."
+    echo "Build with TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH or TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL."
     exit 1
 fi
 

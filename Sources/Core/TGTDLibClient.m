@@ -1141,6 +1141,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if (error) {
             *error = [self errorWithDescription:@"Remote TDLib config URL is not configured." code:60];
         }
+        [[TGLogger sharedLogger] log:@"Remote TDLib config URL is not configured."];
         return nil;
     }
 
@@ -1149,6 +1150,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if (error) {
             *error = [self errorWithDescription:@"Remote TDLib config URL must be a valid HTTPS URL." code:60];
         }
+        [[TGLogger sharedLogger] log:@"Remote TDLib config URL is invalid."];
         return nil;
     }
 
