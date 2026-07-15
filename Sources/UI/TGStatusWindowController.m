@@ -134,6 +134,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
+@property (nonatomic, retain) NSProgressIndicator *messageLoadingSpinner;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
@@ -255,8 +256,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *voicePreviewWindow;
 @property (nonatomic, retain) NSTextField *voicePreviewTitleField;
 @property (nonatomic, retain) NSButton *voicePreviewPlayButton;
+@property (nonatomic, retain) NSButton *voicePreviewStopButton;
 @property (nonatomic, retain) NSSlider *voicePreviewProgressSlider;
 @property (nonatomic, retain) NSTextField *voicePreviewTimeField;
+@property (nonatomic, retain) NSButton *voicePreviewCancelButton;
 @property (nonatomic, retain) NSButton *voicePreviewSendButton;
 @property (nonatomic, retain) NSTextField *voicePreviewErrorField;
 @property (nonatomic, retain) NSTimer *voicePreviewTimer;
@@ -280,6 +283,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL hasAccountUnreadCount;
 @property (nonatomic, assign) BOOL backgroundChatRefreshInFlight;
 @property (nonatomic, assign) BOOL backgroundMessageRefreshInFlight;
+@property (nonatomic, assign) BOOL messageLoadingIndicatorVisible;
+@property (nonatomic, assign) NSUInteger messageLoadingGeneration;
 @property (nonatomic, assign) BOOL pendingLiveChatRefresh;
 @property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
@@ -398,6 +403,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageScrollSurfaceView = _messageScrollSurfaceView;
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
+@synthesize messageLoadingSpinner = _messageLoadingSpinner;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
@@ -519,8 +525,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize voicePreviewWindow = _voicePreviewWindow;
 @synthesize voicePreviewTitleField = _voicePreviewTitleField;
 @synthesize voicePreviewPlayButton = _voicePreviewPlayButton;
+@synthesize voicePreviewStopButton = _voicePreviewStopButton;
 @synthesize voicePreviewProgressSlider = _voicePreviewProgressSlider;
 @synthesize voicePreviewTimeField = _voicePreviewTimeField;
+@synthesize voicePreviewCancelButton = _voicePreviewCancelButton;
 @synthesize voicePreviewSendButton = _voicePreviewSendButton;
 @synthesize voicePreviewErrorField = _voicePreviewErrorField;
 @synthesize voicePreviewTimer = _voicePreviewTimer;
@@ -544,6 +552,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize hasAccountUnreadCount = _hasAccountUnreadCount;
 @synthesize backgroundChatRefreshInFlight = _backgroundChatRefreshInFlight;
 @synthesize backgroundMessageRefreshInFlight = _backgroundMessageRefreshInFlight;
+@synthesize messageLoadingIndicatorVisible = _messageLoadingIndicatorVisible;
+@synthesize messageLoadingGeneration = _messageLoadingGeneration;
 @synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
 @synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
@@ -1501,6 +1511,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                  name:NSViewBoundsDidChangeNotification
                                                object:[self.messageScrollView contentView]];
     [contentView addSubview:self.messageScrollView];
+
+    self.messageLoadingSpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)] autorelease];
+    [self.messageLoadingSpinner setStyle:NSProgressIndicatorSpinningStyle];
+    [self.messageLoadingSpinner setControlSize:NSSmallControlSize];
+    [self.messageLoadingSpinner setDisplayedWhenStopped:NO];
+    [self.messageLoadingSpinner setIndeterminate:YES];
+    [self.messageLoadingSpinner setHidden:YES];
+    [self.messageLoadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
+    [contentView addSubview:self.messageLoadingSpinner];
 
     self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
     [self.messageDropOverlayView setHidden:YES];
@@ -2483,6 +2502,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_chatItemsBeforeTopicList release];
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
+    [_messageLoadingSpinner release];
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
     }
@@ -2634,8 +2654,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_voicePreviewWindow release];
     [_voicePreviewTitleField release];
     [_voicePreviewPlayButton release];
+    [_voicePreviewStopButton release];
     [_voicePreviewProgressSlider release];
     [_voicePreviewTimeField release];
+    [_voicePreviewCancelButton release];
     [_voicePreviewSendButton release];
     [_voicePreviewErrorField release];
     [_voicePreviewTimer release];

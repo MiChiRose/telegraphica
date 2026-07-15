@@ -550,7 +550,6 @@
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:topicItems];
     [self.chatTableView reloadData];
-    [self.chatTableView deselectAll:nil];
     self.suppressChatSelectionHandling = NO;
 
     self.selectedChatID = self.topicParentChatID;
@@ -560,15 +559,38 @@
     self.selectedChatLastReadOutboxMessageID = nil;
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
+    TGChatItem *firstTopicItem = ([topicItems count] > 0 && [[topicItems objectAtIndex:0] isKindOfClass:[TGChatItem class]]) ? [topicItems objectAtIndex:0] : nil;
+    if (firstTopicItem) {
+        NSNumber *firstThreadID = nil;
+        if ([[firstTopicItem messageThreadID] respondsToSelector:@selector(longLongValue)]) {
+            firstThreadID = [NSNumber numberWithLongLong:[[firstTopicItem messageThreadID] longLongValue]];
+        }
+        self.selectedChatTitle = [[firstTopicItem title] length] > 0 ? [firstTopicItem title] : self.topicParentTitle;
+        self.selectedChatTypeSummary = [firstTopicItem typeSummary];
+        self.selectedChatAvatarLocalPath = [firstTopicItem avatarLocalPath] ? [firstTopicItem avatarLocalPath] : self.topicParentAvatarLocalPath;
+        self.selectedMessageThreadID = firstThreadID;
+        self.selectedMessageTopicKind = ([[firstTopicItem messageTopicKind] length] > 0 ? [firstTopicItem messageTopicKind] : @"forum");
+        self.suppressChatSelectionHandling = YES;
+        [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+        [self.chatTableView scrollRowToVisible:0];
+        self.suppressChatSelectionHandling = NO;
+    } else {
+        [self.chatTableView deselectAll:nil];
+    }
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
     [self.messageTableView reloadData];
-    [self setComposerTextWithoutSavingDraft:nil];
+    [self restoreComposerDraftForChatID:self.selectedChatID
+                        messageThreadID:self.selectedMessageThreadID
+                         messageTopicKind:self.selectedMessageTopicKind];
     NSString *topicListTitle = ([self.topicParentTitle length] > 0 ? self.topicParentTitle : @"Topics");
     [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
     [self updateAuthControlsForState:self.currentAuthState];
     [self layoutContentView];
     [self updateVisibleSection];
+    if (firstTopicItem && self.selectedChatID && self.selectedMessageThreadID) {
+        [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+    }
 }
 
 - (void)closeForumTopicList:(id)sender {
@@ -647,7 +669,6 @@
                 [self.chatItems removeAllObjects];
                 [self.chatItems addObjectsFromArray:topicItems];
                 [self.chatTableView reloadData];
-                [self.chatTableView deselectAll:nil];
                 self.suppressChatSelectionHandling = NO;
                 self.selectedChatID = parentChatID;
                 self.selectedChatTitle = parentTitle;
@@ -656,12 +677,33 @@
                 self.selectedChatLastReadOutboxMessageID = nil;
                 self.selectedMessageThreadID = nil;
                 self.selectedMessageTopicKind = nil;
+                TGChatItem *firstTopicItem = ([topicItems count] > 0 && [[topicItems objectAtIndex:0] isKindOfClass:[TGChatItem class]]) ? [topicItems objectAtIndex:0] : nil;
+                if (firstTopicItem) {
+                    NSNumber *firstThreadID = nil;
+                    if ([[firstTopicItem messageThreadID] respondsToSelector:@selector(longLongValue)]) {
+                        firstThreadID = [NSNumber numberWithLongLong:[[firstTopicItem messageThreadID] longLongValue]];
+                    }
+                    self.selectedChatTitle = [[firstTopicItem title] length] > 0 ? [firstTopicItem title] : parentTitle;
+                    self.selectedChatTypeSummary = [firstTopicItem typeSummary];
+                    self.selectedChatAvatarLocalPath = [firstTopicItem avatarLocalPath] ? [firstTopicItem avatarLocalPath] : parentAvatarPath;
+                    self.selectedMessageThreadID = firstThreadID;
+                    self.selectedMessageTopicKind = ([[firstTopicItem messageTopicKind] length] > 0 ? [firstTopicItem messageTopicKind] : @"forum");
+                    self.suppressChatSelectionHandling = YES;
+                    [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+                    [self.chatTableView scrollRowToVisible:0];
+                    self.suppressChatSelectionHandling = NO;
+                } else {
+                    [self.chatTableView deselectAll:nil];
+                }
                 [self refreshSelectedChatHeaderDisplay];
                 [self.messageItems removeAllObjects];
                 [self.messageTableView reloadData];
                 NSString *topicListTitle = ([parentTitle length] > 0 ? parentTitle : @"Topics");
                 [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
                 [self appendDetail:[NSString stringWithFormat:@"Forum topics: loaded %lu topics.", (unsigned long)[topicItems count]]];
+                if (firstTopicItem && self.selectedChatID && self.selectedMessageThreadID) {
+                    [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+                }
             } else if (stillCurrent && [topicErrorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"Forum topics: %@", topicErrorMessage]];
             }
@@ -693,6 +735,11 @@
     }
 
     self.forumTopicRefreshInFlight = YES;
+    NSUInteger topicLoadingGeneration = self.messageLoadingGeneration + 1;
+    self.messageLoadingGeneration = topicLoadingGeneration;
+    self.messageLoadingIndicatorVisible = YES;
+    [self.messageLoadingSpinner startAnimation:self];
+    [self updateVisibleSection];
     NSNumber *chatIDCopy = [[NSNumber numberWithLongLong:[chatID longLongValue]] retain];
     TGChatItem *chatItemCopy = [chatItem retain];
     NSString *parentTitle = [[chatItem title] copy];
@@ -715,6 +762,10 @@
                     [self appendDetail:[NSString stringWithFormat:@"Forum topics: %@", topicErrorMessage]];
                 }
                 [self reloadMessagesForChatID:chatIDCopy interactive:NO];
+            } else if (self.messageLoadingGeneration == topicLoadingGeneration) {
+                self.messageLoadingIndicatorVisible = NO;
+                [self.messageLoadingSpinner stopAnimation:self];
+                [self updateVisibleSection];
             }
             [topics release];
             [topicErrorMessage release];
@@ -728,4 +779,3 @@
         [pool drain];
     });
 }
-

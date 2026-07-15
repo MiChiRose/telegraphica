@@ -279,10 +279,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 11.5,
-                                 NSMidY(buttonRect) - 11.5,
-                                 23.0,
-                                 23.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 10.5,
+                                 NSMidY(buttonRect) - 10.5,
+                                 21.0,
+                                 21.0);
     TGDrawTemplateIconAsset(@"upload", iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
@@ -310,6 +310,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([title isEqualToString:@"mic"]) {
         NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
         TGDrawTemplateIconAsset(@"microphone", micRect, iconColor, 1.0, flipped);
+        return;
+    }
+    if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
+        NSRect smileRect = NSMakeRect(NSMidX(buttonRect) - 12.0, NSMidY(buttonRect) - 12.0, 24.0, 24.0);
+        TGDrawTemplateIconAsset(@"emoji-smile", smileRect, iconColor, 1.0, flipped);
         return;
     }
 
@@ -596,10 +601,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
             title = @"?";
         }
         if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
-            NSRect iconRect = NSMakeRect(NSMidX(contentRect) - 11.0,
-                                         NSMidY(contentRect) - 11.0,
-                                         22.0,
-                                         22.0);
+            NSRect iconRect = NSMakeRect(NSMidX(contentRect) - 12.0,
+                                         NSMidY(contentRect) - 12.0,
+                                         24.0,
+                                         24.0);
             TGDrawTemplateIconAsset(@"emoji-smile",
                                     iconRect,
                                     [NSColor colorWithCalibratedWhite:0.05 alpha:alpha],

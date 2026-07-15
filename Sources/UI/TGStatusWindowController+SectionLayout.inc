@@ -1,5 +1,9 @@
 - (void)showView:(NSView *)view visible:(BOOL)visible {
-    TGSetViewVisibleAnimated(view, visible);
+    if (!view) {
+        return;
+    }
+    [view setHidden:!visible];
+    [view setAlphaValue:1.0];
 }
 
 - (void)showMessageDropOverlay:(BOOL)visible {
@@ -70,6 +74,7 @@
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
+    [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
     if (showChats) {
         [self scheduleInlineMediaPlaybackRefresh];
     } else {
@@ -83,7 +88,7 @@
     [self showView:self.attachPhotoButton visible:showChats];
     [self showView:self.stickerButton visible:showChats];
     [self showView:self.voiceRecordButton visible:showChats];
-    [self showView:self.voiceRecordingIndicatorField visible:(showChats && [self.voiceRecorder isRecording])];
+    [self showView:self.voiceRecordingIndicatorField visible:NO];
     [self showView:self.sendTextFieldBackgroundView visible:showChats];
     [self showView:self.sendTextField visible:showChats];
     [self showView:self.sendMessageButton visible:showChats];
@@ -449,7 +454,6 @@
                                                         NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
                                                         selectedAvatarSize + 4.0)];
 
-    BOOL voiceRecordingActive = [self.voiceRecorder isRecording];
     CGFloat estimatedSendFieldWidth = conversationWidth - 198.0;
     if (estimatedSendFieldWidth < 160.0) {
         estimatedSendFieldWidth = 160.0;
@@ -458,9 +462,6 @@
     CGFloat composerHeight = composerInputHeight + 16.0;
     if (composerHeight < 42.0) {
         composerHeight = 42.0;
-    }
-    if (voiceRecordingActive && composerHeight < 60.0) {
-        composerHeight = 60.0;
     }
     CGFloat composerY = mainY + 8.0;
     CGFloat messageBottom = composerY + composerHeight + 4.0;
@@ -477,6 +478,10 @@
     NSRect messageSurfaceFrame = NSMakeRect(messageScrollX, messageBottom, messageScrollWidth, messageHeight);
     [self.messageScrollSurfaceView setFrame:messageSurfaceFrame];
     [self.messageScrollView setFrame:NSInsetRect(messageSurfaceFrame, 5.0, 5.0)];
+    [self.messageLoadingSpinner setFrame:NSMakeRect(NSMidX(messageSurfaceFrame) - 12.0,
+                                                    NSMidY(messageSurfaceFrame) - 12.0,
+                                                    24.0,
+                                                    24.0)];
     CGFloat dropOverlayInset = (NSHeight(messageSurfaceFrame) > 130.0) ? 24.0 : 12.0;
     [self.messageDropOverlayView setFrame:NSInsetRect(messageSurfaceFrame, dropOverlayInset, dropOverlayInset)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
@@ -512,11 +517,7 @@
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
     [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerControlY, sendButtonWidth, 32.0)];
-    if (voiceRecordingActive) {
-        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, conversationWidth - (sendFieldX - conversationX) - 28.0, 16.0)];
-    } else {
-        [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, 0.0, 0.0)];
-    }
+    [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, 0.0, 0.0)];
 
     CGFloat panelTitleY = headerLabelY;
     CGFloat contentTop = mainTop - TGPanelHeaderHeight;
@@ -886,6 +887,12 @@
         self.mediaPlaybackWindow = nil;
     }
     if ([notification object] == self.voicePreviewWindow) {
+        if ([self.voiceRecorder isRecording]) {
+            [self.voiceRecorder stop];
+            self.voiceRecorder = nil;
+            [self.voiceRecordButton setToolTip:@"Record voice message"];
+            [self.statusField setStringValue:@"Voice recording cancelled"];
+        }
         [self invalidateVoicePreviewTimer];
         [self.voicePreviewPlayer stop];
         self.voicePreviewPlayer = nil;
@@ -894,8 +901,19 @@
         }
         self.voiceRecordingPath = nil;
         self.voiceRecordingStartDate = nil;
+        [self.voiceRecordingIndicatorField setStringValue:@""];
+        [self.voiceRecordingIndicatorField setHidden:YES];
         [self.voicePreviewWindow setDelegate:nil];
+        self.voicePreviewTitleField = nil;
+        self.voicePreviewPlayButton = nil;
+        self.voicePreviewStopButton = nil;
+        self.voicePreviewProgressSlider = nil;
+        self.voicePreviewTimeField = nil;
+        self.voicePreviewCancelButton = nil;
+        self.voicePreviewSendButton = nil;
+        self.voicePreviewErrorField = nil;
         self.voicePreviewWindow = nil;
+        [self updateVisibleSection];
     }
     if ([notification object] == self.stickerPickerWindow) {
         [self.stickerPickerPlaybackCoordinator removeAllPlayback];

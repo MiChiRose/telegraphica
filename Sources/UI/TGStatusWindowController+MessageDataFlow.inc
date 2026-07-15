@@ -1001,6 +1001,15 @@
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
     NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
+    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0);
+    NSUInteger messageLoadingGeneration = 0;
+    if (shouldShowMessageLoading) {
+        messageLoadingGeneration = self.messageLoadingGeneration + 1;
+        self.messageLoadingGeneration = messageLoadingGeneration;
+        self.messageLoadingIndicatorVisible = YES;
+        [self.messageLoadingSpinner startAnimation:self];
+        [self updateVisibleSection];
+    }
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading messages..."];
@@ -1068,6 +1077,11 @@
             } else {
                 self.backgroundMessageRefreshInFlight = NO;
             }
+            if (shouldShowMessageLoading && self.messageLoadingGeneration == messageLoadingGeneration) {
+                self.messageLoadingIndicatorVisible = NO;
+                [self.messageLoadingSpinner stopAnimation:self];
+                [self updateVisibleSection];
+            }
             if ([authorizationState length] > 0) {
                 [self updateAuthControlsForState:authorizationState];
             }
@@ -1113,6 +1127,11 @@
     NSNumber *chatIDCopy = [self.selectedChatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
     NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
+    NSUInteger messageLoadingGeneration = self.messageLoadingGeneration + 1;
+    self.messageLoadingGeneration = messageLoadingGeneration;
+    self.messageLoadingIndicatorVisible = YES;
+    [self.messageLoadingSpinner startAnimation:self];
+    [self updateVisibleSection];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Loading older messages..."];
     [self appendDetail:(messageThreadIDCopy ? @"Loading older topic message previews from TDLib..." : @"Loading older message previews from TDLib...")];
@@ -1166,6 +1185,11 @@
                 [self updateAuthControlsForState:authorizationState];
             }
             [self setControlsBusy:NO];
+            if (self.messageLoadingGeneration == messageLoadingGeneration) {
+                self.messageLoadingIndicatorVisible = NO;
+                [self.messageLoadingSpinner stopAnimation:self];
+                [self updateVisibleSection];
+            }
             [self handlePendingLiveRefreshesIfPossible];
             [itemsCopy release];
             [messageErrorMessage release];
@@ -1603,4 +1627,3 @@
     (void)sender;
     [self reloadOlderMessagesInteractive];
 }
-

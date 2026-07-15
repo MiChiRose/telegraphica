@@ -669,6 +669,15 @@
     [contentView addSubview:playButton];
     self.voicePreviewPlayButton = playButton;
 
+    NSButton *stopButton = [[[NSButton alloc] initWithFrame:NSMakeRect(144, 54, 92, 30)] autorelease];
+    [stopButton setTitle:@"Stop"];
+    [stopButton setTarget:self];
+    [stopButton setAction:@selector(toggleVoiceRecording:)];
+    [self applySkeuomorphicButtonStyle:stopButton isPrimary:YES];
+    [stopButton setHidden:YES];
+    [contentView addSubview:stopButton];
+    self.voicePreviewStopButton = stopButton;
+
     NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(104, 61, 164, 22)] autorelease];
     [progressSlider setMinValue:0.0];
     [progressSlider setMaxValue:1.0];
@@ -693,6 +702,7 @@
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelVoicePreview:)];
     [contentView addSubview:cancelButton];
+    self.voicePreviewCancelButton = cancelButton;
 
     NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(266, 20, 92, 28)] autorelease];
     [sendButton setTitle:TGLoc(@"send")];
@@ -713,6 +723,43 @@
     self.voicePreviewErrorField = errorField;
 
     self.voicePreviewWindow = window;
+}
+
+- (void)configureVoicePreviewWindowForRecording {
+    [self ensureVoicePreviewWindow];
+    [self.voicePreviewTitleField setStringValue:TGLoc(@"voice.recording")];
+    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [self.voicePreviewErrorField setStringValue:@"Press Stop when you finish recording."];
+    [self.voicePreviewErrorField setHidden:NO];
+    [self.voicePreviewPlayButton setHidden:YES];
+    [self.voicePreviewProgressSlider setHidden:YES];
+    [self.voicePreviewTimeField setHidden:YES];
+    [self.voicePreviewCancelButton setHidden:YES];
+    [self.voicePreviewSendButton setHidden:YES];
+    [self.voicePreviewStopButton setHidden:NO];
+    [self.voicePreviewStopButton setEnabled:YES];
+    [self.voicePreviewWindow center];
+    [self.voicePreviewWindow makeKeyAndOrderFront:nil];
+}
+
+- (void)configureVoicePreviewWindowForReadyDuration:(NSTimeInterval)duration {
+    [self ensureVoicePreviewWindow];
+    [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
+    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedWhite:0.08 alpha:1.0]];
+    [self.voicePreviewPlayButton setTitle:@"Play"];
+    [self.voicePreviewPlayButton setHidden:NO];
+    [self.voicePreviewStopButton setHidden:YES];
+    [self.voicePreviewProgressSlider setHidden:NO];
+    [self.voicePreviewTimeField setHidden:NO];
+    [self.voicePreviewCancelButton setHidden:NO];
+    [self.voicePreviewSendButton setHidden:NO];
+    [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
+    [self.voicePreviewSendButton setEnabled:YES];
+    [self.voicePreviewErrorField setStringValue:@""];
+    [self.voicePreviewErrorField setHidden:YES];
+    [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:duration];
+    [self.voicePreviewWindow center];
+    [self.voicePreviewWindow makeKeyAndOrderFront:nil];
 }
 
 - (BOOL)ensureMicrophoneConsent {
@@ -748,18 +795,9 @@
         [self.statusField setStringValue:@"Voice recorded"];
         [self.voiceRecordingIndicatorField setStringValue:@""];
         [self.voiceRecordingIndicatorField setHidden:YES];
-        [self ensureVoicePreviewWindow];
         NSTimeInterval duration = [[NSDate date] timeIntervalSinceDate:self.voiceRecordingStartDate];
         self.voicePreviewPlayer = nil;
-        [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
-        [self.voicePreviewPlayButton setTitle:@"Play"];
-        [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
-        [self.voicePreviewSendButton setEnabled:YES];
-        [self.voicePreviewErrorField setStringValue:@""];
-        [self.voicePreviewErrorField setHidden:YES];
-        [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:duration];
-        [self.voicePreviewWindow center];
-        [self.voicePreviewWindow makeKeyAndOrderFront:nil];
+        [self configureVoicePreviewWindowForReadyDuration:duration];
         [self layoutContentView];
         [self updateVisibleSection];
         return;
@@ -796,10 +834,10 @@
     self.voiceRecordingStartDate = [NSDate date];
     self.voiceRecorder = recorder;
     [self.statusField setStringValue:TGLoc(@"voice.recording")];
-    [self.voiceRecordingIndicatorField setStringValue:[NSString stringWithFormat:@"%@ %@", TGLoc(@"voice.recording"), TGLoc(@"voice.stopHint")]];
-    [self.voiceRecordingIndicatorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
-    [self.voiceRecordingIndicatorField setHidden:NO];
+    [self.voiceRecordingIndicatorField setStringValue:@""];
+    [self.voiceRecordingIndicatorField setHidden:YES];
     [self.voiceRecordButton setToolTip:TGLoc(@"voice.stopHint")];
+    [self configureVoicePreviewWindowForRecording];
     [self layoutContentView];
     [self updateVisibleSection];
 }
