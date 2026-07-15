@@ -4,6 +4,7 @@
 #import "../Core/TGMessageItem.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
+#import "../Services/TGResourcePolicy.h"
 #include <math.h>
 
 static CGFloat const TGMessageBubbleMaximumWidth = 500.0;
@@ -677,6 +678,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
+CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
 
 CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
     CGFloat widthRatio = ([item isVisualMediaMessage] ? 0.78 : 0.68);
@@ -696,6 +698,8 @@ BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item) {
             ![item isVisualMediaMessage]);
 }
 
+BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item);
+
 BOOL TGMessageItemIsAudioOnlyPlayableMedia(TGMessageItem *item) {
     if (![item isKindOfClass:[TGMessageItem class]]) {
         return NO;
@@ -708,6 +712,16 @@ BOOL TGMessageItemIsAudioOnlyPlayableMedia(TGMessageItem *item) {
     }
     NSString *mimeType = [[item mediaMimeType] lowercaseString];
     return [mimeType hasPrefix:@"audio/"];
+}
+
+BOOL TGMessageItemIsNonVisualDocument(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isDocumentMessage]) {
+        return NO;
+    }
+    if ([item isVisualMediaMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) {
+        return NO;
+    }
+    return ([[item downloadFileName] length] > 0 || TGMessageItemHasDownloadableAttachment(item));
 }
 
 BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item) {
@@ -734,6 +748,28 @@ BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item) {
         }
     }
     return NO;
+}
+
+static NSString *TGDocumentFileTitleForMessageItem(TGMessageItem *item) {
+    NSString *title = [item downloadFileName];
+    if ([title length] == 0) {
+        title = [item preview];
+    }
+    if ([title length] == 0 || [title hasPrefix:@"["]) {
+        title = @"Document";
+    }
+    return title;
+}
+
+static NSString *TGDocumentFileSubtitleForMessageItem(TGMessageItem *item) {
+    NSString *sizeText = @"";
+    if ([[item downloadFileSize] respondsToSelector:@selector(longLongValue)] && [[item downloadFileSize] longLongValue] > 0) {
+        sizeText = TGResourcePolicyReadableSize([[item downloadFileSize] longLongValue]);
+    }
+    if ([sizeText length] > 0) {
+        return [NSString stringWithFormat:@"%@ - Download", sizeText];
+    }
+    return @"Download";
 }
 
 NSString *TGPlayableMediaTitleForMessageItem(TGMessageItem *item) {
@@ -773,6 +809,26 @@ CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item) {
     return height;
 }
 
+CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth) {
+    NSString *title = TGDocumentFileTitleForMessageItem(item);
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                     nil];
+    CGFloat width = [title sizeWithAttributes:titleAttributes].width + 96.0;
+    if (width < 210.0) {
+        width = 210.0;
+    }
+    if (width > maximumWidth) {
+        width = maximumWidth;
+    }
+    return width;
+}
+
+CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item) {
+    (void)item;
+    return 58.0;
+}
+
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
     return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
 }
@@ -782,6 +838,18 @@ CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderD
         return 0.0;
     }
     return ([[item senderDisplayName] length] > 0) ? 17.0 : 0.0;
+}
+
+CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return 0.0;
+    }
+    if ([[item forwardSourceDisplayName] length] > 0 ||
+        [[item replyPreview] length] > 0 ||
+        [[item replyToMessageID] respondsToSelector:@selector(longLongValue)]) {
+        return 32.0;
+    }
+    return 0.0;
 }
 
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
@@ -861,7 +929,8 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     }
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
-    NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
+    BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
+    NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -894,18 +963,22 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     }
 
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat height = textHeight + 26.0 + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat height = textHeight + 26.0 + senderHeaderHeight + contextHeaderHeight;
     if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-        height = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
+        height = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if (nonVisualDocument) {
+        height = TGDocumentBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
-        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
+        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + contextHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
     }
     if (height < 42.0) {
         height = 42.0;
     }
-    if (!TGMessageItemIsNonVisualPlayableMedia(item)) {
+    if (!TGMessageItemIsNonVisualPlayableMedia(item) && !nonVisualDocument) {
         height += TGReactionBandHeightForMessageItem(item);
     }
     return height + 10.0;
@@ -916,7 +989,8 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
         return NSZeroRect;
     }
 
-    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
+    BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
@@ -970,6 +1044,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     if (nonVisualPlayable) {
         bubbleWidth = TGPlayableMediaBubbleWidthForItem(item, maximumBubbleWidth);
     }
+    if (nonVisualDocument) {
+        bubbleWidth = TGDocumentBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -984,12 +1061,16 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     }
 
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight + contextHeaderHeight;
     if (nonVisualPlayable) {
-        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if (nonVisualDocument) {
+        bubbleHeight = TGDocumentBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
@@ -997,12 +1078,65 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
-    if (!nonVisualPlayable) {
+    if (!nonVisualPlayable && !nonVisualDocument) {
         bubbleHeight += TGReactionBandHeightForMessageItem(item);
     }
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+}
+
+void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(bubbleRect)) {
+        return;
+    }
+
+    NSRect contentRect = NSInsetRect(bubbleRect, 12.0, 9.0);
+    CGFloat iconSide = 36.0;
+    NSRect iconRect = NSMakeRect(NSMinX(contentRect),
+                                 NSMidY(contentRect) - (iconSide / 2.0),
+                                 iconSide,
+                                 iconSide);
+    NSBezierPath *iconPath = [NSBezierPath bezierPathWithOvalInRect:iconRect];
+    NSColor *accentColor = outgoing ? TGClassicNavigationSelectedColor(0.95) : [NSColor colorWithCalibratedRed:0.05 green:0.67 blue:0.17 alpha:1.0];
+    [accentColor set];
+    [iconPath fill];
+
+    [[NSColor whiteColor] set];
+    NSBezierPath *arrowPath = [NSBezierPath bezierPath];
+    [arrowPath setLineWidth:3.0];
+    [arrowPath setLineCapStyle:NSRoundLineCapStyle];
+    CGFloat centerX = NSMidX(iconRect);
+    CGFloat topY = flipped ? (NSMinY(iconRect) + 9.0) : (NSMaxY(iconRect) - 9.0);
+    CGFloat bottomY = flipped ? (NSMaxY(iconRect) - 12.0) : (NSMinY(iconRect) + 12.0);
+    [arrowPath moveToPoint:NSMakePoint(centerX, topY)];
+    [arrowPath lineToPoint:NSMakePoint(centerX, bottomY)];
+    [arrowPath moveToPoint:NSMakePoint(centerX - 7.0, flipped ? (bottomY - 7.0) : (bottomY + 7.0))];
+    [arrowPath lineToPoint:NSMakePoint(centerX, bottomY)];
+    [arrowPath lineToPoint:NSMakePoint(centerX + 7.0, flipped ? (bottomY - 7.0) : (bottomY + 7.0))];
+    [arrowPath stroke];
+
+    CGFloat textX = NSMaxX(iconRect) + 10.0;
+    CGFloat textWidth = NSMaxX(contentRect) - textX - 52.0;
+    if (textWidth < 80.0) {
+        textWidth = 80.0;
+    }
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     nil];
+    NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                        accentColor, NSForegroundColorAttributeName,
+                                        nil];
+    NSString *title = TGDocumentFileTitleForMessageItem(item);
+    NSString *subtitle = TGDocumentFileSubtitleForMessageItem(item);
+    NSRect titleRect = flipped ? NSMakeRect(textX, NSMinY(contentRect) + 2.0, textWidth, 18.0)
+                               : NSMakeRect(textX, NSMaxY(contentRect) - 20.0, textWidth, 18.0);
+    NSRect subtitleRect = flipped ? NSMakeRect(textX, NSMinY(contentRect) + 22.0, textWidth, 16.0)
+                                  : NSMakeRect(textX, NSMinY(contentRect) + 3.0, textWidth, 16.0);
+    [title drawInRect:titleRect withAttributes:titleAttributes];
+    [subtitle drawInRect:subtitleRect withAttributes:subtitleAttributes];
 }
 
 void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {

@@ -1195,6 +1195,15 @@
     NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
     NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
     NSString *messageText = [text copy];
+    NSNumber *replyToMessageID = nil;
+    if (self.replyTargetMessageItem &&
+        [self.replyTargetChatID respondsToSelector:@selector(longLongValue)] &&
+        [chatID respondsToSelector:@selector(longLongValue)] &&
+        [self.replyTargetChatID longLongValue] == [chatID longLongValue] &&
+        [[self.replyTargetMessageItem messageID] respondsToSelector:@selector(longLongValue)]) {
+        replyToMessageID = [[[self.replyTargetMessageItem messageID] retain] autorelease];
+    }
+    [replyToMessageID retain];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending..."];
     [self appendDetail:(messageThreadID ? @"Submitting topic text message to TDLib..." : @"Submitting text message to TDLib...")];
@@ -1209,6 +1218,7 @@
                                                 messageThreadID:messageThreadID
                                               messageTopicKind:messageTopicKind
                                                            text:messageText
+                                                replyToMessageID:replyToMessageID
                                                         timeout:8.0
                                                           error:&sendError];
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
@@ -1231,6 +1241,9 @@
                                     messageTopicKind:messageTopicKind];
                 if (selectionStillCurrent) {
                     [self setComposerTextWithoutSavingDraft:nil];
+                    if (replyToMessageID) {
+                        [self clearReplyTarget];
+                    }
                     self.forceMessageScrollToNewest = YES;
                 }
             } else {
@@ -1259,6 +1272,7 @@
             [messageThreadID release];
             [messageTopicKind release];
             [messageText release];
+            [replyToMessageID release];
         });
 
         [client release];

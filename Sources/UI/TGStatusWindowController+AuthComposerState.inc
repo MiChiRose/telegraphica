@@ -177,6 +177,9 @@
 - (void)restoreComposerDraftForChatID:(NSNumber *)chatID
                       messageThreadID:(NSNumber *)messageThreadID
                        messageTopicKind:(NSString *)messageTopicKind {
+    [self clearReplyTargetIfSelectionDiffersFromChatID:chatID
+                                       messageThreadID:messageThreadID
+                                      messageTopicKind:messageTopicKind];
     NSString *key = [self composerDraftKeyForChatID:chatID
                                     messageThreadID:messageThreadID
                                      messageTopicKind:messageTopicKind];
