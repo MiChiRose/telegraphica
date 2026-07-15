@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 APP_PATH="${1:-build-legacy/Release/Telegraphica.app}"
 DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
 ALLOW_TDLIBLESS_INSTALLER="${TELEGRAPHICA_ALLOW_TDLIBLESS_INSTALLER:-0}"
+PUBLIC_RELEASE="${TELEGRAPHICA_PUBLIC_RELEASE:-0}"
 
 if [ ! -d "$APP_PATH" ]; then
     echo "Telegraphica.app was not found at: $APP_PATH"
@@ -47,7 +48,12 @@ if [ -f "$BUNDLED_CONFIG_PATH" ]; then
     exit 1
 fi
 HAS_RUNTIME_CREDENTIALS="$(/usr/libexec/PlistBuddy -c "Print :has_runtime_credentials" "$RUNTIME_CONFIG_MARKER" 2>/dev/null || true)"
-if [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
+if [ "$PUBLIC_RELEASE" = "1" ]; then
+    if [ "$HAS_RUNTIME_CREDENTIALS" = "true" ]; then
+        echo "Refusing to create a public installer with bundled runtime Telegram credentials."
+        exit 1
+    fi
+elif [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
     echo "Refusing to create an installer without a runtime Telegram connection configuration marker."
     exit 1
 fi
