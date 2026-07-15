@@ -84,6 +84,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize senderID = _senderID;
 @synthesize senderDisplayName = _senderDisplayName;
 @synthesize senderAvatarLocalPath = _senderAvatarLocalPath;
+@synthesize replyToMessageID = _replyToMessageID;
+@synthesize replyPreview = _replyPreview;
+@synthesize replySenderDisplayName = _replySenderDisplayName;
+@synthesize forwardSourceDisplayName = _forwardSourceDisplayName;
 @synthesize capabilitiesKnown = _capabilitiesKnown;
 @synthesize canBeEdited = _canBeEdited;
 @synthesize canBeDeletedOnlyForSelf = _canBeDeletedOnlyForSelf;
@@ -322,6 +326,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setSenderID:_senderID];
     [copy setSenderDisplayName:_senderDisplayName];
     [copy setSenderAvatarLocalPath:_senderAvatarLocalPath];
+    [copy setReplyToMessageID:_replyToMessageID];
+    [copy setReplyPreview:_replyPreview];
+    [copy setReplySenderDisplayName:_replySenderDisplayName];
+    [copy setForwardSourceDisplayName:_forwardSourceDisplayName];
     [copy setCapabilitiesKnown:_capabilitiesKnown];
     [copy setCanBeEdited:_canBeEdited];
     [copy setCanBeDeletedOnlyForSelf:_canBeDeletedOnlyForSelf];
@@ -371,6 +379,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_senderID release];
     [_senderDisplayName release];
     [_senderAvatarLocalPath release];
+    [_replyToMessageID release];
+    [_replyPreview release];
+    [_replySenderDisplayName release];
+    [_forwardSourceDisplayName release];
     [_editDate release];
     [_editableText release];
     [super dealloc];

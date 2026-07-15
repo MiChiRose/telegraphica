@@ -91,6 +91,11 @@
     [self showView:self.pinnedMessageLabelField visible:showPinnedPanel];
     [self showView:self.pinnedMessageTextField visible:showPinnedPanel];
     [self showView:self.pinnedMessageButton visible:showPinnedPanel];
+    BOOL showReplyPanel = (showChats && self.replyTargetMessageItem != nil);
+    [self showView:self.replyPanelView visible:showReplyPanel];
+    [self showView:self.replyPanelTitleField visible:showReplyPanel];
+    [self showView:self.replyPanelTextField visible:showReplyPanel];
+    [self showView:self.replyPanelCancelButton visible:showReplyPanel];
     if (showChats) {
         [self scheduleInlineMediaPlaybackRefresh];
     } else {
@@ -497,7 +502,10 @@
         composerHeight = 42.0;
     }
     CGFloat composerY = mainY + 8.0;
-    CGFloat messageBottom = composerY + composerHeight + 4.0;
+    BOOL hasReplyPanel = (self.replyTargetMessageItem != nil);
+    CGFloat replyPanelHeight = hasReplyPanel ? 46.0 : 0.0;
+    CGFloat replyPanelGap = hasReplyPanel ? 6.0 : 0.0;
+    CGFloat messageBottom = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
     CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
     CGFloat panelInsetX = conversationX + 8.0;
     CGFloat panelWidth = conversationWidth - 16.0;
@@ -583,6 +591,18 @@
     [self.voiceRecordButton setFrame:NSMakeRect(voiceButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
     [self.sendMessageButton setFrame:NSMakeRect(sendButtonX, composerControlY, sendButtonWidth, 32.0)];
     [self.voiceRecordingIndicatorField setFrame:NSMakeRect(sendFieldX + 2.0, composerY + composerHeight + 2.0, 0.0, 0.0)];
+    if (hasReplyPanel) {
+        CGFloat replyY = composerY + composerHeight + 6.0;
+        CGFloat replyX = sendFieldX;
+        CGFloat replyWidth = sendButtonX + sendButtonWidth - sendFieldX;
+        if (replyWidth < 220.0) {
+            replyWidth = 220.0;
+        }
+        [self.replyPanelView setFrame:NSMakeRect(replyX, replyY, replyWidth, 40.0)];
+        [self.replyPanelTitleField setFrame:NSMakeRect(replyX + 14.0, replyY + 22.0, replyWidth - 54.0, 14.0)];
+        [self.replyPanelTextField setFrame:NSMakeRect(replyX + 14.0, replyY + 7.0, replyWidth - 54.0, 15.0)];
+        [self.replyPanelCancelButton setFrame:NSMakeRect(replyX + replyWidth - 34.0, replyY + 8.0, 26.0, 24.0)];
+    }
 
     CGFloat panelTitleY = headerLabelY;
     CGFloat contentTop = mainTop - TGPanelHeaderHeight;

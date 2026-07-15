@@ -35,6 +35,7 @@ CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWi
 CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
+CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item);
 CGFloat TGComposerMinimumInputHeight(void);
 CGFloat TGComposerMaximumInputHeight(void);

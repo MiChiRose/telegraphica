@@ -127,6 +127,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *pinnedMessageButton;
 @property (nonatomic, retain) TGMessageItem *pinnedMessageItem;
 @property (nonatomic, assign) NSUInteger pinnedMessageGeneration;
+@property (nonatomic, retain) TGGroupedCardView *replyPanelView;
+@property (nonatomic, retain) NSTextField *replyPanelTitleField;
+@property (nonatomic, retain) NSTextField *replyPanelTextField;
+@property (nonatomic, retain) NSButton *replyPanelCancelButton;
+@property (nonatomic, retain) TGMessageItem *replyTargetMessageItem;
+@property (nonatomic, retain) NSNumber *replyTargetChatID;
+@property (nonatomic, retain) NSNumber *replyTargetThreadID;
+@property (nonatomic, copy) NSString *replyTargetTopicKind;
 @property (nonatomic, retain) NSNumber *highlightedSearchMessageID;
 @property (nonatomic, retain) NSTimer *searchHighlightTimer;
 @property (nonatomic, retain) NSTextField *sendLabel;
@@ -368,6 +376,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
 @property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
 @property (nonatomic, retain) NSMutableDictionary *localMuteUnreadCountsByChatID;
+- (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item;
+- (void)clearReplyTarget;
+- (void)clearReplyTargetIfSelectionDiffersFromChatID:(NSNumber *)chatID
+                                     messageThreadID:(NSNumber *)messageThreadID
+                                    messageTopicKind:(NSString *)messageTopicKind;
+- (void)replyToMessageFromMenu:(id)sender;
+- (void)cancelReplyTarget:(id)sender;
+- (void)forwardMessageFromMenu:(id)sender;
+- (void)forwardMessageToSavedMessagesFromMenu:(id)sender;
 @end
 
 @implementation TGStatusWindowController
@@ -439,6 +456,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize pinnedMessageButton = _pinnedMessageButton;
 @synthesize pinnedMessageItem = _pinnedMessageItem;
 @synthesize pinnedMessageGeneration = _pinnedMessageGeneration;
+@synthesize replyPanelView = _replyPanelView;
+@synthesize replyPanelTitleField = _replyPanelTitleField;
+@synthesize replyPanelTextField = _replyPanelTextField;
+@synthesize replyPanelCancelButton = _replyPanelCancelButton;
+@synthesize replyTargetMessageItem = _replyTargetMessageItem;
+@synthesize replyTargetChatID = _replyTargetChatID;
+@synthesize replyTargetThreadID = _replyTargetThreadID;
+@synthesize replyTargetTopicKind = _replyTargetTopicKind;
 @synthesize highlightedSearchMessageID = _highlightedSearchMessageID;
 @synthesize searchHighlightTimer = _searchHighlightTimer;
 @synthesize sendLabel = _sendLabel;
@@ -1688,6 +1713,34 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.pinnedMessageButton setHidden:YES];
     [contentView addSubview:self.pinnedMessageButton];
 
+    self.replyPanelView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 88, 600, 44)] autorelease];
+    [self.replyPanelView setHidden:YES];
+    [contentView addSubview:self.replyPanelView];
+
+    self.replyPanelTitleField = [self labelWithFrame:NSMakeRect(38, 112, 500, 15)
+                                                text:@"Reply"
+                                                font:[NSFont boldSystemFontOfSize:10.0]];
+    [self.replyPanelTitleField setTextColor:TGClassicNavigationSelectedColor(0.95)];
+    [self.replyPanelTitleField setHidden:YES];
+    [contentView addSubview:self.replyPanelTitleField];
+
+    self.replyPanelTextField = [self labelWithFrame:NSMakeRect(38, 95, 500, 17)
+                                               text:@""
+                                               font:[NSFont systemFontOfSize:11.0]];
+    [self.replyPanelTextField setTextColor:TGClassicMutedInkColor()];
+    [[self.replyPanelTextField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [self.replyPanelTextField setHidden:YES];
+    [contentView addSubview:self.replyPanelTextField];
+
+    self.replyPanelCancelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 96, 28, 24)] autorelease];
+    [self.replyPanelCancelButton setTitle:@"×"];
+    [self.replyPanelCancelButton setTarget:self];
+    [self.replyPanelCancelButton setAction:@selector(cancelReplyTarget:)];
+    [self.replyPanelCancelButton setToolTip:@"Cancel reply"];
+    [self applyUtilityButtonStyle:self.replyPanelCancelButton];
+    [self.replyPanelCancelButton setHidden:YES];
+    [contentView addSubview:self.replyPanelCancelButton];
+
     self.searchPanelView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 180, 600, 180)] autorelease];
     [self.searchPanelView setHidden:YES];
     [contentView addSubview:self.searchPanelView];
@@ -2638,6 +2691,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 #include "TGStatusWindowController+MessageMediaHitTesting.inc"
 
+#include "TGStatusWindowController+MessagingActions.inc"
+
 #include "TGStatusWindowController+MessageMenus.inc"
 
 #include "TGStatusWindowController+SearchNavigation.inc"
@@ -2750,6 +2805,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_pinnedMessageTextField release];
     [_pinnedMessageButton release];
     [_pinnedMessageItem release];
+    [_replyPanelView release];
+    [_replyPanelTitleField release];
+    [_replyPanelTextField release];
+    [_replyPanelCancelButton release];
+    [_replyTargetMessageItem release];
+    [_replyTargetChatID release];
+    [_replyTargetThreadID release];
+    [_replyTargetTopicKind release];
     [_highlightedSearchMessageID release];
     [_searchHighlightTimer invalidate];
     [_searchHighlightTimer release];

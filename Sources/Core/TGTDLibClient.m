@@ -3854,6 +3854,100 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return summaryCopy;
 }
 
+- (NSNumber *)replyMessageIDFromMessageObject:(NSDictionary *)messageObject {
+    if (![messageObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id directReplyID = [messageObject objectForKey:@"reply_to_message_id"];
+    if ([directReplyID respondsToSelector:@selector(longLongValue)] && [directReplyID longLongValue] > 0) {
+        return [NSNumber numberWithLongLong:[directReplyID longLongValue]];
+    }
+
+    id replyObject = [messageObject objectForKey:@"reply_to"];
+    if ([replyObject isKindOfClass:[NSDictionary class]]) {
+        id nestedReplyID = [(NSDictionary *)replyObject objectForKey:@"message_id"];
+        if ([nestedReplyID respondsToSelector:@selector(longLongValue)] && [nestedReplyID longLongValue] > 0) {
+            return [NSNumber numberWithLongLong:[nestedReplyID longLongValue]];
+        }
+    }
+    return nil;
+}
+
+- (NSString *)replyPreviewFromMessageObject:(NSDictionary *)messageObject {
+    id replyObject = [messageObject objectForKey:@"reply_to"];
+    if (![replyObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id quoteObject = [(NSDictionary *)replyObject objectForKey:@"quote"];
+    if ([quoteObject isKindOfClass:[NSDictionary class]]) {
+        NSString *quoteText = [self textFromFormattedTextObject:[(NSDictionary *)quoteObject objectForKey:@"text"]];
+        if ([quoteText length] > 0) {
+            return [self singleLineTrimmedString:quoteText maximumLength:96];
+        }
+    }
+    id originObject = [(NSDictionary *)replyObject objectForKey:@"origin"];
+    if ([originObject isKindOfClass:[NSDictionary class]]) {
+        id originType = [(NSDictionary *)originObject objectForKey:@"@type"];
+        if ([originType isKindOfClass:[NSString class]]) {
+            return @"Reply";
+        }
+    }
+    return nil;
+}
+
+- (NSString *)forwardSourceDisplayNameFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout {
+    if (![messageObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id forwardInfo = [messageObject objectForKey:@"forward_info"];
+    id originObject = nil;
+    if ([forwardInfo isKindOfClass:[NSDictionary class]]) {
+        originObject = [(NSDictionary *)forwardInfo objectForKey:@"origin"];
+    }
+    if (![originObject isKindOfClass:[NSDictionary class]]) {
+        originObject = [messageObject objectForKey:@"forward_origin"];
+    }
+    if (![originObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSString *originType = [(NSDictionary *)originObject objectForKey:@"@type"];
+    id senderUserID = [(NSDictionary *)originObject objectForKey:@"sender_user_id"];
+    if ([senderUserID respondsToSelector:@selector(longLongValue)]) {
+        NSDictionary *summary = [self userSenderSummaryForUserID:[NSNumber numberWithLongLong:[senderUserID longLongValue]]
+                                                         timeout:timeout];
+        NSString *displayName = [summary objectForKey:@"display_name"];
+        if ([displayName length] > 0) {
+            return displayName;
+        }
+    }
+
+    id senderChatID = [(NSDictionary *)originObject objectForKey:@"sender_chat_id"];
+    if (![senderChatID respondsToSelector:@selector(longLongValue)]) {
+        senderChatID = [(NSDictionary *)originObject objectForKey:@"chat_id"];
+    }
+    if ([senderChatID respondsToSelector:@selector(longLongValue)]) {
+        NSError *chatError = nil;
+        NSDictionary *summary = [self chatSummaryForChatID:[NSNumber numberWithLongLong:[senderChatID longLongValue]]
+                                            downloadAvatar:NO
+                                                   timeout:timeout
+                                                     error:&chatError];
+        NSString *title = [summary objectForKey:@"title"];
+        if ([title length] > 0) {
+            return title;
+        }
+    }
+
+    id senderName = [(NSDictionary *)originObject objectForKey:@"sender_name"];
+    if ([senderName isKindOfClass:[NSString class]] && [(NSString *)senderName length] > 0) {
+        return [self singleLineTrimmedString:senderName maximumLength:80];
+    }
+    if ([originType isKindOfClass:[NSString class]]) {
+        return @"Forwarded";
+    }
+    return nil;
+}
+
 - (NSString *)messageContentPreviewForObject:(id)contentObject {
     if (![contentObject isKindOfClass:[NSDictionary class]]) {
         return @"[Message]";
@@ -4076,6 +4170,16 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        NSNumber *replyMessageID = [self replyMessageIDFromMessageObject:message];
+        if (replyMessageID) {
+            [item setReplyToMessageID:replyMessageID];
+            NSString *replyPreview = [self replyPreviewFromMessageObject:message];
+            [item setReplyPreview:([replyPreview length] > 0 ? replyPreview : @"Reply to message")];
+        }
+        NSString *forwardSource = [self forwardSourceDisplayNameFromMessageObject:message timeout:0.6];
+        if ([forwardSource length] > 0) {
+            [item setForwardSourceDisplayName:forwardSource];
+        }
         if ([contentType isEqualToString:@"messageText"] && [contentObject isKindOfClass:[NSDictionary class]]) {
             NSString *editableText = [self textFromFormattedTextObject:[(NSDictionary *)contentObject objectForKey:@"text"]];
             if ([editableText length] > 0) {
@@ -5046,6 +5150,16 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendTextMessageToChatID:chatID
+                         messageThreadID:messageThreadID
+                        messageTopicKind:messageTopicKind
+                                     text:text
+                         replyToMessageID:nil
+                                  timeout:timeout
+                                    error:error];
+}
+
+- (NSString *)sendTextMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:42];
@@ -5098,58 +5212,42 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:chatID forKey:@"chat_id"];
     [request setObject:content forKey:@"input_message_content"];
 
-    BOOL threadSend = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0);
-    NSString *safeTopicKind = [messageTopicKind isKindOfClass:[NSString class]] ? messageTopicKind : nil;
-    BOOL knownFreshForumTopic = [safeTopicKind isEqualToString:@"forum"];
-    BOOL knownLegacyForumTopic = [safeTopicKind isEqualToString:@"forum_legacy"];
-    BOOL knownThreadTopic = [safeTopicKind isEqualToString:@"thread"];
-    BOOL allowForumSchema = threadSend && !knownThreadTopic;
-    BOOL allowThreadSchema = threadSend && !knownFreshForumTopic && !knownLegacyForumTopic;
-    BOOL allowLegacyThreadSchema = threadSend && !knownFreshForumTopic;
-
     NSError *sendError = nil;
     NSDictionary *response = nil;
-    if (threadSend && allowForumSchema) {
-        NSMutableDictionary *forumRequest = [NSMutableDictionary dictionaryWithDictionary:request];
-        NSDictionary *forumTopic = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    @"messageTopicForum", @"@type",
-                                    [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"forum_topic_id",
-                                    nil];
-        [forumRequest setObject:forumTopic forKey:@"topic_id"];
-        response = [self sendTDLibRequestAndWaitForExtra:forumRequest
-                                             extraPrefix:@"telegraphica-send-text-forum-topic"
-                                                 timeout:timeout
-                                               errorCode:46
-                                                   error:&sendError];
-    }
-    if (!response && threadSend && allowThreadSchema) {
-        NSMutableDictionary *threadRequest = [NSMutableDictionary dictionaryWithDictionary:request];
-        NSDictionary *messageThread = [NSDictionary dictionaryWithObjectsAndKeys:
-                                       @"messageTopicThread", @"@type",
-                                       [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"message_thread_id",
-                                       nil];
-        [threadRequest setObject:messageThread forKey:@"topic_id"];
-        response = [self sendTDLibRequestAndWaitForExtra:threadRequest
-                                             extraPrefix:@"telegraphica-send-text-message-thread"
-                                                 timeout:timeout
-                                               errorCode:46
-                                                   error:&sendError];
-    }
-    if (!response && threadSend && allowLegacyThreadSchema) {
-        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
-        [legacyRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
-        response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
-                                             extraPrefix:@"telegraphica-send-text-legacy-thread"
-                                                 timeout:timeout
-                                               errorCode:46
-                                                   error:&sendError];
-    }
-    if (!response && !threadSend) {
-        response = [self sendTDLibRequestAndWaitForExtra:request
-                                             extraPrefix:@"telegraphica-send-text"
-                                                 timeout:timeout
-                                               errorCode:46
-                                                   error:&sendError];
+    if ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+        NSMutableDictionary *replyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        NSDictionary *replyTarget = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     @"inputMessageReplyToMessage", @"@type",
+                                     [NSNumber numberWithLongLong:[replyToMessageID longLongValue]], @"message_id",
+                                     nil];
+        [replyRequest setObject:replyTarget forKey:@"reply_to"];
+        response = [self sendMessageRequest:replyRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-text-reply"
+                                    timeout:timeout
+                                  errorCode:46
+                                      error:&sendError];
+        if (!response) {
+            NSMutableDictionary *legacyReplyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+            [legacyReplyRequest setObject:[NSNumber numberWithLongLong:[replyToMessageID longLongValue]] forKey:@"reply_to_message_id"];
+            sendError = nil;
+            response = [self sendMessageRequest:legacyReplyRequest
+                                messageThreadID:messageThreadID
+                               messageTopicKind:messageTopicKind
+                                    extraPrefix:@"telegraphica-send-text-legacy-reply"
+                                        timeout:timeout
+                                      errorCode:46
+                                          error:&sendError];
+        }
+    } else {
+        response = [self sendMessageRequest:request
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-text"
+                                    timeout:timeout
+                                  errorCode:46
+                                      error:&sendError];
     }
     if (!response) {
         if (error) {
@@ -5167,6 +5265,71 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return @"message submitted";
+}
+
+- (NSString *)forwardMessagesFromChatID:(NSNumber *)fromChatID messageIDs:(NSArray *)messageIDs toChatID:(NSNumber *)toChatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![fromChatID respondsToSelector:@selector(longLongValue)] || ![toChatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Forward source or destination chat is missing." code:98];
+        }
+        return nil;
+    }
+    NSMutableArray *safeMessageIDs = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [messageIDs count]; index++) {
+        id messageID = [messageIDs objectAtIndex:index];
+        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
+            [safeMessageIDs addObject:[NSNumber numberWithLongLong:[messageID longLongValue]]];
+        }
+    }
+    if ([safeMessageIDs count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"No message identifiers are available to forward." code:99];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to forward messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:100];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"forwardMessages" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[toChatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[fromChatID longLongValue]] forKey:@"from_chat_id"];
+    [request setObject:safeMessageIDs forKey:@"message_ids"];
+    [request setObject:[NSNumber numberWithBool:NO] forKey:@"send_copy"];
+    [request setObject:[NSNumber numberWithBool:NO] forKey:@"remove_caption"];
+
+    NSError *forwardError = nil;
+    NSDictionary *response = [self sendMessageRequest:request
+                                      messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind
+                                          extraPrefix:@"telegraphica-forward-messages"
+                                              timeout:timeout
+                                            errorCode:101
+                                                error:&forwardError];
+    if (!response) {
+        if (error) {
+            *error = forwardError ? forwardError : [self errorWithDescription:@"TDLib did not confirm forwardMessages before timeout." code:101];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] ||
+        (![(NSString *)responseType isEqualToString:@"messages"] && ![(NSString *)responseType isEqualToString:@"ok"])) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib forwardMessages returned an unexpected response." code:102];
+        }
+        return nil;
+    }
+    return @"messages forwarded";
 }
 
 - (NSString *)sendPhotoMessageToChatID:(NSNumber *)chatID localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {

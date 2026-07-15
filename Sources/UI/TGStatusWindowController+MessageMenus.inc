@@ -333,6 +333,28 @@
         [menu addItem:[NSMenuItem separatorItem]];
     }
     BOOL addedMessageAction = NO;
+    NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
+                                                        action:@selector(replyToMessageFromMenu:)
+                                                 keyEquivalent:@""] autorelease];
+    [replyItem setRepresentedObject:item];
+    [replyItem setTarget:self];
+    [menu addItem:replyItem];
+    addedMessageAction = YES;
+
+    NSMenuItem *forwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward..."
+                                                          action:@selector(forwardMessageFromMenu:)
+                                                   keyEquivalent:@""] autorelease];
+    [forwardItem setRepresentedObject:item];
+    [forwardItem setTarget:self];
+    [menu addItem:forwardItem];
+    if ([self.profileUserID respondsToSelector:@selector(longLongValue)]) {
+        NSMenuItem *savedForwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward to Saved Messages"
+                                                                   action:@selector(forwardMessageToSavedMessagesFromMenu:)
+                                                            keyEquivalent:@""] autorelease];
+        [savedForwardItem setRepresentedObject:item];
+        [savedForwardItem setTarget:self];
+        [menu addItem:savedForwardItem];
+    }
     if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
         NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
                                                            action:@selector(editMessageFromMenu:)

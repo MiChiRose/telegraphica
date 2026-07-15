@@ -677,6 +677,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
+CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
 
 CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
     CGFloat widthRatio = ([item isVisualMediaMessage] ? 0.78 : 0.68);
@@ -782,6 +783,18 @@ CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderD
         return 0.0;
     }
     return ([[item senderDisplayName] length] > 0) ? 17.0 : 0.0;
+}
+
+CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return 0.0;
+    }
+    if ([[item forwardSourceDisplayName] length] > 0 ||
+        [[item replyPreview] length] > 0 ||
+        [[item replyToMessageID] respondsToSelector:@selector(longLongValue)]) {
+        return 32.0;
+    }
+    return 0.0;
 }
 
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
@@ -894,13 +907,14 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     }
 
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat height = textHeight + 26.0 + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat height = textHeight + 26.0 + senderHeaderHeight + contextHeaderHeight;
     if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-        height = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
+        height = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
-        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
+        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + contextHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
     }
     if (height < 42.0) {
         height = 42.0;
@@ -984,12 +998,13 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     }
 
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight + contextHeaderHeight;
     if (nonVisualPlayable) {
-        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
