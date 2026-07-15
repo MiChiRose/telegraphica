@@ -437,6 +437,17 @@ if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     echo "Bundled runtime TDLib app configuration marker: $RUNTIME_CONFIG_MARKER"
 fi
 
+if [ -n "${TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL:-}" ]; then
+    INFO_PLIST="$APP_NAME/Contents/Info.plist"
+    if ! echo "$TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL" | grep -E -q '^https://'; then
+        echo "TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL must be an HTTPS URL."
+        exit 1
+    fi
+    /usr/libexec/PlistBuddy -c "Delete :TelegraphicaRemoteTDLibConfigURL" "$INFO_PLIST" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Add :TelegraphicaRemoteTDLibConfigURL string $TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL" "$INFO_PLIST"
+    echo "Bundled remote TDLib config endpoint."
+fi
+
 HELPERS_DIR="$APP_NAME/Contents/Resources/Helpers"
 mkdir -p "$HELPERS_DIR"
 ditto "$OPUS_HELPER_PATH" "$HELPERS_DIR/tgopusdec"
