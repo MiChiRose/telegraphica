@@ -1467,7 +1467,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.loadMoreChatsButton];
 
     self.chatSearchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(188, 332, 32, 32)] autorelease];
-    [self.chatSearchButton setTitle:@"⌕"];
+    [self.chatSearchButton setTitle:@"search"];
     [self.chatSearchButton setToolTip:@"Search all chats"];
     [self.chatSearchButton setTarget:self];
     [self.chatSearchButton setAction:@selector(openGlobalSearch:)];
@@ -1556,7 +1556,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.loadOlderMessagesButton];
 
     self.conversationSearchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(228, 192, 32, 32)] autorelease];
-    [self.conversationSearchButton setTitle:@"⌕"];
+    [self.conversationSearchButton setTitle:@"search"];
     [self.conversationSearchButton setToolTip:@"Search in this chat"];
     [self.conversationSearchButton setTarget:self];
     [self.conversationSearchButton setAction:@selector(openChatSearch:)];

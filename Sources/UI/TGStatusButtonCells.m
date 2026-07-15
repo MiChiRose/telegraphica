@@ -359,6 +359,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         assetName = @"plus";
     } else if ([title isEqualToString:@"↑"]) {
         assetName = @"upload";
+    } else if ([title isEqualToString:@"search"]) {
+        assetName = @"search";
     }
     if ([assetName length] > 0) {
         NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
