@@ -7,6 +7,7 @@
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
 #import "TGStatusButtonCells.h"
+#import "TGSectionTitleField.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusSupport.h"
@@ -116,6 +117,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *authSecondaryLabel;
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
+@property (nonatomic, retain) NSProgressIndicator *busySpinner;
 @property (nonatomic, retain) NSButton *loginLogsButton;
 @property (nonatomic, retain) NSArray *loginLanguageButtons;
 @property (nonatomic, retain) NSTextField *chatsLabel;
@@ -379,6 +381,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize authSecondaryLabel = _authSecondaryLabel;
 @synthesize authSecondaryTextFieldBackgroundView = _authSecondaryTextFieldBackgroundView;
 @synthesize authButton = _authButton;
+@synthesize busySpinner = _busySpinner;
 @synthesize loginLogsButton = _loginLogsButton;
 @synthesize loginLanguageButtons = _loginLanguageButtons;
 @synthesize chatsLabel = _chatsLabel;
@@ -1278,6 +1281,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
+    self.busySpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
+    [self.busySpinner setStyle:NSProgressIndicatorSpinningStyle];
+    [self.busySpinner setControlSize:NSSmallControlSize];
+    [self.busySpinner setIndeterminate:YES];
+    [self.busySpinner setDisplayedWhenStopped:NO];
+    [self.busySpinner setHidden:YES];
+    [contentView addSubview:self.busySpinner];
+
     self.loginLogsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(894, 20, 70, 28)] autorelease];
     [self.loginLogsButton setTitle:@"Logs"];
     [self.loginLogsButton setToolTip:@"Open diagnostic logs"];
@@ -1727,41 +1738,47 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyPanelHeaderLabelStyle:self.settingsTitleField];
     [contentView addSubview:self.settingsTitleField];
 
-    self.settingsStateField = [self labelWithFrame:NSMakeRect(64, 458, 760, 24)
-                                              text:@"Interface & notifications"
-                                              font:[NSFont systemFontOfSize:13.0]];
+    self.settingsStateField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 458, 760, 24)] autorelease];
+    [self.settingsStateField setStringValue:@"Notifications"];
+    [self.settingsStateField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsStateField setIconName:@"bell"];
     [self applyMutedLabelStyle:self.settingsStateField];
     [contentView addSubview:self.settingsStateField];
 
-    self.settingsLibraryField = [self labelWithFrame:NSMakeRect(64, 424, 760, 24)
-                                                text:@""
-                                                font:[NSFont systemFontOfSize:13.0]];
+    self.settingsLibraryField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 424, 760, 24)] autorelease];
+    [self.settingsLibraryField setStringValue:@"Appearance"];
+    [self.settingsLibraryField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsLibraryField setIconName:@"image"];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [[self.settingsLibraryField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
     [contentView addSubview:self.settingsLibraryField];
 
-    self.settingsStorageField = [self labelWithFrame:NSMakeRect(64, 380, 760, 44)
-                                                text:@""
-                                                font:[NSFont systemFontOfSize:12.0]];
+    self.settingsStorageField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 380, 760, 44)] autorelease];
+    [self.settingsStorageField setStringValue:@"Active Sessions"];
+    [self.settingsStorageField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsStorageField setIconName:@"smartphone"];
     [[self.settingsStorageField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [self applyMutedLabelStyle:self.settingsStorageField];
     [contentView addSubview:self.settingsStorageField];
 
-    self.settingsDrawerSectionField = [self labelWithFrame:NSMakeRect(64, 356, 760, 18)
-                                                      text:@"Drawer"
-                                                      font:[NSFont systemFontOfSize:13.0]];
+    self.settingsDrawerSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 356, 760, 18)] autorelease];
+    [self.settingsDrawerSectionField setStringValue:@"General"];
+    [self.settingsDrawerSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsDrawerSectionField setIconName:@"suitcase"];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
     [contentView addSubview:self.settingsDrawerSectionField];
 
-    self.settingsFilesSectionField = [self labelWithFrame:NSMakeRect(64, 206, 760, 18)
-                                                     text:@"Files"
-                                                     font:[NSFont systemFontOfSize:13.0]];
+    self.settingsFilesSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 206, 760, 18)] autorelease];
+    [self.settingsFilesSectionField setStringValue:@"Files"];
+    [self.settingsFilesSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsFilesSectionField setIconName:@"document"];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
     [contentView addSubview:self.settingsFilesSectionField];
 
-    self.settingsHelpSectionField = [self labelWithFrame:NSMakeRect(64, 126, 760, 18)
-                                                    text:@"Help"
-                                                    font:[NSFont systemFontOfSize:13.0]];
+    self.settingsHelpSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 126, 760, 18)] autorelease];
+    [self.settingsHelpSectionField setStringValue:@"Help"];
+    [self.settingsHelpSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsHelpSectionField setIconName:@"info"];
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
     [contentView addSubview:self.settingsHelpSectionField];
 
@@ -1882,8 +1899,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsActiveSessionsButton setTarget:self];
     [self.settingsActiveSessionsButton setAction:@selector(showActiveSessionsWindow:)];
     [self applyUtilityButtonStyle:self.settingsActiveSessionsButton];
-    [self.settingsActiveSessionsButton setImagePosition:NSImageLeft];
-    [self.settingsActiveSessionsButton setImage:TGTemplateIconAssetImage(@"contacts", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsActiveSessionsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsActiveSessionsButton];
 
@@ -1898,8 +1913,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsDownloadFolderButton setTarget:self];
     [self.settingsDownloadFolderButton setAction:@selector(chooseDownloadFolder:)];
     [self applyUtilityButtonStyle:self.settingsDownloadFolderButton];
-    [self.settingsDownloadFolderButton setImagePosition:NSImageLeft];
-    [self.settingsDownloadFolderButton setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsDownloadFolderButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsDownloadFolderButton];
 
@@ -1908,8 +1921,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsStorageUsageButton setTarget:self];
     [self.settingsStorageUsageButton setAction:@selector(showStorageUsageWindow:)];
     [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
-    [self.settingsStorageUsageButton setImagePosition:NSImageLeft];
-    [self.settingsStorageUsageButton setImage:TGTemplateIconAssetImage(@"archive", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];
 
@@ -1918,8 +1929,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsCheckUpdatesButton setTarget:self];
     [self.settingsCheckUpdatesButton setAction:@selector(checkForUpdatesManually:)];
     [self applyUtilityButtonStyle:self.settingsCheckUpdatesButton];
-    [self.settingsCheckUpdatesButton setImagePosition:NSImageLeft];
-    [self.settingsCheckUpdatesButton setImage:TGTemplateIconAssetImage(@"refresh", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsCheckUpdatesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsCheckUpdatesButton];
 
@@ -1938,8 +1947,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsLogsButton setTarget:self];
     [self.settingsLogsButton setAction:@selector(showLogsWindow:)];
     [self applyUtilityButtonStyle:self.settingsLogsButton];
-    [self.settingsLogsButton setImagePosition:NSImageLeft];
-    [self.settingsLogsButton setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsLogsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLogsButton];
 
@@ -1949,8 +1956,6 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsAboutButton setTarget:self];
     [self.settingsAboutButton setAction:@selector(showAboutWindow:)];
     [self applyUtilityButtonStyle:self.settingsAboutButton];
-    [self.settingsAboutButton setImagePosition:NSImageLeft];
-    [self.settingsAboutButton setImage:TGTemplateIconAssetImage(@"info", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.72)];
     [self.settingsAboutButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsAboutButton];
 
@@ -2461,6 +2466,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_authTextField release];
     [_authSecureField release];
     [_authButton release];
+    [_busySpinner release];
     [_loginLogsButton release];
     [_loginLanguageButtons release];
     [_loginErrorLocalizationKey release];

@@ -44,6 +44,7 @@
     [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
     [self showView:self.authSecureField visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPassword"])];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
+    [self showView:self.busySpinner visible:(showLogin && self.controlsBusy)];
     [self showView:self.loginLogsButton visible:showLogin];
     NSUInteger loginLanguageIndex = 0;
     for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
@@ -379,6 +380,7 @@
     [self.authSecondaryTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, secondaryInputY, loginInputWidth, 32.0)];
     [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
+    [self.busySpinner setFrame:NSMakeRect(loginX + loginWidth - 36.0, primaryInputY + 8.0, 16.0, 16.0)];
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
     CGFloat loginLanguageX = margin;
     NSUInteger loginLanguageIndex = 0;

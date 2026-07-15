@@ -24,50 +24,6 @@ static NSPoint TGIconPoint(NSRect rect, CGFloat x, CGFloat y, BOOL flipped) {
     return NSMakePoint(NSMinX(rect) + x, flipped ? (NSMaxY(rect) - y) : (NSMinY(rect) + y));
 }
 
-static NSPoint TGSvgPoint(NSRect rect, CGFloat x, CGFloat y, BOOL flipped) {
-    CGFloat pointX = NSMinX(rect) + ((x / 64.0) * NSWidth(rect));
-    CGFloat pointY = flipped ? (NSMinY(rect) + ((y / 64.0) * NSHeight(rect)))
-                             : (NSMaxY(rect) - ((y / 64.0) * NSHeight(rect)));
-    return NSMakePoint(pointX, pointY);
-}
-
-static void TGSvgCurveTo(NSBezierPath *path, NSRect rect, BOOL flipped,
-                         CGFloat x, CGFloat y,
-                         CGFloat cp1x, CGFloat cp1y,
-                         CGFloat cp2x, CGFloat cp2y) {
-    [path curveToPoint:TGSvgPoint(rect, x, y, flipped)
-         controlPoint1:TGSvgPoint(rect, cp1x, cp1y, flipped)
-         controlPoint2:TGSvgPoint(rect, cp2x, cp2y, flipped)];
-}
-
-static void TGDrawPaperclipSvgPathInRect(NSRect iconRect, BOOL flipped, CGFloat alpha) {
-    NSBezierPath *path = [NSBezierPath bezierPath];
-    [path setWindingRule:NSEvenOddWindingRule];
-    [path moveToPoint:TGSvgPoint(iconRect, 39.9057, 15.5859, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 43.4272, 26.4035, 44.0598, 17.4299, 45.6997, 22.4675);
-    [path lineToPoint:TGSvgPoint(iconRect, 32.1243, 45.9807, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 21.8791, 48.7259, 30.0532, 49.5679, 25.4663, 50.7970);
-    TGSvgCurveTo(path, iconRect, flipped, 19.1339, 38.4807, 18.2919, 46.6548, 17.0629, 42.0679);
-    [path lineToPoint:TGSvgPoint(iconRect, 29.2589, 20.9437, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 35.7476, 19.2051, 30.5706, 18.6718, 33.4757, 17.8934);
-    TGSvgCurveTo(path, iconRect, flipped, 37.4862, 25.6937, 38.0194, 20.5167, 38.7978, 23.4218);
-    [path lineToPoint:TGSvgPoint(iconRect, 27.3612, 43.2307, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 25.9951, 43.5967, 27.0850, 43.7090, 26.4734, 43.8729);
-    TGSvgCurveTo(path, iconRect, flipped, 25.6291, 42.2307, 25.5169, 43.3206, 25.3530, 42.7090);
-    [path lineToPoint:TGSvgPoint(iconRect, 35.7541, 24.6937, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 34.7476, 20.9371, 36.5135, 23.3784, 36.0629, 21.6965);
-    TGSvgCurveTo(path, iconRect, flipped, 30.9910, 21.9437, 33.4322, 20.1777, 31.7504, 20.6284);
-    [path lineToPoint:TGSvgPoint(iconRect, 20.8660, 39.4807, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 22.8791, 46.9938, 19.3472, 42.1113, 20.2485, 45.4751);
-    TGSvgCurveTo(path, iconRect, flipped, 30.3923, 44.9807, 25.5097, 48.5126, 28.8735, 47.6113);
-    [path lineToPoint:TGSvgPoint(iconRect, 41.6951, 25.4035, flipped)];
-    TGSvgCurveTo(path, iconRect, flipped, 39.0942, 17.4139, 43.3735, 22.4965, 42.1623, 18.7758);
-    [path lineToPoint:TGSvgPoint(iconRect, 39.9057, 15.5859, flipped)];
-    [path closePath];
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:alpha] set];
-    [path fill];
-}
-
 void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
     NSBezierPath *speakerPath = [NSBezierPath bezierPath];
@@ -98,15 +54,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
         TGDrawTemplateIconAsset(@"chat", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Profile"] || [title isEqualToString:@"Профиль"] || [title isEqualToString:@"Профіль"]) {
-        NSRect headRect = TGIconRect(iconRect, 5.0, 10.0, 8.0, 8.0, flipped);
-        [[NSBezierPath bezierPathWithOvalInRect:headRect] stroke];
-        NSBezierPath *bodyPath = [NSBezierPath bezierPath];
-        [bodyPath setLineWidth:1.4];
-        [bodyPath moveToPoint:TGIconPoint(iconRect, 4.0, 3.0, flipped)];
-        [bodyPath curveToPoint:TGIconPoint(iconRect, 14.0, 3.0, flipped)
-                 controlPoint1:TGIconPoint(iconRect, 6.0, 8.0, flipped)
-                 controlPoint2:TGIconPoint(iconRect, 12.0, 8.0, flipped)];
-        [bodyPath stroke];
+        TGDrawTemplateIconAsset(@"user", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Settings"] || [title isEqualToString:@"Настройки"] || [title isEqualToString:@"Налады"]) {
         TGStrokeLine(TGIconPoint(iconRect, 2.0, 14.0, flipped),
                      TGIconPoint(iconRect, 16.0, 14.0, flipped),
@@ -331,12 +279,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    BOOL flipped = [controlView isFlipped];
     NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 11.5,
                                  NSMidY(buttonRect) - 11.5,
                                  23.0,
                                  23.0);
-    TGDrawPaperclipSvgPathInRect(iconRect, flipped, alpha);
+    TGDrawTemplateIconAsset(@"upload", iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
 @end
@@ -647,6 +594,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         NSString *title = [self title];
         if ([title length] == 0) {
             title = @"?";
+        }
+        if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
+            NSRect iconRect = NSMakeRect(NSMidX(contentRect) - 11.0,
+                                         NSMidY(contentRect) - 11.0,
+                                         22.0,
+                                         22.0);
+            TGDrawTemplateIconAsset(@"emoji-smile",
+                                    iconRect,
+                                    [NSColor colorWithCalibratedWhite:0.05 alpha:alpha],
+                                    1.0,
+                                    [controlView isFlipped]);
+            return;
         }
         NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
         [paragraph setAlignment:NSCenterTextAlignment];

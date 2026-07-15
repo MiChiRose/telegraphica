@@ -91,7 +91,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat titleX = NSMaxX(avatarRect) + 9.0;
     CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
     CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
-    CGFloat pinIconWidth = [item isPinned] ? 10.0 : 0.0;
+    CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
     CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) + ([item isPinned] ? (pinIconWidth + 4.0) : 0.0);
     CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
     if (titleAvailableWidth < 40.0) {
@@ -111,10 +111,10 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if ([item isPinned]) {
         NSRect pinRect = NSMakeRect(iconX,
                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 12.0) / 2.0),
-                                    10.0,
+                                    12.0,
                                     12.0);
         NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
-        TGDrawPinIconInRect(pinRect, pinColor, [controlView isFlipped]);
+        TGDrawTemplateIconAsset(@"flag-triangle", pinRect, pinColor, 0.9, [controlView isFlipped]);
         iconX = NSMaxX(pinRect) + 4.0;
     }
     if ([item notificationsMuted]) {

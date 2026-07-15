@@ -540,6 +540,13 @@
 
 - (void)setControlsBusy:(BOOL)busy {
     _controlsBusy = busy;
+    if (busy) {
+        [self.busySpinner setHidden:NO];
+        [self.busySpinner startAnimation:self];
+    } else {
+        [self.busySpinner stopAnimation:self];
+        [self.busySpinner setHidden:YES];
+    }
     NSUInteger loginLanguageIndex = 0;
     for (loginLanguageIndex = 0; loginLanguageIndex < [self.loginLanguageButtons count]; loginLanguageIndex++) {
         [[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] setEnabled:YES];
@@ -653,4 +660,3 @@
     }
     self.offlineModeActive = active;
 }
-

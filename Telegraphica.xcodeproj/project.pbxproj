@@ -48,6 +48,7 @@
 		111111111111111111111139 /* TGAnimationSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111274 /* TGAnimationSupport.m */; };
 		111111111111111111111140 /* TGIconAssets.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111276 /* TGIconAssets.m */; };
 		111111111111111111111141 /* Icons in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111277 /* Icons */; };
+		111111111111111111111142 /* TGSectionTitleField.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111279 /* TGSectionTitleField.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -123,6 +124,8 @@
 		111111111111111111111275 /* TGIconAssets.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGIconAssets.h; sourceTree = "<group>"; };
 		111111111111111111111276 /* TGIconAssets.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGIconAssets.m; sourceTree = "<group>"; };
 		111111111111111111111277 /* Icons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Icons; sourceTree = "<group>"; };
+		111111111111111111111278 /* TGSectionTitleField.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSectionTitleField.h; sourceTree = "<group>"; };
+		111111111111111111111279 /* TGSectionTitleField.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSectionTitleField.m; sourceTree = "<group>"; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -219,6 +222,8 @@
 				111111111111111111111274 /* TGAnimationSupport.m */,
 				111111111111111111111275 /* TGIconAssets.h */,
 				111111111111111111111276 /* TGIconAssets.m */,
+				111111111111111111111278 /* TGSectionTitleField.h */,
+				111111111111111111111279 /* TGSectionTitleField.m */,
 				111111111111111111111271 /* TGIconDrawing.h */,
 				111111111111111111111272 /* TGIconDrawing.m */,
 				111111111111111111111216 /* TGActiveSessionsPresentation.h */,
@@ -388,6 +393,7 @@
 				111111111111111111111138 /* TGIconDrawing.m in Sources */,
 				111111111111111111111139 /* TGAnimationSupport.m in Sources */,
 				111111111111111111111140 /* TGIconAssets.m in Sources */,
+				111111111111111111111142 /* TGSectionTitleField.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
