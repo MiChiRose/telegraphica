@@ -9,7 +9,7 @@ TDLIB_LABEL="${TDLIB_LABEL:-$TDLIB_VERSION}"
 COMPILER_CC="${CC:-}"
 COMPILER_CXX="${CXX:-}"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
-DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.9}"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 BUILD_DIR="$ROOT_DIR/build-tdlib-legacy"
 INSTALL_DIR=""
 STAGE_DIR=""
@@ -18,7 +18,10 @@ ARCHIVE_PATH=""
 OPENSSL_ROOT="${TDLIB_OPENSSL_ROOT:-}"
 ZLIB_ROOT="${TDLIB_ZLIB_ROOT:-}"
 CMAKE_BIN="${CMAKE:-cmake}"
+CMAKE_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM:-/usr/bin/make}"
 GPERF_BIN="${GPERF:-gperf}"
+TDLIB_RELEASE_C_FLAGS="${TDLIB_RELEASE_C_FLAGS:--O0 -fno-vectorize -fno-slp-vectorize -DNDEBUG}"
+TDLIB_RELEASE_CXX_FLAGS="${TDLIB_RELEASE_CXX_FLAGS:--O0 -fno-vectorize -fno-slp-vectorize -DNDEBUG}"
 JOBS=""
 CLEAN=0
 ALLOW_UNKNOWN_TAG=0
@@ -26,6 +29,13 @@ PATCH_LEGACY_LINKER=1
 PATCH_MAVERICKS_FDOPENDIR=1
 PATCH_MAVERICKS_CLOCK_GETTIME=1
 PATCH_WEBPAGES_MANAGER_STACK_ADDRESS_WARNING=1
+PATCH_XCODE5_SCOPE_EXIT_HEAP_GUARD=1
+PATCH_XCODE5_FILEFD_SCOPE_EXIT=1
+PATCH_XCODE5_STATUS_SCOPE_EXIT=1
+PATCH_XCODE5_IPADDRESS_SCOPE_EXIT=1
+PATCH_XCODE5_STDSTREAMS_SCOPE_EXIT=1
+PATCH_XCODE5_ORDERED_EVENTS_RESIZE=1
+PATCH_NETSTATS_PARSE_GUARD=1
 
 usage() {
     cat <<EOF
@@ -294,13 +304,16 @@ patch_tdlib_for_legacy_linker() {
     sed \
         -e 's/set(TD_LINKER_FLAGS "-Wl,-dead_strip")/set(TD_LINKER_FLAGS "") # Telegraphica legacy Xcode 6 linker workaround/' \
         -e 's/set(TD_LINKER_FLAGS "${TD_LINKER_FLAGS},-x,-S")/set(TD_LINKER_FLAGS "${TD_LINKER_FLAGS}") # Telegraphica legacy Xcode 6 linker workaround/' \
+        -e 's/add_cxx_compiler_flag("-Wodr")/# Telegraphica legacy Xcode workaround: skip -Wodr/' \
+        -e 's/add_cxx_compiler_flag("-flto-odr-type-merging")/# Telegraphica legacy Xcode workaround: skip -flto-odr-type-merging/' \
         "$compiler_file.telegraphica-backup" > "$compiler_file"
     {
         echo "Patched TDLib Apple linker strip flags for Xcode 6.2 compatibility."
         echo "File: $compiler_file"
         echo "Removed: -Wl,-dead_strip,-x,-S"
+        echo "Removed: -Wodr and -flto-odr-type-merging"
     } > "$marker_file"
-    echo "Patched TDLib Apple linker strip flags for Xcode 6.2 compatibility."
+    echo "Patched TDLib Apple linker/ODR flags for legacy Xcode compatibility."
 }
 
 patch_tdlib_for_mavericks_fdopendir() {
@@ -375,6 +388,284 @@ patch_tdlib_for_mavericks_clock_gettime() {
         echo "Replacement: skip POSIX clock_gettime debug enumeration on Apple legacy builds."
     } > "$marker_file"
     echo "Patched TDLib clock_gettime debug clock block for OS X 10.9 SDK compatibility."
+}
+
+patch_tdlib_for_xcode5_filefd_scope_exit() {
+    local source_root="$1"
+    local filefd_file="$source_root/tdutils/td/utils/port/FileFd.cpp"
+    local marker_file="$BUILD_DIR/xcode5-filefd-scope-exit-patch.txt"
+
+    if [ "$PATCH_XCODE5_FILEFD_SCOPE_EXIT" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$filefd_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib FileFd.cpp; skipping Xcode 5 FileFd::lock patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib FileFd.cpp: $filefd_file"
+    fi
+
+    if ! grep -q 'SCOPE_EXIT {' "$filefd_file" || ! grep -q 'Status FileFd::lock' "$filefd_file"; then
+        echo "Warning: TDLib FileFd::lock SCOPE_EXIT block was not found; skipping Xcode 5 FileFd patch."
+        return 0
+    fi
+
+    cp "$filefd_file" "$filefd_file.telegraphica-xcode5-backup"
+    perl -0pi -e 's@  SCOPE_EXIT \{\n    if \(need_local_unlock\) \{\n      remove_local_lock\(path\);\n    \}\n  \};\n@  // Telegraphica legacy Xcode workaround: AppleClang 5.1.1 crashes while\n  // generating FileFd::lock with SCOPE_EXIT; keep the same cleanup explicit.\n@s' "$filefd_file"
+    perl -0pi -e 's@        return OS_ERROR\(PSLICE\(\) << "Can'"'"'t lock file \\"" << path\n                                 << "\\", because it is already in use; check for another program instance running"\);@        if (need_local_unlock) {\n          remove_local_lock(path);\n        }\n        return OS_ERROR(PSLICE() << "Can'"'"'t lock file \\"" << path\n                                 << "\\", because it is already in use; check for another program instance running");@s' "$filefd_file"
+    perl -0pi -e 's@      return OS_ERROR\("Can'"'"'t lock file"\);@      if (need_local_unlock) {\n        remove_local_lock(path);\n      }\n      return OS_ERROR("Can'"'"'t lock file");@' "$filefd_file"
+    perl -0pi -e 's@  if \(flags == LockFlags::Write\) \{\n    need_local_unlock = false;\n  \}\n  return Status::OK\(\);@  if (flags == LockFlags::Write) {\n    need_local_unlock = false;\n  }\n  if (need_local_unlock) {\n    remove_local_lock(path);\n  }\n  return Status::OK();@' "$filefd_file"
+
+    if grep -q 'SCOPE_EXIT {' "$filefd_file"; then
+        fail "Failed to patch TDLib FileFd::lock SCOPE_EXIT block in $filefd_file"
+    fi
+
+    {
+        echo "Patched TDLib FileFd::lock SCOPE_EXIT for AppleClang 5.1.1 compatibility."
+        echo "File: $filefd_file"
+        echo "Replacement: explicit local-lock cleanup before error/success returns."
+    } > "$marker_file"
+    echo "Patched TDLib FileFd::lock SCOPE_EXIT for Xcode 5.1.1 compatibility."
+}
+
+patch_tdlib_for_xcode5_scope_exit_heap_guard() {
+    local source_root="$1"
+    local scope_guard_file="$source_root/tdutils/td/utils/ScopeGuard.h"
+    local marker_file="$BUILD_DIR/xcode5-scope-exit-heap-guard-patch.txt"
+
+    if [ "$PATCH_XCODE5_SCOPE_EXIT_HEAP_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$scope_guard_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ScopeGuard.h; skipping Xcode 5 SCOPE_EXIT heap guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ScopeGuard.h: $scope_guard_file"
+    fi
+
+    if ! grep -q '#define SCOPE_EXIT auto TD_CONCAT(SCOPE_EXIT_VAR_, __LINE__) = ::td::ScopeExit() + \[&\]' "$scope_guard_file"; then
+        echo "Warning: TDLib SCOPE_EXIT macro shape was not found; skipping Xcode 5 heap guard patch."
+        return 0
+    fi
+
+    cp "$scope_guard_file" "$scope_guard_file.telegraphica-xcode5-backup"
+    perl -0pi -e 's@enum class ScopeExit \{\};\ntemplate <class FunctionT>\nauto operator\+\(ScopeExit, FunctionT &&func\) \{\n  return LambdaGuard<std::decay_t<FunctionT>>\(std::forward<FunctionT>\(func\)\);\n\}\n@enum class ScopeExit {};\nenum class ScopeExitHeap {};\ntemplate <class FunctionT>\nLambdaGuard<typename std::decay<FunctionT>::type> operator+(ScopeExit, FunctionT &&func) {\n  return LambdaGuard<typename std::decay<FunctionT>::type>(std::forward<FunctionT>(func));\n}\ntemplate <class FunctionT>\nunique_ptr<Guard> operator+(ScopeExitHeap, FunctionT &&func) {\n  return create_lambda_guard(std::forward<FunctionT>(func));\n}\n@' "$scope_guard_file"
+    perl -0pi -e 's@#define SCOPE_EXIT auto TD_CONCAT\(SCOPE_EXIT_VAR_, __LINE__\) = ::td::ScopeExit\(\) \+ \[\&\]@#define SCOPE_EXIT auto TD_CONCAT(SCOPE_EXIT_VAR_, __LINE__) = ::td::ScopeExitHeap() + [&]@' "$scope_guard_file"
+
+    if ! grep -q '#define SCOPE_EXIT auto TD_CONCAT(SCOPE_EXIT_VAR_, __LINE__) = ::td::ScopeExitHeap() + \[&\]' "$scope_guard_file"; then
+        fail "Failed to patch TDLib SCOPE_EXIT macro in $scope_guard_file"
+    fi
+
+    {
+        echo "Patched TDLib SCOPE_EXIT macro for AppleClang 5.1.1 compatibility."
+        echo "File: $scope_guard_file"
+        echo "Replacement: heap-backed Guard via create_lambda_guard."
+    } > "$marker_file"
+    echo "Patched TDLib SCOPE_EXIT macro for Xcode 5.1.1 compatibility."
+}
+
+patch_tdlib_for_xcode5_status_scope_exit() {
+    local source_root="$1"
+    local status_file="$source_root/tdutils/td/utils/Status.h"
+    local marker_file="$BUILD_DIR/xcode5-status-scope-exit-patch.txt"
+
+    if [ "$PATCH_XCODE5_STATUS_SCOPE_EXIT" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$status_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib Status.h; skipping Xcode 5 Result<T> status patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib Status.h: $status_file"
+    fi
+
+    if ! grep -q 'Status move_as_error()' "$status_file" || ! grep -q 'SCOPE_EXIT {' "$status_file"; then
+        echo "Warning: TDLib Result<T> SCOPE_EXIT methods were not found; skipping Xcode 5 Status patch."
+        return 0
+    fi
+
+    cp "$status_file" "$status_file.telegraphica-xcode5-backup"
+    perl -0pi -e 's@  Status move_as_error\(\) TD_WARN_UNUSED_RESULT \{\n    CHECK\(status_\.is_error\(\)\);\n    SCOPE_EXIT \{\n      status_ = Status::Error<-4>\(\);\n    \};\n    return std::move\(status_\);\n  \}\n  Status move_as_error_prefix\(Slice prefix\) TD_WARN_UNUSED_RESULT \{\n    SCOPE_EXIT \{\n      status_ = Status::Error<-5>\(\);\n    \};\n    return status_\.move_as_error_prefix\(prefix\);\n  \}\n  Status move_as_error_prefix\(const Status &prefix\) TD_WARN_UNUSED_RESULT \{\n    SCOPE_EXIT \{\n      status_ = Status::Error<-6>\(\);\n    \};\n    return status_\.move_as_error_prefix\(prefix\);\n  \}\n  Status move_as_error_suffix\(Slice suffix\) TD_WARN_UNUSED_RESULT \{\n    SCOPE_EXIT \{\n      status_ = Status::Error<-7>\(\);\n    \};\n    return status_\.move_as_error_suffix\(suffix\);\n  \}@  Status move_as_error() TD_WARN_UNUSED_RESULT {\n    CHECK(status_.is_error());\n    Status result = std::move(status_);\n    status_ = Status::Error<-4>();\n    return result;\n  }\n  Status move_as_error_prefix(Slice prefix) TD_WARN_UNUSED_RESULT {\n    Status result = status_.move_as_error_prefix(prefix);\n    status_ = Status::Error<-5>();\n    return result;\n  }\n  Status move_as_error_prefix(const Status &prefix) TD_WARN_UNUSED_RESULT {\n    Status result = status_.move_as_error_prefix(prefix);\n    status_ = Status::Error<-6>();\n    return result;\n  }\n  Status move_as_error_suffix(Slice suffix) TD_WARN_UNUSED_RESULT {\n    Status result = status_.move_as_error_suffix(suffix);\n    status_ = Status::Error<-7>();\n    return result;\n  }@s' "$status_file"
+
+    if ! grep -q 'Status result = std::move(status_);' "$status_file"; then
+        fail "Failed to patch TDLib Result<T> SCOPE_EXIT methods in $status_file"
+    fi
+
+    {
+        echo "Patched TDLib Result<T> SCOPE_EXIT methods for AppleClang 5.1.1 compatibility."
+        echo "File: $status_file"
+        echo "Replacement: explicit status reset after constructing return value."
+    } > "$marker_file"
+    echo "Patched TDLib Result<T> SCOPE_EXIT methods for Xcode 5.1.1 compatibility."
+}
+
+patch_tdlib_for_xcode5_ipaddress_scope_exit() {
+    local source_root="$1"
+    local ipaddress_file="$source_root/tdutils/td/utils/port/IPAddress.cpp"
+    local marker_file="$BUILD_DIR/xcode5-ipaddress-scope-exit-patch.txt"
+
+    if [ "$PATCH_XCODE5_IPADDRESS_SCOPE_EXIT" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$ipaddress_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib IPAddress.cpp; skipping Xcode 5 IPAddress patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib IPAddress.cpp: $ipaddress_file"
+    fi
+
+    if ! grep -q 'freeaddrinfo(info)' "$ipaddress_file" || ! grep -q 'SCOPE_EXIT {' "$ipaddress_file"; then
+        echo "Warning: TDLib IPAddress::init_host_port SCOPE_EXIT block was not found; skipping Xcode 5 IPAddress patch."
+        return 0
+    fi
+
+    cp "$ipaddress_file" "$ipaddress_file.telegraphica-xcode5-backup"
+    perl -0pi -e 's@  SCOPE_EXIT \{\n    freeaddrinfo\(info\);\n  \};\n@  // Telegraphica legacy Xcode workaround: AppleClang 5.1.1 crashes while\n  // generating this SCOPE_EXIT; keep the same cleanup explicit.\n@s' "$ipaddress_file"
+    perl -0pi -e 's@  if \(best_info == nullptr\) \{\n    return Status::Error\("Failed to find IPv4/IPv6 address"\);\n  \}\n  return init_sockaddr\(best_info->ai_addr, narrow_cast<socklen_t>\(best_info->ai_addrlen\)\);@  if (best_info == nullptr) {\n    freeaddrinfo(info);\n    return Status::Error("Failed to find IPv4/IPv6 address");\n  }\n  auto status = init_sockaddr(best_info->ai_addr, narrow_cast<socklen_t>(best_info->ai_addrlen));\n  freeaddrinfo(info);\n  return status;@' "$ipaddress_file"
+
+    if grep -q 'SCOPE_EXIT {' "$ipaddress_file"; then
+        fail "Failed to patch TDLib IPAddress::init_host_port SCOPE_EXIT block in $ipaddress_file"
+    fi
+
+    {
+        echo "Patched TDLib IPAddress::init_host_port SCOPE_EXIT for AppleClang 5.1.1 compatibility."
+        echo "File: $ipaddress_file"
+        echo "Replacement: explicit freeaddrinfo cleanup before returns."
+    } > "$marker_file"
+    echo "Patched TDLib IPAddress::init_host_port SCOPE_EXIT for Xcode 5.1.1 compatibility."
+}
+
+patch_tdlib_for_xcode5_stdstreams_scope_exit() {
+    local source_root="$1"
+    local stdstreams_file="$source_root/tdutils/td/utils/port/StdStreams.cpp"
+    local marker_file="$BUILD_DIR/xcode5-stdstreams-scope-exit-patch.txt"
+
+    if [ "$PATCH_XCODE5_STDSTREAMS_SCOPE_EXIT" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$stdstreams_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib StdStreams.cpp; skipping Xcode 5 StdStreams patch for snapshot source."
+            return 0
+        fi
+        fail "Could not find TDLib StdStreams.cpp: $stdstreams_file"
+    fi
+
+    if ! grep -q 'static auto guard = ScopeExit() + \[&\]' "$stdstreams_file"; then
+        echo "Warning: TDLib StdStreams ScopeExit guard was not found; skipping Xcode 5 StdStreams patch."
+        return 0
+    fi
+
+    cp "$stdstreams_file" "$stdstreams_file.telegraphica-xcode5-backup"
+    perl -0pi -e 's@static auto guard = ScopeExit\(\) \+ \[\&\] \{\n    result\.move_as_native_fd\(\)\.release\(\);\n  \};@static auto guard = create_lambda_guard([&] {\n    result.move_as_native_fd().release();\n  });@g' "$stdstreams_file"
+
+    if grep -q 'static auto guard = ScopeExit() + \[&\]' "$stdstreams_file"; then
+        fail "Failed to patch TDLib StdStreams ScopeExit guards in $stdstreams_file"
+    fi
+
+    {
+        echo "Patched TDLib StdStreams ScopeExit guards for AppleClang 5.1.1 compatibility."
+        echo "File: $stdstreams_file"
+        echo "Replacement: heap-backed create_lambda_guard for static guards."
+    } > "$marker_file"
+    echo "Patched TDLib StdStreams ScopeExit guards for Xcode 5.1.1 compatibility."
+}
+
+patch_tdlib_for_xcode5_ordered_events_resize() {
+    local source_root="$1"
+    local ordered_events_file="$source_root/tdutils/td/utils/OrderedEventsProcessor.h"
+    local marker_file="$BUILD_DIR/xcode5-ordered-events-resize-patch.txt"
+
+    if [ "$PATCH_XCODE5_ORDERED_EVENTS_RESIZE" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$ordered_events_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib OrderedEventsProcessor.h; skipping Xcode 5 resize patch."
+            return 0
+        fi
+        fail "Could not find TDLib OrderedEventsProcessor.h: $ordered_events_file"
+    fi
+
+    if ! grep -q 'data_array_\.resize(need_size);' "$ordered_events_file"; then
+        echo "Warning: TDLib OrderedEventsProcessor resize call was not found; skipping Xcode 5 resize patch."
+        return 0
+    fi
+
+    cp "$ordered_events_file" "$ordered_events_file.telegraphica-xcode5-backup"
+    perl -0pi -e 's@#include <utility>@#include <deque>\n#include <utility>@' "$ordered_events_file"
+    perl -0pi -e 's@    \*this = OrderedEventsProcessor\(\);@    data_array_.clear();\n    offset_ = 1;\n    begin_ = 1;\n    end_ = 1;@g' "$ordered_events_file"
+    perl -0pi -e 's@      // try_compactify\n      auto begin_pos = static_cast<size_t>\(begin_ - offset_\);\n      if \(begin_pos > 5 && begin_pos \* 2 > data_array_\.size\(\)\) \{\n        data_array_\.erase\(data_array_\.begin\(\), data_array_\.begin\(\) \+ begin_pos\);\n        offset_ = begin_;\n      \}@      // Telegraphica legacy Xcode workaround: AppleClang 5.1.1 libc++\n      // cannot compact containers that store move-only DataT values here.@' "$ordered_events_file"
+    perl -0pi -e 's@      if \(data_array_\.size\(\) < need_size\) \{\n        data_array_\.resize\(need_size\);\n      \}@      while (data_array_.size() < need_size) {\n        data_array_.emplace_back();\n      }@' "$ordered_events_file"
+    perl -0pi -e 's@std::vector<std::pair<DataT, bool>> data_array_;@std::deque<std::pair<DataT, bool>> data_array_;@' "$ordered_events_file"
+
+    if grep -q 'data_array_\.resize(need_size);' "$ordered_events_file"; then
+        fail "Failed to patch TDLib OrderedEventsProcessor resize call in $ordered_events_file"
+    fi
+    if grep -q 'data_array_\.erase' "$ordered_events_file"; then
+        fail "Failed to patch TDLib OrderedEventsProcessor erase compaction in $ordered_events_file"
+    fi
+    if ! grep -q 'std::deque<std::pair<DataT, bool>> data_array_;' "$ordered_events_file"; then
+        fail "Failed to patch TDLib OrderedEventsProcessor container type in $ordered_events_file"
+    fi
+
+    {
+        echo "Patched TDLib OrderedEventsProcessor storage for AppleClang/Xcode 5 libc++ compatibility."
+        echo "File: $ordered_events_file"
+        echo "Replacement: deque storage, no erase compaction, and emplace_back loop avoid moving copy-disabled DataT values."
+    } > "$marker_file"
+    echo "Patched TDLib OrderedEventsProcessor storage for Xcode 5 libc++ compatibility."
+}
+
+patch_tdlib_for_netstats_parse_guard() {
+    local source_root="$1"
+    local netstats_file="$source_root/td/telegram/net/NetStatsManager.cpp"
+    local marker_file="$BUILD_DIR/netstats-parse-guard-patch.txt"
+
+    if [ "$PATCH_NETSTATS_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$netstats_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib NetStatsManager.cpp; skipping net-stats parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib NetStatsManager.cpp: $netstats_file"
+    fi
+
+    if ! grep -q 'log_event_parse(info.stats_by_type\[net_type_i\]\.db_stats, value)\.ensure();' "$netstats_file"; then
+        echo "Warning: TDLib NetStatsManager fatal parse call was not found; skipping net-stats parse guard patch."
+        return 0
+    fi
+
+    cp "$netstats_file" "$netstats_file.telegraphica-netstats-backup"
+    perl -0pi -e 's@#include "td/utils/tl_helpers.h"\n@#include "td/utils/tl_helpers.h"\n\n#include <cstring>\n@' "$netstats_file"
+    perl -0pi -e 's@      auto value = G\(\)->td_db\(\)->get_binlog_pmc\(\)->get\(key\);\n      if \(value\.empty\(\)\) \{\n        continue;\n      \}\n      log_event_parse\(info\.stats_by_type\[net_type_i\]\.db_stats, value\)\.ensure\(\);@      auto value = G()->td_db()->get_binlog_pmc()->get(key);\n      if (value.empty()) {\n        continue;\n      }\n\n      int32 net_stats_version = -1;\n      if (value.size() < sizeof(net_stats_version)) {\n        LOG(ERROR) << "Drop too short persistent network statistics";\n        G()->td_db()->get_binlog_pmc()->erase(key);\n        continue;\n      }\n      std::memcpy(&net_stats_version, value.data(), sizeof(net_stats_version));\n      if (net_stats_version < 0 || net_stats_version >= static_cast<int32>(Version::Next)) {\n        LOG(ERROR) << "Drop invalid persistent network statistics version " << net_stats_version;\n        G()->td_db()->get_binlog_pmc()->erase(key);\n        continue;\n      }\n\n      auto status = log_event_parse(info.stats_by_type[net_type_i].db_stats, value);\n      if (status.is_error()) {\n        LOG(ERROR) << "Drop unreadable persistent network statistics: " << status;\n        info.stats_by_type[net_type_i].db_stats = NetStatsData();\n        G()->td_db()->get_binlog_pmc()->erase(key);\n        continue;\n      }@' "$netstats_file"
+
+    if grep -q 'log_event_parse(info.stats_by_type\[net_type_i\]\.db_stats, value)\.ensure();' "$netstats_file"; then
+        fail "Failed to patch TDLib NetStatsManager fatal parse call in $netstats_file"
+    fi
+    if ! grep -q 'Drop invalid persistent network statistics version' "$netstats_file"; then
+        fail "Failed to add TDLib NetStatsManager version guard in $netstats_file"
+    fi
+
+    {
+        echo "Patched TDLib NetStatsManager persistent stats parsing for crash resistance."
+        echo "File: $netstats_file"
+        echo "Replacement: validate log-event version and erase unreadable net_stats keys instead of fatal abort."
+    } > "$marker_file"
+    echo "Patched TDLib NetStatsManager persistent stats parsing guard."
 }
 
 patch_tdlib_for_webpages_manager_stack_address_warning() {
@@ -533,7 +824,7 @@ fi
 
 require_command "$CMAKE_BIN"
 require_command "$GPERF_BIN"
-require_command make
+require_command "$CMAKE_MAKE_PROGRAM"
 require_command xcrun
 require_command file
 require_command otool
@@ -583,6 +874,13 @@ fi
 patch_tdlib_for_legacy_linker "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_fdopendir "$SOURCE_ROOT"
 patch_tdlib_for_mavericks_clock_gettime "$SOURCE_ROOT"
+patch_tdlib_for_xcode5_scope_exit_heap_guard "$SOURCE_ROOT"
+patch_tdlib_for_xcode5_filefd_scope_exit "$SOURCE_ROOT"
+patch_tdlib_for_xcode5_status_scope_exit "$SOURCE_ROOT"
+patch_tdlib_for_xcode5_ipaddress_scope_exit "$SOURCE_ROOT"
+patch_tdlib_for_xcode5_stdstreams_scope_exit "$SOURCE_ROOT"
+patch_tdlib_for_xcode5_ordered_events_resize "$SOURCE_ROOT"
+patch_tdlib_for_netstats_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_webpages_manager_stack_address_warning "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
@@ -609,7 +907,7 @@ SDK_NAME="macosx"
 if xcrun --sdk macosx10.9 --show-sdk-path >/dev/null 2>&1; then
     SDK_NAME="macosx10.9"
 fi
-SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path 2>/dev/null || true)"
+SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path 2>/dev/null || true)}"
 
 CONFIGURE_DIR="$BUILD_DIR/build"
 mkdir -p "$CONFIGURE_DIR"
@@ -622,6 +920,8 @@ CMAKE_ARGS=(
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOYMENT_TARGET"
     "-DCMAKE_C_FLAGS=-mmacosx-version-min=$DEPLOYMENT_TARGET"
     "-DCMAKE_CXX_FLAGS=-stdlib=libc++ -mmacosx-version-min=$DEPLOYMENT_TARGET"
+    "-DCMAKE_C_FLAGS_RELEASE=$TDLIB_RELEASE_C_FLAGS"
+    "-DCMAKE_CXX_FLAGS_RELEASE=$TDLIB_RELEASE_CXX_FLAGS"
     "-DCMAKE_SHARED_LINKER_FLAGS=-mmacosx-version-min=$DEPLOYMENT_TARGET"
     "-DOPENSSL_USE_STATIC_LIBS=TRUE"
     "-DZLIB_USE_STATIC_LIBS=TRUE"
@@ -629,6 +929,9 @@ CMAKE_ARGS=(
     "-DTD_ENABLE_DOTNET=OFF"
 )
 
+if [ -n "$CMAKE_MAKE_PROGRAM" ]; then
+    CMAKE_ARGS+=("-DCMAKE_MAKE_PROGRAM=$CMAKE_MAKE_PROGRAM")
+fi
 if [ -n "$SDK_PATH" ]; then
     CMAKE_ARGS+=("-DCMAKE_OSX_SYSROOT=$SDK_PATH")
 fi
@@ -662,8 +965,8 @@ set +e
 (
     set -e
     cd "$CONFIGURE_DIR"
-    "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
-    "$CMAKE_BIN" --build . --target tdjson -- -j "$JOBS"
+    MAKE="$CMAKE_MAKE_PROGRAM" "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
+    MAKE="$CMAKE_MAKE_PROGRAM" "$CMAKE_BIN" --build . --target tdjson -- -j "$JOBS" MAKE="$CMAKE_MAKE_PROGRAM"
 ) 2>&1 | tee "$BUILD_DIR/build.log"
 BUILD_STATUS=${PIPESTATUS[0]}
 set -e

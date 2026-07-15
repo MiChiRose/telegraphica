@@ -8,13 +8,17 @@ TARGET="Telegraphica"
 SCHEME="${TELEGRAPHICA_SCHEME:-$TARGET}"
 APP_NAME="Telegraphica.app"
 EXECUTABLE_NAME="Telegraphica"
-DEPLOYMENT_TARGET="10.9"
+DEPLOYMENT_TARGET="${TELEGRAPHICA_DEPLOYMENT_TARGET:-${MACOSX_DEPLOYMENT_TARGET:-10.8}}"
 ARCH="x86_64"
 BUILD_ROOT="build-legacy"
 DERIVED_DATA_PATH="$BUILD_ROOT/DerivedData"
 DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
 
-if [ -z "${DEVELOPER_DIR:-}" ] && [ -d "/Applications/Xcode_6.2.app/Contents/Developer" ]; then
+export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
+
+if [ -z "${DEVELOPER_DIR:-}" ] && [ "$DEPLOYMENT_TARGET" = "10.8" ] && [ -d "/Applications/Xcode 5.1.1.app/Contents/Developer" ]; then
+    export DEVELOPER_DIR="/Applications/Xcode 5.1.1.app/Contents/Developer"
+elif [ -z "${DEVELOPER_DIR:-}" ] && [ -d "/Applications/Xcode_6.2.app/Contents/Developer" ]; then
     export DEVELOPER_DIR="/Applications/Xcode_6.2.app/Contents/Developer"
 fi
 
@@ -55,9 +59,14 @@ else
     echo "Skipping legacy compatibility script: python/python3 was not found."
 fi
 
-SDK_NAME="macosx"
-if "$XCODEBUILD" -showsdks 2>/dev/null | grep -q "macosx10\.9"; then
-    SDK_NAME="macosx10.9"
+SDK_NAME="${TELEGRAPHICA_SDK_NAME:-macosx}"
+if [ -z "${TELEGRAPHICA_SDK_NAME:-}" ]; then
+    for SDK_CANDIDATE in macosx10.9 macosx10.8; do
+        if "$XCODEBUILD" -showsdks 2>/dev/null | grep -q "$SDK_CANDIDATE"; then
+            SDK_NAME="$SDK_CANDIDATE"
+            break
+        fi
+    done
 fi
 SDK_ARGS=(-sdk "$SDK_NAME")
 

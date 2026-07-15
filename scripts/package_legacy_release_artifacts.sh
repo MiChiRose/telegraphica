@@ -7,7 +7,7 @@ DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
 APP_PATH="build-legacy/Release/Telegraphica.app"
 APP_NAME="Telegraphica.app"
 ARCH="x86_64"
-DEPLOYMENT_TARGET="10.9"
+DEPLOYMENT_TARGET="${TELEGRAPHICA_DEPLOYMENT_TARGET:-${MACOSX_DEPLOYMENT_TARGET:-10.8}}"
 
 usage() {
     cat <<USAGE
@@ -16,8 +16,8 @@ Usage: $0 [--tdjson /path/to/libtdjson.dylib]
 Builds Telegraphica with bundled TDLib on the legacy Mac, then creates release
 artifacts in dist/:
 
-  - Telegraphica-v<VERSION>-macos10.9-x86_64.dmg
-  - Telegraphica-v<VERSION>-macos10.9-x86_64.app.zip
+  - Telegraphica-v<VERSION>-macos${DEPLOYMENT_TARGET}-x86_64.dmg
+  - Telegraphica-v<VERSION>-macos${DEPLOYMENT_TARGET}-x86_64.app.zip
   - matching .sha256 files
 
 The script refuses to package a public installer unless libtdjson.dylib is

@@ -7,13 +7,14 @@ BUILD_DIR="${2:-build-legacy/Tests/media-item-support}"
 SDK_NAME="${3:-macosx}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CLANG="$(xcrun --sdk "$SDK_NAME" --find clang)"
-SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path)"
+SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path)}"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 
 mkdir -p "$BUILD_DIR"
 "$CLANG" \
     -arch "$ARCH" \
     -isysroot "$SDK_PATH" \
-    -mmacosx-version-min=10.9 \
+    -mmacosx-version-min="$DEPLOYMENT_TARGET" \
     -fno-objc-arc \
     -I"$ROOT_DIR/Sources/Media" \
     "$ROOT_DIR/Tests/media_item_support_probe.m" \
