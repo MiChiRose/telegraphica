@@ -35,7 +35,10 @@ PATCH_XCODE5_STATUS_SCOPE_EXIT=1
 PATCH_XCODE5_IPADDRESS_SCOPE_EXIT=1
 PATCH_XCODE5_STDSTREAMS_SCOPE_EXIT=1
 PATCH_XCODE5_ORDERED_EVENTS_RESIZE=1
+PATCH_LOGEVENT_PARSER_STATUS=1
 PATCH_NETSTATS_PARSE_GUARD=1
+PATCH_THEME_CHAT_THEMES_PARSE_GUARD=1
+PATCH_MESSAGES_NOTIFICATION_SETTINGS_PARSE_GUARD=1
 
 usage() {
     cat <<EOF
@@ -627,6 +630,50 @@ patch_tdlib_for_xcode5_ordered_events_resize() {
     echo "Patched TDLib OrderedEventsProcessor storage for Xcode 5 libc++ compatibility."
 }
 
+patch_tdlib_for_logevent_parser_status() {
+    local source_root="$1"
+    local logevent_file="$source_root/td/telegram/logevent/LogEvent.h"
+    local marker_file="$BUILD_DIR/logevent-parser-status-patch.txt"
+
+    if [ "$PATCH_LOGEVENT_PARSER_STATUS" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$logevent_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib LogEvent.h; skipping nonfatal log-event parser patch."
+            return 0
+        fi
+        fail "Could not find TDLib LogEvent.h: $logevent_file"
+    fi
+
+    if ! grep -q 'LOG_CHECK(version() < static_cast<int32>(Version::Next)) << "Wrong version " << version();' "$logevent_file"; then
+        echo "Warning: TDLib LogEventParser fatal version check was not found; skipping nonfatal log-event parser patch."
+        return 0
+    fi
+
+    cp "$logevent_file" "$logevent_file.telegraphica-logevent-backup"
+    perl -0pi -e 's@  explicit LogEventParser\(Slice data\) : WithVersion<WithContext<TlParser, Global \*>>\(data\) \{\n    set_version\(fetch_int\(\)\);\n    LOG_CHECK\(version\(\) < static_cast<int32>\(Version::Next\)\) << "Wrong version " << version\(\);\n    set_context\(G\(\)\);\n  \}@  explicit LogEventParser(Slice data) : WithVersion<WithContext<TlParser, Global *>>(data) {\n    if (!can_prefetch_int()) {\n      set_version(-1);\n      set_error("Not enough data to read log event version");\n      set_context(G());\n      return;\n    }\n    set_version(fetch_int());\n    if (version() < 0 || version() >= static_cast<int32>(Version::Next)) {\n      set_error("Wrong log event version");\n      set_context(G());\n      return;\n    }\n    set_context(G());\n  }@' "$logevent_file"
+    perl -0pi -e 's@Status log_event_parse\(T &data, Slice slice\) \{\n  LogEventParser parser\(slice\);\n  parse\(data, parser\);\n  parser\.fetch_end\(\);\n  return parser\.get_status\(\);\n\}@Status log_event_parse(T &data, Slice slice) {\n  LogEventParser parser(slice);\n  auto parser_status = parser.get_status();\n  if (parser_status.is_error()) {\n    return parser_status.move_as_error();\n  }\n  parse(data, parser);\n  parser.fetch_end();\n  return parser.get_status();\n}@' "$logevent_file"
+
+    if grep -q 'LOG_CHECK(version() < static_cast<int32>(Version::Next)) << "Wrong version " << version();' "$logevent_file"; then
+        fail "Failed to patch TDLib LogEventParser fatal version check in $logevent_file"
+    fi
+    if ! grep -q 'Not enough data to read log event version' "$logevent_file"; then
+        fail "Failed to add TDLib LogEventParser status guard in $logevent_file"
+    fi
+    if ! grep -q 'parser_status.move_as_error()' "$logevent_file"; then
+        fail "Failed to add TDLib log_event_parse early status return in $logevent_file"
+    fi
+
+    {
+        echo "Patched TDLib LogEventParser to report invalid versions as Status errors."
+        echo "File: $logevent_file"
+        echo "Replacement: no fatal LOG_CHECK before callers can handle parser status."
+    } > "$marker_file"
+    echo "Patched TDLib LogEventParser invalid-version handling."
+}
+
 patch_tdlib_for_netstats_parse_guard() {
     local source_root="$1"
     local netstats_file="$source_root/td/telegram/net/NetStatsManager.cpp"
@@ -666,6 +713,88 @@ patch_tdlib_for_netstats_parse_guard() {
         echo "Replacement: validate log-event version and erase unreadable net_stats keys instead of fatal abort."
     } > "$marker_file"
     echo "Patched TDLib NetStatsManager persistent stats parsing guard."
+}
+
+patch_tdlib_for_theme_chat_themes_parse_guard() {
+    local source_root="$1"
+    local theme_file="$source_root/td/telegram/ThemeManager.cpp"
+    local marker_file="$BUILD_DIR/theme-chat-themes-parse-guard-patch.txt"
+
+    if [ "$PATCH_THEME_CHAT_THEMES_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$theme_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ThemeManager.cpp; skipping chat themes parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ThemeManager.cpp: $theme_file"
+    fi
+
+    if grep -q 'get_binlog_pmc()->erase(get_chat_themes_database_key())' "$theme_file"; then
+        echo "Warning: TDLib ThemeManager chat themes parse recovery is already patched; skipping."
+        return 0
+    fi
+
+    if ! grep -q 'LOG(ERROR) << "Failed to parse chat themes from binlog: " << status;' "$theme_file"; then
+        echo "Warning: TDLib ThemeManager chat themes parse error branch was not found; skipping chat themes parse guard patch."
+        return 0
+    fi
+
+    cp "$theme_file" "$theme_file.telegraphica-theme-backup"
+    perl -0pi -e 's@      LOG\(ERROR\) << "Failed to parse chat themes from binlog: " << status;\n      chat_themes_ = ChatThemes\(\);@      LOG(ERROR) << "Failed to parse chat themes from binlog: " << status;\n      chat_themes_ = ChatThemes();\n      G()->td_db()->get_binlog_pmc()->erase(get_chat_themes_database_key());@' "$theme_file"
+
+    if ! grep -q 'get_binlog_pmc()->erase(get_chat_themes_database_key())' "$theme_file"; then
+        fail "Failed to patch TDLib ThemeManager chat themes parse error branch in $theme_file"
+    fi
+
+    {
+        echo "Patched TDLib ThemeManager chat themes parse recovery."
+        echo "File: $theme_file"
+        echo "Replacement: erase unreadable chat_themes cache after parse failure."
+    } > "$marker_file"
+    echo "Patched TDLib ThemeManager chat themes parse recovery."
+}
+
+patch_tdlib_for_messages_notification_settings_parse_guard() {
+    local source_root="$1"
+    local messages_file="$source_root/td/telegram/MessagesManager.cpp"
+    local marker_file="$BUILD_DIR/messages-notification-settings-parse-guard-patch.txt"
+
+    if [ "$PATCH_MESSAGES_NOTIFICATION_SETTINGS_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$messages_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib MessagesManager.cpp; skipping notification settings parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib MessagesManager.cpp: $messages_file"
+    fi
+
+    if ! grep -q 'log_event_parse(\*current_settings, notification_settings_string)\.ensure();' "$messages_file"; then
+        echo "Warning: TDLib MessagesManager notification settings fatal parse call was not found; skipping notification settings parse guard patch."
+        return 0
+    fi
+
+    cp "$messages_file" "$messages_file.telegraphica-notification-settings-backup"
+    perl -0pi -e 's@        log_event_parse\(\*current_settings, notification_settings_string\)\.ensure\(\);\n\n        VLOG\(notifications\) << "Loaded notification settings in " << scope << ": " << \*current_settings;@        auto status = log_event_parse(*current_settings, notification_settings_string);\n        if (status.is_error()) {\n          LOG(ERROR) << "Failed to parse notification settings in " << scope << ": " << status;\n          *current_settings = ScopeNotificationSettings();\n          G()->td_db()->get_binlog_pmc()->erase(get_notification_settings_scope_database_key(scope));\n          continue;\n        }\n\n        VLOG(notifications) << "Loaded notification settings in " << scope << ": " << *current_settings;@' "$messages_file"
+
+    if grep -q 'log_event_parse(\*current_settings, notification_settings_string)\.ensure();' "$messages_file"; then
+        fail "Failed to patch TDLib MessagesManager notification settings fatal parse call in $messages_file"
+    fi
+    if ! grep -q 'Failed to parse notification settings in' "$messages_file"; then
+        fail "Failed to add TDLib MessagesManager notification settings recovery in $messages_file"
+    fi
+
+    {
+        echo "Patched TDLib MessagesManager notification settings parse recovery."
+        echo "File: $messages_file"
+        echo "Replacement: reset unreadable scope notification settings and erase the damaged binlog key."
+    } > "$marker_file"
+    echo "Patched TDLib MessagesManager notification settings parse recovery."
 }
 
 patch_tdlib_for_webpages_manager_stack_address_warning() {
@@ -880,7 +1009,10 @@ patch_tdlib_for_xcode5_status_scope_exit "$SOURCE_ROOT"
 patch_tdlib_for_xcode5_ipaddress_scope_exit "$SOURCE_ROOT"
 patch_tdlib_for_xcode5_stdstreams_scope_exit "$SOURCE_ROOT"
 patch_tdlib_for_xcode5_ordered_events_resize "$SOURCE_ROOT"
+patch_tdlib_for_logevent_parser_status "$SOURCE_ROOT"
 patch_tdlib_for_netstats_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_theme_chat_themes_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_messages_notification_settings_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_webpages_manager_stack_address_warning "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
