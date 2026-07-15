@@ -59,7 +59,7 @@ voice messages, and keep the app updated from GitHub Releases.
 ### ✅ Working In This Beta
 
 - 🔐 TDLib login flow: phone number, login code, and 2FA password.
-- 🧾 Bundled Telegraphica app credentials for public builds, with local
+- 🧾 Automatic TDLib app configuration bootstrap for public builds, with local
   developer override support.
 - 💬 Chat list with unread badges, muted indicators, avatars, and selected chat
   state.
@@ -238,9 +238,10 @@ docs/local-tdlib-config.example.plist
 Copy that example outside the repository, edit the copy with values from
 `my.telegram.org`, and keep the real file local to your Mac.
 
-Public release builds use a generated runtime app configuration so people can
-sign in without manually entering Telegram API fields. Do not add plaintext
-release credentials to app resources or repository files.
+Public release builds fetch the Telegraphica TDLib app configuration
+automatically on first launch so people can sign in without manually entering
+Telegram API fields. Do not add plaintext release credentials to app resources
+or repository files.
 
 Never commit, upload, paste, or screenshot:
 
@@ -304,7 +305,7 @@ the old Mac lane.
 
 **Security posture:**
 
-- public builds bundle Telegraphica app-level Telegram API credentials only;
+- public builds fetch Telegraphica app-level Telegram API configuration on first launch;
 - no bundled user credentials, phone numbers, login codes, or 2FA passwords;
 - no committed sessions or TDLib databases;
 - diagnostics are redacted where practical;
