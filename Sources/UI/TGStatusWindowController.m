@@ -22,6 +22,7 @@
 #import "../Media/TGFileTransferState.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
+#import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGSearchResultItem.h"

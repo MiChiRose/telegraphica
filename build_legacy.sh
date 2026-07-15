@@ -172,6 +172,14 @@ if [ ! -f "$VPX_STATIC_LIBRARY" ]; then
 fi
 scripts/check_tgs_legacy.sh "$ARCH" "$RLOTTIE_BUILD_DIR" "$SDK_NAME" "$VPX_BUILD_DIR"
 
+OPUS_BUILD_DIR="$BUILD_ROOT/Vendor/opus"
+scripts/build_opus_legacy.sh "$ARCH" "$OPUS_BUILD_DIR" "$SDK_NAME"
+OPUS_HELPER_PATH="$PWD/$OPUS_BUILD_DIR/bin/tgopusdec"
+if [ ! -x "$OPUS_HELPER_PATH" ]; then
+    echo "Opus decoder helper was not produced: $OPUS_HELPER_PATH"
+    exit 1
+fi
+
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
     "VALID_ARCHS=$ARCH"
@@ -325,6 +333,12 @@ if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     chmod 0644 "$BUNDLED_CONFIG_DEST"
     echo "Bundled sanitized TDLib app config: $BUNDLED_CONFIG_DEST"
 fi
+
+HELPERS_DIR="$APP_NAME/Contents/Resources/Helpers"
+mkdir -p "$HELPERS_DIR"
+ditto "$OPUS_HELPER_PATH" "$HELPERS_DIR/tgopusdec"
+chmod 0755 "$HELPERS_DIR/tgopusdec"
+echo "Bundled Opus decoder helper: $HELPERS_DIR/tgopusdec"
 
 xattr -cr "$APP_NAME" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then

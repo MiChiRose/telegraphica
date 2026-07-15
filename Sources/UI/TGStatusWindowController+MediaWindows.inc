@@ -287,8 +287,25 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         [self appendDetail:@"Playable media file is not available yet."];
         return NO;
     }
-    if (TGMediaPlaybackPathLooksUnsupportedOnMavericks(path, audioOnly) ||
-        TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
+    NSString *playablePath = path;
+    NSError *transcodeError = nil;
+    if (TGVoicePathLooksLikeOggOpus(path, mimeType, audioOnly)) {
+        [self.statusField setStringValue:@"Preparing voice..."];
+        playablePath = TGPlayableVoicePathByTranscodingIfNeeded(path, mimeType, audioOnly, &transcodeError);
+        if ([playablePath length] == 0) {
+            NSString *message = [transcodeError localizedDescription];
+            if ([message length] == 0) {
+                message = @"This voice message uses Ogg/Opus and could not be decoded.";
+            }
+            [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: Opus transcode failed file=%@ mime=%@ reason=%@",
+                                          [path lastPathComponent],
+                                          [mimeType length] > 0 ? mimeType : @"unknown",
+                                          message]];
+            return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
+        }
+    } else if (TGMediaPlaybackPathLooksUnsupportedOnMavericks(path, audioOnly) ||
+               TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
         return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
     }
 
@@ -297,7 +314,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [self layoutMediaPlaybackWindowForAudioOnly:audioOnly title:title];
     self.mediaPlaybackKnownDuration = ([duration respondsToSelector:@selector(doubleValue)] && [duration doubleValue] > 0.0) ? [duration doubleValue] : 0.0;
 
-    NSURL *url = [NSURL fileURLWithPath:path];
+    NSURL *url = [NSURL fileURLWithPath:playablePath];
     AVPlayer *player = [[[AVPlayer alloc] initWithURL:url] autorelease];
     if (!player) {
         [self appendDetail:@"Could not create media player."];
