@@ -13,6 +13,7 @@ ARCH="x86_64"
 BUILD_ROOT="build-legacy"
 DERIVED_DATA_PATH="$BUILD_ROOT/DerivedData"
 DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
+PUBLIC_RELEASE="${TELEGRAPHICA_PUBLIC_RELEASE:-0}"
 
 if [ -z "${DEVELOPER_DIR:-}" ] && [ -d "/Applications/Xcode_6.2.app/Contents/Developer" ]; then
     export DEVELOPER_DIR="/Applications/Xcode_6.2.app/Contents/Developer"
@@ -201,12 +202,15 @@ PY
 }
 
 BUNDLED_TDLIB_CONFIG_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}"
+if [ "$PUBLIC_RELEASE" = "1" ]; then
+    BUNDLED_TDLIB_CONFIG_SOURCE=""
+fi
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && ! valid_tdlib_config "$BUNDLED_TDLIB_CONFIG_SOURCE"; then
     echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH is missing or does not contain valid api_id and api_hash."
     exit 1
 fi
 
-if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+if [ "$PUBLIC_RELEASE" != "1" ] && [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     for CONFIG_CANDIDATE in \
         "$HOME/Library/Application Support/Telegraphica/tdlib-config.plist" \
         "$BUILD_ROOT/Release/$APP_NAME/Contents/Resources/TelegraphicaTDLibDefaults.plist" \
@@ -232,7 +236,9 @@ cleanup_legacy_build_inputs() {
 }
 trap cleanup_legacy_build_inputs EXIT
 
-if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+if [ "$PUBLIC_RELEASE" = "1" ]; then
+    echo "Public release mode: no Telegram API credentials will be generated into the app binary."
+elif [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     BUNDLED_TDLIB_CONFIG_TEMP="$(mktemp /tmp/telegraphica-tdlib-config.XXXXXX)"
     ditto "$BUNDLED_TDLIB_CONFIG_SOURCE" "$BUNDLED_TDLIB_CONFIG_TEMP"
     chmod 0600 "$BUNDLED_TDLIB_CONFIG_TEMP"
