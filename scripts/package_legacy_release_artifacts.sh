@@ -8,7 +8,6 @@ APP_PATH="build-legacy/Release/Telegraphica.app"
 APP_NAME="Telegraphica.app"
 ARCH="x86_64"
 DEPLOYMENT_TARGET="10.9"
-PUBLIC_RELEASE="${TELEGRAPHICA_PUBLIC_RELEASE:-1}"
 
 usage() {
     cat <<USAGE
@@ -101,7 +100,7 @@ cleanup_build_dist() {
     rm -rf "$BUILD_DIST_DIR"
 }
 trap cleanup_build_dist EXIT
-TELEGRAPHICA_DIST_DIR="$BUILD_DIST_DIR" TELEGRAPHICA_TDJSON_PATH="$TDJSON_PATH" TELEGRAPHICA_PUBLIC_RELEASE="$PUBLIC_RELEASE" ./build_legacy.sh
+TELEGRAPHICA_DIST_DIR="$BUILD_DIST_DIR" TELEGRAPHICA_TDJSON_PATH="$TDJSON_PATH" ./build_legacy.sh
 
 BUNDLED_TDJSON="$APP_PATH/Contents/Frameworks/libtdjson.dylib"
 if [ ! -f "$BUNDLED_TDJSON" ]; then
@@ -120,13 +119,7 @@ if [ -f "$BUNDLED_CONFIG" ]; then
     exit 1
 fi
 HAS_RUNTIME_CREDENTIALS="$(/usr/libexec/PlistBuddy -c "Print :has_runtime_credentials" "$RUNTIME_CONFIG_MARKER" 2>/dev/null || true)"
-if [ "$PUBLIC_RELEASE" = "1" ]; then
-    if [ "$HAS_RUNTIME_CREDENTIALS" = "true" ]; then
-        echo "Refusing to create public release artifacts with bundled runtime Telegram credentials."
-        echo "Unexpected marker: $RUNTIME_CONFIG_MARKER"
-        exit 1
-    fi
-elif [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
+if [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
     echo "Refusing to create release artifacts without the runtime Telegram connection marker."
     echo "Rebuild with TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH pointing to the private build config."
     exit 1
@@ -140,7 +133,7 @@ fi
 
 mkdir -p "$DIST_DIR"
 
-TELEGRAPHICA_PUBLIC_RELEASE="$PUBLIC_RELEASE" scripts/package_release_installer.sh "$APP_PATH"
+scripts/package_release_installer.sh "$APP_PATH"
 
 DMG_SRC="$DIST_DIR/Telegraphica-v${APP_VERSION}-installer.dmg"
 DMG_FINAL="$DIST_DIR/Telegraphica-v${APP_VERSION}-macos${DEPLOYMENT_TARGET}-${ARCH}.dmg"
