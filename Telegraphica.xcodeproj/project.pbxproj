@@ -54,6 +54,7 @@
 		111111111111111111111145 /* TGFileTransferState.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111285 /* TGFileTransferState.m */; };
 		111111111111111111111146 /* TGSearchResultItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111287 /* TGSearchResultItem.m */; };
 		111111111111111111111147 /* TGOpusVoiceTranscoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111289 /* TGOpusVoiceTranscoder.m */; };
+		111111111111111111111148 /* TGTDLibBundledCredentialsGenerated.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -141,6 +142,8 @@
 		111111111111111111111287 /* TGSearchResultItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSearchResultItem.m; sourceTree = "<group>"; };
 		111111111111111111111288 /* TGOpusVoiceTranscoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGOpusVoiceTranscoder.h; sourceTree = "<group>"; };
 		111111111111111111111289 /* TGOpusVoiceTranscoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGOpusVoiceTranscoder.m; sourceTree = "<group>"; };
+		111111111111111111111290 /* TGTDLibBundledCredentials.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTDLibBundledCredentials.h; sourceTree = "<group>"; };
+		111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = TGTDLibBundledCredentialsGenerated.m; path = build-legacy/Generated/TGTDLibBundledCredentialsGenerated.m; sourceTree = SOURCE_ROOT; };
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -209,6 +212,8 @@
 			children = (
 				111111111111111111111204 /* TGTDLibClient.h */,
 				111111111111111111111205 /* TGTDLibClient.m */,
+				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
+				111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */,
 				111111111111111111111212 /* TGChatItem.h */,
 				111111111111111111111213 /* TGChatItem.m */,
 				111111111111111111111214 /* TGMessageItem.h */,
@@ -424,6 +429,7 @@
 				111111111111111111111145 /* TGFileTransferState.m in Sources */,
 				111111111111111111111146 /* TGSearchResultItem.m in Sources */,
 				111111111111111111111147 /* TGOpusVoiceTranscoder.m in Sources */,
+				111111111111111111111148 /* TGTDLibBundledCredentialsGenerated.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

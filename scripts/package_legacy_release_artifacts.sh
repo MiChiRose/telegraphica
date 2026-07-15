@@ -112,10 +112,15 @@ fi
 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON"
 
 BUNDLED_CONFIG="$APP_PATH/Contents/Resources/TelegraphicaTDLibDefaults.plist"
-BUNDLED_API_ID="$(/usr/libexec/PlistBuddy -c "Print :api_id" "$BUNDLED_CONFIG" 2>/dev/null || true)"
-BUNDLED_API_HASH="$(/usr/libexec/PlistBuddy -c "Print :api_hash" "$BUNDLED_CONFIG" 2>/dev/null || true)"
-if ! echo "$BUNDLED_API_ID" | grep -E -q '^[1-9][0-9]*$' || ! echo "$BUNDLED_API_HASH" | grep -E -q '^[[:xdigit:]]{32}$'; then
-    echo "Refusing to create release artifacts without a valid internal Telegram connection configuration."
+RUNTIME_CONFIG_MARKER="$APP_PATH/Contents/Resources/TelegraphicaTDLibRuntimeDefaults.plist"
+if [ -f "$BUNDLED_CONFIG" ]; then
+    echo "Refusing to create release artifacts with plaintext TDLib app credentials in Resources."
+    echo "Unexpected file: $BUNDLED_CONFIG"
+    exit 1
+fi
+HAS_RUNTIME_CREDENTIALS="$(/usr/libexec/PlistBuddy -c "Print :has_runtime_credentials" "$RUNTIME_CONFIG_MARKER" 2>/dev/null || true)"
+if [ "$HAS_RUNTIME_CREDENTIALS" != "true" ]; then
+    echo "Refusing to create release artifacts without the runtime Telegram connection marker."
     echo "Rebuild with TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH pointing to the private build config."
     exit 1
 fi
