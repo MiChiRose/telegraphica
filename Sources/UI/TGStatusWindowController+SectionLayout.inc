@@ -473,7 +473,7 @@
     CGFloat selectedAvatarY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - selectedAvatarSize) / 2.0) + sectionHeaderVisualOffset;
     [self.selectedChatAvatarView setFrame:NSMakeRect(selectedAvatarX, selectedAvatarY, selectedAvatarSize, selectedAvatarSize)];
     CGFloat selectedTitleX = NSMaxX([self.selectedChatAvatarView frame]) + 8.0;
-    CGFloat selectedTitleWidth = NSMinX([self.loadMessagesButton frame]) - selectedTitleX - 12.0;
+    CGFloat selectedTitleWidth = NSMinX([self.conversationSearchButton frame]) - selectedTitleX - 12.0;
     if (selectedTitleWidth < 120.0) {
         selectedTitleWidth = 120.0;
     }

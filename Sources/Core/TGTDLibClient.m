@@ -171,6 +171,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
 - (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary;
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
 - (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
@@ -192,6 +193,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
 - (BOOL)shouldAutoDownloadMessageContentObject:(id)contentObject downloadableInfo:(NSDictionary *)downloadableInfo;
 - (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
+- (NSDictionary *)replyContextForMessageObject:(NSDictionary *)messageObject chatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout;
+- (NSString *)messageContentPreviewForObject:(id)contentObject;
 - (NSDictionary *)userSenderSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)photoInfoFromChatPhotoObject:(id)photoObject
                                downloadMissing:(BOOL)downloadMissing
@@ -3895,6 +3898,58 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSDictionary *)replyContextForMessageObject:(NSDictionary *)messageObject chatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout {
+    NSNumber *replyMessageID = [self replyMessageIDFromMessageObject:messageObject];
+    if (![replyMessageID respondsToSelector:@selector(longLongValue)] || [replyMessageID longLongValue] <= 0) {
+        return nil;
+    }
+
+    NSNumber *targetChatID = chatID;
+    id rawChatID = [messageObject objectForKey:@"chat_id"];
+    if (![targetChatID respondsToSelector:@selector(longLongValue)] && [rawChatID respondsToSelector:@selector(longLongValue)]) {
+        targetChatID = [NSNumber numberWithLongLong:[rawChatID longLongValue]];
+    }
+    if (![targetChatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getMessage" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[targetChatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[replyMessageID longLongValue]] forKey:@"message_id"];
+
+    NSError *error = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-get-reply-message"
+                                                           timeout:timeout
+                                                         errorCode:96
+                                                             error:&error];
+    if (![response isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        return nil;
+    }
+
+    NSString *preview = [self messageContentPreviewForObject:[response objectForKey:@"content"]];
+    preview = [self singleLineTrimmedString:preview maximumLength:96];
+    if (TGPreviewLooksLikePlainMediaLabel(preview)) {
+        preview = nil;
+    }
+    NSDictionary *senderSummary = [self senderSummaryFromMessageObject:response timeout:0.4];
+    NSString *senderName = [senderSummary objectForKey:@"display_name"];
+
+    NSMutableDictionary *context = [NSMutableDictionary dictionary];
+    if ([preview length] > 0) {
+        [context setObject:preview forKey:@"preview"];
+    }
+    if ([senderName length] > 0) {
+        [context setObject:senderName forKey:@"sender_name"];
+    }
+    return ([context count] > 0) ? context : nil;
+}
+
 - (NSString *)forwardSourceDisplayNameFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout {
     if (![messageObject isKindOfClass:[NSDictionary class]]) {
         return nil;
@@ -4174,7 +4229,22 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if (replyMessageID) {
             [item setReplyToMessageID:replyMessageID];
             NSString *replyPreview = [self replyPreviewFromMessageObject:message];
-            [item setReplyPreview:([replyPreview length] > 0 ? replyPreview : @"Reply to message")];
+            NSString *replySenderName = nil;
+            if ([replyPreview length] == 0 || [replyPreview isEqualToString:@"Reply"]) {
+                NSDictionary *replyContext = [self replyContextForMessageObject:message chatID:safeChatID timeout:0.65];
+                NSString *contextPreview = [replyContext objectForKey:@"preview"];
+                if ([contextPreview length] > 0) {
+                    replyPreview = contextPreview;
+                }
+                replySenderName = [replyContext objectForKey:@"sender_name"];
+            }
+            if ([replySenderName length] > 0) {
+                [item setReplySenderDisplayName:replySenderName];
+            }
+            if ([replyPreview length] == 0 || [replyPreview isEqualToString:@"Reply"]) {
+                replyPreview = @"Original message";
+            }
+            [item setReplyPreview:replyPreview];
         }
         NSString *forwardSource = [self forwardSourceDisplayNameFromMessageObject:message timeout:0.6];
         if ([forwardSource length] > 0) {

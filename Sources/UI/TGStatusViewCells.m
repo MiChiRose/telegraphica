@@ -352,8 +352,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
+    BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
-    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : rawMessageText;
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -403,6 +404,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (nonVisualPlayable) {
         bubbleWidth = TGPlayableMediaBubbleWidthForItem(item, maximumBubbleWidth);
     }
+    if (nonVisualDocument) {
+        bubbleWidth = TGDocumentBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -427,11 +431,14 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (nonVisualPlayable) {
         bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
+    if (nonVisualDocument) {
+        bubbleHeight = TGDocumentBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    if (!nonVisualPlayable) {
+    if (!nonVisualPlayable && !nonVisualDocument) {
         bubbleHeight += reactionBandHeight;
     }
 
@@ -542,6 +549,23 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             playableRect.size.height -= contextHeaderHeight;
         }
         TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
+    }
+
+    if (nonVisualDocument) {
+        NSRect documentRect = bubbleRect;
+        if (senderHeaderHeight > 0.0) {
+            if (flipped) {
+                documentRect.origin.y += senderHeaderHeight;
+            }
+            documentRect.size.height -= senderHeaderHeight;
+        }
+        if (contextHeaderHeight > 0.0) {
+            if (flipped) {
+                documentRect.origin.y += contextHeaderHeight;
+            }
+            documentRect.size.height -= contextHeaderHeight;
+        }
+        TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
     }
 
     if (!flipped && reactionBandHeight > 0.0) {
