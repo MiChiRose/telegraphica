@@ -1500,7 +1500,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSString *encryptionKey = [encryptionKeyData base64EncodedStringWithOptions:0];
+    NSString *encryptionKey = [encryptionKeyData base64Encoding];
     if ([encryptionKey length] == 0) {
         if (error) {
             *error = [self errorWithDescription:@"Could not encode TDLib database encryption key." code:20];

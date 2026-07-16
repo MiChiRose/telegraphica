@@ -23,6 +23,7 @@ FORBIDDEN_TEXT = [
     ("NSLayoutAnchor", "Use frame/autoresizing or old NSLayoutConstraint APIs."),
     ("activateConstraints:", "Use addConstraints: for Xcode 6.2 compatibility."),
     ("NSStackView", "Use Mavericks-safe manual AppKit layout."),
+    ("base64EncodedStringWithOptions:", "Use NSData base64Encoding for the OS X 10.8 Mountain Lion lane."),
     ("NSLog(", "Use TGLogger redaction instead of direct NSLog."),
 ]
 
