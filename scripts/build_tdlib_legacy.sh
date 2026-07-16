@@ -39,6 +39,9 @@ PATCH_LOGEVENT_PARSER_STATUS=1
 PATCH_NETSTATS_PARSE_GUARD=1
 PATCH_THEME_CHAT_THEMES_PARSE_GUARD=1
 PATCH_MESSAGES_NOTIFICATION_SETTINGS_PARSE_GUARD=1
+PATCH_STICKERS_DATABASE_PARSE_GUARD=1
+PATCH_CONTACTS_USER_PARSE_GUARD=1
+PATCH_CONTACTS_LIST_PARSE_GUARD=1
 
 usage() {
     cat <<EOF
@@ -797,6 +800,147 @@ patch_tdlib_for_messages_notification_settings_parse_guard() {
     echo "Patched TDLib MessagesManager notification settings parse recovery."
 }
 
+patch_tdlib_for_stickers_database_parse_guard() {
+    local source_root="$1"
+    local stickers_cpp="$source_root/td/telegram/StickersManager.cpp"
+    local stickers_hpp="$source_root/td/telegram/StickersManager.hpp"
+    local marker_file="$BUILD_DIR/stickers-database-parse-guard-patch.txt"
+
+    if [ "$PATCH_STICKERS_DATABASE_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$stickers_cpp" ] || [ ! -f "$stickers_hpp" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib StickersManager sources; skipping sticker database parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib StickersManager sources: $stickers_cpp / $stickers_hpp"
+    fi
+
+    if ! grep -q 'Have wrong sticker set id in database' "$stickers_hpp"; then
+        if ! grep -q 'CHECK(sticker_set->id.get() == sticker_set_id);' "$stickers_hpp"; then
+            echo "Warning: TDLib StickersManager sticker set id check was not found; skipping id parse guard patch."
+        else
+            cp "$stickers_hpp" "$stickers_hpp.telegraphica-stickers-backup"
+            perl -0pi -e 's@  CHECK\(sticker_set->id\.get\(\) == sticker_set_id\);@  if (sticker_set->id.get() != sticker_set_id) {\n    return parser.set_error("Have wrong sticker set id in database");\n  }@' "$stickers_hpp"
+        fi
+    fi
+
+    if ! grep -q 'Failed to parse sticker set .* from database' "$stickers_cpp"; then
+        if ! grep -q 'LOG(FATAL) << "Failed to parse "' "$stickers_cpp"; then
+            echo "Warning: TDLib StickersManager fatal database parse branch was not found; skipping sticker parse recovery patch."
+        else
+            cp "$stickers_cpp" "$stickers_cpp.telegraphica-stickers-backup"
+            perl -0pi -e 's@      G\(\)->td_db\(\)->get_sqlite_sync_pmc\(\)->erase\(with_stickers \? get_full_sticker_set_database_key\(sticker_set_id\)\n                                                               : get_sticker_set_database_key\(sticker_set_id\)\);\n      // need to crash, because the current StickerSet state is spoiled by parse_sticker_set\n      LOG\(FATAL\) << "Failed to parse " << sticker_set_id << ": " << status << '"'"' '"'"'\n                 << format::as_hex_dump<4>\(Slice\(value\)\);@      G()->td_db()->get_sqlite_sync_pmc()->erase(with_stickers ? get_full_sticker_set_database_key(sticker_set_id)\n                                                               : get_sticker_set_database_key(sticker_set_id));\n      LOG(ERROR) << "Failed to parse sticker set " << sticker_set_id << " from database: " << status;\n      return do_reload_sticker_set(sticker_set_id, get_input_sticker_set(sticker_set), 0, Auto());@' "$stickers_cpp"
+        fi
+    fi
+
+    if ! grep -q 'Have wrong sticker set id in database' "$stickers_hpp"; then
+        fail "Failed to patch TDLib StickersManager sticker set id parser guard in $stickers_hpp"
+    fi
+    if ! grep -q 'Failed to parse sticker set .* from database' "$stickers_cpp"; then
+        fail "Failed to patch TDLib StickersManager database parse recovery in $stickers_cpp"
+    fi
+
+    {
+        echo "Patched TDLib StickersManager database parse recovery."
+        echo "Files: $stickers_hpp, $stickers_cpp"
+        echo "Replacement: treat unreadable cached sticker sets as reloadable database misses instead of fatal aborts."
+    } > "$marker_file"
+    echo "Patched TDLib StickersManager database parse recovery."
+}
+
+patch_tdlib_for_contacts_user_parse_guard() {
+    local source_root="$1"
+    local contacts_file="$source_root/td/telegram/ContactsManager.cpp"
+    local marker_file="$BUILD_DIR/contacts-user-parse-guard-patch.txt"
+
+    if [ "$PATCH_CONTACTS_USER_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$contacts_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ContactsManager.cpp; skipping user parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ContactsManager.cpp: $contacts_file"
+    fi
+
+    if grep -q 'Failed to parse user .* from database' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager user parse recovery is already patched; skipping."
+        return 0
+    fi
+
+    if ! grep -q 'log_event_parse(\*u, value)\.ensure();' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager user fatal parse call was not found; skipping user parse guard patch."
+        return 0
+    fi
+
+    cp "$contacts_file" "$contacts_file.telegraphica-user-backup"
+    perl -0pi -e 's@      u = add_user\(user_id, "on_load_user_from_database"\);\n\n      log_event_parse\(\*u, value\)\.ensure\(\);\n\n      u->is_saved = true;\n      u->is_status_saved = true;\n      update_user\(u, user_id, true, true\);@      User parsed_user;\n      auto status = log_event_parse(parsed_user, value);\n      if (status.is_error()) {\n        LOG(ERROR) << "Failed to parse user " << user_id << " from database: " << status;\n        G()->td_db()->get_sqlite_sync_pmc()->erase(get_user_database_key(user_id));\n      } else {\n        u = add_user(user_id, "on_load_user_from_database");\n        *u = std::move(parsed_user);\n        u->is_saved = true;\n        u->is_status_saved = true;\n        update_user(u, user_id, true, true);\n      }@' "$contacts_file"
+
+    if grep -q 'log_event_parse(\*u, value)\.ensure();' "$contacts_file"; then
+        fail "Failed to patch TDLib ContactsManager user fatal parse call in $contacts_file"
+    fi
+    if ! grep -q 'Failed to parse user .* from database' "$contacts_file"; then
+        fail "Failed to add TDLib ContactsManager user parse recovery in $contacts_file"
+    fi
+
+    {
+        echo "Patched TDLib ContactsManager user parse recovery."
+        echo "File: $contacts_file"
+        echo "Replacement: parse cached users into a temporary value and erase unreadable sqlite cache entries."
+    } > "$marker_file"
+    echo "Patched TDLib ContactsManager user parse recovery."
+}
+
+patch_tdlib_for_contacts_list_parse_guard() {
+    local source_root="$1"
+    local contacts_file="$source_root/td/telegram/ContactsManager.cpp"
+    local marker_file="$BUILD_DIR/contacts-list-parse-guard-patch.txt"
+
+    if [ "$PATCH_CONTACTS_LIST_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$contacts_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ContactsManager.cpp; skipping contacts list parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ContactsManager.cpp: $contacts_file"
+    fi
+
+    if grep -q 'Failed to parse contacts from database' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager contacts list parse recovery is already patched; skipping."
+        return 0
+    fi
+
+    if ! grep -q 'log_event_parse(user_ids, value)\.ensure();' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager contacts list fatal parse call was not found; skipping contacts list parse guard patch."
+        return 0
+    fi
+
+    cp "$contacts_file" "$contacts_file.telegraphica-contacts-list-backup"
+    perl -0pi -e 's@  vector<UserId> user_ids;\n  log_event_parse\(user_ids, value\)\.ensure\(\);\n\n  LOG\(INFO\) << "Successfully loaded " << user_ids\.size\(\) << " contacts from database";@  vector<UserId> user_ids;\n  auto status = log_event_parse(user_ids, value);\n  if (status.is_error()) {\n    LOG(ERROR) << "Failed to parse contacts from database: " << status;\n    G()->td_db()->get_sqlite_pmc()->erase("user_contacts", Auto());\n    G()->td_db()->get_binlog_pmc()->erase("saved_contact_count");\n    saved_contact_count_ = -1;\n    reload_contacts(true);\n    return;\n  }\n\n  LOG(INFO) << "Successfully loaded " << user_ids.size() << " contacts from database";@' "$contacts_file"
+
+    if grep -q 'log_event_parse(user_ids, value)\.ensure();' "$contacts_file"; then
+        fail "Failed to patch TDLib ContactsManager contacts list fatal parse call in $contacts_file"
+    fi
+    if ! grep -q 'Failed to parse contacts from database' "$contacts_file"; then
+        fail "Failed to add TDLib ContactsManager contacts list parse recovery in $contacts_file"
+    fi
+
+    {
+        echo "Patched TDLib ContactsManager contacts list parse recovery."
+        echo "File: $contacts_file"
+        echo "Replacement: erase unreadable user_contacts sqlite cache and reload contacts from the server."
+    } > "$marker_file"
+    echo "Patched TDLib ContactsManager contacts list parse recovery."
+}
+
 patch_tdlib_for_webpages_manager_stack_address_warning() {
     local source_root="$1"
     local webpages_file="$source_root/td/telegram/WebPagesManager.cpp"
@@ -1013,6 +1157,9 @@ patch_tdlib_for_logevent_parser_status "$SOURCE_ROOT"
 patch_tdlib_for_netstats_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_theme_chat_themes_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_messages_notification_settings_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_stickers_database_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_contacts_user_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_contacts_list_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_webpages_manager_stack_address_warning "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
