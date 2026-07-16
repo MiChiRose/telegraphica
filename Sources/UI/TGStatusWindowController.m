@@ -1236,6 +1236,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
     self.accountBadgeView = [[[TGAccountBadgeView alloc] initWithFrame:NSMakeRect(30, 626, 60, 60)] autorelease];
     [self.accountBadgeView setDisplayName:@"Telegraphica"];
+    [self.accountBadgeView setTarget:self];
+    [self.accountBadgeView setAction:@selector(openProfileFromDrawer:)];
+    [self.accountBadgeView setToolTip:@"Open profile"];
     [self.accountBadgeView setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
     [contentView addSubview:self.accountBadgeView];
 
@@ -2544,6 +2547,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     if ([self.chatFilterInfos count] > 0) {
         [folderItems addObjectsFromArray:self.chatFilterInfos];
     }
+    NSMutableArray *drawerTitles = [NSMutableArray array];
 
     for (index = 0; index < [folderItems count]; index++) {
         NSDictionary *folderInfo = [folderItems objectAtIndex:index];
@@ -2552,6 +2556,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         if (![buttonTitle isKindOfClass:[NSString class]] || [buttonTitle length] == 0 || ![filterID respondsToSelector:@selector(integerValue)]) {
             continue;
         }
+        [drawerTitles addObject:buttonTitle];
 
         NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (index * 48), 92, 42)] autorelease];
         TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
@@ -2572,6 +2577,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     self.drawerFolderButtons = buttons;
     [self updateDrawerFolderButtonStates];
     [self layoutContentView];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: rebuilt %lu visible folder button(s) from %lu TDLib folder(s); drawerOpen=%@; titles=%@.",
+                                  (unsigned long)[buttons count],
+                                  (unsigned long)[self.chatFilterInfos count],
+                                  self.drawerOpen ? @"yes" : @"no",
+                                  drawerTitles]];
 }
 
 - (void)reloadChatFiltersIfReady {
@@ -2580,6 +2590,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     }
 
     self.chatFilterRefreshInFlight = YES;
+    [[TGLogger sharedLogger] log:@"Drawer: requesting chat folders for UI."];
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2588,6 +2599,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.client == client && [self.currentAuthState isEqualToString:@"ready"]) {
                 self.chatFilterInfos = filters ? filters : [NSArray array];
+                NSMutableArray *filterTitles = [NSMutableArray array];
+                NSUInteger logFilterIndex = 0;
+                for (logFilterIndex = 0; logFilterIndex < [self.chatFilterInfos count]; logFilterIndex++) {
+                    NSDictionary *filterInfo = [self.chatFilterInfos objectAtIndex:logFilterIndex];
+                    NSString *title = [filterInfo objectForKey:@"title"];
+                    if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
+                        [filterTitles addObject:title];
+                    }
+                }
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: received %lu TDLib folder(s) for UI; titles=%@.",
+                                              (unsigned long)[self.chatFilterInfos count],
+                                              filterTitles]];
                 BOOL selectedFilterWasCleared = NO;
                 if (self.selectedChatFilterID) {
                     BOOL selectedFilterStillExists = NO;
@@ -2623,6 +2646,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
         [pool drain];
     });
+}
+
+- (void)openProfileFromDrawer:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    self.activeSection = TGSectionProfile;
+    [self updateVisibleSection];
+    if (!self.profileSummaryLoaded && !self.profileSummaryLoading && !self.controlsBusy) {
+        [self reloadProfileSummaryIfReady];
+    }
 }
 
 - (void)updateNavigationButtonsForSection:(NSString *)section enabled:(BOOL)enabled {

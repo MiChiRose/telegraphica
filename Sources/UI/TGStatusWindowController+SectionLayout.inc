@@ -29,8 +29,7 @@
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
-    [self showView:self.topPanelView visible:(ready && !drawerHidden)];
-    [self showView:self.drawerButton visible:(ready && !drawerHidden)];
+    [self showView:self.topPanelView visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.accountBadgeView visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.bottomNavigationView visible:ready];
 
@@ -56,6 +55,7 @@
     }
 
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
+    [self showView:self.drawerButton visible:(showChats && !drawerHidden)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
     [self showView:self.chatsLabel visible:showChats];
@@ -266,14 +266,14 @@
     CGFloat height = NSHeight(bounds);
     CGFloat margin = 10.0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
-    CGFloat railGutter = drawerHidden ? 0.0 : 10.0;
+    CGFloat railGutter = (!drawerHidden && self.drawerOpen) ? 10.0 : 0.0;
     CGFloat panelGutter = 10.0;
-    CGFloat railWidth = drawerHidden ? 0.0 : (self.drawerOpen ? 108.0 : 44.0);
+    CGFloat railWidth = (!drawerHidden && self.drawerOpen) ? 108.0 : 0.0;
     CGFloat railX = margin;
     CGFloat railY = margin;
     CGFloat railHeight = height - (margin * 2.0);
     CGFloat railTop = railY + railHeight;
-    CGFloat mainX = drawerHidden ? margin : (railX + railWidth + railGutter);
+    CGFloat mainX = (!drawerHidden && self.drawerOpen) ? (railX + railWidth + railGutter) : margin;
     CGFloat mainY = margin;
     CGFloat mainWidth = width - mainX - margin;
     CGFloat mainHeight = railHeight;
@@ -315,7 +315,6 @@
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
 
-    [self.drawerButton setFrame:NSMakeRect(railX + 5.0, railTop - 39.0, 34.0, 34.0)];
     CGFloat accountBadgeWidth = railWidth - 48.0;
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
@@ -436,8 +435,19 @@
     CGFloat sectionHeaderVisualOffset = -2.0;
     CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVisualOffset;
     CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVisualOffset;
-    CGFloat chatHeaderTitleX = self.showingForumTopicList ? (mainX + 52.0) : (mainX + 16.0);
-    [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
+    CGFloat headerLeftX = mainX + 12.0;
+    CGFloat chatHeaderTitleX = mainX + 16.0;
+    if (!drawerHidden) {
+        [self.drawerButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
+        headerLeftX += headerButtonSize + 8.0;
+        chatHeaderTitleX = headerLeftX;
+    }
+    if (self.showingForumTopicList) {
+        [self.topicBackButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
+        chatHeaderTitleX = headerLeftX + headerButtonSize + 8.0;
+    } else {
+        [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
+    }
     [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, sidebarWidth - (chatHeaderTitleX - mainX) - 58.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];

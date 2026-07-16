@@ -159,6 +159,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL _shutdownStarted;
     BOOL _mainChatListExhausted;
     BOOL _chatFilterInfosKnown;
+    BOOL _chatFilterFallbackProbeFinished;
     NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
@@ -295,6 +296,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_chatFilterInfos release];
         _chatFilterInfos = nil;
         _chatFilterInfosKnown = NO;
+        _chatFilterFallbackProbeFinished = NO;
         [_responseCondition broadcast];
     }
     [_responseCondition unlock];
@@ -328,6 +330,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_chatFilterInfos release];
     _chatFilterInfos = nil;
     _chatFilterInfosKnown = NO;
+    _chatFilterFallbackProbeFinished = NO;
     [_responseCondition broadcast];
     [_responseCondition unlock];
 
@@ -340,6 +343,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_chatFilterInfos release];
     _chatFilterInfos = nil;
     _chatFilterInfosKnown = NO;
+    _chatFilterFallbackProbeFinished = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
     _mainChatListExhausted = NO;
@@ -406,13 +410,14 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_responseCondition waitUntilDate:deadline];
     }
     BOOL known = _chatFilterInfosKnown;
+    BOOL fallbackProbeFinished = _chatFilterFallbackProbeFinished;
     NSArray *filters = [_chatFilterInfos copy];
     [_responseCondition unlock];
 
-    if (!known) {
+    if ((!known || [filters count] == 0) && !fallbackProbeFinished) {
         NSArray *probedFilters = [self chatFilterInfoItemsByProbingChatFoldersWithTimeout:timeout];
         [_responseCondition lock];
-        if (!_chatFilterInfosKnown) {
+        if (!_chatFilterInfosKnown || [_chatFilterInfos count] == 0) {
             [_chatFilterInfos release];
             _chatFilterInfos = [probedFilters copy];
             _chatFilterInfosKnown = YES;
@@ -420,6 +425,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             filters = [_chatFilterInfos copy];
             [_responseCondition broadcast];
         }
+        _chatFilterFallbackProbeFinished = YES;
         [_responseCondition unlock];
     }
 
@@ -586,6 +592,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
     NSMutableArray *folders = [NSMutableArray array];
+    NSMutableArray *missSamples = [NSMutableArray array];
     NSUInteger missingAfterLastHit = 0;
     NSInteger folderID = 1;
     for (folderID = 1; folderID <= 64; folderID++) {
@@ -605,6 +612,23 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                                   error:&folderError];
         id responseType = [response objectForKey:@"@type"];
         if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chatFolder"]) {
+            if ([missSamples count] < 10) {
+                NSString *sample = nil;
+                if (folderError) {
+                    sample = [NSString stringWithFormat:@"id=%ld error=%@", (long)folderID, [folderError localizedDescription]];
+                } else if ([responseType isKindOfClass:[NSString class]]) {
+                    id code = [response objectForKey:@"code"];
+                    id message = [response objectForKey:@"message"];
+                    sample = [NSString stringWithFormat:@"id=%ld type=%@ code=%@ message=%@",
+                              (long)folderID,
+                              responseType,
+                              code ? code : @"?",
+                              message ? message : @"?"];
+                } else {
+                    sample = [NSString stringWithFormat:@"id=%ld no response", (long)folderID];
+                }
+                [missSamples addObject:sample];
+            }
             if ([folders count] > 0) {
                 missingAfterLastHit++;
                 if (missingAfterLastHit >= 8) {
@@ -619,11 +643,16 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                                    apiKind:@"folder"];
         if (safeFolder) {
             [folders addObject:safeFolder];
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: probed folder id=%ld title=%@.",
+                                           (long)folderID,
+                                           [safeFolder objectForKey:@"title"]]];
             missingAfterLastHit = 0;
         }
     }
 
-    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: fallback probe loaded %lu folder(s).", (unsigned long)[folders count]]];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: fallback probe loaded %lu folder(s); samples: %@",
+                                   (unsigned long)[folders count],
+                                   [missSamples componentsJoinedByString:@"; "]]];
     return folders;
 }
 
@@ -714,6 +743,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSMutableArray *filters = [NSMutableArray arrayWithCapacity:[(NSArray *)filterObjects count]];
+    NSMutableArray *titles = [NSMutableArray array];
     NSUInteger index = 0;
     for (index = 0; index < [(NSArray *)filterObjects count]; index++) {
         id filterObject = [(NSArray *)filterObjects objectAtIndex:index];
@@ -728,10 +758,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                                    apiKind:apiKind];
         if (safeFilter) {
             [filters addObject:safeFilter];
+            [titles addObject:[safeFilter objectForKey:@"title"]];
         }
     }
 
-    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: update loaded %lu item(s) from %@.", (unsigned long)[filters count], typeObject]];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: update %@ raw=%lu parsed=%lu titles=%@.",
+                                   typeObject,
+                                   (unsigned long)[(NSArray *)filterObjects count],
+                                   (unsigned long)[filters count],
+                                   [titles componentsJoinedByString:@", "]]];
     return filters;
 }
 
@@ -1005,6 +1040,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_chatFilterInfos release];
         _chatFilterInfos = [chatFilterInfos copy];
         _chatFilterInfosKnown = YES;
+        _chatFilterFallbackProbeFinished = NO;
     }
 
     if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
