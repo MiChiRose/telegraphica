@@ -267,7 +267,7 @@
     CGFloat margin = 10.0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
     BOOL drawerVisible = (!drawerHidden && self.drawerOpen);
-    BOOL drawerConsumesLayout = (drawerVisible && [self.activeSection isEqualToString:TGSectionChats]);
+    BOOL drawerConsumesLayout = drawerVisible;
     CGFloat railGutter = (!drawerHidden && self.drawerOpen) ? 10.0 : 0.0;
     CGFloat panelGutter = 10.0;
     CGFloat railWidth = (!drawerHidden && self.drawerOpen) ? 108.0 : 0.0;
