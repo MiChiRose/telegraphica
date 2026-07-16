@@ -1317,6 +1317,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.profileScrollView setBorderType:NSNoBorder];
     [self.profileScrollView setDrawsBackground:NO];
     [self.profileScrollView setHasVerticalScroller:YES];
+    [self.profileScrollView setHasHorizontalScroller:NO];
     [self.profileScrollView setAutohidesScrollers:YES];
     [[self.profileScrollView contentView] setDrawsBackground:NO];
     self.profileContentView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0, 0, 760, 520)] autorelease];
@@ -1331,6 +1332,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsScrollView setBorderType:NSNoBorder];
     [self.settingsScrollView setDrawsBackground:NO];
     [self.settingsScrollView setHasVerticalScroller:YES];
+    [self.settingsScrollView setHasHorizontalScroller:NO];
     [self.settingsScrollView setAutohidesScrollers:YES];
     [[self.settingsScrollView contentView] setDrawsBackground:NO];
     self.settingsContentView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0, 0, 760, 620)] autorelease];

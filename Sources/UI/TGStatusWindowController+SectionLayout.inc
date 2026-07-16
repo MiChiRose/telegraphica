@@ -673,6 +673,12 @@
     if (profileDocWidth < 340.0) {
         profileDocWidth = profileScrollWidth;
     }
+    CGFloat initialProfileDocHeight = NSHeight([self.profileContentView frame]);
+    if (initialProfileDocHeight < profileScrollHeight) {
+        initialProfileDocHeight = profileScrollHeight;
+    }
+    [self.profileContentView setFrame:NSMakeRect(0.0, 0.0, profileDocWidth, initialProfileDocHeight)];
+
     CGFloat profileGroupedWidth = profileDocWidth - 56.0;
     if (profileGroupedWidth > 760.0) {
         profileGroupedWidth = 760.0;
@@ -821,6 +827,11 @@
         profileDocHeight = profileScrollHeight;
     }
     [self.profileContentView setFrame:NSMakeRect(0.0, 0.0, profileDocWidth, profileDocHeight)];
+    NSClipView *profileClipView = [self.profileScrollView contentView];
+    NSPoint profileClipOrigin = [profileClipView bounds].origin;
+    if (profileClipOrigin.x != 0.0) {
+        [profileClipView setBoundsOrigin:NSMakePoint(0.0, profileClipOrigin.y)];
+    }
 
     [self.settingsTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
 
@@ -849,6 +860,11 @@
         settingsDocHeight = settingsScrollHeight;
     }
     [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
+    NSClipView *settingsClipView = [self.settingsScrollView contentView];
+    NSPoint settingsClipOrigin = [settingsClipView bounds].origin;
+    if (settingsClipOrigin.x != 0.0) {
+        [settingsClipView setBoundsOrigin:NSMakePoint(0.0, settingsClipOrigin.y)];
+    }
 
     CGFloat settingsLabelHeight = 16.0;
     CGFloat settingsLabelGap = 7.0;
