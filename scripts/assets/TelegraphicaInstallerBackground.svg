@@ -26,5 +26,5 @@
         fill="url(#arrow)" stroke="#123047" stroke-width="2" filter="url(#shadow)"/>
   <circle cx="132" cy="205" r="73" fill="#0f2b42" opacity="0.22"/>
   <circle cx="468" cy="205" r="73" fill="#0f2b42" opacity="0.22"/>
-  <text x="300" y="354" text-anchor="middle" fill="#173650" font-family="Helvetica, Arial, sans-serif" font-size="12">OS X 10.9 Mavericks and later</text>
+  <text x="300" y="354" text-anchor="middle" fill="#173650" font-family="Helvetica, Arial, sans-serif" font-size="12">Special build for OS X 10.8.5 Mountain Lion</text>
 </svg>
