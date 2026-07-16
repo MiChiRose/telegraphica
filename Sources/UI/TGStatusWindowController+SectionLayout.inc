@@ -77,7 +77,8 @@
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
-    [self showView:self.messageJumpToNewestButton visible:(showChats && [self shouldShowMessageJumpToNewestButton])];
+    [self showView:self.messageJumpToNewestButton visible:showChats];
+    [self.messageJumpToNewestButton setEnabled:(showChats && [self shouldShowMessageJumpToNewestButton])];
     BOOL showSearchPanel = (showChats && self.searchPanelVisible);
     [self showView:self.searchPanelView visible:showSearchPanel];
     [self showView:self.searchTextField visible:showSearchPanel];
@@ -465,9 +466,13 @@
         [chatColumn setWidth:chatWidth];
     }
 
-    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.loadMessagesButton setFrame:NSMakeRect(conversationX + conversationWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.conversationSearchButton setFrame:NSMakeRect(conversationX + conversationWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
+    CGFloat conversationRefreshX = conversationX + conversationWidth - 12.0 - headerButtonSize;
+    CGFloat conversationJumpX = conversationRefreshX - 6.0 - headerButtonSize;
+    CGFloat conversationSearchX = conversationJumpX - 6.0 - headerButtonSize;
+    [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.loadMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.messageJumpToNewestButton setFrame:NSMakeRect(conversationJumpX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.conversationSearchButton setFrame:NSMakeRect(conversationSearchX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
     CGFloat selectedAvatarSize = 24.0;
     CGFloat selectedAvatarX = conversationX + 16.0;
@@ -560,10 +565,6 @@
                                                     NSMidY(messageSurfaceFrame) - 12.0,
                                                     24.0,
                                                     24.0)];
-    [self.messageJumpToNewestButton setFrame:NSMakeRect(NSMaxX(messageSurfaceFrame) - 48.0,
-                                                        NSMinY(messageSurfaceFrame) + 18.0,
-                                                        34.0,
-                                                        34.0)];
     CGFloat dropOverlayInset = (NSHeight(messageSurfaceFrame) > 130.0) ? 24.0 : 12.0;
     [self.messageDropOverlayView setFrame:NSInsetRect(messageSurfaceFrame, dropOverlayInset, dropOverlayInset)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];

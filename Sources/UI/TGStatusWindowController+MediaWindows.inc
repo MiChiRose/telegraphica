@@ -536,8 +536,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     NSRect visibleFrame = [screen visibleFrame];
     CGFloat maxWindowWidth = floor(NSWidth(visibleFrame) * 0.70);
     CGFloat maxWindowHeight = floor(NSHeight(visibleFrame) * 0.70);
-    if (maxWindowWidth < 360.0) {
-        maxWindowWidth = 360.0;
+    if (maxWindowWidth < 240.0) {
+        maxWindowWidth = 240.0;
     }
     if (maxWindowHeight < 260.0) {
         maxWindowHeight = 260.0;
@@ -559,8 +559,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     CGFloat contentWidth = ceil(imageSize.width * scale) + chromeWidth;
     CGFloat contentHeight = ceil(imageSize.height * scale) + chromeHeight;
-    if (contentWidth < 360.0) {
-        contentWidth = 360.0;
+    if (contentWidth < 240.0) {
+        contentWidth = 240.0;
     }
     if (contentHeight < 260.0) {
         contentHeight = 260.0;
@@ -572,7 +572,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         contentHeight = maxWindowHeight;
     }
 
-    [self.mediaPreviewWindow setMinSize:NSMakeSize(320.0, 220.0)];
+    [self.mediaPreviewWindow setMinSize:NSMakeSize(240.0, 220.0)];
     [self.mediaPreviewWindow setContentSize:NSMakeSize(contentWidth, contentHeight)];
     [self layoutMediaPreviewWindowControls];
 }
@@ -588,7 +588,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@""];
-    [window setMinSize:NSMakeSize(320, 220)];
+    [window setMinSize:NSMakeSize(240, 220)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
@@ -616,10 +616,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     self.mediaPreviewImageView = imageView;
 
     NSButton *zoomOutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(16, 18, 42, 30)] autorelease];
-    [zoomOutButton setTitle:@""];
-    [zoomOutButton setImage:TGTemplateIconAssetImage(@"remove-ellipse", NSMakeSize(18.0, 18.0), TGClassicHeaderTextColor(1.0), 1.0)];
-    [zoomOutButton setImagePosition:NSImageOnly];
-    [zoomOutButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@""] autorelease]];
+    [zoomOutButton setTitle:@"zoom-out"];
+    [zoomOutButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"zoom-out"] autorelease]];
     [zoomOutButton setBordered:NO];
     [zoomOutButton setFocusRingType:NSFocusRingTypeNone];
     [zoomOutButton setToolTip:@"Zoom out"];
@@ -640,10 +638,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     self.mediaPreviewFitButton = fitButton;
 
     NSButton *zoomInButton = [[[NSButton alloc] initWithFrame:NSMakeRect(148, 18, 42, 30)] autorelease];
-    [zoomInButton setTitle:@""];
-    [zoomInButton setImage:TGTemplateIconAssetImage(@"add-ellipse", NSMakeSize(18.0, 18.0), TGClassicHeaderTextColor(1.0), 1.0)];
-    [zoomInButton setImagePosition:NSImageOnly];
-    [zoomInButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@""] autorelease]];
+    [zoomInButton setTitle:@"zoom-in"];
+    [zoomInButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"zoom-in"] autorelease]];
     [zoomInButton setBordered:NO];
     [zoomInButton setFocusRingType:NSFocusRingTypeNone];
     [zoomInButton setToolTip:@"Zoom in"];

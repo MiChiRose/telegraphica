@@ -1690,18 +1690,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.messageLoadingSpinner];
 
     self.messageJumpToNewestButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 34, 34)] autorelease];
-    [self.messageJumpToNewestButton setTitle:@""];
-    [self.messageJumpToNewestButton setImage:TGTemplateIconAssetImage(@"arrow-down",
-                                                                       NSMakeSize(18.0, 18.0),
-                                                                       TGClassicHeaderTextColor(1.0),
-                                                                       1.0)];
-    [self.messageJumpToNewestButton setImagePosition:NSImageOnly];
+    [self.messageJumpToNewestButton setTitle:@"jump-newest"];
     [self.messageJumpToNewestButton setToolTip:@"Jump to latest messages"];
     [self.messageJumpToNewestButton setTarget:self];
     [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
     [self.messageJumpToNewestButton setBordered:NO];
     [self.messageJumpToNewestButton setFocusRingType:NSFocusRingTypeNone];
-    [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@""] autorelease]];
+    [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"jump-newest"] autorelease]];
+    [self.messageJumpToNewestButton setEnabled:NO];
     [self.messageJumpToNewestButton setHidden:YES];
     [contentView addSubview:self.messageJumpToNewestButton];
 

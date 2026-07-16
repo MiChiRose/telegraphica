@@ -244,7 +244,8 @@
 - (void)updateMessageJumpToNewestButtonVisibility {
     BOOL ready = ([self.currentAuthState isEqualToString:@"ready"] &&
                   [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
-    [self.messageJumpToNewestButton setHidden:!(ready && [self shouldShowMessageJumpToNewestButton])];
+    [self.messageJumpToNewestButton setHidden:!ready];
+    [self.messageJumpToNewestButton setEnabled:(ready && [self shouldShowMessageJumpToNewestButton])];
 }
 
 - (void)jumpToNewestMessages:(id)sender {

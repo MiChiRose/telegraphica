@@ -361,6 +361,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         assetName = @"upload";
     } else if ([title isEqualToString:@"search"]) {
         assetName = @"search";
+    } else if ([title isEqualToString:@"jump-newest"]) {
+        assetName = @"arrow-down";
+    } else if ([title isEqualToString:@"zoom-in"]) {
+        assetName = @"add-ellipse";
+    } else if ([title isEqualToString:@"zoom-out"]) {
+        assetName = @"remove-ellipse";
     }
     if ([assetName length] > 0) {
         NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
