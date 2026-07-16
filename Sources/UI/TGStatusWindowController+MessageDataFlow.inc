@@ -218,8 +218,58 @@
 - (void)scrollMessagesToNewestIfAvailable {
     NSUInteger count = [self.messageItems count];
     if (count > 0) {
-        [self.messageTableView scrollRowToVisible:(count - 1)];
+        NSInteger newestRow = (NSInteger)count - 1;
+        [self.messageTableView scrollRowToVisible:newestRow];
+        NSClipView *clipView = [self.messageScrollView contentView];
+        NSView *documentView = [self.messageScrollView documentView];
+        if (clipView && documentView) {
+            NSRect visibleRect = [clipView bounds];
+            NSRect documentBounds = [documentView bounds];
+            NSPoint targetPoint = NSMakePoint(NSMinX(visibleRect), NSMaxY(documentBounds) - NSHeight(visibleRect));
+            if (targetPoint.y < 0.0) {
+                targetPoint.y = 0.0;
+            }
+            [clipView scrollToPoint:targetPoint];
+            [self.messageScrollView reflectScrolledClipView:clipView];
+        }
     }
+    [self updateMessageJumpToNewestButtonVisibility];
+}
+
+- (BOOL)shouldShowMessageJumpToNewestButton {
+    if ([self.messageItems count] <= 20 || !self.messageScrollView || [self.messageScrollView isHidden]) {
+        return NO;
+    }
+    NSClipView *clipView = [self.messageScrollView contentView];
+    NSView *documentView = [self.messageScrollView documentView];
+    if (!clipView || !documentView) {
+        return NO;
+    }
+    NSRange visibleRows = [self.messageTableView rowsInRect:[clipView bounds]];
+    if (visibleRows.length == 0) {
+        return NO;
+    }
+    NSInteger lastVisibleRow = (NSInteger)(visibleRows.location + visibleRows.length - 1);
+    NSInteger newestRow = (NSInteger)[self.messageItems count] - 1;
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    CGFloat distanceFromBottom = NSMaxY(documentBounds) - NSMaxY(visibleRect);
+    return ((newestRow - lastVisibleRow) >= 20 && distanceFromBottom > 48.0);
+}
+
+- (void)updateMessageJumpToNewestButtonVisibility {
+    BOOL ready = ([self.currentAuthState isEqualToString:@"ready"] &&
+                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
+    [self.messageJumpToNewestButton setHidden:!ready];
+    [self.messageJumpToNewestButton setEnabled:(ready && [self shouldShowMessageJumpToNewestButton])];
+}
+
+- (void)jumpToNewestMessages:(id)sender {
+    (void)sender;
+    self.forceMessageScrollToNewest = YES;
+    [self scrollMessagesToNewestIfAvailable];
+    [self performSelector:@selector(scrollMessagesToNewestIfAvailable) withObject:nil afterDelay:0.0];
+    [self updateMessageJumpToNewestButtonVisibility];
 }
 
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
@@ -269,6 +319,8 @@
     [self.messageTableView reloadData];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
+    } else {
+        [self updateMessageJumpToNewestButtonVisibility];
     }
 }
 
@@ -326,6 +378,8 @@
         } else {
             [self scrollMessagesToNewestIfAvailable];
         }
+    } else {
+        [self updateMessageJumpToNewestButtonVisibility];
     }
     return added;
 }
@@ -404,10 +458,7 @@
     }
 
     if ([self isChatListNearTop]) {
-        if (self.autoChatListRefreshArmed) {
-            self.autoChatListRefreshArmed = NO;
-            [self reloadChatsInteractive:NO preserveSelection:YES];
-        }
+        self.autoChatListRefreshArmed = NO;
         return;
     }
 
@@ -515,6 +566,7 @@
     }
 
     [self scheduleInlineMediaPlaybackRefresh];
+    [self updateMessageJumpToNewestButtonVisibility];
 
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||
@@ -877,6 +929,15 @@
 
     NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
     NSNumber *activeFilterID = [self.selectedChatFilterID retain];
+    NSPoint visibleChatOrigin = NSZeroPoint;
+    BOOL shouldRestoreChatOrigin = NO;
+    if (!interactive) {
+        NSClipView *chatClipView = [self.chatScrollView contentView];
+        if (chatClipView) {
+            visibleChatOrigin = [chatClipView bounds].origin;
+            shouldRestoreChatOrigin = YES;
+        }
+    }
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading chats..."];
@@ -936,6 +997,27 @@
                     effectivePreferredChatID = self.selectedChatID;
                 }
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:effectivePreferredChatID];
+                if (!interactive && shouldRestoreChatOrigin) {
+                    NSClipView *chatClipView = [self.chatScrollView contentView];
+                    NSView *chatDocumentView = [self.chatScrollView documentView];
+                    if (chatClipView && chatDocumentView) {
+                        NSRect visibleRect = [chatClipView bounds];
+                        NSRect documentBounds = [chatDocumentView bounds];
+                        CGFloat maxY = NSMaxY(documentBounds) - NSHeight(visibleRect);
+                        if (maxY < 0.0) {
+                            maxY = 0.0;
+                        }
+                        CGFloat restoredY = visibleChatOrigin.y;
+                        if (restoredY > maxY) {
+                            restoredY = maxY;
+                        }
+                        if (restoredY < 0.0) {
+                            restoredY = 0.0;
+                        }
+                        [chatClipView scrollToPoint:NSMakePoint(visibleChatOrigin.x, restoredY)];
+                        [self.chatScrollView reflectScrolledClipView:chatClipView];
+                    }
+                }
                 [self setOfflineModeActive:NO reason:nil];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
@@ -1287,6 +1369,8 @@
             }
         } else if ([kind isEqualToString:@"chat_action"]) {
             [self handleTypingUpdateSummary:summary];
+        } else if ([kind isEqualToString:@"draft_update"]) {
+            [self handleComposerDraftUpdateSummary:summary];
         } else if ([kind isEqualToString:@"pinned_message_update"]) {
             id chatID = [summary objectForKey:@"chat_id"];
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {

@@ -23,6 +23,16 @@ FORBIDDEN_TEXT = [
     ("NSLayoutAnchor", "Use frame/autoresizing or old NSLayoutConstraint APIs."),
     ("activateConstraints:", "Use addConstraints: for Xcode 6.2 compatibility."),
     ("NSStackView", "Use Mavericks-safe manual AppKit layout."),
+    ("base64EncodedStringWithOptions:", "Use NSData base64Encoding for the OS X 10.8 Mountain Lion lane."),
+    ("base64EncodedDataWithOptions:", "Use NSData base64Encoding for the OS X 10.8 Mountain Lion lane."),
+    ("initWithBase64EncodedString:", "Use NSData initWithBase64Encoding: for the OS X 10.8 Mountain Lion lane."),
+    ("initWithBase64EncodedData:", "Use NSData initWithBase64Encoding: for the OS X 10.8 Mountain Lion lane."),
+    ("dataWithBase64EncodedString:", "Use NSData initWithBase64Encoding: for the OS X 10.8 Mountain Lion lane."),
+    ("NSDataBase64EncodingOptions", "Use the pre-10.9 NSData base64Encoding APIs for the Mountain Lion lane."),
+    ("NSDataBase64DecodingOptions", "Use the pre-10.9 NSData initWithBase64Encoding: APIs for the Mountain Lion lane."),
+    ("colorWithWhite:", "Use colorWithCalibratedWhite:alpha: or colorWithDeviceWhite:alpha: for OS X 10.8."),
+    ("colorWithRed:", "Use colorWithCalibratedRed:green:blue:alpha: or colorWithDeviceRed:green:blue:alpha: for OS X 10.8."),
+    ("colorWithHue:", "Use colorWithCalibratedHue:saturation:brightness:alpha: or colorWithDeviceHue:saturation:brightness:alpha: for OS X 10.8."),
     ("NSLog(", "Use TGLogger redaction instead of direct NSLog."),
 ]
 

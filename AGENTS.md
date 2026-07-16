@@ -8,6 +8,8 @@ These project rules apply to Codex work in this repository.
 - `main` is the protected release/base branch.
 - Create `develop` from `main`.
 - Create task branches from `develop`; do implementation and verification there.
+- Name task branches by work type, for example `feature/...`, `fix/...`, `hotfix/...`, or `test/...`.
+- Do not use AI assistant, model, or tool names in branch names, including `codex`, `gemini`, `claude`, `groq`, or similar prefixes.
 - After local checks pass and the code does not crash in the available smoke tests, merge the task branch into `develop`.
 - The user performs HITL/live validation from `develop`.
 - Merge `develop` into `main` only after HITL approval, and use a teamlead/reviewer subagent for that final merge review when subagents are available.
