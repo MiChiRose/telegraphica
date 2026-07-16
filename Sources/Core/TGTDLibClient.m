@@ -170,6 +170,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (void)receiverThreadMain;
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
 - (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary;
+- (NSArray *)chatFilterInfoItemsByProbingChatFoldersWithTimeout:(NSTimeInterval)timeout;
+- (NSDictionary *)safeChatFilterInfoFromDictionary:(NSDictionary *)filterDictionary identifier:(NSNumber *)identifier apiKind:(NSString *)apiKind;
 - (NSString *)safeChatFolderTitleFromObject:(id)titleObject;
 - (NSString *)chatFilterAPIKindForFilterID:(NSNumber *)filterID;
 - (NSDictionary *)chatListObjectForChatFilterID:(NSNumber *)filterID;
@@ -403,8 +405,23 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     while (!_chatFilterInfosKnown && [[NSDate date] compare:deadline] == NSOrderedAscending) {
         [_responseCondition waitUntilDate:deadline];
     }
+    BOOL known = _chatFilterInfosKnown;
     NSArray *filters = [_chatFilterInfos copy];
     [_responseCondition unlock];
+
+    if (!known) {
+        NSArray *probedFilters = [self chatFilterInfoItemsByProbingChatFoldersWithTimeout:timeout];
+        [_responseCondition lock];
+        if (!_chatFilterInfosKnown) {
+            [_chatFilterInfos release];
+            _chatFilterInfos = [probedFilters copy];
+            _chatFilterInfosKnown = YES;
+            [filters release];
+            filters = [_chatFilterInfos copy];
+            [_responseCondition broadcast];
+        }
+        [_responseCondition unlock];
+    }
 
     if (!filters) {
         return [NSArray array];
@@ -525,6 +542,91 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSDictionary *)safeChatFilterInfoFromDictionary:(NSDictionary *)filterDictionary identifier:(NSNumber *)identifier apiKind:(NSString *)apiKind {
+    if (![filterDictionary isKindOfClass:[NSDictionary class]] ||
+        ![identifier respondsToSelector:@selector(integerValue)] ||
+        [apiKind length] == 0) {
+        return nil;
+    }
+
+    id titleObject = [filterDictionary objectForKey:@"title"];
+    if (!titleObject) {
+        titleObject = [filterDictionary objectForKey:@"name"];
+    }
+    NSString *title = [self safeChatFolderTitleFromObject:titleObject];
+    if ([title length] == 0) {
+        return nil;
+    }
+
+    id iconObject = [filterDictionary objectForKey:@"icon_name"];
+    if (![iconObject isKindOfClass:[NSString class]]) {
+        id iconDictionary = [filterDictionary objectForKey:@"icon"];
+        if ([iconDictionary isKindOfClass:[NSDictionary class]]) {
+            iconObject = [(NSDictionary *)iconDictionary objectForKey:@"name"];
+        }
+    }
+
+    NSMutableDictionary *safeFilter = [NSMutableDictionary dictionary];
+    [safeFilter setObject:[NSNumber numberWithInteger:[identifier integerValue]] forKey:@"id"];
+    [safeFilter setObject:title forKey:@"title"];
+    [safeFilter setObject:apiKind forKey:@"api_kind"];
+    if ([iconObject isKindOfClass:[NSString class]] && [(NSString *)iconObject length] > 0) {
+        [safeFilter setObject:iconObject forKey:@"icon_name"];
+    }
+    return safeFilter;
+}
+
+- (NSArray *)chatFilterInfoItemsByProbingChatFoldersWithTimeout:(NSTimeInterval)timeout {
+    if (timeout <= 0.0) {
+        timeout = 1.5;
+    }
+    if (timeout > 3.0) {
+        timeout = 3.0;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSMutableArray *folders = [NSMutableArray array];
+    NSUInteger missingAfterLastHit = 0;
+    NSInteger folderID = 1;
+    for (folderID = 1; folderID <= 64; folderID++) {
+        if ([[NSDate date] compare:deadline] != NSOrderedAscending) {
+            break;
+        }
+
+        NSMutableDictionary *request = [NSMutableDictionary dictionary];
+        [request setObject:@"getChatFolder" forKey:@"@type"];
+        [request setObject:[NSNumber numberWithInteger:folderID] forKey:@"chat_folder_id"];
+
+        NSError *folderError = nil;
+        NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                            extraPrefix:@"telegraphica-get-chat-folder"
+                                                                timeout:0.25
+                                                              errorCode:98
+                                                                  error:&folderError];
+        id responseType = [response objectForKey:@"@type"];
+        if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chatFolder"]) {
+            if ([folders count] > 0) {
+                missingAfterLastHit++;
+                if (missingAfterLastHit >= 8) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        NSDictionary *safeFolder = [self safeChatFilterInfoFromDictionary:response
+                                                                identifier:[NSNumber numberWithInteger:folderID]
+                                                                   apiKind:@"folder"];
+        if (safeFolder) {
+            [folders addObject:safeFolder];
+            missingAfterLastHit = 0;
+        }
+    }
+
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: fallback probe loaded %lu folder(s).", (unsigned long)[folders count]]];
+    return folders;
+}
+
 - (NSString *)chatFilterAPIKindForFilterID:(NSNumber *)filterID {
     if (![filterID respondsToSelector:@selector(longLongValue)]) {
         return @"filter";
@@ -621,36 +723,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
         NSDictionary *filterDictionary = (NSDictionary *)filterObject;
         id identifier = [filterDictionary objectForKey:@"id"];
-        id titleObject = [filterDictionary objectForKey:@"title"];
-        if (!titleObject) {
-            titleObject = [filterDictionary objectForKey:@"name"];
+        NSDictionary *safeFilter = [self safeChatFilterInfoFromDictionary:filterDictionary
+                                                                identifier:identifier
+                                                                   apiKind:apiKind];
+        if (safeFilter) {
+            [filters addObject:safeFilter];
         }
-        id iconObject = [filterDictionary objectForKey:@"icon_name"];
-        if (![iconObject isKindOfClass:[NSString class]]) {
-            id iconDictionary = [filterDictionary objectForKey:@"icon"];
-            if ([iconDictionary isKindOfClass:[NSDictionary class]]) {
-                iconObject = [(NSDictionary *)iconDictionary objectForKey:@"name"];
-            }
-        }
-        if (![identifier respondsToSelector:@selector(integerValue)]) {
-            continue;
-        }
-
-        NSString *title = [self safeChatFolderTitleFromObject:titleObject];
-        if ([title length] == 0) {
-            continue;
-        }
-
-        NSMutableDictionary *safeFilter = [NSMutableDictionary dictionary];
-        [safeFilter setObject:[NSNumber numberWithInteger:[identifier integerValue]] forKey:@"id"];
-        [safeFilter setObject:title forKey:@"title"];
-        [safeFilter setObject:apiKind forKey:@"api_kind"];
-        if ([iconObject isKindOfClass:[NSString class]] && [(NSString *)iconObject length] > 0) {
-            [safeFilter setObject:iconObject forKey:@"icon_name"];
-        }
-        [filters addObject:safeFilter];
     }
 
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: update loaded %lu item(s) from %@.", (unsigned long)[filters count], typeObject]];
     return filters;
 }
 
