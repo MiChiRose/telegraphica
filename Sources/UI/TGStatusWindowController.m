@@ -963,6 +963,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)refreshThemeAppearance {
+    NSColor *cardInkColor = TGClassicCardInkColor();
+    NSColor *cardMutedColor = TGClassicCardMutedInkColor();
+
     [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self applyPanelHeaderDetailStyle:self.statusField];
     [self applyPanelHeaderLabelStyle:self.diagnosticsLabel];
@@ -973,9 +976,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
 
     [self.loginBrandField setTextColor:TGClassicNavigationTextColor(1.0)];
-    [self.loginTitleField setTextColor:TGClassicInkColor()];
+    [self.loginTitleField setTextColor:cardInkColor];
     [self.sendLabel setTextColor:TGClassicInkColor()];
-    [self.profileNameField setTextColor:TGClassicInkColor()];
+    [self.profileNameField setTextColor:cardInkColor];
     [self.profileNameField setFont:[NSFont boldSystemFontOfSize:18.0]];
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
@@ -984,18 +987,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
-    [self.aboutTitleField setTextColor:TGClassicInkColor()];
-    [self applyMutedLabelStyle:self.loginHintField];
-    [self applyMutedLabelStyle:self.authLabel];
-    [self applyMutedLabelStyle:self.authSecondaryLabel];
+    [self.aboutTitleField setTextColor:cardInkColor];
+    [self.loginHintField setTextColor:cardMutedColor];
+    [self.authLabel setTextColor:cardMutedColor];
+    [self.authSecondaryLabel setTextColor:cardMutedColor];
     if (self.loginErrorVisible) {
         [self.authStateField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
     } else {
-        [self applyMutedLabelStyle:self.authStateField];
+        [self.authStateField setTextColor:cardMutedColor];
     }
-    [self applyMutedLabelStyle:self.profileUsernameField];
-    [self applyMutedLabelStyle:self.profileIDField];
-    [self applyMutedLabelStyle:self.profileStateField];
+    [self.profileUsernameField setTextColor:cardMutedColor];
+    [self.profileIDField setTextColor:cardMutedColor];
+    [self.profileStateField setTextColor:cardMutedColor];
     [self applyMutedLabelStyle:self.profileAboutSectionField];
     [self applyMutedLabelStyle:self.profileAccountSectionField];
     [self.profileStateField setFont:[NSFont systemFontOfSize:13.0]];
@@ -1007,25 +1010,25 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.profilePhoneRowValueField setFont:[NSFont systemFontOfSize:13.0]];
     [self.profileIDRowTitleField setFont:[NSFont systemFontOfSize:13.0]];
     [self.profileIDRowValueField setFont:[NSFont systemFontOfSize:13.0]];
-    [self.profileUsernameRowTitleField setTextColor:TGClassicInkColor()];
-    [self.profilePhoneRowTitleField setTextColor:TGClassicInkColor()];
-    [self.profileIDRowTitleField setTextColor:TGClassicInkColor()];
-    [self applyMutedLabelStyle:self.profileUsernameRowValueField];
-    [self applyMutedLabelStyle:self.profilePhoneRowValueField];
-    [self applyMutedLabelStyle:self.profileIDRowValueField];
+    [self.profileUsernameRowTitleField setTextColor:cardInkColor];
+    [self.profilePhoneRowTitleField setTextColor:cardInkColor];
+    [self.profileIDRowTitleField setTextColor:cardInkColor];
+    [self.profileUsernameRowValueField setTextColor:cardMutedColor];
+    [self.profilePhoneRowValueField setTextColor:cardMutedColor];
+    [self.profileIDRowValueField setTextColor:cardMutedColor];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
-    [self applyMutedLabelStyle:self.settingsDownloadFolderHelpField];
-    [self applyMutedLabelStyle:self.settingsActiveSessionsDetailField];
-    [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
-    [self.settingsLanguageLabel setTextColor:TGClassicInkColor()];
-    [self.settingsMaxAutoDownloadLabel setTextColor:TGClassicInkColor()];
-    [self.settingsMaxAnimationsLabel setTextColor:TGClassicInkColor()];
-    [self.settingsMediaCacheLimitLabel setTextColor:TGClassicInkColor()];
-    [self applyMutedLabelStyle:self.settingsResourceHintField];
-    [self applyMutedLabelStyle:self.aboutVersionField];
-    [self applyMutedLabelStyle:self.aboutCopyrightField];
-    [self.aboutLinkField setTextColor:TGClassicLinkColor()];
+    [self.settingsDownloadFolderHelpField setTextColor:cardMutedColor];
+    [self.settingsActiveSessionsDetailField setTextColor:cardMutedColor];
+    [self.settingsThemeLabel setTextColor:cardInkColor];
+    [self.settingsLanguageLabel setTextColor:cardInkColor];
+    [self.settingsMaxAutoDownloadLabel setTextColor:cardInkColor];
+    [self.settingsMaxAnimationsLabel setTextColor:cardInkColor];
+    [self.settingsMediaCacheLimitLabel setTextColor:cardInkColor];
+    [self.settingsResourceHintField setTextColor:cardMutedColor];
+    [self.aboutVersionField setTextColor:cardMutedColor];
+    [self.aboutCopyrightField setTextColor:cardMutedColor];
+    [self.aboutLinkField setTextColor:TGClassicCardLinkColor()];
     [self applyDestructiveSettingsButtonStyle:self.logoutButton];
 
     [self applyComposerTextFieldStyle:self.authTextField];

@@ -242,6 +242,18 @@ TG_THEME_COLOR_FUNCTION(TGClassicTableGridColor, tableGrid)
 TG_THEME_COLOR_FUNCTION(TGClassicTableHeaderColor, tableHeader)
 TG_THEME_COLOR_FUNCTION(TGClassicLinkColor, link)
 
+NSColor *TGClassicCardInkColor(void) {
+    return [NSColor colorWithCalibratedWhite:0.08 alpha:1.0];
+}
+
+NSColor *TGClassicCardMutedInkColor(void) {
+    return [NSColor colorWithCalibratedWhite:0.36 alpha:1.0];
+}
+
+NSColor *TGClassicCardLinkColor(void) {
+    return TGColorFromHex(0x2d5d96);
+}
+
 #define TG_THEME_ALPHA_COLOR_FUNCTION(name, field) \
     NSColor *name(CGFloat alpha) { TGThemePalette palette = TGCurrentThemePalette(); return TGColorFromRGBWithAlpha(palette.field, alpha); }
 

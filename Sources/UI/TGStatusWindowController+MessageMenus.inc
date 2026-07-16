@@ -103,6 +103,69 @@
     return menuItem;
 }
 
+static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
+    NSString *avatarPath = [summary objectForKey:@"avatar_local_path"];
+    NSString *displayName = [summary objectForKey:@"display_name"];
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(18.0, 18.0)] autorelease];
+    [image lockFocus];
+    NSRect rect = NSMakeRect(0.0, 0.0, 18.0, 18.0);
+    [[NSColor clearColor] set];
+    NSRectFill(rect);
+    TGDrawAvatarInRect(avatarPath, displayName, rect, NO, NO);
+    [image unlockFocus];
+    return image;
+}
+
+- (NSMenu *)messageViewersSubmenuForItem:(TGMessageItem *)item {
+    NSMenu *submenu = [[[NSMenu alloc] initWithTitle:@"Who read"] autorelease];
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:@"Sign in is not ready"
+                                                              action:nil
+                                                       keyEquivalent:@""] autorelease];
+        [unavailable setEnabled:NO];
+        [submenu addItem:unavailable];
+        return submenu;
+    }
+
+    NSError *viewersError = nil;
+    NSArray *viewers = [self.client messageViewersForChatID:item.chatID
+                                                  messageID:item.messageID
+                                                      limit:20
+                                                    timeout:3.0
+                                                      error:&viewersError];
+    if (!viewers) {
+        NSString *message = [[viewersError localizedDescription] length] > 0 ? [viewersError localizedDescription] : @"Readers are unavailable";
+        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:message
+                                                              action:nil
+                                                       keyEquivalent:@""] autorelease];
+        [unavailable setEnabled:NO];
+        [submenu addItem:unavailable];
+        return submenu;
+    }
+    if ([viewers count] == 0) {
+        NSMenuItem *empty = [[[NSMenuItem alloc] initWithTitle:@"Nobody has read it yet"
+                                                        action:nil
+                                                 keyEquivalent:@""] autorelease];
+        [empty setEnabled:NO];
+        [submenu addItem:empty];
+        return submenu;
+    }
+
+    NSUInteger index = 0;
+    for (index = 0; index < [viewers count]; index++) {
+        NSDictionary *summary = [viewers objectAtIndex:index];
+        NSString *displayName = [summary objectForKey:@"display_name"];
+        NSString *title = [displayName length] > 0 ? displayName : @"Unknown";
+        NSMenuItem *viewerItem = [[[NSMenuItem alloc] initWithTitle:title
+                                                             action:nil
+                                                      keyEquivalent:@""] autorelease];
+        [viewerItem setEnabled:NO];
+        [viewerItem setImage:TGMessageViewerMenuAvatarImage(summary)];
+        [submenu addItem:viewerItem];
+    }
+    return submenu;
+}
+
 - (NSString *)safeDownloadFileNameFromName:(NSString *)name fallback:(NSString *)fallback {
     NSString *candidate = ([name length] > 0) ? name : fallback;
     if ([candidate length] == 0) {
@@ -357,10 +420,11 @@
     }
     if ([item outgoing]) {
         NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:@"Who read"
-                                                             action:@selector(showMessageViewersFromMenu:)
+                                                             action:nil
                                                       keyEquivalent:@""] autorelease];
         [readByItem setRepresentedObject:item];
         [readByItem setTarget:self];
+        [readByItem setSubmenu:[self messageViewersSubmenuForItem:item]];
         [menu addItem:readByItem];
     }
     if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
