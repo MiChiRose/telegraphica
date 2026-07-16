@@ -495,18 +495,100 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     });
 }
 
+- (void)layoutMediaPreviewWindowControls {
+    if (!self.mediaPreviewWindow || !self.mediaPreviewScrollView) {
+        return;
+    }
+
+    NSView *contentView = [self.mediaPreviewWindow contentView];
+    NSRect bounds = [contentView bounds];
+    CGFloat bottomBarHeight = 58.0;
+    [self.mediaPreviewScrollView setFrame:NSMakeRect(16.0,
+                                                     bottomBarHeight,
+                                                     MAX(120.0, NSWidth(bounds) - 32.0),
+                                                     MAX(80.0, NSHeight(bounds) - bottomBarHeight - 16.0))];
+
+    CGFloat buttonSide = 34.0;
+    CGFloat fitWidth = 74.0;
+    CGFloat gap = 10.0;
+    CGFloat controlsWidth = buttonSide + gap + fitWidth + gap + buttonSide;
+    CGFloat startX = floor((NSWidth(bounds) - controlsWidth) / 2.0);
+    CGFloat y = 18.0;
+    [self.mediaPreviewZoomOutButton setFrame:NSMakeRect(startX, y, buttonSide, 30.0)];
+    [self.mediaPreviewFitButton setFrame:NSMakeRect(startX + buttonSide + gap, y, fitWidth, 30.0)];
+    [self.mediaPreviewZoomInButton setFrame:NSMakeRect(startX + buttonSide + gap + fitWidth + gap, y, buttonSide, 30.0)];
+}
+
+- (void)resizeMediaPreviewWindowForImage:(NSImage *)image {
+    if (!image || !self.mediaPreviewWindow) {
+        return;
+    }
+
+    NSSize imageSize = [image size];
+    if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+        return;
+    }
+
+    NSScreen *screen = [self.mediaPreviewWindow screen];
+    if (!screen) {
+        screen = [NSScreen mainScreen];
+    }
+    NSRect visibleFrame = [screen visibleFrame];
+    CGFloat maxWindowWidth = floor(NSWidth(visibleFrame) * 0.70);
+    CGFloat maxWindowHeight = floor(NSHeight(visibleFrame) * 0.70);
+    if (maxWindowWidth < 240.0) {
+        maxWindowWidth = 240.0;
+    }
+    if (maxWindowHeight < 260.0) {
+        maxWindowHeight = 260.0;
+    }
+
+    CGFloat chromeWidth = 32.0;
+    CGFloat chromeHeight = 74.0;
+    CGFloat availableImageWidth = MAX(160.0, maxWindowWidth - chromeWidth);
+    CGFloat availableImageHeight = MAX(120.0, maxWindowHeight - chromeHeight);
+    CGFloat scaleX = availableImageWidth / imageSize.width;
+    CGFloat scaleY = availableImageHeight / imageSize.height;
+    CGFloat scale = MIN(scaleX, scaleY);
+    if (scale > 1.0) {
+        scale = 1.0;
+    }
+    if (scale <= 0.0) {
+        scale = 1.0;
+    }
+
+    CGFloat contentWidth = ceil(imageSize.width * scale) + chromeWidth;
+    CGFloat contentHeight = ceil(imageSize.height * scale) + chromeHeight;
+    if (contentWidth < 240.0) {
+        contentWidth = 240.0;
+    }
+    if (contentHeight < 260.0) {
+        contentHeight = 260.0;
+    }
+    if (contentWidth > maxWindowWidth) {
+        contentWidth = maxWindowWidth;
+    }
+    if (contentHeight > maxWindowHeight) {
+        contentHeight = maxWindowHeight;
+    }
+
+    [self.mediaPreviewWindow setMinSize:NSMakeSize(240.0, 220.0)];
+    [self.mediaPreviewWindow setContentSize:NSMakeSize(contentWidth, contentHeight)];
+    [self layoutMediaPreviewWindowControls];
+}
+
 - (void)ensureMediaPreviewWindow {
     if (self.mediaPreviewWindow) {
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 760, 560);
+    NSRect frame = NSMakeRect(0, 0, 520, 420);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@""];
-    [window setMinSize:NSMakeSize(420, 340)];
+    [window setMinSize:NSMakeSize(240, 220)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
@@ -514,7 +596,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    TGMediaPreviewScrollView *scrollView = [[[TGMediaPreviewScrollView alloc] initWithFrame:NSMakeRect(16, 58, 728, 486)] autorelease];
+    TGMediaPreviewScrollView *scrollView = [[[TGMediaPreviewScrollView alloc] initWithFrame:NSMakeRect(16, 58, 488, 346)] autorelease];
     [scrollView setMagnificationTarget:self];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [scrollView setBorderType:NSNoBorder];
@@ -535,14 +617,15 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     NSButton *zoomOutButton = [[[NSButton alloc] initWithFrame:NSMakeRect(16, 18, 42, 30)] autorelease];
     [zoomOutButton setTitle:@"zoom-out"];
-    [zoomOutButton setCell:[[[TGMediaZoomButtonCell alloc] initTextCell:@"zoom-out"] autorelease]];
+    [zoomOutButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"zoom-out"] autorelease]];
     [zoomOutButton setBordered:NO];
     [zoomOutButton setFocusRingType:NSFocusRingTypeNone];
     [zoomOutButton setToolTip:@"Zoom out"];
     [zoomOutButton setTarget:self];
     [zoomOutButton setAction:@selector(zoomOutMediaPreview:)];
-    [zoomOutButton setAutoresizingMask:NSViewMaxYMargin];
+    [zoomOutButton setAutoresizingMask:NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin];
     [contentView addSubview:zoomOutButton];
+    self.mediaPreviewZoomOutButton = zoomOutButton;
 
     NSButton *fitButton = [[[NSButton alloc] initWithFrame:NSMakeRect(66, 18, 74, 30)] autorelease];
     [fitButton setTitle:@"Fit"];
@@ -550,25 +633,24 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [fitButton setTarget:self];
     [fitButton setAction:@selector(fitMediaPreview:)];
     [self applyUtilityButtonStyle:fitButton];
-    [fitButton setAutoresizingMask:NSViewMaxYMargin];
+    [fitButton setAutoresizingMask:NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin];
     [contentView addSubview:fitButton];
+    self.mediaPreviewFitButton = fitButton;
 
     NSButton *zoomInButton = [[[NSButton alloc] initWithFrame:NSMakeRect(148, 18, 42, 30)] autorelease];
     [zoomInButton setTitle:@"zoom-in"];
-    [zoomInButton setCell:[[[TGMediaZoomButtonCell alloc] initTextCell:@"zoom-in"] autorelease]];
+    [zoomInButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"zoom-in"] autorelease]];
     [zoomInButton setBordered:NO];
     [zoomInButton setFocusRingType:NSFocusRingTypeNone];
     [zoomInButton setToolTip:@"Zoom in"];
     [zoomInButton setTarget:self];
     [zoomInButton setAction:@selector(zoomInMediaPreview:)];
-    [zoomInButton setAutoresizingMask:NSViewMaxYMargin];
+    [zoomInButton setAutoresizingMask:NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin];
     [contentView addSubview:zoomInButton];
-
-    NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(624, 18, 120, 30)];
-    [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
-    [contentView addSubview:closeButton];
+    self.mediaPreviewZoomInButton = zoomInButton;
 
     self.mediaPreviewWindow = window;
+    [self layoutMediaPreviewWindowControls];
 }
 
 - (void)applyMediaPreviewZoomScale:(CGFloat)scale {
@@ -679,6 +761,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [self.mediaPreviewImageView setImage:image];
     [self.mediaPreviewImageView setAnimates:YES];
     [self.mediaPreviewWindow setTitle:@""];
+    [self resizeMediaPreviewWindowForImage:image];
     [self fitMediaPreview:nil];
     [self.mediaPreviewWindow center];
     [self.mediaPreviewWindow makeKeyAndOrderFront:nil];

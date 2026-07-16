@@ -21,10 +21,14 @@
 @interface TGAccountBadgeView : NSView {
     NSString *_displayName;
     NSString *_avatarLocalPath;
+    id _target;
+    SEL _action;
     BOOL _connected;
 }
 @property (nonatomic, copy) NSString *displayName;
 @property (nonatomic, copy) NSString *avatarLocalPath;
+@property (nonatomic, assign) id target;
+@property (nonatomic, assign) SEL action;
 @property (nonatomic, assign) BOOL connected;
 @end
 

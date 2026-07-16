@@ -124,6 +124,8 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @synthesize displayName = _displayName;
 @synthesize avatarLocalPath = _avatarLocalPath;
+@synthesize target = _target;
+@synthesize action = _action;
 @synthesize connected = _connected;
 
 - (void)setDisplayName:(NSString *)displayName {
@@ -147,6 +149,13 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 - (void)setConnected:(BOOL)connected {
     _connected = connected;
     [self setNeedsDisplay:YES];
+}
+
+- (void)mouseDown:(NSEvent *)event {
+    (void)event;
+    if (self.target && self.action && [self.target respondsToSelector:self.action]) {
+        [NSApp sendAction:self.action to:self.target from:self];
+    }
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -226,4 +235,3 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 }
 
 @end
-
