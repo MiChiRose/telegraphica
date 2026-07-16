@@ -3229,7 +3229,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     id dataObject = [(NSDictionary *)miniThumbnailObject objectForKey:@"data"];
     if ([dataObject isKindOfClass:[NSString class]] && [(NSString *)dataObject length] > 0) {
-        NSData *data = [[[NSData alloc] initWithBase64EncodedString:(NSString *)dataObject options:0] autorelease];
+        NSData *data = [[[NSData alloc] initWithBase64Encoding:(NSString *)dataObject] autorelease];
         if ([data length] > 0) {
             [info setObject:data forKey:@"minithumbnail_data"];
         }
