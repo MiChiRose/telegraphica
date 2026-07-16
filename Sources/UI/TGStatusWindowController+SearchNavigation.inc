@@ -200,6 +200,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self.searchResultItems removeAllObjects];
         [self.searchResultsTableView reloadData];
         [self setSearchStatusText:@"Введите запрос"];
+        [self updateVisibleSection];
+        [self layoutContentView];
         return;
     }
     BOOL global = ([self.searchScopePopUpButton indexOfSelectedItem] == 1 || self.selectedChatID == nil);
@@ -218,6 +220,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self.searchResultsTableView reloadData];
     }
     [self setSearchStatusText:@"Поиск..."];
+    [self updateVisibleSection];
+    [self layoutContentView];
 
     TGTDLibClient *client = [self.client retain];
     NSArray *localChatMatches = global ? [[self localChatSearchResultsForQuery:query] retain] : nil;
@@ -289,6 +293,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             } else {
                 [self setSearchStatusText:[NSString stringWithFormat:@"Найдено: %lu%@", (unsigned long)[self.searchResultItems count], hasNextOffset ? @" · ещё есть результаты" : @""]];
             }
+            [self updateVisibleSection];
+            [self layoutContentView];
             [messageItems release];
             [errorMessage release];
             [newOffset release];
@@ -333,6 +339,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     NSNumber *messageID = [result.messageID retain];
     NSNumber *threadID = [result.messageThreadID retain];
     NSString *topicKind = [result.messageTopicKind copy];
+    NSString *chatTitle = [result.chatTitle copy];
     NSUInteger generation = self.messageLoadingGeneration + 1;
     self.messageLoadingGeneration = generation;
     self.messageLoadingIndicatorVisible = YES;
@@ -352,16 +359,17 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                                                                 error:&contextError] retain];
         NSString *errorMessage = [[contextError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.messageLoadingGeneration == generation) {
-                self.messageLoadingIndicatorVisible = NO;
-                [self.messageLoadingSpinner stopAnimation:self];
-            }
-            self.selectedChatID = chatID;
-            if (threadID) {
-                self.selectedMessageThreadID = threadID;
-                self.selectedMessageTopicKind = topicKind;
-            }
             if (items) {
+                self.selectedChatID = chatID;
+                self.selectedChatTitle = ([chatTitle length] > 0 ? chatTitle : self.selectedChatTitle);
+                if (threadID) {
+                    self.selectedMessageThreadID = threadID;
+                    self.selectedMessageTopicKind = topicKind;
+                } else {
+                    self.selectedMessageThreadID = nil;
+                    self.selectedMessageTopicKind = nil;
+                }
+                [self refreshSelectedChatHeaderDisplay];
                 [self.messageItems removeAllObjects];
                 [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:items]];
                 [self updateOutgoingReadStateForVisibleMessages];
@@ -377,12 +385,19 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             } else if ([errorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"Search jump failed: %@", errorMessage]];
             }
+            if (self.messageLoadingGeneration == generation) {
+                self.messageLoadingIndicatorVisible = NO;
+                [self.messageLoadingSpinner stopAnimation:self];
+                [self updateVisibleSection];
+                [self layoutContentView];
+            }
             [items release];
             [errorMessage release];
             [chatID release];
             [messageID release];
             [threadID release];
             [topicKind release];
+            [chatTitle release];
             [client release];
         });
         [pool drain];

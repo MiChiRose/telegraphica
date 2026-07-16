@@ -220,6 +220,38 @@
     if (count > 0) {
         [self.messageTableView scrollRowToVisible:(count - 1)];
     }
+    [self updateMessageJumpToNewestButtonVisibility];
+}
+
+- (BOOL)shouldShowMessageJumpToNewestButton {
+    if ([self.messageItems count] <= 20 || !self.messageScrollView || [self.messageScrollView isHidden]) {
+        return NO;
+    }
+    NSClipView *clipView = [self.messageScrollView contentView];
+    if (!clipView) {
+        return NO;
+    }
+    NSRect visibleRect = [clipView bounds];
+    NSInteger lastVisibleRow = [self.messageTableView rowAtPoint:NSMakePoint(NSMinX(visibleRect) + 1.0,
+                                                                             NSMaxY(visibleRect) - 1.0)];
+    if (lastVisibleRow < 0) {
+        return NO;
+    }
+    NSInteger newestRow = (NSInteger)[self.messageItems count] - 1;
+    return ((newestRow - lastVisibleRow) >= 20);
+}
+
+- (void)updateMessageJumpToNewestButtonVisibility {
+    BOOL ready = ([self.currentAuthState isEqualToString:@"ready"] &&
+                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
+    [self.messageJumpToNewestButton setHidden:!(ready && [self shouldShowMessageJumpToNewestButton])];
+}
+
+- (void)jumpToNewestMessages:(id)sender {
+    (void)sender;
+    self.forceMessageScrollToNewest = YES;
+    [self scrollMessagesToNewestIfAvailable];
+    [self updateMessageJumpToNewestButtonVisibility];
 }
 
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
@@ -269,6 +301,8 @@
     [self.messageTableView reloadData];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
+    } else {
+        [self updateMessageJumpToNewestButtonVisibility];
     }
 }
 
@@ -326,6 +360,8 @@
         } else {
             [self scrollMessagesToNewestIfAvailable];
         }
+    } else {
+        [self updateMessageJumpToNewestButtonVisibility];
     }
     return added;
 }
@@ -404,10 +440,7 @@
     }
 
     if ([self isChatListNearTop]) {
-        if (self.autoChatListRefreshArmed) {
-            self.autoChatListRefreshArmed = NO;
-            [self reloadChatsInteractive:NO preserveSelection:YES];
-        }
+        self.autoChatListRefreshArmed = NO;
         return;
     }
 
@@ -515,6 +548,7 @@
     }
 
     [self scheduleInlineMediaPlaybackRefresh];
+    [self updateMessageJumpToNewestButtonVisibility];
 
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||
@@ -877,6 +911,17 @@
 
     NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
     NSNumber *activeFilterID = [self.selectedChatFilterID retain];
+    NSNumber *visibleAnchorChatID = nil;
+    if (!interactive) {
+        NSPoint visibleOrigin = [[self.chatScrollView contentView] bounds].origin;
+        NSInteger anchorRow = [self.chatTableView rowAtPoint:visibleOrigin];
+        if (anchorRow >= 0 && anchorRow < (NSInteger)[self.chatItems count]) {
+            id candidate = [self.chatItems objectAtIndex:(NSUInteger)anchorRow];
+            if ([candidate isKindOfClass:[TGChatItem class]]) {
+                visibleAnchorChatID = [[(TGChatItem *)candidate chatID] retain];
+            }
+        }
+    }
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading chats..."];
@@ -936,6 +981,12 @@
                     effectivePreferredChatID = self.selectedChatID;
                 }
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:effectivePreferredChatID];
+                if (!interactive && [visibleAnchorChatID respondsToSelector:@selector(longLongValue)]) {
+                    NSUInteger anchorIndex = [self indexOfChatID:visibleAnchorChatID inChatItems:self.chatItems];
+                    if (anchorIndex != NSNotFound) {
+                        [self.chatTableView scrollRowToVisible:anchorIndex];
+                    }
+                }
                 [self setOfflineModeActive:NO reason:nil];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
@@ -978,6 +1029,7 @@
             [authorizationState release];
             [activeFilterID release];
             [preferredChatID release];
+            [visibleAnchorChatID release];
         });
 
         [client release];

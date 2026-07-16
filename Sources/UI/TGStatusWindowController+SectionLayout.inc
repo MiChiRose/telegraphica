@@ -77,6 +77,7 @@
     [self showView:self.messageScrollSurfaceView visible:showChats];
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
+    [self showView:self.messageJumpToNewestButton visible:(showChats && [self shouldShowMessageJumpToNewestButton])];
     BOOL showSearchPanel = (showChats && self.searchPanelVisible);
     [self showView:self.searchPanelView visible:showSearchPanel];
     [self showView:self.searchTextField visible:showSearchPanel];
@@ -513,7 +514,9 @@
         panelWidth = 260.0;
     }
     if (self.searchPanelVisible) {
-        CGFloat searchHeight = 174.0;
+        BOOL hasSearchText = ([[self.searchTextField stringValue] length] > 0);
+        BOOL hasSearchResults = ([self.searchResultItems count] > 0);
+    CGFloat searchHeight = (hasSearchResults || (hasSearchText && self.searchLoading)) ? 174.0 : 78.0;
         CGFloat searchY = messageTop - searchHeight;
         [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
         [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, panelWidth - 326.0, 24.0)];
@@ -522,6 +525,8 @@
         [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
         [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
         [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
+        [self.searchResultsScrollView setHidden:!(hasSearchResults || self.searchLoading)];
+        [self.searchResultsTableView setHidden:!(hasSearchResults || self.searchLoading)];
         NSTableColumn *searchColumn = [self.searchResultsTableView tableColumnWithIdentifier:@"search"];
         if (searchColumn) {
             [self.searchResultsScrollView tile];
@@ -555,6 +560,10 @@
                                                     NSMidY(messageSurfaceFrame) - 12.0,
                                                     24.0,
                                                     24.0)];
+    [self.messageJumpToNewestButton setFrame:NSMakeRect(NSMaxX(messageSurfaceFrame) - 48.0,
+                                                        NSMinY(messageSurfaceFrame) + 18.0,
+                                                        34.0,
+                                                        34.0)];
     CGFloat dropOverlayInset = (NSHeight(messageSurfaceFrame) > 130.0) ? 24.0 : 12.0;
     [self.messageDropOverlayView setFrame:NSInsetRect(messageSurfaceFrame, dropOverlayInset, dropOverlayInset)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
@@ -941,6 +950,11 @@
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
+    if ([notification object] == self.mediaPreviewWindow) {
+        [self layoutMediaPreviewWindowControls];
+        [self fitMediaPreview:nil];
+        return;
+    }
     if ([notification object] == self.mediaPlaybackWindow) {
         [self layoutMediaPlaybackLayer];
         return;
@@ -970,6 +984,9 @@
     [closingWindow setDelegate:nil];
     self.mediaPreviewImageView = nil;
     self.mediaPreviewScrollView = nil;
+    self.mediaPreviewZoomOutButton = nil;
+    self.mediaPreviewFitButton = nil;
+    self.mediaPreviewZoomInButton = nil;
     self.mediaPreviewWindow = nil;
 }
 

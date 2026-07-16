@@ -174,6 +174,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
 @property (nonatomic, retain) NSProgressIndicator *messageLoadingSpinner;
+@property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
@@ -274,6 +275,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
+@property (nonatomic, retain) NSButton *mediaPreviewZoomOutButton;
+@property (nonatomic, retain) NSButton *mediaPreviewFitButton;
+@property (nonatomic, retain) NSButton *mediaPreviewZoomInButton;
 @property (nonatomic, retain) NSWindow *mediaPlaybackWindow;
 @property (nonatomic, retain) NSView *mediaPlaybackContainerView;
 @property (nonatomic, retain) NSTextField *mediaPlaybackTitleField;
@@ -503,6 +507,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
 @synthesize messageLoadingSpinner = _messageLoadingSpinner;
+@synthesize messageJumpToNewestButton = _messageJumpToNewestButton;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
@@ -603,6 +608,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
+@synthesize mediaPreviewZoomOutButton = _mediaPreviewZoomOutButton;
+@synthesize mediaPreviewFitButton = _mediaPreviewFitButton;
+@synthesize mediaPreviewZoomInButton = _mediaPreviewZoomInButton;
 @synthesize mediaPlaybackWindow = _mediaPlaybackWindow;
 @synthesize mediaPlaybackContainerView = _mediaPlaybackContainerView;
 @synthesize mediaPlaybackTitleField = _mediaPlaybackTitleField;
@@ -1680,6 +1688,22 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageLoadingSpinner setHidden:YES];
     [self.messageLoadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
     [contentView addSubview:self.messageLoadingSpinner];
+
+    self.messageJumpToNewestButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 34, 34)] autorelease];
+    [self.messageJumpToNewestButton setTitle:@""];
+    [self.messageJumpToNewestButton setImage:TGTemplateIconAssetImage(@"arrow-down",
+                                                                       NSMakeSize(18.0, 18.0),
+                                                                       TGClassicHeaderTextColor(1.0),
+                                                                       1.0)];
+    [self.messageJumpToNewestButton setImagePosition:NSImageOnly];
+    [self.messageJumpToNewestButton setToolTip:@"Jump to latest messages"];
+    [self.messageJumpToNewestButton setTarget:self];
+    [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
+    [self.messageJumpToNewestButton setBordered:NO];
+    [self.messageJumpToNewestButton setFocusRingType:NSFocusRingTypeNone];
+    [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@""] autorelease]];
+    [self.messageJumpToNewestButton setHidden:YES];
+    [contentView addSubview:self.messageJumpToNewestButton];
 
     self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
     [self.messageDropOverlayView setHidden:YES];
@@ -2851,6 +2875,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
     [_messageLoadingSpinner release];
+    [_messageJumpToNewestButton release];
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
     }
@@ -2982,6 +3007,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_mediaPreviewWindow release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];
+    [_mediaPreviewZoomOutButton release];
+    [_mediaPreviewFitButton release];
+    [_mediaPreviewZoomInButton release];
     [_mediaPlaybackWindow release];
     [_mediaPlaybackContainerView release];
     [_mediaPlaybackTitleField release];
