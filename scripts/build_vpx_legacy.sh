@@ -9,6 +9,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/Vendor/libvpx"
 OBJECT_DIR="$BUILD_DIR/Objects"
 OUTPUT_LIBRARY="$BUILD_DIR/libvpxwebmdecoder.a"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 
 if [ ! -x "$SOURCE_DIR/configure" ] || [ ! -f "$SOURCE_DIR/vpx/vpx_decoder.h" ]; then
     echo "Vendored libvpx sources are missing: $SOURCE_DIR"
@@ -21,13 +22,20 @@ fi
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR" "$OBJECT_DIR"
+BUILD_ABS_DIR="$(cd "$BUILD_DIR" && pwd)"
 
 CLANG="$(xcrun --sdk "$SDK_NAME" --find clang)"
 CLANGXX="$(xcrun --sdk "$SDK_NAME" --find clang++)"
-SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path)"
-BASE_CFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=10.9 -Os -DNDEBUG"
+SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path)}"
+TOOLCHAIN_DIR="$BUILD_ABS_DIR/Toolchain"
+mkdir -p "$TOOLCHAIN_DIR"
+ln -sf "$CLANG" "$TOOLCHAIN_DIR/clang"
+ln -sf "$CLANGXX" "$TOOLCHAIN_DIR/clang++"
+CLANG="$TOOLCHAIN_DIR/clang"
+CLANGXX="$TOOLCHAIN_DIR/clang++"
+BASE_CFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=$DEPLOYMENT_TARGET -Os -DNDEBUG"
 BASE_CXXFLAGS="$BASE_CFLAGS -std=c++11 -stdlib=libc++"
-BASE_LDFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=10.9"
+BASE_LDFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=$DEPLOYMENT_TARGET"
 
 pushd "$BUILD_DIR" >/dev/null
 CC="$CLANG" \
@@ -50,7 +58,7 @@ LDFLAGS="$BASE_LDFLAGS" \
     --disable-runtime-cpu-detect \
     --extra-cflags="$BASE_CFLAGS" \
     --extra-cxxflags="$BASE_CXXFLAGS"
-make -j1
+MAKE=/usr/bin/make /usr/bin/make -j1 MAKE=/usr/bin/make
 popd >/dev/null
 
 if [ ! -f "$BUILD_DIR/libvpx.a" ]; then
@@ -61,7 +69,7 @@ fi
 WEBM_FLAGS=(
     -arch "$ARCH"
     -isysroot "$SDK_PATH"
-    -mmacosx-version-min=10.9
+    -mmacosx-version-min="$DEPLOYMENT_TARGET"
     -std=c++11
     -stdlib=libc++
     -Os

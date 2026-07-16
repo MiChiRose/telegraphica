@@ -349,6 +349,10 @@
         NSString *version = [info objectForKey:@"CFBundleShortVersionString"];
         NSString *build = [info objectForKey:@"CFBundleVersion"];
         NSString *versionText = [NSString stringWithFormat:TGLoc(@"about.version"), version ? version : @"0.1.0", build ? build : @"0.1.0"];
+        NSString *compatibilitySummary = [info objectForKey:@"TelegraphicaCompatibilitySummary"];
+        if ([compatibilitySummary length] > 0) {
+            versionText = [versionText stringByAppendingFormat:@" — %@", compatibilitySummary];
+        }
         NSTextField *versionField = [self labelWithFrame:NSMakeRect(70, 212, 340, 22)
                                                     text:versionText
                                                     font:[NSFont systemFontOfSize:12.0]];
