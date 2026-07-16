@@ -2,6 +2,8 @@
 
 @class TGMessageItem;
 
+extern NSString * const TGTDLibChatFiltersDidChangeNotification;
+
 @interface TGTDLibClient : NSObject
 
 - (BOOL)loadLibraryWithError:(NSError **)error;

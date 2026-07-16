@@ -768,6 +768,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                  selector:@selector(resourcePolicyDidChange:)
                                                      name:TGResourcePolicyDidChangeNotification
                                                    object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(chatFiltersDidChange:)
+                                                     name:TGTDLibChatFiltersDidChangeNotification
+                                                   object:self.client];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self applyResourcePolicyToMediaSubsystems];
@@ -783,6 +787,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     if ([message isKindOfClass:[NSString class]] && [(NSString *)message length] > 0) {
         [[TGLogger sharedLogger] log:(NSString *)message];
     }
+}
+
+- (void)chatFiltersDidChange:(NSNotification *)notification {
+    (void)notification;
+    [[TGLogger sharedLogger] log:@"Drawer: TDLib chat folder update received; refreshing drawer folders."];
+    if (self.chatFilterRefreshInFlight) {
+        [self performSelector:@selector(reloadChatFiltersIfReady) withObject:nil afterDelay:0.25];
+        return;
+    }
+    [self reloadChatFiltersIfReady];
 }
 
 - (void)applyTransparentChatTableStyle {

@@ -28,6 +28,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
 static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
 static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
+NSString * const TGTDLibChatFiltersDidChangeNotification = @"TGTDLibChatFiltersDidChangeNotification";
 
 static BOOL TGTDLibObjectIsBoolean(id object) {
     return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
@@ -1062,6 +1063,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     [_responseCondition broadcast];
     [_responseCondition unlock];
+    if (chatFilterInfos) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibChatFiltersDidChangeNotification object:self];
+    }
 }
 
 - (void)receiverThreadMain {

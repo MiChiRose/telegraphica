@@ -55,7 +55,7 @@
     }
 
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
-    [self showView:self.drawerButton visible:(showChats && !drawerHidden)];
+    [self showView:self.drawerButton visible:(ready && !drawerHidden)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
     [self showView:self.chatsLabel visible:showChats];
@@ -436,10 +436,13 @@
     CGFloat headerButtonY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - headerButtonSize) / 2.0) + sectionHeaderVisualOffset;
     CGFloat headerLabelY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - 20.0) / 2.0) + sectionHeaderVisualOffset;
     CGFloat headerLeftX = mainX + 12.0;
+    CGFloat globalHeaderTitleX = mainX + 18.0;
     CGFloat chatHeaderTitleX = mainX + 16.0;
     if (!drawerHidden) {
         [self.drawerButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
+        [[self.drawerButton superview] addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         headerLeftX += headerButtonSize + 8.0;
+        globalHeaderTitleX = headerLeftX;
         chatHeaderTitleX = headerLeftX;
     }
     if (self.showingForumTopicList) {
@@ -633,7 +636,7 @@
     if (groupedWidth < 360.0) {
         groupedWidth = mainWidth - 32.0;
     }
-    [self.profileTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
+    [self.profileTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
     CGFloat profileScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat profileScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
     CGFloat profileScrollHeight = profileScrollTop - profileScrollBottom;
@@ -803,7 +806,7 @@
     }
     [self.profileContentView setFrame:NSMakeRect(0.0, 0.0, profileDocWidth, profileDocHeight)];
 
-    [self.settingsTitleField setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 240.0, 22.0)];
+    [self.settingsTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
 
     CGFloat settingsScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat settingsScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
@@ -950,7 +953,7 @@
     [self.aboutCopyrightField setFrame:NSMakeRect(aboutX + 36.0, aboutY + 72.0, aboutWidth - 72.0, 22.0)];
     [self.aboutLinkField setFrame:NSMakeRect(aboutX + 36.0, aboutY + 40.0, aboutWidth - 72.0, 22.0)];
 
-    [self.diagnosticsLabel setFrame:NSMakeRect(mainX + 18.0, panelTitleY, 160.0, 18.0)];
+    [self.diagnosticsLabel setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 160.0, 18.0)];
     [self.checkButton setFrame:NSMakeRect(mainX + mainWidth - 166.0, headerButtonY, 150.0, headerButtonSize)];
     CGFloat logsCardX = mainX + 18.0;
     CGFloat logsCardY = mainY + 18.0;
