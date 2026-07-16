@@ -42,6 +42,7 @@ PATCH_MESSAGES_NOTIFICATION_SETTINGS_PARSE_GUARD=1
 PATCH_STICKERS_DATABASE_PARSE_GUARD=1
 PATCH_CONTACTS_USER_PARSE_GUARD=1
 PATCH_CONTACTS_LIST_PARSE_GUARD=1
+PATCH_CONTACTS_CHAT_PARSE_GUARD=1
 
 usage() {
     cat <<EOF
@@ -941,6 +942,51 @@ patch_tdlib_for_contacts_list_parse_guard() {
     echo "Patched TDLib ContactsManager contacts list parse recovery."
 }
 
+patch_tdlib_for_contacts_chat_parse_guard() {
+    local source_root="$1"
+    local contacts_file="$source_root/td/telegram/ContactsManager.cpp"
+    local marker_file="$BUILD_DIR/contacts-chat-parse-guard-patch.txt"
+
+    if [ "$PATCH_CONTACTS_CHAT_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$contacts_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ContactsManager.cpp; skipping chat parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ContactsManager.cpp: $contacts_file"
+    fi
+
+    if grep -q 'Failed to parse basic group .* from database' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager chat parse recovery is already patched; skipping."
+        return 0
+    fi
+
+    if ! perl -0ne 'exit(/      c = add_chat\(chat_id\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_chat\(c, chat_id, true, true\);/ ? 0 : 1)' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager chat fatal parse call was not found; skipping chat parse guard patch."
+        return 0
+    fi
+
+    cp "$contacts_file" "$contacts_file.telegraphica-chat-backup"
+    perl -0pi -e 's@      c = add_chat\(chat_id\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_chat\(c, chat_id, true, true\);@      Chat parsed_chat;\n      auto status = log_event_parse(parsed_chat, value);\n      if (status.is_error()) {\n        LOG(ERROR) << "Failed to parse basic group " << chat_id << " from database: " << status;\n        G()->td_db()->get_sqlite_sync_pmc()->erase(get_chat_database_key(chat_id));\n      } else {\n        c = add_chat(chat_id);\n        *c = std::move(parsed_chat);\n        c->is_saved = true;\n        update_chat(c, chat_id, true, true);\n      }@' "$contacts_file"
+
+    if perl -0ne 'exit(/      c = add_chat\(chat_id\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_chat\(c, chat_id, true, true\);/ ? 0 : 1)' "$contacts_file"; then
+        fail "Failed to patch TDLib ContactsManager chat fatal parse call in $contacts_file"
+    fi
+    if ! grep -q 'Failed to parse basic group .* from database' "$contacts_file"; then
+        fail "Failed to add TDLib ContactsManager chat parse recovery in $contacts_file"
+    fi
+
+    {
+        echo "Patched TDLib ContactsManager chat parse recovery."
+        echo "File: $contacts_file"
+        echo "Replacement: parse cached basic groups into a temporary value and erase unreadable sqlite cache entries."
+    } > "$marker_file"
+    echo "Patched TDLib ContactsManager chat parse recovery."
+}
+
 patch_tdlib_for_webpages_manager_stack_address_warning() {
     local source_root="$1"
     local webpages_file="$source_root/td/telegram/WebPagesManager.cpp"
@@ -1160,6 +1206,7 @@ patch_tdlib_for_messages_notification_settings_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_stickers_database_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_contacts_user_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_contacts_list_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_contacts_chat_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_webpages_manager_stack_address_warning "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
