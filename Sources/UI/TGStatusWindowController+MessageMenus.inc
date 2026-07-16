@@ -103,6 +103,69 @@
     return menuItem;
 }
 
+static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
+    NSString *avatarPath = [summary objectForKey:@"avatar_local_path"];
+    NSString *displayName = [summary objectForKey:@"display_name"];
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(18.0, 18.0)] autorelease];
+    [image lockFocus];
+    NSRect rect = NSMakeRect(0.0, 0.0, 18.0, 18.0);
+    [[NSColor clearColor] set];
+    NSRectFill(rect);
+    TGDrawAvatarInRect(avatarPath, displayName, rect, NO, NO);
+    [image unlockFocus];
+    return image;
+}
+
+- (NSMenu *)messageViewersSubmenuForItem:(TGMessageItem *)item {
+    NSMenu *submenu = [[[NSMenu alloc] initWithTitle:@"Who read"] autorelease];
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:@"Sign in is not ready"
+                                                              action:nil
+                                                       keyEquivalent:@""] autorelease];
+        [unavailable setEnabled:NO];
+        [submenu addItem:unavailable];
+        return submenu;
+    }
+
+    NSError *viewersError = nil;
+    NSArray *viewers = [self.client messageViewersForChatID:item.chatID
+                                                  messageID:item.messageID
+                                                      limit:20
+                                                    timeout:3.0
+                                                      error:&viewersError];
+    if (!viewers) {
+        NSString *message = [[viewersError localizedDescription] length] > 0 ? [viewersError localizedDescription] : @"Readers are unavailable";
+        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:message
+                                                              action:nil
+                                                       keyEquivalent:@""] autorelease];
+        [unavailable setEnabled:NO];
+        [submenu addItem:unavailable];
+        return submenu;
+    }
+    if ([viewers count] == 0) {
+        NSMenuItem *empty = [[[NSMenuItem alloc] initWithTitle:@"Nobody has read it yet"
+                                                        action:nil
+                                                 keyEquivalent:@""] autorelease];
+        [empty setEnabled:NO];
+        [submenu addItem:empty];
+        return submenu;
+    }
+
+    NSUInteger index = 0;
+    for (index = 0; index < [viewers count]; index++) {
+        NSDictionary *summary = [viewers objectAtIndex:index];
+        NSString *displayName = [summary objectForKey:@"display_name"];
+        NSString *title = [displayName length] > 0 ? displayName : @"Unknown";
+        NSMenuItem *viewerItem = [[[NSMenuItem alloc] initWithTitle:title
+                                                             action:nil
+                                                      keyEquivalent:@""] autorelease];
+        [viewerItem setEnabled:NO];
+        [viewerItem setImage:TGMessageViewerMenuAvatarImage(summary)];
+        [submenu addItem:viewerItem];
+    }
+    return submenu;
+}
+
 - (NSString *)safeDownloadFileNameFromName:(NSString *)name fallback:(NSString *)fallback {
     NSString *candidate = ([name length] > 0) ? name : fallback;
     if ([candidate length] == 0) {
@@ -333,6 +396,37 @@
         [menu addItem:[NSMenuItem separatorItem]];
     }
     BOOL addedMessageAction = NO;
+    NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
+                                                        action:@selector(replyToMessageFromMenu:)
+                                                 keyEquivalent:@""] autorelease];
+    [replyItem setRepresentedObject:item];
+    [replyItem setTarget:self];
+    [menu addItem:replyItem];
+    addedMessageAction = YES;
+
+    NSMenuItem *forwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward..."
+                                                          action:@selector(forwardMessageFromMenu:)
+                                                   keyEquivalent:@""] autorelease];
+    [forwardItem setRepresentedObject:item];
+    [forwardItem setTarget:self];
+    [menu addItem:forwardItem];
+    if ([self.profileUserID respondsToSelector:@selector(longLongValue)]) {
+        NSMenuItem *savedForwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward to Saved Messages"
+                                                                   action:@selector(forwardMessageToSavedMessagesFromMenu:)
+                                                            keyEquivalent:@""] autorelease];
+        [savedForwardItem setRepresentedObject:item];
+        [savedForwardItem setTarget:self];
+        [menu addItem:savedForwardItem];
+    }
+    if ([item outgoing]) {
+        NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:@"Who read"
+                                                             action:nil
+                                                      keyEquivalent:@""] autorelease];
+        [readByItem setRepresentedObject:item];
+        [readByItem setTarget:self];
+        [readByItem setSubmenu:[self messageViewersSubmenuForItem:item]];
+        [menu addItem:readByItem];
+    }
     if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
         NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
                                                            action:@selector(editMessageFromMenu:)
@@ -478,6 +572,51 @@
             [chatID release];
             [messageID release];
             [text release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)showMessageViewersFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Message viewers are available only after sign-in is ready."];
+        return;
+    }
+
+    self.messageViewersWindowController = [[[TGMessageViewersWindowController alloc] initWithMessagePreview:[item preview]] autorelease];
+    [self.messageViewersWindowController showWindow:self];
+    [[self.messageViewersWindowController window] makeKeyAndOrderFront:self];
+    [self.messageViewersWindowController showLoading];
+
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageID = [[item messageID] retain];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *viewersError = nil;
+        NSArray *viewers = [[client messageViewersForChatID:chatID
+                                                  messageID:messageID
+                                                      limit:80
+                                                    timeout:8.0
+                                                      error:&viewersError] retain];
+        NSString *errorMessage = [[viewersError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (viewers) {
+                [self.messageViewersWindowController showViewerSummaries:viewers];
+            } else {
+                [self.messageViewersWindowController showErrorMessage:([errorMessage length] > 0 ? errorMessage : @"Readers are unavailable for this message.")];
+            }
+            [viewers release];
+            [errorMessage release];
+            [chatID release];
+            [messageID release];
             [client release];
         });
         [pool drain];

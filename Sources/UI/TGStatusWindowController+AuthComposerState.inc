@@ -163,6 +163,20 @@
     } else {
         [self.composerDraftsByTargetKey removeObjectForKey:key];
     }
+
+    NSNumber *replyMessageID = nil;
+    if ([self.replyTargetChatID respondsToSelector:@selector(longLongValue)] &&
+        [chatID respondsToSelector:@selector(longLongValue)] &&
+        [self.replyTargetChatID longLongValue] == [chatID longLongValue] &&
+        (!self.replyTargetThreadID || !messageThreadID || [self.replyTargetThreadID longLongValue] == [messageThreadID longLongValue]) &&
+        [self.replyTargetMessageItem.messageID respondsToSelector:@selector(longLongValue)]) {
+        replyMessageID = self.replyTargetMessageItem.messageID;
+    }
+    [self scheduleComposerDraftSyncForChatID:chatID
+                             messageThreadID:messageThreadID
+                            messageTopicKind:messageTopicKind
+                                        text:text
+                            replyToMessageID:replyMessageID];
 }
 
 - (void)saveCurrentComposerDraft {
@@ -177,6 +191,9 @@
 - (void)restoreComposerDraftForChatID:(NSNumber *)chatID
                       messageThreadID:(NSNumber *)messageThreadID
                        messageTopicKind:(NSString *)messageTopicKind {
+    [self clearReplyTargetIfSelectionDiffersFromChatID:chatID
+                                       messageThreadID:messageThreadID
+                                      messageTopicKind:messageTopicKind];
     NSString *key = [self composerDraftKeyForChatID:chatID
                                     messageThreadID:messageThreadID
                                      messageTopicKind:messageTopicKind];
@@ -192,6 +209,111 @@
                                      messageTopicKind:messageTopicKind];
     if ([key length] > 0) {
         [self.composerDraftsByTargetKey removeObjectForKey:key];
+    }
+    [self scheduleComposerDraftSyncForChatID:chatID
+                             messageThreadID:messageThreadID
+                            messageTopicKind:messageTopicKind
+                                        text:@""
+                            replyToMessageID:nil];
+}
+
+- (void)scheduleComposerDraftSyncForChatID:(NSNumber *)chatID
+                           messageThreadID:(NSNumber *)messageThreadID
+                          messageTopicKind:(NSString *)messageTopicKind
+                                      text:(NSString *)text
+                          replyToMessageID:(NSNumber *)replyToMessageID {
+    if (![self.currentAuthState isEqualToString:@"ready"] || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+
+    self.composerDraftSyncChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
+    self.composerDraftSyncThreadID = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) ? [NSNumber numberWithLongLong:[messageThreadID longLongValue]] : nil;
+    self.composerDraftSyncTopicKind = messageTopicKind;
+    self.composerDraftSyncText = ([text isKindOfClass:[NSString class]] ? text : @"");
+    self.composerDraftSyncReplyMessageID = ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) ? [NSNumber numberWithLongLong:[replyToMessageID longLongValue]] : nil;
+
+    [self.composerDraftSyncTimer invalidate];
+    self.composerDraftSyncTimer = [NSTimer scheduledTimerWithTimeInterval:0.8
+                                                                   target:self
+                                                                 selector:@selector(composerDraftSyncTimerFired:)
+                                                                 userInfo:nil
+                                                                  repeats:NO];
+}
+
+- (void)composerDraftSyncTimerFired:(NSTimer *)timer {
+    (void)timer;
+    self.composerDraftSyncTimer = nil;
+    if (![self.currentAuthState isEqualToString:@"ready"] ||
+        ![self.composerDraftSyncChatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+
+    NSNumber *chatID = [self.composerDraftSyncChatID retain];
+    NSNumber *threadID = [self.composerDraftSyncThreadID retain];
+    NSString *topicKind = [self.composerDraftSyncTopicKind copy];
+    NSString *text = [self.composerDraftSyncText copy];
+    NSNumber *replyMessageID = [self.composerDraftSyncReplyMessageID retain];
+    TGTDLibClient *client = [self.client retain];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *draftError = nil;
+        BOOL ok = [client setDraftMessageForChatID:chatID
+                                   messageThreadID:threadID
+                                  messageTopicKind:topicKind
+                                              text:text
+                                  replyToMessageID:replyMessageID
+                                           timeout:4.0
+                                             error:&draftError];
+        NSString *errorMessage = [[draftError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!ok && [errorMessage length] > 0) {
+                [TGLogger logComponent:@"Drafts" message:[NSString stringWithFormat:@"Remote draft sync failed: %@", errorMessage]];
+            }
+            [errorMessage release];
+            [chatID release];
+            [threadID release];
+            [topicKind release];
+            [text release];
+            [replyMessageID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)handleComposerDraftUpdateSummary:(NSDictionary *)summary {
+    id chatID = [summary objectForKey:@"chat_id"];
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    id threadID = [summary objectForKey:@"message_thread_id"];
+    NSNumber *safeThreadID = ([threadID respondsToSelector:@selector(longLongValue)] && [threadID longLongValue] > 0) ? [NSNumber numberWithLongLong:[threadID longLongValue]] : nil;
+    NSString *key = [self composerDraftKeyForChatID:[NSNumber numberWithLongLong:[chatID longLongValue]]
+                                    messageThreadID:safeThreadID
+                                    messageTopicKind:nil];
+    if ([key length] == 0) {
+        return;
+    }
+
+    BOOL hasDraft = [[summary objectForKey:@"has_draft"] boolValue];
+    NSString *text = [summary objectForKey:@"text"];
+    if (hasDraft && [text length] > 0) {
+        [self.composerDraftsByTargetKey setObject:text forKey:key];
+    } else {
+        [self.composerDraftsByTargetKey removeObjectForKey:key];
+        text = @"";
+    }
+
+    NSString *currentKey = [self currentComposerDraftKey];
+    if (![currentKey isEqualToString:key]) {
+        return;
+    }
+
+    NSString *currentText = [self.sendTextField stringValue];
+    BOOL composerEditing = ([self.sendTextField currentEditor] != nil);
+    if (!composerEditing || [currentText length] == 0 || [currentText isEqualToString:text]) {
+        [self setComposerTextWithoutSavingDraft:text];
     }
 }
 
@@ -380,6 +502,7 @@
         self.selectedChatFilterID = nil;
         self.chatFilterInfos = [NSArray array];
         self.chatFilterRefreshRetryCount = 0;
+        self.chatFilterRefreshPending = NO;
         [NSObject cancelPreviousPerformRequestsWithTarget:self
                                                  selector:@selector(reloadChatFiltersIfReady)
                                                    object:nil];

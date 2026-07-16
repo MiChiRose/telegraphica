@@ -25,6 +25,10 @@
 @property (nonatomic, retain) NSNumber *senderID;
 @property (nonatomic, copy) NSString *senderDisplayName;
 @property (nonatomic, copy) NSString *senderAvatarLocalPath;
+@property (nonatomic, retain) NSNumber *replyToMessageID;
+@property (nonatomic, copy) NSString *replyPreview;
+@property (nonatomic, copy) NSString *replySenderDisplayName;
+@property (nonatomic, copy) NSString *forwardSourceDisplayName;
 @property (nonatomic, assign) BOOL capabilitiesKnown;
 @property (nonatomic, assign) BOOL canBeEdited;
 @property (nonatomic, assign) BOOL canBeDeletedOnlyForSelf;
