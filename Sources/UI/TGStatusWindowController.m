@@ -373,6 +373,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
 @property (nonatomic, assign) BOOL offlineModeActive;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
+@property (nonatomic, assign) BOOL chatFilterRefreshPending;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
@@ -713,6 +714,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
 @synthesize offlineModeActive = _offlineModeActive;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
+@synthesize chatFilterRefreshPending = _chatFilterRefreshPending;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
 @synthesize typingChatID = _typingChatID;
@@ -790,26 +792,33 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)chatFiltersDidChange:(NSNotification *)notification {
-    (void)notification;
     if ([notification object] && [notification object] != self.client) {
         return;
     }
+    NSArray *updatedFilters = [[[notification userInfo] objectForKey:@"chatFilterInfos"] retain];
     if (![NSThread isMainThread]) {
-        [self performSelectorOnMainThread:@selector(handleChatFiltersDidChangeOnMainThread)
-                               withObject:nil
+        [self performSelectorOnMainThread:@selector(handleChatFiltersDidChangeOnMainThread:)
+                               withObject:updatedFilters
                             waitUntilDone:NO];
+        [updatedFilters release];
         return;
     }
-    [self handleChatFiltersDidChangeOnMainThread];
+    [self handleChatFiltersDidChangeOnMainThread:updatedFilters];
+    [updatedFilters release];
 }
 
-- (void)handleChatFiltersDidChangeOnMainThread {
+- (void)handleChatFiltersDidChangeOnMainThread:(NSArray *)updatedFilters {
     [[TGLogger sharedLogger] log:@"Drawer: TDLib chat folder update received on main thread; refreshing drawer folders."];
+    if ([updatedFilters isKindOfClass:[NSArray class]]) {
+        self.chatFilterInfos = updatedFilters;
+        self.chatFilterRefreshInFlight = NO;
+        self.chatFilterRefreshPending = NO;
+        [self rebuildDrawerFolderButtons];
+        return;
+    }
     if (self.chatFilterRefreshInFlight) {
-        [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                                 selector:@selector(reloadChatFiltersIfReady)
-                                                   object:nil];
-        [self performSelector:@selector(reloadChatFiltersIfReady) withObject:nil afterDelay:0.25];
+        self.chatFilterRefreshPending = YES;
+        [[TGLogger sharedLogger] log:@"Drawer: chat folder refresh already in flight; queued one follow-up refresh."];
         return;
     }
     [self reloadChatFiltersIfReady];
@@ -2615,7 +2624,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)reloadChatFiltersIfReady {
-    if (![self.currentAuthState isEqualToString:@"ready"] || self.chatFilterRefreshInFlight) {
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: skipped folder refresh because auth state is %@.",
+                                      self.currentAuthState ? self.currentAuthState : @"unknown"]];
+        return;
+    }
+    if (self.chatFilterRefreshInFlight) {
+        self.chatFilterRefreshPending = YES;
+        [[TGLogger sharedLogger] log:@"Drawer: skipped folder refresh because another refresh is in flight; queued follow-up."];
         return;
     }
 
@@ -2670,6 +2686,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                 }
             }
             self.chatFilterRefreshInFlight = NO;
+            if (self.chatFilterRefreshPending) {
+                self.chatFilterRefreshPending = NO;
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(reloadChatFiltersIfReady)
+                                                           object:nil];
+                [self performSelector:@selector(reloadChatFiltersIfReady) withObject:nil afterDelay:0.05];
+            }
             [filters release];
             [client release];
         });

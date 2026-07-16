@@ -316,12 +316,18 @@
     [self.profilePanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    if (drawerVisible) {
+        [contentView addSubview:self.topPanelView positioned:NSWindowAbove relativeTo:nil];
+    }
 
     CGFloat accountBadgeWidth = railWidth - 48.0;
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
     }
     [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, railTop - 124.0, accountBadgeWidth, 60.0)];
+    if (drawerVisible) {
+        [contentView addSubview:self.accountBadgeView positioned:NSWindowAbove relativeTo:nil];
+    }
     [self.titleField setFont:[NSFont boldSystemFontOfSize:13.0]];
     [[self.titleField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
     [self.titleField setFrame:NSMakeRect(railX + 9.0, railTop - 48.0, railWidth - 18.0, 18.0)];
@@ -336,7 +342,15 @@
     for (navigationIndex = 0; navigationIndex < [self.drawerFolderButtons count]; navigationIndex++) {
         NSButton *folderButton = [self.drawerFolderButtons objectAtIndex:navigationIndex];
         [folderButton setFrame:NSMakeRect(railX + 8.0, drawerFolderButtonY, railWidth - 16.0, drawerFolderButtonHeight)];
+        if (drawerVisible) {
+            [contentView addSubview:folderButton positioned:NSWindowAbove relativeTo:nil];
+        }
         drawerFolderButtonY -= (drawerFolderButtonHeight + drawerFolderButtonGap);
+    }
+    if (drawerVisible) {
+        [contentView addSubview:self.titleField positioned:NSWindowAbove relativeTo:nil];
+        [contentView addSubview:self.statusField positioned:NSWindowAbove relativeTo:nil];
+        [contentView addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
     }
 
     CGFloat bottomNavigationHeight = 62.0;

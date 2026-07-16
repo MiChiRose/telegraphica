@@ -502,6 +502,7 @@
         self.selectedChatFilterID = nil;
         self.chatFilterInfos = [NSArray array];
         self.chatFilterRefreshRetryCount = 0;
+        self.chatFilterRefreshPending = NO;
         [NSObject cancelPreviousPerformRequestsWithTarget:self
                                                  selector:@selector(reloadChatFiltersIfReady)
                                                    object:nil];
