@@ -43,6 +43,8 @@ PATCH_STICKERS_DATABASE_PARSE_GUARD=1
 PATCH_CONTACTS_USER_PARSE_GUARD=1
 PATCH_CONTACTS_LIST_PARSE_GUARD=1
 PATCH_CONTACTS_CHAT_PARSE_GUARD=1
+PATCH_CONTACTS_CHANNEL_PARSE_GUARD=1
+PATCH_CONTACTS_SECRET_CHAT_PARSE_GUARD=1
 
 usage() {
     cat <<EOF
@@ -987,6 +989,110 @@ patch_tdlib_for_contacts_chat_parse_guard() {
     echo "Patched TDLib ContactsManager chat parse recovery."
 }
 
+patch_tdlib_for_contacts_channel_parse_guard() {
+    local source_root="$1"
+    local contacts_file="$source_root/td/telegram/ContactsManager.cpp"
+    local marker_file="$BUILD_DIR/contacts-channel-parse-guard-patch.txt"
+
+    if [ "$PATCH_CONTACTS_CHANNEL_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$contacts_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ContactsManager.cpp; skipping channel parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ContactsManager.cpp: $contacts_file"
+    fi
+
+    if grep -q 'Failed to parse supergroup .* from database' "$contacts_file" &&
+        grep -q 'Failed to parse existing supergroup .* from database' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager channel parse recovery is already patched; skipping."
+        return 0
+    fi
+
+    if ! perl -0ne 'exit(/      c = add_channel\(channel_id, "on_load_channel_from_database"\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_channel\(c, channel_id, true, true\);/ ? 0 : 1)' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager channel fatal parse call was not found; skipping channel parse guard patch."
+        return 0
+    fi
+
+    if ! perl -0ne 'exit(/      Channel temp_c;\n      log_event_parse\(temp_c, value\)\.ensure\(\);\n      if \(c->participant_count == 0 && temp_c\.participant_count != 0\) \{\n        c->participant_count = temp_c\.participant_count;\n        CHECK\(c->is_update_supergroup_sent\);\n        send_closure\(G\(\)->td\(\), &Td::send_update,\n                     make_tl_object<td_api::updateSupergroup>\(get_supergroup_object\(channel_id, c\)\)\);\n      \}\n\n      c->status\.update_restrictions\(\);\n      temp_c\.status\.update_restrictions\(\);\n      if \(temp_c\.status != c->status\) \{\n        on_channel_status_changed\(c, channel_id, temp_c\.status, c->status\);\n        CHECK\(!c->is_being_saved\);\n      \}\n\n      if \(temp_c\.username != c->username\) \{\n        on_channel_username_changed\(c, channel_id, temp_c\.username, c->username\);\n        CHECK\(!c->is_being_saved\);\n      \}/ ? 0 : 1)' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager existing channel fatal parse call was not found; skipping channel parse guard patch."
+        return 0
+    fi
+
+    cp "$contacts_file" "$contacts_file.telegraphica-channel-backup"
+    perl -0pi -e 's@      c = add_channel\(channel_id, "on_load_channel_from_database"\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_channel\(c, channel_id, true, true\);@      Channel parsed_channel;\n      auto status = log_event_parse(parsed_channel, value);\n      if (status.is_error()) {\n        LOG(ERROR) << "Failed to parse supergroup " << channel_id << " from database: " << status;\n        G()->td_db()->get_sqlite_sync_pmc()->erase(get_channel_database_key(channel_id));\n      } else {\n        c = add_channel(channel_id, "on_load_channel_from_database");\n        *c = std::move(parsed_channel);\n        c->is_saved = true;\n        update_channel(c, channel_id, true, true);\n      }@' "$contacts_file"
+
+    perl -0pi -e 's@      Channel temp_c;\n      log_event_parse\(temp_c, value\)\.ensure\(\);\n      if \(c->participant_count == 0 && temp_c\.participant_count != 0\) \{\n        c->participant_count = temp_c\.participant_count;\n        CHECK\(c->is_update_supergroup_sent\);\n        send_closure\(G\(\)->td\(\), &Td::send_update,\n                     make_tl_object<td_api::updateSupergroup>\(get_supergroup_object\(channel_id, c\)\)\);\n      \}\n\n      c->status\.update_restrictions\(\);\n      temp_c\.status\.update_restrictions\(\);\n      if \(temp_c\.status != c->status\) \{\n        on_channel_status_changed\(c, channel_id, temp_c\.status, c->status\);\n        CHECK\(!c->is_being_saved\);\n      \}\n\n      if \(temp_c\.username != c->username\) \{\n        on_channel_username_changed\(c, channel_id, temp_c\.username, c->username\);\n        CHECK\(!c->is_being_saved\);\n      \}@      Channel temp_c;\n      auto status = log_event_parse(temp_c, value);\n      if (status.is_error()) {\n        LOG(ERROR) << "Failed to parse existing supergroup " << channel_id << " from database: " << status;\n        G()->td_db()->get_sqlite_sync_pmc()->erase(get_channel_database_key(channel_id));\n      } else {\n        if (c->participant_count == 0 && temp_c.participant_count != 0) {\n          c->participant_count = temp_c.participant_count;\n          CHECK(c->is_update_supergroup_sent);\n          send_closure(G()->td(), &Td::send_update,\n                       make_tl_object<td_api::updateSupergroup>(get_supergroup_object(channel_id, c)));\n        }\n\n        c->status.update_restrictions();\n        temp_c.status.update_restrictions();\n        if (temp_c.status != c->status) {\n          on_channel_status_changed(c, channel_id, temp_c.status, c->status);\n          CHECK(!c->is_being_saved);\n        }\n\n        if (temp_c.username != c->username) {\n          on_channel_username_changed(c, channel_id, temp_c.username, c->username);\n          CHECK(!c->is_being_saved);\n        }\n      }@' "$contacts_file"
+
+    if perl -0ne 'exit(/      c = add_channel\(channel_id, "on_load_channel_from_database"\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_channel\(c, channel_id, true, true\);/ ? 0 : 1)' "$contacts_file"; then
+        fail "Failed to patch TDLib ContactsManager channel fatal parse call in $contacts_file"
+    fi
+    if grep -q 'log_event_parse(temp_c, value)\.ensure();' "$contacts_file"; then
+        fail "Failed to patch TDLib ContactsManager existing channel fatal parse call in $contacts_file"
+    fi
+    if ! grep -q 'Failed to parse supergroup .* from database' "$contacts_file"; then
+        fail "Failed to add TDLib ContactsManager channel parse recovery in $contacts_file"
+    fi
+    if ! grep -q 'Failed to parse existing supergroup .* from database' "$contacts_file"; then
+        fail "Failed to add TDLib ContactsManager existing channel parse recovery in $contacts_file"
+    fi
+
+    {
+        echo "Patched TDLib ContactsManager channel parse recovery."
+        echo "File: $contacts_file"
+        echo "Replacement: parse cached supergroups into temporary values and erase unreadable sqlite cache entries."
+    } > "$marker_file"
+    echo "Patched TDLib ContactsManager channel parse recovery."
+}
+
+patch_tdlib_for_contacts_secret_chat_parse_guard() {
+    local source_root="$1"
+    local contacts_file="$source_root/td/telegram/ContactsManager.cpp"
+    local marker_file="$BUILD_DIR/contacts-secret-chat-parse-guard-patch.txt"
+
+    if [ "$PATCH_CONTACTS_SECRET_CHAT_PARSE_GUARD" -ne 1 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$contacts_file" ]; then
+        if [ "$ALLOW_UNKNOWN_TAG" -eq 1 ]; then
+            echo "Warning: could not find TDLib ContactsManager.cpp; skipping secret chat parse guard patch."
+            return 0
+        fi
+        fail "Could not find TDLib ContactsManager.cpp: $contacts_file"
+    fi
+
+    if grep -q 'Failed to parse secret chat .* from database' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager secret chat parse recovery is already patched; skipping."
+        return 0
+    fi
+
+    if ! perl -0ne 'exit(/      c = add_secret_chat\(secret_chat_id\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_secret_chat\(c, secret_chat_id, true, true\);/ ? 0 : 1)' "$contacts_file"; then
+        echo "Warning: TDLib ContactsManager secret chat fatal parse call was not found; skipping secret chat parse guard patch."
+        return 0
+    fi
+
+    cp "$contacts_file" "$contacts_file.telegraphica-secret-chat-backup"
+    perl -0pi -e 's@      c = add_secret_chat\(secret_chat_id\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_secret_chat\(c, secret_chat_id, true, true\);@      SecretChat parsed_secret_chat;\n      auto status = log_event_parse(parsed_secret_chat, value);\n      if (status.is_error()) {\n        LOG(ERROR) << "Failed to parse secret chat " << secret_chat_id << " from database: " << status;\n        G()->td_db()->get_sqlite_sync_pmc()->erase(get_secret_chat_database_key(secret_chat_id));\n      } else {\n        c = add_secret_chat(secret_chat_id);\n        *c = std::move(parsed_secret_chat);\n        c->is_saved = true;\n        update_secret_chat(c, secret_chat_id, true, true);\n      }@' "$contacts_file"
+
+    if perl -0ne 'exit(/      c = add_secret_chat\(secret_chat_id\);\n\n      log_event_parse\(\*c, value\)\.ensure\(\);\n\n      c->is_saved = true;\n      update_secret_chat\(c, secret_chat_id, true, true\);/ ? 0 : 1)' "$contacts_file"; then
+        fail "Failed to patch TDLib ContactsManager secret chat fatal parse call in $contacts_file"
+    fi
+    if ! grep -q 'Failed to parse secret chat .* from database' "$contacts_file"; then
+        fail "Failed to add TDLib ContactsManager secret chat parse recovery in $contacts_file"
+    fi
+
+    {
+        echo "Patched TDLib ContactsManager secret chat parse recovery."
+        echo "File: $contacts_file"
+        echo "Replacement: parse cached secret chats into a temporary value and erase unreadable sqlite cache entries."
+    } > "$marker_file"
+    echo "Patched TDLib ContactsManager secret chat parse recovery."
+}
+
 patch_tdlib_for_webpages_manager_stack_address_warning() {
     local source_root="$1"
     local webpages_file="$source_root/td/telegram/WebPagesManager.cpp"
@@ -1207,6 +1313,8 @@ patch_tdlib_for_stickers_database_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_contacts_user_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_contacts_list_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_contacts_chat_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_contacts_channel_parse_guard "$SOURCE_ROOT"
+patch_tdlib_for_contacts_secret_chat_parse_guard "$SOURCE_ROOT"
 patch_tdlib_for_webpages_manager_stack_address_warning "$SOURCE_ROOT"
 
 if ! prove_tdlib_version "$SOURCE_ROOT" "$ARCHIVE_BASENAME"; then
