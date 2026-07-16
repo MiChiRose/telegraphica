@@ -352,8 +352,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
+    BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
-    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : rawMessageText;
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -403,6 +404,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (nonVisualPlayable) {
         bubbleWidth = TGPlayableMediaBubbleWidthForItem(item, maximumBubbleWidth);
     }
+    if (nonVisualDocument) {
+        bubbleWidth = TGDocumentBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -416,21 +420,25 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         bubbleWidth = maximumBubbleWidth;
     }
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight + contextHeaderHeight;
     if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
+        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
     }
     if (nonVisualPlayable) {
-        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight;
+        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if (nonVisualDocument) {
+        bubbleHeight = TGDocumentBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    if (!nonVisualPlayable) {
+    if (!nonVisualPlayable && !nonVisualDocument) {
         bubbleHeight += reactionBandHeight;
     }
 
@@ -475,6 +483,57 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         contentTop += flipped ? senderHeaderHeight : -senderHeaderHeight;
     }
 
+    if (contextHeaderHeight > 0.0) {
+        NSString *contextTitle = nil;
+        NSString *contextSubtitle = nil;
+        if ([[item forwardSourceDisplayName] length] > 0) {
+            contextTitle = [NSString stringWithFormat:@"Forwarded from %@", [item forwardSourceDisplayName]];
+            contextSubtitle = TGDisplayTextForMessageItem(item);
+        } else {
+            contextTitle = ([[item replySenderDisplayName] length] > 0) ? [item replySenderDisplayName] : @"Reply";
+            contextSubtitle = ([[item replyPreview] length] > 0) ? [item replyPreview] : @"Original message";
+        }
+        if ([contextSubtitle length] == 0) {
+            contextSubtitle = @"Media";
+        }
+        NSRect contextRect = flipped ? NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                                  contentTop + 1.0,
+                                                  NSWidth(bubbleRect) - 24.0,
+                                                  contextHeaderHeight - 5.0)
+                                     : NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                                                  contentTop - contextHeaderHeight + 4.0,
+                                                  NSWidth(bubbleRect) - 24.0,
+                                                  contextHeaderHeight - 5.0);
+        NSBezierPath *linePath = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(NSMinX(contextRect),
+                                                                                    NSMinY(contextRect) + 2.0,
+                                                                                    3.0,
+                                                                                    NSHeight(contextRect) - 4.0)
+                                                                 xRadius:1.5
+                                                                 yRadius:1.5];
+        [TGClassicNavigationSelectedColor(0.88) set];
+        [linePath fill];
+
+        NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                         [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
+                                         TGClassicNavigationSelectedColor(0.95), NSForegroundColorAttributeName,
+                                         nil];
+        NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                            TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                            nil];
+        NSRect titleRect = NSMakeRect(NSMinX(contextRect) + 8.0,
+                                      NSMinY(contextRect),
+                                      NSWidth(contextRect) - 8.0,
+                                      13.0);
+        NSRect subtitleRect = NSMakeRect(NSMinX(contextRect) + 8.0,
+                                         NSMinY(contextRect) + 13.0,
+                                         NSWidth(contextRect) - 8.0,
+                                         13.0);
+        [contextTitle drawInRect:titleRect withAttributes:titleAttributes];
+        [contextSubtitle drawInRect:subtitleRect withAttributes:subtitleAttributes];
+        contentTop += flipped ? contextHeaderHeight : -contextHeaderHeight;
+    }
+
     if (nonVisualPlayable) {
         NSRect playableRect = bubbleRect;
         if (senderHeaderHeight > 0.0) {
@@ -483,7 +542,30 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             }
             playableRect.size.height -= senderHeaderHeight;
         }
+        if (contextHeaderHeight > 0.0) {
+            if (flipped) {
+                playableRect.origin.y += contextHeaderHeight;
+            }
+            playableRect.size.height -= contextHeaderHeight;
+        }
         TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
+    }
+
+    if (nonVisualDocument) {
+        NSRect documentRect = bubbleRect;
+        if (senderHeaderHeight > 0.0) {
+            if (flipped) {
+                documentRect.origin.y += senderHeaderHeight;
+            }
+            documentRect.size.height -= senderHeaderHeight;
+        }
+        if (contextHeaderHeight > 0.0) {
+            if (flipped) {
+                documentRect.origin.y += contextHeaderHeight;
+            }
+            documentRect.size.height -= contextHeaderHeight;
+        }
+        TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
     }
 
     if (!flipped && reactionBandHeight > 0.0) {

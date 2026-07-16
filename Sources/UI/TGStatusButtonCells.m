@@ -361,6 +361,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         assetName = @"upload";
     } else if ([title isEqualToString:@"search"]) {
         assetName = @"search";
+    } else if ([title isEqualToString:@"jump-newest"]) {
+        assetName = @"arrow-down";
+    } else if ([title isEqualToString:@"zoom-in"]) {
+        assetName = @"add-ellipse";
+    } else if ([title isEqualToString:@"zoom-out"]) {
+        assetName = @"remove-ellipse";
     }
     if ([assetName length] > 0) {
         NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
@@ -369,6 +375,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                      18.0);
         TGDrawTemplateIconAsset(assetName, iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
         return;
+    }
+    if ([controlView isKindOfClass:[NSButton class]]) {
+        NSImage *image = [(NSButton *)controlView image];
+        if (image) {
+            NSSize imageSize = [image size];
+            if (imageSize.width <= 0.0 || imageSize.height <= 0.0) {
+                imageSize = NSMakeSize(18.0, 18.0);
+            }
+            CGFloat side = 18.0;
+            NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - (side / 2.0),
+                                         NSMidY(buttonRect) - (side / 2.0),
+                                         side,
+                                         side);
+            [image drawInRect:iconRect
+                      fromRect:NSZeroRect
+                     operation:NSCompositeSourceOver
+                      fraction:alpha
+                respectFlipped:[controlView isFlipped]
+                         hints:nil];
+            return;
+        }
     }
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setAlignment:NSCenterTextAlignment];
