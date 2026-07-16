@@ -218,7 +218,19 @@
 - (void)scrollMessagesToNewestIfAvailable {
     NSUInteger count = [self.messageItems count];
     if (count > 0) {
-        [self.messageTableView scrollRowToVisible:(count - 1)];
+        NSInteger newestRow = (NSInteger)count - 1;
+        [self.messageTableView scrollRowToVisible:newestRow];
+        NSClipView *clipView = [self.messageScrollView contentView];
+        NSRect rowRect = [self.messageTableView rectOfRow:newestRow];
+        if (clipView && !NSIsEmptyRect(rowRect)) {
+            NSRect visibleRect = [clipView bounds];
+            NSPoint targetPoint = NSMakePoint(NSMinX(visibleRect), NSMaxY(rowRect) - NSHeight(visibleRect));
+            if (targetPoint.y < 0.0) {
+                targetPoint.y = 0.0;
+            }
+            [clipView scrollToPoint:targetPoint];
+            [self.messageScrollView reflectScrolledClipView:clipView];
+        }
     }
     [self updateMessageJumpToNewestButtonVisibility];
 }
@@ -231,12 +243,11 @@
     if (!clipView) {
         return NO;
     }
-    NSRect visibleRect = [clipView bounds];
-    NSInteger lastVisibleRow = [self.messageTableView rowAtPoint:NSMakePoint(NSMinX(visibleRect) + 1.0,
-                                                                             NSMaxY(visibleRect) - 1.0)];
-    if (lastVisibleRow < 0) {
+    NSRange visibleRows = [self.messageTableView rowsInRect:[clipView bounds]];
+    if (visibleRows.length == 0) {
         return NO;
     }
+    NSInteger lastVisibleRow = (NSInteger)(visibleRows.location + visibleRows.length - 1);
     NSInteger newestRow = (NSInteger)[self.messageItems count] - 1;
     return ((newestRow - lastVisibleRow) >= 20);
 }
@@ -252,6 +263,7 @@
     (void)sender;
     self.forceMessageScrollToNewest = YES;
     [self scrollMessagesToNewestIfAvailable];
+    [self performSelector:@selector(scrollMessagesToNewestIfAvailable) withObject:nil afterDelay:0.0];
     [self updateMessageJumpToNewestButtonVisibility];
 }
 
