@@ -771,7 +771,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(chatFiltersDidChange:)
                                                      name:TGTDLibChatFiltersDidChangeNotification
-                                                   object:self.client];
+                                                   object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self applyResourcePolicyToMediaSubsystems];
@@ -791,8 +791,24 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 - (void)chatFiltersDidChange:(NSNotification *)notification {
     (void)notification;
-    [[TGLogger sharedLogger] log:@"Drawer: TDLib chat folder update received; refreshing drawer folders."];
+    if ([notification object] && [notification object] != self.client) {
+        return;
+    }
+    if (![NSThread isMainThread]) {
+        [self performSelectorOnMainThread:@selector(handleChatFiltersDidChangeOnMainThread)
+                               withObject:nil
+                            waitUntilDone:NO];
+        return;
+    }
+    [self handleChatFiltersDidChangeOnMainThread];
+}
+
+- (void)handleChatFiltersDidChangeOnMainThread {
+    [[TGLogger sharedLogger] log:@"Drawer: TDLib chat folder update received on main thread; refreshing drawer folders."];
     if (self.chatFilterRefreshInFlight) {
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(reloadChatFiltersIfReady)
+                                                   object:nil];
         [self performSelector:@selector(reloadChatFiltersIfReady) withObject:nil afterDelay:0.25];
         return;
     }
