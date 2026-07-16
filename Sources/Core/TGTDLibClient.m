@@ -649,6 +649,49 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return summary;
     }
 
+    if ([type isEqualToString:@"updateChatDraftMessage"]) {
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"draft_update" forKey:@"kind"];
+        id chatID = [dictionary objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        }
+        id messageThreadID = [dictionary objectForKey:@"message_thread_id"];
+        if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+            [summary setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+        }
+
+        id draftObject = [dictionary objectForKey:@"draft_message"];
+        NSString *text = nil;
+        if ([draftObject isKindOfClass:[NSDictionary class]]) {
+            id inputMessageText = [(NSDictionary *)draftObject objectForKey:@"input_message_text"];
+            if ([inputMessageText isKindOfClass:[NSDictionary class]]) {
+                id formattedText = [(NSDictionary *)inputMessageText objectForKey:@"text"];
+                if ([formattedText isKindOfClass:[NSDictionary class]]) {
+                    id textObject = [(NSDictionary *)formattedText objectForKey:@"text"];
+                    if ([textObject isKindOfClass:[NSString class]]) {
+                        text = (NSString *)textObject;
+                    }
+                }
+            }
+            id replyToObject = [(NSDictionary *)draftObject objectForKey:@"reply_to"];
+            if ([replyToObject isKindOfClass:[NSDictionary class]]) {
+                id replyMessageID = [(NSDictionary *)replyToObject objectForKey:@"message_id"];
+                if ([replyMessageID respondsToSelector:@selector(longLongValue)] && [replyMessageID longLongValue] > 0) {
+                    [summary setObject:[NSNumber numberWithLongLong:[replyMessageID longLongValue]] forKey:@"reply_to_message_id"];
+                }
+            }
+        }
+        if ([text length] > 0) {
+            [summary setObject:text forKey:@"text"];
+            [summary setObject:[NSNumber numberWithBool:YES] forKey:@"has_draft"];
+        } else {
+            [summary setObject:@"" forKey:@"text"];
+            [summary setObject:[NSNumber numberWithBool:NO] forKey:@"has_draft"];
+        }
+        return summary;
+    }
+
     if ([type isEqualToString:@"updateMessageIsPinned"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"pinned_message_update" forKey:@"kind"];
@@ -5079,6 +5122,87 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                       error:error];
 }
 
+- (NSArray *)messageViewersForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat or message identifier is missing." code:149];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load message viewers. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:149];
+        }
+        return nil;
+    }
+
+    if (limit == 0 || limit > 100) {
+        limit = 50;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getMessageViewers" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+
+    NSError *viewersError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-message-viewers"
+                                                           timeout:timeout
+                                                         errorCode:149
+                                                             error:&viewersError];
+    if (!response) {
+        if (error) {
+            *error = viewersError;
+        }
+        return nil;
+    }
+
+    id viewersObject = [response objectForKey:@"viewers"];
+    if (![viewersObject isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib returned no viewer list for this message." code:149];
+        }
+        return nil;
+    }
+
+    NSMutableArray *viewers = [NSMutableArray array];
+    NSArray *viewerObjects = (NSArray *)viewersObject;
+    NSUInteger index = 0;
+    for (index = 0; index < [viewerObjects count] && [viewers count] < limit; index++) {
+        id viewer = [viewerObjects objectAtIndex:index];
+        id userIDObject = viewer;
+        id viewDate = nil;
+        if ([viewer isKindOfClass:[NSDictionary class]]) {
+            userIDObject = [(NSDictionary *)viewer objectForKey:@"user_id"];
+            viewDate = [(NSDictionary *)viewer objectForKey:@"view_date"];
+        }
+        if (![userIDObject respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+
+        NSNumber *userID = [NSNumber numberWithLongLong:[userIDObject longLongValue]];
+        NSDictionary *senderSummary = [self userSenderSummaryForUserID:userID timeout:MIN(timeout, 2.0)];
+        NSMutableDictionary *viewerSummary = [NSMutableDictionary dictionary];
+        [viewerSummary setObject:userID forKey:@"user_id"];
+        NSString *displayName = [senderSummary objectForKey:@"display_name"];
+        [viewerSummary setObject:([displayName length] > 0 ? displayName : [NSString stringWithFormat:@"User %@", userID]) forKey:@"display_name"];
+        NSString *avatarPath = [senderSummary objectForKey:@"avatar_local_path"];
+        if ([avatarPath length] > 0) {
+            [viewerSummary setObject:avatarPath forKey:@"avatar_local_path"];
+        }
+        if ([viewDate respondsToSelector:@selector(integerValue)]) {
+            [viewerSummary setObject:[NSNumber numberWithInteger:[viewDate integerValue]] forKey:@"view_date"];
+        }
+        [viewers addObject:viewerSummary];
+    }
+
+    return viewers;
+}
+
 - (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self markMessagesAsReadForChatID:chatID messageThreadID:nil messageIDs:messageIDs timeout:timeout error:error];
 }
@@ -5205,6 +5329,75 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
         if (error && *error == nil) {
             *error = [self errorWithDescription:@"TDLib toggleChatIsPinned returned an unexpected response." code:97];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)setDraftMessageForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    (void)messageTopicKind;
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:150];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to sync draft messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:150];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"setChatDraftMessage" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+        [request setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+    }
+
+    NSString *draftText = ([text isKindOfClass:[NSString class]] ? text : @"");
+    if ([draftText length] > 0) {
+        NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
+        [formattedText setObject:@"formattedText" forKey:@"@type"];
+        [formattedText setObject:draftText forKey:@"text"];
+        [formattedText setObject:[NSArray array] forKey:@"entities"];
+
+        NSMutableDictionary *inputContent = [NSMutableDictionary dictionary];
+        [inputContent setObject:@"inputMessageText" forKey:@"@type"];
+        [inputContent setObject:formattedText forKey:@"text"];
+        [inputContent setObject:[NSNumber numberWithBool:NO] forKey:@"clear_draft"];
+
+        NSMutableDictionary *draft = [NSMutableDictionary dictionary];
+        [draft setObject:@"draftMessage" forKey:@"@type"];
+        [draft setObject:inputContent forKey:@"input_message_text"];
+        [draft setObject:[NSNumber numberWithInteger:(NSInteger)[[NSDate date] timeIntervalSince1970]] forKey:@"date"];
+        if ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+            NSDictionary *replyTarget = [NSDictionary dictionaryWithObjectsAndKeys:
+                                         @"inputMessageReplyToMessage", @"@type",
+                                         [NSNumber numberWithLongLong:[replyToMessageID longLongValue]], @"message_id",
+                                         nil];
+            [draft setObject:replyTarget forKey:@"reply_to"];
+        }
+        [request setObject:draft forKey:@"draft_message"];
+    } else {
+        [request setObject:[NSNull null] forKey:@"draft_message"];
+    }
+
+    NSError *draftError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-set-draft"
+                                                           timeout:timeout
+                                                         errorCode:150
+                                                             error:&draftError];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = draftError ? draftError : [self errorWithDescription:@"TDLib setChatDraftMessage returned an unexpected response." code:150];
         }
         return NO;
     }

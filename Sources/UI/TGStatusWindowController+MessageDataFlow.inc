@@ -1369,6 +1369,8 @@
             }
         } else if ([kind isEqualToString:@"chat_action"]) {
             [self handleTypingUpdateSummary:summary];
+        } else if ([kind isEqualToString:@"draft_update"]) {
+            [self handleComposerDraftUpdateSummary:summary];
         } else if ([kind isEqualToString:@"pinned_message_update"]) {
             id chatID = [summary objectForKey:@"chat_id"];
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {

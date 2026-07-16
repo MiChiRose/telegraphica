@@ -355,6 +355,14 @@
         [savedForwardItem setTarget:self];
         [menu addItem:savedForwardItem];
     }
+    if ([item outgoing]) {
+        NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:@"Who read"
+                                                             action:@selector(showMessageViewersFromMenu:)
+                                                      keyEquivalent:@""] autorelease];
+        [readByItem setRepresentedObject:item];
+        [readByItem setTarget:self];
+        [menu addItem:readByItem];
+    }
     if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
         NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
                                                            action:@selector(editMessageFromMenu:)
@@ -500,6 +508,51 @@
             [chatID release];
             [messageID release];
             [text release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)showMessageViewersFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Message viewers are available only after sign-in is ready."];
+        return;
+    }
+
+    self.messageViewersWindowController = [[[TGMessageViewersWindowController alloc] initWithMessagePreview:[item preview]] autorelease];
+    [self.messageViewersWindowController showWindow:self];
+    [[self.messageViewersWindowController window] makeKeyAndOrderFront:self];
+    [self.messageViewersWindowController showLoading];
+
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageID = [[item messageID] retain];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *viewersError = nil;
+        NSArray *viewers = [[client messageViewersForChatID:chatID
+                                                  messageID:messageID
+                                                      limit:80
+                                                    timeout:8.0
+                                                      error:&viewersError] retain];
+        NSString *errorMessage = [[viewersError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (viewers) {
+                [self.messageViewersWindowController showViewerSummaries:viewers];
+            } else {
+                [self.messageViewersWindowController showErrorMessage:([errorMessage length] > 0 ? errorMessage : @"Readers are unavailable for this message.")];
+            }
+            [viewers release];
+            [errorMessage release];
+            [chatID release];
+            [messageID release];
             [client release];
         });
         [pool drain];

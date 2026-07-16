@@ -8,6 +8,9 @@ NSString * const TGThemeIdentifierIceNavy = @"ice-navy";
 NSString * const TGThemeIdentifierRubyObsidian = @"ruby-obsidian";
 NSString * const TGThemeIdentifierEggshellBurgundy = @"eggshell-burgundy";
 NSString * const TGThemeIdentifierMelonOlive = @"melon-olive";
+NSString * const TGThemeIdentifierMidnightGraphite = @"midnight-graphite";
+NSString * const TGThemeIdentifierNordicNight = @"nordic-night";
+NSString * const TGThemeIdentifierTronGrid = @"tron-grid";
 
 typedef struct {
     CGFloat red;
@@ -76,6 +79,9 @@ NSArray *TGThemeIdentifiers(void) {
             TGThemeIdentifierRubyObsidian,
             TGThemeIdentifierEggshellBurgundy,
             TGThemeIdentifierMelonOlive,
+            TGThemeIdentifierMidnightGraphite,
+            TGThemeIdentifierNordicNight,
+            TGThemeIdentifierTronGrid,
             nil];
 }
 
@@ -90,6 +96,9 @@ NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
     if ([identifier isEqualToString:TGThemeIdentifierRubyObsidian]) return @"Neon Ruby / Obsidian";
     if ([identifier isEqualToString:TGThemeIdentifierEggshellBurgundy]) return @"Eggshell Cream / Burgundy";
     if ([identifier isEqualToString:TGThemeIdentifierMelonOlive]) return @"Soft Melon / Olive Slate";
+    if ([identifier isEqualToString:TGThemeIdentifierMidnightGraphite]) return @"Midnight Graphite";
+    if ([identifier isEqualToString:TGThemeIdentifierNordicNight]) return @"Nordic Night";
+    if ([identifier isEqualToString:TGThemeIdentifierTronGrid]) return @"Neon Grid";
     return @"VK Blue";
 }
 
@@ -174,6 +183,21 @@ static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
                                   0xa79562, 0xffd289, 0x263018, 0x5a6a36, 0xffd289, 0xfffdf3,
                                   0xbc8f48, 0xd7c7a2, 0x687247, 0xf6dda1, 0x52612f, 0xfff7df, 0xf5dfb2);
     }
+    if ([identifier isEqualToString:TGThemeIdentifierMidnightGraphite]) {
+        return TGThemePaletteMake(0x0b1118, 0x151f2a, 0x22354a, 0x101923, 0xe6eef8, 0x8fa1b6,
+                                  0x2f4459, 0x244562, 0xf0f7ff, 0x67b7ff, 0x18334a, 0x111d28,
+                                  0x3d6c91, 0x334758, 0x9aaec3, 0x1f2d3b, 0x71c4ff, 0xf4f8ff, 0x92a8bf);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierNordicNight]) {
+        return TGThemePaletteMake(0x111827, 0x1b2634, 0x334155, 0x16202c, 0xe8edf4, 0x9aa7b7,
+                                  0x405166, 0x2f4c67, 0xf4f8fd, 0x8ed0ff, 0x253d54, 0x182331,
+                                  0x5f7f9c, 0x3a4d62, 0x9aa7b7, 0x243345, 0x9bd7ff, 0xf6f9fd, 0xa7b5c6);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierTronGrid]) {
+        return TGThemePaletteMake(0x030914, 0x071629, 0x063b62, 0x04111f, 0xe7fbff, 0x7fe8ff,
+                                  0x095f8f, 0x062f4b, 0xdfffff, 0x00e5ff, 0x092d4e, 0x061120,
+                                  0x00b9ff, 0x0b729e, 0x6bdcff, 0x07243d, 0x00f5ff, 0xeaffff, 0x79e8ff);
+    }
     return TGThemePaletteMake(0x182537, 0xecf3fb, 0x3c5d8a, 0xf8fbfe, 0x0e141d, 0x4e637c,
                               0x8ca6c4, 0xb3cce9, 0x091321, 0x305d96, 0xc2ddf8, 0xffffff,
                               0x5b88bd, 0xaabace, 0x465d77, 0xd6e4f4, 0x2d5d96, 0xf8fbff, 0xdce9f7);
@@ -245,7 +269,8 @@ NSColor *TGClassicTimeTextColor(void) {
 }
 
 NSColor *TGClassicHeaderTextColor(CGFloat alpha) {
-    if ([TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierCoralPlum]) {
+    NSString *identifier = TGCurrentThemeIdentifier();
+    if ([identifier isEqualToString:TGThemeIdentifierCoralPlum]) {
         TGThemePalette palette = TGCurrentThemePalette();
         return TGColorFromRGBWithAlpha(palette.ink, alpha);
     }
@@ -253,7 +278,8 @@ NSColor *TGClassicHeaderTextColor(CGFloat alpha) {
 }
 
 NSColor *TGClassicHeaderDetailTextColor(CGFloat alpha) {
-    if ([TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierCoralPlum]) {
+    NSString *identifier = TGCurrentThemeIdentifier();
+    if ([identifier isEqualToString:TGThemeIdentifierCoralPlum]) {
         TGThemePalette palette = TGCurrentThemePalette();
         return TGColorFromRGBWithAlpha(palette.ink, alpha);
     }

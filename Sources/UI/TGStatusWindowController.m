@@ -3,6 +3,7 @@
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGMessageViewersWindowController.h"
 #import "TGAnimationSupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
@@ -180,6 +181,12 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
+@property (nonatomic, retain) NSTimer *composerDraftSyncTimer;
+@property (nonatomic, retain) NSNumber *composerDraftSyncChatID;
+@property (nonatomic, retain) NSNumber *composerDraftSyncThreadID;
+@property (nonatomic, copy) NSString *composerDraftSyncTopicKind;
+@property (nonatomic, copy) NSString *composerDraftSyncText;
+@property (nonatomic, retain) NSNumber *composerDraftSyncReplyMessageID;
 @property (nonatomic, retain) NSTextField *profileTitleField;
 @property (nonatomic, retain) NSTextField *profileNameField;
 @property (nonatomic, retain) NSTextField *profileUsernameField;
@@ -288,6 +295,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
 @property (nonatomic, retain) NSTimer *mediaPlaybackTimer;
+@property (nonatomic, retain) TGMessageViewersWindowController *messageViewersWindowController;
 @property (nonatomic, retain) NSWindow *photoSendPreviewWindow;
 @property (nonatomic, retain) NSImageView *photoSendPreviewImageView;
 @property (nonatomic, retain) NSView *photoSendCaptionBackgroundView;
@@ -513,6 +521,12 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
+@synthesize composerDraftSyncTimer = _composerDraftSyncTimer;
+@synthesize composerDraftSyncChatID = _composerDraftSyncChatID;
+@synthesize composerDraftSyncThreadID = _composerDraftSyncThreadID;
+@synthesize composerDraftSyncTopicKind = _composerDraftSyncTopicKind;
+@synthesize composerDraftSyncText = _composerDraftSyncText;
+@synthesize composerDraftSyncReplyMessageID = _composerDraftSyncReplyMessageID;
 @synthesize profileTitleField = _profileTitleField;
 @synthesize profileNameField = _profileNameField;
 @synthesize profileUsernameField = _profileUsernameField;
@@ -621,6 +635,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
 @synthesize mediaPlaybackTimer = _mediaPlaybackTimer;
+@synthesize messageViewersWindowController = _messageViewersWindowController;
 @synthesize photoSendPreviewWindow = _photoSendPreviewWindow;
 @synthesize photoSendPreviewImageView = _photoSendPreviewImageView;
 @synthesize photoSendCaptionBackgroundView = _photoSendCaptionBackgroundView;
@@ -1814,6 +1829,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applySkeuomorphicScrollStyle:self.searchResultsScrollView];
     [self.searchResultsScrollView setHasVerticalScroller:YES];
     [self.searchResultsScrollView setHidden:YES];
+    [[self.searchResultsScrollView contentView] setPostsBoundsChangedNotifications:YES];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(searchResultsScrollViewDidScroll:)
+                                                 name:NSViewBoundsDidChangeNotification
+                                               object:[self.searchResultsScrollView contentView]];
     self.searchResultsTableView = [[[NSTableView alloc] initWithFrame:[[self.searchResultsScrollView contentView] bounds]] autorelease];
     [self.searchResultsTableView setDataSource:self];
     [self.searchResultsTableView setDelegate:self];
@@ -2883,6 +2903,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_messageDropOverlayView release];
     [_messageItems release];
     [_composerDraftsByTargetKey release];
+    [_composerDraftSyncTimer invalidate];
+    [_composerDraftSyncTimer release];
+    [_composerDraftSyncChatID release];
+    [_composerDraftSyncThreadID release];
+    [_composerDraftSyncTopicKind release];
+    [_composerDraftSyncText release];
+    [_composerDraftSyncReplyMessageID release];
     [_notificationChatInfoByChatID release];
     [_localMuteUnreadCountsByChatID release];
     [_profileTitleField release];
@@ -2977,6 +3004,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_aboutWindow close];
     [_appearanceWindow close];
     [_activeSessionsWindow close];
+    [[_messageViewersWindowController window] close];
     [_mediaPreviewWindow setDelegate:nil];
     [_mediaPreviewWindow close];
     [_mediaPlaybackWindow setDelegate:nil];
@@ -3018,6 +3046,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackLayer release];
     [_mediaPlaybackTimer release];
+    [_messageViewersWindowController release];
     [_photoSendPreviewWindow release];
     [_photoSendPreviewImageView release];
     [_photoSendCaptionBackgroundView release];

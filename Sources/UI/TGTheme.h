@@ -8,6 +8,9 @@ extern NSString * const TGThemeIdentifierIceNavy;
 extern NSString * const TGThemeIdentifierRubyObsidian;
 extern NSString * const TGThemeIdentifierEggshellBurgundy;
 extern NSString * const TGThemeIdentifierMelonOlive;
+extern NSString * const TGThemeIdentifierMidnightGraphite;
+extern NSString * const TGThemeIdentifierNordicNight;
+extern NSString * const TGThemeIdentifierTronGrid;
 
 NSArray *TGThemeIdentifiers(void);
 BOOL TGThemeIdentifierIsValid(NSString *identifier);
