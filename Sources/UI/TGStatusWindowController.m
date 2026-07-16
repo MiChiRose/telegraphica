@@ -3,6 +3,7 @@
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGMessageViewersWindowController.h"
 #import "TGAnimationSupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
@@ -174,11 +175,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
 @property (nonatomic, retain) NSProgressIndicator *messageLoadingSpinner;
+@property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
+@property (nonatomic, retain) NSTimer *composerDraftSyncTimer;
+@property (nonatomic, retain) NSNumber *composerDraftSyncChatID;
+@property (nonatomic, retain) NSNumber *composerDraftSyncThreadID;
+@property (nonatomic, copy) NSString *composerDraftSyncTopicKind;
+@property (nonatomic, copy) NSString *composerDraftSyncText;
+@property (nonatomic, retain) NSNumber *composerDraftSyncReplyMessageID;
 @property (nonatomic, retain) NSTextField *profileTitleField;
 @property (nonatomic, retain) NSTextField *profileNameField;
 @property (nonatomic, retain) NSTextField *profileUsernameField;
@@ -274,6 +282,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
+@property (nonatomic, retain) NSButton *mediaPreviewZoomOutButton;
+@property (nonatomic, retain) NSButton *mediaPreviewFitButton;
+@property (nonatomic, retain) NSButton *mediaPreviewZoomInButton;
 @property (nonatomic, retain) NSWindow *mediaPlaybackWindow;
 @property (nonatomic, retain) NSView *mediaPlaybackContainerView;
 @property (nonatomic, retain) NSTextField *mediaPlaybackTitleField;
@@ -284,6 +295,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
 @property (nonatomic, retain) NSTimer *mediaPlaybackTimer;
+@property (nonatomic, retain) TGMessageViewersWindowController *messageViewersWindowController;
 @property (nonatomic, retain) NSWindow *photoSendPreviewWindow;
 @property (nonatomic, retain) NSImageView *photoSendPreviewImageView;
 @property (nonatomic, retain) NSView *photoSendCaptionBackgroundView;
@@ -361,6 +373,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
 @property (nonatomic, assign) BOOL offlineModeActive;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
+@property (nonatomic, assign) BOOL chatFilterRefreshPending;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
@@ -503,11 +516,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
 @synthesize messageLoadingSpinner = _messageLoadingSpinner;
+@synthesize messageJumpToNewestButton = _messageJumpToNewestButton;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
+@synthesize composerDraftSyncTimer = _composerDraftSyncTimer;
+@synthesize composerDraftSyncChatID = _composerDraftSyncChatID;
+@synthesize composerDraftSyncThreadID = _composerDraftSyncThreadID;
+@synthesize composerDraftSyncTopicKind = _composerDraftSyncTopicKind;
+@synthesize composerDraftSyncText = _composerDraftSyncText;
+@synthesize composerDraftSyncReplyMessageID = _composerDraftSyncReplyMessageID;
 @synthesize profileTitleField = _profileTitleField;
 @synthesize profileNameField = _profileNameField;
 @synthesize profileUsernameField = _profileUsernameField;
@@ -603,6 +623,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
+@synthesize mediaPreviewZoomOutButton = _mediaPreviewZoomOutButton;
+@synthesize mediaPreviewFitButton = _mediaPreviewFitButton;
+@synthesize mediaPreviewZoomInButton = _mediaPreviewZoomInButton;
 @synthesize mediaPlaybackWindow = _mediaPlaybackWindow;
 @synthesize mediaPlaybackContainerView = _mediaPlaybackContainerView;
 @synthesize mediaPlaybackTitleField = _mediaPlaybackTitleField;
@@ -613,6 +636,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
 @synthesize mediaPlaybackTimer = _mediaPlaybackTimer;
+@synthesize messageViewersWindowController = _messageViewersWindowController;
 @synthesize photoSendPreviewWindow = _photoSendPreviewWindow;
 @synthesize photoSendPreviewImageView = _photoSendPreviewImageView;
 @synthesize photoSendCaptionBackgroundView = _photoSendCaptionBackgroundView;
@@ -690,6 +714,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
 @synthesize offlineModeActive = _offlineModeActive;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
+@synthesize chatFilterRefreshPending = _chatFilterRefreshPending;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
 @synthesize typingChatID = _typingChatID;
@@ -745,6 +770,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                  selector:@selector(resourcePolicyDidChange:)
                                                      name:TGResourcePolicyDidChangeNotification
                                                    object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(chatFiltersDidChange:)
+                                                     name:TGTDLibChatFiltersDidChangeNotification
+                                                   object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self applyResourcePolicyToMediaSubsystems];
@@ -760,6 +789,39 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     if ([message isKindOfClass:[NSString class]] && [(NSString *)message length] > 0) {
         [[TGLogger sharedLogger] log:(NSString *)message];
     }
+}
+
+- (void)chatFiltersDidChange:(NSNotification *)notification {
+    if ([notification object] && [notification object] != self.client) {
+        return;
+    }
+    NSArray *updatedFilters = [[[notification userInfo] objectForKey:@"chatFilterInfos"] retain];
+    if (![NSThread isMainThread]) {
+        [self performSelectorOnMainThread:@selector(handleChatFiltersDidChangeOnMainThread:)
+                               withObject:updatedFilters
+                            waitUntilDone:NO];
+        [updatedFilters release];
+        return;
+    }
+    [self handleChatFiltersDidChangeOnMainThread:updatedFilters];
+    [updatedFilters release];
+}
+
+- (void)handleChatFiltersDidChangeOnMainThread:(NSArray *)updatedFilters {
+    [[TGLogger sharedLogger] log:@"Drawer: TDLib chat folder update received on main thread; refreshing drawer folders."];
+    if ([updatedFilters isKindOfClass:[NSArray class]]) {
+        self.chatFilterInfos = updatedFilters;
+        self.chatFilterRefreshInFlight = NO;
+        self.chatFilterRefreshPending = NO;
+        [self rebuildDrawerFolderButtons];
+        return;
+    }
+    if (self.chatFilterRefreshInFlight) {
+        self.chatFilterRefreshPending = YES;
+        [[TGLogger sharedLogger] log:@"Drawer: chat folder refresh already in flight; queued one follow-up refresh."];
+        return;
+    }
+    [self reloadChatFiltersIfReady];
 }
 
 - (void)applyTransparentChatTableStyle {
@@ -940,6 +1002,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)refreshThemeAppearance {
+    NSColor *cardInkColor = TGClassicCardInkColor();
+    NSColor *cardMutedColor = TGClassicCardMutedInkColor();
+
     [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self applyPanelHeaderDetailStyle:self.statusField];
     [self applyPanelHeaderLabelStyle:self.diagnosticsLabel];
@@ -950,9 +1015,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
 
     [self.loginBrandField setTextColor:TGClassicNavigationTextColor(1.0)];
-    [self.loginTitleField setTextColor:TGClassicInkColor()];
+    [self.loginTitleField setTextColor:cardInkColor];
     [self.sendLabel setTextColor:TGClassicInkColor()];
-    [self.profileNameField setTextColor:TGClassicInkColor()];
+    [self.profileNameField setTextColor:cardInkColor];
     [self.profileNameField setFont:[NSFont boldSystemFontOfSize:18.0]];
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
@@ -961,18 +1026,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self applyMutedLabelStyle:self.settingsFilesSectionField];
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
-    [self.aboutTitleField setTextColor:TGClassicInkColor()];
-    [self applyMutedLabelStyle:self.loginHintField];
-    [self applyMutedLabelStyle:self.authLabel];
-    [self applyMutedLabelStyle:self.authSecondaryLabel];
+    [self.aboutTitleField setTextColor:cardInkColor];
+    [self.loginHintField setTextColor:cardMutedColor];
+    [self.authLabel setTextColor:cardMutedColor];
+    [self.authSecondaryLabel setTextColor:cardMutedColor];
     if (self.loginErrorVisible) {
         [self.authStateField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
     } else {
-        [self applyMutedLabelStyle:self.authStateField];
+        [self.authStateField setTextColor:cardMutedColor];
     }
-    [self applyMutedLabelStyle:self.profileUsernameField];
-    [self applyMutedLabelStyle:self.profileIDField];
-    [self applyMutedLabelStyle:self.profileStateField];
+    [self.profileUsernameField setTextColor:cardMutedColor];
+    [self.profileIDField setTextColor:cardMutedColor];
+    [self.profileStateField setTextColor:cardMutedColor];
     [self applyMutedLabelStyle:self.profileAboutSectionField];
     [self applyMutedLabelStyle:self.profileAccountSectionField];
     [self.profileStateField setFont:[NSFont systemFontOfSize:13.0]];
@@ -984,25 +1049,25 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.profilePhoneRowValueField setFont:[NSFont systemFontOfSize:13.0]];
     [self.profileIDRowTitleField setFont:[NSFont systemFontOfSize:13.0]];
     [self.profileIDRowValueField setFont:[NSFont systemFontOfSize:13.0]];
-    [self.profileUsernameRowTitleField setTextColor:TGClassicInkColor()];
-    [self.profilePhoneRowTitleField setTextColor:TGClassicInkColor()];
-    [self.profileIDRowTitleField setTextColor:TGClassicInkColor()];
-    [self applyMutedLabelStyle:self.profileUsernameRowValueField];
-    [self applyMutedLabelStyle:self.profilePhoneRowValueField];
-    [self applyMutedLabelStyle:self.profileIDRowValueField];
+    [self.profileUsernameRowTitleField setTextColor:cardInkColor];
+    [self.profilePhoneRowTitleField setTextColor:cardInkColor];
+    [self.profileIDRowTitleField setTextColor:cardInkColor];
+    [self.profileUsernameRowValueField setTextColor:cardMutedColor];
+    [self.profilePhoneRowValueField setTextColor:cardMutedColor];
+    [self.profileIDRowValueField setTextColor:cardMutedColor];
     [self applyMutedLabelStyle:self.settingsLibraryField];
     [self applyMutedLabelStyle:self.settingsStorageField];
-    [self applyMutedLabelStyle:self.settingsDownloadFolderHelpField];
-    [self applyMutedLabelStyle:self.settingsActiveSessionsDetailField];
-    [self.settingsThemeLabel setTextColor:TGClassicInkColor()];
-    [self.settingsLanguageLabel setTextColor:TGClassicInkColor()];
-    [self.settingsMaxAutoDownloadLabel setTextColor:TGClassicInkColor()];
-    [self.settingsMaxAnimationsLabel setTextColor:TGClassicInkColor()];
-    [self.settingsMediaCacheLimitLabel setTextColor:TGClassicInkColor()];
-    [self applyMutedLabelStyle:self.settingsResourceHintField];
-    [self applyMutedLabelStyle:self.aboutVersionField];
-    [self applyMutedLabelStyle:self.aboutCopyrightField];
-    [self.aboutLinkField setTextColor:TGClassicLinkColor()];
+    [self.settingsDownloadFolderHelpField setTextColor:cardMutedColor];
+    [self.settingsActiveSessionsDetailField setTextColor:cardMutedColor];
+    [self.settingsThemeLabel setTextColor:cardInkColor];
+    [self.settingsLanguageLabel setTextColor:cardInkColor];
+    [self.settingsMaxAutoDownloadLabel setTextColor:cardInkColor];
+    [self.settingsMaxAnimationsLabel setTextColor:cardInkColor];
+    [self.settingsMediaCacheLimitLabel setTextColor:cardInkColor];
+    [self.settingsResourceHintField setTextColor:cardMutedColor];
+    [self.aboutVersionField setTextColor:cardMutedColor];
+    [self.aboutCopyrightField setTextColor:cardMutedColor];
+    [self.aboutLinkField setTextColor:TGClassicCardLinkColor()];
     [self applyDestructiveSettingsButtonStyle:self.logoutButton];
 
     [self applyComposerTextFieldStyle:self.authTextField];
@@ -1210,6 +1275,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
     self.accountBadgeView = [[[TGAccountBadgeView alloc] initWithFrame:NSMakeRect(30, 626, 60, 60)] autorelease];
     [self.accountBadgeView setDisplayName:@"Telegraphica"];
+    [self.accountBadgeView setTarget:self];
+    [self.accountBadgeView setAction:@selector(openProfileFromDrawer:)];
+    [self.accountBadgeView setToolTip:@"Open profile"];
     [self.accountBadgeView setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
     [contentView addSubview:self.accountBadgeView];
 
@@ -1249,6 +1317,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.profileScrollView setBorderType:NSNoBorder];
     [self.profileScrollView setDrawsBackground:NO];
     [self.profileScrollView setHasVerticalScroller:YES];
+    [self.profileScrollView setHasHorizontalScroller:NO];
     [self.profileScrollView setAutohidesScrollers:YES];
     [[self.profileScrollView contentView] setDrawsBackground:NO];
     self.profileContentView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0, 0, 760, 520)] autorelease];
@@ -1263,6 +1332,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsScrollView setBorderType:NSNoBorder];
     [self.settingsScrollView setDrawsBackground:NO];
     [self.settingsScrollView setHasVerticalScroller:YES];
+    [self.settingsScrollView setHasHorizontalScroller:NO];
     [self.settingsScrollView setAutohidesScrollers:YES];
     [[self.settingsScrollView contentView] setDrawsBackground:NO];
     self.settingsContentView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0, 0, 760, 620)] autorelease];
@@ -1681,6 +1751,20 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageLoadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
     [contentView addSubview:self.messageLoadingSpinner];
 
+    self.messageJumpToNewestButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 34, 34)] autorelease];
+    [self.messageJumpToNewestButton setTitle:@"jump-newest"];
+    [self.messageJumpToNewestButton setToolTip:@"Jump to latest messages"];
+    [self.messageJumpToNewestButton setTarget:self];
+    [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
+    [self.messageJumpToNewestButton setBordered:NO];
+    [self.messageJumpToNewestButton setFocusRingType:NSFocusRingTypeNone];
+    [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"jump-newest"] autorelease]];
+    [self.messageJumpToNewestButton setTarget:self];
+    [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
+    [self.messageJumpToNewestButton setEnabled:NO];
+    [self.messageJumpToNewestButton setHidden:YES];
+    [contentView addSubview:self.messageJumpToNewestButton];
+
     self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
     [self.messageDropOverlayView setHidden:YES];
     [self.messageDropOverlayView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -1792,6 +1876,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applySkeuomorphicScrollStyle:self.searchResultsScrollView];
     [self.searchResultsScrollView setHasVerticalScroller:YES];
     [self.searchResultsScrollView setHidden:YES];
+    [[self.searchResultsScrollView contentView] setPostsBoundsChangedNotifications:YES];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(searchResultsScrollViewDidScroll:)
+                                                 name:NSViewBoundsDidChangeNotification
+                                               object:[self.searchResultsScrollView contentView]];
     self.searchResultsTableView = [[[NSTableView alloc] initWithFrame:[[self.searchResultsScrollView contentView] bounds]] autorelease];
     [self.searchResultsTableView setDataSource:self];
     [self.searchResultsTableView setDelegate:self];
@@ -2499,6 +2588,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     if ([self.chatFilterInfos count] > 0) {
         [folderItems addObjectsFromArray:self.chatFilterInfos];
     }
+    NSMutableArray *drawerTitles = [NSMutableArray array];
 
     for (index = 0; index < [folderItems count]; index++) {
         NSDictionary *folderInfo = [folderItems objectAtIndex:index];
@@ -2507,6 +2597,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         if (![buttonTitle isKindOfClass:[NSString class]] || [buttonTitle length] == 0 || ![filterID respondsToSelector:@selector(integerValue)]) {
             continue;
         }
+        [drawerTitles addObject:buttonTitle];
 
         NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (index * 48), 92, 42)] autorelease];
         TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
@@ -2527,14 +2618,27 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     self.drawerFolderButtons = buttons;
     [self updateDrawerFolderButtonStates];
     [self layoutContentView];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: rebuilt %lu visible folder button(s) from %lu TDLib folder(s); drawerOpen=%@; titles=%@.",
+                                  (unsigned long)[buttons count],
+                                  (unsigned long)[self.chatFilterInfos count],
+                                  self.drawerOpen ? @"yes" : @"no",
+                                  drawerTitles]];
 }
 
 - (void)reloadChatFiltersIfReady {
-    if (![self.currentAuthState isEqualToString:@"ready"] || self.chatFilterRefreshInFlight) {
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: skipped folder refresh because auth state is %@.",
+                                      self.currentAuthState ? self.currentAuthState : @"unknown"]];
+        return;
+    }
+    if (self.chatFilterRefreshInFlight) {
+        self.chatFilterRefreshPending = YES;
+        [[TGLogger sharedLogger] log:@"Drawer: skipped folder refresh because another refresh is in flight; queued follow-up."];
         return;
     }
 
     self.chatFilterRefreshInFlight = YES;
+    [[TGLogger sharedLogger] log:@"Drawer: requesting chat folders for UI."];
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2543,6 +2647,18 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.client == client && [self.currentAuthState isEqualToString:@"ready"]) {
                 self.chatFilterInfos = filters ? filters : [NSArray array];
+                NSMutableArray *filterTitles = [NSMutableArray array];
+                NSUInteger logFilterIndex = 0;
+                for (logFilterIndex = 0; logFilterIndex < [self.chatFilterInfos count]; logFilterIndex++) {
+                    NSDictionary *filterInfo = [self.chatFilterInfos objectAtIndex:logFilterIndex];
+                    NSString *title = [filterInfo objectForKey:@"title"];
+                    if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
+                        [filterTitles addObject:title];
+                    }
+                }
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: received %lu TDLib folder(s) for UI; titles=%@.",
+                                              (unsigned long)[self.chatFilterInfos count],
+                                              filterTitles]];
                 BOOL selectedFilterWasCleared = NO;
                 if (self.selectedChatFilterID) {
                     BOOL selectedFilterStillExists = NO;
@@ -2572,12 +2688,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                 }
             }
             self.chatFilterRefreshInFlight = NO;
+            if (self.chatFilterRefreshPending) {
+                self.chatFilterRefreshPending = NO;
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(reloadChatFiltersIfReady)
+                                                           object:nil];
+                [self performSelector:@selector(reloadChatFiltersIfReady) withObject:nil afterDelay:0.05];
+            }
             [filters release];
             [client release];
         });
 
         [pool drain];
     });
+}
+
+- (void)openProfileFromDrawer:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    self.activeSection = TGSectionProfile;
+    [self updateVisibleSection];
+    if (!self.profileSummaryLoaded && !self.profileSummaryLoading && !self.controlsBusy) {
+        [self reloadProfileSummaryIfReady];
+    }
 }
 
 - (void)updateNavigationButtonsForSection:(NSString *)section enabled:(BOOL)enabled {
@@ -2851,6 +2986,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
     [_messageLoadingSpinner release];
+    [_messageJumpToNewestButton release];
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
     }
@@ -2860,6 +2996,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_messageDropOverlayView release];
     [_messageItems release];
     [_composerDraftsByTargetKey release];
+    [_composerDraftSyncTimer invalidate];
+    [_composerDraftSyncTimer release];
+    [_composerDraftSyncChatID release];
+    [_composerDraftSyncThreadID release];
+    [_composerDraftSyncTopicKind release];
+    [_composerDraftSyncText release];
+    [_composerDraftSyncReplyMessageID release];
     [_notificationChatInfoByChatID release];
     [_localMuteUnreadCountsByChatID release];
     [_profileTitleField release];
@@ -2954,6 +3097,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_aboutWindow close];
     [_appearanceWindow close];
     [_activeSessionsWindow close];
+    [[_messageViewersWindowController window] close];
     [_mediaPreviewWindow setDelegate:nil];
     [_mediaPreviewWindow close];
     [_mediaPlaybackWindow setDelegate:nil];
@@ -2982,6 +3126,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_mediaPreviewWindow release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];
+    [_mediaPreviewZoomOutButton release];
+    [_mediaPreviewFitButton release];
+    [_mediaPreviewZoomInButton release];
     [_mediaPlaybackWindow release];
     [_mediaPlaybackContainerView release];
     [_mediaPlaybackTitleField release];
@@ -2992,6 +3139,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackLayer release];
     [_mediaPlaybackTimer release];
+    [_messageViewersWindowController release];
     [_photoSendPreviewWindow release];
     [_photoSendPreviewImageView release];
     [_photoSendCaptionBackgroundView release];

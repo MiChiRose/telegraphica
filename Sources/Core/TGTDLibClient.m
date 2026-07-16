@@ -28,6 +28,7 @@ static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
 static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
 static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
 static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
+NSString * const TGTDLibChatFiltersDidChangeNotification = @"TGTDLibChatFiltersDidChangeNotification";
 
 static BOOL TGTDLibObjectIsBoolean(id object) {
     return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
@@ -159,6 +160,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL _shutdownStarted;
     BOOL _mainChatListExhausted;
     BOOL _chatFilterInfosKnown;
+    BOOL _chatFilterFallbackProbeFinished;
     NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
@@ -170,6 +172,12 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (void)receiverThreadMain;
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary;
 - (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary;
+- (NSArray *)chatFilterInfoItemsByProbingChatFoldersWithTimeout:(NSTimeInterval)timeout;
+- (NSDictionary *)safeChatFilterInfoFromDictionary:(NSDictionary *)filterDictionary identifier:(NSNumber *)identifier apiKind:(NSString *)apiKind;
+- (NSString *)safeChatFolderTitleFromObject:(id)titleObject;
+- (NSString *)chatFilterAPIKindForFilterID:(NSNumber *)filterID;
+- (NSDictionary *)chatListObjectForChatFilterID:(NSNumber *)filterID;
+- (NSString *)chatListIDKeyForType:(NSString *)chatListType;
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
@@ -289,6 +297,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_chatFilterInfos release];
         _chatFilterInfos = nil;
         _chatFilterInfosKnown = NO;
+        _chatFilterFallbackProbeFinished = NO;
         [_responseCondition broadcast];
     }
     [_responseCondition unlock];
@@ -322,6 +331,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_chatFilterInfos release];
     _chatFilterInfos = nil;
     _chatFilterInfosKnown = NO;
+    _chatFilterFallbackProbeFinished = NO;
     [_responseCondition broadcast];
     [_responseCondition unlock];
 
@@ -334,6 +344,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_chatFilterInfos release];
     _chatFilterInfos = nil;
     _chatFilterInfosKnown = NO;
+    _chatFilterFallbackProbeFinished = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
     _mainChatListExhausted = NO;
@@ -399,8 +410,25 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     while (!_chatFilterInfosKnown && [[NSDate date] compare:deadline] == NSOrderedAscending) {
         [_responseCondition waitUntilDate:deadline];
     }
+    BOOL known = _chatFilterInfosKnown;
+    BOOL fallbackProbeFinished = _chatFilterFallbackProbeFinished;
     NSArray *filters = [_chatFilterInfos copy];
     [_responseCondition unlock];
+
+    if ((!known || [filters count] == 0) && !fallbackProbeFinished) {
+        NSArray *probedFilters = [self chatFilterInfoItemsByProbingChatFoldersWithTimeout:timeout];
+        [_responseCondition lock];
+        if (!_chatFilterInfosKnown || [_chatFilterInfos count] == 0) {
+            [_chatFilterInfos release];
+            _chatFilterInfos = [probedFilters copy];
+            _chatFilterInfosKnown = YES;
+            [filters release];
+            filters = [_chatFilterInfos copy];
+            [_responseCondition broadcast];
+        }
+        _chatFilterFallbackProbeFinished = YES;
+        [_responseCondition unlock];
+    }
 
     if (!filters) {
         return [NSArray array];
@@ -494,18 +522,229 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return YES;
 }
 
-- (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary {
-    id typeObject = [dictionary objectForKey:@"@type"];
-    if (![typeObject isKindOfClass:[NSString class]] || ![(NSString *)typeObject isEqualToString:@"updateChatFilters"]) {
+- (NSString *)safeChatFolderTitleFromObject:(id)titleObject {
+    if ([titleObject isKindOfClass:[NSString class]]) {
+        NSString *title = (NSString *)titleObject;
+        return ([title length] > 0) ? title : nil;
+    }
+    if (![titleObject isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
 
-    id filterObjects = [dictionary objectForKey:@"chat_filters"];
+    NSDictionary *titleDictionary = (NSDictionary *)titleObject;
+    NSArray *candidateKeys = [NSArray arrayWithObjects:@"text", @"title", @"name", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [candidateKeys count]; index++) {
+        id value = [titleDictionary objectForKey:[candidateKeys objectAtIndex:index]];
+        if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
+            return (NSString *)value;
+        }
+        if ([value isKindOfClass:[NSDictionary class]]) {
+            NSString *nestedTitle = [self safeChatFolderTitleFromObject:value];
+            if ([nestedTitle length] > 0) {
+                return nestedTitle;
+            }
+        }
+    }
+    return nil;
+}
+
+- (NSDictionary *)safeChatFilterInfoFromDictionary:(NSDictionary *)filterDictionary identifier:(NSNumber *)identifier apiKind:(NSString *)apiKind {
+    if (![filterDictionary isKindOfClass:[NSDictionary class]] ||
+        ![identifier respondsToSelector:@selector(integerValue)] ||
+        [apiKind length] == 0) {
+        return nil;
+    }
+
+    id titleObject = [filterDictionary objectForKey:@"title"];
+    if (!titleObject) {
+        titleObject = [filterDictionary objectForKey:@"name"];
+    }
+    NSString *title = [self safeChatFolderTitleFromObject:titleObject];
+    if ([title length] == 0) {
+        return nil;
+    }
+
+    id iconObject = [filterDictionary objectForKey:@"icon_name"];
+    if (![iconObject isKindOfClass:[NSString class]]) {
+        id iconDictionary = [filterDictionary objectForKey:@"icon"];
+        if ([iconDictionary isKindOfClass:[NSDictionary class]]) {
+            iconObject = [(NSDictionary *)iconDictionary objectForKey:@"name"];
+        }
+    }
+
+    NSMutableDictionary *safeFilter = [NSMutableDictionary dictionary];
+    [safeFilter setObject:[NSNumber numberWithInteger:[identifier integerValue]] forKey:@"id"];
+    [safeFilter setObject:title forKey:@"title"];
+    [safeFilter setObject:apiKind forKey:@"api_kind"];
+    if ([iconObject isKindOfClass:[NSString class]] && [(NSString *)iconObject length] > 0) {
+        [safeFilter setObject:iconObject forKey:@"icon_name"];
+    }
+    return safeFilter;
+}
+
+- (NSArray *)chatFilterInfoItemsByProbingChatFoldersWithTimeout:(NSTimeInterval)timeout {
+    if (timeout <= 0.0) {
+        timeout = 1.5;
+    }
+    if (timeout > 3.0) {
+        timeout = 3.0;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSMutableArray *folders = [NSMutableArray array];
+    NSMutableArray *missSamples = [NSMutableArray array];
+    NSUInteger missingAfterLastHit = 0;
+    NSInteger folderID = 1;
+    for (folderID = 1; folderID <= 64; folderID++) {
+        if ([[NSDate date] compare:deadline] != NSOrderedAscending) {
+            break;
+        }
+
+        NSMutableDictionary *request = [NSMutableDictionary dictionary];
+        [request setObject:@"getChatFolder" forKey:@"@type"];
+        [request setObject:[NSNumber numberWithInteger:folderID] forKey:@"chat_folder_id"];
+
+        NSError *folderError = nil;
+        NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                            extraPrefix:@"telegraphica-get-chat-folder"
+                                                                timeout:0.25
+                                                              errorCode:98
+                                                                  error:&folderError];
+        id responseType = [response objectForKey:@"@type"];
+        if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chatFolder"]) {
+            if ([missSamples count] < 10) {
+                NSString *sample = nil;
+                if (folderError) {
+                    sample = [NSString stringWithFormat:@"id=%ld error=%@", (long)folderID, [folderError localizedDescription]];
+                } else if ([responseType isKindOfClass:[NSString class]]) {
+                    id code = [response objectForKey:@"code"];
+                    id message = [response objectForKey:@"message"];
+                    sample = [NSString stringWithFormat:@"id=%ld type=%@ code=%@ message=%@",
+                              (long)folderID,
+                              responseType,
+                              code ? code : @"?",
+                              message ? message : @"?"];
+                } else {
+                    sample = [NSString stringWithFormat:@"id=%ld no response", (long)folderID];
+                }
+                [missSamples addObject:sample];
+            }
+            if ([folders count] > 0) {
+                missingAfterLastHit++;
+                if (missingAfterLastHit >= 8) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        NSDictionary *safeFolder = [self safeChatFilterInfoFromDictionary:response
+                                                                identifier:[NSNumber numberWithInteger:folderID]
+                                                                   apiKind:@"folder"];
+        if (safeFolder) {
+            [folders addObject:safeFolder];
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: probed folder id=%ld title=%@.",
+                                           (long)folderID,
+                                           [safeFolder objectForKey:@"title"]]];
+            missingAfterLastHit = 0;
+        }
+    }
+
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: fallback probe loaded %lu folder(s); samples: %@",
+                                   (unsigned long)[folders count],
+                                   [missSamples componentsJoinedByString:@"; "]]];
+    return folders;
+}
+
+- (NSString *)chatFilterAPIKindForFilterID:(NSNumber *)filterID {
+    if (![filterID respondsToSelector:@selector(longLongValue)]) {
+        return @"filter";
+    }
+
+    [_responseCondition lock];
+    NSArray *filters = [_chatFilterInfos copy];
+    [_responseCondition unlock];
+
+    NSString *apiKind = nil;
+    NSUInteger index = 0;
+    for (index = 0; index < [filters count]; index++) {
+        id filterObject = [filters objectAtIndex:index];
+        if (![filterObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *filterDictionary = (NSDictionary *)filterObject;
+        id identifier = [filterDictionary objectForKey:@"id"];
+        if (![identifier respondsToSelector:@selector(longLongValue)] ||
+            [identifier longLongValue] != [filterID longLongValue]) {
+            continue;
+        }
+        id kind = [filterDictionary objectForKey:@"api_kind"];
+        if ([kind isKindOfClass:[NSString class]] && [(NSString *)kind length] > 0) {
+            apiKind = [(NSString *)kind retain];
+        }
+        break;
+    }
+    [filters release];
+
+    if (!apiKind) {
+        return @"filter";
+    }
+    return [apiKind autorelease];
+}
+
+- (NSDictionary *)chatListObjectForChatFilterID:(NSNumber *)filterID {
+    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
+    if (![filterID respondsToSelector:@selector(longLongValue)]) {
+        [chatList setObject:@"chatListMain" forKey:@"@type"];
+        return chatList;
+    }
+
+    NSString *apiKind = [self chatFilterAPIKindForFilterID:filterID];
+    if ([apiKind isEqualToString:@"folder"]) {
+        [chatList setObject:@"chatListFolder" forKey:@"@type"];
+        [chatList setObject:[NSNumber numberWithLongLong:[filterID longLongValue]] forKey:@"chat_folder_id"];
+    } else {
+        [chatList setObject:@"chatListFilter" forKey:@"@type"];
+        [chatList setObject:[NSNumber numberWithLongLong:[filterID longLongValue]] forKey:@"chat_filter_id"];
+    }
+    return chatList;
+}
+
+- (NSString *)chatListIDKeyForType:(NSString *)chatListType {
+    if ([chatListType isEqualToString:@"chatListFolder"]) {
+        return @"chat_folder_id";
+    }
+    if ([chatListType isEqualToString:@"chatListFilter"]) {
+        return @"chat_filter_id";
+    }
+    return nil;
+}
+
+- (NSArray *)chatFilterInfoItemsFromUpdateObject:(NSDictionary *)dictionary {
+    id typeObject = [dictionary objectForKey:@"@type"];
+    if (![typeObject isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    NSString *apiKind = nil;
+    id filterObjects = nil;
+    if ([(NSString *)typeObject isEqualToString:@"updateChatFilters"]) {
+        apiKind = @"filter";
+        filterObjects = [dictionary objectForKey:@"chat_filters"];
+    } else if ([(NSString *)typeObject isEqualToString:@"updateChatFolders"]) {
+        apiKind = @"folder";
+        filterObjects = [dictionary objectForKey:@"chat_folders"];
+    } else {
+        return nil;
+    }
+
     if (![filterObjects isKindOfClass:[NSArray class]]) {
         return [NSArray array];
     }
 
     NSMutableArray *filters = [NSMutableArray arrayWithCapacity:[(NSArray *)filterObjects count]];
+    NSMutableArray *titles = [NSMutableArray array];
     NSUInteger index = 0;
     for (index = 0; index < [(NSArray *)filterObjects count]; index++) {
         id filterObject = [(NSArray *)filterObjects objectAtIndex:index];
@@ -515,26 +754,20 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
         NSDictionary *filterDictionary = (NSDictionary *)filterObject;
         id identifier = [filterDictionary objectForKey:@"id"];
-        id titleObject = [filterDictionary objectForKey:@"title"];
-        id iconObject = [filterDictionary objectForKey:@"icon_name"];
-        if (![identifier respondsToSelector:@selector(integerValue)] || ![titleObject isKindOfClass:[NSString class]]) {
-            continue;
+        NSDictionary *safeFilter = [self safeChatFilterInfoFromDictionary:filterDictionary
+                                                                identifier:identifier
+                                                                   apiKind:apiKind];
+        if (safeFilter) {
+            [filters addObject:safeFilter];
+            [titles addObject:[safeFilter objectForKey:@"title"]];
         }
-
-        NSString *title = (NSString *)titleObject;
-        if ([title length] == 0) {
-            continue;
-        }
-
-        NSMutableDictionary *safeFilter = [NSMutableDictionary dictionary];
-        [safeFilter setObject:[NSNumber numberWithInteger:[identifier integerValue]] forKey:@"id"];
-        [safeFilter setObject:title forKey:@"title"];
-        if ([iconObject isKindOfClass:[NSString class]] && [(NSString *)iconObject length] > 0) {
-            [safeFilter setObject:iconObject forKey:@"icon_name"];
-        }
-        [filters addObject:safeFilter];
     }
 
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Chat folders: update %@ raw=%lu parsed=%lu titles=%@.",
+                                   typeObject,
+                                   (unsigned long)[(NSArray *)filterObjects count],
+                                   (unsigned long)[filters count],
+                                   [titles componentsJoinedByString:@", "]]];
     return filters;
 }
 
@@ -639,12 +872,55 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return summary;
     }
 
-    if ([type isEqualToString:@"updateChatFilters"]) {
+    if ([type isEqualToString:@"updateChatFilters"] || [type isEqualToString:@"updateChatFolders"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"chat_filters" forKey:@"kind"];
-        id filterObjects = [dictionary objectForKey:@"chat_filters"];
+        id filterObjects = [dictionary objectForKey:[type isEqualToString:@"updateChatFolders"] ? @"chat_folders" : @"chat_filters"];
         if ([filterObjects isKindOfClass:[NSArray class]]) {
             [summary setObject:[NSNumber numberWithUnsignedInteger:[(NSArray *)filterObjects count]] forKey:@"count"];
+        }
+        return summary;
+    }
+
+    if ([type isEqualToString:@"updateChatDraftMessage"]) {
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"draft_update" forKey:@"kind"];
+        id chatID = [dictionary objectForKey:@"chat_id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        }
+        id messageThreadID = [dictionary objectForKey:@"message_thread_id"];
+        if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+            [summary setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+        }
+
+        id draftObject = [dictionary objectForKey:@"draft_message"];
+        NSString *text = nil;
+        if ([draftObject isKindOfClass:[NSDictionary class]]) {
+            id inputMessageText = [(NSDictionary *)draftObject objectForKey:@"input_message_text"];
+            if ([inputMessageText isKindOfClass:[NSDictionary class]]) {
+                id formattedText = [(NSDictionary *)inputMessageText objectForKey:@"text"];
+                if ([formattedText isKindOfClass:[NSDictionary class]]) {
+                    id textObject = [(NSDictionary *)formattedText objectForKey:@"text"];
+                    if ([textObject isKindOfClass:[NSString class]]) {
+                        text = (NSString *)textObject;
+                    }
+                }
+            }
+            id replyToObject = [(NSDictionary *)draftObject objectForKey:@"reply_to"];
+            if ([replyToObject isKindOfClass:[NSDictionary class]]) {
+                id replyMessageID = [(NSDictionary *)replyToObject objectForKey:@"message_id"];
+                if ([replyMessageID respondsToSelector:@selector(longLongValue)] && [replyMessageID longLongValue] > 0) {
+                    [summary setObject:[NSNumber numberWithLongLong:[replyMessageID longLongValue]] forKey:@"reply_to_message_id"];
+                }
+            }
+        }
+        if ([text length] > 0) {
+            [summary setObject:text forKey:@"text"];
+            [summary setObject:[NSNumber numberWithBool:YES] forKey:@"has_draft"];
+        } else {
+            [summary setObject:@"" forKey:@"text"];
+            [summary setObject:[NSNumber numberWithBool:NO] forKey:@"has_draft"];
         }
         return summary;
     }
@@ -765,6 +1041,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_chatFilterInfos release];
         _chatFilterInfos = [chatFilterInfos copy];
         _chatFilterInfosKnown = YES;
+        _chatFilterFallbackProbeFinished = NO;
     }
 
     if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
@@ -786,6 +1063,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     [_responseCondition broadcast];
     [_responseCondition unlock];
+    if (chatFilterInfos) {
+        NSDictionary *userInfo = [NSDictionary dictionaryWithObject:chatFilterInfos forKey:@"chatFilterInfos"];
+        [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibChatFiltersDidChangeNotification object:self userInfo:userInfo];
+    }
 }
 
 - (void)receiverThreadMain {
@@ -2280,8 +2561,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             continue;
         }
 
-        if ([chatListType isEqualToString:@"chatListFilter"]) {
-            id candidateFilterID = [list objectForKey:@"chat_filter_id"];
+        NSString *listIDKey = [self chatListIDKeyForType:chatListType];
+        if ([listIDKey length] > 0) {
+            id candidateFilterID = [list objectForKey:listIDKey];
             if (![candidateFilterID respondsToSelector:@selector(longLongValue)] ||
                 ![filterID respondsToSelector:@selector(longLongValue)] ||
                 [candidateFilterID longLongValue] != [filterID longLongValue]) {
@@ -2485,9 +2767,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         safeLimit = TGTDLibMaxMainChatPreviewLimit;
     }
 
-    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
-    [chatList setObject:@"chatListFilter" forKey:@"@type"];
-    [chatList setObject:[NSNumber numberWithInteger:[filterID integerValue]] forKey:@"chat_filter_id"];
+    NSDictionary *chatList = [self chatListObjectForChatFilterID:filterID];
 
     NSTimeInterval loadChatsTimeout = timeout;
     if (loadChatsTimeout > 1.0) {
@@ -2605,6 +2885,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     NSUInteger index = 0;
     NSUInteger avatarDownloadsRemaining = 12;
+    NSString *chatListType = [[self chatListObjectForChatFilterID:filterID] objectForKey:@"@type"];
     for (index = 0; index < [chatIDs count]; index++) {
         id chatID = [chatIDs objectAtIndex:index];
         if (!chatID) {
@@ -2645,7 +2926,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
-        [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:@"chatListFilter" filterID:filterID];
+        [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:chatListType filterID:filterID];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
@@ -5079,6 +5360,87 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                       error:error];
 }
 
+- (NSArray *)messageViewersForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat or message identifier is missing." code:149];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load message viewers. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:149];
+        }
+        return nil;
+    }
+
+    if (limit == 0 || limit > 100) {
+        limit = 50;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getMessageViewers" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+
+    NSError *viewersError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-message-viewers"
+                                                           timeout:timeout
+                                                         errorCode:149
+                                                             error:&viewersError];
+    if (!response) {
+        if (error) {
+            *error = viewersError;
+        }
+        return nil;
+    }
+
+    id viewersObject = [response objectForKey:@"viewers"];
+    if (![viewersObject isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib returned no viewer list for this message." code:149];
+        }
+        return nil;
+    }
+
+    NSMutableArray *viewers = [NSMutableArray array];
+    NSArray *viewerObjects = (NSArray *)viewersObject;
+    NSUInteger index = 0;
+    for (index = 0; index < [viewerObjects count] && [viewers count] < limit; index++) {
+        id viewer = [viewerObjects objectAtIndex:index];
+        id userIDObject = viewer;
+        id viewDate = nil;
+        if ([viewer isKindOfClass:[NSDictionary class]]) {
+            userIDObject = [(NSDictionary *)viewer objectForKey:@"user_id"];
+            viewDate = [(NSDictionary *)viewer objectForKey:@"view_date"];
+        }
+        if (![userIDObject respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+
+        NSNumber *userID = [NSNumber numberWithLongLong:[userIDObject longLongValue]];
+        NSDictionary *senderSummary = [self userSenderSummaryForUserID:userID timeout:MIN(timeout, 2.0)];
+        NSMutableDictionary *viewerSummary = [NSMutableDictionary dictionary];
+        [viewerSummary setObject:userID forKey:@"user_id"];
+        NSString *displayName = [senderSummary objectForKey:@"display_name"];
+        [viewerSummary setObject:([displayName length] > 0 ? displayName : [NSString stringWithFormat:@"User %@", userID]) forKey:@"display_name"];
+        NSString *avatarPath = [senderSummary objectForKey:@"avatar_local_path"];
+        if ([avatarPath length] > 0) {
+            [viewerSummary setObject:avatarPath forKey:@"avatar_local_path"];
+        }
+        if ([viewDate respondsToSelector:@selector(integerValue)]) {
+            [viewerSummary setObject:[NSNumber numberWithInteger:[viewDate integerValue]] forKey:@"view_date"];
+        }
+        [viewers addObject:viewerSummary];
+    }
+
+    return viewers;
+}
+
 - (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self markMessagesAsReadForChatID:chatID messageThreadID:nil messageIDs:messageIDs timeout:timeout error:error];
 }
@@ -5182,13 +5544,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return NO;
     }
 
-    NSMutableDictionary *chatList = [NSMutableDictionary dictionary];
-    if ([chatFilterID respondsToSelector:@selector(longLongValue)]) {
-        [chatList setObject:@"chatListFilter" forKey:@"@type"];
-        [chatList setObject:[NSNumber numberWithLongLong:[chatFilterID longLongValue]] forKey:@"chat_filter_id"];
-    } else {
-        [chatList setObject:@"chatListMain" forKey:@"@type"];
-    }
+    NSDictionary *chatList = [self chatListObjectForChatFilterID:chatFilterID];
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"toggleChatIsPinned" forKey:@"@type"];
@@ -5205,6 +5561,75 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
         if (error && *error == nil) {
             *error = [self errorWithDescription:@"TDLib toggleChatIsPinned returned an unexpected response." code:97];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)setDraftMessageForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    (void)messageTopicKind;
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:150];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to sync draft messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:150];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"setChatDraftMessage" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
+        [request setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
+    }
+
+    NSString *draftText = ([text isKindOfClass:[NSString class]] ? text : @"");
+    if ([draftText length] > 0) {
+        NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
+        [formattedText setObject:@"formattedText" forKey:@"@type"];
+        [formattedText setObject:draftText forKey:@"text"];
+        [formattedText setObject:[NSArray array] forKey:@"entities"];
+
+        NSMutableDictionary *inputContent = [NSMutableDictionary dictionary];
+        [inputContent setObject:@"inputMessageText" forKey:@"@type"];
+        [inputContent setObject:formattedText forKey:@"text"];
+        [inputContent setObject:[NSNumber numberWithBool:NO] forKey:@"clear_draft"];
+
+        NSMutableDictionary *draft = [NSMutableDictionary dictionary];
+        [draft setObject:@"draftMessage" forKey:@"@type"];
+        [draft setObject:inputContent forKey:@"input_message_text"];
+        [draft setObject:[NSNumber numberWithInteger:(NSInteger)[[NSDate date] timeIntervalSince1970]] forKey:@"date"];
+        if ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+            NSDictionary *replyTarget = [NSDictionary dictionaryWithObjectsAndKeys:
+                                         @"inputMessageReplyToMessage", @"@type",
+                                         [NSNumber numberWithLongLong:[replyToMessageID longLongValue]], @"message_id",
+                                         nil];
+            [draft setObject:replyTarget forKey:@"reply_to"];
+        }
+        [request setObject:draft forKey:@"draft_message"];
+    } else {
+        [request setObject:[NSNull null] forKey:@"draft_message"];
+    }
+
+    NSError *draftError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-set-draft"
+                                                           timeout:timeout
+                                                         errorCode:150
+                                                             error:&draftError];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = draftError ? draftError : [self errorWithDescription:@"TDLib setChatDraftMessage returned an unexpected response." code:150];
         }
         return NO;
     }

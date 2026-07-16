@@ -80,6 +80,32 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     [self.searchStatusField setStringValue:([text length] > 0 ? text : @"")];
 }
 
+- (NSString *)searchResultIdentityKey:(TGSearchResultItem *)result {
+    if (![result isKindOfClass:[TGSearchResultItem class]]) {
+        return nil;
+    }
+    if (result.chatTitleOnly) {
+        return [NSString stringWithFormat:@"chat:%lld:%lld:%@", [result.chatID longLongValue], [result.messageThreadID longLongValue], result.messageTopicKind ? result.messageTopicKind : @""];
+    }
+    if (![result.chatID respondsToSelector:@selector(longLongValue)] || ![result.messageID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"msg:%lld:%lld", [result.chatID longLongValue], [result.messageID longLongValue]];
+}
+
+- (NSNumber *)searchPaginationAnchorMessageID {
+    NSInteger index = (NSInteger)[self.searchResultItems count] - 1;
+    for (; index >= 0; index--) {
+        TGSearchResultItem *result = [self.searchResultItems objectAtIndex:(NSUInteger)index];
+        if ([result isKindOfClass:[TGSearchResultItem class]] &&
+            !result.chatTitleOnly &&
+            [result.messageID respondsToSelector:@selector(longLongValue)]) {
+            return [NSNumber numberWithLongLong:[result.messageID longLongValue]];
+        }
+    }
+    return nil;
+}
+
 - (void)openSearchPanelGlobal:(BOOL)global {
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         return;
@@ -200,6 +226,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self.searchResultItems removeAllObjects];
         [self.searchResultsTableView reloadData];
         [self setSearchStatusText:@"Введите запрос"];
+        [self updateVisibleSection];
+        [self layoutContentView];
         return;
     }
     BOOL global = ([self.searchScopePopUpButton indexOfSelectedItem] == 1 || self.selectedChatID == nil);
@@ -209,6 +237,36 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     NSString *topicKind = [self.selectedMessageTopicKind copy];
     NSString *chatTitle = [self.selectedChatTitle copy];
     NSString *offset = reset ? nil : [self.globalSearchOffset copy];
+    NSNumber *fromMessageID = (!global && !reset) ? [[self searchPaginationAnchorMessageID] retain] : nil;
+
+    if (!reset && self.searchEndReached) {
+        [offset release];
+        [fromMessageID release];
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        [chatTitle release];
+        return;
+    }
+    if (!reset && global && [offset length] == 0) {
+        [offset release];
+        [fromMessageID release];
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        [chatTitle release];
+        return;
+    }
+    if (!reset && !global && ![fromMessageID respondsToSelector:@selector(longLongValue)]) {
+        [offset release];
+        [fromMessageID release];
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        [chatTitle release];
+        return;
+    }
+
     NSUInteger generation = self.searchGeneration + 1;
     self.searchGeneration = generation;
     self.searchLoading = YES;
@@ -218,6 +276,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self.searchResultsTableView reloadData];
     }
     [self setSearchStatusText:@"Поиск..."];
+    [self updateVisibleSection];
+    [self layoutContentView];
 
     TGTDLibClient *client = [self.client retain];
     NSArray *localChatMatches = global ? [[self localChatSearchResultsForQuery:query] retain] : nil;
@@ -242,7 +302,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                                                       messageTopicKind:topicKind
                                                                  query:query
                                                                 filter:filter
-                                                         fromMessageID:nil
+                                                         fromMessageID:fromMessageID
                                                                  limit:30
                                                                timeout:8.0
                                                                  error:&searchError] retain];
@@ -256,6 +316,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                 [newOffset release];
                 [localChatMatches release];
                 [offset release];
+                [fromMessageID release];
                 [chatID release];
                 [threadID release];
                 [topicKind release];
@@ -265,23 +326,45 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             }
             self.searchLoading = NO;
             NSMutableArray *results = [NSMutableArray array];
+            NSMutableSet *existingKeys = [NSMutableSet set];
+            NSUInteger existingIndex = 0;
+            for (existingIndex = 0; existingIndex < [self.searchResultItems count]; existingIndex++) {
+                NSString *key = [self searchResultIdentityKey:[self.searchResultItems objectAtIndex:existingIndex]];
+                if ([key length] > 0) {
+                    [existingKeys addObject:key];
+                }
+            }
             if (global && reset && localChatMatches) {
-                [results addObjectsFromArray:localChatMatches];
+                NSUInteger localIndex = 0;
+                for (localIndex = 0; localIndex < [localChatMatches count]; localIndex++) {
+                    TGSearchResultItem *localResult = [localChatMatches objectAtIndex:localIndex];
+                    NSString *key = [self searchResultIdentityKey:localResult];
+                    if ([key length] == 0 || ![existingKeys containsObject:key]) {
+                        [results addObject:localResult];
+                        if ([key length] > 0) {
+                            [existingKeys addObject:key];
+                        }
+                    }
+                }
             }
             if (messageItems) {
                 NSUInteger index = 0;
                 for (index = 0; index < [messageItems count]; index++) {
                     TGSearchResultItem *result = [self searchResultForMessageItem:[messageItems objectAtIndex:index] chatTitle:chatTitle];
-                    if (result) {
+                    NSString *key = [self searchResultIdentityKey:result];
+                    if (result && ([key length] == 0 || ![existingKeys containsObject:key])) {
                         [results addObject:result];
+                        if ([key length] > 0) {
+                            [existingKeys addObject:key];
+                        }
                     }
                 }
             }
             [self.searchResultItems addObjectsFromArray:results];
             [self.searchResultsTableView reloadData];
             self.globalSearchOffset = newOffset;
-            BOOL hasNextOffset = ([newOffset length] > 0);
-            self.searchEndReached = !hasNextOffset;
+            BOOL hasNextOffset = global ? ([newOffset length] > 0) : ([messageItems count] >= 30);
+            self.searchEndReached = !hasNextOffset || ([messageItems count] == 0);
             if ([errorMessage length] > 0 && !messageItems) {
                 [self setSearchStatusText:[NSString stringWithFormat:@"Ошибка: %@", errorMessage]];
             } else if ([self.searchResultItems count] == 0) {
@@ -289,11 +372,14 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             } else {
                 [self setSearchStatusText:[NSString stringWithFormat:@"Найдено: %lu%@", (unsigned long)[self.searchResultItems count], hasNextOffset ? @" · ещё есть результаты" : @""]];
             }
+            [self updateVisibleSection];
+            [self layoutContentView];
             [messageItems release];
             [errorMessage release];
             [newOffset release];
             [localChatMatches release];
             [offset release];
+            [fromMessageID release];
             [chatID release];
             [threadID release];
             [topicKind release];
@@ -317,6 +403,27 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     [self jumpToSearchResult:result];
 }
 
+- (void)searchResultsScrollViewDidScroll:(NSNotification *)notification {
+    if ([notification object] != [self.searchResultsScrollView contentView]) {
+        return;
+    }
+    if (!self.searchPanelVisible || self.searchLoading || self.searchEndReached) {
+        return;
+    }
+    NSString *query = [[self.searchTextField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([query length] == 0 || [self.searchResultItems count] == 0) {
+        return;
+    }
+
+    NSClipView *clipView = [self.searchResultsScrollView contentView];
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentRect = [[self.searchResultsScrollView documentView] frame];
+    CGFloat remaining = NSMaxY(documentRect) - NSMaxY(visibleRect);
+    if (remaining < 90.0) {
+        [self performSearchReset:NO];
+    }
+}
+
 - (void)jumpToSearchResult:(TGSearchResultItem *)result {
     if (![result.chatID respondsToSelector:@selector(longLongValue)]) {
         return;
@@ -333,6 +440,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     NSNumber *messageID = [result.messageID retain];
     NSNumber *threadID = [result.messageThreadID retain];
     NSString *topicKind = [result.messageTopicKind copy];
+    NSString *chatTitle = [result.chatTitle copy];
     NSUInteger generation = self.messageLoadingGeneration + 1;
     self.messageLoadingGeneration = generation;
     self.messageLoadingIndicatorVisible = YES;
@@ -352,16 +460,17 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                                                                 error:&contextError] retain];
         NSString *errorMessage = [[contextError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.messageLoadingGeneration == generation) {
-                self.messageLoadingIndicatorVisible = NO;
-                [self.messageLoadingSpinner stopAnimation:self];
-            }
-            self.selectedChatID = chatID;
-            if (threadID) {
-                self.selectedMessageThreadID = threadID;
-                self.selectedMessageTopicKind = topicKind;
-            }
             if (items) {
+                self.selectedChatID = chatID;
+                self.selectedChatTitle = ([chatTitle length] > 0 ? chatTitle : self.selectedChatTitle);
+                if (threadID) {
+                    self.selectedMessageThreadID = threadID;
+                    self.selectedMessageTopicKind = topicKind;
+                } else {
+                    self.selectedMessageThreadID = nil;
+                    self.selectedMessageTopicKind = nil;
+                }
+                [self refreshSelectedChatHeaderDisplay];
                 [self.messageItems removeAllObjects];
                 [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:items]];
                 [self updateOutgoingReadStateForVisibleMessages];
@@ -377,12 +486,19 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             } else if ([errorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"Search jump failed: %@", errorMessage]];
             }
+            if (self.messageLoadingGeneration == generation) {
+                self.messageLoadingIndicatorVisible = NO;
+                [self.messageLoadingSpinner stopAnimation:self];
+                [self updateVisibleSection];
+                [self layoutContentView];
+            }
             [items release];
             [errorMessage release];
             [chatID release];
             [messageID release];
             [threadID release];
             [topicKind release];
+            [chatTitle release];
             [client release];
         });
         [pool drain];
