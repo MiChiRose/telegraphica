@@ -1697,6 +1697,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageJumpToNewestButton setBordered:NO];
     [self.messageJumpToNewestButton setFocusRingType:NSFocusRingTypeNone];
     [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"jump-newest"] autorelease]];
+    [self.messageJumpToNewestButton setTarget:self];
+    [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
     [self.messageJumpToNewestButton setEnabled:NO];
     [self.messageJumpToNewestButton setHidden:YES];
     [contentView addSubview:self.messageJumpToNewestButton];

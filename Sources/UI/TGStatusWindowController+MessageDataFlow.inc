@@ -221,10 +221,11 @@
         NSInteger newestRow = (NSInteger)count - 1;
         [self.messageTableView scrollRowToVisible:newestRow];
         NSClipView *clipView = [self.messageScrollView contentView];
-        NSRect rowRect = [self.messageTableView rectOfRow:newestRow];
-        if (clipView && !NSIsEmptyRect(rowRect)) {
+        NSView *documentView = [self.messageScrollView documentView];
+        if (clipView && documentView) {
             NSRect visibleRect = [clipView bounds];
-            NSPoint targetPoint = NSMakePoint(NSMinX(visibleRect), NSMaxY(rowRect) - NSHeight(visibleRect));
+            NSRect documentBounds = [documentView bounds];
+            NSPoint targetPoint = NSMakePoint(NSMinX(visibleRect), NSMaxY(documentBounds) - NSHeight(visibleRect));
             if (targetPoint.y < 0.0) {
                 targetPoint.y = 0.0;
             }
@@ -240,7 +241,8 @@
         return NO;
     }
     NSClipView *clipView = [self.messageScrollView contentView];
-    if (!clipView) {
+    NSView *documentView = [self.messageScrollView documentView];
+    if (!clipView || !documentView) {
         return NO;
     }
     NSRange visibleRows = [self.messageTableView rowsInRect:[clipView bounds]];
@@ -249,7 +251,10 @@
     }
     NSInteger lastVisibleRow = (NSInteger)(visibleRows.location + visibleRows.length - 1);
     NSInteger newestRow = (NSInteger)[self.messageItems count] - 1;
-    return ((newestRow - lastVisibleRow) >= 20);
+    NSRect visibleRect = [clipView bounds];
+    NSRect documentBounds = [documentView bounds];
+    CGFloat distanceFromBottom = NSMaxY(documentBounds) - NSMaxY(visibleRect);
+    return ((newestRow - lastVisibleRow) >= 20 && distanceFromBottom > 48.0);
 }
 
 - (void)updateMessageJumpToNewestButtonVisibility {
@@ -924,15 +929,13 @@
 
     NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
     NSNumber *activeFilterID = [self.selectedChatFilterID retain];
-    NSNumber *visibleAnchorChatID = nil;
+    NSPoint visibleChatOrigin = NSZeroPoint;
+    BOOL shouldRestoreChatOrigin = NO;
     if (!interactive) {
-        NSPoint visibleOrigin = [[self.chatScrollView contentView] bounds].origin;
-        NSInteger anchorRow = [self.chatTableView rowAtPoint:visibleOrigin];
-        if (anchorRow >= 0 && anchorRow < (NSInteger)[self.chatItems count]) {
-            id candidate = [self.chatItems objectAtIndex:(NSUInteger)anchorRow];
-            if ([candidate isKindOfClass:[TGChatItem class]]) {
-                visibleAnchorChatID = [[(TGChatItem *)candidate chatID] retain];
-            }
+        NSClipView *chatClipView = [self.chatScrollView contentView];
+        if (chatClipView) {
+            visibleChatOrigin = [chatClipView bounds].origin;
+            shouldRestoreChatOrigin = YES;
         }
     }
     if (interactive) {
@@ -994,10 +997,25 @@
                     effectivePreferredChatID = self.selectedChatID;
                 }
                 [self applyChatItems:itemsCopy preserveSelection:preserveSelection preferredChatID:effectivePreferredChatID];
-                if (!interactive && [visibleAnchorChatID respondsToSelector:@selector(longLongValue)]) {
-                    NSUInteger anchorIndex = [self indexOfChatID:visibleAnchorChatID inChatItems:self.chatItems];
-                    if (anchorIndex != NSNotFound) {
-                        [self.chatTableView scrollRowToVisible:anchorIndex];
+                if (!interactive && shouldRestoreChatOrigin) {
+                    NSClipView *chatClipView = [self.chatScrollView contentView];
+                    NSView *chatDocumentView = [self.chatScrollView documentView];
+                    if (chatClipView && chatDocumentView) {
+                        NSRect visibleRect = [chatClipView bounds];
+                        NSRect documentBounds = [chatDocumentView bounds];
+                        CGFloat maxY = NSMaxY(documentBounds) - NSHeight(visibleRect);
+                        if (maxY < 0.0) {
+                            maxY = 0.0;
+                        }
+                        CGFloat restoredY = visibleChatOrigin.y;
+                        if (restoredY > maxY) {
+                            restoredY = maxY;
+                        }
+                        if (restoredY < 0.0) {
+                            restoredY = 0.0;
+                        }
+                        [chatClipView scrollToPoint:NSMakePoint(visibleChatOrigin.x, restoredY)];
+                        [self.chatScrollView reflectScrolledClipView:chatClipView];
                     }
                 }
                 [self setOfflineModeActive:NO reason:nil];
@@ -1042,7 +1060,6 @@
             [authorizationState release];
             [activeFilterID release];
             [preferredChatID release];
-            [visibleAnchorChatID release];
         });
 
         [client release];
