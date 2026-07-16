@@ -2344,6 +2344,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     NSString *version = [info objectForKey:@"CFBundleShortVersionString"];
     NSString *build = [info objectForKey:@"CFBundleVersion"];
     NSString *versionText = [NSString stringWithFormat:@"Version %@ (%@)", version ? version : @"0.1.0", build ? build : @"0.1.0"];
+    NSString *compatibilitySummary = [info objectForKey:@"TelegraphicaCompatibilitySummary"];
+    if ([compatibilitySummary length] > 0) {
+        versionText = [versionText stringByAppendingFormat:@" — %@", compatibilitySummary];
+    }
     self.aboutVersionField = [self labelWithFrame:NSMakeRect(240, 324, 500, 22)
                                              text:versionText
                                              font:[NSFont systemFontOfSize:12.0]];

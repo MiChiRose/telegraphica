@@ -24,7 +24,9 @@ NSString *TGUpdateCheckUserAgentString(void) {
     if ([version length] == 0) {
         version = @"unknown";
     }
-    return [NSString stringWithFormat:@"Telegraphica/%@ (Mac OS X; Mavericks-compatible)", version];
+    NSString *minimumSystemVersion = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"LSMinimumSystemVersion"];
+    NSString *compatibility = [minimumSystemVersion hasPrefix:@"10.8"] ? @"Mountain-Lion-compatible" : @"Mavericks-compatible";
+    return [NSString stringWithFormat:@"Telegraphica/%@ (Mac OS X; %@)", version, compatibility];
 }
 
 NSString *TGGitHubErrorMessageFromData(NSData *data, NSString *fallback) {

@@ -26,6 +26,11 @@ Mavericks-friendly.
 > Telegram logos, official artwork, user credentials, TDLib databases, sessions,
 > or account data.
 
+> **Mountain Lion branch note:** `0.4.5-ml` / `0.4.5(ml)` is a special OS X
+> 10.8.5 Mountain Lion release built from the separate `mountain-lion/*` branch
+> line. The regular Mavericks release remains on the ordinary `main` /
+> `develop` branches.
+
 ---
 
 ## What Telegraphica Is For
