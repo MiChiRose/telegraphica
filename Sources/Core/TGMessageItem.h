@@ -36,6 +36,8 @@
 @property (nonatomic, assign) BOOL canBeDeletedForAllUsers;
 @property (nonatomic, retain) NSNumber *editDate;
 @property (nonatomic, copy) NSString *editableText;
+@property (nonatomic, assign) BOOL canGetMessageThread;
+@property (nonatomic, retain) NSNumber *messageThreadReplyCount;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID

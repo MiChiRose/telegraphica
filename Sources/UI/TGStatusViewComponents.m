@@ -90,15 +90,33 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     }
 }
 
+- (void)copy:(id)sender {
+    SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
+    if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+        [_dropOverlayTarget performSelector:selector withObject:sender ? sender : self];
+        return;
+    }
+    if (![[self nextResponder] tryToPerform:@selector(copy:) with:sender]) {
+        NSBeep();
+    }
+}
+
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
-    if ([event type] == NSKeyDown &&
-        (([event modifierFlags] & NSCommandKeyMask) != 0) &&
-        ([[event charactersIgnoringModifiers] isEqualToString:@"v"] ||
-         [[event charactersIgnoringModifiers] isEqualToString:@"V"])) {
-        SEL selector = NSSelectorFromString(@"messageTableViewPaste:");
-        if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
-            [_dropOverlayTarget performSelector:selector withObject:self];
-            return YES;
+    if ([event type] == NSKeyDown && (([event modifierFlags] & NSCommandKeyMask) != 0)) {
+        NSString *characters = [event charactersIgnoringModifiers];
+        if ([characters isEqualToString:@"v"] || [characters isEqualToString:@"V"]) {
+            SEL selector = NSSelectorFromString(@"messageTableViewPaste:");
+            if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+                [_dropOverlayTarget performSelector:selector withObject:self];
+                return YES;
+            }
+        }
+        if ([characters isEqualToString:@"c"] || [characters isEqualToString:@"C"]) {
+            SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
+            if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+                [_dropOverlayTarget performSelector:selector withObject:self];
+                return YES;
+            }
         }
     }
     return [super performKeyEquivalent:event];
