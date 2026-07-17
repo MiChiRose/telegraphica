@@ -42,3 +42,22 @@ export TELEGRAPHICA_TDLIB_PROXY_TYPE=socks5
 
 Do not put proxy passwords, MTProto secrets, Telegram login codes, or phone
 numbers in screenshots or public issue reports.
+
+## Safe Login Mode
+
+Mountain Lion builds default to a safe login mode. After authorization reaches
+`ready`, Telegraphica does not automatically request chat lists, folders,
+profile details, live updates, or notifications. This avoids a TDLib 1.8 crash
+seen while loading poll data from existing Telegram state on legacy macOS.
+
+For controlled debugging only, safe mode can be disabled before launching:
+
+```sh
+defaults write com.michirose.Telegraphica TelegraphicaMountainLionSafeLoginModeDisabled -bool YES
+```
+
+Restore the default guarded behavior with:
+
+```sh
+defaults delete com.michirose.Telegraphica TelegraphicaMountainLionSafeLoginModeDisabled
+```

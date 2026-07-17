@@ -57,10 +57,21 @@ static NSString * const TGNotificationsWhenActiveDefaultsKey = @"TelegraphicaNot
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
+static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
+
+static BOOL TGMountainLionSafeLoginModeEnabled(void) {
+    NSString *minimumSystemVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"LSMinimumSystemVersion"];
+    BOOL targetsMountainLion = ([minimumSystemVersion isKindOfClass:[NSString class]] &&
+                                [minimumSystemVersion hasPrefix:@"10.8"]);
+    if (!targetsMountainLion) {
+        return NO;
+    }
+    return ![[NSUserDefaults standardUserDefaults] boolForKey:TGMountainLionSafeLoginModeDisabledDefaultsKey];
+}
 
 @interface TGPointingHandButton : NSButton
 @end
@@ -828,7 +839,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [self buildContentView];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
-        [self startLiveUpdateTimerIfNeeded];
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling is disabled until chat loading is explicitly re-enabled."];
+        } else {
+            [self startLiveUpdateTimerIfNeeded];
+        }
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
         [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
     }
@@ -2720,6 +2735,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)reloadChatFiltersIfReady {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: skipped TDLib chat folder refresh."];
+        return;
+    }
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: skipped folder refresh because auth state is %@.",
                                       self.currentAuthState ? self.currentAuthState : @"unknown"]];
@@ -2804,7 +2823,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     }
     self.activeSection = TGSectionProfile;
     [self updateVisibleSection];
-    if (!self.profileSummaryLoaded && !self.profileSummaryLoading && !self.controlsBusy) {
+    if (!self.profileSummaryLoaded && !self.profileSummaryLoading && !self.controlsBusy &&
+        !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 }
@@ -2839,7 +2859,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self updateVisibleSection];
     if ([self.activeSection isEqualToString:TGSectionProfile] &&
         !self.profileSummaryLoaded && !self.profileSummaryLoading &&
-        [self.currentAuthState isEqualToString:@"ready"] && !self.controlsBusy) {
+        [self.currentAuthState isEqualToString:@"ready"] && !self.controlsBusy &&
+        !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 }

@@ -545,7 +545,11 @@
     } else if (![previousState isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
         self.chatFilterRefreshRetryCount = 0;
-        if ([self.chatItems count] == 0) {
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            self.pendingLiveChatRefresh = NO;
+            self.pendingLiveMessageRefresh = NO;
+            [self appendDetail:@"Mountain Lion safe login mode: signed in; automatic chat/profile/live sync is paused to avoid TDLib poll crashes."];
+        } else if ([self.chatItems count] == 0) {
             self.pendingLiveChatRefresh = YES;
             [self handlePendingLiveRefreshesIfPossible];
         }
@@ -676,9 +680,9 @@
     [self.authButton setTitle:TGLoc(@"login.send")];
     [self.authButton setEnabled:NO];
     [self.authButton setHidden:YES];
-    [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
+    [self.loadChatsButton setEnabled:([state isEqualToString:@"ready"] && !TGMountainLionSafeLoginModeEnabled())];
     [self.loadMoreChatsButton setEnabled:NO];
-    [self.chatSearchButton setEnabled:[state isEqualToString:@"ready"]];
+    [self.chatSearchButton setEnabled:([state isEqualToString:@"ready"] && !TGMountainLionSafeLoginModeEnabled())];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -687,7 +691,7 @@
     [self updateSendControls];
     [self refreshProfileDisplay];
     [self updateVisibleSection];
-    if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy) {
+    if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy && !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 
@@ -711,9 +715,9 @@
     [self.logsCheckButton setEnabled:!busy];
     [self.logoutButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self updateNavigationButtonsForSection:(self.activeSection ? self.activeSection : TGSectionChats) enabled:!busy];
-    [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
+    [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && !TGMountainLionSafeLoginModeEnabled())];
     [self.loadMoreChatsButton setEnabled:NO];
-    [self.chatSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
+    [self.chatSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && !TGMountainLionSafeLoginModeEnabled())];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];

@@ -850,6 +850,11 @@
 }
 
 - (void)reloadProfileSummaryIfReady {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        [self appendDetail:@"Mountain Lion safe login mode: profile loading is paused for this build."];
+        return;
+    }
+
     if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy || self.profileSummaryLoading) {
         return;
     }
@@ -922,6 +927,14 @@
 }
 
 - (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection requestedLimit:(NSUInteger)requestedLimit {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        if (interactive) {
+            [self.statusField setStringValue:@"Connected"];
+            [self appendDetail:@"Mountain Lion safe login mode: chat loading is paused to avoid a TDLib poll database crash. Disable the safe mode defaults key only for controlled testing."];
+        }
+        return;
+    }
+
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         if (interactive) {
             [self appendDetail:@"Chats are available only after sign-in is ready."];
@@ -1295,6 +1308,12 @@
 }
 
 - (void)handlePendingLiveRefreshesIfPossible {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        self.pendingLiveChatRefresh = NO;
+        self.pendingLiveMessageRefresh = NO;
+        return;
+    }
+
     if (self.controlsBusy || ![self.currentAuthState isEqualToString:@"ready"]) {
         return;
     }
@@ -1316,6 +1335,9 @@
 
 - (void)pollLiveUpdates:(NSTimer *)timer {
     (void)timer;
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        return;
+    }
     if (!self.client) {
         return;
     }
@@ -1481,9 +1503,13 @@
                 finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&finalAuthorizationError];
             }
             if ([finalAuthorizationState isEqualToString:@"ready"]) {
-                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
-                if (!postLoginProbeSummary) {
-                    finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
+                if (TGMountainLionSafeLoginModeEnabled()) {
+                    postLoginProbeSummary = @"Mountain Lion safe login mode: skipped automatic getChats post-login probe.";
+                } else {
+                    postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
+                    if (!postLoginProbeSummary) {
+                        finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
+                    }
                 }
             }
             if (![finalAuthorizationState length]) {
@@ -1651,9 +1677,13 @@
         }
         NSString *finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError];
         if ([finalAuthorizationState isEqualToString:@"ready"]) {
-            postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
-            if (!postLoginProbeSummary) {
-                finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&stateError];
+            if (TGMountainLionSafeLoginModeEnabled()) {
+                postLoginProbeSummary = @"Mountain Lion safe login mode: skipped automatic getChats post-login probe.";
+            } else {
+                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
+                if (!postLoginProbeSummary) {
+                    finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&stateError];
+                }
             }
         }
 
