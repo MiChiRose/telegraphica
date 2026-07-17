@@ -10,9 +10,8 @@
     [self.chatSearchWindow setTitle:@"Search chats"];
     [self.chatSearchWindow setReleasedWhenClosed:NO];
 
-    NSView *contentView = [self.chatSearchWindow contentView];
-    [contentView setWantsLayer:YES];
-    [[contentView layer] setBackgroundColor:[TGClassicPanelBottomColor() CGColor]];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:NSMakeRect(0, 0, 440, 420)] autorelease];
+    [self.chatSearchWindow setContentView:contentView];
 
     NSTextField *titleField = [[[NSTextField alloc] initWithFrame:NSMakeRect(22, 376, 396, 22)] autorelease];
     [titleField setStringValue:@"Search chats"];
@@ -55,6 +54,8 @@
         return;
     }
     [self buildChatSearchWindowIfNeeded];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: opening chat search window with %lu visible chat candidate(s).",
+                                  (unsigned long)[self.chatItems count]]];
     [self.chatSearchWindowResults removeAllObjects];
     [self.chatSearchWindowTextField setStringValue:@""];
     [self.chatSearchWindowStatusField setStringValue:@"Start typing to find a chat"];
@@ -62,6 +63,7 @@
     [self.chatSearchWindow center];
     [self.chatSearchWindow makeKeyAndOrderFront:self];
     [self.chatSearchWindow makeFirstResponder:self.chatSearchWindowTextField];
+    [self applyPointingHandCursorToButtonsInView:[self.chatSearchWindow contentView]];
 }
 
 - (void)closeChatSearchWindow:(id)sender {
@@ -89,6 +91,9 @@
     if ([query length] > 0) {
         [self.chatSearchWindowResults addObjectsFromArray:[self localChatSearchResultsForQuery:query]];
     }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: chat search query length=%lu results=%lu.",
+                                  (unsigned long)[query length],
+                                  (unsigned long)[self.chatSearchWindowResults count]]];
 
     [self clearChatSearchWindowResultButtons];
     CGFloat rowHeight = 46.0;

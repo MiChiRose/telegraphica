@@ -137,6 +137,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL searchLoading;
 @property (nonatomic, assign) BOOL searchEndReached;
 @property (nonatomic, assign) BOOL chatTitleSearchOnly;
+@property (nonatomic, assign) BOOL searchInlineCurrentChatOnly;
 @property (nonatomic, assign) NSUInteger searchGeneration;
 @property (nonatomic, retain) NSWindow *chatSearchWindow;
 @property (nonatomic, retain) NSTextField *chatSearchWindowTextField;
@@ -490,6 +491,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize searchLoading = _searchLoading;
 @synthesize searchEndReached = _searchEndReached;
 @synthesize chatTitleSearchOnly = _chatTitleSearchOnly;
+@synthesize searchInlineCurrentChatOnly = _searchInlineCurrentChatOnly;
 @synthesize searchGeneration = _searchGeneration;
 @synthesize chatSearchWindow = _chatSearchWindow;
 @synthesize chatSearchWindowTextField = _chatSearchWindowTextField;
@@ -2865,8 +2867,12 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     for (index = 0; index < [subviews count]; index++) {
         NSView *subview = [subviews objectAtIndex:index];
         if ([subview isKindOfClass:[NSButton class]] &&
-            [subview class] == [NSButton class]) {
+            [subview class] == [NSButton class] &&
+            ![subview isKindOfClass:[TGPointingHandButton class]]) {
             object_setClass(subview, [TGPointingHandButton class]);
+            [subview discardCursorRects];
+        } else if ([subview isKindOfClass:[TGPointingHandButton class]]) {
+            [subview discardCursorRects];
         }
         [self applyPointingHandCursorToButtonsInView:subview];
     }

@@ -865,7 +865,7 @@ CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
 }
 
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
-    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 11.0 : 0.0;
+    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 13.0 : 0.0;
 }
 
 CGFloat TGComposerMinimumInputHeight(void) {
@@ -899,7 +899,7 @@ void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL 
         return;
     }
 
-    CGFloat dotSide = 4.0;
+    CGFloat dotSide = 5.0;
     CGFloat dotGap = 3.0;
     CGFloat dotX = NSMaxX(timeRect) + 4.0;
     CGFloat dotY = NSMinY(timeRect) + floor((NSHeight(timeRect) - dotSide) / 2.0) + 1.0;
@@ -962,7 +962,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:7.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:8.0] forKey:NSFontAttributeName];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@" %@", statusDots]
                                                                                         attributes:statusAttributes] autorelease];
                 [composedText appendAttributedString:statusSuffixText];
@@ -1028,7 +1028,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:7.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:8.0] forKey:NSFontAttributeName];
                 [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
                 NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];

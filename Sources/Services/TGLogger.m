@@ -9,6 +9,7 @@
 @synthesize logLines = _logLines;
 
 static NSUInteger const TGLoggerMaxInMemoryLines = 500;
+static unsigned long long const TGLoggerMaxDiagnosticFileBytes = 1024ULL * 1024ULL;
 
 static BOOL TGLoggerFlagEnabled(NSString *value) {
     if (!value) return NO;
@@ -99,6 +100,11 @@ static NSString *TGLoggerRedactedMessage(NSString *message) {
                                   withIntermediateDirectories:YES
                                                    attributes:nil
                                                         error:nil];
+        NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+        unsigned long long fileSize = [[attributes objectForKey:NSFileSize] unsignedLongLongValue];
+        if (fileSize > TGLoggerMaxDiagnosticFileBytes) {
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
 
         NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
         if (!handle) {

@@ -79,6 +79,31 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     }
 }
 
+- (void)paste:(id)sender {
+    SEL selector = NSSelectorFromString(@"messageTableViewPaste:");
+    if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+        [_dropOverlayTarget performSelector:selector withObject:sender ? sender : self];
+        return;
+    }
+    if (![[self nextResponder] tryToPerform:@selector(paste:) with:sender]) {
+        NSBeep();
+    }
+}
+
+- (BOOL)performKeyEquivalent:(NSEvent *)event {
+    if ([event type] == NSKeyDown &&
+        (([event modifierFlags] & NSCommandKeyMask) != 0) &&
+        ([[event charactersIgnoringModifiers] isEqualToString:@"v"] ||
+         [[event charactersIgnoringModifiers] isEqualToString:@"V"])) {
+        SEL selector = NSSelectorFromString(@"messageTableViewPaste:");
+        if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+            [_dropOverlayTarget performSelector:selector withObject:self];
+            return YES;
+        }
+    }
+    return [super performKeyEquivalent:event];
+}
+
 - (void)draggingExited:(id <NSDraggingInfo>)sender {
     (void)sender;
     [self notifyDropOverlayTarget];
@@ -153,6 +178,13 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     (void)event;
     if (self.target && self.action && [self.target respondsToSelector:self.action]) {
         [NSApp sendAction:self.action to:self.target from:self];
+    }
+}
+
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    if (![self isHidden] && self.target && self.action) {
+        [self addCursorRect:[self bounds] cursor:[NSCursor pointingHandCursor]];
     }
 }
 

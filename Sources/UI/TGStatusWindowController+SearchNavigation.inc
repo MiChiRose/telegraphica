@@ -110,14 +110,17 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         return;
     }
+    if (global) {
+        [self openChatSearchWindow:self];
+        return;
+    }
     self.chatTitleSearchOnly = NO;
+    self.searchInlineCurrentChatOnly = (self.selectedChatID != nil);
     self.searchPanelVisible = YES;
     self.searchEndReached = NO;
     self.globalSearchOffset = nil;
-    [self.searchScopePopUpButton selectItemAtIndex:(global ? 1 : 0)];
-    if (!global && !self.selectedChatID) {
-        [self.searchScopePopUpButton selectItemAtIndex:1];
-    }
+    [self.searchScopePopUpButton selectItemAtIndex:0];
+    [self.searchFilterPopUpButton selectItemAtIndex:0];
     [self.searchResultItems removeAllObjects];
     [self.searchResultsTableView reloadData];
     [self setSearchStatusText:@"Введите запрос"];
@@ -145,6 +148,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     self.searchPanelVisible = NO;
     self.searchLoading = NO;
     self.chatTitleSearchOnly = NO;
+    self.searchInlineCurrentChatOnly = NO;
     self.searchGeneration++;
     [self.searchDebounceTimer invalidate];
     self.searchDebounceTimer = nil;
@@ -252,7 +256,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self layoutContentView];
         return;
     }
-    BOOL global = ([self.searchScopePopUpButton indexOfSelectedItem] == 1 || self.selectedChatID == nil);
+    BOOL global = (!self.searchInlineCurrentChatOnly && ([self.searchScopePopUpButton indexOfSelectedItem] == 1 || self.selectedChatID == nil));
     NSString *filter = TGSearchFilterIdentifierForIndex([self.searchFilterPopUpButton indexOfSelectedItem]);
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *threadID = [self.selectedMessageThreadID retain];
@@ -669,19 +673,33 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
 
 - (BOOL)handlePasteAttachmentFromPasteboard:(NSPasteboard *)pasteboard {
     if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID || self.showingForumTopicList) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Pasteboard: ignored paste auth=%@ selectedChat=%@ forumList=%@.",
+                                      self.currentAuthState ? self.currentAuthState : @"unknown",
+                                      self.selectedChatID ? @"yes" : @"no",
+                                      self.showingForumTopicList ? @"yes" : @"no"]];
         return NO;
     }
+    NSArray *types = [pasteboard types];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Pasteboard: attempting attachment paste with %lu type(s): %@.",
+                                  (unsigned long)[types count],
+                                  [types componentsJoinedByString:@", "]]];
     NSString *path = TGFirstSupportedPhotoPathFromPasteboard(pasteboard);
     if ([path length] == 0) {
         path = [self temporaryPNGPathFromPasteboardImage:pasteboard];
     }
     if ([path length] == 0) {
+        [[TGLogger sharedLogger] log:@"Pasteboard: no supported image path or bitmap data found."];
         return NO;
     }
     TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:path];
     if (![descriptor isKindOfClass:[TGAttachmentDescriptor class]] || ![descriptor isSupported]) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Pasteboard: rejected attachment path=%@ reason=unsupported descriptor.",
+                                      [path lastPathComponent] ? [path lastPathComponent] : @"unknown"]];
         return NO;
     }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Pasteboard: accepted attachment preview kind=%ld file=%@.",
+                                  (long)[descriptor kind],
+                                  [[descriptor path] lastPathComponent] ? [[descriptor path] lastPathComponent] : @"unknown"]];
     [self presentAttachmentPreviewForDescriptor:descriptor];
     return YES;
 }

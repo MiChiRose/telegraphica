@@ -18,6 +18,17 @@
     [self showMessageDropOverlay:NO];
 }
 
+- (void)messageTableViewPaste:(id)sender {
+    (void)sender;
+    BOOL handled = [self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]];
+    if (!handled) {
+        [[TGLogger sharedLogger] log:@"Pasteboard: message table paste did not contain a supported image/file attachment."];
+    }
+    if ([self.sendTextField isEnabled]) {
+        [[self window] makeFirstResponder:self.sendTextField];
+    }
+}
+
 - (void)updateVisibleSection {
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
     NSString *section = self.activeSection ? self.activeSection : TGSectionChats;
@@ -554,13 +565,14 @@
         CGFloat searchHeight = (hasSearchResults || (hasSearchText && self.searchLoading)) ? 174.0 : 78.0;
         CGFloat searchY = messageTop - searchHeight;
         [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
-        CGFloat searchFieldWidth = self.chatTitleSearchOnly ? (panelWidth - 82.0) : (panelWidth - 326.0);
+        BOOL compactSearchControls = (self.chatTitleSearchOnly || self.searchInlineCurrentChatOnly);
+        CGFloat searchFieldWidth = compactSearchControls ? (panelWidth - 82.0) : (panelWidth - 326.0);
         [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, searchFieldWidth, 24.0)];
         [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 306.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
         [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 168.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
         [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
-        [self.searchScopePopUpButton setHidden:self.chatTitleSearchOnly];
-        [self.searchFilterPopUpButton setHidden:self.chatTitleSearchOnly];
+        [self.searchScopePopUpButton setHidden:compactSearchControls];
+        [self.searchFilterPopUpButton setHidden:compactSearchControls];
         [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
         [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
         [self.searchResultsScrollView setHidden:!(hasSearchResults || self.searchLoading)];
