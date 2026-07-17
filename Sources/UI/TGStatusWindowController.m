@@ -333,6 +333,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *photoSendSendButton;
 @property (nonatomic, copy) NSString *pendingPhotoSendPath;
 @property (nonatomic, retain) TGAttachmentDescriptor *pendingAttachmentDescriptor;
+@property (nonatomic, retain) NSArray *pendingAttachmentDescriptors;
 @property (nonatomic, retain) TGFileTransferState *pendingAttachmentTransferState;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendChatID;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendThreadID;
@@ -687,6 +688,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize photoSendSendButton = _photoSendSendButton;
 @synthesize pendingPhotoSendPath = _pendingPhotoSendPath;
 @synthesize pendingAttachmentDescriptor = _pendingAttachmentDescriptor;
+@synthesize pendingAttachmentDescriptors = _pendingAttachmentDescriptors;
 @synthesize pendingAttachmentTransferState = _pendingAttachmentTransferState;
 @synthesize pendingPhotoSendChatID = _pendingPhotoSendChatID;
 @synthesize pendingPhotoSendThreadID = _pendingPhotoSendThreadID;
@@ -3245,6 +3247,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_photoSendSendButton release];
     [_pendingPhotoSendPath release];
     [_pendingAttachmentDescriptor release];
+    [_pendingAttachmentDescriptors release];
     [_pendingAttachmentTransferState release];
     [_pendingPhotoSendChatID release];
     [_pendingPhotoSendThreadID release];

@@ -1,3 +1,49 @@
+static void TGDrawAttachmentPreviewImageInRect(NSImage *image, NSRect rect) {
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:8.0 yRadius:8.0];
+    [[NSColor colorWithCalibratedWhite:0.96 alpha:1.0] set];
+    [path fill];
+    if (image) {
+        NSSize imageSize = [image size];
+        if (imageSize.width > 0.0 && imageSize.height > 0.0) {
+            CGFloat scale = MIN(NSWidth(rect) / imageSize.width, NSHeight(rect) / imageSize.height);
+            NSSize drawSize = NSMakeSize(floor(imageSize.width * scale), floor(imageSize.height * scale));
+            NSRect drawRect = NSMakeRect(NSMidX(rect) - floor(drawSize.width / 2.0),
+                                         NSMidY(rect) - floor(drawSize.height / 2.0),
+                                         drawSize.width,
+                                         drawSize.height);
+            [NSGraphicsContext saveGraphicsState];
+            [path addClip];
+            [image drawInRect:drawRect
+                     fromRect:NSZeroRect
+                    operation:NSCompositeSourceOver
+                     fraction:1.0
+               respectFlipped:NO
+                        hints:nil];
+            [NSGraphicsContext restoreGraphicsState];
+        }
+    }
+    [[NSColor colorWithCalibratedWhite:0.70 alpha:0.78] set];
+    [path setLineWidth:1.0];
+    [path stroke];
+}
+
+static NSString *TGSummarizeAttachmentDescriptors(NSArray *descriptors) {
+    unsigned long long totalSize = 0;
+    NSUInteger index = 0;
+    for (index = 0; index < [descriptors count]; index++) {
+        TGAttachmentDescriptor *descriptor = [descriptors objectAtIndex:index];
+        if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+            totalSize += descriptor.fileSize;
+        }
+    }
+    NSString *countText = [NSString stringWithFormat:@"%lu file%@", (unsigned long)[descriptors count], ([descriptors count] == 1 ? @"" : @"s")];
+    return [NSString stringWithFormat:@"%@ • %@", countText, TGResourcePolicyReadableSize((long long)totalSize)];
+}
+
+static NSString *TGAttachmentBatchProgressText(NSUInteger index, NSUInteger count) {
+    return [NSString stringWithFormat:@"Sending %lu of %lu...", (unsigned long)index, (unsigned long)count];
+}
+
 - (void)ensurePhotoSendPreviewWindow {
     if (self.photoSendPreviewWindow) {
         return;
@@ -97,7 +143,57 @@
     return icon;
 }
 
-- (void)presentAttachmentPreviewForDescriptor:(TGAttachmentDescriptor *)descriptor {
+- (NSImage *)previewImageForAttachmentDescriptors:(NSArray *)descriptors {
+    if ([descriptors count] <= 1) {
+        return [self previewImageForAttachmentDescriptor:[descriptors count] > 0 ? [descriptors objectAtIndex:0] : nil];
+    }
+
+    NSSize canvasSize = NSMakeSize(432.0, 376.0);
+    NSImage *canvas = [[[NSImage alloc] initWithSize:canvasSize] autorelease];
+    [canvas lockFocus];
+    [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
+    NSRectFill(NSMakeRect(0.0, 0.0, canvasSize.width, canvasSize.height));
+
+    TGAttachmentDescriptor *firstDescriptor = [descriptors objectAtIndex:0];
+    NSImage *mainImage = [self previewImageForAttachmentDescriptor:firstDescriptor];
+    TGDrawAttachmentPreviewImageInRect(mainImage, NSMakeRect(8.0, 112.0, canvasSize.width - 16.0, 256.0));
+
+    NSUInteger visibleCount = MIN([descriptors count], (NSUInteger)4);
+    CGFloat thumbGap = 8.0;
+    CGFloat thumbWidth = floor((canvasSize.width - 16.0 - (CGFloat)(visibleCount - 1) * thumbGap) / (CGFloat)visibleCount);
+    if (thumbWidth > 96.0) {
+        thumbWidth = 96.0;
+    }
+    CGFloat rowWidth = (CGFloat)visibleCount * thumbWidth + (CGFloat)(visibleCount - 1) * thumbGap;
+    CGFloat rowX = floor((canvasSize.width - rowWidth) / 2.0);
+    NSUInteger index = 0;
+    for (index = 0; index < visibleCount; index++) {
+        TGAttachmentDescriptor *descriptor = [descriptors objectAtIndex:index];
+        NSImage *thumbnail = [self previewImageForAttachmentDescriptor:descriptor];
+        NSRect thumbRect = NSMakeRect(rowX + (CGFloat)index * (thumbWidth + thumbGap), 8.0, thumbWidth, 88.0);
+        TGDrawAttachmentPreviewImageInRect(thumbnail, thumbRect);
+        if (index == visibleCount - 1 && [descriptors count] > visibleCount) {
+            NSBezierPath *overlayPath = [NSBezierPath bezierPathWithRoundedRect:thumbRect xRadius:8.0 yRadius:8.0];
+            [[NSColor colorWithCalibratedWhite:0.0 alpha:0.34] set];
+            [overlayPath fill];
+            NSString *remainingText = [NSString stringWithFormat:@"+%lu", (unsigned long)([descriptors count] - visibleCount + 1)];
+            NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont boldSystemFontOfSize:22.0], NSFontAttributeName,
+                                        [NSColor whiteColor], NSForegroundColorAttributeName,
+                                        nil];
+            NSSize textSize = [remainingText sizeWithAttributes:attributes];
+            [remainingText drawAtPoint:NSMakePoint(NSMidX(thumbRect) - floor(textSize.width / 2.0),
+                                                   NSMidY(thumbRect) - floor(textSize.height / 2.0))
+                        withAttributes:attributes];
+            break;
+        }
+    }
+
+    [canvas unlockFocus];
+    return canvas;
+}
+
+- (void)presentAttachmentPreviewForDescriptors:(NSArray *)descriptors {
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
         [self appendDetail:@"Select a chat after sign-in is ready before sending a file."];
@@ -107,14 +203,31 @@
         [self appendDetail:@"Wait for the current Telegram operation to finish before sending a file."];
         return;
     }
+    NSMutableArray *safeDescriptors = [NSMutableArray array];
+    NSUInteger sourceIndex = 0;
+    for (sourceIndex = 0; sourceIndex < [descriptors count] && [safeDescriptors count] < 10; sourceIndex++) {
+        id candidate = [descriptors objectAtIndex:sourceIndex];
+        if ([candidate isKindOfClass:[TGAttachmentDescriptor class]] && [(TGAttachmentDescriptor *)candidate isSupported]) {
+            [safeDescriptors addObject:candidate];
+        }
+    }
+    TGAttachmentDescriptor *descriptor = [safeDescriptors count] > 0 ? [safeDescriptors objectAtIndex:0] : nil;
     if (![descriptor isKindOfClass:[TGAttachmentDescriptor class]] || ![descriptor isSupported]) {
-        [self appendDetail:([descriptor.errorMessage length] > 0 ? descriptor.errorMessage : @"This file is not supported.")];
+        [self appendDetail:@"This file is not supported."];
         return;
     }
-    if ([descriptor isLarge]) {
+    BOOL hasLargeDescriptor = NO;
+    NSUInteger descriptorIndex = 0;
+    for (descriptorIndex = 0; descriptorIndex < [safeDescriptors count]; descriptorIndex++) {
+        if ([[safeDescriptors objectAtIndex:descriptorIndex] isLarge]) {
+            hasLargeDescriptor = YES;
+            break;
+        }
+    }
+    if (hasLargeDescriptor) {
         NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-        [alert setMessageText:@"Send large file?"];
-        [alert setInformativeText:[NSString stringWithFormat:@"%@ is %@. Sending may take a while.", descriptor.fileName, [descriptor readableSize]]];
+        [alert setMessageText:([safeDescriptors count] > 1 ? @"Send large files?" : @"Send large file?")];
+        [alert setInformativeText:([safeDescriptors count] > 1 ? [NSString stringWithFormat:@"%@. Sending may take a while.", TGSummarizeAttachmentDescriptors(safeDescriptors)] : [NSString stringWithFormat:@"%@ is %@. Sending may take a while.", descriptor.fileName, [descriptor readableSize]])];
         [alert addButtonWithTitle:TGLoc(@"send")];
         [alert addButtonWithTitle:TGLoc(@"cancel")];
         if ([alert runModal] != NSAlertFirstButtonReturn) {
@@ -124,15 +237,16 @@
 
     [self ensurePhotoSendPreviewWindow];
     self.pendingAttachmentDescriptor = descriptor;
+    self.pendingAttachmentDescriptors = safeDescriptors;
     self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStatePreparing progressKnown:NO progress:0.0 message:@"Ready to send"];
     self.pendingPhotoSendPath = descriptor.path;
     self.pendingPhotoSendChatID = self.selectedChatID;
     self.pendingPhotoSendThreadID = self.selectedMessageThreadID;
     self.pendingPhotoSendTopicKind = self.selectedMessageTopicKind;
-    [self.photoSendPreviewWindow setTitle:[NSString stringWithFormat:@"Send %@", [descriptor.typeLabel lowercaseString]]];
-    [self.photoSendTitleField setStringValue:@"1 media"];
-    [self.photoSendPreviewImageView setImage:[self previewImageForAttachmentDescriptor:descriptor]];
-    [self.photoSendMetaField setStringValue:[descriptor summary]];
+    [self.photoSendPreviewWindow setTitle:([safeDescriptors count] > 1 ? @"Send media" : [NSString stringWithFormat:@"Send %@", [descriptor.typeLabel lowercaseString]])];
+    [self.photoSendTitleField setStringValue:[NSString stringWithFormat:@"%lu media", (unsigned long)[safeDescriptors count]]];
+    [self.photoSendPreviewImageView setImage:[self previewImageForAttachmentDescriptors:safeDescriptors]];
+    [self.photoSendMetaField setStringValue:([safeDescriptors count] > 1 ? TGSummarizeAttachmentDescriptors(safeDescriptors) : [descriptor summary])];
     [self.photoSendCaptionField setStringValue:@""];
     [[self.photoSendCaptionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
     [self.photoSendErrorField setStringValue:@""];
@@ -142,6 +256,14 @@
     [self.photoSendPreviewWindow center];
     [self.photoSendPreviewWindow makeKeyAndOrderFront:nil];
     [[self.photoSendPreviewWindow contentView] setNeedsDisplay:YES];
+}
+
+- (void)presentAttachmentPreviewForDescriptor:(TGAttachmentDescriptor *)descriptor {
+    if (![descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+        [self presentAttachmentPreviewForDescriptors:[NSArray array]];
+        return;
+    }
+    [self presentAttachmentPreviewForDescriptors:[NSArray arrayWithObject:descriptor]];
 }
 
 - (void)presentPhotoSendPreviewForPath:(NSString *)path {
@@ -166,6 +288,7 @@
     (void)sender;
     self.pendingPhotoSendPath = nil;
     self.pendingAttachmentDescriptor = nil;
+    self.pendingAttachmentDescriptors = nil;
     self.pendingAttachmentTransferState = nil;
     self.pendingPhotoSendChatID = nil;
     self.pendingPhotoSendThreadID = nil;
@@ -218,6 +341,8 @@
                 [self appendDetail:@"TDLib send: photo message accepted by TDLib."];
                 [[TGLogger sharedLogger] log:@"TDLib photo message send accepted."];
                 self.pendingPhotoSendPath = nil;
+                self.pendingAttachmentDescriptor = nil;
+                self.pendingAttachmentDescriptors = nil;
                 self.pendingPhotoSendChatID = nil;
                 self.pendingPhotoSendThreadID = nil;
                 self.pendingPhotoSendTopicKind = nil;
@@ -352,6 +477,7 @@
                 [self appendDetail:@"TDLib send: file message accepted by TDLib."];
                 self.pendingPhotoSendPath = nil;
                 self.pendingAttachmentDescriptor = nil;
+                self.pendingAttachmentDescriptors = nil;
                 self.pendingAttachmentTransferState = nil;
                 self.pendingPhotoSendChatID = nil;
                 self.pendingPhotoSendThreadID = nil;
@@ -398,6 +524,132 @@
     });
 }
 
+- (void)submitAttachmentDescriptors:(NSArray *)descriptors caption:(NSString *)caption chatID:(NSNumber *)targetChatID messageThreadID:(NSNumber *)targetThreadID messageTopicKind:(NSString *)targetTopicKind {
+    if ([descriptors count] == 0 || ![targetChatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    NSArray *descriptorCopies = [descriptors retain];
+    NSNumber *chatID = [targetChatID retain];
+    NSNumber *messageThreadID = [targetThreadID retain];
+    NSString *messageTopicKind = [targetTopicKind copy];
+    NSString *safeCaption = [caption isKindOfClass:[NSString class]] ? caption : @"";
+    NSString *firstCaption = [safeCaption copy];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:TGAttachmentBatchProgressText(1, [descriptorCopies count])];
+    self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSending progressKnown:NO progress:0.0 message:@"Sending"];
+    [self appendDetail:[NSString stringWithFormat:@"Submitting %lu attachment(s) to TDLib...", (unsigned long)[descriptorCopies count]]];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSString *firstErrorMessage = nil;
+        NSUInteger sentCount = 0;
+        NSUInteger index = 0;
+        for (index = 0; index < [descriptorCopies count]; index++) {
+            TGAttachmentDescriptor *descriptor = [descriptorCopies objectAtIndex:index];
+            NSString *captionForMessage = (index == 0) ? firstCaption : @"";
+            NSError *sendError = nil;
+            NSString *summary = nil;
+            if (descriptor.kind == TGAttachmentKindPhoto) {
+                summary = [[client sendPhotoMessageToChatID:chatID
+                                             messageThreadID:messageThreadID
+                                           messageTopicKind:messageTopicKind
+                                                   localPath:descriptor.path
+                                                     caption:captionForMessage
+                                                     timeout:18.0
+                                                       error:&sendError] copy];
+            } else if (descriptor.kind == TGAttachmentKindVideo) {
+                summary = [[client sendVideoMessageToChatID:chatID
+                                            messageThreadID:messageThreadID
+                                           messageTopicKind:messageTopicKind
+                                                  localPath:descriptor.path
+                                                    caption:captionForMessage
+                                                    timeout:24.0
+                                                      error:&sendError] copy];
+            } else if (descriptor.kind == TGAttachmentKindAudio) {
+                summary = [[client sendAudioMessageToChatID:chatID
+                                            messageThreadID:messageThreadID
+                                           messageTopicKind:messageTopicKind
+                                                  localPath:descriptor.path
+                                                    caption:captionForMessage
+                                                    timeout:24.0
+                                                      error:&sendError] copy];
+            } else {
+                summary = [[client sendDocumentMessageToChatID:chatID
+                                               messageThreadID:messageThreadID
+                                              messageTopicKind:messageTopicKind
+                                                     localPath:descriptor.path
+                                                       caption:captionForMessage
+                                                       timeout:24.0
+                                                         error:&sendError] copy];
+            }
+            if ([summary length] > 0) {
+                sentCount++;
+                [summary release];
+            } else {
+                NSString *rawErrorMessage = ([[sendError localizedDescription] length] > 0 ? [sendError localizedDescription] : @"Attachment send was not confirmed.");
+                firstErrorMessage = [rawErrorMessage copy];
+                [summary release];
+                break;
+            }
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadID) ||
+                               (self.selectedMessageThreadID && messageThreadID && [self.selectedMessageThreadID longLongValue] == [messageThreadID longLongValue]));
+            BOOL sameTopicKind = ((!self.selectedMessageTopicKind && !messageTopicKind) ||
+                                  (self.selectedMessageTopicKind && messageTopicKind && [self.selectedMessageTopicKind isEqualToString:messageTopicKind]));
+            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
+            if (sentCount == [descriptorCopies count]) {
+                self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSucceeded progressKnown:NO progress:1.0 message:@"Sent"];
+                [self.statusField setStringValue:@"Media sent"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %lu attachment(s) accepted by TDLib.", (unsigned long)sentCount]];
+                self.pendingPhotoSendPath = nil;
+                self.pendingAttachmentDescriptor = nil;
+                self.pendingAttachmentDescriptors = nil;
+                self.pendingAttachmentTransferState = nil;
+                self.pendingPhotoSendChatID = nil;
+                self.pendingPhotoSendThreadID = nil;
+                self.pendingPhotoSendTopicKind = nil;
+                [self.photoSendPreviewWindow orderOut:nil];
+                [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                [self.photoSendSendButton setEnabled:YES];
+                [self.photoSendErrorField setStringValue:@""];
+                [self.photoSendErrorField setHidden:YES];
+                if (selectionStillCurrent) {
+                    self.forceMessageScrollToNewest = YES;
+                    self.pendingLiveChatRefresh = YES;
+                    self.pendingLiveMessageRefresh = YES;
+                    [self handlePendingLiveRefreshesIfPossible];
+                    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                             selector:@selector(refreshSelectedMessagesAfterMediaSend)
+                                                               object:nil];
+                    [self performSelector:@selector(refreshSelectedMessagesAfterMediaSend) withObject:nil afterDelay:1.25];
+                }
+            } else {
+                NSString *message = ([firstErrorMessage length] > 0) ? firstErrorMessage : @"Attachment send was not confirmed.";
+                self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateFailed progressKnown:NO progress:0.0 message:message];
+                [self.statusField setStringValue:@"Media send failed"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib send: sent %lu of %lu; %@", (unsigned long)sentCount, (unsigned long)[descriptorCopies count], message]];
+                [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                [self.photoSendSendButton setEnabled:YES];
+                [self.photoSendErrorField setStringValue:message];
+                [self.photoSendErrorField setHidden:NO];
+            }
+            [self setControlsBusy:NO];
+            [self requestComposerRefocus];
+            [firstErrorMessage release];
+            [descriptorCopies release];
+            [chatID release];
+            [messageThreadID release];
+            [messageTopicKind release];
+            [firstCaption release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)sendPendingPhotoPreview:(id)sender {
     (void)sender;
     NSString *path = [self.pendingPhotoSendPath copy];
@@ -406,6 +658,7 @@
     NSNumber *threadID = [self.pendingPhotoSendThreadID retain];
     NSString *topicKind = [self.pendingPhotoSendTopicKind copy];
     TGAttachmentDescriptor *descriptor = [self.pendingAttachmentDescriptor retain];
+    NSArray *descriptors = [self.pendingAttachmentDescriptors retain];
     NSString *effectivePath = [path length] > 0 ? path : [descriptor path];
     if (![effectivePath length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         [self.photoSendErrorField setStringValue:@"Attachment target is no longer available."];
@@ -415,7 +668,9 @@
         [self.photoSendErrorField setHidden:YES];
         [self.photoSendSendButton setTitle:TGLoc(@"sending")];
         [self.photoSendSendButton setEnabled:NO];
-        if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+        if ([descriptors count] > 1) {
+            [self submitAttachmentDescriptors:descriptors caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
+        } else if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
             [self submitAttachmentDescriptor:descriptor caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
         } else {
             [self submitPhotoAtPath:effectivePath caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
@@ -427,6 +682,7 @@
     [threadID release];
     [topicKind release];
     [descriptor release];
+    [descriptors release];
 }
 
 - (void)ensureStickerPickerWindow {
@@ -1153,7 +1409,7 @@
     NSOpenPanel *panel = [NSOpenPanel openPanel];
     [panel setCanChooseFiles:YES];
     [panel setCanChooseDirectories:NO];
-    [panel setAllowsMultipleSelection:NO];
+    [panel setAllowsMultipleSelection:YES];
     [panel setAllowedFileTypes:[TGAttachmentDescriptor supportedOpenPanelTypes]];
     NSInteger result = [panel runModal];
     if (result != NSOKButton) {
@@ -1165,9 +1421,16 @@
     if ([urls count] == 0) {
         return;
     }
-    NSURL *url = [urls objectAtIndex:0];
-    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:[url path]];
-    [self presentAttachmentPreviewForDescriptor:descriptor];
+    NSMutableArray *descriptors = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [urls count] && [descriptors count] < 10; index++) {
+        NSURL *url = [urls objectAtIndex:index];
+        TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:[url path]];
+        if ([descriptor isSupported]) {
+            [descriptors addObject:descriptor];
+        }
+    }
+    [self presentAttachmentPreviewForDescriptors:descriptors];
 }
 
 - (void)sendMessage:(id)sender {

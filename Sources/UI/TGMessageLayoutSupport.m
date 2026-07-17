@@ -465,6 +465,16 @@ NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumW
 
 NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth) {
     NSArray *mediaItems = [item visualMediaItems];
+    if ([item isVideoNoteMessage]) {
+        CGFloat side = 154.0;
+        if (maximumWidth > 0.0 && side > maximumWidth) {
+            side = maximumWidth;
+        }
+        if (side < 124.0) {
+            side = 124.0;
+        }
+        return NSMakeSize(ceil(side), ceil(side));
+    }
     if ([mediaItems count] > 1) {
         CGFloat albumWidth = maximumWidth;
         if (albumWidth > 360.0) {

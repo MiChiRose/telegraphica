@@ -497,11 +497,12 @@ void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL f
                                                           endingColor:TGColorFromHex(0xf4f0e6)] autorelease];
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternPaper, 0.30);
-    [[NSColor colorWithCalibratedWhite:0.0 alpha:0.16] set];
-    NSFrameRectWithWidth(NSInsetRect(rect, 0.5, 0.5), 1.0);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.24] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 2.0, NSMinY(rect) + 1.0, NSWidth(rect) - 4.0, 1.0), NSCompositeSourceOver);
     [NSGraphicsContext restoreGraphicsState];
+    [[NSColor colorWithCalibratedWhite:0.0 alpha:0.13] set];
+    [path setLineWidth:1.0];
+    [path stroke];
 }
 
 void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped) {

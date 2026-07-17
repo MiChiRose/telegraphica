@@ -96,8 +96,8 @@
         [self showMessageDropOverlay:NO];
         return NSDragOperationNone;
     }
-    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor firstDescriptorFromPasteboard:[info draggingPasteboard]];
-    if ([descriptor isSupported]) {
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:[info draggingPasteboard] maximumCount:10];
+    if ([descriptors count] > 0) {
         [self.messageTableView setDropRow:-1 dropOperation:NSTableViewDropOn];
         [self showMessageDropOverlay:YES];
         return NSDragOperationCopy;
@@ -120,14 +120,12 @@
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
         return NO;
     }
-    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor firstDescriptorFromPasteboard:[info draggingPasteboard]];
-    if (![descriptor isSupported]) {
-        if ([descriptor.errorMessage length] > 0) {
-            [self appendDetail:descriptor.errorMessage];
-        }
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:[info draggingPasteboard] maximumCount:10];
+    if ([descriptors count] == 0) {
+        [self appendDetail:@"No supported files were found in the drop."];
         return NO;
     }
-    [self presentAttachmentPreviewForDescriptor:descriptor];
+    [self presentAttachmentPreviewForDescriptors:descriptors];
     return YES;
 }
 

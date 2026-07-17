@@ -22,5 +22,6 @@ typedef enum {
 - (NSString *)summary;
 + (TGAttachmentDescriptor *)descriptorForPath:(NSString *)path;
 + (TGAttachmentDescriptor *)firstDescriptorFromPasteboard:(NSPasteboard *)pasteboard;
++ (NSArray *)descriptorsFromPasteboard:(NSPasteboard *)pasteboard maximumCount:(NSUInteger)maximumCount;
 + (NSArray *)supportedOpenPanelTypes;
 @end

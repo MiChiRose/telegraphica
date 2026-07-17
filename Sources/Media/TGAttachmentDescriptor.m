@@ -76,13 +76,22 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
 }
 
 + (TGAttachmentDescriptor *)firstDescriptorFromPasteboard:(NSPasteboard *)pasteboard {
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:pasteboard maximumCount:1];
+    return [descriptors count] > 0 ? [descriptors objectAtIndex:0] : nil;
+}
+
++ (NSArray *)descriptorsFromPasteboard:(NSPasteboard *)pasteboard maximumCount:(NSUInteger)maximumCount {
     if (!pasteboard) {
-        return nil;
+        return [NSArray array];
     }
     NSArray *paths = [pasteboard propertyListForType:NSFilenamesPboardType];
     if (![paths isKindOfClass:[NSArray class]] || [paths count] == 0) {
-        return nil;
+        return [NSArray array];
     }
+    if (maximumCount == 0) {
+        maximumCount = [paths count];
+    }
+    NSMutableArray *descriptors = [NSMutableArray array];
     NSUInteger index = 0;
     for (index = 0; index < [paths count]; index++) {
         id candidate = [paths objectAtIndex:index];
@@ -90,11 +99,14 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
             continue;
         }
         TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:(NSString *)candidate];
-        if (descriptor) {
-            return descriptor;
+        if (descriptor && [descriptor isSupported]) {
+            [descriptors addObject:descriptor];
+            if ([descriptors count] >= maximumCount) {
+                break;
+            }
         }
     }
-    return nil;
+    return descriptors;
 }
 
 - (BOOL)isSupported {

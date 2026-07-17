@@ -985,6 +985,12 @@
     [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
+    CGFloat settingsBottomPadding = 32.0;
+    CGFloat requiredSettingsDocHeight = helpCardY + helpCardHeight + settingsBottomPadding;
+    if (requiredSettingsDocHeight > settingsDocHeight) {
+        settingsDocHeight = requiredSettingsDocHeight;
+        [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
+    }
 
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
