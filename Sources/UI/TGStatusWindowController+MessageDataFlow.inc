@@ -1448,13 +1448,19 @@
         NSError *encryptionKeyError = nil;
         NSError *finalAuthorizationError = nil;
         NSError *postLoginProbeError = nil;
+        NSError *proxyError = nil;
+        NSError *networkDiagnosticsError = nil;
         NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
         NSString *parametersSummary = nil;
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
+        NSString *proxySummary = nil;
+        NSString *networkDiagnosticsSummary = nil;
         if (probeSummary) {
+            proxySummary = [client configureNetworkProxyIfNeededWithTimeout:5.0 error:&proxyError];
+            networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:2.0 error:&networkDiagnosticsError];
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
                 authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
@@ -1506,6 +1512,16 @@
                 [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummary]];
                 if (receiverSummary) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib receiver: %@", receiverSummary]];
+                }
+                if (proxySummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib proxy: %@", proxySummary]];
+                } else if (proxyError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib proxy: %@", [proxyError localizedDescription]]];
+                }
+                if (networkDiagnosticsSummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", networkDiagnosticsSummary]];
+                } else if (networkDiagnosticsError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", [networkDiagnosticsError localizedDescription]]];
                 }
                 if (authorizationState) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", authorizationState]];
@@ -1618,14 +1634,20 @@
         NSError *authError = nil;
         NSError *stateError = nil;
         NSError *postLoginProbeError = nil;
+        NSError *networkDiagnosticsError = nil;
         NSString *authSummary = nil;
         NSString *postLoginProbeSummary = nil;
+        NSString *networkDiagnosticsSummary = nil;
         if ([state isEqualToString:@"waitPhoneNumber"]) {
-            authSummary = [client submitAuthenticationPhoneNumber:input timeout:8.0 error:&authError];
+            authSummary = [client submitAuthenticationPhoneNumber:input timeout:30.0 error:&authError];
         } else if ([state isEqualToString:@"waitCode"]) {
-            authSummary = [client submitAuthenticationCode:input timeout:8.0 error:&authError];
+            authSummary = [client submitAuthenticationCode:input timeout:15.0 error:&authError];
         } else if ([state isEqualToString:@"waitPassword"]) {
-            authSummary = [client submitAuthenticationPassword:input timeout:8.0 error:&authError];
+            authSummary = [client submitAuthenticationPassword:input timeout:15.0 error:&authError];
+        }
+        BOOL authNetworkTimeout = [client isAuthorizationNetworkTimeoutError:authError];
+        if (!authSummary && authNetworkTimeout) {
+            networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:3.0 error:&networkDiagnosticsError];
         }
         NSString *finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError];
         if ([finalAuthorizationState isEqualToString:@"ready"]) {
@@ -1648,8 +1670,13 @@
                 [self appendDetail:[NSString stringWithFormat:@"TDLib auth submit: %@", authSummary]];
             } else {
                 NSString *message = [authError localizedDescription] ? [authError localizedDescription] : @"Authentication submit did not return a result.";
-                [self.statusField setStringValue:@"Sign-in needs attention"];
+                [self.statusField setStringValue:(authNetworkTimeout ? @"Telegram connection timed out" : @"Sign-in needs attention")];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib auth submit: %@", message]];
+                if (networkDiagnosticsSummary) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", networkDiagnosticsSummary]];
+                } else if (networkDiagnosticsError) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", [networkDiagnosticsError localizedDescription]]];
+                }
             }
             if (finalAuthorizationState) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationState]];
@@ -1660,18 +1687,18 @@
                 }
                 [self updateAuthControlsForState:finalAuthorizationState];
                 if (!authSummary) {
-                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:finalAuthorizationState]];
+                    [self setLoginErrorWithLocalizationKey:(authNetworkTimeout ? @"login.connection.unavailable" : [self loginErrorLocalizationKeyForAuthState:finalAuthorizationState])];
                 }
             } else if (stateError) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", [stateError localizedDescription]]];
                 [self updateAuthControlsForState:state];
                 if (!authSummary) {
-                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:state]];
+                    [self setLoginErrorWithLocalizationKey:(authNetworkTimeout ? @"login.connection.unavailable" : [self loginErrorLocalizationKeyForAuthState:state])];
                 }
             } else {
                 [self updateAuthControlsForState:state];
                 if (!authSummary) {
-                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:state]];
+                    [self setLoginErrorWithLocalizationKey:(authNetworkTimeout ? @"login.connection.unavailable" : [self loginErrorLocalizationKeyForAuthState:state])];
                 }
             }
             [self updateVisibleSection];

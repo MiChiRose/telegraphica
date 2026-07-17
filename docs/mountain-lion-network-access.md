@@ -1,0 +1,44 @@
+# Mountain Lion Network Access
+
+Telegraphica can ask TDLib to use a proxy before Telegram authorization. This is
+intended for OS X 10.8.5 users on networks where Telegram does not answer during
+phone-number sign-in.
+
+Create or edit:
+
+`~/Library/Application Support/Telegraphica/tdlib-config.plist`
+
+Keep the existing `api_id` and `api_hash` values intact, then add a `proxy`
+dictionary:
+
+```xml
+<key>proxy</key>
+<dict>
+	<key>enabled</key>
+	<true/>
+	<key>type</key>
+	<string>socks5</string>
+	<key>server</key>
+	<string>127.0.0.1</string>
+	<key>port</key>
+	<integer>1080</integer>
+</dict>
+```
+
+Supported proxy types:
+
+- `socks5`: optional `username` and `password`.
+- `http`: optional `username`, `password`, and `http_only`.
+- `mtproto`: required hexadecimal `secret`.
+
+For one-off testing, the same settings can be passed through environment
+variables before launching Telegraphica:
+
+```sh
+export TELEGRAPHICA_TDLIB_PROXY_SERVER=127.0.0.1
+export TELEGRAPHICA_TDLIB_PROXY_PORT=1080
+export TELEGRAPHICA_TDLIB_PROXY_TYPE=socks5
+```
+
+Do not put proxy passwords, MTProto secrets, Telegram login codes, or phone
+numbers in screenshots or public issue reports.
