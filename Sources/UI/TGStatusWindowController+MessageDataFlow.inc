@@ -284,6 +284,7 @@
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self updateOutgoingReadStateForVisibleMessages];
+        [self markVisiblePinnedMessagesFromPinnedItems];
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
         [self scrollMessagesToNewestIfAvailable];
@@ -319,6 +320,7 @@
     [self.messageItems removeAllObjects];
     [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
     [self updateOutgoingReadStateForVisibleMessages];
+    [self markVisiblePinnedMessagesFromPinnedItems];
     [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     if (shouldScrollToNewest) {

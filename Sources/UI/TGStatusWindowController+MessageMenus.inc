@@ -695,6 +695,10 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     if (![item isKindOfClass:[TGChatItem class]]) {
         return;
     }
+    [self markChatItemRead:item];
+}
+
+- (void)markChatItemRead:(TGChatItem *)item {
     NSNumber *sourceChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
     NSNumber *sourceThreadID = [item isForumTopic] ? [item messageThreadID] : nil;
     NSString *sourceTopicKind = [item isForumTopic] ? [item messageTopicKind] : nil;
@@ -736,6 +740,47 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         });
         [pool drain];
     });
+}
+
+- (void)markAllChatsReadFromMenu:(id)sender {
+    (void)sender;
+    NSMutableArray *itemsToRead = [NSMutableArray array];
+    NSMutableSet *seenKeys = [NSMutableSet set];
+    NSUInteger index = 0;
+    NSArray *collections[2] = { self.chatItems, self.chatItemsBeforeTopicList };
+    NSUInteger collectionIndex = 0;
+    for (collectionIndex = 0; collectionIndex < 2; collectionIndex++) {
+        NSArray *sourceItems = collections[collectionIndex];
+        for (index = 0; index < [sourceItems count]; index++) {
+            id candidate = [sourceItems objectAtIndex:index];
+            if (![candidate isKindOfClass:[TGChatItem class]] ||
+                [(TGChatItem *)candidate unreadCount] <= 0) {
+                continue;
+            }
+            TGChatItem *chatItem = (TGChatItem *)candidate;
+            NSNumber *sourceChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
+            NSNumber *sourceThreadID = [chatItem isForumTopic] ? [chatItem messageThreadID] : nil;
+            if (![sourceChatID respondsToSelector:@selector(longLongValue)]) {
+                continue;
+            }
+            NSString *key = [NSString stringWithFormat:@"%lld:%lld",
+                             [sourceChatID longLongValue],
+                             [sourceThreadID respondsToSelector:@selector(longLongValue)] ? [sourceThreadID longLongValue] : 0LL];
+            if ([seenKeys containsObject:key]) {
+                continue;
+            }
+            [seenKeys addObject:key];
+            [itemsToRead addObject:chatItem];
+        }
+    }
+    if ([itemsToRead count] == 0) {
+        [self appendDetail:@"Read all: no unread chats in the loaded list."];
+        return;
+    }
+    [self appendDetail:[NSString stringWithFormat:@"Read all: marking %lu loaded chat(s) as read.", (unsigned long)[itemsToRead count]]];
+    for (index = 0; index < [itemsToRead count]; index++) {
+        [self markChatItemRead:[itemsToRead objectAtIndex:index]];
+    }
 }
 
 - (void)toggleChatPinnedFromMenu:(id)sender {

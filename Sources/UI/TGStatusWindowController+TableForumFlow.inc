@@ -306,7 +306,9 @@
         self.selectedChatLastReadOutboxMessageID = nil;
         self.selectedMessageThreadID = nil;
         self.selectedMessageTopicKind = nil;
+        self.pinnedMessageItems = [NSArray array];
         self.pinnedMessageItem = nil;
+        self.pinnedMessageCarouselIndex = 0;
         self.searchGeneration++;
         [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
@@ -358,7 +360,9 @@
     if (selectionChanged) {
         [self clearTypingIndicator];
         self.searchGeneration++;
+        self.pinnedMessageItems = [NSArray array];
         self.pinnedMessageItem = nil;
+        self.pinnedMessageCarouselIndex = 0;
         [self.messageItems removeAllObjects];
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
@@ -387,9 +391,13 @@
     if (newChatID && (selectionChanged || [self.messageItems count] == 0)) {
         if (selectedForumTopic) {
             [self reloadMessagesForChatID:newChatID interactive:NO];
+            [self requestComposerRefocus];
         } else if (!shouldOpenTopicList) {
             [self reloadMessagesForChatID:newChatID interactive:NO];
+            [self requestComposerRefocus];
         }
+    } else if (newChatID && !shouldOpenTopicList) {
+        [self requestComposerRefocus];
     }
     [previousChatID release];
     [previousThreadID release];

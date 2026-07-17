@@ -36,6 +36,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (TGMessageItem *)messagePreviewItemForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)messageContextPreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind centerMessageID:(NSNumber *)messageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (TGMessageItem *)pinnedMessagePreviewItemForChatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSArray *)pinnedMessagePreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)messageViewersForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error;

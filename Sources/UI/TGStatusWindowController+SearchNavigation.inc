@@ -110,6 +110,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         return;
     }
+    self.chatTitleSearchOnly = NO;
     self.searchPanelVisible = YES;
     self.searchEndReached = NO;
     self.globalSearchOffset = nil;
@@ -135,10 +136,30 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     [self openSearchPanelGlobal:YES];
 }
 
+- (void)openChatListSearch:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    self.chatTitleSearchOnly = YES;
+    self.searchPanelVisible = YES;
+    self.searchEndReached = YES;
+    self.searchLoading = NO;
+    self.globalSearchOffset = nil;
+    [self.searchScopePopUpButton selectItemAtIndex:1];
+    [self.searchResultItems removeAllObjects];
+    [self.searchResultsTableView reloadData];
+    [self setSearchStatusText:@"Ищите чат, группу или человека"];
+    [self updateVisibleSection];
+    [self layoutContentView];
+    [[self window] makeFirstResponder:self.searchTextField];
+}
+
 - (void)closeSearchPanel:(id)sender {
     (void)sender;
     self.searchPanelVisible = NO;
     self.searchLoading = NO;
+    self.chatTitleSearchOnly = NO;
     self.searchGeneration++;
     [self.searchDebounceTimer invalidate];
     self.searchDebounceTimer = nil;
@@ -226,6 +247,22 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self.searchResultItems removeAllObjects];
         [self.searchResultsTableView reloadData];
         [self setSearchStatusText:@"Введите запрос"];
+        [self updateVisibleSection];
+        [self layoutContentView];
+        return;
+    }
+    if (self.chatTitleSearchOnly) {
+        self.searchLoading = NO;
+        self.searchEndReached = YES;
+        self.globalSearchOffset = nil;
+        [self.searchResultItems removeAllObjects];
+        [self.searchResultItems addObjectsFromArray:[self localChatSearchResultsForQuery:query]];
+        [self.searchResultsTableView reloadData];
+        if ([self.searchResultItems count] == 0) {
+            [self setSearchStatusText:@"Чаты не найдены"];
+        } else {
+            [self setSearchStatusText:[NSString stringWithFormat:@"Найдено чатов: %lu", (unsigned long)[self.searchResultItems count]]];
+        }
         [self updateVisibleSection];
         [self layoutContentView];
         return;
@@ -474,6 +511,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                 [self.messageItems removeAllObjects];
                 [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:items]];
                 [self updateOutgoingReadStateForVisibleMessages];
+                [self markVisiblePinnedMessagesFromPinnedItems];
                 [self.messageTableView reloadData];
                 NSUInteger index = [self indexOfMessageID:messageID inMessageItems:self.messageItems];
                 if (index != NSNotFound) {
@@ -598,15 +636,149 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     return NO;
 }
 
+- (NSString *)temporaryPNGPathFromPasteboardImage:(NSPasteboard *)pasteboard {
+    NSData *imageData = nil;
+    NSString *pngType = @"public.png";
+    if ([[pasteboard types] containsObject:pngType]) {
+        imageData = [pasteboard dataForType:pngType];
+    }
+    NSImage *image = nil;
+    if ([imageData length] > 0) {
+        image = [[[NSImage alloc] initWithData:imageData] autorelease];
+    }
+    if (!image) {
+        NSData *tiffData = [pasteboard dataForType:NSTIFFPboardType];
+        if ([tiffData length] > 0) {
+            image = [[[NSImage alloc] initWithData:tiffData] autorelease];
+        }
+    }
+    if (!image) {
+        return nil;
+    }
+    NSBitmapImageRep *bitmap = nil;
+    NSArray *representations = [image representations];
+    NSUInteger index = 0;
+    for (index = 0; index < [representations count]; index++) {
+        id representation = [representations objectAtIndex:index];
+        if ([representation isKindOfClass:[NSBitmapImageRep class]]) {
+            bitmap = (NSBitmapImageRep *)representation;
+            break;
+        }
+    }
+    if (!bitmap) {
+        NSData *tiffData = [image TIFFRepresentation];
+        if ([tiffData length] > 0) {
+            bitmap = [[[NSBitmapImageRep alloc] initWithData:tiffData] autorelease];
+        }
+    }
+    NSData *pngData = [bitmap representationUsingType:NSPNGFileType properties:[NSDictionary dictionary]];
+    if ([pngData length] == 0) {
+        return nil;
+    }
+    NSString *directory = [NSTemporaryDirectory() stringByAppendingPathComponent:@"TelegraphicaPasteboard"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:NULL];
+    NSString *fileName = [NSString stringWithFormat:@"paste-%lld.png", (long long)([[NSDate date] timeIntervalSince1970] * 1000.0)];
+    NSString *path = [directory stringByAppendingPathComponent:fileName];
+    return [pngData writeToFile:path atomically:YES] ? path : nil;
+}
+
+- (BOOL)handlePasteAttachmentFromPasteboard:(NSPasteboard *)pasteboard {
+    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID || self.showingForumTopicList) {
+        return NO;
+    }
+    NSString *path = TGFirstSupportedPhotoPathFromPasteboard(pasteboard);
+    if ([path length] == 0) {
+        path = [self temporaryPNGPathFromPasteboardImage:pasteboard];
+    }
+    if ([path length] == 0) {
+        return NO;
+    }
+    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:path];
+    if (![descriptor isKindOfClass:[TGAttachmentDescriptor class]] || ![descriptor isSupported]) {
+        return NO;
+    }
+    [self presentAttachmentPreviewForDescriptor:descriptor];
+    return YES;
+}
+
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
+    if ([event type] == NSKeyDown &&
+        (([event modifierFlags] & NSCommandKeyMask) != 0) &&
+        ([[event charactersIgnoringModifiers] isEqualToString:@"v"] || [[event charactersIgnoringModifiers] isEqualToString:@"V"]) &&
+        [self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]]) {
+        return YES;
+    }
     if ([self handleSearchKeyEquivalent:event]) {
         return YES;
     }
     return NO;
 }
 
+- (void)updatePinnedMessagePanelDisplay {
+    NSUInteger pinnedCount = [self.pinnedMessageItems count];
+    if (pinnedCount == 0 || !self.pinnedMessageItem) {
+        [self.pinnedMessageTextField setStringValue:@""];
+        [self.pinnedMessageLabelField setStringValue:@"Pinned"];
+        [self.pinnedMessageStripeField setStringValue:@""];
+        return;
+    }
+    NSString *preview = [self.pinnedMessageItem preview];
+    [self.pinnedMessageTextField setStringValue:([preview length] > 0 ? preview : @"Pinned message")];
+    if (pinnedCount > 1) {
+        [self.pinnedMessageLabelField setStringValue:[NSString stringWithFormat:@"Pinned %lu/%lu", (unsigned long)(self.pinnedMessageCarouselIndex + 1), (unsigned long)pinnedCount]];
+    } else {
+        [self.pinnedMessageLabelField setStringValue:@"Pinned"];
+    }
+    NSUInteger visibleStripeCount = pinnedCount;
+    if (visibleStripeCount > 6) {
+        visibleStripeCount = 6;
+    }
+    NSMutableString *stripes = [NSMutableString string];
+    NSUInteger index = 0;
+    for (index = 0; index < visibleStripeCount; index++) {
+        if (index > 0) {
+            [stripes appendString:@"\n"];
+        }
+        [stripes appendString:@"|"];
+    }
+    [self.pinnedMessageStripeField setStringValue:stripes];
+}
+
+- (void)markVisiblePinnedMessagesFromPinnedItems {
+    NSMutableSet *pinnedIDs = [NSMutableSet set];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.pinnedMessageItems count]; index++) {
+        TGMessageItem *item = [self.pinnedMessageItems objectAtIndex:index];
+        if ([[item messageID] respondsToSelector:@selector(longLongValue)]) {
+            [pinnedIDs addObject:[NSNumber numberWithLongLong:[[item messageID] longLongValue]]];
+        }
+    }
+    if ([pinnedIDs count] == 0) {
+        return;
+    }
+    BOOL changed = NO;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        id candidate = [self.messageItems objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+        TGMessageItem *messageItem = (TGMessageItem *)candidate;
+        if ([[messageItem messageID] respondsToSelector:@selector(longLongValue)] &&
+            [pinnedIDs containsObject:[NSNumber numberWithLongLong:[[messageItem messageID] longLongValue]]] &&
+            ![messageItem isPinned]) {
+            [messageItem setPinned:YES];
+            changed = YES;
+        }
+    }
+    if (changed) {
+        [self.messageTableView reloadData];
+    }
+}
+
 - (void)loadPinnedMessageForSelectedChat {
+    self.pinnedMessageItems = [NSArray array];
     self.pinnedMessageItem = nil;
+    self.pinnedMessageCarouselIndex = 0;
     if (![self.currentAuthState isEqualToString:@"ready"] || ![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
         [self updateVisibleSection];
         return;
@@ -618,20 +790,21 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *pinnedError = nil;
-        TGMessageItem *item = [[client pinnedMessagePreviewItemForChatID:chatID timeout:5.0 error:&pinnedError] retain];
+        NSArray *items = [[client pinnedMessagePreviewItemsForChatID:chatID limit:20 timeout:5.0 error:&pinnedError] retain];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.pinnedMessageGeneration == generation &&
                 self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
-                self.pinnedMessageItem = item;
-                if (item) {
-                    [self.pinnedMessageTextField setStringValue:[item preview] ? [item preview] : @"Pinned message"];
-                } else {
-                    [self.pinnedMessageTextField setStringValue:@""];
+                self.pinnedMessageItems = items ? items : [NSArray array];
+                self.pinnedMessageCarouselIndex = 0;
+                if ([self.pinnedMessageItems count] > 0) {
+                    self.pinnedMessageItem = [self.pinnedMessageItems objectAtIndex:0];
                 }
+                [self updatePinnedMessagePanelDisplay];
+                [self markVisiblePinnedMessagesFromPinnedItems];
                 [self updateVisibleSection];
                 [self layoutContentView];
             }
-            [item release];
+            [items release];
             [chatID release];
             [client release];
         });
@@ -650,4 +823,10 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     [result setChatTitle:self.selectedChatTitle];
     [result setMessageItem:self.pinnedMessageItem];
     [self jumpToSearchResult:result];
+    NSUInteger count = [self.pinnedMessageItems count];
+    if (count > 1) {
+        self.pinnedMessageCarouselIndex = (self.pinnedMessageCarouselIndex + 1) % count;
+        self.pinnedMessageItem = [self.pinnedMessageItems objectAtIndex:self.pinnedMessageCarouselIndex];
+        [self updatePinnedMessagePanelDisplay];
+    }
 }

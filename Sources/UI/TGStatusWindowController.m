@@ -32,6 +32,7 @@
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import <AVFoundation/AVFoundation.h>
+#import <objc/runtime.h>
 #include <math.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
@@ -60,6 +61,19 @@ static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophon
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 
+@interface TGPointingHandButton : NSButton
+@end
+
+@implementation TGPointingHandButton
+
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    if ([self isEnabled] && ![self isHidden]) {
+        [self addCursorRect:[self bounds] cursor:[NSCursor pointingHandCursor]];
+    }
+}
+
+@end
 
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
@@ -122,12 +136,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL searchPanelVisible;
 @property (nonatomic, assign) BOOL searchLoading;
 @property (nonatomic, assign) BOOL searchEndReached;
+@property (nonatomic, assign) BOOL chatTitleSearchOnly;
 @property (nonatomic, assign) NSUInteger searchGeneration;
 @property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
+@property (nonatomic, retain) NSTextField *pinnedMessageStripeField;
 @property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
 @property (nonatomic, retain) NSTextField *pinnedMessageTextField;
 @property (nonatomic, retain) NSButton *pinnedMessageButton;
+@property (nonatomic, retain) NSArray *pinnedMessageItems;
 @property (nonatomic, retain) TGMessageItem *pinnedMessageItem;
+@property (nonatomic, assign) NSUInteger pinnedMessageCarouselIndex;
 @property (nonatomic, assign) NSUInteger pinnedMessageGeneration;
 @property (nonatomic, retain) TGGroupedCardView *replyPanelView;
 @property (nonatomic, retain) NSTextField *replyPanelTitleField;
@@ -335,6 +353,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *voiceRecordingIndicatorField;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, retain) NSMenu *chatContextMenu;
+@property (nonatomic, retain) NSMenu *chatsNavigationContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
 @property (nonatomic, assign) NSUInteger mediaPreviewRequestGeneration;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
@@ -463,12 +482,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize searchPanelVisible = _searchPanelVisible;
 @synthesize searchLoading = _searchLoading;
 @synthesize searchEndReached = _searchEndReached;
+@synthesize chatTitleSearchOnly = _chatTitleSearchOnly;
 @synthesize searchGeneration = _searchGeneration;
 @synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
+@synthesize pinnedMessageStripeField = _pinnedMessageStripeField;
 @synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
 @synthesize pinnedMessageTextField = _pinnedMessageTextField;
 @synthesize pinnedMessageButton = _pinnedMessageButton;
+@synthesize pinnedMessageItems = _pinnedMessageItems;
 @synthesize pinnedMessageItem = _pinnedMessageItem;
+@synthesize pinnedMessageCarouselIndex = _pinnedMessageCarouselIndex;
 @synthesize pinnedMessageGeneration = _pinnedMessageGeneration;
 @synthesize replyPanelView = _replyPanelView;
 @synthesize replyPanelTitleField = _replyPanelTitleField;
@@ -676,6 +699,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize voiceRecordingIndicatorField = _voiceRecordingIndicatorField;
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize chatContextMenu = _chatContextMenu;
+@synthesize chatsNavigationContextMenu = _chatsNavigationContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -777,6 +801,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                    object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
+        [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
@@ -1380,6 +1405,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [navigationButton setTarget:self];
         [navigationButton setAction:@selector(navigationChanged:)];
         [navigationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+        if (navigationTags[navigationIndex] == 0) {
+            NSMenu *readAllMenu = [[[NSMenu alloc] initWithTitle:@"Chats"] autorelease];
+            NSMenuItem *readAllItem = [[[NSMenuItem alloc] initWithTitle:@"Read all chats"
+                                                                   action:@selector(markAllChatsReadFromMenu:)
+                                                            keyEquivalent:@""] autorelease];
+            [readAllItem setTarget:self];
+            [readAllMenu addItem:readAllItem];
+            self.chatsNavigationContextMenu = readAllMenu;
+            [navigationButton setMenu:readAllMenu];
+        }
         [contentView addSubview:navigationButton];
         [navigationButtons addObject:navigationButton];
     }
@@ -1566,7 +1601,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.chatSearchButton setTitle:@"search"];
     [self.chatSearchButton setToolTip:@"Search all chats"];
     [self.chatSearchButton setTarget:self];
-    [self.chatSearchButton setAction:@selector(openGlobalSearch:)];
+    [self.chatSearchButton setAction:@selector(openChatListSearch:)];
     [self.chatSearchButton setEnabled:NO];
     [self applyHeaderIconButtonStyle:self.chatSearchButton];
     [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
@@ -1775,13 +1810,20 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.pinnedMessagePanelView setHidden:YES];
     [contentView addSubview:self.pinnedMessagePanelView];
 
-    self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(32, 190, 90, 16)
+    self.pinnedMessageStripeField = [self labelWithFrame:NSMakeRect(32, 182, 8, 40)
+                                                    text:@""
+                                                    font:[NSFont boldSystemFontOfSize:14.0]];
+    [self.pinnedMessageStripeField setTextColor:TGClassicNavigationSelectedColor(0.92)];
+    [self.pinnedMessageStripeField setHidden:YES];
+    [contentView addSubview:self.pinnedMessageStripeField];
+
+    self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(44, 190, 90, 16)
                                                    text:@"Pinned"
                                                    font:[NSFont boldSystemFontOfSize:10.0]];
     [self.pinnedMessageLabelField setTextColor:TGClassicMutedInkColor()];
     [contentView addSubview:self.pinnedMessageLabelField];
 
-    self.pinnedMessageTextField = [self labelWithFrame:NSMakeRect(32, 174, 520, 18)
+    self.pinnedMessageTextField = [self labelWithFrame:NSMakeRect(44, 174, 520, 18)
                                                   text:@""
                                                   font:[NSFont systemFontOfSize:12.0]];
     [self.pinnedMessageTextField setTextColor:TGClassicInkColor()];
@@ -2798,6 +2840,23 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self updateVisibleSection];
 }
 
+- (void)applyPointingHandCursorToButtonsInView:(NSView *)view {
+    if (!view) {
+        return;
+    }
+    NSArray *subviews = [[view subviews] copy];
+    NSUInteger index = 0;
+    for (index = 0; index < [subviews count]; index++) {
+        NSView *subview = [subviews objectAtIndex:index];
+        if ([subview isKindOfClass:[NSButton class]] &&
+            [subview class] == [NSButton class]) {
+            object_setClass(subview, [TGPointingHandButton class]);
+        }
+        [self applyPointingHandCursorToButtonsInView:subview];
+    }
+    [subviews release];
+}
+
 - (NSButton *)modalCloseButtonWithFrame:(NSRect)frame {
     NSButton *button = [[[NSButton alloc] initWithFrame:frame] autorelease];
     [button setTitle:@"Close"];
@@ -2937,9 +2996,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_searchDebounceTimer release];
     [_globalSearchOffset release];
     [_pinnedMessagePanelView release];
+    [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];
     [_pinnedMessageTextField release];
     [_pinnedMessageButton release];
+    [_pinnedMessageItems release];
     [_pinnedMessageItem release];
     [_replyPanelView release];
     [_replyPanelTitleField release];
@@ -3178,6 +3239,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_voiceRecordingIndicatorField release];
     [_messageContextMenu release];
     [_chatContextMenu release];
+    [_chatsNavigationContextMenu release];
     [_mediaPreviewPath release];
     [_logsWindowDetailsView release];
     [_logsCheckButton release];

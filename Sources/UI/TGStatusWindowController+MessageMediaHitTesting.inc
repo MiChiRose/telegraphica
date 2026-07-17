@@ -60,7 +60,7 @@
 
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                          options:NSStringDrawingUsesLineFragmentOrigin];
     }
 
@@ -294,7 +294,7 @@
     NSAttributedString *attributedMessageText = composedMessageText;
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                            options:NSStringDrawingUsesLineFragmentOrigin];
     } else {
         measuredRect = NSZeroRect;
@@ -358,7 +358,7 @@
 
     NSTextStorage *textStorage = [[[NSTextStorage alloc] initWithAttributedString:attributedMessageText] autorelease];
     NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
-    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 1000.0)] autorelease];
+    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 12000.0)] autorelease];
     [textContainer setLineFragmentPadding:0.0];
     [layoutManager addTextContainer:textContainer];
     [textStorage addLayoutManager:layoutManager];

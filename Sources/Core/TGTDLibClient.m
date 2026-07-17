@@ -3174,7 +3174,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (NSString *)textFromFormattedTextObject:(id)object {
     if ([object isKindOfClass:[NSString class]]) {
-        return [self singleLineTrimmedString:(NSString *)object maximumLength:300];
+        return [self singleLineTrimmedString:(NSString *)object maximumLength:4060];
     }
     if (![object isKindOfClass:[NSDictionary class]]) {
         return @"";
@@ -3184,7 +3184,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![text isKindOfClass:[NSString class]]) {
         return @"";
     }
-    return [self singleLineTrimmedString:(NSString *)text maximumLength:300];
+    return [self singleLineTrimmedString:(NSString *)text maximumLength:4060];
 }
 
 - (NSNumber *)fileIDFromFileObject:(id)fileObject {
@@ -4506,6 +4506,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        id pinnedObject = [message objectForKey:@"is_pinned"];
+        if ([pinnedObject respondsToSelector:@selector(boolValue)]) {
+            [item setPinned:[pinnedObject boolValue]];
+        }
         NSNumber *replyMessageID = [self replyMessageIDFromMessageObject:message];
         if (replyMessageID) {
             [item setReplyToMessageID:replyMessageID];
@@ -5340,7 +5344,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return centerItem ? [NSArray arrayWithObject:centerItem] : nil;
 }
 
-- (TGMessageItem *)pinnedMessagePreviewItemForChatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+- (TGMessageItem *)legacyPinnedMessagePreviewItemForChatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         return nil;
     }
@@ -5363,6 +5367,63 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                    messageID:[NSNumber numberWithLongLong:[pinnedMessageID longLongValue]]
                                     timeout:timeout
                                       error:error];
+}
+
+- (TGMessageItem *)pinnedMessagePreviewItemForChatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSArray *items = [self pinnedMessagePreviewItemsForChatID:chatID limit:1 timeout:timeout error:NULL];
+    if ([items count] > 0) {
+        return [items objectAtIndex:0];
+    }
+    return [self legacyPinnedMessagePreviewItemForChatID:chatID timeout:timeout error:error];
+}
+
+- (NSArray *)pinnedMessagePreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return [NSArray array];
+    }
+    NSUInteger safeLimit = limit;
+    if (safeLimit == 0 || safeLimit > 50) {
+        safeLimit = 20;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"searchChatMessages" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:@"" forKey:@"query"];
+    [request setObject:[NSNull null] forKey:@"sender_id"];
+    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"from_message_id"];
+    [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+    [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+    [request setObject:[NSDictionary dictionaryWithObject:@"searchMessagesFilterPinned" forKey:@"@type"] forKey:@"filter"];
+
+    NSError *searchError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-search-pinned-messages"
+                                                           timeout:timeout
+                                                         errorCode:97
+                                                             error:&searchError];
+    NSArray *messages = response ? [self messagesFromSearchResponse:response error:&searchError] : nil;
+    if (messages) {
+        NSArray *items = [self messagePreviewItemsFromMessages:messages chatID:chatID];
+        NSUInteger index = 0;
+        for (index = 0; index < [items count]; index++) {
+            id candidate = [items objectAtIndex:index];
+            if ([candidate isKindOfClass:[TGMessageItem class]]) {
+                [(TGMessageItem *)candidate setPinned:YES];
+            }
+        }
+        return items;
+    }
+
+    TGMessageItem *fallback = [self legacyPinnedMessagePreviewItemForChatID:chatID timeout:timeout error:error];
+    if (fallback) {
+        [fallback setPinned:YES];
+        return [NSArray arrayWithObject:fallback];
+    }
+    if (error && *error == nil) {
+        *error = searchError;
+    }
+    return [NSArray array];
 }
 
 - (NSArray *)messageViewersForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {

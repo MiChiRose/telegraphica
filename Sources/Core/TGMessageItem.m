@@ -67,6 +67,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize outgoing = _outgoing;
 @synthesize sending = _sending;
 @synthesize outgoingRead = _outgoingRead;
+@synthesize pinned = _pinned;
 @synthesize preview = _preview;
 @synthesize contentType = _contentType;
 @synthesize mediaLocalPath = _mediaLocalPath;

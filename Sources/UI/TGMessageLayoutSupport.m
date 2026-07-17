@@ -957,7 +957,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
                 [composedText appendAttributedString:statusSuffixText];
             }
         }
-        NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 1000.0)
+        NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 12000.0)
                                                      options:NSStringDrawingUsesLineFragmentOrigin];
         textHeight = ceil(NSHeight(textRect));
     }
@@ -1029,7 +1029,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
 
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                          options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;

@@ -389,7 +389,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSAttributedString *attributedMessageText = composedMessageText;
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                            options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;
@@ -454,6 +454,18 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     [strokeColor set];
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
+
+    if ([item isPinned]) {
+        NSRect pinRect = NSMakeRect(NSMaxX(bubbleRect) - 23.0,
+                                    [controlView isFlipped] ? (NSMinY(bubbleRect) + 7.0) : (NSMaxY(bubbleRect) - 21.0),
+                                    14.0,
+                                    14.0);
+        TGDrawTemplateIconAsset(@"flag-triangle",
+                                pinRect,
+                                TGClassicNavigationSelectedColor(0.82),
+                                0.92,
+                                [controlView isFlipped]);
+    }
 
     if (showSenderDetails && !outgoing) {
         NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + sidePadding,
