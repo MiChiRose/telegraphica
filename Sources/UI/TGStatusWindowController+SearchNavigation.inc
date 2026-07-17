@@ -683,6 +683,13 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Pasteboard: attempting attachment paste with %lu type(s): %@.",
                                   (unsigned long)[types count],
                                   [types componentsJoinedByString:@", "]]];
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:pasteboard maximumCount:10];
+    if ([descriptors count] > 0) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Pasteboard: accepted %lu attachment descriptor(s) from pasteboard.",
+                                      (unsigned long)[descriptors count]]];
+        [self presentAttachmentPreviewForDescriptors:descriptors];
+        return YES;
+    }
     NSString *path = TGFirstSupportedPhotoPathFromPasteboard(pasteboard);
     if ([path length] == 0) {
         path = [self temporaryPNGPathFromPasteboardImage:pasteboard];

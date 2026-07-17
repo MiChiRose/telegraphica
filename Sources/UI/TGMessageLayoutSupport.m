@@ -706,6 +706,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
 CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
+CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item);
 
 CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
     CGFloat widthRatio = ([item isVisualMediaMessage] ? 0.78 : 0.68);
@@ -879,6 +880,64 @@ CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
     return 0.0;
 }
 
+BOOL TGMessageItemHasCommentThread(TGMessageItem *item) {
+    BOOL hasReplies = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] && [[item messageThreadReplyCount] integerValue] > 0);
+    return ([item isKindOfClass:[TGMessageItem class]] &&
+            ([item canGetMessageThread] || hasReplies) &&
+            [[item chatID] respondsToSelector:@selector(longLongValue)] &&
+            [[item messageID] respondsToSelector:@selector(longLongValue)]);
+}
+
+CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item) {
+    return TGMessageItemHasCommentThread(item) ? 34.0 : 0.0;
+}
+
+NSRect TGMessageCommentBarRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
+    CGFloat height = TGMessageCommentBarHeightForItem(item);
+    if (height <= 0.0 || NSIsEmptyRect(bubbleRect)) {
+        return NSZeroRect;
+    }
+    CGFloat reactionHeight = TGReactionBandHeightForMessageItem(item);
+    CGFloat y = flipped ? (NSMaxY(bubbleRect) - reactionHeight - height - 4.0)
+                        : (NSMinY(bubbleRect) + reactionHeight + 4.0);
+    return NSMakeRect(NSMinX(bubbleRect) + 10.0, y, NSWidth(bubbleRect) - 20.0, height - 6.0);
+}
+
+void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {
+    if (!TGMessageItemHasCommentThread(item)) {
+        return;
+    }
+    NSRect barRect = TGMessageCommentBarRectForItem(item, bubbleRect, flipped);
+    if (NSIsEmptyRect(barRect)) {
+        return;
+    }
+    NSBezierPath *barPath = [NSBezierPath bezierPathWithRoundedRect:barRect xRadius:11.0 yRadius:11.0];
+    NSColor *fillColor = outgoing ? TGClassicIncomingBubbleBottomColor() : TGClassicOutgoingBubbleBottomColor();
+    [[fillColor colorWithAlphaComponent:0.62] set];
+    [barPath fill];
+    [TGClassicNavigationSelectedStrokeColor(0.48) set];
+    [barPath setLineWidth:0.8];
+    [barPath stroke];
+
+    NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
+    NSString *title = (replyCount > 0) ? [NSString stringWithFormat:@"%ld comment%@", (long)replyCount, (replyCount == 1 ? @"" : @"s")] : @"No comments yet";
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                TGClassicNavigationSelectedColor(0.96), NSForegroundColorAttributeName,
+                                nil];
+    CGFloat iconSide = 15.0;
+    NSRect iconRect = NSMakeRect(NSMinX(barRect) + 10.0,
+                                 NSMinY(barRect) + floor((NSHeight(barRect) - iconSide) / 2.0),
+                                 iconSide,
+                                 iconSide);
+    TGDrawTemplateIconAsset(@"route-arrow", iconRect, TGClassicNavigationSelectedColor(0.98), 0.95, flipped);
+    NSRect textRect = NSMakeRect(NSMaxX(iconRect) + 7.0,
+                                 NSMinY(barRect) + floor((NSHeight(barRect) - 14.0) / 2.0) - 1.0,
+                                 NSWidth(barRect) - iconSide - 27.0,
+                                 16.0);
+    [title drawInRect:textRect withAttributes:attributes];
+}
+
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
     return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 13.0 : 0.0;
 }
@@ -1007,6 +1066,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     if (!TGMessageItemIsNonVisualPlayableMedia(item) && !nonVisualDocument) {
         height += TGReactionBandHeightForMessageItem(item);
     }
+    height += TGMessageCommentBarHeightForItem(item);
     return height + 10.0;
 }
 
@@ -1106,6 +1166,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     if (!nonVisualPlayable && !nonVisualDocument) {
         bubbleHeight += TGReactionBandHeightForMessageItem(item);
     }
+    bubbleHeight += TGMessageCommentBarHeightForItem(item);
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);

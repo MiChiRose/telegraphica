@@ -119,6 +119,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *loadChatsButton;
 @property (nonatomic, retain) NSButton *loadMoreChatsButton;
 @property (nonatomic, retain) NSButton *topicBackButton;
+@property (nonatomic, retain) NSButton *commentThreadBackButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSButton *chatSearchButton;
@@ -286,6 +287,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSNumber *selectedChatLastReadOutboxMessageID;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
+@property (nonatomic, copy) NSString *commentThreadParentTitle;
+@property (nonatomic, copy) NSString *commentThreadParentTypeSummary;
+@property (nonatomic, copy) NSString *commentThreadParentAvatarLocalPath;
 @property (nonatomic, retain) NSNumber *topicParentChatID;
 @property (nonatomic, copy) NSString *topicParentTitle;
 @property (nonatomic, copy) NSString *topicParentAvatarLocalPath;
@@ -477,6 +481,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize loadChatsButton = _loadChatsButton;
 @synthesize loadMoreChatsButton = _loadMoreChatsButton;
 @synthesize topicBackButton = _topicBackButton;
+@synthesize commentThreadBackButton = _commentThreadBackButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize chatSearchButton = _chatSearchButton;
@@ -644,6 +649,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize selectedChatLastReadOutboxMessageID = _selectedChatLastReadOutboxMessageID;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
+@synthesize commentThreadParentTitle = _commentThreadParentTitle;
+@synthesize commentThreadParentTypeSummary = _commentThreadParentTypeSummary;
+@synthesize commentThreadParentAvatarLocalPath = _commentThreadParentAvatarLocalPath;
 @synthesize topicParentChatID = _topicParentChatID;
 @synthesize topicParentTitle = _topicParentTitle;
 @synthesize topicParentAvatarLocalPath = _topicParentAvatarLocalPath;
@@ -1665,6 +1673,17 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.topicBackButton setAutoresizingMask:NSViewMaxYMargin];
     [self.topicBackButton setHidden:YES];
     [contentView addSubview:self.topicBackButton];
+
+    self.commentThreadBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(228, 192, 32, 32)] autorelease];
+    [self.commentThreadBackButton setTitle:@"‹"];
+    [self.commentThreadBackButton setToolTip:@"Back to channel"];
+    [self.commentThreadBackButton setTarget:self];
+    [self.commentThreadBackButton setAction:@selector(closeMessageCommentsThread:)];
+    [self.commentThreadBackButton setEnabled:YES];
+    [self applyHeaderIconButtonStyle:self.commentThreadBackButton];
+    [self.commentThreadBackButton setAutoresizingMask:NSViewMaxYMargin];
+    [self.commentThreadBackButton setHidden:YES];
+    [contentView addSubview:self.commentThreadBackButton];
 
     self.chatScrollSurfaceView = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 232, 712, 96)] autorelease];
     [self.chatScrollSurfaceView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
@@ -3034,6 +3053,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_loadChatsButton release];
     [_loadMoreChatsButton release];
     [_topicBackButton release];
+    [_commentThreadBackButton release];
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
     [_chatSearchButton release];
@@ -3200,6 +3220,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_selectedChatLastReadOutboxMessageID release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
+    [_commentThreadParentTitle release];
+    [_commentThreadParentTypeSummary release];
+    [_commentThreadParentAvatarLocalPath release];
     [_topicParentChatID release];
     [_topicParentTitle release];
     [_topicParentAvatarLocalPath release];

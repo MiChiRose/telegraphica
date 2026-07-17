@@ -35,6 +35,13 @@
         return NO;
     }
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    if (TGMessageItemHasCommentThread(item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:item]);
+        NSRect commentRect = TGMessageCommentBarRectForItem(item, bubbleRect, [self.messageTableView isFlipped]);
+        if (!NSIsEmptyRect(commentRect) && NSPointInRect(tablePoint, commentRect)) {
+            return YES;
+        }
+    }
     if (NSIsEmptyRect(cellFrame)) {
         return NO;
     }
@@ -420,6 +427,17 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     [menu addItem:replyItem];
     addedMessageAction = YES;
 
+    if (TGMessageItemHasCommentThread(item)) {
+        NSMenuItem *commentsItem = [[[NSMenuItem alloc] initWithTitle:@"Open comments"
+                                                               action:@selector(openMessageCommentsFromMenu:)
+                                                        keyEquivalent:@""] autorelease];
+        [commentsItem setRepresentedObject:item];
+        [commentsItem setTarget:self];
+        [commentsItem setImage:TGTemplateIconAssetImage(@"chats", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
+        [menu addItem:commentsItem];
+        addedMessageAction = YES;
+    }
+
     NSMenuItem *forwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward..."
                                                           action:@selector(forwardMessageFromMenu:)
                                                    keyEquivalent:@""] autorelease];
@@ -767,6 +785,14 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         return;
     }
     [self downloadAttachmentForMessageItem:item];
+}
+
+- (void)openMessageCommentsFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    [self openMessageCommentsForItem:item];
 }
 
 - (void)markChatReadFromMenu:(id)sender {

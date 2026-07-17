@@ -398,6 +398,14 @@
     }
     NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
+    if (TGMessageItemHasCommentThread((TGMessageItem *)item)) {
+        NSRect commentRect = TGMessageCommentBarRectForItem((TGMessageItem *)item, bubbleRect, [self.messageTableView isFlipped]);
+        if (!NSIsEmptyRect(commentRect) && NSPointInRect(tablePoint, commentRect)) {
+            [self openMessageCommentsForItem:(TGMessageItem *)item];
+            return;
+        }
+    }
     NSDictionary *mediaItem = [self mediaItemForItem:(TGMessageItem *)item
                                         inCellFrame:cellFrame
                                             atPoint:tablePoint];
@@ -406,7 +414,6 @@
         return;
     }
     if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
-        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
         if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
             [self openPlayableMediaForMessageItem:(TGMessageItem *)item];
             return;
@@ -424,4 +431,101 @@
     } else {
         [self appendDetail:@"Could not open message link in default browser."];
     }
+}
+
+- (void)openMessageCommentsForItem:(TGMessageItem *)item {
+    if (!TGMessageItemHasCommentThread(item)) {
+        return;
+    }
+    NSNumber *chatID = [NSNumber numberWithLongLong:[[item chatID] longLongValue]];
+    NSNumber *threadID = [NSNumber numberWithLongLong:[[item messageID] longLongValue]];
+    NSNumber *previousChatID = [self.selectedChatID retain];
+    NSNumber *previousThreadID = [self.selectedMessageThreadID retain];
+    NSString *previousTopicKind = [self.selectedMessageTopicKind copy];
+    [self saveComposerDraftForChatID:previousChatID
+                     messageThreadID:previousThreadID
+                    messageTopicKind:previousTopicKind];
+    self.commentThreadParentTitle = self.selectedChatTitle;
+    self.commentThreadParentTypeSummary = self.selectedChatTypeSummary;
+    self.commentThreadParentAvatarLocalPath = self.selectedChatAvatarLocalPath;
+    self.selectedChatID = chatID;
+    self.selectedMessageThreadID = threadID;
+    self.selectedMessageTopicKind = @"thread";
+    if ([self.selectedChatTitle length] == 0) {
+        self.selectedChatTitle = @"Comments";
+    } else if ([self.selectedChatTitle rangeOfString:@"comments" options:NSCaseInsensitiveSearch].location == NSNotFound) {
+        self.selectedChatTitle = [NSString stringWithFormat:@"%@ comments", self.selectedChatTitle];
+    }
+    self.showingForumTopicList = NO;
+    self.pinnedMessageItems = [NSArray array];
+    self.pinnedMessageItem = nil;
+    self.pinnedMessageCarouselIndex = 0;
+    self.searchGeneration++;
+    [self clearTypingIndicator];
+    [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    [self.messageTableView reloadData];
+    [self restoreComposerDraftForChatID:self.selectedChatID
+                        messageThreadID:self.selectedMessageThreadID
+                       messageTopicKind:self.selectedMessageTopicKind];
+    [self refreshSelectedChatHeaderDisplay];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self appendDetail:[NSString stringWithFormat:@"Opening comments thread for message %@.", threadID]];
+    [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+    [self requestComposerRefocus];
+    [previousChatID release];
+    [previousThreadID release];
+    [previousTopicKind release];
+}
+
+- (void)closeMessageCommentsThread:(id)sender {
+    (void)sender;
+    if (![self.selectedMessageTopicKind isEqualToString:@"thread"] ||
+        ![self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)] ||
+        !self.selectedChatID) {
+        return;
+    }
+
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *threadID = [self.selectedMessageThreadID retain];
+    NSString *topicKind = [self.selectedMessageTopicKind copy];
+    [self saveComposerDraftForChatID:chatID
+                     messageThreadID:threadID
+                    messageTopicKind:topicKind];
+
+    self.selectedMessageThreadID = nil;
+    self.selectedMessageTopicKind = nil;
+    if ([self.commentThreadParentTitle length] > 0) {
+        self.selectedChatTitle = self.commentThreadParentTitle;
+    }
+    if ([self.commentThreadParentTypeSummary length] > 0) {
+        self.selectedChatTypeSummary = self.commentThreadParentTypeSummary;
+    }
+    self.selectedChatAvatarLocalPath = self.commentThreadParentAvatarLocalPath;
+    self.commentThreadParentTitle = nil;
+    self.commentThreadParentTypeSummary = nil;
+    self.commentThreadParentAvatarLocalPath = nil;
+    self.pinnedMessageItems = [NSArray array];
+    self.pinnedMessageItem = nil;
+    self.pinnedMessageCarouselIndex = 0;
+    self.searchGeneration++;
+    [self clearTypingIndicator];
+    [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    [self.messageTableView reloadData];
+    [self restoreComposerDraftForChatID:chatID
+                        messageThreadID:nil
+                       messageTopicKind:nil];
+    self.olderMessagesExhausted = NO;
+    self.autoOlderMessagesLoadArmed = YES;
+    [self refreshSelectedChatHeaderDisplay];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self loadPinnedMessageForSelectedChat];
+    [self appendDetail:@"Closed comments thread and returned to channel."];
+    [self reloadMessagesForChatID:chatID interactive:NO];
+    [self requestComposerRefocus];
+
+    [chatID release];
+    [threadID release];
+    [topicKind release];
 }

@@ -446,6 +446,8 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (!nonVisualPlayable && !nonVisualDocument) {
         bubbleHeight += reactionBandHeight;
     }
+    CGFloat commentBarHeight = TGMessageCommentBarHeightForItem(item);
+    bubbleHeight += commentBarHeight;
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
@@ -563,6 +565,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             }
             playableRect.size.height -= contextHeaderHeight;
         }
+        if (commentBarHeight > 0.0) {
+            playableRect.size.height -= commentBarHeight;
+        }
         TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
     }
 
@@ -579,6 +584,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                 documentRect.origin.y += contextHeaderHeight;
             }
             documentRect.size.height -= contextHeaderHeight;
+        }
+        if (commentBarHeight > 0.0) {
+            documentRect.size.height -= commentBarHeight;
         }
         TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
     }
@@ -642,6 +650,8 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [attributedMessageText drawWithRect:textRect
                                     options:NSStringDrawingUsesLineFragmentOrigin];
     }
+
+    TGDrawMessageCommentBarForItem(item, bubbleRect, outgoing, flipped);
 
     if ([timeString length] > 0 && [messageText length] == 0 && !nonVisualPlayable) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
