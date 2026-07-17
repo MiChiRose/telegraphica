@@ -18,6 +18,7 @@
 #import "TGTheme.h"
 #import "TGTypingIndicatorPresentation.h"
 #import "TGUpdateSupport.h"
+#import "TGTransparentSpinnerView.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGAttachmentDescriptor.h"
 #import "../Media/TGFileTransferState.h"
@@ -184,7 +185,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *authSecondaryLabel;
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
-@property (nonatomic, retain) NSProgressIndicator *busySpinner;
+@property (nonatomic, retain) TGTransparentSpinnerView *busySpinner;
 @property (nonatomic, retain) NSButton *loginLogsButton;
 @property (nonatomic, retain) NSArray *loginLanguageButtons;
 @property (nonatomic, retain) NSTextField *chatsLabel;
@@ -201,7 +202,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
-@property (nonatomic, retain) NSProgressIndicator *messageLoadingSpinner;
+@property (nonatomic, retain) TGTransparentSpinnerView *messageLoadingSpinner;
 @property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
@@ -1587,10 +1588,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
-    self.busySpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
-    [self.busySpinner setStyle:NSProgressIndicatorSpinningStyle];
-    [self.busySpinner setControlSize:NSSmallControlSize];
-    [self.busySpinner setIndeterminate:YES];
+    self.busySpinner = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
     [self.busySpinner setDisplayedWhenStopped:NO];
     [self.busySpinner setHidden:YES];
     [contentView addSubview:self.busySpinner];
@@ -1830,11 +1828,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                object:[self.messageScrollView contentView]];
     [contentView addSubview:self.messageScrollView];
 
-    self.messageLoadingSpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)] autorelease];
-    [self.messageLoadingSpinner setStyle:NSProgressIndicatorSpinningStyle];
-    [self.messageLoadingSpinner setControlSize:NSSmallControlSize];
+    self.messageLoadingSpinner = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)] autorelease];
     [self.messageLoadingSpinner setDisplayedWhenStopped:NO];
-    [self.messageLoadingSpinner setIndeterminate:YES];
     [self.messageLoadingSpinner setHidden:YES];
     [self.messageLoadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
     [contentView addSubview:self.messageLoadingSpinner];
