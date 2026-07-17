@@ -417,6 +417,138 @@
     }
 }
 
+- (NSString *)uniqueDownloadPathForUpdateFileName:(NSString *)fileName {
+    NSString *folder = TGConfiguredDownloadFolderPath();
+    if ([folder length] == 0) {
+        folder = TGDefaultDownloadFolderPath();
+    }
+    NSString *safeName = ([fileName length] > 0) ? [fileName lastPathComponent] : @"Telegraphica-update.dmg";
+    NSString *candidate = [folder stringByAppendingPathComponent:safeName];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:candidate]) {
+        return candidate;
+    }
+
+    NSString *base = [safeName stringByDeletingPathExtension];
+    NSString *ext = [safeName pathExtension];
+    NSUInteger index = 2;
+    while (index < 1000) {
+        NSString *numberedName = ([ext length] > 0)
+            ? [NSString stringWithFormat:@"%@-%lu.%@", base, (unsigned long)index, ext]
+            : [NSString stringWithFormat:@"%@-%lu", base, (unsigned long)index];
+        candidate = [folder stringByAppendingPathComponent:numberedName];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:candidate]) {
+            return candidate;
+        }
+        index++;
+    }
+    return [folder stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%lu", base, (unsigned long)[[NSDate date] timeIntervalSince1970]]];
+}
+
+- (void)downloadUpdateFromInfo:(NSDictionary *)releaseInfo {
+    NSString *downloadURLString = TGUpdateDownloadURLStringFromInfo(releaseInfo);
+    if ([downloadURLString length] == 0) {
+        [self openProjectReleasesPage];
+        return;
+    }
+
+    NSString *fileName = TGUpdateDownloadFileNameFromInfo(releaseInfo);
+    NSString *targetPath = [self uniqueDownloadPathForUpdateFileName:fileName];
+    NSString *folder = [targetPath stringByDeletingLastPathComponent];
+    [[NSFileManager defaultManager] createDirectoryAtPath:folder
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:NULL];
+
+    NSString *previousStatus = [[self.statusField stringValue] copy];
+    [self.statusField setStringValue:@"Downloading update..."];
+    [self.settingsCheckUpdatesButton setEnabled:NO];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: downloading %@ to %@.", downloadURLString, [targetPath lastPathComponent]]];
+
+    NSDictionary *infoCopy = [releaseInfo retain];
+    NSString *targetPathCopy = [targetPath copy];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *downloadError = nil;
+        NSURL *downloadURL = [NSURL URLWithString:downloadURLString];
+        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:downloadURL
+                                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                                           timeoutInterval:120.0];
+        [request setHTTPMethod:@"GET"];
+        [request setValue:TGUpdateCheckUserAgentString() forHTTPHeaderField:@"User-Agent"];
+        NSURLResponse *response = nil;
+        NSData *data = nil;
+        if (downloadURL) {
+            data = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&downloadError];
+        }
+        if (!downloadURL && !downloadError) {
+            downloadError = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                                code:30
+                                            userInfo:[NSDictionary dictionaryWithObject:@"Update download URL is invalid." forKey:NSLocalizedDescriptionKey]];
+        }
+        if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+            NSInteger statusCode = [(NSHTTPURLResponse *)response statusCode];
+            if (statusCode < 200 || statusCode >= 300) {
+                downloadError = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                                    code:statusCode
+                                                userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Update download returned HTTP %ld.", (long)statusCode] forKey:NSLocalizedDescriptionKey]];
+            }
+        }
+        if (!downloadError && [data length] == 0) {
+            downloadError = [NSError errorWithDomain:@"TelegraphicaUpdate"
+                                                code:31
+                                            userInfo:[NSDictionary dictionaryWithObject:@"Downloaded update is empty." forKey:NSLocalizedDescriptionKey]];
+        }
+
+        BOOL wroteFile = NO;
+        if (!downloadError) {
+            wroteFile = [data writeToFile:targetPathCopy options:NSDataWritingAtomic error:&downloadError];
+        }
+        if (!downloadError && wroteFile) {
+            NSString *expectedSHA256 = [infoCopy objectForKey:@"sha256"];
+            if ([expectedSHA256 length] > 0) {
+                NSError *shaError = nil;
+                if (!TGUpdateFileMatchesSHA256(targetPathCopy, expectedSHA256, &shaError)) {
+                    downloadError = [shaError retain];
+                    [[NSFileManager defaultManager] removeItemAtPath:targetPathCopy error:NULL];
+                    [downloadError autorelease];
+                }
+            }
+        }
+
+        NSString *errorMessage = [[downloadError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.statusField setStringValue:([previousStatus length] > 0 ? previousStatus : @"")];
+            [self.settingsCheckUpdatesButton setEnabled:YES];
+            if ([errorMessage length] > 0) {
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: download failed: %@.", errorMessage]];
+                NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+                [alert setMessageText:TGLoc(@"update.download.failed.title")];
+                [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.download.failed.message"), errorMessage]];
+                [alert addButtonWithTitle:TGLoc(@"update.open")];
+                [alert addButtonWithTitle:@"OK"];
+                if ([alert runModal] == NSAlertFirstButtonReturn) {
+                    [self openProjectReleasesPage];
+                }
+            } else {
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: downloaded update to %@.", targetPathCopy]];
+                NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+                [alert setMessageText:TGLoc(@"update.downloaded.title")];
+                [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.downloaded.message"), targetPathCopy]];
+                [alert addButtonWithTitle:TGLoc(@"update.downloaded.open")];
+                [alert addButtonWithTitle:@"OK"];
+                if ([alert runModal] == NSAlertFirstButtonReturn) {
+                    [[NSWorkspace sharedWorkspace] openFile:targetPathCopy];
+                }
+            }
+            [infoCopy release];
+            [targetPathCopy release];
+            [errorMessage release];
+            [previousStatus release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)showUpdateCheckResult:(NSDictionary *)releaseInfo errorMessage:(NSString *)errorMessage manual:(BOOL)manual {
     if ([errorMessage length] > 0) {
         if (manual) {
@@ -452,13 +584,30 @@
     if ([urlString length] == 0) {
         urlString = TGUpdateProjectReleasesURLString();
     }
+    NSString *downloadURLString = TGUpdateDownloadURLStringFromInfo(releaseInfo);
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
     [alert setMessageText:TGLoc(@"update.title")];
     [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"update.availableMessage"), remoteVersion]];
-    [alert addButtonWithTitle:TGLoc(@"update.open")];
+    if ([downloadURLString length] > 0) {
+        [alert addButtonWithTitle:TGLoc(@"update.download")];
+        [alert addButtonWithTitle:TGLoc(@"update.open")];
+    } else {
+        [alert addButtonWithTitle:TGLoc(@"update.open")];
+    }
     [alert addButtonWithTitle:TGLoc(@"update.later")];
     NSInteger result = [alert runModal];
     if (result == NSAlertFirstButtonReturn) {
+        if ([downloadURLString length] > 0) {
+            [self downloadUpdateFromInfo:releaseInfo];
+            return;
+        }
+        NSURL *releaseURL = [NSURL URLWithString:urlString];
+        if (releaseURL) {
+            [[NSWorkspace sharedWorkspace] openURL:releaseURL];
+        } else {
+            [self openProjectReleasesPage];
+        }
+    } else if ([downloadURLString length] > 0 && result == NSAlertSecondButtonReturn) {
         NSURL *releaseURL = [NSURL URLWithString:urlString];
         if (releaseURL) {
             [[NSWorkspace sharedWorkspace] openURL:releaseURL];
@@ -489,8 +638,14 @@
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *updateError = nil;
-        NSDictionary *releaseInfo = [TGLatestGitHubReleaseInfoWithError(&updateError) retain];
+        NSDictionary *releaseInfo = [TGLatestUpdateInfoWithError(&updateError) retain];
         NSString *errorMessage = [[updateError localizedDescription] copy];
+        if (releaseInfo) {
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: update info loaded from %@; version=%@; asset=%@.",
+                                          [releaseInfo objectForKey:@"source"] ? [releaseInfo objectForKey:@"source"] : @"unknown",
+                                          [releaseInfo objectForKey:@"version"] ? [releaseInfo objectForKey:@"version"] : @"unknown",
+                                          TGUpdateDownloadFileNameFromInfo(releaseInfo)]];
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             if (manual) {
                 [self.statusField setStringValue:([previousStatus length] > 0 ? previousStatus : @"")];
@@ -724,4 +879,3 @@
     }
     [[NSUserNotificationCenter defaultUserNotificationCenter] deliverNotification:notification];
 }
-

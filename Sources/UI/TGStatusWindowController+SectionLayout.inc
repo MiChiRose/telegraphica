@@ -18,6 +18,17 @@
     [self showMessageDropOverlay:NO];
 }
 
+- (void)messageTableViewPaste:(id)sender {
+    (void)sender;
+    BOOL handled = [self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]];
+    if (!handled) {
+        [[TGLogger sharedLogger] log:@"Pasteboard: message table paste did not contain a supported image/file attachment."];
+    }
+    if ([self.sendTextField isEnabled]) {
+        [[self window] makeFirstResponder:self.sendTextField];
+    }
+}
+
 - (void)updateVisibleSection {
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
     NSString *section = self.activeSection ? self.activeSection : TGSectionChats;
@@ -90,6 +101,7 @@
     [self showView:self.searchResultsTableView visible:showSearchPanel];
     BOOL showPinnedPanel = (showChats && !self.searchPanelVisible && self.pinnedMessageItem != nil);
     [self showView:self.pinnedMessagePanelView visible:showPinnedPanel];
+    [self showView:self.pinnedMessageStripeField visible:showPinnedPanel];
     [self showView:self.pinnedMessageLabelField visible:showPinnedPanel];
     [self showView:self.pinnedMessageTextField visible:showPinnedPanel];
     [self showView:self.pinnedMessageButton visible:showPinnedPanel];
@@ -236,7 +248,7 @@
                                 font, NSFontAttributeName,
                                 paragraphStyle, NSParagraphStyleAttributeName,
                                 nil];
-    NSRect measuredRect = [text boundingRectWithSize:NSMakeSize(width, 1000.0)
+    NSRect measuredRect = [text boundingRectWithSize:NSMakeSize(width, 12000.0)
                                              options:NSStringDrawingUsesLineFragmentOrigin
                                           attributes:attributes];
     CGFloat measuredHeight = ceil(NSHeight(measuredRect)) + 4.0;
@@ -550,13 +562,17 @@
     if (self.searchPanelVisible) {
         BOOL hasSearchText = ([[self.searchTextField stringValue] length] > 0);
         BOOL hasSearchResults = ([self.searchResultItems count] > 0);
-    CGFloat searchHeight = (hasSearchResults || (hasSearchText && self.searchLoading)) ? 174.0 : 78.0;
+        CGFloat searchHeight = (hasSearchResults || (hasSearchText && self.searchLoading)) ? 174.0 : 78.0;
         CGFloat searchY = messageTop - searchHeight;
         [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
-        [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, panelWidth - 326.0, 24.0)];
+        BOOL compactSearchControls = (self.chatTitleSearchOnly || self.searchInlineCurrentChatOnly);
+        CGFloat searchFieldWidth = compactSearchControls ? (panelWidth - 82.0) : (panelWidth - 326.0);
+        [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, searchFieldWidth, 24.0)];
         [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 306.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
         [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 168.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
         [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
+        [self.searchScopePopUpButton setHidden:compactSearchControls];
+        [self.searchFilterPopUpButton setHidden:compactSearchControls];
         [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
         [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
         [self.searchResultsScrollView setHidden:!(hasSearchResults || self.searchLoading)];
@@ -573,8 +589,9 @@
         CGFloat pinnedHeight = 48.0;
         CGFloat pinnedY = messageTop - pinnedHeight;
         [self.pinnedMessagePanelView setFrame:NSMakeRect(panelInsetX, pinnedY, panelWidth, pinnedHeight)];
-        [self.pinnedMessageLabelField setFrame:NSMakeRect(panelInsetX + 16.0, pinnedY + 27.0, 120.0, 15.0)];
-        [self.pinnedMessageTextField setFrame:NSMakeRect(panelInsetX + 16.0, pinnedY + 9.0, panelWidth - 32.0, 18.0)];
+        [self.pinnedMessageStripeField setFrame:NSMakeRect(panelInsetX + 12.0, pinnedY + 9.0, 10.0, pinnedHeight - 16.0)];
+        [self.pinnedMessageLabelField setFrame:NSMakeRect(panelInsetX + 28.0, pinnedY + 27.0, 180.0, 15.0)];
+        [self.pinnedMessageTextField setFrame:NSMakeRect(panelInsetX + 28.0, pinnedY + 9.0, panelWidth - 78.0, 18.0)];
         [self.pinnedMessageButton setFrame:NSMakeRect(panelInsetX, pinnedY, panelWidth, pinnedHeight)];
         messageTop = pinnedY - 6.0;
     }
@@ -720,7 +737,7 @@
                                        [NSFont systemFontOfSize:13.0], NSFontAttributeName,
                                        nil];
         NSString *bioText = [self.profileStateField stringValue];
-        NSRect bioRect = [bioText boundingRectWithSize:NSMakeSize(profileGroupedWidth - 44.0, 1000.0)
+        NSRect bioRect = [bioText boundingRectWithSize:NSMakeSize(profileGroupedWidth - 44.0, 12000.0)
                                                options:NSStringDrawingUsesLineFragmentOrigin
                                             attributes:bioAttributes];
         CGFloat bioTextHeight = ceil(NSHeight(bioRect));
@@ -855,7 +872,8 @@
     if (settingsDocWidth < 340.0) {
         settingsDocWidth = settingsScrollWidth;
     }
-    CGFloat settingsDocHeight = 1120.0;
+    CGFloat settingsBottomPadding = 32.0;
+    CGFloat settingsDocHeight = 1120.0 + settingsBottomPadding;
     if (settingsDocHeight < settingsScrollHeight) {
         settingsDocHeight = settingsScrollHeight;
     }
@@ -968,7 +986,6 @@
     [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
-
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
         aboutWidth = 560.0;
@@ -993,6 +1010,7 @@
     CGFloat logsCardHeight = mainHeight - TGPanelHeaderHeight - 36.0;
     [self.logsCardView setFrame:NSMakeRect(logsCardX, logsCardY, logsCardWidth, logsCardHeight)];
     [self.detailsScrollView setFrame:NSMakeRect(logsCardX + 12.0, logsCardY + 12.0, logsCardWidth - 24.0, logsCardHeight - 24.0)];
+    [self applyPointingHandCursorToButtonsInView:contentView];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
