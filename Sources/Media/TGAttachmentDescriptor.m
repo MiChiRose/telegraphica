@@ -10,6 +10,8 @@
 @synthesize errorMessage = _errorMessage;
 @synthesize kind = _kind;
 @synthesize fileSize = _fileSize;
+@synthesize pixelWidth = _pixelWidth;
+@synthesize pixelHeight = _pixelHeight;
 
 static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
     if ([extension length] == 0) {
@@ -58,6 +60,22 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
     if (TGAttachmentExtensionInSet(descriptor.extension, photoExtensions)) {
         descriptor.kind = TGAttachmentKindPhoto;
         descriptor.typeLabel = @"Photo";
+        NSImage *image = [[[NSImage alloc] initWithContentsOfFile:standardPath] autorelease];
+        NSArray *representations = [image representations];
+        NSUInteger bestWidth = 0;
+        NSUInteger bestHeight = 0;
+        NSUInteger representationIndex = 0;
+        for (representationIndex = 0; representationIndex < [representations count]; representationIndex++) {
+            NSImageRep *representation = [representations objectAtIndex:representationIndex];
+            NSInteger pixelsWide = [representation pixelsWide];
+            NSInteger pixelsHigh = [representation pixelsHigh];
+            if (pixelsWide > 0 && pixelsHigh > 0 && (NSUInteger)pixelsWide * (NSUInteger)pixelsHigh > bestWidth * bestHeight) {
+                bestWidth = (NSUInteger)pixelsWide;
+                bestHeight = (NSUInteger)pixelsHigh;
+            }
+        }
+        descriptor.pixelWidth = bestWidth;
+        descriptor.pixelHeight = bestHeight;
     } else if (TGAttachmentExtensionInSet(descriptor.extension, videoExtensions)) {
         descriptor.kind = TGAttachmentKindVideo;
         descriptor.typeLabel = @"Video";

@@ -225,7 +225,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                 error:(NSError **)error;
 - (NSDictionary *)formattedCaptionForSendCaption:(NSString *)caption;
 - (NSDictionary *)inputFileLocalForPath:(NSString *)path;
-- (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema;
+- (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption width:(NSNumber *)width height:(NSNumber *)height currentSchema:(BOOL)currentSchema;
 - (NSDictionary *)genericInputMessageContentForInputFile:(NSDictionary *)inputFile contentType:(NSString *)contentType caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema;
 - (BOOL)validateLocalSendFilePath:(NSString *)localPath label:(NSString *)label outPath:(NSString **)outPath error:(NSError **)error code:(NSInteger)code;
 - (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
@@ -5964,7 +5964,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self sendPhotoMessageToChatID:chatID messageThreadID:nil messageTopicKind:nil localPath:localPath caption:caption timeout:timeout error:error];
 }
 
-- (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema {
+- (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption width:(NSNumber *)width height:(NSNumber *)height currentSchema:(BOOL)currentSchema {
+    NSNumber *safeWidth = ([width respondsToSelector:@selector(intValue)] && [width intValue] > 0) ? width : [NSNumber numberWithInt:0];
+    NSNumber *safeHeight = ([height respondsToSelector:@selector(intValue)] && [height intValue] > 0) ? height : [NSNumber numberWithInt:0];
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
     [content setObject:@"inputMessagePhoto" forKey:@"@type"];
     [content setObject:formattedCaption forKey:@"caption"];
@@ -5975,8 +5977,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                     [NSNull null], @"thumbnail",
                                     [NSNull null], @"video",
                                     [NSArray array], @"added_sticker_file_ids",
-                                    [NSNumber numberWithInt:0], @"width",
-                                    [NSNumber numberWithInt:0], @"height",
+                                    safeWidth, @"width",
+                                    safeHeight, @"height",
                                     nil];
         [content setObject:inputPhoto forKey:@"photo"];
         [content setObject:[NSNumber numberWithBool:NO] forKey:@"show_caption_above_media"];
@@ -5986,8 +5988,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [content setObject:inputFile forKey:@"photo"];
         [content setObject:[NSNull null] forKey:@"thumbnail"];
         [content setObject:[NSArray array] forKey:@"added_sticker_file_ids"];
-        [content setObject:[NSNumber numberWithInt:0] forKey:@"width"];
-        [content setObject:[NSNumber numberWithInt:0] forKey:@"height"];
+        [content setObject:safeWidth forKey:@"width"];
+        [content setObject:safeHeight forKey:@"height"];
         [content setObject:[NSNumber numberWithInt:0] forKey:@"ttl"];
     }
     return content;
@@ -6215,6 +6217,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *item = (NSDictionary *)itemObject;
         NSString *kind = [[item objectForKey:@"kind"] isKindOfClass:[NSString class]] ? [item objectForKey:@"kind"] : @"";
         NSString *path = [[item objectForKey:@"path"] isKindOfClass:[NSString class]] ? [item objectForKey:@"path"] : @"";
+        NSNumber *width = [[item objectForKey:@"width"] respondsToSelector:@selector(intValue)] ? [item objectForKey:@"width"] : nil;
+        NSNumber *height = [[item objectForKey:@"height"] respondsToSelector:@selector(intValue)] ? [item objectForKey:@"height"] : nil;
         NSString *standardPath = nil;
         NSString *label = [kind isEqualToString:@"video"] ? @"Video" : @"Photo";
         if (![self validateLocalSendFilePath:path label:label outPath:&standardPath error:error code:105]) {
@@ -6232,17 +6236,31 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *formattedCaption = [self formattedCaptionForSendCaption:captionForItem];
         NSDictionary *legacyContent = [kind isEqualToString:@"video"]
             ? [self genericInputMessageContentForInputFile:inputFile contentType:@"inputMessageVideo" caption:formattedCaption currentSchema:NO]
-            : [self photoInputMessageContentForInputFile:inputFile caption:formattedCaption currentSchema:NO];
+            : [self photoInputMessageContentForInputFile:inputFile caption:formattedCaption width:width height:height currentSchema:NO];
         NSDictionary *currentContent = [kind isEqualToString:@"video"]
             ? [self genericInputMessageContentForInputFile:inputFile contentType:@"inputMessageVideo" caption:formattedCaption currentSchema:YES]
-            : [self photoInputMessageContentForInputFile:inputFile caption:formattedCaption currentSchema:YES];
+            : [self photoInputMessageContentForInputFile:inputFile caption:formattedCaption width:width height:height currentSchema:YES];
         [legacyContents addObject:legacyContent];
         [currentContents addObject:currentContent];
+        NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:standardPath error:NULL];
+        id fileSizeObject = [attributes objectForKey:NSFileSize];
+        unsigned long long byteSize = [fileSizeObject respondsToSelector:@selector(unsignedLongLongValue)] ? [fileSizeObject unsignedLongLongValue] : 0;
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib media album item %lu/%lu kind=%@ file=%@ bytes=%llu size=%@x%@.",
+                                      (unsigned long)(index + 1),
+                                      (unsigned long)[localMediaItems count],
+                                      kind,
+                                      [standardPath lastPathComponent],
+                                      byteSize,
+                                      width ? [width stringValue] : @"0",
+                                      height ? [height stringValue] : @"0"]];
     }
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"sendMessageAlbum" forKey:@"@type"];
     [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"message_thread_id"];
+    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"reply_to_message_id"];
+    [request setObject:[NSNull null] forKey:@"options"];
     [request setObject:legacyContents forKey:@"input_message_contents"];
 
     NSError *sendError = nil;
@@ -6255,6 +6273,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                 error:&sendError];
     if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSMutableDictionary *currentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [currentRequest removeObjectForKey:@"reply_to_message_id"];
+        [currentRequest setObject:[NSNull null] forKey:@"reply_to"];
         [currentRequest setObject:currentContents forKey:@"input_message_contents"];
         response = [self sendMessageRequest:currentRequest
                             messageThreadID:messageThreadID
@@ -6278,6 +6298,21 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         }
         return nil;
     }
+    NSMutableArray *albumIDs = [NSMutableArray array];
+    id messages = [response objectForKey:@"messages"];
+    if ([messages isKindOfClass:[NSArray class]]) {
+        NSUInteger responseIndex = 0;
+        for (responseIndex = 0; responseIndex < [(NSArray *)messages count]; responseIndex++) {
+            id message = [(NSArray *)messages objectAtIndex:responseIndex];
+            id albumID = [message isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)message objectForKey:@"media_album_id"] : nil;
+            if ([albumID respondsToSelector:@selector(longLongValue)] && [albumID longLongValue] > 0) {
+                [albumIDs addObject:[albumID stringValue]];
+            }
+        }
+    }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib media album accepted; response message count=%lu album_ids=%@.",
+                                  [messages isKindOfClass:[NSArray class]] ? (unsigned long)[(NSArray *)messages count] : 0,
+                                  albumIDs]];
     return @"media album submitted";
 }
 

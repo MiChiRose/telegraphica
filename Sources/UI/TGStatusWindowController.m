@@ -889,12 +889,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 - (void)applyMessageTranscriptBackgroundStyle {
     if (TGThemeIsSkeuomorphicBlue()) {
         [self.messageTableView setBackgroundColor:[NSColor clearColor]];
+        [self.messageScrollView setDrawsBackground:NO];
         [[self.messageScrollView contentView] setDrawsBackground:NO];
         [[self.messageScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+        [[self.messageScrollView contentView] setCopiesOnScroll:NO];
     } else {
+        [self.messageScrollView setDrawsBackground:YES];
         [self.messageTableView setBackgroundColor:TGClassicTablePaperColor()];
         [[self.messageScrollView contentView] setDrawsBackground:YES];
         [[self.messageScrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+        [[self.messageScrollView contentView] setCopiesOnScroll:YES];
     }
 }
 

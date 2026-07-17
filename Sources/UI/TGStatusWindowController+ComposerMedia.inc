@@ -69,10 +69,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         TGAttachmentDescriptor *descriptor = [descriptors objectAtIndex:index];
         NSString *kind = (descriptor.kind == TGAttachmentKindVideo) ? @"video" : @"photo";
         if ([descriptor.path length] > 0) {
-            [items addObject:[NSDictionary dictionaryWithObjectsAndKeys:
-                              kind, @"kind",
-                              descriptor.path, @"path",
-                              nil]];
+            NSMutableDictionary *item = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                         kind, @"kind",
+                                         descriptor.path, @"path",
+                                         nil];
+            if (descriptor.pixelWidth > 0 && descriptor.pixelHeight > 0) {
+                [item setObject:[NSNumber numberWithUnsignedInteger:descriptor.pixelWidth] forKey:@"width"];
+                [item setObject:[NSNumber numberWithUnsignedInteger:descriptor.pixelHeight] forKey:@"height"];
+            }
+            [items addObject:item];
         }
     }
     return items;
@@ -569,6 +574,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSString *safeCaption = [caption isKindOfClass:[NSString class]] ? caption : @"";
     NSString *firstCaption = [safeCaption copy];
     BOOL sendAsAlbum = TGAttachmentDescriptorsCanSendAsMediaAlbum(descriptorCopies);
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Composer: sending %lu attachment(s); mediaAlbum=%@.",
+                                  (unsigned long)[descriptorCopies count],
+                                  sendAsAlbum ? @"yes" : @"no"]];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:(sendAsAlbum ? @"Sending media album..." : TGAttachmentBatchProgressText(1, [descriptorCopies count]))];
     self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSending progressKnown:NO progress:0.0 message:@"Sending"];

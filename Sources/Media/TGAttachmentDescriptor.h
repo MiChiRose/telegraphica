@@ -16,6 +16,8 @@ typedef enum {
 @property (nonatomic, copy) NSString *errorMessage;
 @property (nonatomic, assign) TGAttachmentKind kind;
 @property (nonatomic, assign) unsigned long long fileSize;
+@property (nonatomic, assign) NSUInteger pixelWidth;
+@property (nonatomic, assign) NSUInteger pixelHeight;
 - (BOOL)isSupported;
 - (BOOL)isLarge;
 - (NSString *)readableSize;
