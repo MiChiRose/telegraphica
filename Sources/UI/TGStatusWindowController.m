@@ -840,10 +840,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
         if (TGMountainLionSafeLoginModeEnabled()) {
-            [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling is disabled until chat loading is explicitly re-enabled."];
-        } else {
-            [self startLiveUpdateTimerIfNeeded];
+            [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling will drain updates without automatic chat refresh."];
         }
+        [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
         [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
     }
@@ -2735,10 +2734,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)reloadChatFiltersIfReady {
-    if (TGMountainLionSafeLoginModeEnabled()) {
-        [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: skipped TDLib chat folder refresh."];
-        return;
-    }
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: skipped folder refresh because auth state is %@.",
                                       self.currentAuthState ? self.currentAuthState : @"unknown"]];

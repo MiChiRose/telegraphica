@@ -46,9 +46,10 @@ numbers in screenshots or public issue reports.
 ## Safe Login Mode
 
 Mountain Lion builds default to a safe login mode. After authorization reaches
-`ready`, Telegraphica does not automatically request chat lists, folders,
-profile details, live updates, or notifications. This avoids a TDLib 1.8 crash
-seen while loading poll data from existing Telegram state on legacy macOS.
+`ready`, Telegraphica does not automatically request profile details, live chat
+refreshes, or notifications. Chat lists, folders, and messages can still be
+loaded manually. This avoids a TDLib 1.8 crash seen while loading poll data from
+existing Telegram state on legacy macOS.
 In this mode TDLib is also started with `use_message_database` disabled, so it
 does not read the local poll/message cache that can abort the library during
 startup after login.

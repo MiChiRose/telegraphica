@@ -927,14 +927,6 @@
 }
 
 - (void)reloadChatsInteractive:(BOOL)interactive preserveSelection:(BOOL)preserveSelection requestedLimit:(NSUInteger)requestedLimit {
-    if (TGMountainLionSafeLoginModeEnabled()) {
-        if (interactive) {
-            [self.statusField setStringValue:@"Connected"];
-            [self appendDetail:@"Mountain Lion safe login mode: chat loading is paused to avoid a TDLib poll database crash. Disable the safe mode defaults key only for controlled testing."];
-        }
-        return;
-    }
-
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         if (interactive) {
             [self appendDetail:@"Chats are available only after sign-in is ready."];
@@ -961,6 +953,9 @@
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading chats..."];
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            [self appendDetail:@"Mountain Lion safe login mode: loading chats with TDLib message database disabled."];
+        }
         [self appendDetail:activeFilterID ? @"Loading folder chat previews from TDLib..." : @"Loading main chat previews from TDLib..."];
     } else {
         self.backgroundChatRefreshInFlight = YES;
@@ -1335,9 +1330,6 @@
 
 - (void)pollLiveUpdates:(NSTimer *)timer {
     (void)timer;
-    if (TGMountainLionSafeLoginModeEnabled()) {
-        return;
-    }
     if (!self.client) {
         return;
     }
@@ -1353,6 +1345,7 @@
     BOOL needsMessageRefresh = NO;
     BOOL needsChatFilterRefresh = NO;
     BOOL needsPinnedMessageRefresh = NO;
+    BOOL mountainLionSafeLoginMode = TGMountainLionSafeLoginModeEnabled();
 
     NSUInteger index = 0;
     for (index = 0; index < [updates count]; index++) {
@@ -1371,9 +1364,11 @@
         }
 
         if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"] || [kind isEqualToString:@"message_update"]) {
-            needsChatRefresh = YES;
-            self.chatsExhausted = NO;
-            [self.client invalidateMainChatListExhaustion];
+            if (!mountainLionSafeLoginMode) {
+                needsChatRefresh = YES;
+                self.chatsExhausted = NO;
+                [self.client invalidateMainChatListExhaustion];
+            }
             if ([kind isEqualToString:@"new_message"]) {
                 id direction = [summary objectForKey:@"direction"];
                 id incomingChatID = [summary objectForKey:@"chat_id"];
@@ -1393,7 +1388,7 @@
                 [chatID respondsToSelector:@selector(longLongValue)]) {
                 [self removeDisplayedMessageWithID:oldMessageID chatID:chatID];
             }
-            if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
+            if (!mountainLionSafeLoginMode && selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
             }
         } else if ([kind isEqualToString:@"chat_action"]) {
@@ -1402,7 +1397,7 @@
             [self handleComposerDraftUpdateSummary:summary];
         } else if ([kind isEqualToString:@"pinned_message_update"]) {
             id chatID = [summary objectForKey:@"chat_id"];
-            if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
+            if (!mountainLionSafeLoginMode && selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsPinnedMessageRefresh = YES;
             }
         } else if ([kind isEqualToString:@"account_unread"]) {
