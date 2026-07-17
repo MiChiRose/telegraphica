@@ -337,39 +337,48 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         return *slot;
     }
 
-    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(8.0, 8.0)];
+    CGFloat tileSize = 8.0;
+    if (pattern == TGSkeuomorphicPatternCanvas) {
+        tileSize = 16.0;
+    } else if (pattern == TGSkeuomorphicPatternPaper) {
+        tileSize = 18.0;
+    }
+
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(tileSize, tileSize)];
     [image lockFocus];
     [[NSColor clearColor] set];
-    NSRectFill(NSMakeRect(0.0, 0.0, 8.0, 8.0));
+    NSRectFill(NSMakeRect(0.0, 0.0, tileSize, tileSize));
 
     if (pattern == TGSkeuomorphicPatternCanvas) {
         NSBezierPath *lightThread = [NSBezierPath bezierPath];
-        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.052] set];
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.050] set];
         [lightThread setLineWidth:1.0];
-        [lightThread moveToPoint:NSMakePoint(-2.0, 7.0)];
-        [lightThread lineToPoint:NSMakePoint(7.0, -2.0)];
-        [lightThread moveToPoint:NSMakePoint(2.0, 10.0)];
-        [lightThread lineToPoint:NSMakePoint(10.0, 2.0)];
+        [lightThread moveToPoint:NSMakePoint(-3.0, 15.0)];
+        [lightThread lineToPoint:NSMakePoint(15.0, -3.0)];
+        [lightThread moveToPoint:NSMakePoint(7.0, 19.0)];
+        [lightThread lineToPoint:NSMakePoint(19.0, 7.0)];
         [lightThread stroke];
 
         NSBezierPath *shadowThread = [NSBezierPath bezierPath];
-        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.032] set];
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.030] set];
         [shadowThread setLineWidth:1.0];
-        [shadowThread moveToPoint:NSMakePoint(-1.0, 2.0)];
-        [shadowThread lineToPoint:NSMakePoint(2.0, -1.0)];
-        [shadowThread moveToPoint:NSMakePoint(5.0, 9.0)];
-        [shadowThread lineToPoint:NSMakePoint(9.0, 5.0)];
+        [shadowThread moveToPoint:NSMakePoint(-2.0, 7.0)];
+        [shadowThread lineToPoint:NSMakePoint(7.0, -2.0)];
+        [shadowThread moveToPoint:NSMakePoint(10.0, 18.0)];
+        [shadowThread lineToPoint:NSMakePoint(18.0, 10.0)];
         [shadowThread stroke];
 
-        TGDrawPatternDot(3.0, 4.0, 0.026);
-        TGDrawPatternDot(6.0, 1.0, 0.024);
+        TGDrawPatternDot(5.0, 6.0, 0.020);
+        TGDrawPatternDot(12.0, 2.0, 0.018);
     } else if (pattern == TGSkeuomorphicPatternPaper) {
-        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.075] set];
-        NSRectFill(NSMakeRect(0.0, 2.0, 8.0, 1.0));
-        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.030] set];
-        NSRectFill(NSMakeRect(0.0, 6.0, 8.0, 1.0));
-        TGDrawPatternDot(1.0, 1.0, 0.060);
-        TGDrawPatternDot(4.0, 5.0, 0.045);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.070] set];
+        NSRectFill(NSMakeRect(0.0, 1.0, tileSize, 1.0));
+        [[NSColor colorWithCalibratedRed:0.34 green:0.48 blue:0.62 alpha:0.090] set];
+        NSRectFill(NSMakeRect(0.0, 14.0, tileSize, 1.0));
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.050] set];
+        NSRectFill(NSMakeRect(0.0, 15.0, tileSize, 1.0));
+        TGDrawPatternDot(3.0, 4.0, 0.035);
+        TGDrawPatternDot(11.0, 10.0, 0.028);
     } else {
         [[NSColor colorWithCalibratedWhite:1.0 alpha:0.055] set];
         NSRectFill(NSMakeRect(0.0, 0.0, 8.0, 1.0));
