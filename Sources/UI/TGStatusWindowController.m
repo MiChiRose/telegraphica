@@ -871,13 +871,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)applyTransparentChatTableStyle {
-    [self.chatTableView setBackgroundColor:[NSColor clearColor]];
+    if (TGThemeIsSkeuomorphicBlue()) {
+        [self.chatTableView setBackgroundColor:TGClassicTablePaperColor()];
+        [[self.chatScrollView contentView] setDrawsBackground:YES];
+        [[self.chatScrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+    } else {
+        [self.chatTableView setBackgroundColor:[NSColor clearColor]];
+        [[self.chatScrollView contentView] setDrawsBackground:NO];
+        [[self.chatScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+    }
     [self.chatTableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
     [self.chatTableView setGridColor:TGClassicTableGridColor()];
     [self.chatTableView setUsesAlternatingRowBackgroundColors:NO];
     [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
-    [[self.chatScrollView contentView] setDrawsBackground:NO];
-    [[self.chatScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+}
+
+- (void)applyMessageTranscriptBackgroundStyle {
+    if (TGThemeIsSkeuomorphicBlue()) {
+        [self.messageTableView setBackgroundColor:[NSColor clearColor]];
+        [[self.messageScrollView contentView] setDrawsBackground:NO];
+        [[self.messageScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+    } else {
+        [self.messageTableView setBackgroundColor:TGClassicTablePaperColor()];
+        [[self.messageScrollView contentView] setDrawsBackground:YES];
+        [[self.messageScrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+    }
 }
 
 - (void)selectThemePopUpItemForIdentifier:(NSString *)identifier {
@@ -1141,6 +1159,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsResourceCardView setNeedsDisplay:YES];
     [self.settingsHelpCardView setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
+    if ([self.messageScrollSurfaceView isKindOfClass:[TGScrollSurfaceView class]]) {
+        [(TGScrollSurfaceView *)self.messageScrollSurfaceView setDrawsInterior:!TGThemeIsSkeuomorphicBlue()];
+    }
     [self.chatScrollSurfaceView setNeedsDisplay:YES];
     [self.messageScrollSurfaceView setNeedsDisplay:YES];
     [self applySkeuomorphicScrollStyle:self.detailsScrollView];
@@ -1151,6 +1172,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self applyMessageTranscriptBackgroundStyle];
     [self applyTransparentChatTableStyle];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
@@ -1749,6 +1771,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.selectedChatProfileButton];
 
     self.messageScrollSurfaceView = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 72, 712, 112)] autorelease];
+    [(TGScrollSurfaceView *)self.messageScrollSurfaceView setDrawsInterior:!TGThemeIsSkeuomorphicBlue()];
     [self.messageScrollSurfaceView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.messageScrollSurfaceView];
 
@@ -1769,6 +1792,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageTableView setRowHeight:52.0];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self applyMessageTranscriptBackgroundStyle];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];

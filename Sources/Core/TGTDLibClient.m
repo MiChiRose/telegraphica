@@ -223,6 +223,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                               timeout:(NSTimeInterval)timeout
                             errorCode:(NSInteger)errorCode
                                 error:(NSError **)error;
+- (NSDictionary *)formattedCaptionForSendCaption:(NSString *)caption;
+- (NSDictionary *)inputFileLocalForPath:(NSString *)path;
+- (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema;
+- (NSDictionary *)genericInputMessageContentForInputFile:(NSDictionary *)inputFile contentType:(NSString *)contentType caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema;
+- (BOOL)validateLocalSendFilePath:(NSString *)localPath label:(NSString *)label outPath:(NSString **)outPath error:(NSError **)error code:(NSInteger)code;
 - (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -5959,6 +5964,35 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self sendPhotoMessageToChatID:chatID messageThreadID:nil messageTopicKind:nil localPath:localPath caption:caption timeout:timeout error:error];
 }
 
+- (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema {
+    NSMutableDictionary *content = [NSMutableDictionary dictionary];
+    [content setObject:@"inputMessagePhoto" forKey:@"@type"];
+    [content setObject:formattedCaption forKey:@"caption"];
+    if (currentSchema) {
+        NSDictionary *inputPhoto = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    @"inputPhoto", @"@type",
+                                    inputFile, @"photo",
+                                    [NSNull null], @"thumbnail",
+                                    [NSNull null], @"video",
+                                    [NSArray array], @"added_sticker_file_ids",
+                                    [NSNumber numberWithInt:0], @"width",
+                                    [NSNumber numberWithInt:0], @"height",
+                                    nil];
+        [content setObject:inputPhoto forKey:@"photo"];
+        [content setObject:[NSNumber numberWithBool:NO] forKey:@"show_caption_above_media"];
+        [content setObject:[NSNull null] forKey:@"self_destruct_type"];
+        [content setObject:[NSNumber numberWithBool:NO] forKey:@"has_spoiler"];
+    } else {
+        [content setObject:inputFile forKey:@"photo"];
+        [content setObject:[NSNull null] forKey:@"thumbnail"];
+        [content setObject:[NSArray array] forKey:@"added_sticker_file_ids"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"width"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"height"];
+        [content setObject:[NSNumber numberWithInt:0] forKey:@"ttl"];
+    }
+    return content;
+}
+
 - (NSDictionary *)sendMessageRequest:(NSDictionary *)request
                       messageThreadID:(NSNumber *)messageThreadID
                      messageTopicKind:(NSString *)messageTopicKind
@@ -6136,6 +6170,115 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return @"photo submitted";
+}
+
+- (NSString *)sendMediaAlbumToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localMediaItems:(NSArray *)localMediaItems caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:103];
+        }
+        return nil;
+    }
+    if (![localMediaItems isKindOfClass:[NSArray class]] || [localMediaItems count] < 2) {
+        if (error) {
+            *error = [self errorWithDescription:@"Media album needs at least two items." code:103];
+        }
+        return nil;
+    }
+    if ([localMediaItems count] > 10) {
+        if (error) {
+            *error = [self errorWithDescription:@"Media album cannot contain more than 10 items." code:103];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to send media albums. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:104];
+        }
+        return nil;
+    }
+
+    NSMutableArray *legacyContents = [NSMutableArray array];
+    NSMutableArray *currentContents = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [localMediaItems count]; index++) {
+        id itemObject = [localMediaItems objectAtIndex:index];
+        if (![itemObject isKindOfClass:[NSDictionary class]]) {
+            if (error) {
+                *error = [self errorWithDescription:@"Media album item is invalid." code:105];
+            }
+            return nil;
+        }
+        NSDictionary *item = (NSDictionary *)itemObject;
+        NSString *kind = [[item objectForKey:@"kind"] isKindOfClass:[NSString class]] ? [item objectForKey:@"kind"] : @"";
+        NSString *path = [[item objectForKey:@"path"] isKindOfClass:[NSString class]] ? [item objectForKey:@"path"] : @"";
+        NSString *standardPath = nil;
+        NSString *label = [kind isEqualToString:@"video"] ? @"Video" : @"Photo";
+        if (![self validateLocalSendFilePath:path label:label outPath:&standardPath error:error code:105]) {
+            return nil;
+        }
+        if (![kind isEqualToString:@"photo"] && ![kind isEqualToString:@"video"]) {
+            if (error) {
+                *error = [self errorWithDescription:@"Media albums currently support only photos and videos." code:106];
+            }
+            return nil;
+        }
+
+        NSDictionary *inputFile = [self inputFileLocalForPath:standardPath];
+        NSString *captionForItem = (index == 0 && [caption isKindOfClass:[NSString class]]) ? caption : @"";
+        NSDictionary *formattedCaption = [self formattedCaptionForSendCaption:captionForItem];
+        NSDictionary *legacyContent = [kind isEqualToString:@"video"]
+            ? [self genericInputMessageContentForInputFile:inputFile contentType:@"inputMessageVideo" caption:formattedCaption currentSchema:NO]
+            : [self photoInputMessageContentForInputFile:inputFile caption:formattedCaption currentSchema:NO];
+        NSDictionary *currentContent = [kind isEqualToString:@"video"]
+            ? [self genericInputMessageContentForInputFile:inputFile contentType:@"inputMessageVideo" caption:formattedCaption currentSchema:YES]
+            : [self photoInputMessageContentForInputFile:inputFile caption:formattedCaption currentSchema:YES];
+        [legacyContents addObject:legacyContent];
+        [currentContents addObject:currentContent];
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"sendMessageAlbum" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:legacyContents forKey:@"input_message_contents"];
+
+    NSError *sendError = nil;
+    NSDictionary *response = [self sendMessageRequest:request
+                                      messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind
+                                          extraPrefix:@"telegraphica-send-media-album"
+                                              timeout:timeout
+                                            errorCode:107
+                                                error:&sendError];
+    if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
+        NSMutableDictionary *currentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [currentRequest setObject:currentContents forKey:@"input_message_contents"];
+        response = [self sendMessageRequest:currentRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-media-album-current"
+                                    timeout:timeout
+                                  errorCode:107
+                                      error:&sendError];
+    }
+    if (!response) {
+        if (error) {
+            *error = sendError ? sendError : [self errorWithDescription:@"TDLib did not confirm media album send." code:107];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"messages"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib sendMessageAlbum returned an unexpected response." code:108];
+        }
+        return nil;
+    }
+    return @"media album submitted";
 }
 
 - (BOOL)validateLocalSendFilePath:(NSString *)localPath

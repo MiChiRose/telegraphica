@@ -44,6 +44,40 @@ static NSString *TGAttachmentBatchProgressText(NSUInteger index, NSUInteger coun
     return [NSString stringWithFormat:@"Sending %lu of %lu...", (unsigned long)index, (unsigned long)count];
 }
 
+static BOOL TGAttachmentDescriptorsCanSendAsMediaAlbum(NSArray *descriptors) {
+    if ([descriptors count] < 2 || [descriptors count] > 10) {
+        return NO;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [descriptors count]; index++) {
+        id object = [descriptors objectAtIndex:index];
+        if (![object isKindOfClass:[TGAttachmentDescriptor class]]) {
+            return NO;
+        }
+        TGAttachmentDescriptor *descriptor = (TGAttachmentDescriptor *)object;
+        if (descriptor.kind != TGAttachmentKindPhoto && descriptor.kind != TGAttachmentKindVideo) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
+static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors) {
+    NSMutableArray *items = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [descriptors count]; index++) {
+        TGAttachmentDescriptor *descriptor = [descriptors objectAtIndex:index];
+        NSString *kind = (descriptor.kind == TGAttachmentKindVideo) ? @"video" : @"photo";
+        if ([descriptor.path length] > 0) {
+            [items addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                              kind, @"kind",
+                              descriptor.path, @"path",
+                              nil]];
+        }
+    }
+    return items;
+}
+
 - (void)ensurePhotoSendPreviewWindow {
     if (self.photoSendPreviewWindow) {
         return;
@@ -534,63 +568,85 @@ static NSString *TGAttachmentBatchProgressText(NSUInteger index, NSUInteger coun
     NSString *messageTopicKind = [targetTopicKind copy];
     NSString *safeCaption = [caption isKindOfClass:[NSString class]] ? caption : @"";
     NSString *firstCaption = [safeCaption copy];
+    BOOL sendAsAlbum = TGAttachmentDescriptorsCanSendAsMediaAlbum(descriptorCopies);
     [self setControlsBusy:YES];
-    [self.statusField setStringValue:TGAttachmentBatchProgressText(1, [descriptorCopies count])];
+    [self.statusField setStringValue:(sendAsAlbum ? @"Sending media album..." : TGAttachmentBatchProgressText(1, [descriptorCopies count]))];
     self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSending progressKnown:NO progress:0.0 message:@"Sending"];
-    [self appendDetail:[NSString stringWithFormat:@"Submitting %lu attachment(s) to TDLib...", (unsigned long)[descriptorCopies count]]];
+    [self appendDetail:[NSString stringWithFormat:@"Submitting %lu attachment(s) to TDLib%@...",
+                        (unsigned long)[descriptorCopies count],
+                        sendAsAlbum ? @" as a media album" : @""]];
 
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSString *firstErrorMessage = nil;
         NSUInteger sentCount = 0;
-        NSUInteger index = 0;
-        for (index = 0; index < [descriptorCopies count]; index++) {
-            TGAttachmentDescriptor *descriptor = [descriptorCopies objectAtIndex:index];
-            NSString *captionForMessage = (index == 0) ? firstCaption : @"";
+        if (sendAsAlbum) {
             NSError *sendError = nil;
-            NSString *summary = nil;
-            if (descriptor.kind == TGAttachmentKindPhoto) {
-                summary = [[client sendPhotoMessageToChatID:chatID
-                                             messageThreadID:messageThreadID
-                                           messageTopicKind:messageTopicKind
-                                                   localPath:descriptor.path
-                                                     caption:captionForMessage
-                                                     timeout:18.0
-                                                       error:&sendError] copy];
-            } else if (descriptor.kind == TGAttachmentKindVideo) {
-                summary = [[client sendVideoMessageToChatID:chatID
-                                            messageThreadID:messageThreadID
-                                           messageTopicKind:messageTopicKind
-                                                  localPath:descriptor.path
-                                                    caption:captionForMessage
-                                                    timeout:24.0
-                                                      error:&sendError] copy];
-            } else if (descriptor.kind == TGAttachmentKindAudio) {
-                summary = [[client sendAudioMessageToChatID:chatID
-                                            messageThreadID:messageThreadID
-                                           messageTopicKind:messageTopicKind
-                                                  localPath:descriptor.path
-                                                    caption:captionForMessage
-                                                    timeout:24.0
-                                                      error:&sendError] copy];
+            NSArray *albumItems = TGAttachmentMediaAlbumItemsFromDescriptors(descriptorCopies);
+            NSString *summary = [[client sendMediaAlbumToChatID:chatID
+                                                messageThreadID:messageThreadID
+                                               messageTopicKind:messageTopicKind
+                                                localMediaItems:albumItems
+                                                        caption:firstCaption
+                                                        timeout:24.0
+                                                          error:&sendError] copy];
+            if ([summary length] > 0) {
+                sentCount = [descriptorCopies count];
             } else {
-                summary = [[client sendDocumentMessageToChatID:chatID
+                NSString *rawErrorMessage = ([[sendError localizedDescription] length] > 0 ? [sendError localizedDescription] : @"Media album send was not confirmed.");
+                firstErrorMessage = [rawErrorMessage copy];
+            }
+            [summary release];
+        } else {
+            NSUInteger index = 0;
+            for (index = 0; index < [descriptorCopies count]; index++) {
+                TGAttachmentDescriptor *descriptor = [descriptorCopies objectAtIndex:index];
+                NSString *captionForMessage = (index == 0) ? firstCaption : @"";
+                NSError *sendError = nil;
+                NSString *summary = nil;
+                if (descriptor.kind == TGAttachmentKindPhoto) {
+                    summary = [[client sendPhotoMessageToChatID:chatID
+                                                messageThreadID:messageThreadID
+                                              messageTopicKind:messageTopicKind
+                                                      localPath:descriptor.path
+                                                        caption:captionForMessage
+                                                        timeout:18.0
+                                                          error:&sendError] copy];
+                } else if (descriptor.kind == TGAttachmentKindVideo) {
+                    summary = [[client sendVideoMessageToChatID:chatID
                                                messageThreadID:messageThreadID
                                               messageTopicKind:messageTopicKind
                                                      localPath:descriptor.path
                                                        caption:captionForMessage
                                                        timeout:24.0
                                                          error:&sendError] copy];
-            }
-            if ([summary length] > 0) {
-                sentCount++;
-                [summary release];
-            } else {
-                NSString *rawErrorMessage = ([[sendError localizedDescription] length] > 0 ? [sendError localizedDescription] : @"Attachment send was not confirmed.");
-                firstErrorMessage = [rawErrorMessage copy];
-                [summary release];
-                break;
+                } else if (descriptor.kind == TGAttachmentKindAudio) {
+                    summary = [[client sendAudioMessageToChatID:chatID
+                                               messageThreadID:messageThreadID
+                                              messageTopicKind:messageTopicKind
+                                                     localPath:descriptor.path
+                                                       caption:captionForMessage
+                                                       timeout:24.0
+                                                         error:&sendError] copy];
+                } else {
+                    summary = [[client sendDocumentMessageToChatID:chatID
+                                                  messageThreadID:messageThreadID
+                                                 messageTopicKind:messageTopicKind
+                                                        localPath:descriptor.path
+                                                          caption:captionForMessage
+                                                          timeout:24.0
+                                                            error:&sendError] copy];
+                }
+                if ([summary length] > 0) {
+                    sentCount++;
+                    [summary release];
+                } else {
+                    NSString *rawErrorMessage = ([[sendError localizedDescription] length] > 0 ? [sendError localizedDescription] : @"Attachment send was not confirmed.");
+                    firstErrorMessage = [rawErrorMessage copy];
+                    [summary release];
+                    break;
+                }
             }
         }
 
@@ -602,8 +658,10 @@ static NSString *TGAttachmentBatchProgressText(NSUInteger index, NSUInteger coun
             BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
             if (sentCount == [descriptorCopies count]) {
                 self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSucceeded progressKnown:NO progress:1.0 message:@"Sent"];
-                [self.statusField setStringValue:@"Media sent"];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %lu attachment(s) accepted by TDLib.", (unsigned long)sentCount]];
+                [self.statusField setStringValue:(sendAsAlbum ? @"Media album sent" : @"Media sent")];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %lu attachment(s) accepted by TDLib%@.",
+                                    (unsigned long)sentCount,
+                                    sendAsAlbum ? @" as an album" : @""]];
                 self.pendingPhotoSendPath = nil;
                 self.pendingAttachmentDescriptor = nil;
                 self.pendingAttachmentDescriptors = nil;

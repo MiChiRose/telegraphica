@@ -12,7 +12,10 @@
 @interface TGPanelView : NSView
 @end
 
-@interface TGScrollSurfaceView : NSView
+@interface TGScrollSurfaceView : NSView {
+    BOOL _drawsInterior;
+}
+@property (nonatomic, assign) BOOL drawsInterior;
 @end
 
 @interface TGComposerInputBackgroundView : NSView
