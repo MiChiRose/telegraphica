@@ -1185,16 +1185,11 @@
         [self updateSendControls];
         return;
     }
-    if ([text length] > 4096) {
-        [self appendDetail:@"Message text is too long for this spike."];
-        [self updateSendControls];
-        return;
-    }
-
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
     NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
     NSString *messageText = [text copy];
+    NSArray *messageChunks = [TGOutgoingTextMessageChunks(messageText) retain];
     NSNumber *replyToMessageID = nil;
     if (self.replyTargetMessageItem &&
         [self.replyTargetChatID respondsToSelector:@selector(longLongValue)] &&
@@ -1206,7 +1201,11 @@
     [replyToMessageID retain];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending..."];
-    [self appendDetail:(messageThreadID ? @"Submitting topic text message to TDLib..." : @"Submitting text message to TDLib...")];
+    if ([messageChunks count] > 1) {
+        [self appendDetail:[NSString stringWithFormat:@"Submitting long text message to TDLib as %lu parts...", (unsigned long)[messageChunks count]]];
+    } else {
+        [self appendDetail:(messageThreadID ? @"Submitting topic text message to TDLib..." : @"Submitting text message to TDLib...")];
+    }
     [[TGLogger sharedLogger] log:@"TDLib text message send requested."];
 
     TGTDLibClient *client = [self.client retain];
@@ -1214,16 +1213,29 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *sendError = nil;
         NSError *stateError = nil;
-        NSString *sendSummary = [client sendTextMessageToChatID:chatID
-                                                messageThreadID:messageThreadID
-                                              messageTopicKind:messageTopicKind
-                                                           text:messageText
-                                                replyToMessageID:replyToMessageID
-                                                        timeout:8.0
-                                                          error:&sendError];
+        NSUInteger sentPartCount = 0;
+        NSUInteger totalPartCount = [messageChunks count];
+        NSUInteger chunkIndex = 0;
+        for (chunkIndex = 0; chunkIndex < totalPartCount; chunkIndex++) {
+            NSString *chunkText = [messageChunks objectAtIndex:chunkIndex];
+            NSError *chunkError = nil;
+            NSNumber *chunkReplyToMessageID = (chunkIndex == 0) ? replyToMessageID : nil;
+            NSString *sendSummary = [client sendTextMessageToChatID:chatID
+                                                    messageThreadID:messageThreadID
+                                                  messageTopicKind:messageTopicKind
+                                                               text:chunkText
+                                                    replyToMessageID:chunkReplyToMessageID
+                                                            timeout:8.0
+                                                              error:&chunkError];
+            if ([sendSummary length] == 0) {
+                sendError = chunkError;
+                break;
+            }
+            sentPartCount++;
+        }
         NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
         NSString *sendErrorMessage = [[sendError localizedDescription] copy];
-        BOOL sendSucceeded = ([sendSummary length] > 0);
+        BOOL sendSucceeded = (totalPartCount > 0 && sentPartCount == totalPartCount);
 
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameThread = ((!self.selectedMessageThreadID && !messageThreadID) ||
@@ -1233,9 +1245,14 @@
             BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
             if (sendSucceeded) {
                 [self setOfflineModeActive:NO reason:nil];
-                [self.statusField setStringValue:@"Message sent"];
-                [self appendDetail:@"TDLib send: text message accepted by TDLib."];
-                [[TGLogger sharedLogger] log:@"TDLib text message send accepted."];
+                [self.statusField setStringValue:([messageChunks count] > 1 ? @"Messages sent" : @"Message sent")];
+                if ([messageChunks count] > 1) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib send: long text accepted by TDLib in %lu parts.", (unsigned long)[messageChunks count]]];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib long text message send accepted in %lu parts.", (unsigned long)[messageChunks count]]];
+                } else {
+                    [self appendDetail:@"TDLib send: text message accepted by TDLib."];
+                    [[TGLogger sharedLogger] log:@"TDLib text message send accepted."];
+                }
                 [self removeComposerDraftForChatID:chatID
                                    messageThreadID:messageThreadID
                                     messageTopicKind:messageTopicKind];
@@ -1253,7 +1270,14 @@
                 } else {
                     [self.statusField setStringValue:@"Send not confirmed"];
                 }
-                [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@ Do not retry automatically; it may or may not have been sent.", message]];
+                if ([messageChunks count] > 1) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@ Sent %lu of %lu parts. Do not retry automatically; it may or may not have been partially sent.",
+                                        message,
+                                        (unsigned long)sentPartCount,
+                                        (unsigned long)[messageChunks count]]];
+                } else {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@ Do not retry automatically; it may or may not have been sent.", message]];
+                }
                 [[TGLogger sharedLogger] log:@"TDLib text message send not confirmed."];
             }
             if ([authorizationState length] > 0) {
@@ -1272,6 +1296,7 @@
             [messageThreadID release];
             [messageTopicKind release];
             [messageText release];
+            [messageChunks release];
             [replyToMessageID release];
         });
 

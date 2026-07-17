@@ -117,7 +117,7 @@
     [self.stickerButton setEnabled:canTargetChat];
     [self.voiceRecordButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];
-    [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
+    [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0)];
 }
 
 - (NSString *)composerDraftKeyForChatID:(NSNumber *)chatID
@@ -268,7 +268,7 @@
         NSString *errorMessage = [[draftError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!ok && [errorMessage length] > 0) {
-                [TGLogger logComponent:@"Drafts" message:[NSString stringWithFormat:@"Remote draft sync failed: %@", errorMessage]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drafts: remote draft sync failed: %@", errorMessage]];
             }
             [errorMessage release];
             [chatID release];

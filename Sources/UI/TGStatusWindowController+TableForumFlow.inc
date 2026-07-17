@@ -310,6 +310,7 @@
         self.searchGeneration++;
         [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
         [self setComposerTextWithoutSavingDraft:nil];
         self.olderMessagesExhausted = NO;
@@ -359,6 +360,7 @@
         self.searchGeneration++;
         self.pinnedMessageItem = nil;
         [self.messageItems removeAllObjects];
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
         if (shouldOpenTopicList) {
             [self setComposerTextWithoutSavingDraft:nil];
@@ -495,6 +497,7 @@
     [self refreshSelectedChatHeaderDisplay];
     [self loadPinnedMessageForSelectedChat];
     [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     [self setComposerTextWithoutSavingDraft:nil];
     self.olderMessagesExhausted = NO;
@@ -629,6 +632,7 @@
     }
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     [self restoreComposerDraftForChatID:self.selectedChatID
                         messageThreadID:self.selectedMessageThreadID
@@ -748,6 +752,7 @@
                 [self refreshSelectedChatHeaderDisplay];
                 [self loadPinnedMessageForSelectedChat];
                 [self.messageItems removeAllObjects];
+                [self.inlineMediaPlaybackCoordinator removeAllPlayback];
                 [self.messageTableView reloadData];
                 NSString *topicListTitle = ([parentTitle length] > 0 ? parentTitle : @"Topics");
                 [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];

@@ -4828,6 +4828,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return topicItems;
     }
 
+    if (forumTopicError && error) {
+        *error = forumTopicError;
+    }
+    return [NSArray array];
+
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Thread preview request requires a chat id." code:83];

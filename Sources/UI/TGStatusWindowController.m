@@ -26,6 +26,7 @@
 #import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
