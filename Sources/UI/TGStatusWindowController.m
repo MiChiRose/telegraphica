@@ -209,6 +209,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
 @property (nonatomic, retain) NSTimer *composerDraftSyncTimer;
+@property (nonatomic, assign) NSUInteger composerDraftSyncGeneration;
 @property (nonatomic, retain) NSNumber *composerDraftSyncChatID;
 @property (nonatomic, retain) NSNumber *composerDraftSyncThreadID;
 @property (nonatomic, copy) NSString *composerDraftSyncTopicKind;
@@ -566,6 +567,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
 @synthesize composerDraftSyncTimer = _composerDraftSyncTimer;
+@synthesize composerDraftSyncGeneration = _composerDraftSyncGeneration;
 @synthesize composerDraftSyncChatID = _composerDraftSyncChatID;
 @synthesize composerDraftSyncThreadID = _composerDraftSyncThreadID;
 @synthesize composerDraftSyncTopicKind = _composerDraftSyncTopicKind;
