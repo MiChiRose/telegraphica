@@ -76,6 +76,45 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 @end
 
+@interface TGReplyCancelButton : TGPointingHandButton
+@end
+
+@implementation TGReplyCancelButton
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    BOOL highlighted = [[self cell] isHighlighted];
+
+    NSRect buttonRect = NSInsetRect(bounds, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:7.0 yRadius:7.0];
+    TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, YES, YES, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSColor *iconColor = TGClassicHeaderTextColor(1.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 8.5,
+                                 NSMidY(buttonRect) - 8.5,
+                                 17.0,
+                                 17.0);
+    if (!NSIsEmptyRect(iconRect)) {
+        TGDrawTemplateIconAsset(@"cross", iconRect, iconColor, 1.0, [self isFlipped]);
+    }
+
+    [iconColor set];
+    NSBezierPath *crossPath = [NSBezierPath bezierPath];
+    [crossPath setLineWidth:1.8];
+    [crossPath setLineCapStyle:NSRoundLineCapStyle];
+    [crossPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 1.0, NSMinY(iconRect) + 1.0)];
+    [crossPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 1.0, NSMaxY(iconRect) - 1.0)];
+    [crossPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 1.0, NSMaxY(iconRect) - 1.0)];
+    [crossPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 1.0, NSMinY(iconRect) + 1.0)];
+    [crossPath stroke];
+}
+
+@end
+
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
@@ -1925,17 +1964,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.replyPanelTextField setHidden:YES];
     [contentView addSubview:self.replyPanelTextField];
 
-    self.replyPanelCancelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 96, 28, 24)] autorelease];
+    self.replyPanelCancelButton = [[[TGReplyCancelButton alloc] initWithFrame:NSMakeRect(24, 96, 38, 32)] autorelease];
     [self.replyPanelCancelButton setTitle:@""];
-    [self.replyPanelCancelButton setImage:TGTemplateIconAssetImage(@"cross",
-                                                                   NSMakeSize(13.0, 13.0),
-                                                                   TGClassicMutedInkColor(),
-                                                                   0.95)];
-    [self.replyPanelCancelButton setImagePosition:NSImageOnly];
+    [self.replyPanelCancelButton setBordered:NO];
+    [self.replyPanelCancelButton setTransparent:YES];
+    [self.replyPanelCancelButton setButtonType:NSMomentaryPushInButton];
+    [self.replyPanelCancelButton setImage:nil];
+    [self.replyPanelCancelButton setImagePosition:NSNoImage];
     [self.replyPanelCancelButton setTarget:self];
     [self.replyPanelCancelButton setAction:@selector(cancelReplyTarget:)];
     [self.replyPanelCancelButton setToolTip:@"Cancel reply"];
-    [self applyUtilityButtonStyle:self.replyPanelCancelButton];
     [self.replyPanelCancelButton setHidden:YES];
     [contentView addSubview:self.replyPanelCancelButton];
 

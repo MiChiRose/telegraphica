@@ -294,8 +294,7 @@
     [self saveComposerDraftForChatID:previousChatID
                      messageThreadID:previousThreadID
                       messageTopicKind:previousTopicKind];
-    NSInteger clickedRow = [self.chatTableView clickedRow];
-    NSInteger row = (clickedRow >= 0) ? clickedRow : [self.chatTableView selectedRow];
+    NSInteger row = [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
@@ -477,6 +476,8 @@
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
         [self.chatTableView scrollRowToVisible:selectedIndex];
+        [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                         object:self.chatTableView]];
         id selectedItem = [items objectAtIndex:selectedIndex];
         if ([selectedItem isKindOfClass:[TGChatItem class]]) {
             self.selectedChatLastReadOutboxMessageID = [(TGChatItem *)selectedItem lastReadOutboxMessageID];
@@ -489,6 +490,8 @@
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:0];
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
         [self.chatTableView scrollRowToVisible:0];
+        [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                         object:self.chatTableView]];
         return;
     }
 

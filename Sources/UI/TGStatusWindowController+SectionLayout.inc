@@ -695,9 +695,14 @@
             replyWidth = 220.0;
         }
         [self.replyPanelView setFrame:NSMakeRect(replyX, replyY, replyWidth, 40.0)];
-        [self.replyPanelTitleField setFrame:NSMakeRect(replyX + 14.0, replyY + 22.0, replyWidth - 54.0, 14.0)];
-        [self.replyPanelTextField setFrame:NSMakeRect(replyX + 14.0, replyY + 7.0, replyWidth - 54.0, 15.0)];
-        [self.replyPanelCancelButton setFrame:NSMakeRect(replyX + replyWidth - 34.0, replyY + 8.0, 26.0, 24.0)];
+        CGFloat replyTextX = replyX + 14.0;
+        CGFloat replyTextWidth = replyWidth - 26.0;
+        if (replyTextWidth < 80.0) {
+            replyTextWidth = 80.0;
+        }
+        [self.replyPanelTitleField setFrame:NSMakeRect(replyTextX, replyY + 22.0, replyTextWidth, 14.0)];
+        [self.replyPanelTextField setFrame:NSMakeRect(replyTextX, replyY + 7.0, replyTextWidth, 15.0)];
+        [self.replyPanelCancelButton setFrame:NSMakeRect(attachButtonX, replyY + 4.0, attachButtonWidth, 32.0)];
     }
 
     CGFloat panelTitleY = headerLabelY;
