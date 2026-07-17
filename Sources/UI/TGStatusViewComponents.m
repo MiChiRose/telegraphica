@@ -10,8 +10,7 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
-    [TGClassicWindowBottomColor() set];
-    NSRectFill(bounds);
+    TGThemeDrawWindowBackgroundInRect(bounds, [self isFlipped]);
 }
 
 @end
@@ -110,8 +109,7 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     NSBezierPath *railPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 1.0, 1.0)
                                                              xRadius:TGPanelCornerRadius
                                                              yRadius:TGPanelCornerRadius];
-    [TGClassicWindowBottomColor() set];
-    [railPath fill];
+    TGThemeDrawRailBackgroundInPath(railPath, NSInsetRect(bounds, 1.0, 1.0), [self isFlipped]);
 
     [TGClassicRailStrokeColor() set];
     [railPath setLineWidth:1.0];

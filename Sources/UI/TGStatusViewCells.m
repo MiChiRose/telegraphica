@@ -162,8 +162,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                              xRadius:TGPanelCornerRadius
                                                              yRadius:TGPanelCornerRadius];
 
-    [TGClassicPanelBottomColor() set];
-    [panelPath fill];
+    TGThemeDrawPanelBackgroundInPath(panelPath, panelBounds, [self isFlipped]);
 
     [NSGraphicsContext saveGraphicsState];
     [panelPath addClip];
@@ -171,8 +170,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                    NSMaxY(panelBounds) - TGPanelHeaderHeight,
                                    NSWidth(panelBounds),
                                    TGPanelHeaderHeight);
-    [TGClassicHeaderBottomColor() set];
-    NSRectFill(headerRect);
+    TGThemeDrawHeaderBackgroundInRect(headerRect, [self isFlipped]);
     [TGClassicHeaderSeparatorColor() set];
     NSRectFill(NSMakeRect(NSMinX(headerRect), NSMinY(headerRect), NSWidth(headerRect), 1.0));
     [NSGraphicsContext restoreGraphicsState];
@@ -196,8 +194,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSBezierPath *surfacePath = [NSBezierPath bezierPathWithRoundedRect:surfaceRect
                                                                 xRadius:8.0
                                                                 yRadius:8.0];
-    [TGClassicPanelBottomColor() set];
-    [surfacePath fill];
+    TGThemeDrawRecessedBackgroundInPath(surfacePath, surfaceRect, [self isFlipped]);
     [TGClassicTableGridColor() set];
     [surfacePath setLineWidth:1.0];
     [surfacePath stroke];
@@ -212,8 +209,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSRect bounds = [self bounds];
     NSRect inputRect = NSInsetRect(bounds, 0.5, 0.5);
     NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:7.0 yRadius:7.0];
-    [TGClassicTablePaperColor() set];
-    [inputPath fill];
+    TGThemeDrawRecessedBackgroundInPath(inputPath, inputRect, [self isFlipped]);
     [TGClassicTableGridColor() set];
     [inputPath setLineWidth:1.0];
     [inputPath stroke];
@@ -238,8 +234,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSRect bounds = [self bounds];
     NSRect inputRect = NSInsetRect(bounds, 0.5, 0.5);
     NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:7.0 yRadius:7.0];
-    [TGClassicTablePaperColor() set];
-    [inputPath fill];
+    TGThemeDrawRecessedBackgroundInPath(inputPath, inputRect, [self isFlipped]);
     NSColor *strokeColor = self.errorState ? [NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0] : TGClassicTableGridColor();
     [strokeColor set];
     [inputPath setLineWidth:(self.errorState ? 1.4 : 1.0)];
@@ -257,8 +252,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect
                                                              xRadius:14.0
                                                              yRadius:14.0];
-    [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
-    [cardPath fill];
+    TGThemeDrawGroupedCardInPath(cardPath, cardRect, [self isFlipped]);
     [[NSColor colorWithCalibratedWhite:0.78 alpha:0.62] set];
     [cardPath setLineWidth:1.0];
     [cardPath stroke];
@@ -445,9 +439,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     NSBezierPath *bubblePath = [NSBezierPath bezierPathWithRoundedRect:bubbleRect xRadius:13.0 yRadius:13.0];
 
-    NSColor *bubbleFillColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
-    [bubbleFillColor set];
-    [bubblePath fill];
+    TGThemeDrawMessageBubbleInPath(bubblePath, bubbleRect, outgoing, [controlView isFlipped]);
 
     NSColor *strokeColor = outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor();
     [strokeColor set];
