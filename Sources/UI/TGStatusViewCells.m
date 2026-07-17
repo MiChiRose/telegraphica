@@ -162,8 +162,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                              xRadius:TGPanelCornerRadius
                                                              yRadius:TGPanelCornerRadius];
 
-    [TGClassicPanelBottomColor() set];
-    [panelPath fill];
+    TGThemeDrawPanelBackgroundInPath(panelPath, panelBounds, [self isFlipped]);
 
     [NSGraphicsContext saveGraphicsState];
     [panelPath addClip];
@@ -171,8 +170,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                    NSMaxY(panelBounds) - TGPanelHeaderHeight,
                                    NSWidth(panelBounds),
                                    TGPanelHeaderHeight);
-    [TGClassicHeaderBottomColor() set];
-    NSRectFill(headerRect);
+    TGThemeDrawHeaderBackgroundInRect(headerRect, [self isFlipped]);
     [TGClassicHeaderSeparatorColor() set];
     NSRectFill(NSMakeRect(NSMinX(headerRect), NSMinY(headerRect), NSWidth(headerRect), 1.0));
     [NSGraphicsContext restoreGraphicsState];
@@ -189,6 +187,16 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 
 @implementation TGScrollSurfaceView
 
+@synthesize drawsInterior = _drawsInterior;
+
+- (id)initWithFrame:(NSRect)frameRect {
+    self = [super initWithFrame:frameRect];
+    if (self) {
+        _drawsInterior = YES;
+    }
+    return self;
+}
+
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
@@ -196,8 +204,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSBezierPath *surfacePath = [NSBezierPath bezierPathWithRoundedRect:surfaceRect
                                                                 xRadius:8.0
                                                                 yRadius:8.0];
-    [TGClassicPanelBottomColor() set];
-    [surfacePath fill];
+    if (self.drawsInterior) {
+        TGThemeDrawRecessedBackgroundInPath(surfacePath, surfaceRect, [self isFlipped]);
+    }
     [TGClassicTableGridColor() set];
     [surfacePath setLineWidth:1.0];
     [surfacePath stroke];
@@ -212,8 +221,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSRect bounds = [self bounds];
     NSRect inputRect = NSInsetRect(bounds, 0.5, 0.5);
     NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:7.0 yRadius:7.0];
-    [TGClassicTablePaperColor() set];
-    [inputPath fill];
+    TGThemeDrawRecessedBackgroundInPath(inputPath, inputRect, [self isFlipped]);
     [TGClassicTableGridColor() set];
     [inputPath setLineWidth:1.0];
     [inputPath stroke];
@@ -238,8 +246,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSRect bounds = [self bounds];
     NSRect inputRect = NSInsetRect(bounds, 0.5, 0.5);
     NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:7.0 yRadius:7.0];
-    [TGClassicTablePaperColor() set];
-    [inputPath fill];
+    TGThemeDrawRecessedBackgroundInPath(inputPath, inputRect, [self isFlipped]);
     NSColor *strokeColor = self.errorState ? [NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0] : TGClassicTableGridColor();
     [strokeColor set];
     [inputPath setLineWidth:(self.errorState ? 1.4 : 1.0)];
@@ -257,8 +264,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect
                                                              xRadius:14.0
                                                              yRadius:14.0];
-    [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
-    [cardPath fill];
+    TGThemeDrawGroupedCardInPath(cardPath, cardRect, [self isFlipped]);
     [[NSColor colorWithCalibratedWhite:0.78 alpha:0.62] set];
     [cardPath setLineWidth:1.0];
     [cardPath stroke];
@@ -355,8 +361,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : rawMessageText;
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
@@ -378,7 +383,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:7.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:8.0] forKey:NSFontAttributeName];
                 [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
                 NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
@@ -389,7 +394,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSAttributedString *attributedMessageText = composedMessageText;
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                            options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;
@@ -446,14 +451,24 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     NSBezierPath *bubblePath = [NSBezierPath bezierPathWithRoundedRect:bubbleRect xRadius:13.0 yRadius:13.0];
 
-    NSColor *bubbleFillColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
-    [bubbleFillColor set];
-    [bubblePath fill];
+    TGThemeDrawMessageBubbleInPath(bubblePath, bubbleRect, outgoing, [controlView isFlipped]);
 
     NSColor *strokeColor = outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor();
     [strokeColor set];
     [bubblePath setLineWidth:1.0];
     [bubblePath stroke];
+
+    if ([item isPinned]) {
+        NSRect pinRect = NSMakeRect(NSMinX(bubbleRect) + 9.0,
+                                    [controlView isFlipped] ? (NSMinY(bubbleRect) + 7.0) : (NSMaxY(bubbleRect) - 20.0),
+                                    12.0,
+                                    12.0);
+        TGDrawTemplateIconAsset(@"flag-triangle",
+                                pinRect,
+                                TGClassicNavigationSelectedColor(0.82),
+                                0.92,
+                                [controlView isFlipped]);
+    }
 
     if (showSenderDetails && !outgoing) {
         NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + sidePadding,

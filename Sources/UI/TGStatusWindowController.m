@@ -18,6 +18,7 @@
 #import "TGTheme.h"
 #import "TGTypingIndicatorPresentation.h"
 #import "TGUpdateSupport.h"
+#import "TGTransparentSpinnerView.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGAttachmentDescriptor.h"
 #import "../Media/TGFileTransferState.h"
@@ -26,11 +27,13 @@
 #import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import <AVFoundation/AVFoundation.h>
+#import <objc/runtime.h>
 #include <math.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
@@ -59,6 +62,19 @@ static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophon
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 
+@interface TGPointingHandButton : NSButton
+@end
+
+@implementation TGPointingHandButton
+
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    if ([self isEnabled] && ![self isHidden]) {
+        [self addCursorRect:[self bounds] cursor:[NSCursor pointingHandCursor]];
+    }
+}
+
+@end
 
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
@@ -121,12 +137,24 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL searchPanelVisible;
 @property (nonatomic, assign) BOOL searchLoading;
 @property (nonatomic, assign) BOOL searchEndReached;
+@property (nonatomic, assign) BOOL chatTitleSearchOnly;
+@property (nonatomic, assign) BOOL searchInlineCurrentChatOnly;
 @property (nonatomic, assign) NSUInteger searchGeneration;
+@property (nonatomic, retain) NSWindow *chatSearchWindow;
+@property (nonatomic, retain) NSTextField *chatSearchWindowTextField;
+@property (nonatomic, retain) NSScrollView *chatSearchWindowScrollView;
+@property (nonatomic, retain) NSView *chatSearchWindowResultsView;
+@property (nonatomic, retain) NSTextField *chatSearchWindowStatusField;
+@property (nonatomic, retain) NSMutableArray *chatSearchWindowResults;
+@property (nonatomic, retain) NSMutableArray *chatSearchWindowResultButtons;
 @property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
+@property (nonatomic, retain) NSTextField *pinnedMessageStripeField;
 @property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
 @property (nonatomic, retain) NSTextField *pinnedMessageTextField;
 @property (nonatomic, retain) NSButton *pinnedMessageButton;
+@property (nonatomic, retain) NSArray *pinnedMessageItems;
 @property (nonatomic, retain) TGMessageItem *pinnedMessageItem;
+@property (nonatomic, assign) NSUInteger pinnedMessageCarouselIndex;
 @property (nonatomic, assign) NSUInteger pinnedMessageGeneration;
 @property (nonatomic, retain) TGGroupedCardView *replyPanelView;
 @property (nonatomic, retain) NSTextField *replyPanelTitleField;
@@ -157,7 +185,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *authSecondaryLabel;
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
-@property (nonatomic, retain) NSProgressIndicator *busySpinner;
+@property (nonatomic, retain) TGTransparentSpinnerView *busySpinner;
 @property (nonatomic, retain) NSButton *loginLogsButton;
 @property (nonatomic, retain) NSArray *loginLanguageButtons;
 @property (nonatomic, retain) NSTextField *chatsLabel;
@@ -174,7 +202,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
-@property (nonatomic, retain) NSProgressIndicator *messageLoadingSpinner;
+@property (nonatomic, retain) TGTransparentSpinnerView *messageLoadingSpinner;
 @property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
@@ -182,6 +210,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
 @property (nonatomic, retain) NSTimer *composerDraftSyncTimer;
+@property (nonatomic, assign) NSUInteger composerDraftSyncGeneration;
 @property (nonatomic, retain) NSNumber *composerDraftSyncChatID;
 @property (nonatomic, retain) NSNumber *composerDraftSyncThreadID;
 @property (nonatomic, copy) NSString *composerDraftSyncTopicKind;
@@ -306,6 +335,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *photoSendSendButton;
 @property (nonatomic, copy) NSString *pendingPhotoSendPath;
 @property (nonatomic, retain) TGAttachmentDescriptor *pendingAttachmentDescriptor;
+@property (nonatomic, retain) NSArray *pendingAttachmentDescriptors;
 @property (nonatomic, retain) TGFileTransferState *pendingAttachmentTransferState;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendChatID;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendThreadID;
@@ -334,6 +364,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *voiceRecordingIndicatorField;
 @property (nonatomic, retain) NSMenu *messageContextMenu;
 @property (nonatomic, retain) NSMenu *chatContextMenu;
+@property (nonatomic, retain) NSMenu *chatsNavigationContextMenu;
 @property (nonatomic, copy) NSString *mediaPreviewPath;
 @property (nonatomic, assign) NSUInteger mediaPreviewRequestGeneration;
 @property (nonatomic, retain) NSTextView *logsWindowDetailsView;
@@ -400,6 +431,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 - (void)forwardMessageToSavedMessagesFromMenu:(id)sender;
 @end
 
+#include "TGChatSearchPanelView.inc"
+
 @implementation TGStatusWindowController
 
 @synthesize topPanelView = _topPanelView;
@@ -462,12 +495,24 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize searchPanelVisible = _searchPanelVisible;
 @synthesize searchLoading = _searchLoading;
 @synthesize searchEndReached = _searchEndReached;
+@synthesize chatTitleSearchOnly = _chatTitleSearchOnly;
+@synthesize searchInlineCurrentChatOnly = _searchInlineCurrentChatOnly;
 @synthesize searchGeneration = _searchGeneration;
+@synthesize chatSearchWindow = _chatSearchWindow;
+@synthesize chatSearchWindowTextField = _chatSearchWindowTextField;
+@synthesize chatSearchWindowScrollView = _chatSearchWindowScrollView;
+@synthesize chatSearchWindowResultsView = _chatSearchWindowResultsView;
+@synthesize chatSearchWindowStatusField = _chatSearchWindowStatusField;
+@synthesize chatSearchWindowResults = _chatSearchWindowResults;
+@synthesize chatSearchWindowResultButtons = _chatSearchWindowResultButtons;
 @synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
+@synthesize pinnedMessageStripeField = _pinnedMessageStripeField;
 @synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
 @synthesize pinnedMessageTextField = _pinnedMessageTextField;
 @synthesize pinnedMessageButton = _pinnedMessageButton;
+@synthesize pinnedMessageItems = _pinnedMessageItems;
 @synthesize pinnedMessageItem = _pinnedMessageItem;
+@synthesize pinnedMessageCarouselIndex = _pinnedMessageCarouselIndex;
 @synthesize pinnedMessageGeneration = _pinnedMessageGeneration;
 @synthesize replyPanelView = _replyPanelView;
 @synthesize replyPanelTitleField = _replyPanelTitleField;
@@ -523,6 +568,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
 @synthesize composerDraftSyncTimer = _composerDraftSyncTimer;
+@synthesize composerDraftSyncGeneration = _composerDraftSyncGeneration;
 @synthesize composerDraftSyncChatID = _composerDraftSyncChatID;
 @synthesize composerDraftSyncThreadID = _composerDraftSyncThreadID;
 @synthesize composerDraftSyncTopicKind = _composerDraftSyncTopicKind;
@@ -647,6 +693,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize photoSendSendButton = _photoSendSendButton;
 @synthesize pendingPhotoSendPath = _pendingPhotoSendPath;
 @synthesize pendingAttachmentDescriptor = _pendingAttachmentDescriptor;
+@synthesize pendingAttachmentDescriptors = _pendingAttachmentDescriptors;
 @synthesize pendingAttachmentTransferState = _pendingAttachmentTransferState;
 @synthesize pendingPhotoSendChatID = _pendingPhotoSendChatID;
 @synthesize pendingPhotoSendThreadID = _pendingPhotoSendThreadID;
@@ -675,6 +722,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize voiceRecordingIndicatorField = _voiceRecordingIndicatorField;
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize chatContextMenu = _chatContextMenu;
+@synthesize chatsNavigationContextMenu = _chatsNavigationContextMenu;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -750,6 +798,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         self.searchResultItems = [NSMutableArray array];
+        self.chatSearchWindowResults = [NSMutableArray array];
+        self.chatSearchWindowResultButtons = [NSMutableArray array];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
@@ -776,6 +826,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                    object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
+        [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
@@ -825,13 +876,35 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)applyTransparentChatTableStyle {
-    [self.chatTableView setBackgroundColor:[NSColor clearColor]];
+    if (TGThemeIsSkeuomorphicBlue()) {
+        [self.chatTableView setBackgroundColor:TGClassicTablePaperColor()];
+        [[self.chatScrollView contentView] setDrawsBackground:YES];
+        [[self.chatScrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+    } else {
+        [self.chatTableView setBackgroundColor:[NSColor clearColor]];
+        [[self.chatScrollView contentView] setDrawsBackground:NO];
+        [[self.chatScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+    }
     [self.chatTableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
     [self.chatTableView setGridColor:TGClassicTableGridColor()];
     [self.chatTableView setUsesAlternatingRowBackgroundColors:NO];
     [self.chatTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
-    [[self.chatScrollView contentView] setDrawsBackground:NO];
-    [[self.chatScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+}
+
+- (void)applyMessageTranscriptBackgroundStyle {
+    if (TGThemeIsSkeuomorphicBlue()) {
+        [self.messageTableView setBackgroundColor:[NSColor clearColor]];
+        [self.messageScrollView setDrawsBackground:NO];
+        [[self.messageScrollView contentView] setDrawsBackground:NO];
+        [[self.messageScrollView contentView] setBackgroundColor:[NSColor clearColor]];
+        [[self.messageScrollView contentView] setCopiesOnScroll:NO];
+    } else {
+        [self.messageScrollView setDrawsBackground:YES];
+        [self.messageTableView setBackgroundColor:TGClassicTablePaperColor()];
+        [[self.messageScrollView contentView] setDrawsBackground:YES];
+        [[self.messageScrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+        [[self.messageScrollView contentView] setCopiesOnScroll:YES];
+    }
 }
 
 - (void)selectThemePopUpItemForIdentifier:(NSString *)identifier {
@@ -1095,6 +1168,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsResourceCardView setNeedsDisplay:YES];
     [self.settingsHelpCardView setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
+    if ([self.messageScrollSurfaceView isKindOfClass:[TGScrollSurfaceView class]]) {
+        [(TGScrollSurfaceView *)self.messageScrollSurfaceView setDrawsInterior:!TGThemeIsSkeuomorphicBlue()];
+    }
     [self.chatScrollSurfaceView setNeedsDisplay:YES];
     [self.messageScrollSurfaceView setNeedsDisplay:YES];
     [self applySkeuomorphicScrollStyle:self.detailsScrollView];
@@ -1105,6 +1181,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
     [self applySkeuomorphicTableStyle:self.chatTableView];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self applyMessageTranscriptBackgroundStyle];
     [self applyTransparentChatTableStyle];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
@@ -1379,6 +1456,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [navigationButton setTarget:self];
         [navigationButton setAction:@selector(navigationChanged:)];
         [navigationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+        if (navigationTags[navigationIndex] == 0) {
+            NSMenu *readAllMenu = [[[NSMenu alloc] initWithTitle:@"Chats"] autorelease];
+            NSMenuItem *readAllItem = [[[NSMenuItem alloc] initWithTitle:@"Read all chats"
+                                                                   action:@selector(markAllChatsReadFromMenu:)
+                                                            keyEquivalent:@""] autorelease];
+            [readAllItem setTarget:self];
+            [readAllMenu addItem:readAllItem];
+            self.chatsNavigationContextMenu = readAllMenu;
+            [navigationButton setMenu:readAllMenu];
+        }
         [contentView addSubview:navigationButton];
         [navigationButtons addObject:navigationButton];
     }
@@ -1501,10 +1588,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
 
-    self.busySpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
-    [self.busySpinner setStyle:NSProgressIndicatorSpinningStyle];
-    [self.busySpinner setControlSize:NSSmallControlSize];
-    [self.busySpinner setIndeterminate:YES];
+    self.busySpinner = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
     [self.busySpinner setDisplayedWhenStopped:NO];
     [self.busySpinner setHidden:YES];
     [contentView addSubview:self.busySpinner];
@@ -1565,7 +1649,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.chatSearchButton setTitle:@"search"];
     [self.chatSearchButton setToolTip:@"Search all chats"];
     [self.chatSearchButton setTarget:self];
-    [self.chatSearchButton setAction:@selector(openGlobalSearch:)];
+    [self.chatSearchButton setAction:@selector(openChatListSearch:)];
     [self.chatSearchButton setEnabled:NO];
     [self applyHeaderIconButtonStyle:self.chatSearchButton];
     [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
@@ -1693,6 +1777,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.selectedChatProfileButton];
 
     self.messageScrollSurfaceView = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 72, 712, 112)] autorelease];
+    [(TGScrollSurfaceView *)self.messageScrollSurfaceView setDrawsInterior:!TGThemeIsSkeuomorphicBlue()];
     [self.messageScrollSurfaceView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.messageScrollSurfaceView];
 
@@ -1713,6 +1798,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageTableView setRowHeight:52.0];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self applySkeuomorphicTableStyle:self.messageTableView];
+    [self applyMessageTranscriptBackgroundStyle];
     [self.messageTableView setIntercellSpacing:NSMakeSize(0.0, 3.0)];
     [self.messageTableView setGridStyleMask:0];
     [self.messageTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
@@ -1742,11 +1828,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                object:[self.messageScrollView contentView]];
     [contentView addSubview:self.messageScrollView];
 
-    self.messageLoadingSpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)] autorelease];
-    [self.messageLoadingSpinner setStyle:NSProgressIndicatorSpinningStyle];
-    [self.messageLoadingSpinner setControlSize:NSSmallControlSize];
+    self.messageLoadingSpinner = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)] autorelease];
     [self.messageLoadingSpinner setDisplayedWhenStopped:NO];
-    [self.messageLoadingSpinner setIndeterminate:YES];
     [self.messageLoadingSpinner setHidden:YES];
     [self.messageLoadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
     [contentView addSubview:self.messageLoadingSpinner];
@@ -1774,13 +1857,20 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.pinnedMessagePanelView setHidden:YES];
     [contentView addSubview:self.pinnedMessagePanelView];
 
-    self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(32, 190, 90, 16)
+    self.pinnedMessageStripeField = [self labelWithFrame:NSMakeRect(32, 182, 8, 40)
+                                                    text:@""
+                                                    font:[NSFont boldSystemFontOfSize:14.0]];
+    [self.pinnedMessageStripeField setTextColor:TGClassicNavigationSelectedColor(0.92)];
+    [self.pinnedMessageStripeField setHidden:YES];
+    [contentView addSubview:self.pinnedMessageStripeField];
+
+    self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(44, 190, 90, 16)
                                                    text:@"Pinned"
                                                    font:[NSFont boldSystemFontOfSize:10.0]];
     [self.pinnedMessageLabelField setTextColor:TGClassicMutedInkColor()];
     [contentView addSubview:self.pinnedMessageLabelField];
 
-    self.pinnedMessageTextField = [self labelWithFrame:NSMakeRect(32, 174, 520, 18)
+    self.pinnedMessageTextField = [self labelWithFrame:NSMakeRect(44, 174, 520, 18)
                                                   text:@""
                                                   font:[NSFont systemFontOfSize:12.0]];
     [self.pinnedMessageTextField setTextColor:TGClassicInkColor()];
@@ -2797,6 +2887,27 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self updateVisibleSection];
 }
 
+- (void)applyPointingHandCursorToButtonsInView:(NSView *)view {
+    if (!view) {
+        return;
+    }
+    NSArray *subviews = [[view subviews] copy];
+    NSUInteger index = 0;
+    for (index = 0; index < [subviews count]; index++) {
+        NSView *subview = [subviews objectAtIndex:index];
+        if ([subview isKindOfClass:[NSButton class]] &&
+            [subview class] == [NSButton class] &&
+            ![subview isKindOfClass:[TGPointingHandButton class]]) {
+            object_setClass(subview, [TGPointingHandButton class]);
+            [subview discardCursorRects];
+        } else if ([subview isKindOfClass:[TGPointingHandButton class]]) {
+            [subview discardCursorRects];
+        }
+        [self applyPointingHandCursorToButtonsInView:subview];
+    }
+    [subviews release];
+}
+
 - (NSButton *)modalCloseButtonWithFrame:(NSRect)frame {
     NSButton *button = [[[NSButton alloc] initWithFrame:frame] autorelease];
     [button setTitle:@"Close"];
@@ -2829,6 +2940,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 #include "TGStatusWindowController+MessagingActions.inc"
 
 #include "TGStatusWindowController+MessageMenus.inc"
+
+#include "TGStatusWindowController+ChatSearchWindow.inc"
 
 #include "TGStatusWindowController+SearchNavigation.inc"
 
@@ -2873,6 +2986,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_messageTableView setDelegate:nil];
     [_searchResultsTableView setDataSource:nil];
     [_searchResultsTableView setDelegate:nil];
+    [_chatSearchWindowTextField setDelegate:nil];
+    [_chatSearchWindow close];
     [_messageContextMenu setDelegate:nil];
     [_chatContextMenu setDelegate:nil];
     [_sendTextField setDelegate:nil];
@@ -2935,10 +3050,19 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_searchDebounceTimer invalidate];
     [_searchDebounceTimer release];
     [_globalSearchOffset release];
+    [_chatSearchWindow release];
+    [_chatSearchWindowTextField release];
+    [_chatSearchWindowScrollView release];
+    [_chatSearchWindowResultsView release];
+    [_chatSearchWindowStatusField release];
+    [_chatSearchWindowResults release];
+    [_chatSearchWindowResultButtons release];
     [_pinnedMessagePanelView release];
+    [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];
     [_pinnedMessageTextField release];
     [_pinnedMessageButton release];
+    [_pinnedMessageItems release];
     [_pinnedMessageItem release];
     [_replyPanelView release];
     [_replyPanelTitleField release];
@@ -3150,6 +3274,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_photoSendSendButton release];
     [_pendingPhotoSendPath release];
     [_pendingAttachmentDescriptor release];
+    [_pendingAttachmentDescriptors release];
     [_pendingAttachmentTransferState release];
     [_pendingPhotoSendChatID release];
     [_pendingPhotoSendThreadID release];
@@ -3177,6 +3302,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_voiceRecordingIndicatorField release];
     [_messageContextMenu release];
     [_chatContextMenu release];
+    [_chatsNavigationContextMenu release];
     [_mediaPreviewPath release];
     [_logsWindowDetailsView release];
     [_logsCheckButton release];

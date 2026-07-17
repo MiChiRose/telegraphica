@@ -208,7 +208,9 @@
             [itemMessageID longLongValue] == targetMessageID &&
             [itemChatID longLongValue] == targetChatID) {
             [self.messageItems removeObjectAtIndex:index];
+            [self.inlineMediaPlaybackCoordinator removeAllPlayback];
             [self.messageTableView reloadData];
+            [self scheduleInlineMediaPlaybackRefresh];
             return YES;
         }
     }
@@ -282,6 +284,8 @@
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self updateOutgoingReadStateForVisibleMessages];
+        [self markVisiblePinnedMessagesFromPinnedItems];
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
         [self scrollMessagesToNewestIfAvailable];
         return;
@@ -316,6 +320,8 @@
     [self.messageItems removeAllObjects];
     [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
     [self updateOutgoingReadStateForVisibleMessages];
+    [self markVisiblePinnedMessagesFromPinnedItems];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
@@ -367,6 +373,7 @@
     }
 
     [self updateOutgoingReadStateForVisibleMessages];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     if (added > 0) {
         if (preserveVisiblePosition) {
@@ -565,7 +572,7 @@
         return;
     }
 
-    [self scheduleInlineMediaPlaybackRefresh];
+    [self refreshInlineMediaPlayback];
     [self updateMessageJumpToNewestButtonVisibility];
 
     if (![self.currentAuthState isEqualToString:@"ready"] ||

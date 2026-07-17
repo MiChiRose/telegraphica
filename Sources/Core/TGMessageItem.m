@@ -67,6 +67,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize outgoing = _outgoing;
 @synthesize sending = _sending;
 @synthesize outgoingRead = _outgoingRead;
+@synthesize pinned = _pinned;
 @synthesize preview = _preview;
 @synthesize contentType = _contentType;
 @synthesize mediaLocalPath = _mediaLocalPath;
@@ -132,10 +133,14 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     if ([self isDocumentMessage]) {
         NSString *label = [self.preview length] > 0 ? self.preview : @"";
         BOOL visualLabel = ([label hasPrefix:@"[Photo]"] ||
+                            [label hasPrefix:@"Image"] ||
                             [label hasPrefix:@"[Video]"] ||
+                            [label hasPrefix:@"Video"] ||
                             [label hasPrefix:@"[GIF]"] ||
-                            [label hasPrefix:@"[Sticker]"]);
-        BOOL playableFallback = (([label hasPrefix:@"[Video]"] || [label hasPrefix:@"[GIF]"]) &&
+                            [label hasPrefix:@"GIF"] ||
+                            [label hasPrefix:@"[Sticker]"] ||
+                            [label hasPrefix:@"Sticker"]);
+        BOOL playableFallback = (([label hasPrefix:@"[Video]"] || [label hasPrefix:@"Video"] || [label hasPrefix:@"[GIF]"] || [label hasPrefix:@"GIF"]) &&
                                  [self.mediaFileID respondsToSelector:@selector(integerValue)] &&
                                  [self.mediaFileID integerValue] > 0);
         return (visualLabel && ([self.mediaLocalPath length] > 0 || [self.mediaItems count] > 0 || playableFallback));
@@ -277,9 +282,13 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     }
     if ([self isStickerMessage]) {
         NSString *preview = ([self.preview length] > 0) ? self.preview : @"";
-        NSString *stickerPrefix = @"[Sticker] ";
-        if ([preview hasPrefix:stickerPrefix] && [preview length] > [stickerPrefix length]) {
-            return [preview substringFromIndex:[stickerPrefix length]];
+        NSArray *stickerPrefixes = [NSArray arrayWithObjects:@"Sticker ", @"[Sticker] ", nil];
+        NSUInteger index = 0;
+        for (index = 0; index < [stickerPrefixes count]; index++) {
+            NSString *stickerPrefix = [stickerPrefixes objectAtIndex:index];
+            if ([preview hasPrefix:stickerPrefix] && [preview length] > [stickerPrefix length]) {
+                return [preview substringFromIndex:[stickerPrefix length]];
+            }
         }
         return @"Sticker";
     }

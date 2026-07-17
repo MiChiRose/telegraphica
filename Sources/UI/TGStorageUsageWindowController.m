@@ -6,6 +6,7 @@
 #import "TGIconDrawing.h"
 #import "TGLocalization.h"
 #import "TGTheme.h"
+#import "TGTransparentSpinnerView.h"
 #include <math.h>
 
 static NSColor *TGStorageAccentBlue(void) {
@@ -297,7 +298,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @property (nonatomic, retain) NSTextField *hintField;
 @property (nonatomic, retain) NSButton *clearButton;
 @property (nonatomic, retain) NSButton *refreshButton;
-@property (nonatomic, retain) NSProgressIndicator *progressIndicator;
+@property (nonatomic, retain) TGTransparentSpinnerView *progressIndicator;
 
 @end
 
@@ -446,8 +447,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [self.hintField setStringValue:TGLoc(@"storage.safeHint")];
     [contentView addSubview:self.hintField];
 
-    self.progressIndicator = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(308, 384, 24, 24)] autorelease];
-    [self.progressIndicator setStyle:NSProgressIndicatorSpinningStyle];
+    self.progressIndicator = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(308, 384, 24, 24)] autorelease];
     [self.progressIndicator setDisplayedWhenStopped:NO];
     [contentView addSubview:self.progressIndicator];
 }

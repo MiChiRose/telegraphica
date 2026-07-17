@@ -11,12 +11,14 @@ extern NSString * const TGThemeIdentifierMelonOlive;
 extern NSString * const TGThemeIdentifierMidnightGraphite;
 extern NSString * const TGThemeIdentifierNordicNight;
 extern NSString * const TGThemeIdentifierTronGrid;
+extern NSString * const TGThemeIdentifierSkeuomorphicBlue;
 
 NSArray *TGThemeIdentifiers(void);
 BOOL TGThemeIdentifierIsValid(NSString *identifier);
 NSString *TGThemeDisplayNameForIdentifier(NSString *identifier);
 void TGSetActiveThemeIdentifier(NSString *identifier);
 NSString *TGCurrentThemeIdentifier(void);
+BOOL TGThemeIsSkeuomorphicBlue(void);
 
 NSColor *TGColorFromHex(NSUInteger hex);
 NSColor *TGClassicWindowBottomColor(void);
@@ -51,3 +53,12 @@ NSColor *TGClassicTableHeaderColor(void);
 NSColor *TGClassicLinkColor(void);
 NSColor *TGClassicHeaderTextColor(CGFloat alpha);
 NSColor *TGClassicHeaderDetailTextColor(CGFloat alpha);
+
+void TGThemeDrawWindowBackgroundInRect(NSRect rect, BOOL flipped);
+void TGThemeDrawRailBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipped);
+void TGThemeDrawPanelBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipped);
+void TGThemeDrawHeaderBackgroundInRect(NSRect rect, BOOL flipped);
+void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipped);
+void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped);
+void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlighted, BOOL selected, BOOL enabled, BOOL flipped);
+void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoing, BOOL flipped);

@@ -63,7 +63,10 @@ NSString *TGTypingIndicatorTextForSummary(NSDictionary *summary,
                                           NSString *selectedChatTypeSummary,
                                           NSString *selectedChatTitle,
                                           NSArray *messageItems) {
-    NSString *senderName = TGTypingSenderNameForSummary(summary, selectedChatTypeSummary, selectedChatTitle, messageItems);
     NSString *actionText = TGTypingActionTextForSummary(summary);
+    if ([selectedChatTypeSummary isEqualToString:@"Private"]) {
+        return actionText;
+    }
+    NSString *senderName = TGTypingSenderNameForSummary(summary, selectedChatTypeSummary, selectedChatTitle, messageItems);
     return [NSString stringWithFormat:@"%@ %@", senderName, actionText];
 }
