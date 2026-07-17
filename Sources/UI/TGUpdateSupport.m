@@ -368,23 +368,10 @@ NSDictionary *TGLatestUpdateInfoWithError(NSError **error) {
         return manifestInfo;
     }
 
-    NSError *githubError = nil;
-    NSDictionary *githubInfo = TGLatestGitHubReleaseInfoWithError(&githubError);
-    if (githubInfo) {
-        return githubInfo;
-    }
-
     if (error) {
-        NSString *manifestMessage = [manifestError localizedDescription];
-        NSString *githubMessage = [githubError localizedDescription];
-        NSString *message = nil;
-        if ([manifestMessage length] > 0 && [githubMessage length] > 0) {
-            message = [NSString stringWithFormat:@"%@; fallback GitHub check failed: %@", manifestMessage, githubMessage];
-        } else {
-            message = ([manifestMessage length] > 0) ? manifestMessage : githubMessage;
-        }
+        NSString *message = [manifestError localizedDescription];
         if ([message length] == 0) {
-            message = @"No update source returned release information.";
+            message = @"Update manifest did not return release information.";
         }
         *error = [NSError errorWithDomain:@"TelegraphicaUpdate"
                                      code:13
