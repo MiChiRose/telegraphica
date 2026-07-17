@@ -429,6 +429,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 - (void)forwardMessageToSavedMessagesFromMenu:(id)sender;
 @end
 
+#include "TGChatSearchPanelView.inc"
+
 @implementation TGStatusWindowController
 
 @synthesize topPanelView = _topPanelView;

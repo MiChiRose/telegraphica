@@ -151,10 +151,15 @@ NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
     if ([item isVisualMediaMessage]) {
         NSArray *mediaLabels = [NSArray arrayWithObjects:
                                 @"[Photo]",
+                                @"Image",
                                 @"[Sticker]",
+                                @"Sticker",
                                 @"[Animation]",
+                                @"Animation",
                                 @"[GIF]",
+                                @"GIF",
                                 @"[Video]",
+                                @"Video",
                                 nil];
         NSUInteger index = 0;
         for (index = 0; index < [mediaLabels count]; index++) {

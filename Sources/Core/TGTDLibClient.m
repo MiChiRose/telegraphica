@@ -93,12 +93,19 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     }
     NSArray *labels = [NSArray arrayWithObjects:
                        @"[Photo]",
+                       @"Image",
                        @"[Video]",
+                       @"Video",
                        @"[Animation]",
+                       @"Animation",
                        @"[GIF]",
+                       @"GIF",
                        @"[Document]",
+                       @"Document",
                        @"[Sticker]",
+                       @"Sticker",
                        @"[Media]",
+                       @"Media",
                        nil];
     NSUInteger index = 0;
     for (index = 0; index < [labels count]; index++) {
@@ -151,6 +158,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableArray *_pendingUpdateSummaries;
     NSArray *_chatFilterInfos;
     NSMutableDictionary *_senderSummaryCache;
+    NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSString *_latestAuthorizationStateSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
@@ -216,6 +224,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSNumber *)messageThreadIDFromMessageObject:(NSDictionary *)messageObject;
 - (NSString *)messageTopicKindFromMessageObject:(NSDictionary *)messageObject;
 - (NSArray *)messagePreviewItemsByGroupingMediaAlbums:(NSArray *)items;
+- (NSString *)syntheticMediaAlbumMessageKeyForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID;
+- (void)rememberSyntheticMediaAlbumForMessages:(NSArray *)messages chatID:(NSNumber *)chatID;
+- (NSNumber *)syntheticMediaAlbumIDForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID;
 - (NSDictionary *)sendMessageRequest:(NSDictionary *)request
                       messageThreadID:(NSNumber *)messageThreadID
                      messageTopicKind:(NSString *)messageTopicKind
@@ -247,6 +258,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _waitingResponseExtras = [[NSMutableSet alloc] init];
         _pendingUpdateSummaries = [[NSMutableArray alloc] init];
         _senderSummaryCache = [[NSMutableDictionary alloc] init];
+        _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -377,6 +389,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_pendingUpdateSummaries release];
     [_chatFilterInfos release];
     [_senderSummaryCache release];
+    [_syntheticMediaAlbumIDByMessageKey release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
     [_receiverThread release];
@@ -3559,7 +3572,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject {
     if (![documentObject isKindOfClass:[NSDictionary class]]) {
-        return @"[Document]";
+        return @"Document";
     }
 
     id mimeTypeObject = [documentObject objectForKey:@"mime_type"];
@@ -3572,15 +3585,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     if ([mimeType isEqualToString:@"image/gif"] || [extension isEqualToString:@"gif"]) {
-        return @"[GIF]";
+        return @"GIF";
     }
     if ([mimeType hasPrefix:@"video/"]) {
-        return @"[Video]";
+        return @"Video";
     }
     if ([mimeType hasPrefix:@"image/"]) {
-        return @"[Photo]";
+        return @"Image";
     }
-    return @"[Document]";
+    return @"Document";
 }
 
 - (NSDictionary *)visualMediaInfoFromDocumentObject:(id)documentObject
@@ -4019,7 +4032,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     id emojiObject = [sticker objectForKey:@"emoji"];
     if ([emojiObject isKindOfClass:[NSString class]] && [(NSString *)emojiObject length] > 0) {
         [info setObject:emojiObject forKey:@"emoji"];
-        [info setObject:[NSString stringWithFormat:@"[Sticker] %@", emojiObject] forKey:@"label"];
+        [info setObject:[NSString stringWithFormat:@"Sticker %@", emojiObject] forKey:@"label"];
     }
     [info setObject:@"messageSticker" forKey:@"content_type"];
     NSString *placeholder = ([emojiObject isKindOfClass:[NSString class]] && [(NSString *)emojiObject length] > 0) ? (NSString *)emojiObject : @"Sticker";
@@ -4323,20 +4336,20 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSDictionary *labels = [NSDictionary dictionaryWithObjectsAndKeys:
-                            @"[Photo]", @"messagePhoto",
-                            @"[Video]", @"messageVideo",
-                            @"[Animation]", @"messageAnimation",
-                            @"[Document]", @"messageDocument",
-                            @"[Audio]", @"messageAudio",
-                            @"[Voice]", @"messageVoiceNote",
-                            @"[Video note]", @"messageVideoNote",
-                            @"[Sticker]", @"messageSticker",
-                            @"[Contact]", @"messageContact",
-                            @"[Location]", @"messageLocation",
-                            @"[Poll]", @"messagePoll",
-                            @"[Call]", @"messageCall",
-                            @"[Invoice]", @"messageInvoice",
-                            @"[Unsupported]", @"messageUnsupported",
+                            @"Image", @"messagePhoto",
+                            @"Video", @"messageVideo",
+                            @"Animation", @"messageAnimation",
+                            @"Document", @"messageDocument",
+                            @"Audio", @"messageAudio",
+                            @"Voice message", @"messageVoiceNote",
+                            @"Video note", @"messageVideoNote",
+                            @"Sticker", @"messageSticker",
+                            @"Contact", @"messageContact",
+                            @"Location", @"messageLocation",
+                            @"Poll", @"messagePoll",
+                            @"Call", @"messageCall",
+                            @"Invoice", @"messageInvoice",
+                            @"Unsupported message", @"messageUnsupported",
                             nil];
     NSString *label = [labels objectForKey:type];
     if ([label length] == 0) {
@@ -4470,6 +4483,56 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return NO;
 }
 
+- (NSString *)syntheticMediaAlbumMessageKeyForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%lld|%lld", [chatID longLongValue], [messageID longLongValue]];
+}
+
+- (NSNumber *)syntheticMediaAlbumIDForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID {
+    NSString *key = [self syntheticMediaAlbumMessageKeyForChatID:chatID messageID:messageID];
+    if ([key length] == 0) {
+        return nil;
+    }
+    id value = [_syntheticMediaAlbumIDByMessageKey objectForKey:key];
+    return [value respondsToSelector:@selector(longLongValue)] ? value : nil;
+}
+
+- (void)rememberSyntheticMediaAlbumForMessages:(NSArray *)messages chatID:(NSNumber *)chatID {
+    if (![messages isKindOfClass:[NSArray class]] || [messages count] < 2 || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    long long firstMessageID = 0;
+    NSUInteger index = 0;
+    for (index = 0; index < [messages count]; index++) {
+        id message = [messages objectAtIndex:index];
+        id messageID = [message isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)message objectForKey:@"id"] : nil;
+        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] != 0) {
+            firstMessageID = [messageID longLongValue];
+            break;
+        }
+    }
+    if (firstMessageID == 0) {
+        return;
+    }
+    NSNumber *syntheticAlbumID = [NSNumber numberWithLongLong:llabs(firstMessageID)];
+    NSUInteger remembered = 0;
+    for (index = 0; index < [messages count]; index++) {
+        id message = [messages objectAtIndex:index];
+        id messageID = [message isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)message objectForKey:@"id"] : nil;
+        NSString *key = [self syntheticMediaAlbumMessageKeyForChatID:chatID messageID:messageID];
+        if ([key length] == 0) {
+            continue;
+        }
+        [_syntheticMediaAlbumIDByMessageKey setObject:syntheticAlbumID forKey:key];
+        remembered++;
+    }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib media album fallback: remembered %lu message id(s) under synthetic album %@.",
+                                  (unsigned long)remembered,
+                                  syntheticAlbumID]];
+}
+
 - (NSArray *)messagePreviewItemsFromMessages:(NSArray *)messages chatID:(NSNumber *)chatID {
     NSMutableArray *items = [NSMutableArray array];
     NSUInteger index = 0;
@@ -4598,6 +4661,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         id mediaAlbumID = [message objectForKey:@"media_album_id"];
         if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
             [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
+        } else {
+            NSNumber *syntheticAlbumID = [self syntheticMediaAlbumIDForChatID:safeChatID messageID:safeMessageID];
+            if ([syntheticAlbumID respondsToSelector:@selector(longLongValue)] && [syntheticAlbumID longLongValue] > 0) {
+                [item setMediaAlbumID:syntheticAlbumID];
+            }
         }
         NSDictionary *downloadInfo = [self downloadableInfoFromMessageContentObject:contentObject];
         BOOL policyAllowsAutoDownload = [self shouldAutoDownloadMessageContentObject:contentObject downloadableInfo:downloadInfo];
@@ -4653,7 +4721,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             [item setDownloadFileSize:[NSNumber numberWithLongLong:[fileSize longLongValue]]];
         }
         BOOL hasDisplayablePhotoInfo = ([[photoInfo objectForKey:@"local_path"] length] > 0);
-        if ([contentType isEqualToString:@"messagePhoto"] && !hasDisplayablePhotoInfo && [preview isEqualToString:@"[Photo]"]) {
+        if ([contentType isEqualToString:@"messagePhoto"] && !hasDisplayablePhotoInfo && ([preview isEqualToString:@"Image"] || [preview isEqualToString:@"[Photo]"])) {
             continue;
         }
         BOOL canKeepStickerFallback = ([contentType isEqualToString:@"messageSticker"] && [photoInfo count] > 0);
@@ -6311,6 +6379,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             if ([albumID respondsToSelector:@selector(longLongValue)] && [albumID longLongValue] > 0) {
                 [albumIDs addObject:[albumID stringValue]];
             }
+        }
+        if ([albumIDs count] == 0 && [(NSArray *)messages count] > 1) {
+            [self rememberSyntheticMediaAlbumForMessages:(NSArray *)messages chatID:chatID];
         }
     }
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib media album accepted using %@ schema; response message count=%lu album_ids=%@.",
