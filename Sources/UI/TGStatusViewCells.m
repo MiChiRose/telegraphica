@@ -355,8 +355,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : rawMessageText;
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,

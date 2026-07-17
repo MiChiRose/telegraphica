@@ -3172,9 +3172,25 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return trimmed;
 }
 
+- (NSString *)multilineTrimmedString:(NSString *)string maximumLength:(NSUInteger)maximumLength {
+    if (![string isKindOfClass:[NSString class]]) {
+        return @"";
+    }
+
+    NSMutableString *mutable = [NSMutableString stringWithString:string];
+    [mutable replaceOccurrencesOfString:@"\r\n" withString:@"\n" options:0 range:NSMakeRange(0, [mutable length])];
+    [mutable replaceOccurrencesOfString:@"\r" withString:@"\n" options:0 range:NSMakeRange(0, [mutable length])];
+    NSString *trimmed = [mutable stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (maximumLength > 0 && [trimmed length] > maximumLength) {
+        NSString *prefix = [trimmed substringToIndex:maximumLength];
+        return [prefix stringByAppendingString:@"..."];
+    }
+    return trimmed;
+}
+
 - (NSString *)textFromFormattedTextObject:(id)object {
     if ([object isKindOfClass:[NSString class]]) {
-        return [self singleLineTrimmedString:(NSString *)object maximumLength:4060];
+        return [self multilineTrimmedString:(NSString *)object maximumLength:4060];
     }
     if (![object isKindOfClass:[NSDictionary class]]) {
         return @"";
@@ -3184,7 +3200,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![text isKindOfClass:[NSString class]]) {
         return @"";
     }
-    return [self singleLineTrimmedString:(NSString *)text maximumLength:4060];
+    return [self multilineTrimmedString:(NSString *)text maximumLength:4060];
 }
 
 - (NSNumber *)fileIDFromFileObject:(id)fileObject {
@@ -5627,6 +5643,52 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
         if (error && *error == nil) {
             *error = [self errorWithDescription:@"TDLib toggleChatIsPinned returned an unexpected response." code:97];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)setMessagePinnedForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat or message identifier is missing." code:98];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to update pinned messages. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:99];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    if (pinned) {
+        [request setObject:@"pinChatMessage" forKey:@"@type"];
+        [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+        [request setObject:[NSNumber numberWithBool:NO] forKey:@"disable_notification"];
+        [request setObject:[NSNumber numberWithBool:NO] forKey:@"only_for_self"];
+    } else {
+        [request setObject:@"unpinChatMessage" forKey:@"@type"];
+        [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+    }
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:(pinned ? @"telegraphica-pin-chat-message" : @"telegraphica-unpin-chat-message")
+                                                           timeout:timeout
+                                                         errorCode:(pinned ? 100 : 101)
+                                                             error:error];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = [self errorWithDescription:@"TDLib pin/unpin message returned an unexpected response." code:102];
         }
         return NO;
     }

@@ -137,22 +137,7 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
 }
 
 - (void)openChatListSearch:(id)sender {
-    (void)sender;
-    if (![self.currentAuthState isEqualToString:@"ready"]) {
-        return;
-    }
-    self.chatTitleSearchOnly = YES;
-    self.searchPanelVisible = YES;
-    self.searchEndReached = YES;
-    self.searchLoading = NO;
-    self.globalSearchOffset = nil;
-    [self.searchScopePopUpButton selectItemAtIndex:1];
-    [self.searchResultItems removeAllObjects];
-    [self.searchResultsTableView reloadData];
-    [self setSearchStatusText:@"Ищите чат, группу или человека"];
-    [self updateVisibleSection];
-    [self layoutContentView];
-    [[self window] makeFirstResponder:self.searchTextField];
+    [self openChatSearchWindow:sender];
 }
 
 - (void)closeSearchPanel:(id)sender {

@@ -418,6 +418,16 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [savedForwardItem setTarget:self];
         [menu addItem:savedForwardItem];
     }
+    if ([item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
+        NSMenuItem *pinMessageItem = [[[NSMenuItem alloc] initWithTitle:([item isPinned] ? TGLoc(@"message.unpin") : TGLoc(@"message.pin"))
+                                                                 action:@selector(toggleMessagePinnedFromMenu:)
+                                                          keyEquivalent:@""] autorelease];
+        [pinMessageItem setRepresentedObject:item];
+        [pinMessageItem setTarget:self];
+        [pinMessageItem setImage:TGTemplateIconAssetImage(@"flag-triangle", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.78)];
+        [menu addItem:pinMessageItem];
+        addedMessageAction = YES;
+    }
     if ([item outgoing]) {
         NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:@"Who read"
                                                              action:nil
@@ -615,6 +625,59 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
             }
             [viewers release];
             [errorMessage release];
+            [chatID release];
+            [messageID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)toggleMessagePinnedFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Pinning messages is available only after sign-in is ready."];
+        return;
+    }
+
+    BOOL targetPinned = ![item isPinned];
+    TGMessageItem *itemCopy = [item retain];
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSNumber *messageID = [[NSNumber numberWithLongLong:[[item messageID] longLongValue]] retain];
+    TGTDLibClient *client = [self.client retain];
+
+    [item setPinned:targetPinned];
+    [self.messageTableView reloadData];
+    [self.statusField setStringValue:(targetPinned ? TGLoc(@"message.pin") : TGLoc(@"message.unpin"))];
+    [self appendDetail:[NSString stringWithFormat:@"%@ message...", targetPinned ? @"Pinning" : @"Unpinning"]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *pinError = nil;
+        BOOL succeeded = [client setMessagePinnedForChatID:chatID messageID:messageID pinned:targetPinned timeout:8.0 error:&pinError];
+        NSString *errorMessage = [[pinError localizedDescription] copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:(targetPinned ? TGLoc(@"message.pin") : TGLoc(@"message.unpin"))];
+                [self appendDetail:[NSString stringWithFormat:@"%@ message accepted by TDLib.", targetPinned ? @"Pin" : @"Unpin"]];
+                [self loadPinnedMessageForSelectedChat];
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            } else {
+                [itemCopy setPinned:!targetPinned];
+                [self.messageTableView reloadData];
+                [self.statusField setStringValue:@"Pin unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib pin message: %@", [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [itemCopy release];
             [chatID release];
             [messageID release];
             [client release];

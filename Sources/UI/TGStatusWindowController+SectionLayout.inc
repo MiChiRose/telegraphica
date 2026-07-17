@@ -998,6 +998,7 @@
     CGFloat logsCardHeight = mainHeight - TGPanelHeaderHeight - 36.0;
     [self.logsCardView setFrame:NSMakeRect(logsCardX, logsCardY, logsCardWidth, logsCardHeight)];
     [self.detailsScrollView setFrame:NSMakeRect(logsCardX + 12.0, logsCardY + 12.0, logsCardWidth - 24.0, logsCardHeight - 24.0)];
+    [self applyPointingHandCursorToButtonsInView:contentView];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {

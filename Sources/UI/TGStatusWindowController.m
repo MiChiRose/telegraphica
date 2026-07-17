@@ -138,6 +138,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL searchEndReached;
 @property (nonatomic, assign) BOOL chatTitleSearchOnly;
 @property (nonatomic, assign) NSUInteger searchGeneration;
+@property (nonatomic, retain) NSWindow *chatSearchWindow;
+@property (nonatomic, retain) NSTextField *chatSearchWindowTextField;
+@property (nonatomic, retain) NSScrollView *chatSearchWindowScrollView;
+@property (nonatomic, retain) NSView *chatSearchWindowResultsView;
+@property (nonatomic, retain) NSTextField *chatSearchWindowStatusField;
+@property (nonatomic, retain) NSMutableArray *chatSearchWindowResults;
+@property (nonatomic, retain) NSMutableArray *chatSearchWindowResultButtons;
 @property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
 @property (nonatomic, retain) NSTextField *pinnedMessageStripeField;
 @property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
@@ -484,6 +491,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize searchEndReached = _searchEndReached;
 @synthesize chatTitleSearchOnly = _chatTitleSearchOnly;
 @synthesize searchGeneration = _searchGeneration;
+@synthesize chatSearchWindow = _chatSearchWindow;
+@synthesize chatSearchWindowTextField = _chatSearchWindowTextField;
+@synthesize chatSearchWindowScrollView = _chatSearchWindowScrollView;
+@synthesize chatSearchWindowResultsView = _chatSearchWindowResultsView;
+@synthesize chatSearchWindowStatusField = _chatSearchWindowStatusField;
+@synthesize chatSearchWindowResults = _chatSearchWindowResults;
+@synthesize chatSearchWindowResultButtons = _chatSearchWindowResultButtons;
 @synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
 @synthesize pinnedMessageStripeField = _pinnedMessageStripeField;
 @synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
@@ -775,6 +789,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         self.searchResultItems = [NSMutableArray array];
+        self.chatSearchWindowResults = [NSMutableArray array];
+        self.chatSearchWindowResultButtons = [NSMutableArray array];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
@@ -2890,6 +2906,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 #include "TGStatusWindowController+MessageMenus.inc"
 
+#include "TGStatusWindowController+ChatSearchWindow.inc"
+
 #include "TGStatusWindowController+SearchNavigation.inc"
 
 #include "TGStatusWindowController+TableForumFlow.inc"
@@ -2933,6 +2951,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_messageTableView setDelegate:nil];
     [_searchResultsTableView setDataSource:nil];
     [_searchResultsTableView setDelegate:nil];
+    [_chatSearchWindowTextField setDelegate:nil];
+    [_chatSearchWindow close];
     [_messageContextMenu setDelegate:nil];
     [_chatContextMenu setDelegate:nil];
     [_sendTextField setDelegate:nil];
@@ -2995,6 +3015,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_searchDebounceTimer invalidate];
     [_searchDebounceTimer release];
     [_globalSearchOffset release];
+    [_chatSearchWindow release];
+    [_chatSearchWindowTextField release];
+    [_chatSearchWindowScrollView release];
+    [_chatSearchWindowResultsView release];
+    [_chatSearchWindowStatusField release];
+    [_chatSearchWindowResults release];
+    [_chatSearchWindowResultButtons release];
     [_pinnedMessagePanelView release];
     [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];

@@ -42,6 +42,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (BOOL)setMessagePinnedForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)setDraftMessageForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;

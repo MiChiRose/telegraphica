@@ -258,12 +258,24 @@ NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex) 
     return nil;
 }
 
+NSMutableParagraphStyle *TGMessageTextParagraphStyle(void) {
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    [paragraph setLineSpacing:1.0];
+    [paragraph setParagraphSpacing:6.0];
+    return paragraph;
+}
+
 NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *baseAttributes) {
     if (![text isKindOfClass:[NSString class]]) {
         text = @"";
     }
+    NSMutableDictionary *attributes = [NSMutableDictionary dictionaryWithDictionary:baseAttributes ? baseAttributes : [NSDictionary dictionary]];
+    if (![attributes objectForKey:NSParagraphStyleAttributeName]) {
+        [attributes setObject:TGMessageTextParagraphStyle() forKey:NSParagraphStyleAttributeName];
+    }
     NSMutableAttributedString *attributed = [[[NSMutableAttributedString alloc] initWithString:text
-                                                                                   attributes:baseAttributes] autorelease];
+                                                                                   attributes:attributes] autorelease];
     NSDataDetector *detector = TGSharedLinkDetector();
     if (!detector || [text length] == 0) {
         return attributed;
@@ -931,8 +943,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : TGDisplayTextForMessageItem(item);
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                 paragraph, NSParagraphStyleAttributeName,
@@ -995,8 +1006,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     CGFloat sidePadding = 14.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,

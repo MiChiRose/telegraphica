@@ -723,6 +723,9 @@
     if ([notification object] == self.searchTextField) {
         [self scheduleSearchRequest];
         return;
+    } else if ([notification object] == self.chatSearchWindowTextField) {
+        [self updateChatSearchWindowResults];
+        return;
     } else if ([notification object] == self.sendTextField) {
         [self saveCurrentComposerDraft];
         [self updateSendControls];
@@ -739,6 +742,16 @@
     if (control == self.searchTextField &&
         [self control:control textView:textView doSearchCommandBySelector:commandSelector]) {
         return YES;
+    }
+    if (control == self.chatSearchWindowTextField &&
+        [self control:control textView:textView doChatSearchWindowCommandBySelector:commandSelector]) {
+        return YES;
+    }
+    if (control == self.sendTextField && commandSelector == @selector(paste:)) {
+        if ([self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]]) {
+            return YES;
+        }
+        return NO;
     }
     if (control == self.sendTextField &&
         (commandSelector == @selector(insertNewline:) ||
