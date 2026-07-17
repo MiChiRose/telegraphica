@@ -16,11 +16,14 @@ typedef enum {
 @property (nonatomic, copy) NSString *errorMessage;
 @property (nonatomic, assign) TGAttachmentKind kind;
 @property (nonatomic, assign) unsigned long long fileSize;
+@property (nonatomic, assign) NSUInteger pixelWidth;
+@property (nonatomic, assign) NSUInteger pixelHeight;
 - (BOOL)isSupported;
 - (BOOL)isLarge;
 - (NSString *)readableSize;
 - (NSString *)summary;
 + (TGAttachmentDescriptor *)descriptorForPath:(NSString *)path;
 + (TGAttachmentDescriptor *)firstDescriptorFromPasteboard:(NSPasteboard *)pasteboard;
++ (NSArray *)descriptorsFromPasteboard:(NSPasteboard *)pasteboard maximumCount:(NSUInteger)maximumCount;
 + (NSArray *)supportedOpenPanelTypes;
 @end

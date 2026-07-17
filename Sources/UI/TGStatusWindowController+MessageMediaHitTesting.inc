@@ -24,9 +24,9 @@
     BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
+    BOOL flipped = [self.messageTableView isFlipped];
 
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
@@ -59,7 +59,7 @@
 
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                          options:NSStringDrawingUsesLineFragmentOrigin];
     }
 
@@ -78,7 +78,8 @@
 
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
     if (NSHeight(measuredRect) > 0.0) {
         bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
     }
@@ -89,15 +90,18 @@
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
-    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
-    contentTop -= senderHeaderHeight;
+    CGFloat contentTop = flipped ? (NSMinY(bubbleRect) + 9.0) : (NSMaxY(bubbleRect) - 9.0);
+    contentTop += flipped ? senderHeaderHeight : -senderHeaderHeight;
+    contentTop += flipped ? contextHeaderHeight : -contextHeaderHeight;
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    contentTop -= reactionBandHeight;
-    if ([messageText length] == 0 && mediaFooterHeight > 0.0) {
+    if (!flipped) {
+        contentTop -= reactionBandHeight;
+    }
+    if (!flipped && [messageText length] == 0 && mediaFooterHeight > 0.0) {
         contentTop -= mediaFooterHeight;
     }
     NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
-                                  contentTop - photoSize.height,
+                                  flipped ? contentTop : (contentTop - photoSize.height),
                                   photoSize.width,
                                   photoSize.height);
     NSArray *mediaItems = [item visualMediaItems];
@@ -136,10 +140,14 @@
 }
 
 - (void)scheduleInlineMediaPlaybackRefresh {
+    [self scheduleInlineMediaPlaybackRefreshAfterDelay:0.0];
+}
+
+- (void)scheduleInlineMediaPlaybackRefreshAfterDelay:(NSTimeInterval)delay {
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(refreshInlineMediaPlayback)
                                                object:nil];
-    [self performSelector:@selector(refreshInlineMediaPlayback) withObject:nil afterDelay:0.0];
+    [self performSelector:@selector(refreshInlineMediaPlayback) withObject:nil afterDelay:delay];
 }
 
 - (void)logInlinePlaybackDiagnosticOnceForKey:(NSString *)key message:(NSString *)message {
@@ -260,8 +268,7 @@
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
@@ -285,7 +292,7 @@
     NSAttributedString *attributedMessageText = composedMessageText;
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                            options:NSStringDrawingUsesLineFragmentOrigin];
     } else {
         measuredRect = NSZeroRect;
@@ -349,7 +356,7 @@
 
     NSTextStorage *textStorage = [[[NSTextStorage alloc] initWithAttributedString:attributedMessageText] autorelease];
     NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
-    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 1000.0)] autorelease];
+    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 12000.0)] autorelease];
     [textContainer setLineFragmentPadding:0.0];
     [layoutManager addTextContainer:textContainer];
     [textStorage addLayoutManager:layoutManager];

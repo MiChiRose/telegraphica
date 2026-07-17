@@ -46,3 +46,4 @@ These project rules apply to Codex work in this repository.
 - Do not let one file become a broad mixed-responsibility dump. If a feature adds a meaningful amount of UI, media, data-flow, presentation, or TDLib orchestration code, split that area into a small focused file during the same task.
 - For refactors of oversized files, prefer substantial cohesive moves of complete method groups or helper responsibilities over tiny cosmetic reductions. Verify with local checks and, when relevant, the remote Mavericks HITL build flow.
 - Do not commit Telegram `api_id`, `api_hash`, sessions, phone numbers, login codes, TDLib databases, generated database keys, or local credentials.
+- Periodically clean `dist` from obsolete Telegraphica build archives and scratch artifacts after newer verified builds replace them, using narrow exact-path cleanup only.

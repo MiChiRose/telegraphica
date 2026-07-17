@@ -151,10 +151,15 @@ NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
     if ([item isVisualMediaMessage]) {
         NSArray *mediaLabels = [NSArray arrayWithObjects:
                                 @"[Photo]",
+                                @"Image",
                                 @"[Sticker]",
+                                @"Sticker",
                                 @"[Animation]",
+                                @"Animation",
                                 @"[GIF]",
+                                @"GIF",
                                 @"[Video]",
+                                @"Video",
                                 nil];
         NSUInteger index = 0;
         for (index = 0; index < [mediaLabels count]; index++) {
@@ -258,12 +263,24 @@ NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex) 
     return nil;
 }
 
+NSMutableParagraphStyle *TGMessageTextParagraphStyle(void) {
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    [paragraph setLineSpacing:1.0];
+    [paragraph setParagraphSpacing:6.0];
+    return paragraph;
+}
+
 NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *baseAttributes) {
     if (![text isKindOfClass:[NSString class]]) {
         text = @"";
     }
+    NSMutableDictionary *attributes = [NSMutableDictionary dictionaryWithDictionary:baseAttributes ? baseAttributes : [NSDictionary dictionary]];
+    if (![attributes objectForKey:NSParagraphStyleAttributeName]) {
+        [attributes setObject:TGMessageTextParagraphStyle() forKey:NSParagraphStyleAttributeName];
+    }
     NSMutableAttributedString *attributed = [[[NSMutableAttributedString alloc] initWithString:text
-                                                                                   attributes:baseAttributes] autorelease];
+                                                                                   attributes:attributes] autorelease];
     NSDataDetector *detector = TGSharedLinkDetector();
     if (!detector || [text length] == 0) {
         return attributed;
@@ -549,6 +566,16 @@ NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumW
 
 NSSize TGPhotoDisplaySizeForMessageItem(TGMessageItem *item, CGFloat maximumWidth) {
     NSArray *mediaItems = [item visualMediaItems];
+    if ([item isVideoNoteMessage]) {
+        CGFloat side = 154.0;
+        if (maximumWidth > 0.0 && side > maximumWidth) {
+            side = maximumWidth;
+        }
+        if (side < 124.0) {
+            side = 124.0;
+        }
+        return NSMakeSize(ceil(side), ceil(side));
+    }
     if ([mediaItems count] > 1) {
         CGFloat albumWidth = maximumWidth;
         if (albumWidth > 360.0) {
@@ -952,7 +979,7 @@ CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
 }
 
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
-    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 11.0 : 0.0;
+    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? 13.0 : 0.0;
 }
 
 CGFloat TGComposerMinimumInputHeight(void) {
@@ -986,7 +1013,7 @@ void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL 
         return;
     }
 
-    CGFloat dotSide = 4.0;
+    CGFloat dotSide = 5.0;
     CGFloat dotGap = 3.0;
     CGFloat dotX = NSMaxX(timeRect) + 4.0;
     CGFloat dotY = NSMinY(timeRect) + floor((NSHeight(timeRect) - dotSide) / 2.0) + 1.0;
@@ -1030,8 +1057,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : TGDisplayTextForMessageItem(item);
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                 paragraph, NSParagraphStyleAttributeName,
@@ -1050,13 +1076,13 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:7.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:8.0] forKey:NSFontAttributeName];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@" %@", statusDots]
                                                                                         attributes:statusAttributes] autorelease];
                 [composedText appendAttributedString:statusSuffixText];
             }
         }
-        NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 1000.0)
+        NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 12000.0)
                                                      options:NSStringDrawingUsesLineFragmentOrigin];
         textHeight = ceil(NSHeight(textRect));
     }
@@ -1094,8 +1120,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     CGFloat sidePadding = 14.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
@@ -1117,7 +1142,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:7.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:8.0] forKey:NSFontAttributeName];
                 [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
                 NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
@@ -1128,7 +1153,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
 
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                          options:NSStringDrawingUsesLineFragmentOrigin];
     }
     NSSize photoSize = NSZeroSize;

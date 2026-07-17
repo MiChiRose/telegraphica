@@ -352,12 +352,12 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
         NSSize imageSize = [frame size];
         if (imageSize.width > 0.0 && imageSize.height > 0.0) {
             NSRect bounds = [self bounds];
-            CGFloat x = floor(NSMidX(bounds) - imageSize.width / 2.0);
-            CGFloat y = floor(NSMidY(bounds) - imageSize.height / 2.0);
-            [frame drawInRect:NSMakeRect(x, y, imageSize.width, imageSize.height)
-                     fromRect:NSZeroRect
+            [frame drawInRect:bounds
+                     fromRect:NSMakeRect(0.0, 0.0, imageSize.width, imageSize.height)
                     operation:NSCompositeSourceOver
-                     fraction:1.0];
+                     fraction:1.0
+               respectFlipped:YES
+                        hints:nil];
         }
     }
 }
