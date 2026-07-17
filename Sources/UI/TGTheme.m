@@ -342,6 +342,8 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         tileSize = 16.0;
     } else if (pattern == TGSkeuomorphicPatternPaper) {
         tileSize = 18.0;
+    } else {
+        tileSize = 18.0;
     }
 
     NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(tileSize, tileSize)];
@@ -380,12 +382,15 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         TGDrawPatternDot(3.0, 4.0, 0.035);
         TGDrawPatternDot(11.0, 10.0, 0.028);
     } else {
-        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.055] set];
-        NSRectFill(NSMakeRect(0.0, 0.0, 8.0, 1.0));
-        NSRectFill(NSMakeRect(0.0, 4.0, 8.0, 1.0));
-        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.035] set];
-        NSRectFill(NSMakeRect(2.0, 0.0, 1.0, 8.0));
-        NSRectFill(NSMakeRect(6.0, 0.0, 1.0, 8.0));
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.035] set];
+        NSRectFill(NSMakeRect(0.0, 2.0, tileSize, 1.0));
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.024] set];
+        NSRectFill(NSMakeRect(4.0, 0.0, 1.0, tileSize));
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.018] set];
+        NSRectFill(NSMakeRect(0.0, 15.0, tileSize, 1.0));
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.014] set];
+        NSRectFill(NSMakeRect(13.0, 0.0, 1.0, tileSize));
+        TGDrawPatternDot(8.0, 8.0, 0.012);
     }
     [image unlockFocus];
     *slot = image;
@@ -400,10 +405,12 @@ static void TGThemeDrawPatternInClippedRect(NSRect rect, TGSkeuomorphicPattern p
 }
 
 static void TGThemeDrawInnerShadow(NSBezierPath *path, NSRect rect, CGFloat alpha) {
+    (void)rect;
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
     [[NSColor colorWithCalibratedWhite:0.0 alpha:alpha] set];
-    NSFrameRectWithWidth(NSInsetRect(rect, 0.5, 0.5), 1.0);
+    [path setLineWidth:1.0];
+    [path stroke];
     [NSGraphicsContext restoreGraphicsState];
 }
 
