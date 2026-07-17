@@ -1926,7 +1926,12 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.replyPanelTextField];
 
     self.replyPanelCancelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 96, 28, 24)] autorelease];
-    [self.replyPanelCancelButton setTitle:@"×"];
+    [self.replyPanelCancelButton setTitle:@""];
+    [self.replyPanelCancelButton setImage:TGTemplateIconAssetImage(@"cross",
+                                                                   NSMakeSize(13.0, 13.0),
+                                                                   TGClassicMutedInkColor(),
+                                                                   0.95)];
+    [self.replyPanelCancelButton setImagePosition:NSImageOnly];
     [self.replyPanelCancelButton setTarget:self];
     [self.replyPanelCancelButton setAction:@selector(cancelReplyTarget:)];
     [self.replyPanelCancelButton setToolTip:@"Cancel reply"];

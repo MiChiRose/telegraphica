@@ -920,7 +920,7 @@ void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL
     [barPath stroke];
 
     NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
-    NSString *title = (replyCount > 0) ? [NSString stringWithFormat:@"%ld comment%@", (long)replyCount, (replyCount == 1 ? @"" : @"s")] : @"No comments yet";
+    NSString *title = (replyCount > 0) ? [NSString stringWithFormat:@"%ld comment%@", (long)replyCount, (replyCount == 1 ? @"" : @"s")] : @"Comment";
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
                                 TGClassicNavigationSelectedColor(0.96), NSForegroundColorAttributeName,

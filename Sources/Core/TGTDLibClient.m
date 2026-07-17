@@ -52,6 +52,13 @@ static BOOL TGTDLibCanGetMessageThreadFromObject(NSDictionary *object) {
         return YES;
     }
 
+    NSDictionary *interactionInfo = [[object objectForKey:@"interaction_info"] isKindOfClass:[NSDictionary class]] ? [object objectForKey:@"interaction_info"] : nil;
+    NSDictionary *replyInfo = [[interactionInfo objectForKey:@"reply_info"] isKindOfClass:[NSDictionary class]] ? [interactionInfo objectForKey:@"reply_info"] : nil;
+    id replyInfoCanGetThread = [replyInfo objectForKey:@"can_get_message_thread"];
+    if ([replyInfoCanGetThread respondsToSelector:@selector(boolValue)] && [replyInfoCanGetThread boolValue]) {
+        return YES;
+    }
+
     NSArray *nestedKeys = [NSArray arrayWithObjects:@"message_properties", @"messageProperties", @"properties", nil];
     NSUInteger index = 0;
     for (index = 0; index < [nestedKeys count]; index++) {
@@ -4663,9 +4670,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *interactionInfo = [message objectForKey:@"interaction_info"];
         NSDictionary *replyInfo = [interactionInfo isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)interactionInfo objectForKey:@"reply_info"] : nil;
         id replyCount = [replyInfo isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)replyInfo objectForKey:@"reply_count"] : nil;
-        if ([replyCount respondsToSelector:@selector(integerValue)] && [replyCount integerValue] > 0) {
+        if ([replyCount respondsToSelector:@selector(integerValue)] && [replyCount integerValue] >= 0) {
             [item setMessageThreadReplyCount:[NSNumber numberWithInteger:[replyCount integerValue]]];
-            [item setCanGetMessageThread:YES];
+            if ([replyCount integerValue] > 0 || TGTDLibCanGetMessageThreadFromObject(message)) {
+                [item setCanGetMessageThread:YES];
+            }
         }
         if (!outgoing) {
             NSDictionary *senderSummary = [self senderSummaryFromMessageObject:message timeout:0.9];
