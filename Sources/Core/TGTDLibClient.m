@@ -30,6 +30,7 @@ static NSString * const TGTDLibProxyUsernameEnvironmentKey = @"TELEGRAPHICA_TDLI
 static NSString * const TGTDLibProxyPasswordEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_PASSWORD";
 static NSString * const TGTDLibProxySecretEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_SECRET";
 static NSString * const TGTDLibProxyHTTPOnlyEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_HTTP_ONLY";
+static NSString * const TGTDLibMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSTimeInterval const TGTDLibRemoteConfigurationTimeout = 8.0;
 static NSUInteger const TGTDLibMaxPendingResponses = 64;
 static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
@@ -49,6 +50,14 @@ static BOOL TGTDLibCapabilityBoolFromDictionary(NSDictionary *dictionary, NSStri
 
 static BOOL TGTDLibDictionaryHasKey(NSDictionary *dictionary, NSString *key) {
     return ([dictionary isKindOfClass:[NSDictionary class]] && [dictionary objectForKey:key] != nil);
+}
+
+static BOOL TGTDLibMountainLionSafeLoginModeEnabled(void) {
+    NSString *minimumSystemVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"LSMinimumSystemVersion"];
+    if (![minimumSystemVersion isKindOfClass:[NSString class]] || ![minimumSystemVersion hasPrefix:@"10.8"]) {
+        return NO;
+    }
+    return ![[NSUserDefaults standardUserDefaults] boolForKey:TGTDLibMountainLionSafeLoginModeDisabledDefaultsKey];
 }
 
 static NSComparisonResult TGTDLibCompareChatItemsByPinnedOrder(id leftObject, id rightObject, void *context) {
@@ -2015,12 +2024,16 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
+    BOOL mountainLionSafeLoginMode = TGTDLibMountainLionSafeLoginModeEnabled();
     [parameters setObject:[self boolValueForKey:@"use_test_dc" inConfiguration:configuration defaultValue:NO] forKey:@"use_test_dc"];
     [parameters setObject:databasePath forKey:@"database_directory"];
     [parameters setObject:filesPath forKey:@"files_directory"];
     [parameters setObject:[self boolValueForKey:@"use_file_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_file_database"];
     [parameters setObject:[self boolValueForKey:@"use_chat_info_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_chat_info_database"];
-    [parameters setObject:[self boolValueForKey:@"use_message_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_message_database"];
+    [parameters setObject:[self boolValueForKey:@"use_message_database" inConfiguration:configuration defaultValue:!mountainLionSafeLoginMode] forKey:@"use_message_database"];
+    if (mountainLionSafeLoginMode) {
+        [parameters setObject:[NSNumber numberWithBool:NO] forKey:@"use_message_database"];
+    }
     [parameters setObject:[self boolValueForKey:@"use_secret_chats" inConfiguration:configuration defaultValue:NO] forKey:@"use_secret_chats"];
     [parameters setObject:apiID forKey:@"api_id"];
     [parameters setObject:apiHash forKey:@"api_hash"];
