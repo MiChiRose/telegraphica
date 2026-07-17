@@ -215,21 +215,17 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     if (![item isKindOfClass:[TGMessageItem class]]) {
         return nil;
     }
-    NSString *localPath = [item mediaLocalPath];
-    NSNumber *fileID = [item mediaFileID];
+    NSString *localPath = nil;
+    NSNumber *fileID = nil;
     NSString *fileName = [item downloadFileName];
     NSArray *mediaItems = [item visualMediaItems];
-    if (([localPath length] == 0 || !fileID) && [mediaItems count] > 0) {
+    if ([mediaItems count] > 0) {
         id media = [mediaItems objectAtIndex:0];
         if ([media isKindOfClass:[NSDictionary class]]) {
+            fileID = TGMediaItemFullFileID(media);
+            localPath = TGMediaItemFullLocalPath(media);
             if ([localPath length] == 0) {
-                localPath = TGMediaItemFullLocalPath(media);
-                if ([localPath length] == 0) {
-                    localPath = TGMediaItemLocalPath(media);
-                }
-            }
-            if (!fileID) {
-                fileID = TGMediaItemFullFileID(media);
+                localPath = TGMediaItemLocalPath(media);
             }
             if ([fileName length] == 0) {
                 id mediaFileName = [(NSDictionary *)media objectForKey:@"file_name"];
@@ -238,6 +234,12 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                 }
             }
         }
+    }
+    if (!fileID) {
+        fileID = [item mediaFileID];
+    }
+    if ([localPath length] == 0) {
+        localPath = [item mediaLocalPath];
     }
     if ([fileName length] == 0 && [localPath length] > 0) {
         fileName = [localPath lastPathComponent];
@@ -258,20 +260,24 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     NSString *localPath = nil;
     NSString *fileName = nil;
     NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:&localPath fileName:&fileName];
-    if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-        NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
-        NSError *copyError = nil;
-        if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
-            [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
-        } else {
-            [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-        }
-        return;
-    }
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+            NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
+            NSError *copyError = nil;
+            if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
+                [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
+            } else {
+                [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
+            }
+            return;
+        }
         [self appendDetail:@"Attachment file id is not available yet."];
         return;
     }
+
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Download media: requesting full file id %@ before copying to Downloads; fallback=%@.",
+                                  fileID,
+                                  [localPath length] > 0 ? [localPath lastPathComponent] : @"none"]];
 
     NSNumber *fileIDCopy = [fileID retain];
     NSString *fileNameCopy = [fileName copy];
@@ -289,6 +295,16 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                 if ([[NSFileManager defaultManager] copyItemAtPath:downloadedPath toPath:destination error:&copyError]) {
                     [self.statusField setStringValue:@"File downloaded"];
                     [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
+                } else {
+                    [self.statusField setStringValue:@"Download failed"];
+                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
+                }
+            } else if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
+                NSError *copyError = nil;
+                if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
+                    [self.statusField setStringValue:@"File downloaded"];
+                    [self appendDetail:[NSString stringWithFormat:@"Downloaded cached fallback to %@", destination]];
                 } else {
                     [self.statusField setStringValue:@"Download failed"];
                     [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];

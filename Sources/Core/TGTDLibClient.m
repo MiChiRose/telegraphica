@@ -6255,31 +6255,34 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                       height ? [height stringValue] : @"0"]];
     }
 
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"sendMessageAlbum" forKey:@"@type"];
-    [request setObject:chatID forKey:@"chat_id"];
-    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"message_thread_id"];
-    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"reply_to_message_id"];
-    [request setObject:[NSNull null] forKey:@"options"];
-    [request setObject:legacyContents forKey:@"input_message_contents"];
+    NSMutableDictionary *currentRequest = [NSMutableDictionary dictionary];
+    [currentRequest setObject:@"sendMessageAlbum" forKey:@"@type"];
+    [currentRequest setObject:chatID forKey:@"chat_id"];
+    [currentRequest setObject:[NSNull null] forKey:@"reply_to"];
+    [currentRequest setObject:[NSNull null] forKey:@"options"];
+    [currentRequest setObject:currentContents forKey:@"input_message_contents"];
 
     NSError *sendError = nil;
-    NSDictionary *response = [self sendMessageRequest:request
+    NSString *acceptedSchema = @"current";
+    NSDictionary *response = [self sendMessageRequest:currentRequest
                                       messageThreadID:messageThreadID
                                      messageTopicKind:messageTopicKind
-                                          extraPrefix:@"telegraphica-send-media-album"
+                                          extraPrefix:@"telegraphica-send-media-album-current"
                                               timeout:timeout
                                             errorCode:107
                                                 error:&sendError];
     if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
-        NSMutableDictionary *currentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
-        [currentRequest removeObjectForKey:@"reply_to_message_id"];
-        [currentRequest setObject:[NSNull null] forKey:@"reply_to"];
-        [currentRequest setObject:currentContents forKey:@"input_message_contents"];
-        response = [self sendMessageRequest:currentRequest
+        acceptedSchema = @"legacy";
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionary];
+        [legacyRequest setObject:@"sendMessageAlbum" forKey:@"@type"];
+        [legacyRequest setObject:chatID forKey:@"chat_id"];
+        [legacyRequest setObject:[NSNumber numberWithLongLong:0] forKey:@"reply_to_message_id"];
+        [legacyRequest setObject:[NSNull null] forKey:@"options"];
+        [legacyRequest setObject:legacyContents forKey:@"input_message_contents"];
+        response = [self sendMessageRequest:legacyRequest
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
-                                extraPrefix:@"telegraphica-send-media-album-current"
+                                extraPrefix:@"telegraphica-send-media-album-legacy"
                                     timeout:timeout
                                   errorCode:107
                                       error:&sendError];
@@ -6310,7 +6313,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             }
         }
     }
-    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib media album accepted; response message count=%lu album_ids=%@.",
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib media album accepted using %@ schema; response message count=%lu album_ids=%@.",
+                                  acceptedSchema,
                                   [messages isKindOfClass:[NSArray class]] ? (unsigned long)[(NSArray *)messages count] : 0,
                                   albumIDs]];
     return @"media album submitted";

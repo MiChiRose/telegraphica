@@ -574,10 +574,6 @@
 
     [self refreshInlineMediaPlayback];
     [self updateMessageJumpToNewestButtonVisibility];
-    if (TGThemeIsSkeuomorphicBlue()) {
-        [self.messageScrollSurfaceView setNeedsDisplay:YES];
-        [[[self.messageScrollView superview] superview] setNeedsDisplay:YES];
-    }
 
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||

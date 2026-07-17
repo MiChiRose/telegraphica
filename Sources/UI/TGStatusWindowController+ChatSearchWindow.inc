@@ -3,17 +3,17 @@
         return;
     }
 
-    self.chatSearchWindow = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 460, 420)
+    self.chatSearchWindow = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 460, 340)
                                                          styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                            backing:NSBackingStoreBuffered
                                                              defer:NO] autorelease];
     [self.chatSearchWindow setTitle:@"Search chats"];
     [self.chatSearchWindow setReleasedWhenClosed:NO];
 
-    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:NSMakeRect(0, 0, 460, 420)] autorelease];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:NSMakeRect(0, 0, 460, 340)] autorelease];
     [self.chatSearchWindow setContentView:contentView];
 
-    NSTextField *titleField = [[[NSTextField alloc] initWithFrame:NSMakeRect(22, 376, 416, 22)] autorelease];
+    NSTextField *titleField = [[[NSTextField alloc] initWithFrame:NSMakeRect(22, 296, 416, 22)] autorelease];
     [titleField setStringValue:@"Search chats"];
     [titleField setFont:[NSFont boldSystemFontOfSize:16.0]];
     [titleField setTextColor:TGClassicInkColor()];
@@ -23,7 +23,7 @@
     [titleField setDrawsBackground:NO];
     [contentView addSubview:titleField];
 
-    self.chatSearchWindowTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(22, 338, 416, 28)] autorelease];
+    self.chatSearchWindowTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(22, 258, 416, 28)] autorelease];
     [self.chatSearchWindowTextField setFont:[NSFont systemFontOfSize:13.0]];
     [self.chatSearchWindowTextField setPlaceholderString:@"Chat, group, person"];
     [self.chatSearchWindowTextField setBordered:YES];
@@ -35,18 +35,18 @@
     [self.chatSearchWindowTextField setDelegate:self];
     [contentView addSubview:self.chatSearchWindowTextField];
 
-    self.chatSearchWindowStatusField = [self labelWithFrame:NSMakeRect(24, 312, 412, 18)
+    self.chatSearchWindowStatusField = [self labelWithFrame:NSMakeRect(24, 232, 412, 18)
                                                        text:@"Start typing to find a chat"
                                                        font:[NSFont systemFontOfSize:11.0]];
     [self.chatSearchWindowStatusField setTextColor:TGClassicMutedInkColor()];
     [contentView addSubview:self.chatSearchWindowStatusField];
 
-    self.chatSearchWindowScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20, 20, 420, 286)] autorelease];
+    self.chatSearchWindowScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20, 20, 420, 204)] autorelease];
     [self.chatSearchWindowScrollView setBorderType:NSBezelBorder];
     [self.chatSearchWindowScrollView setHasVerticalScroller:YES];
     [self.chatSearchWindowScrollView setDrawsBackground:YES];
     [[self.chatSearchWindowScrollView contentView] setBackgroundColor:[NSColor colorWithCalibratedWhite:0.985 alpha:1.0]];
-    self.chatSearchWindowResultsView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 402, 286)] autorelease];
+    self.chatSearchWindowResultsView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 402, 204)] autorelease];
     [self.chatSearchWindowScrollView setDocumentView:self.chatSearchWindowResultsView];
     [contentView addSubview:self.chatSearchWindowScrollView];
 
@@ -55,10 +55,6 @@
 
 - (void)openChatSearchWindow:(id)sender {
     (void)sender;
-    if (![self.currentAuthState isEqualToString:@"ready"]) {
-        [[TGLogger sharedLogger] log:@"Search: chat search window ignored because TDLib is not ready."];
-        return;
-    }
     [self buildChatSearchWindowIfNeeded];
     [NSApp activateIgnoringOtherApps:YES];
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: opening chat search window with %lu visible chat candidate(s).",
@@ -69,6 +65,7 @@
     [self updateChatSearchWindowResults];
     [self.chatSearchWindow center];
     [self.chatSearchWindow makeKeyAndOrderFront:self];
+    [self.chatSearchWindow orderFrontRegardless];
     [self.chatSearchWindow makeFirstResponder:self.chatSearchWindowTextField];
     [self applyPointingHandCursorToButtonsInView:[self.chatSearchWindow contentView]];
 }
@@ -124,13 +121,24 @@
     CGFloat rowHeight = 46.0;
     CGFloat width = NSWidth([self.chatSearchWindowResultsView frame]);
     NSUInteger count = [self.chatSearchWindowResults count];
-    CGFloat contentHeight = MAX(286.0, rowHeight * (CGFloat)MAX(count, (NSUInteger)1));
+    CGFloat contentHeight = MAX(204.0, rowHeight * (CGFloat)MAX(count, (NSUInteger)1));
     [self.chatSearchWindowResultsView setFrame:NSMakeRect(0, 0, width, contentHeight)];
 
     if ([query length] == 0) {
         [self.chatSearchWindowStatusField setStringValue:(count == 0 ? @"Start typing to find a chat" : @"Recent chats. Type to filter by chat, group, or person.")];
     } else {
         [self.chatSearchWindowStatusField setStringValue:(count == 0 ? @"No chats found" : [NSString stringWithFormat:@"Found chats: %lu", (unsigned long)count])];
+    }
+
+    if (count == 0) {
+        NSButton *emptyButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, contentHeight - rowHeight, width - 8.0, rowHeight - 4.0)] autorelease];
+        [emptyButton setTitle:([query length] == 0 ? @"No loaded chats yet" : @"No chats found")];
+        [emptyButton setFont:[NSFont systemFontOfSize:12.0]];
+        [emptyButton setAlignment:NSCenterTextAlignment];
+        [emptyButton setBezelStyle:NSRegularSquareBezelStyle];
+        [emptyButton setEnabled:NO];
+        [self.chatSearchWindowResultsView addSubview:emptyButton];
+        [self.chatSearchWindowResultButtons addObject:emptyButton];
     }
 
     NSUInteger index = 0;
