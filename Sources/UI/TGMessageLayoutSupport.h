@@ -40,6 +40,9 @@ CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
 CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
+BOOL TGMessageItemHasCommentThread(TGMessageItem *item);
+CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item);
+NSRect TGMessageCommentBarRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item);
 CGFloat TGComposerMinimumInputHeight(void);
 CGFloat TGComposerMaximumInputHeight(void);
@@ -51,5 +54,6 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails);
 void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped);
+void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped);
 long long TGMessageSortValue(id value);
 NSInteger TGCompareMessageItemsAscending(id left, id right, void *context);

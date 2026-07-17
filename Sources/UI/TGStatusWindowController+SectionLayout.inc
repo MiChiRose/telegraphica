@@ -29,6 +29,33 @@
     }
 }
 
+- (void)messageTableViewCopy:(id)sender {
+    (void)sender;
+    NSInteger row = [self.messageTableView selectedRow];
+    if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        NSBeep();
+        return;
+    }
+    id candidate = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![candidate isKindOfClass:[TGMessageItem class]]) {
+        NSBeep();
+        return;
+    }
+    TGMessageItem *item = (TGMessageItem *)candidate;
+    NSString *text = TGDisplayTextForMessageItem(item);
+    if ([text length] == 0) {
+        text = [item preview];
+    }
+    if ([text length] == 0) {
+        NSBeep();
+        return;
+    }
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pasteboard setString:text forType:NSStringPboardType];
+    [[TGLogger sharedLogger] log:@"Pasteboard: copied selected message text."];
+}
+
 - (void)updateVisibleSection {
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
     NSString *section = self.activeSection ? self.activeSection : TGSectionChats;
@@ -80,6 +107,10 @@
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.conversationSearchButton visible:showChats];
+    BOOL showCommentThreadBack = (showChats &&
+                                  [self.selectedMessageTopicKind isEqualToString:@"thread"] &&
+                                  [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
+    [self showView:self.commentThreadBackButton visible:showCommentThreadBack];
     [self showView:self.selectedChatField visible:showChats];
     [self showView:self.typingIndicatorField visible:(showChats && [[self.typingIndicatorField stringValue] length] > 0)];
     BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
@@ -514,9 +545,18 @@
     [self.loadMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messageJumpToNewestButton setFrame:NSMakeRect(conversationJumpX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.conversationSearchButton setFrame:NSMakeRect(conversationSearchX, headerButtonY, headerButtonSize, headerButtonSize)];
+    BOOL layoutCommentThreadBack = ([self.selectedMessageTopicKind isEqualToString:@"thread"] &&
+                                    [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
+    CGFloat conversationHeaderLeftX = conversationX + 16.0;
+    if (layoutCommentThreadBack) {
+        [self.commentThreadBackButton setFrame:NSMakeRect(conversationX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
+        conversationHeaderLeftX = NSMaxX([self.commentThreadBackButton frame]) + 8.0;
+    } else {
+        [self.commentThreadBackButton setFrame:NSMakeRect(conversationX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
+    }
     [self.messagesLabel setFrame:NSMakeRect(conversationX + 16.0, headerLabelY, 0.0, 20.0)];
     CGFloat selectedAvatarSize = 24.0;
-    CGFloat selectedAvatarX = conversationX + 16.0;
+    CGFloat selectedAvatarX = conversationHeaderLeftX;
     CGFloat selectedAvatarY = mainTop - TGPanelHeaderHeight + floor((TGPanelHeaderHeight - selectedAvatarSize) / 2.0) + sectionHeaderVisualOffset;
     [self.selectedChatAvatarView setFrame:NSMakeRect(selectedAvatarX, selectedAvatarY, selectedAvatarSize, selectedAvatarSize)];
     CGFloat selectedTitleX = NSMaxX([self.selectedChatAvatarView frame]) + 8.0;
@@ -655,9 +695,14 @@
             replyWidth = 220.0;
         }
         [self.replyPanelView setFrame:NSMakeRect(replyX, replyY, replyWidth, 40.0)];
-        [self.replyPanelTitleField setFrame:NSMakeRect(replyX + 14.0, replyY + 22.0, replyWidth - 54.0, 14.0)];
-        [self.replyPanelTextField setFrame:NSMakeRect(replyX + 14.0, replyY + 7.0, replyWidth - 54.0, 15.0)];
-        [self.replyPanelCancelButton setFrame:NSMakeRect(replyX + replyWidth - 34.0, replyY + 8.0, 26.0, 24.0)];
+        CGFloat replyTextX = replyX + 14.0;
+        CGFloat replyTextWidth = replyWidth - 26.0;
+        if (replyTextWidth < 80.0) {
+            replyTextWidth = 80.0;
+        }
+        [self.replyPanelTitleField setFrame:NSMakeRect(replyTextX, replyY + 22.0, replyTextWidth, 14.0)];
+        [self.replyPanelTextField setFrame:NSMakeRect(replyTextX, replyY + 7.0, replyTextWidth, 15.0)];
+        [self.replyPanelCancelButton setFrame:NSMakeRect(attachButtonX, replyY + 4.0, attachButtonWidth, 32.0)];
     }
 
     CGFloat panelTitleY = headerLabelY;

@@ -76,6 +76,45 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 @end
 
+@interface TGReplyCancelButton : TGPointingHandButton
+@end
+
+@implementation TGReplyCancelButton
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    BOOL highlighted = [[self cell] isHighlighted];
+
+    NSRect buttonRect = NSInsetRect(bounds, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:7.0 yRadius:7.0];
+    TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, YES, YES, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSColor *iconColor = TGClassicHeaderTextColor(1.0);
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 8.5,
+                                 NSMidY(buttonRect) - 8.5,
+                                 17.0,
+                                 17.0);
+    if (!NSIsEmptyRect(iconRect)) {
+        TGDrawTemplateIconAsset(@"cross", iconRect, iconColor, 1.0, [self isFlipped]);
+    }
+
+    [iconColor set];
+    NSBezierPath *crossPath = [NSBezierPath bezierPath];
+    [crossPath setLineWidth:1.8];
+    [crossPath setLineCapStyle:NSRoundLineCapStyle];
+    [crossPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 1.0, NSMinY(iconRect) + 1.0)];
+    [crossPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 1.0, NSMaxY(iconRect) - 1.0)];
+    [crossPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 1.0, NSMaxY(iconRect) - 1.0)];
+    [crossPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 1.0, NSMinY(iconRect) + 1.0)];
+    [crossPath stroke];
+}
+
+@end
+
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
@@ -119,6 +158,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *loadChatsButton;
 @property (nonatomic, retain) NSButton *loadMoreChatsButton;
 @property (nonatomic, retain) NSButton *topicBackButton;
+@property (nonatomic, retain) NSButton *commentThreadBackButton;
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSButton *chatSearchButton;
@@ -286,6 +326,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSNumber *selectedChatLastReadOutboxMessageID;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
+@property (nonatomic, copy) NSString *commentThreadParentTitle;
+@property (nonatomic, copy) NSString *commentThreadParentTypeSummary;
+@property (nonatomic, copy) NSString *commentThreadParentAvatarLocalPath;
 @property (nonatomic, retain) NSNumber *topicParentChatID;
 @property (nonatomic, copy) NSString *topicParentTitle;
 @property (nonatomic, copy) NSString *topicParentAvatarLocalPath;
@@ -477,6 +520,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize loadChatsButton = _loadChatsButton;
 @synthesize loadMoreChatsButton = _loadMoreChatsButton;
 @synthesize topicBackButton = _topicBackButton;
+@synthesize commentThreadBackButton = _commentThreadBackButton;
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize chatSearchButton = _chatSearchButton;
@@ -644,6 +688,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize selectedChatLastReadOutboxMessageID = _selectedChatLastReadOutboxMessageID;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
+@synthesize commentThreadParentTitle = _commentThreadParentTitle;
+@synthesize commentThreadParentTypeSummary = _commentThreadParentTypeSummary;
+@synthesize commentThreadParentAvatarLocalPath = _commentThreadParentAvatarLocalPath;
 @synthesize topicParentChatID = _topicParentChatID;
 @synthesize topicParentTitle = _topicParentTitle;
 @synthesize topicParentAvatarLocalPath = _topicParentAvatarLocalPath;
@@ -1666,6 +1713,17 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.topicBackButton setHidden:YES];
     [contentView addSubview:self.topicBackButton];
 
+    self.commentThreadBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(228, 192, 32, 32)] autorelease];
+    [self.commentThreadBackButton setTitle:@"‹"];
+    [self.commentThreadBackButton setToolTip:@"Back to channel"];
+    [self.commentThreadBackButton setTarget:self];
+    [self.commentThreadBackButton setAction:@selector(closeMessageCommentsThread:)];
+    [self.commentThreadBackButton setEnabled:YES];
+    [self applyHeaderIconButtonStyle:self.commentThreadBackButton];
+    [self.commentThreadBackButton setAutoresizingMask:NSViewMaxYMargin];
+    [self.commentThreadBackButton setHidden:YES];
+    [contentView addSubview:self.commentThreadBackButton];
+
     self.chatScrollSurfaceView = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 232, 712, 96)] autorelease];
     [self.chatScrollSurfaceView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.chatScrollSurfaceView];
@@ -1906,12 +1964,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.replyPanelTextField setHidden:YES];
     [contentView addSubview:self.replyPanelTextField];
 
-    self.replyPanelCancelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 96, 28, 24)] autorelease];
-    [self.replyPanelCancelButton setTitle:@"×"];
+    self.replyPanelCancelButton = [[[TGReplyCancelButton alloc] initWithFrame:NSMakeRect(24, 96, 38, 32)] autorelease];
+    [self.replyPanelCancelButton setTitle:@""];
+    [self.replyPanelCancelButton setBordered:NO];
+    [self.replyPanelCancelButton setTransparent:YES];
+    [self.replyPanelCancelButton setButtonType:NSMomentaryPushInButton];
+    [self.replyPanelCancelButton setImage:nil];
+    [self.replyPanelCancelButton setImagePosition:NSNoImage];
     [self.replyPanelCancelButton setTarget:self];
     [self.replyPanelCancelButton setAction:@selector(cancelReplyTarget:)];
     [self.replyPanelCancelButton setToolTip:@"Cancel reply"];
-    [self applyUtilityButtonStyle:self.replyPanelCancelButton];
     [self.replyPanelCancelButton setHidden:YES];
     [contentView addSubview:self.replyPanelCancelButton];
 
@@ -3034,6 +3096,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_loadChatsButton release];
     [_loadMoreChatsButton release];
     [_topicBackButton release];
+    [_commentThreadBackButton release];
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
     [_chatSearchButton release];
@@ -3200,6 +3263,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_selectedChatLastReadOutboxMessageID release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
+    [_commentThreadParentTitle release];
+    [_commentThreadParentTypeSummary release];
+    [_commentThreadParentAvatarLocalPath release];
     [_topicParentChatID release];
     [_topicParentTitle release];
     [_topicParentAvatarLocalPath release];
