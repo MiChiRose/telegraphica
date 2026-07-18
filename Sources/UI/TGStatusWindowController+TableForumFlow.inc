@@ -453,6 +453,7 @@
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:items];
     [self applyLocalNotificationMuteStateToItems:self.chatItems];
+    [self updateSavedMessagesPresentationForChatItems];
     [self.chatTableView reloadData];
     [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;
@@ -686,7 +687,7 @@
     }
     self.suppressChatSelectionHandling = NO;
     self.chatItemsBeforeTopicList = nil;
-    [self.chatsLabel setStringValue:@"Chats"];
+    [self.chatsLabel setStringValue:TGLoc(@"chats")];
     [self updateAuthControlsForState:self.currentAuthState];
     [self layoutContentView];
     [self updateVisibleSection];

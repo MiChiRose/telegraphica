@@ -31,6 +31,7 @@
 @property (nonatomic, copy) NSString *replySenderDisplayName;
 @property (nonatomic, copy) NSString *forwardSourceDisplayName;
 @property (nonatomic, assign) BOOL capabilitiesKnown;
+@property (nonatomic, assign) BOOL canBeReplied;
 @property (nonatomic, assign) BOOL canBeEdited;
 @property (nonatomic, assign) BOOL canBeDeletedOnlyForSelf;
 @property (nonatomic, assign) BOOL canBeDeletedForAllUsers;
