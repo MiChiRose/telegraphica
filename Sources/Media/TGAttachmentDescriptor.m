@@ -1,5 +1,6 @@
 #import "TGAttachmentDescriptor.h"
 #import "../Services/TGResourcePolicy.h"
+#import <ImageIO/ImageIO.h>
 
 @implementation TGAttachmentDescriptor
 
@@ -10,12 +11,55 @@
 @synthesize errorMessage = _errorMessage;
 @synthesize kind = _kind;
 @synthesize fileSize = _fileSize;
+@synthesize pixelWidth = _pixelWidth;
+@synthesize pixelHeight = _pixelHeight;
 
 static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
     if ([extension length] == 0) {
         return NO;
     }
     return [set containsObject:[extension lowercaseString]];
+}
+
+static void TGAttachmentReadImageDimensions(NSString *path, NSUInteger *width, NSUInteger *height) {
+    if (width) {
+        *width = 0;
+    }
+    if (height) {
+        *height = 0;
+    }
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
+        return;
+    }
+
+    CFURLRef fileURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
+                                                     (CFStringRef)path,
+                                                     kCFURLPOSIXPathStyle,
+                                                     false);
+    if (!fileURL) {
+        return;
+    }
+    CGImageSourceRef source = CGImageSourceCreateWithURL(fileURL, NULL);
+    CFRelease(fileURL);
+    if (!source) {
+        return;
+    }
+
+    NSDictionary *properties = (NSDictionary *)CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
+    if ([properties isKindOfClass:[NSDictionary class]]) {
+        id pixelWidth = [properties objectForKey:(NSString *)kCGImagePropertyPixelWidth];
+        id pixelHeight = [properties objectForKey:(NSString *)kCGImagePropertyPixelHeight];
+        if ([pixelWidth respondsToSelector:@selector(unsignedIntegerValue)] && width) {
+            *width = [pixelWidth unsignedIntegerValue];
+        }
+        if ([pixelHeight respondsToSelector:@selector(unsignedIntegerValue)] && height) {
+            *height = [pixelHeight unsignedIntegerValue];
+        }
+    }
+    if (properties) {
+        CFRelease(properties);
+    }
+    CFRelease(source);
 }
 
 + (NSArray *)supportedOpenPanelTypes {
@@ -54,35 +98,50 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
     NSArray *photoExtensions = [NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", @"gif", @"webp", nil];
     NSArray *videoExtensions = [NSArray arrayWithObjects:@"mp4", @"mov", @"m4v", @"webm", nil];
     NSArray *audioExtensions = [NSArray arrayWithObjects:@"mp3", @"m4a", @"aac", @"wav", @"aiff", @"ogg", @"oga", @"opus", nil];
+    NSArray *documentExtensions = [NSArray arrayWithObjects:@"pdf", @"zip", @"rar", @"7z", @"txt", @"rtf", @"doc", @"docx", @"xls", @"xlsx", @"ppt", @"pptx", nil];
 
     if (TGAttachmentExtensionInSet(descriptor.extension, photoExtensions)) {
         descriptor.kind = TGAttachmentKindPhoto;
         descriptor.typeLabel = @"Photo";
+        NSUInteger bestWidth = 0;
+        NSUInteger bestHeight = 0;
+        TGAttachmentReadImageDimensions(standardPath, &bestWidth, &bestHeight);
+        descriptor.pixelWidth = bestWidth;
+        descriptor.pixelHeight = bestHeight;
     } else if (TGAttachmentExtensionInSet(descriptor.extension, videoExtensions)) {
         descriptor.kind = TGAttachmentKindVideo;
         descriptor.typeLabel = @"Video";
     } else if (TGAttachmentExtensionInSet(descriptor.extension, audioExtensions)) {
         descriptor.kind = TGAttachmentKindAudio;
         descriptor.typeLabel = @"Audio";
-    } else if ([[TGAttachmentDescriptor supportedOpenPanelTypes] containsObject:descriptor.extension]) {
+    } else if (TGAttachmentExtensionInSet(descriptor.extension, documentExtensions) || [descriptor.extension length] == 0) {
         descriptor.kind = TGAttachmentKindDocument;
         descriptor.typeLabel = @"Document";
     } else {
         descriptor.kind = TGAttachmentKindDocument;
-        descriptor.typeLabel = @"Document";
+        descriptor.typeLabel = @"File";
     }
 
     return descriptor;
 }
 
 + (TGAttachmentDescriptor *)firstDescriptorFromPasteboard:(NSPasteboard *)pasteboard {
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:pasteboard maximumCount:1];
+    return [descriptors count] > 0 ? [descriptors objectAtIndex:0] : nil;
+}
+
++ (NSArray *)descriptorsFromPasteboard:(NSPasteboard *)pasteboard maximumCount:(NSUInteger)maximumCount {
     if (!pasteboard) {
-        return nil;
+        return [NSArray array];
     }
     NSArray *paths = [pasteboard propertyListForType:NSFilenamesPboardType];
     if (![paths isKindOfClass:[NSArray class]] || [paths count] == 0) {
-        return nil;
+        return [NSArray array];
     }
+    if (maximumCount == 0) {
+        maximumCount = [paths count];
+    }
+    NSMutableArray *descriptors = [NSMutableArray array];
     NSUInteger index = 0;
     for (index = 0; index < [paths count]; index++) {
         id candidate = [paths objectAtIndex:index];
@@ -90,11 +149,14 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
             continue;
         }
         TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor descriptorForPath:(NSString *)candidate];
-        if (descriptor) {
-            return descriptor;
+        if (descriptor && [descriptor isSupported]) {
+            [descriptors addObject:descriptor];
+            if ([descriptors count] >= maximumCount) {
+                break;
+            }
         }
     }
-    return nil;
+    return descriptors;
 }
 
 - (BOOL)isSupported {

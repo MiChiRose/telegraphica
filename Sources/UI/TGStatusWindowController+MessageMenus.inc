@@ -35,6 +35,13 @@
         return NO;
     }
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    if (TGMessageItemHasCommentThread(item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:item]);
+        NSRect commentRect = TGMessageCommentBarRectForItem(item, bubbleRect, [self.messageTableView isFlipped]);
+        if (!NSIsEmptyRect(commentRect) && NSPointInRect(tablePoint, commentRect)) {
+            return YES;
+        }
+    }
     if (NSIsEmptyRect(cellFrame)) {
         return NO;
     }
@@ -215,21 +222,17 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     if (![item isKindOfClass:[TGMessageItem class]]) {
         return nil;
     }
-    NSString *localPath = [item mediaLocalPath];
-    NSNumber *fileID = [item mediaFileID];
+    NSString *localPath = nil;
+    NSNumber *fileID = nil;
     NSString *fileName = [item downloadFileName];
     NSArray *mediaItems = [item visualMediaItems];
-    if (([localPath length] == 0 || !fileID) && [mediaItems count] > 0) {
+    if ([mediaItems count] > 0) {
         id media = [mediaItems objectAtIndex:0];
         if ([media isKindOfClass:[NSDictionary class]]) {
+            fileID = TGMediaItemFullFileID(media);
+            localPath = TGMediaItemFullLocalPath(media);
             if ([localPath length] == 0) {
-                localPath = TGMediaItemFullLocalPath(media);
-                if ([localPath length] == 0) {
-                    localPath = TGMediaItemLocalPath(media);
-                }
-            }
-            if (!fileID) {
-                fileID = TGMediaItemFullFileID(media);
+                localPath = TGMediaItemLocalPath(media);
             }
             if ([fileName length] == 0) {
                 id mediaFileName = [(NSDictionary *)media objectForKey:@"file_name"];
@@ -238,6 +241,12 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                 }
             }
         }
+    }
+    if (!fileID) {
+        fileID = [item mediaFileID];
+    }
+    if ([localPath length] == 0) {
+        localPath = [item mediaLocalPath];
     }
     if ([fileName length] == 0 && [localPath length] > 0) {
         fileName = [localPath lastPathComponent];
@@ -258,20 +267,24 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     NSString *localPath = nil;
     NSString *fileName = nil;
     NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:&localPath fileName:&fileName];
-    if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-        NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
-        NSError *copyError = nil;
-        if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
-            [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
-        } else {
-            [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-        }
-        return;
-    }
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+            NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
+            NSError *copyError = nil;
+            if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
+                [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
+            } else {
+                [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
+            }
+            return;
+        }
         [self appendDetail:@"Attachment file id is not available yet."];
         return;
     }
+
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Download media: requesting full file id %@ before copying to Downloads; fallback=%@.",
+                                  fileID,
+                                  [localPath length] > 0 ? [localPath lastPathComponent] : @"none"]];
 
     NSNumber *fileIDCopy = [fileID retain];
     NSString *fileNameCopy = [fileName copy];
@@ -289,6 +302,16 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                 if ([[NSFileManager defaultManager] copyItemAtPath:downloadedPath toPath:destination error:&copyError]) {
                     [self.statusField setStringValue:@"File downloaded"];
                     [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
+                } else {
+                    [self.statusField setStringValue:@"Download failed"];
+                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
+                }
+            } else if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
+                NSError *copyError = nil;
+                if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
+                    [self.statusField setStringValue:@"File downloaded"];
+                    [self appendDetail:[NSString stringWithFormat:@"Downloaded cached fallback to %@", destination]];
                 } else {
                     [self.statusField setStringValue:@"Download failed"];
                     [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
@@ -396,13 +419,39 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [menu addItem:[NSMenuItem separatorItem]];
     }
     BOOL addedMessageAction = NO;
-    NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
-                                                        action:@selector(replyToMessageFromMenu:)
-                                                 keyEquivalent:@""] autorelease];
-    [replyItem setRepresentedObject:item];
-    [replyItem setTarget:self];
-    [menu addItem:replyItem];
-    addedMessageAction = YES;
+    NSString *copyableText = ([[item editableText] length] > 0) ? [item editableText] : TGDisplayTextForMessageItem(item);
+    if ([copyableText length] > 0) {
+        NSMenuItem *copyTextItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.copyText")
+                                                               action:@selector(copyMessageTextFromMenu:)
+                                                        keyEquivalent:@""] autorelease];
+        [copyTextItem setRepresentedObject:item];
+        [copyTextItem setTarget:self];
+        [copyTextItem setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.78)];
+        [menu addItem:copyTextItem];
+        addedMessageAction = YES;
+    }
+
+    BOOL canReply = (![item capabilitiesKnown] || [item canBeReplied]);
+    if (canReply) {
+        NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
+                                                            action:@selector(replyToMessageFromMenu:)
+                                                     keyEquivalent:@""] autorelease];
+        [replyItem setRepresentedObject:item];
+        [replyItem setTarget:self];
+        [menu addItem:replyItem];
+        addedMessageAction = YES;
+    }
+
+    if (TGMessageItemHasCommentThread(item)) {
+        NSMenuItem *commentsItem = [[[NSMenuItem alloc] initWithTitle:@"Open comments"
+                                                               action:@selector(openMessageCommentsFromMenu:)
+                                                        keyEquivalent:@""] autorelease];
+        [commentsItem setRepresentedObject:item];
+        [commentsItem setTarget:self];
+        [commentsItem setImage:TGTemplateIconAssetImage(@"chats", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
+        [menu addItem:commentsItem];
+        addedMessageAction = YES;
+    }
 
     NSMenuItem *forwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward..."
                                                           action:@selector(forwardMessageFromMenu:)
@@ -418,6 +467,16 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [savedForwardItem setTarget:self];
         [menu addItem:savedForwardItem];
     }
+    if ([item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
+        NSMenuItem *pinMessageItem = [[[NSMenuItem alloc] initWithTitle:([item isPinned] ? TGLoc(@"message.unpin") : TGLoc(@"message.pin"))
+                                                                 action:@selector(toggleMessagePinnedFromMenu:)
+                                                          keyEquivalent:@""] autorelease];
+        [pinMessageItem setRepresentedObject:item];
+        [pinMessageItem setTarget:self];
+        [pinMessageItem setImage:TGTemplateIconAssetImage(@"flag-triangle", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.78)];
+        [menu addItem:pinMessageItem];
+        addedMessageAction = YES;
+    }
     if ([item outgoing]) {
         NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:@"Who read"
                                                              action:nil
@@ -427,7 +486,9 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [readByItem setSubmenu:[self messageViewersSubmenuForItem:item]];
         [menu addItem:readByItem];
     }
-    if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
+    BOOL canEdit = (([item capabilitiesKnown] && [item canBeEdited]) ||
+                    (![item capabilitiesKnown] && [item outgoing]));
+    if (canEdit && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
         NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
                                                            action:@selector(editMessageFromMenu:)
                                                     keyEquivalent:@""] autorelease];
@@ -436,7 +497,8 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [menu addItem:editItem];
         addedMessageAction = YES;
     }
-    if ([item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
+    BOOL canDelete = (![item capabilitiesKnown] || [item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers]);
+    if (canDelete && [item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
         NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.delete")
                                                              action:@selector(deleteMessageFromMenu:)
                                                       keyEquivalent:@""] autorelease];
@@ -517,6 +579,21 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [messageIDs addObject:[NSNumber numberWithLongLong:[item.messageID longLongValue]]];
     }
     return messageIDs;
+}
+
+- (void)copyMessageTextFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    NSString *text = ([[item editableText] length] > 0) ? [item editableText] : TGDisplayTextForMessageItem(item);
+    if ([text length] == 0) {
+        return;
+    }
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard clearContents];
+    [pasteboard setString:text forType:NSStringPboardType];
+    [self appendDetail:@"Message text copied to clipboard."];
 }
 
 - (void)editMessageFromMenu:(id)sender {
@@ -623,6 +700,59 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     });
 }
 
+- (void)toggleMessagePinnedFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Pinning messages is available only after sign-in is ready."];
+        return;
+    }
+
+    BOOL targetPinned = ![item isPinned];
+    TGMessageItem *itemCopy = [item retain];
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSNumber *messageID = [[NSNumber numberWithLongLong:[[item messageID] longLongValue]] retain];
+    TGTDLibClient *client = [self.client retain];
+
+    [item setPinned:targetPinned];
+    [self.messageTableView reloadData];
+    [self.statusField setStringValue:(targetPinned ? TGLoc(@"message.pin") : TGLoc(@"message.unpin"))];
+    [self appendDetail:[NSString stringWithFormat:@"%@ message...", targetPinned ? @"Pinning" : @"Unpinning"]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *pinError = nil;
+        BOOL succeeded = [client setMessagePinnedForChatID:chatID messageID:messageID pinned:targetPinned timeout:8.0 error:&pinError];
+        NSString *errorMessage = [[pinError localizedDescription] copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:(targetPinned ? TGLoc(@"message.pin") : TGLoc(@"message.unpin"))];
+                [self appendDetail:[NSString stringWithFormat:@"%@ message accepted by TDLib.", targetPinned ? @"Pin" : @"Unpin"]];
+                [self loadPinnedMessageForSelectedChat];
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            } else {
+                [itemCopy setPinned:!targetPinned];
+                [self.messageTableView reloadData];
+                [self.statusField setStringValue:@"Pin unavailable"];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib pin message: %@", [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [itemCopy release];
+            [chatID release];
+            [messageID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)deleteMessageFromMenu:(id)sender {
     TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
     if (![item isKindOfClass:[TGMessageItem class]] ||
@@ -690,11 +820,23 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     [self downloadAttachmentForMessageItem:item];
 }
 
+- (void)openMessageCommentsFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    [self openMessageCommentsForItem:item];
+}
+
 - (void)markChatReadFromMenu:(id)sender {
     TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
     if (![item isKindOfClass:[TGChatItem class]]) {
         return;
     }
+    [self markChatItemRead:item];
+}
+
+- (void)markChatItemRead:(TGChatItem *)item {
     NSNumber *sourceChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
     NSNumber *sourceThreadID = [item isForumTopic] ? [item messageThreadID] : nil;
     NSString *sourceTopicKind = [item isForumTopic] ? [item messageTopicKind] : nil;
@@ -732,6 +874,97 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
             [chatID release];
             [threadID release];
             [topicKind release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)markAllChatsReadFromMenu:(id)sender {
+    (void)sender;
+    [self setMarkAllChatsReadBusy:YES];
+    NSMutableArray *seedItems = [NSMutableArray array];
+    NSMutableSet *seenKeys = [NSMutableSet set];
+    NSUInteger index = 0;
+    NSArray *collections[2] = { self.chatItems, self.chatItemsBeforeTopicList };
+    NSUInteger collectionIndex = 0;
+    for (collectionIndex = 0; collectionIndex < 2; collectionIndex++) {
+        NSArray *sourceItems = collections[collectionIndex];
+        for (index = 0; index < [sourceItems count]; index++) {
+            id candidate = [sourceItems objectAtIndex:index];
+            if (![candidate isKindOfClass:[TGChatItem class]] ||
+                [(TGChatItem *)candidate unreadCount] <= 0) {
+                continue;
+            }
+            TGChatItem *chatItem = (TGChatItem *)candidate;
+            NSNumber *sourceChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
+            NSNumber *sourceThreadID = [chatItem isForumTopic] ? [chatItem messageThreadID] : nil;
+            if (![sourceChatID respondsToSelector:@selector(longLongValue)]) {
+                continue;
+            }
+            NSString *key = [NSString stringWithFormat:@"%lld:%lld",
+                             [sourceChatID longLongValue],
+                             [sourceThreadID respondsToSelector:@selector(longLongValue)] ? [sourceThreadID longLongValue] : 0LL];
+            if ([seenKeys containsObject:key]) {
+                continue;
+            }
+            [seenKeys addObject:key];
+            [seedItems addObject:chatItem];
+        }
+    }
+    [self appendDetail:@"Read all: loading a wider unread chat set from TDLib..."];
+
+    NSArray *seedCopy = [[NSArray alloc] initWithArray:seedItems];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *loadError = nil;
+        NSArray *serverItems = [[client mainChatPreviewItemsWithLimit:500 timeout:8.0 error:&loadError] retain];
+        NSString *errorMessage = [[loadError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSMutableArray *itemsToRead = [NSMutableArray array];
+            NSMutableSet *finalSeenKeys = [NSMutableSet set];
+            NSArray *sources[2] = { seedCopy, serverItems };
+            NSUInteger sourceIndex = 0;
+            for (sourceIndex = 0; sourceIndex < 2; sourceIndex++) {
+                NSArray *source = sources[sourceIndex];
+                NSUInteger itemIndex = 0;
+                for (itemIndex = 0; itemIndex < [source count]; itemIndex++) {
+                    id candidate = [source objectAtIndex:itemIndex];
+                    if (![candidate isKindOfClass:[TGChatItem class]] ||
+                        ![[(TGChatItem *)candidate unreadCount] respondsToSelector:@selector(integerValue)] ||
+                        [[(TGChatItem *)candidate unreadCount] integerValue] <= 0) {
+                        continue;
+                    }
+                    TGChatItem *chatItem = (TGChatItem *)candidate;
+                    NSNumber *sourceChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
+                    NSNumber *sourceThreadID = [chatItem isForumTopic] ? [chatItem messageThreadID] : nil;
+                    if (![sourceChatID respondsToSelector:@selector(longLongValue)]) {
+                        continue;
+                    }
+                    NSString *key = [NSString stringWithFormat:@"%lld:%lld",
+                                     [sourceChatID longLongValue],
+                                     [sourceThreadID respondsToSelector:@selector(longLongValue)] ? [sourceThreadID longLongValue] : 0LL];
+                    if ([finalSeenKeys containsObject:key]) {
+                        continue;
+                    }
+                    [finalSeenKeys addObject:key];
+                    [itemsToRead addObject:chatItem];
+                }
+            }
+            if ([itemsToRead count] == 0) {
+                [self appendDetail:([errorMessage length] > 0 ? [NSString stringWithFormat:@"Read all: no unread chats found; wider load warning: %@", errorMessage] : @"Read all: no unread chats found.")];
+            } else {
+                [self appendDetail:[NSString stringWithFormat:@"Read all: marking %lu chat(s) as read.", (unsigned long)[itemsToRead count]]];
+                NSUInteger readIndex = 0;
+                for (readIndex = 0; readIndex < [itemsToRead count]; readIndex++) {
+                    [self markChatItemRead:[itemsToRead objectAtIndex:readIndex]];
+                }
+            }
+            [self setMarkAllChatsReadBusy:NO];
+            [seedCopy release];
+            [serverItems release];
+            [errorMessage release];
             [client release];
         });
         [pool drain];

@@ -13,6 +13,7 @@
 @property (nonatomic, assign) BOOL notificationsMuted;
 @property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
+@property (nonatomic, assign, getter=isSavedMessages) BOOL savedMessages;
 @property (nonatomic, retain) NSNumber *parentChatID;
 @property (nonatomic, retain) NSNumber *messageThreadID;
 @property (nonatomic, copy) NSString *messageTopicKind;

@@ -67,6 +67,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize outgoing = _outgoing;
 @synthesize sending = _sending;
 @synthesize outgoingRead = _outgoingRead;
+@synthesize pinned = _pinned;
 @synthesize preview = _preview;
 @synthesize contentType = _contentType;
 @synthesize mediaLocalPath = _mediaLocalPath;
@@ -89,11 +90,14 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize replySenderDisplayName = _replySenderDisplayName;
 @synthesize forwardSourceDisplayName = _forwardSourceDisplayName;
 @synthesize capabilitiesKnown = _capabilitiesKnown;
+@synthesize canBeReplied = _canBeReplied;
 @synthesize canBeEdited = _canBeEdited;
 @synthesize canBeDeletedOnlyForSelf = _canBeDeletedOnlyForSelf;
 @synthesize canBeDeletedForAllUsers = _canBeDeletedForAllUsers;
 @synthesize editDate = _editDate;
 @synthesize editableText = _editableText;
+@synthesize canGetMessageThread = _canGetMessageThread;
+@synthesize messageThreadReplyCount = _messageThreadReplyCount;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -108,6 +112,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         self.outgoing = outgoing;
         self.sending = NO;
         self.outgoingRead = NO;
+        self.canBeReplied = YES;
         self.preview = ([preview length] > 0) ? preview : @"[Message]";
     }
     return self;
@@ -132,10 +137,14 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     if ([self isDocumentMessage]) {
         NSString *label = [self.preview length] > 0 ? self.preview : @"";
         BOOL visualLabel = ([label hasPrefix:@"[Photo]"] ||
+                            [label hasPrefix:@"Image"] ||
                             [label hasPrefix:@"[Video]"] ||
+                            [label hasPrefix:@"Video"] ||
                             [label hasPrefix:@"[GIF]"] ||
-                            [label hasPrefix:@"[Sticker]"]);
-        BOOL playableFallback = (([label hasPrefix:@"[Video]"] || [label hasPrefix:@"[GIF]"]) &&
+                            [label hasPrefix:@"GIF"] ||
+                            [label hasPrefix:@"[Sticker]"] ||
+                            [label hasPrefix:@"Sticker"]);
+        BOOL playableFallback = (([label hasPrefix:@"[Video]"] || [label hasPrefix:@"Video"] || [label hasPrefix:@"[GIF]"] || [label hasPrefix:@"GIF"]) &&
                                  [self.mediaFileID respondsToSelector:@selector(integerValue)] &&
                                  [self.mediaFileID integerValue] > 0);
         return (visualLabel && ([self.mediaLocalPath length] > 0 || [self.mediaItems count] > 0 || playableFallback));
@@ -277,9 +286,13 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     }
     if ([self isStickerMessage]) {
         NSString *preview = ([self.preview length] > 0) ? self.preview : @"";
-        NSString *stickerPrefix = @"[Sticker] ";
-        if ([preview hasPrefix:stickerPrefix] && [preview length] > [stickerPrefix length]) {
-            return [preview substringFromIndex:[stickerPrefix length]];
+        NSArray *stickerPrefixes = [NSArray arrayWithObjects:@"Sticker ", @"[Sticker] ", nil];
+        NSUInteger index = 0;
+        for (index = 0; index < [stickerPrefixes count]; index++) {
+            NSString *stickerPrefix = [stickerPrefixes objectAtIndex:index];
+            if ([preview hasPrefix:stickerPrefix] && [preview length] > [stickerPrefix length]) {
+                return [preview substringFromIndex:[stickerPrefix length]];
+            }
         }
         return @"Sticker";
     }
@@ -331,11 +344,14 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setReplySenderDisplayName:_replySenderDisplayName];
     [copy setForwardSourceDisplayName:_forwardSourceDisplayName];
     [copy setCapabilitiesKnown:_capabilitiesKnown];
+    [copy setCanBeReplied:_canBeReplied];
     [copy setCanBeEdited:_canBeEdited];
     [copy setCanBeDeletedOnlyForSelf:_canBeDeletedOnlyForSelf];
     [copy setCanBeDeletedForAllUsers:_canBeDeletedForAllUsers];
     [copy setEditDate:_editDate];
     [copy setEditableText:_editableText];
+    [copy setCanGetMessageThread:_canGetMessageThread];
+    [copy setMessageThreadReplyCount:_messageThreadReplyCount];
     return copy;
 }
 
@@ -385,6 +401,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_forwardSourceDisplayName release];
     [_editDate release];
     [_editableText release];
+    [_messageThreadReplyCount release];
     [super dealloc];
 }
 

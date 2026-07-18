@@ -96,8 +96,8 @@
         [self showMessageDropOverlay:NO];
         return NSDragOperationNone;
     }
-    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor firstDescriptorFromPasteboard:[info draggingPasteboard]];
-    if ([descriptor isSupported]) {
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:[info draggingPasteboard] maximumCount:10];
+    if ([descriptors count] > 0) {
         [self.messageTableView setDropRow:-1 dropOperation:NSTableViewDropOn];
         [self showMessageDropOverlay:YES];
         return NSDragOperationCopy;
@@ -120,14 +120,12 @@
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
         return NO;
     }
-    TGAttachmentDescriptor *descriptor = [TGAttachmentDescriptor firstDescriptorFromPasteboard:[info draggingPasteboard]];
-    if (![descriptor isSupported]) {
-        if ([descriptor.errorMessage length] > 0) {
-            [self appendDetail:descriptor.errorMessage];
-        }
+    NSArray *descriptors = [TGAttachmentDescriptor descriptorsFromPasteboard:[info draggingPasteboard] maximumCount:10];
+    if ([descriptors count] == 0) {
+        [self appendDetail:@"No supported files were found in the drop."];
         return NO;
     }
-    [self presentAttachmentPreviewForDescriptor:descriptor];
+    [self presentAttachmentPreviewForDescriptors:descriptors];
     return YES;
 }
 
@@ -296,8 +294,7 @@
     [self saveComposerDraftForChatID:previousChatID
                      messageThreadID:previousThreadID
                       messageTopicKind:previousTopicKind];
-    NSInteger clickedRow = [self.chatTableView clickedRow];
-    NSInteger row = (clickedRow >= 0) ? clickedRow : [self.chatTableView selectedRow];
+    NSInteger row = [self.chatTableView selectedRow];
     if (row < 0 || (NSUInteger)row >= [self.chatItems count]) {
         self.selectedChatID = nil;
         self.selectedChatTitle = nil;
@@ -306,10 +303,13 @@
         self.selectedChatLastReadOutboxMessageID = nil;
         self.selectedMessageThreadID = nil;
         self.selectedMessageTopicKind = nil;
+        self.pinnedMessageItems = [NSArray array];
         self.pinnedMessageItem = nil;
+        self.pinnedMessageCarouselIndex = 0;
         self.searchGeneration++;
         [self refreshSelectedChatHeaderDisplay];
         [self.messageItems removeAllObjects];
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
         [self setComposerTextWithoutSavingDraft:nil];
         self.olderMessagesExhausted = NO;
@@ -357,8 +357,11 @@
     if (selectionChanged) {
         [self clearTypingIndicator];
         self.searchGeneration++;
+        self.pinnedMessageItems = [NSArray array];
         self.pinnedMessageItem = nil;
+        self.pinnedMessageCarouselIndex = 0;
         [self.messageItems removeAllObjects];
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
         if (shouldOpenTopicList) {
             [self setComposerTextWithoutSavingDraft:nil];
@@ -385,9 +388,13 @@
     if (newChatID && (selectionChanged || [self.messageItems count] == 0)) {
         if (selectedForumTopic) {
             [self reloadMessagesForChatID:newChatID interactive:NO];
+            [self requestComposerRefocus];
         } else if (!shouldOpenTopicList) {
             [self reloadMessagesForChatID:newChatID interactive:NO];
+            [self requestComposerRefocus];
         }
+    } else if (newChatID && !shouldOpenTopicList) {
+        [self requestComposerRefocus];
     }
     [previousChatID release];
     [previousThreadID release];
@@ -446,6 +453,7 @@
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:items];
     [self applyLocalNotificationMuteStateToItems:self.chatItems];
+    [self updateSavedMessagesPresentationForChatItems];
     [self.chatTableView reloadData];
     [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;
@@ -469,6 +477,8 @@
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
         [self.chatTableView scrollRowToVisible:selectedIndex];
+        [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                         object:self.chatTableView]];
         id selectedItem = [items objectAtIndex:selectedIndex];
         if ([selectedItem isKindOfClass:[TGChatItem class]]) {
             self.selectedChatLastReadOutboxMessageID = [(TGChatItem *)selectedItem lastReadOutboxMessageID];
@@ -481,6 +491,8 @@
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:0];
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
         [self.chatTableView scrollRowToVisible:0];
+        [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                         object:self.chatTableView]];
         return;
     }
 
@@ -495,6 +507,7 @@
     [self refreshSelectedChatHeaderDisplay];
     [self loadPinnedMessageForSelectedChat];
     [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     [self setComposerTextWithoutSavingDraft:nil];
     self.olderMessagesExhausted = NO;
@@ -629,6 +642,7 @@
     }
     [self refreshSelectedChatHeaderDisplay];
     [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
     [self restoreComposerDraftForChatID:self.selectedChatID
                         messageThreadID:self.selectedMessageThreadID
@@ -673,7 +687,7 @@
     }
     self.suppressChatSelectionHandling = NO;
     self.chatItemsBeforeTopicList = nil;
-    [self.chatsLabel setStringValue:@"Chats"];
+    [self.chatsLabel setStringValue:TGLoc(@"chats")];
     [self updateAuthControlsForState:self.currentAuthState];
     [self layoutContentView];
     [self updateVisibleSection];
@@ -748,6 +762,7 @@
                 [self refreshSelectedChatHeaderDisplay];
                 [self loadPinnedMessageForSelectedChat];
                 [self.messageItems removeAllObjects];
+                [self.inlineMediaPlaybackCoordinator removeAllPlayback];
                 [self.messageTableView reloadData];
                 NSString *topicListTitle = ([parentTitle length] > 0 ? parentTitle : @"Topics");
                 [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];

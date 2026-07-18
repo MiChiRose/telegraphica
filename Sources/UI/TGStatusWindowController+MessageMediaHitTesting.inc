@@ -24,9 +24,9 @@
     BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
+    BOOL flipped = [self.messageTableView isFlipped];
 
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
@@ -59,7 +59,7 @@
 
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                          options:NSStringDrawingUsesLineFragmentOrigin];
     }
 
@@ -78,7 +78,8 @@
 
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight;
+    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
     if (NSHeight(measuredRect) > 0.0) {
         bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
     }
@@ -89,15 +90,18 @@
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
-    CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
-    contentTop -= senderHeaderHeight;
+    CGFloat contentTop = flipped ? (NSMinY(bubbleRect) + 9.0) : (NSMaxY(bubbleRect) - 9.0);
+    contentTop += flipped ? senderHeaderHeight : -senderHeaderHeight;
+    contentTop += flipped ? contextHeaderHeight : -contextHeaderHeight;
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    contentTop -= reactionBandHeight;
-    if ([messageText length] == 0 && mediaFooterHeight > 0.0) {
+    if (!flipped) {
+        contentTop -= reactionBandHeight;
+    }
+    if (!flipped && [messageText length] == 0 && mediaFooterHeight > 0.0) {
         contentTop -= mediaFooterHeight;
     }
     NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
-                                  contentTop - photoSize.height,
+                                  flipped ? contentTop : (contentTop - photoSize.height),
                                   photoSize.width,
                                   photoSize.height);
     NSArray *mediaItems = [item visualMediaItems];
@@ -136,10 +140,14 @@
 }
 
 - (void)scheduleInlineMediaPlaybackRefresh {
+    [self scheduleInlineMediaPlaybackRefreshAfterDelay:0.0];
+}
+
+- (void)scheduleInlineMediaPlaybackRefreshAfterDelay:(NSTimeInterval)delay {
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(refreshInlineMediaPlayback)
                                                object:nil];
-    [self performSelector:@selector(refreshInlineMediaPlayback) withObject:nil afterDelay:0.0];
+    [self performSelector:@selector(refreshInlineMediaPlayback) withObject:nil afterDelay:delay];
 }
 
 - (void)logInlinePlaybackDiagnosticOnceForKey:(NSString *)key message:(NSString *)message {
@@ -260,8 +268,7 @@
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
@@ -285,7 +292,7 @@
     NSAttributedString *attributedMessageText = composedMessageText;
     NSRect measuredRect = NSZeroRect;
     if ([messageText length] > 0) {
-        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 1000.0)
+        measuredRect = [attributedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
                                                            options:NSStringDrawingUsesLineFragmentOrigin];
     } else {
         measuredRect = NSZeroRect;
@@ -349,7 +356,7 @@
 
     NSTextStorage *textStorage = [[[NSTextStorage alloc] initWithAttributedString:attributedMessageText] autorelease];
     NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
-    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 1000.0)] autorelease];
+    NSTextContainer *textContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(textRect), 12000.0)] autorelease];
     [textContainer setLineFragmentPadding:0.0];
     [layoutManager addTextContainer:textContainer];
     [textStorage addLayoutManager:layoutManager];
@@ -391,6 +398,14 @@
     }
     NSPoint tablePoint = [self.messageTableView convertPoint:[event locationInWindow] fromView:nil];
     NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
+    if (TGMessageItemHasCommentThread((TGMessageItem *)item)) {
+        NSRect commentRect = TGMessageCommentBarRectForItem((TGMessageItem *)item, bubbleRect, [self.messageTableView isFlipped]);
+        if (!NSIsEmptyRect(commentRect) && NSPointInRect(tablePoint, commentRect)) {
+            [self openMessageCommentsForItem:(TGMessageItem *)item];
+            return;
+        }
+    }
     NSDictionary *mediaItem = [self mediaItemForItem:(TGMessageItem *)item
                                         inCellFrame:cellFrame
                                             atPoint:tablePoint];
@@ -399,7 +414,6 @@
         return;
     }
     if (TGMessageItemIsNonVisualPlayableMedia((TGMessageItem *)item)) {
-        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
         if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
             [self openPlayableMediaForMessageItem:(TGMessageItem *)item];
             return;
@@ -417,4 +431,101 @@
     } else {
         [self appendDetail:@"Could not open message link in default browser."];
     }
+}
+
+- (void)openMessageCommentsForItem:(TGMessageItem *)item {
+    if (!TGMessageItemHasCommentThread(item)) {
+        return;
+    }
+    NSNumber *chatID = [NSNumber numberWithLongLong:[[item chatID] longLongValue]];
+    NSNumber *threadID = [NSNumber numberWithLongLong:[[item messageID] longLongValue]];
+    NSNumber *previousChatID = [self.selectedChatID retain];
+    NSNumber *previousThreadID = [self.selectedMessageThreadID retain];
+    NSString *previousTopicKind = [self.selectedMessageTopicKind copy];
+    [self saveComposerDraftForChatID:previousChatID
+                     messageThreadID:previousThreadID
+                    messageTopicKind:previousTopicKind];
+    self.commentThreadParentTitle = self.selectedChatTitle;
+    self.commentThreadParentTypeSummary = self.selectedChatTypeSummary;
+    self.commentThreadParentAvatarLocalPath = self.selectedChatAvatarLocalPath;
+    self.selectedChatID = chatID;
+    self.selectedMessageThreadID = threadID;
+    self.selectedMessageTopicKind = @"thread";
+    if ([self.selectedChatTitle length] == 0) {
+        self.selectedChatTitle = @"Comments";
+    } else if ([self.selectedChatTitle rangeOfString:@"comments" options:NSCaseInsensitiveSearch].location == NSNotFound) {
+        self.selectedChatTitle = [NSString stringWithFormat:@"%@ comments", self.selectedChatTitle];
+    }
+    self.showingForumTopicList = NO;
+    self.pinnedMessageItems = [NSArray array];
+    self.pinnedMessageItem = nil;
+    self.pinnedMessageCarouselIndex = 0;
+    self.searchGeneration++;
+    [self clearTypingIndicator];
+    [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    [self.messageTableView reloadData];
+    [self restoreComposerDraftForChatID:self.selectedChatID
+                        messageThreadID:self.selectedMessageThreadID
+                       messageTopicKind:self.selectedMessageTopicKind];
+    [self refreshSelectedChatHeaderDisplay];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self appendDetail:[NSString stringWithFormat:@"Opening comments thread for message %@.", threadID]];
+    [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+    [self requestComposerRefocus];
+    [previousChatID release];
+    [previousThreadID release];
+    [previousTopicKind release];
+}
+
+- (void)closeMessageCommentsThread:(id)sender {
+    (void)sender;
+    if (![self.selectedMessageTopicKind isEqualToString:@"thread"] ||
+        ![self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)] ||
+        !self.selectedChatID) {
+        return;
+    }
+
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *threadID = [self.selectedMessageThreadID retain];
+    NSString *topicKind = [self.selectedMessageTopicKind copy];
+    [self saveComposerDraftForChatID:chatID
+                     messageThreadID:threadID
+                    messageTopicKind:topicKind];
+
+    self.selectedMessageThreadID = nil;
+    self.selectedMessageTopicKind = nil;
+    if ([self.commentThreadParentTitle length] > 0) {
+        self.selectedChatTitle = self.commentThreadParentTitle;
+    }
+    if ([self.commentThreadParentTypeSummary length] > 0) {
+        self.selectedChatTypeSummary = self.commentThreadParentTypeSummary;
+    }
+    self.selectedChatAvatarLocalPath = self.commentThreadParentAvatarLocalPath;
+    self.commentThreadParentTitle = nil;
+    self.commentThreadParentTypeSummary = nil;
+    self.commentThreadParentAvatarLocalPath = nil;
+    self.pinnedMessageItems = [NSArray array];
+    self.pinnedMessageItem = nil;
+    self.pinnedMessageCarouselIndex = 0;
+    self.searchGeneration++;
+    [self clearTypingIndicator];
+    [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    [self.messageTableView reloadData];
+    [self restoreComposerDraftForChatID:chatID
+                        messageThreadID:nil
+                       messageTopicKind:nil];
+    self.olderMessagesExhausted = NO;
+    self.autoOlderMessagesLoadArmed = YES;
+    [self refreshSelectedChatHeaderDisplay];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self loadPinnedMessageForSelectedChat];
+    [self appendDetail:@"Closed comments thread and returned to channel."];
+    [self reloadMessagesForChatID:chatID interactive:NO];
+    [self requestComposerRefocus];
+
+    [chatID release];
+    [threadID release];
+    [topicKind release];
 }

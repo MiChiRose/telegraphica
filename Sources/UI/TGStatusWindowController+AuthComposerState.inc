@@ -117,7 +117,7 @@
     [self.stickerButton setEnabled:canTargetChat];
     [self.voiceRecordButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];
-    [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0 && [text length] <= 4096)];
+    [self.sendMessageButton setEnabled:(canTargetChat && [trimmedText length] > 0)];
 }
 
 - (NSString *)composerDraftKeyForChatID:(NSNumber *)chatID
@@ -233,6 +233,7 @@
     self.composerDraftSyncReplyMessageID = ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) ? [NSNumber numberWithLongLong:[replyToMessageID longLongValue]] : nil;
 
     [self.composerDraftSyncTimer invalidate];
+    self.composerDraftSyncGeneration++;
     self.composerDraftSyncTimer = [NSTimer scheduledTimerWithTimeInterval:0.8
                                                                    target:self
                                                                  selector:@selector(composerDraftSyncTimerFired:)
@@ -254,22 +255,52 @@
     NSString *text = [self.composerDraftSyncText copy];
     NSNumber *replyMessageID = [self.composerDraftSyncReplyMessageID retain];
     TGTDLibClient *client = [self.client retain];
+    NSUInteger generation = self.composerDraftSyncGeneration;
+    SEL draftSelector = @selector(setDraftMessageForChatID:messageThreadID:messageTopicKind:text:replyToMessageID:timeout:error:);
+
+    if (![client isKindOfClass:[TGTDLibClient class]] || ![client respondsToSelector:draftSelector]) {
+        [[TGLogger sharedLogger] log:@"Drafts: skipped remote draft sync because TDLib client is unavailable."];
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        [text release];
+        [replyMessageID release];
+        [client release];
+        return;
+    }
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *draftError = nil;
-        BOOL ok = [client setDraftMessageForChatID:chatID
-                                   messageThreadID:threadID
-                                  messageTopicKind:topicKind
-                                              text:text
-                                  replyToMessageID:replyMessageID
-                                           timeout:4.0
-                                             error:&draftError];
-        NSString *errorMessage = [[draftError localizedDescription] copy];
+        BOOL ok = NO;
+        NSString *errorMessage = nil;
+        NSString *exceptionMessage = nil;
+
+        @try {
+            ok = [client setDraftMessageForChatID:chatID
+                                  messageThreadID:threadID
+                                 messageTopicKind:topicKind
+                                             text:text
+                                 replyToMessageID:replyMessageID
+                                          timeout:4.0
+                                            error:&draftError];
+            errorMessage = [[draftError localizedDescription] copy];
+        } @catch (NSException *exception) {
+            exceptionMessage = [[NSString alloc] initWithFormat:@"%@: %@",
+                                [exception name] ? [exception name] : @"exception",
+                                [exception reason] ? [exception reason] : @"unknown draft sync failure"];
+        }
+
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (!ok && [errorMessage length] > 0) {
-                [TGLogger logComponent:@"Drafts" message:[NSString stringWithFormat:@"Remote draft sync failed: %@", errorMessage]];
+            BOOL stale = (generation != self.composerDraftSyncGeneration || self.client != client);
+            if (!stale) {
+                if ([exceptionMessage length] > 0) {
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drafts: remote draft sync skipped after exception: %@", exceptionMessage]];
+                } else if (!ok && [errorMessage length] > 0) {
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drafts: remote draft sync failed: %@", errorMessage]];
+                }
             }
+            [exceptionMessage release];
             [errorMessage release];
             [chatID release];
             [threadID release];
@@ -317,6 +348,11 @@
     }
 }
 
+- (BOOL)isComposerActivelyEditing {
+    NSText *editor = [self.sendTextField currentEditor];
+    return (editor != nil && [[self window] firstResponder] == editor);
+}
+
 - (void)refocusComposerIfPossible {
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||
@@ -326,7 +362,29 @@
     }
     [self updateSendControls];
     [self.sendTextField setEnabled:YES];
+
+    NSText *existingEditor = [self.sendTextField currentEditor];
+    if (existingEditor != nil && [[self window] firstResponder] == existingEditor) {
+        return;
+    }
+
+    NSRange previousSelection = NSMakeRange(NSNotFound, 0);
+    if (existingEditor != nil) {
+        previousSelection = [existingEditor selectedRange];
+    }
+
     [[self window] makeFirstResponder:self.sendTextField];
+
+    NSText *editor = [self.sendTextField currentEditor];
+    if (editor != nil) {
+        NSUInteger textLength = [[self.sendTextField stringValue] length];
+        if (previousSelection.location != NSNotFound &&
+            NSMaxRange(previousSelection) <= textLength) {
+            [editor setSelectedRange:previousSelection];
+        } else {
+            [editor setSelectedRange:NSMakeRange(textLength, 0)];
+        }
+    }
 }
 
 - (void)consumePendingComposerRefocus:(id)sender {
@@ -348,6 +406,13 @@
 }
 
 - (void)requestComposerRefocus {
+    if ([self isComposerActivelyEditing]) {
+        self.composerRefocusPending = NO;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(consumePendingComposerRefocus:)
+                                                   object:nil];
+        return;
+    }
     self.composerRefocusPending = YES;
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(consumePendingComposerRefocus:)
@@ -514,7 +579,14 @@
     } else if (![previousState isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
         self.chatFilterRefreshRetryCount = 0;
-        if ([self.chatItems count] == 0) {
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            self.pendingLiveChatRefresh = NO;
+            self.pendingLiveMessageRefresh = NO;
+            [self appendDetail:@"Mountain Lion safe login mode: signed in; loading initial chats with profile/live sync paused."];
+            if ([self.chatItems count] == 0 && !self.backgroundChatRefreshInFlight) {
+                [self reloadChatsInteractive:NO preserveSelection:NO requestedLimit:TGStatusChatPreviewInitialLimit];
+            }
+        } else if ([self.chatItems count] == 0) {
             self.pendingLiveChatRefresh = YES;
             [self handlePendingLiveRefreshesIfPossible];
         }
@@ -656,7 +728,7 @@
     [self updateSendControls];
     [self refreshProfileDisplay];
     [self updateVisibleSection];
-    if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy) {
+    if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy && !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 
@@ -723,6 +795,9 @@
     if ([notification object] == self.searchTextField) {
         [self scheduleSearchRequest];
         return;
+    } else if ([notification object] == self.chatSearchWindowTextField) {
+        [self updateChatSearchWindowResults];
+        return;
     } else if ([notification object] == self.sendTextField) {
         [self saveCurrentComposerDraft];
         [self updateSendControls];
@@ -739,6 +814,16 @@
     if (control == self.searchTextField &&
         [self control:control textView:textView doSearchCommandBySelector:commandSelector]) {
         return YES;
+    }
+    if (control == self.chatSearchWindowTextField &&
+        [self control:control textView:textView doChatSearchWindowCommandBySelector:commandSelector]) {
+        return YES;
+    }
+    if (control == self.sendTextField && commandSelector == @selector(paste:)) {
+        if ([self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]]) {
+            return YES;
+        }
+        return NO;
     }
     if (control == self.sendTextField &&
         (commandSelector == @selector(insertNewline:) ||

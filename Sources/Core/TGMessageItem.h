@@ -8,6 +8,7 @@
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL sending;
 @property (nonatomic, assign) BOOL outgoingRead;
+@property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, copy) NSString *preview;
 @property (nonatomic, copy) NSString *contentType;
 @property (nonatomic, copy) NSString *mediaLocalPath;
@@ -30,11 +31,14 @@
 @property (nonatomic, copy) NSString *replySenderDisplayName;
 @property (nonatomic, copy) NSString *forwardSourceDisplayName;
 @property (nonatomic, assign) BOOL capabilitiesKnown;
+@property (nonatomic, assign) BOOL canBeReplied;
 @property (nonatomic, assign) BOOL canBeEdited;
 @property (nonatomic, assign) BOOL canBeDeletedOnlyForSelf;
 @property (nonatomic, assign) BOOL canBeDeletedForAllUsers;
 @property (nonatomic, retain) NSNumber *editDate;
 @property (nonatomic, copy) NSString *editableText;
+@property (nonatomic, assign) BOOL canGetMessageThread;
+@property (nonatomic, retain) NSNumber *messageThreadReplyCount;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
