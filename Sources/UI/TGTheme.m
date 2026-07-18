@@ -307,7 +307,7 @@ static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
                                   0x70c8de, 0xb6d7df, 0x4b7584, 0xe0f6fb, 0x0f83bf, 0xf9ffff, 0xdff6ff);
     }
     if ([identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark]) {
-        return TGThemePaletteMake(0x17110f, 0x251a15, 0xb96124, 0x211814, 0xfff4e8, 0xe4b88c,
+        return TGThemePaletteMake(0x17110f, 0x251a15, 0xb96124, 0x211814, 0xfff4e8, 0xffd7ad,
                                   0x8f5631, 0x57321f, 0xfff8ee, 0xffb35a, 0x3b271d, 0x241b16,
                                   0xb66a35, 0x6d4b34, 0xe5b990, 0x322119, 0xff9b3d, 0xfff8ec, 0xf1c59c);
     }
@@ -429,6 +429,9 @@ NSColor *TGClassicCardInkColor(void) {
 }
 
 NSColor *TGClassicCardMutedInkColor(void) {
+    if (TGThemeIsFrutigerMetroDark()) {
+        return TGColorFromHex(0xffd7ad);
+    }
     if (TGThemeUsesDarkLayeredCards()) {
         return TGClassicMutedInkColor();
     }

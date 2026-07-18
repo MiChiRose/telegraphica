@@ -1,4 +1,5 @@
 #import "TGStatusViewCells.h"
+#import "TGChatDisplayPreferences.h"
 #import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGIconDrawing.h"
@@ -377,13 +378,13 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                    TGChatMessageBodyFont(), NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGChatMessageMetaFont(), NSFontAttributeName,
                                     TGClassicTimeTextColor(), NSForegroundColorAttributeName,
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
@@ -397,7 +398,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:12.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:TGChatMessageBoldBodyFont() forKey:NSFontAttributeName];
                 [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
                 NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
@@ -464,7 +465,18 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     bubbleHeight += commentBarHeight;
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
-    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+    CGFloat blockOffset = floor(TGMessageExtraBlockVerticalPadding() / 2.0);
+    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0 + blockOffset, bubbleWidth, bubbleHeight);
+    if (TGChatMessagesAsBlocksEnabled()) {
+        NSRect blockRect = NSInsetRect(bubbleRect, -5.0, -4.0);
+        NSBezierPath *blockPath = [NSBezierPath bezierPathWithRoundedRect:blockRect xRadius:15.0 yRadius:15.0];
+        NSColor *blockColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
+        [[blockColor colorWithAlphaComponent:0.44] set];
+        [blockPath fill];
+        [TGClassicPanelStrokeColor() set];
+        [blockPath setLineWidth:0.7];
+        [blockPath stroke];
+    }
     NSBezierPath *bubblePath = [NSBezierPath bezierPathWithRoundedRect:bubbleRect xRadius:13.0 yRadius:13.0];
 
     TGThemeDrawMessageBubbleInPath(bubblePath, bubbleRect, outgoing, [controlView isFlipped]);
@@ -499,7 +511,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (senderHeaderHeight > 0.0) {
         NSString *senderName = [item senderDisplayName];
         NSDictionary *senderAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                          [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                          TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
                                           TGClassicNavigationSelectedColor(0.90), NSForegroundColorAttributeName,
                                           nil];
         NSRect senderRect = flipped ? NSMakeRect(NSMinX(bubbleRect) + 12.0,
@@ -545,11 +557,11 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [linePath fill];
 
         NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                         [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
+                                         TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
                                          TGClassicNavigationSelectedColor(0.95), NSForegroundColorAttributeName,
                                          nil];
         NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                            [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                            TGChatMessageSecondaryFont(), NSFontAttributeName,
                                             TGClassicMutedInkColor(), NSForegroundColorAttributeName,
                                             nil];
         NSRect titleRect = NSMakeRect(NSMinX(contextRect) + 8.0,
@@ -641,7 +653,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             [imagePath setLineWidth:1.0];
             [imagePath stroke];
             NSDictionary *placeholderAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                                   [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                                   TGChatMessageBoldBodyFont(), NSFontAttributeName,
                                                    TGClassicMutedInkColor(), NSForegroundColorAttributeName,
                                                    nil];
             NSString *placeholder = [item visualMediaPlaceholderTitle];

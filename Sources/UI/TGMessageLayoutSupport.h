@@ -16,6 +16,7 @@ NSString *TGFirstSupportedPhotoPathFromPasteboard(NSPasteboard *pasteboard);
 NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex);
 NSMutableParagraphStyle *TGMessageTextParagraphStyle(void);
 NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *baseAttributes);
+CGFloat TGMessageExtraBlockVerticalPadding(void);
 NSString *TGDurationStringFromSecondsValue(id durationValue);
 NSString *TGVoicePreviewTimeString(NSTimeInterval seconds);
 NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem);

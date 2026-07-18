@@ -1,5 +1,7 @@
 #import "TGMessageLayoutSupport.h"
+#import "TGChatDisplayPreferences.h"
 #import "TGIconAssets.h"
+#import "TGLocalization.h"
 #import "TGTheme.h"
 #import "../Core/TGMessageItem.h"
 #import "../Media/TGMediaImageLoader.h"
@@ -269,8 +271,8 @@ NSURL *TGURLAtCharacterIndexInString(NSString *text, NSUInteger characterIndex) 
 NSMutableParagraphStyle *TGMessageTextParagraphStyle(void) {
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
     [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
-    [paragraph setLineSpacing:1.0];
-    [paragraph setParagraphSpacing:6.0];
+    [paragraph setLineSpacing:(TGChatMessageBodyFontSize() >= 15.0 ? 2.0 : 1.0)];
+    [paragraph setParagraphSpacing:(TGChatMessageBodyFontSize() >= 15.0 ? 8.0 : 6.0)];
     return paragraph;
 }
 
@@ -300,6 +302,10 @@ NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *base
         [attributed addAttribute:NSUnderlineStyleAttributeName value:[NSNumber numberWithInteger:NSUnderlineStyleSingle] range:[result range]];
     }
     return attributed;
+}
+
+CGFloat TGMessageExtraBlockVerticalPadding(void) {
+    return TGChatMessagesAsBlocksEnabled() ? 8.0 : 0.0;
 }
 
 NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -798,9 +804,9 @@ static NSString *TGDocumentFileSubtitleForMessageItem(TGMessageItem *item) {
         sizeText = TGResourcePolicyReadableSize([[item downloadFileSize] longLongValue]);
     }
     if ([sizeText length] > 0) {
-        return [NSString stringWithFormat:@"%@ - Download", sizeText];
+        return [NSString stringWithFormat:@"%@ - %@", sizeText, TGLoc(@"message.download.action")];
     }
-    return @"Download";
+    return TGLoc(@"message.download.action");
 }
 
 NSString *TGPlayableMediaTitleForMessageItem(TGMessageItem *item) {
@@ -835,7 +841,7 @@ CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWi
 }
 
 CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item) {
-    CGFloat height = [item isVoiceNoteMessage] ? 58.0 : 62.0;
+    CGFloat height = ([item isVoiceNoteMessage] ? 58.0 : 62.0) + MAX(0.0, TGChatMessageBodyFontSize() - 12.0);
     height += TGReactionBandHeightForMessageItem(item);
     return height;
 }
@@ -843,7 +849,7 @@ CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item) {
 CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth) {
     NSString *title = TGDocumentFileTitleForMessageItem(item);
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                     TGChatMessageBoldBodyFont(), NSFontAttributeName,
                                      nil];
     CGFloat width = [title sizeWithAttributes:titleAttributes].width + 96.0;
     if (width < 210.0) {
@@ -857,7 +863,7 @@ CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth) 
 
 CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item) {
     (void)item;
-    return 58.0;
+    return 58.0 + MAX(0.0, TGChatMessageBodyFontSize() - 12.0);
 }
 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
@@ -868,7 +874,7 @@ CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderD
     if (!showSenderDetails || ![item isKindOfClass:[TGMessageItem class]] || [item outgoing]) {
         return 0.0;
     }
-    return ([[item senderDisplayName] length] > 0) ? 17.0 : 0.0;
+    return ([[item senderDisplayName] length] > 0) ? MAX(17.0, TGChatMessageSecondaryFontSize() + 7.0) : 0.0;
 }
 
 CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
@@ -878,7 +884,7 @@ CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item) {
     if ([[item forwardSourceDisplayName] length] > 0 ||
         [[item replyPreview] length] > 0 ||
         [[item replyToMessageID] respondsToSelector:@selector(longLongValue)]) {
-        return 32.0;
+        return MAX(32.0, (TGChatMessageSecondaryFontSize() * 2.0) + 12.0);
     }
     return 0.0;
 }
@@ -923,9 +929,9 @@ void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL
     [barPath stroke];
 
     NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
-    NSString *title = (replyCount > 0) ? [NSString stringWithFormat:@"%ld comment%@", (long)replyCount, (replyCount == 1 ? @"" : @"s")] : @"Comment";
+    NSString *title = (replyCount > 0) ? [NSString stringWithFormat:TGLoc(replyCount == 1 ? @"message.comments.count.one" : @"message.comments.count.many"), (long)replyCount] : TGLoc(@"message.comments.add");
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
                                 TGClassicNavigationSelectedColor(0.96), NSForegroundColorAttributeName,
                                 nil];
     CGFloat iconSide = 15.0;
@@ -1022,11 +1028,11 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument) ? @"" : TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                TGChatMessageBodyFont(), NSFontAttributeName,
                                 paragraph, NSParagraphStyleAttributeName,
                                 nil];
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGChatMessageMetaFont(), NSFontAttributeName,
                                     nil];
     CGFloat textHeight = 0.0;
     if ([text length] > 0) {
@@ -1070,7 +1076,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         height += TGReactionBandHeightForMessageItem(item);
     }
     height += TGMessageCommentBarHeightForItem(item);
-    return height + 10.0;
+    return height + 10.0 + TGMessageExtraBlockVerticalPadding();
 }
 
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails) {
@@ -1086,13 +1092,13 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                    TGChatMessageBodyFont(), NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGChatMessageMetaFont(), NSFontAttributeName,
                                     TGClassicTimeTextColor(), NSForegroundColorAttributeName,
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
@@ -1172,7 +1178,8 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     bubbleHeight += TGMessageCommentBarHeightForItem(item);
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
-    return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+    CGFloat blockOffset = floor(TGMessageExtraBlockVerticalPadding() / 2.0);
+    return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0 + blockOffset, bubbleWidth, bubbleHeight);
 }
 
 void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {
@@ -1211,11 +1218,11 @@ void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL o
         textWidth = 80.0;
     }
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                     TGChatMessageBoldBodyFont(), NSFontAttributeName,
                                      TGClassicInkColor(), NSForegroundColorAttributeName,
                                      nil];
     NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                        [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                        TGChatMessageBodyFont(), NSFontAttributeName,
                                         accentColor, NSForegroundColorAttributeName,
                                         nil];
     NSString *title = TGDocumentFileTitleForMessageItem(item);
@@ -1259,7 +1266,7 @@ void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, B
 
     NSString *title = TGPlayableMediaTitleForMessageItem(item);
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                     TGChatMessageBoldBodyFont(), NSFontAttributeName,
                                      TGClassicInkColor(), NSForegroundColorAttributeName,
                                      nil];
     NSString *duration = TGDurationStringFromSecondsValue([item mediaDuration]);
@@ -1267,7 +1274,7 @@ void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, B
         duration = @"Tap to play";
     }
     NSDictionary *durationAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                        [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                        TGChatMessageSecondaryFont(), NSFontAttributeName,
                                         TGClassicMutedInkColor(), NSForegroundColorAttributeName,
                                         nil];
     CGFloat textX = NSMaxX(playCircleRect) + 10.0;

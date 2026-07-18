@@ -124,9 +124,9 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
 }
 
 - (NSMenu *)messageViewersSubmenuForItem:(TGMessageItem *)item {
-    NSMenu *submenu = [[[NSMenu alloc] initWithTitle:@"Who read"] autorelease];
+    NSMenu *submenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"message.whoRead")] autorelease];
     if (![self.currentAuthState isEqualToString:@"ready"]) {
-        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:@"Sign in is not ready"
+        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.viewers.signInUnavailable")
                                                               action:nil
                                                        keyEquivalent:@""] autorelease];
         [unavailable setEnabled:NO];
@@ -141,7 +141,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                                                     timeout:3.0
                                                       error:&viewersError];
     if (!viewers) {
-        NSString *message = [[viewersError localizedDescription] length] > 0 ? [viewersError localizedDescription] : @"Readers are unavailable";
+        NSString *message = [[viewersError localizedDescription] length] > 0 ? [viewersError localizedDescription] : TGLoc(@"message.viewers.unavailable");
         NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:message
                                                               action:nil
                                                        keyEquivalent:@""] autorelease];
@@ -150,7 +150,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         return submenu;
     }
     if ([viewers count] == 0) {
-        NSMenuItem *empty = [[[NSMenuItem alloc] initWithTitle:@"Nobody has read it yet"
+        NSMenuItem *empty = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.viewers.empty")
                                                         action:nil
                                                  keyEquivalent:@""] autorelease];
         [empty setEnabled:NO];
@@ -162,7 +162,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     for (index = 0; index < [viewers count]; index++) {
         NSDictionary *summary = [viewers objectAtIndex:index];
         NSString *displayName = [summary objectForKey:@"display_name"];
-        NSString *title = [displayName length] > 0 ? displayName : @"Unknown";
+        NSString *title = [displayName length] > 0 ? displayName : TGLoc(@"message.viewers.unknown");
         NSMenuItem *viewerItem = [[[NSMenuItem alloc] initWithTitle:title
                                                              action:nil
                                                       keyEquivalent:@""] autorelease];
@@ -365,7 +365,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     [menu addItem:[self chatCurrentMuteStateMenuItemForChatItem:item]];
 
     if ([self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]) {
-        NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:@"Enable local notifications"
+        NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.notifications.enable")
                                                              action:@selector(unmuteChatFromMenu:)
                                                       keyEquivalent:@""] autorelease];
         [unmuteItem setRepresentedObject:item];
@@ -374,12 +374,12 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [menu addItem:unmuteItem];
     }
 
-    NSMenu *muteMenu = [[[NSMenu alloc] initWithTitle:@"Mute notifications"] autorelease];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 hour" duration:(60.0 * 60.0) chatItem:item]];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"For 1 day" duration:(24.0 * 60.0 * 60.0) chatItem:item]];
+    NSMenu *muteMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"chat.notifications.mute")] autorelease];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:TGLoc(@"chat.notifications.hour") duration:(60.0 * 60.0) chatItem:item]];
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:TGLoc(@"chat.notifications.day") duration:(24.0 * 60.0 * 60.0) chatItem:item]];
     [muteMenu addItem:[NSMenuItem separatorItem]];
-    [muteMenu addItem:[self chatMuteMenuItemWithTitle:@"Forever" duration:-1.0 chatItem:item]];
-    NSMenuItem *muteRoot = [[[NSMenuItem alloc] initWithTitle:@"Mute notifications"
+    [muteMenu addItem:[self chatMuteMenuItemWithTitle:TGLoc(@"chat.notifications.forever") duration:-1.0 chatItem:item]];
+    NSMenuItem *muteRoot = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.notifications.mute")
                                                        action:nil
                                                 keyEquivalent:@""] autorelease];
     [muteRoot setImage:TGTemplateIconAssetImage(@"sound-off", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
@@ -433,7 +433,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
 
     BOOL canReply = (![item capabilitiesKnown] || [item canBeReplied]);
     if (canReply) {
-        NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
+        NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reply")
                                                             action:@selector(replyToMessageFromMenu:)
                                                      keyEquivalent:@""] autorelease];
         [replyItem setRepresentedObject:item];
@@ -443,7 +443,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     }
 
     if (TGMessageItemHasCommentThread(item)) {
-        NSMenuItem *commentsItem = [[[NSMenuItem alloc] initWithTitle:@"Open comments"
+        NSMenuItem *commentsItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.comments.open")
                                                                action:@selector(openMessageCommentsFromMenu:)
                                                         keyEquivalent:@""] autorelease];
         [commentsItem setRepresentedObject:item];
@@ -453,14 +453,14 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         addedMessageAction = YES;
     }
 
-    NSMenuItem *forwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward..."
+    NSMenuItem *forwardItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.forward")
                                                           action:@selector(forwardMessageFromMenu:)
                                                    keyEquivalent:@""] autorelease];
     [forwardItem setRepresentedObject:item];
     [forwardItem setTarget:self];
     [menu addItem:forwardItem];
     if ([self.profileUserID respondsToSelector:@selector(longLongValue)]) {
-        NSMenuItem *savedForwardItem = [[[NSMenuItem alloc] initWithTitle:@"Forward to Saved Messages"
+        NSMenuItem *savedForwardItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.forward.saved")
                                                                    action:@selector(forwardMessageToSavedMessagesFromMenu:)
                                                             keyEquivalent:@""] autorelease];
         [savedForwardItem setRepresentedObject:item];
@@ -478,7 +478,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         addedMessageAction = YES;
     }
     if ([item outgoing]) {
-        NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:@"Who read"
+        NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.whoRead")
                                                              action:nil
                                                       keyEquivalent:@""] autorelease];
         [readByItem setRepresentedObject:item];
@@ -532,7 +532,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     NSArray *moreEmojis = [NSArray arrayWithObjects:@"😂", @"🎉", @"👏", @"🙏", @"😍", @"🤔", @"🤯", @"💯", @"😡", @"🥰", nil];
     if ([moreEmojis count] > 0) {
         [menu addItem:[NSMenuItem separatorItem]];
-        NSMenu *moreMenu = [[[NSMenu alloc] initWithTitle:@"More reactions"] autorelease];
+        NSMenu *moreMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"message.reactions.more")] autorelease];
         for (index = 0; index < [moreEmojis count]; index++) {
             NSString *emoji = [moreEmojis objectAtIndex:index];
             BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
@@ -548,7 +548,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
             [menuItem setTarget:self];
             [moreMenu addItem:menuItem];
         }
-        NSMenuItem *moreItem = [[[NSMenuItem alloc] initWithTitle:@"More reactions"
+        NSMenuItem *moreItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reactions.more")
                                                            action:nil
                                                     keyEquivalent:@""] autorelease];
         [moreItem setSubmenu:moreMenu];

@@ -149,6 +149,24 @@
         NSTextFieldCell *textFieldCell = (NSTextFieldCell *)[textField cell];
         [textFieldCell setBezelStyle:NSTextFieldSquareBezel];
     }
+    [self applyComposerPlaceholderStyle:textField];
+}
+
+- (void)applyComposerPlaceholderStyle:(NSTextField *)textField {
+    if (![[textField cell] isKindOfClass:[NSTextFieldCell class]]) {
+        return;
+    }
+    NSTextFieldCell *textFieldCell = (NSTextFieldCell *)[textField cell];
+    NSString *placeholder = [textFieldCell placeholderString];
+    if ([placeholder length] == 0 || ![textFieldCell respondsToSelector:@selector(setPlaceholderAttributedString:)]) {
+        return;
+    }
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                TGClassicCardMutedInkColor(), NSForegroundColorAttributeName,
+                                [textField font] ? [textField font] : [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                nil];
+    NSAttributedString *attributedPlaceholder = [[[NSAttributedString alloc] initWithString:placeholder attributes:attributes] autorelease];
+    [textFieldCell setPlaceholderAttributedString:attributedPlaceholder];
 }
 
 - (void)applyHeaderIconButtonStyle:(NSButton *)button {

@@ -452,9 +452,9 @@
     self.selectedMessageThreadID = threadID;
     self.selectedMessageTopicKind = @"thread";
     if ([self.selectedChatTitle length] == 0) {
-        self.selectedChatTitle = @"Comments";
-    } else if ([self.selectedChatTitle rangeOfString:@"comments" options:NSCaseInsensitiveSearch].location == NSNotFound) {
-        self.selectedChatTitle = [NSString stringWithFormat:@"%@ comments", self.selectedChatTitle];
+        self.selectedChatTitle = TGLoc(@"message.comments.threadTitle");
+    } else if ([self.selectedChatTitle rangeOfString:TGLoc(@"message.comments.threadSuffix") options:NSCaseInsensitiveSearch].location == NSNotFound) {
+        self.selectedChatTitle = [NSString stringWithFormat:@"%@ %@", self.selectedChatTitle, TGLoc(@"message.comments.threadSuffix")];
     }
     self.showingForumTopicList = NO;
     self.pinnedMessageItems = [NSArray array];

@@ -341,7 +341,7 @@
     TGSearchResultItem *result = [candidate isKindOfClass:[TGSearchResultItem class]] ? (TGSearchResultItem *)candidate : nil;
     NSString *identifier = [tableColumn identifier];
     if ([identifier isEqualToString:@"title"]) {
-        return [result displayTitle] ? [result displayTitle] : @"Chat";
+        return [result displayTitle] ? [result displayTitle] : TGLoc(@"search.chats.fallbackChat");
     }
     NSString *subtitle = [result displaySubtitle];
     return [subtitle length] > 0 ? subtitle : TGLoc(@"search.chats.openHint");

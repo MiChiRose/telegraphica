@@ -66,10 +66,10 @@
     NSUInteger generation = self.chatSearchGeneration + 1;
     self.chatSearchGeneration = generation;
     [self.chatSearchWindowResults removeAllObjects];
+    NSArray *source = self.showingForumTopicList && self.chatItemsBeforeTopicList ? self.chatItemsBeforeTopicList : self.chatItems;
     if ([query length] > 0) {
         [self.chatSearchWindowResults addObjectsFromArray:[self localChatSearchResultsForQuery:query]];
     } else {
-        NSArray *source = self.showingForumTopicList && self.chatItemsBeforeTopicList ? self.chatItemsBeforeTopicList : self.chatItems;
         NSUInteger index = 0;
         for (index = 0; index < [source count] && [self.chatSearchWindowResults count] < 12; index++) {
             id candidate = [source objectAtIndex:index];
@@ -81,7 +81,7 @@
             [result setChatID:([chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID])];
             [result setMessageThreadID:[chatItem messageThreadID]];
             [result setMessageTopicKind:[chatItem messageTopicKind]];
-            [result setChatTitle:[[chatItem title] length] > 0 ? [chatItem title] : @"Chat"];
+            [result setChatTitle:[[chatItem title] length] > 0 ? [chatItem title] : TGLoc(@"search.chats.fallbackChat")];
             [result setSnippet:[chatItem typeSummary]];
             [result setChatTitleOnly:YES];
             [self.chatSearchWindowResults addObject:result];
@@ -96,6 +96,54 @@
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: chat search query length=%lu results=%lu.",
                                   (unsigned long)[query length],
                                   (unsigned long)[self.chatSearchWindowResults count]]];
+
+    if ([query length] == 0) {
+        if ([self.chatSearchWindowResults count] == 0) {
+            TGTDLibClient *client = [self.client retain];
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+                NSError *loadError = nil;
+                NSArray *serverItems = [[client mainChatPreviewItemsWithLimit:24 timeout:5.0 error:&loadError] retain];
+                NSString *errorMessage = [[loadError localizedDescription] copy];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (self.chatSearchGeneration == generation) {
+                        TGChatSearchPanelView *activePanelView = [self chatSearchPanelView];
+                        [self.chatSearchWindowResults removeAllObjects];
+                        NSUInteger index = 0;
+                        for (index = 0; index < [serverItems count] && [self.chatSearchWindowResults count] < 12; index++) {
+                            id candidate = [serverItems objectAtIndex:index];
+                            if (![candidate isKindOfClass:[TGChatItem class]]) {
+                                continue;
+                            }
+                            TGChatItem *chatItem = (TGChatItem *)candidate;
+                            TGSearchResultItem *result = [[[TGSearchResultItem alloc] init] autorelease];
+                            [result setChatID:([chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID])];
+                            [result setMessageThreadID:[chatItem messageThreadID]];
+                            [result setMessageTopicKind:[chatItem messageTopicKind]];
+                            [result setChatTitle:[[chatItem title] length] > 0 ? [chatItem title] : TGLoc(@"search.chats.fallbackChat")];
+                            [result setSnippet:[chatItem typeSummary]];
+                            [result setChatTitleOnly:YES];
+                            [self.chatSearchWindowResults addObject:result];
+                        }
+                        [activePanelView setResults:self.chatSearchWindowResults];
+                        if ([self.chatSearchWindowResults count] > 0) {
+                            [activePanelView setStatusText:TGLoc(@"search.chats.recent")];
+                        } else if ([errorMessage length] > 0) {
+                            [activePanelView setStatusText:[NSString stringWithFormat:TGLoc(@"search.chats.failed"), errorMessage]];
+                            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: recent chat load failed: %@", errorMessage]];
+                        } else {
+                            [activePanelView setStatusText:TGLoc(@"search.chats.noLoaded")];
+                        }
+                    }
+                    [serverItems release];
+                    [errorMessage release];
+                    [client release];
+                });
+                [pool drain];
+            });
+        }
+        return;
+    }
 
     NSArray *localSnapshot = [[NSArray alloc] initWithArray:self.chatSearchWindowResults];
     TGTDLibClient *client = [self.client retain];
@@ -159,7 +207,7 @@
                 [result setChatID:resultChatID];
                 [result setMessageThreadID:[chatItem messageThreadID]];
                 [result setMessageTopicKind:[chatItem messageTopicKind]];
-                [result setChatTitle:[[chatItem title] length] > 0 ? [chatItem title] : @"Chat"];
+                [result setChatTitle:[[chatItem title] length] > 0 ? [chatItem title] : TGLoc(@"search.chats.fallbackChat")];
                 [result setSnippet:[chatItem typeSummary]];
                 [result setChatTitleOnly:YES];
                 [self.chatSearchWindowResults addObject:result];

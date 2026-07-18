@@ -500,9 +500,11 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                 [self refreshSelectedChatHeaderDisplay];
                 [self.messageItems removeAllObjects];
                 [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:items]];
+                self.messageItemsRepresentFocusedContext = YES;
                 [self updateOutgoingReadStateForVisibleMessages];
                 [self markVisiblePinnedMessagesFromPinnedItems];
                 [self.messageTableView reloadData];
+                [self updateMessageJumpToNewestButtonVisibility];
                 NSUInteger index = [self indexOfMessageID:messageID inMessageItems:self.messageItems];
                 if (index != NSNotFound) {
                     [self.messageTableView scrollRowToVisible:index];

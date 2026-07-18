@@ -235,6 +235,10 @@
     [self showView:self.settingsResourceHintField visible:showSettings];
     [self showView:self.settingsLanguageLabel visible:showSettings];
     [self showView:self.settingsLanguagePopUpButton visible:showSettings];
+    [self showView:self.settingsMessagesAsBlocksButton visible:showSettings];
+    [self showView:self.settingsChatTextSizeSectionField visible:showSettings];
+    [self showView:self.settingsChatTextSizeSlider visible:showSettings];
+    [self showView:self.settingsChatTextSizeValueField visible:showSettings];
     [self showView:self.settingsActiveSessionsDetailField visible:showSettings];
     [self showView:self.settingsActiveSessionsButton visible:showSettings];
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
@@ -928,7 +932,7 @@
         settingsDocWidth = settingsScrollWidth;
     }
     CGFloat settingsBottomPadding = 32.0;
-    CGFloat settingsDocHeight = 1120.0 + settingsBottomPadding;
+    CGFloat settingsDocHeight = 1180.0 + settingsBottomPadding;
     if (settingsDocHeight < settingsScrollHeight) {
         settingsDocHeight = settingsScrollHeight;
     }
@@ -1000,7 +1004,7 @@
     settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat interfaceCardHeight = 118.0;
+    CGFloat interfaceCardHeight = 184.0;
     CGFloat interfaceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsThemeCardView setFrame:NSMakeRect(settingsGroupedX, interfaceCardY, settingsGroupedWidth, interfaceCardHeight)];
     [self.settingsAppearanceButton setFrame:NSMakeRect(rowLeft, interfaceCardY, 0.0, 0.0)];
@@ -1017,6 +1021,18 @@
     [self.themePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 42.0, popupWidth, 28.0)];
     [self.settingsLanguageLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 80.0, labelWidth, 22.0)];
     [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 76.0, popupWidth, 28.0)];
+    [self.settingsMessagesAsBlocksButton setFrame:NSMakeRect(rowLeft, interfaceCardY + 112.0, rowWidth, 22.0)];
+    [self.settingsChatTextSizeSectionField setFrame:NSMakeRect(rowLeft, interfaceCardY + 146.0, labelWidth, 22.0)];
+    CGFloat textSizeValueWidth = 110.0;
+    CGFloat textSizeSliderWidth = rowWidth - labelWidth - textSizeValueWidth - 28.0;
+    if (textSizeSliderWidth < 120.0) {
+        textSizeSliderWidth = 120.0;
+    }
+    [self.settingsChatTextSizeSlider setFrame:NSMakeRect(popupX, interfaceCardY + 140.0, textSizeSliderWidth, 28.0)];
+    [self.settingsChatTextSizeValueField setFrame:NSMakeRect(popupX + textSizeSliderWidth + 10.0,
+                                                             interfaceCardY + 146.0,
+                                                             textSizeValueWidth,
+                                                             22.0)];
     settingsNextY = interfaceCardY + interfaceCardHeight + settingsGroupGap;
 
     [self.settingsStorageField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];

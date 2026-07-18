@@ -239,6 +239,12 @@
 }
 
 - (BOOL)shouldShowMessageJumpToNewestButton {
+    if (self.messageItemsRepresentFocusedContext &&
+        [self.currentAuthState isEqualToString:@"ready"] &&
+        self.selectedChatID &&
+        ![self.messageScrollView isHidden]) {
+        return YES;
+    }
     if ([self.messageItems count] <= 20 || !self.messageScrollView || [self.messageScrollView isHidden]) {
         return NO;
     }
@@ -269,6 +275,17 @@
 - (void)jumpToNewestMessages:(id)sender {
     (void)sender;
     self.forceMessageScrollToNewest = YES;
+    if (self.messageItemsRepresentFocusedContext && self.selectedChatID) {
+        NSNumber *chatID = [self.selectedChatID retain];
+        self.messageItemsRepresentFocusedContext = NO;
+        self.olderMessagesExhausted = NO;
+        self.messageLoadingIndicatorVisible = YES;
+        [self.messageLoadingSpinner startAnimation:self];
+        [self updateVisibleSection];
+        [self reloadMessagesForChatID:chatID interactive:NO];
+        [chatID release];
+        return;
+    }
     [self scrollMessagesToNewestIfAvailable];
     [self performSelector:@selector(scrollMessagesToNewestIfAvailable) withObject:nil afterDelay:0.0];
     [self updateMessageJumpToNewestButtonVisibility];
@@ -1091,7 +1108,7 @@
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
     NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
-    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0);
+    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0 || self.forceMessageScrollToNewest);
     NSUInteger messageLoadingGeneration = 0;
     if (shouldShowMessageLoading) {
         messageLoadingGeneration = self.messageLoadingGeneration + 1;
@@ -1134,6 +1151,10 @@
                 }
             } else if (itemsCopy) {
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
+                if (self.forceMessageScrollToNewest) {
+                    preserveOlder = NO;
+                }
+                self.messageItemsRepresentFocusedContext = NO;
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
                 [self scheduleMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
                 [self setOfflineModeActive:NO reason:nil];
