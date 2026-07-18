@@ -306,6 +306,11 @@
 }
 
 - (void)refreshUpdateAvailabilityBadge {
+    if (TGCurrentApplicationVersionIsMountainLionBuild()) {
+        self.updateAvailable = NO;
+        self.availableUpdateVersion = nil;
+        [self.settingsCheckUpdatesButton setEnabled:NO];
+    }
     NSString *badgeText = self.updateAvailable ? @"1" : nil;
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
@@ -328,6 +333,14 @@
 }
 
 - (void)setUpdateAvailableFromVersion:(NSString *)version {
+    if (TGCurrentApplicationVersionIsMountainLionBuild()) {
+        self.updateAvailable = NO;
+        self.availableUpdateVersion = nil;
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:TGAvailableUpdateVersionDefaultsKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        [self refreshUpdateAvailabilityBadge];
+        return;
+    }
     BOOL available = ([version isKindOfClass:[NSString class]] &&
                       TGVersionStringIsNewer(version, TGCurrentApplicationVersionString()));
     self.updateAvailable = available;
@@ -661,6 +674,11 @@
 }
 
 - (void)checkForUpdatesManual:(BOOL)manual {
+    if (TGCurrentApplicationVersionIsMountainLionBuild()) {
+        [self setUpdateAvailableFromVersion:nil];
+        return;
+    }
+
     if (!manual) {
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         NSTimeInterval last = [[NSUserDefaults standardUserDefaults] doubleForKey:TGLastUpdateCheckDefaultsKey];

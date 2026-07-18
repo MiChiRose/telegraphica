@@ -1040,8 +1040,10 @@
                     if (self.chatsExhausted) {
                         [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
                     }
-                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
+                } else if (TGMountainLionSafeLoginModeEnabled()) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews after Mountain Lion safe login.", (unsigned long)[itemsCopy count]]];
                 }
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
             } else {
                 BOOL looksOffline = TGStatusErrorLooksOffline(chatErrorMessage);
                 if (interactive) {

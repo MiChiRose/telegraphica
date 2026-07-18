@@ -582,7 +582,10 @@
         if (TGMountainLionSafeLoginModeEnabled()) {
             self.pendingLiveChatRefresh = NO;
             self.pendingLiveMessageRefresh = NO;
-            [self appendDetail:@"Mountain Lion safe login mode: signed in; automatic profile/live sync is paused. Chats can be loaded manually with TDLib message database disabled."];
+            [self appendDetail:@"Mountain Lion safe login mode: signed in; loading initial chats with profile/live sync paused."];
+            if ([self.chatItems count] == 0 && !self.backgroundChatRefreshInFlight) {
+                [self reloadChatsInteractive:NO preserveSelection:NO requestedLimit:TGStatusChatPreviewInitialLimit];
+            }
         } else if ([self.chatItems count] == 0) {
             self.pendingLiveChatRefresh = YES;
             [self handlePendingLiveRefreshesIfPossible];

@@ -873,8 +873,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
         NSString *storedUpdateVersion = [[NSUserDefaults standardUserDefaults] stringForKey:TGAvailableUpdateVersionDefaultsKey];
-        if ([storedUpdateVersion isKindOfClass:[NSString class]] &&
-            TGVersionStringIsNewer(storedUpdateVersion, TGCurrentApplicationVersionString())) {
+        if (TGCurrentApplicationVersionIsMountainLionBuild()) {
+            if ([storedUpdateVersion length] > 0) {
+                [[NSUserDefaults standardUserDefaults] removeObjectForKey:TGAvailableUpdateVersionDefaultsKey];
+            }
+        } else if ([storedUpdateVersion isKindOfClass:[NSString class]] &&
+                   TGVersionStringIsNewer(storedUpdateVersion, TGCurrentApplicationVersionString())) {
             self.availableUpdateVersion = storedUpdateVersion;
             self.updateAvailable = YES;
         } else if ([storedUpdateVersion length] > 0) {
@@ -907,7 +911,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         }
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
-        [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
+        if (!TGCurrentApplicationVersionIsMountainLionBuild()) {
+            [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
+        }
     }
     return self;
 }
