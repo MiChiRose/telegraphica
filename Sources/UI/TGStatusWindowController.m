@@ -58,6 +58,7 @@ static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"Telegraph
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
+static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvailableUpdateVersion";
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
@@ -309,6 +310,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
 @property (nonatomic, retain) NSButton *settingsStorageUsageButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
+@property (nonatomic, retain) TGNotificationDotView *settingsUpdateDotView;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
 @property (nonatomic, retain) NSButton *settingsLogsButton;
 @property (nonatomic, retain) NSButton *settingsAboutButton;
@@ -446,6 +448,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL composerRefocusPending;
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
 @property (nonatomic, assign) BOOL offlineModeActive;
+@property (nonatomic, assign) BOOL updateAvailable;
+@property (nonatomic, copy) NSString *availableUpdateVersion;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
 @property (nonatomic, assign) BOOL chatFilterRefreshPending;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
@@ -671,6 +675,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
 @synthesize settingsStorageUsageButton = _settingsStorageUsageButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
+@synthesize settingsUpdateDotView = _settingsUpdateDotView;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
 @synthesize settingsLogsButton = _settingsLogsButton;
 @synthesize settingsAboutButton = _settingsAboutButton;
@@ -808,6 +813,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize composerRefocusPending = _composerRefocusPending;
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
 @synthesize offlineModeActive = _offlineModeActive;
+@synthesize updateAvailable = _updateAvailable;
+@synthesize availableUpdateVersion = _availableUpdateVersion;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
 @synthesize chatFilterRefreshPending = _chatFilterRefreshPending;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
@@ -854,6 +861,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         self.chatFilterInfos = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
+        NSString *storedUpdateVersion = [[NSUserDefaults standardUserDefaults] stringForKey:TGAvailableUpdateVersionDefaultsKey];
+        if ([storedUpdateVersion isKindOfClass:[NSString class]] &&
+            TGVersionStringIsNewer(storedUpdateVersion, TGCurrentApplicationVersionString())) {
+            self.availableUpdateVersion = storedUpdateVersion;
+            self.updateAvailable = YES;
+        } else if ([storedUpdateVersion length] > 0) {
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:TGAvailableUpdateVersionDefaultsKey];
+        }
         self.mediaPreviewZoomScale = 1.0;
         self.autoChatListLoadArmed = YES;
         self.autoChatListRefreshArmed = YES;
@@ -873,6 +888,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                                    object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
+        [self refreshUpdateAvailabilityBadge];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
         [self startLiveUpdateTimerIfNeeded];
@@ -2485,6 +2501,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyUtilityButtonStyle:self.settingsCheckUpdatesButton];
     [self.settingsCheckUpdatesButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsCheckUpdatesButton];
+    self.settingsUpdateDotView = [[[TGNotificationDotView alloc] initWithFrame:NSMakeRect(0, 0, 10, 10)] autorelease];
+    [self.settingsUpdateDotView setHidden:YES];
+    [self.settingsUpdateDotView setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsUpdateDotView positioned:NSWindowAbove relativeTo:self.settingsCheckUpdatesButton];
 
     self.settingsAppearanceButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 328, 260, 40)] autorelease];
     [self.settingsAppearanceButton setTitle:@"Appearance"];
@@ -3248,6 +3268,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsDownloadFolderButton release];
     [_settingsStorageUsageButton release];
     [_settingsCheckUpdatesButton release];
+    [_settingsUpdateDotView release];
     [_storageUsageWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
@@ -3283,6 +3304,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_profileAvatarLocalPath release];
     [_profileBio release];
     [_lastLogSection release];
+    [_availableUpdateVersion release];
     [_logsWindow close];
     [_aboutWindow close];
     [_appearanceWindow close];

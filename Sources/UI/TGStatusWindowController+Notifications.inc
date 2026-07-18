@@ -305,6 +305,37 @@
     }
 }
 
+- (void)refreshUpdateAvailabilityBadge {
+    NSString *badgeText = self.updateAvailable ? @"1" : nil;
+    NSUInteger index = 0;
+    for (index = 0; index < [self.navigationButtons count]; index++) {
+        NSButton *button = [self.navigationButtons objectAtIndex:index];
+        if ([button tag] != 2 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
+            continue;
+        }
+        [(TGNavigationButtonCell *)[button cell] setBadgeText:badgeText];
+        [button setNeedsDisplay:YES];
+        break;
+    }
+    [self.settingsUpdateDotView setHidden:(!self.updateAvailable ||
+                                           ![(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionSettings])];
+    [self.settingsUpdateDotView setNeedsDisplay:YES];
+}
+
+- (void)setUpdateAvailableFromVersion:(NSString *)version {
+    BOOL available = ([version isKindOfClass:[NSString class]] &&
+                      TGVersionStringIsNewer(version, TGCurrentApplicationVersionString()));
+    self.updateAvailable = available;
+    self.availableUpdateVersion = available ? version : nil;
+    if (available) {
+        [[NSUserDefaults standardUserDefaults] setObject:version forKey:TGAvailableUpdateVersionDefaultsKey];
+    } else {
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:TGAvailableUpdateVersionDefaultsKey];
+    }
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self refreshUpdateAvailabilityBadge];
+}
+
 - (void)notificationSettingChanged:(id)sender {
     (void)sender;
     [[NSUserDefaults standardUserDefaults] setBool:([self.settingsNotificationsEnabledButton state] == NSOnState)
@@ -570,6 +601,7 @@
     NSString *remoteVersion = [releaseInfo objectForKey:@"version"];
     NSString *currentVersion = TGCurrentApplicationVersionString();
     if (![remoteVersion isKindOfClass:[NSString class]] || !TGVersionStringIsNewer(remoteVersion, currentVersion)) {
+        [self setUpdateAvailableFromVersion:nil];
         if (manual) {
             NSAlert *alert = [[[NSAlert alloc] init] autorelease];
             [alert setMessageText:TGLoc(@"update.none")];
@@ -577,6 +609,12 @@
             [alert addButtonWithTitle:@"OK"];
             [alert runModal];
         }
+        return;
+    }
+
+    [self setUpdateAvailableFromVersion:remoteVersion];
+    if (!manual) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: version %@ is available; settings badge was updated.", remoteVersion]];
         return;
     }
 
