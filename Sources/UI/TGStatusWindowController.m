@@ -1377,6 +1377,25 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.aboutVersionField setTextColor:cardMutedColor];
     [self.aboutCopyrightField setTextColor:cardMutedColor];
     [self.aboutLinkField setTextColor:TGClassicCardLinkColor()];
+    NSArray *settingsSwitchButtons = [NSArray arrayWithObjects:
+                                      self.settingsNotificationsEnabledButton,
+                                      self.settingsNotificationSoundButton,
+                                      self.settingsNotificationBadgeButton,
+                                      self.settingsNotificationPreviewButton,
+                                      self.settingsNotificationsWhenActiveButton,
+                                      self.settingsDrawerHiddenButton,
+                                      self.settingsTypingIndicatorsButton,
+                                      self.settingsEconomyModeButton,
+                                      self.settingsAutoDownloadPhotosButton,
+                                      self.settingsAutoDownloadVideosButton,
+                                      self.settingsAutoDownloadDocumentsButton,
+                                      self.settingsAutoplayAnimatedStickersButton,
+                                      self.settingsStopInactiveAnimationsButton,
+                                      nil];
+    NSUInteger settingsSwitchIndex = 0;
+    for (settingsSwitchIndex = 0; settingsSwitchIndex < [settingsSwitchButtons count]; settingsSwitchIndex++) {
+        [self applySettingsSwitchTextStyle:[settingsSwitchButtons objectAtIndex:settingsSwitchIndex]];
+    }
     [self applyDestructiveSettingsButtonStyle:self.logoutButton];
 
     [self applyComposerTextFieldStyle:self.authTextField];
