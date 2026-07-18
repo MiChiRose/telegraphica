@@ -319,6 +319,11 @@
     }
     [self.settingsUpdateDotView setHidden:(!self.updateAvailable ||
                                            ![(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionSettings])];
+    NSRect buttonBounds = [self.settingsCheckUpdatesButton bounds];
+    [self.settingsUpdateDotView setFrame:NSMakeRect(NSMaxX(buttonBounds) - 20.0,
+                                                    floor((NSHeight(buttonBounds) - 10.0) / 2.0),
+                                                    10.0,
+                                                    10.0)];
     [self.settingsUpdateDotView setNeedsDisplay:YES];
 }
 

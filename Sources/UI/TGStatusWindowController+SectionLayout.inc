@@ -1033,7 +1033,7 @@
     [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
-    [self.settingsUpdateDotView setFrame:NSMakeRect(rowLeft + 10.0, helpCardY + 83.0, 10.0, 10.0)];
+    [self.settingsUpdateDotView setFrame:NSMakeRect(rowWidth - 20.0, 9.0, 10.0, 10.0)];
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
         aboutWidth = 560.0;

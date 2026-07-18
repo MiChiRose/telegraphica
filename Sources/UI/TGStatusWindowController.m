@@ -2503,8 +2503,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.settingsCheckUpdatesButton];
     self.settingsUpdateDotView = [[[TGNotificationDotView alloc] initWithFrame:NSMakeRect(0, 0, 10, 10)] autorelease];
     [self.settingsUpdateDotView setHidden:YES];
-    [self.settingsUpdateDotView setAutoresizingMask:NSViewMaxYMargin];
-    [contentView addSubview:self.settingsUpdateDotView positioned:NSWindowAbove relativeTo:self.settingsCheckUpdatesButton];
+    [self.settingsUpdateDotView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [self.settingsCheckUpdatesButton addSubview:self.settingsUpdateDotView];
 
     self.settingsAppearanceButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 328, 260, 40)] autorelease];
     [self.settingsAppearanceButton setTitle:@"Appearance"];
