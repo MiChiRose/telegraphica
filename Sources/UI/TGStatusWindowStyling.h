@@ -8,6 +8,7 @@
 - (void)applySkeuomorphicButtonStyle:(NSButton *)button isPrimary:(BOOL)isPrimary;
 - (void)applyUtilityButtonStyle:(NSButton *)button;
 - (void)applySettingsListButtonStyle:(NSButton *)button;
+- (void)applySettingsSwitchTextStyle:(NSButton *)button;
 - (void)applyDestructiveSettingsButtonStyle:(NSButton *)button;
 - (void)applySkeuomorphicTextFieldStyle:(NSTextField *)textField;
 - (void)applyComposerTextFieldStyle:(NSTextField *)textField;

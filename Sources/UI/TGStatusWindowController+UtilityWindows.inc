@@ -425,3 +425,25 @@
     [self refreshThemeAppearance];
     [self appendDetail:[NSString stringWithFormat:@"Theme changed: %@", TGThemeDisplayNameForIdentifier(themeIdentifier)]];
 }
+
+- (void)themeCategorySelectionChanged:(id)sender {
+    NSPopUpButton *sourcePopUpButton = [sender isKindOfClass:[NSPopUpButton class]] ? (NSPopUpButton *)sender : self.themeCategoryPopUpButton;
+    NSString *categoryIdentifier = [[sourcePopUpButton selectedItem] representedObject];
+    NSArray *themeIdentifiers = TGThemeIdentifiersForCategory(categoryIdentifier);
+    if ([themeIdentifiers count] == 0) {
+        return;
+    }
+
+    NSString *currentThemeIdentifier = TGCurrentThemeIdentifier();
+    NSString *selectedThemeIdentifier = currentThemeIdentifier;
+    if (![themeIdentifiers containsObject:selectedThemeIdentifier]) {
+        selectedThemeIdentifier = [themeIdentifiers objectAtIndex:0];
+    }
+
+    [self populateThemePopUpButton:self.themePopUpButton
+             forCategoryIdentifier:categoryIdentifier
+                selectedIdentifier:selectedThemeIdentifier];
+    if (![selectedThemeIdentifier isEqualToString:currentThemeIdentifier]) {
+        [self themeSelectionChanged:self.themePopUpButton];
+    }
+}

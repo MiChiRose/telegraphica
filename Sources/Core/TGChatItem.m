@@ -13,6 +13,7 @@
 @synthesize notificationsMuted = _notificationsMuted;
 @synthesize pinned = _pinned;
 @synthesize forumTopic = _forumTopic;
+@synthesize savedMessages = _savedMessages;
 @synthesize parentChatID = _parentChatID;
 @synthesize messageThreadID = _messageThreadID;
 @synthesize messageTopicKind = _messageTopicKind;
@@ -49,6 +50,9 @@
     }
     if ([identifier isEqual:@"is_pinned"]) {
         return [NSNumber numberWithBool:self.pinned];
+    }
+    if ([identifier isEqual:@"is_saved_messages"]) {
+        return [NSNumber numberWithBool:self.savedMessages];
     }
     if ([identifier isEqual:@"notifications_muted"]) {
         return [NSNumber numberWithBool:self.notificationsMuted];

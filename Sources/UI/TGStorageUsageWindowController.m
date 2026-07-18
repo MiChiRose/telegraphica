@@ -1,6 +1,7 @@
 #import "TGStorageUsageWindowController.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "../Media/TGMediaImageLoader.h"
 #import "../Services/TGLogger.h"
 #import "TGIconAssets.h"
 #import "TGIconDrawing.h"
@@ -591,6 +592,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         NSDictionary *summary = [[client clearDownloadedMediaCacheWithTimeout:15.0 error:&error] retain];
         NSString *errorText = [[error localizedDescription] copy];
         if (summary) {
+            TGMediaImageLoaderClearCache();
             [[TGLogger sharedLogger] log:@"Storage cache cleanup completed."];
         } else {
             [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Storage cache cleanup failed: %@", errorText ? errorText : @"unknown error"]];

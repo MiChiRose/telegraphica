@@ -99,15 +99,21 @@ static NSDictionary *TGTDLibMessageCapabilitiesFromObject(NSDictionary *object) 
     if (![object isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
+    BOOL hasReply = TGTDLibDictionaryHasKey(object, @"can_be_replied");
     BOOL hasEdit = TGTDLibDictionaryHasKey(object, @"can_be_edited");
     BOOL hasDeleteSelf = TGTDLibDictionaryHasKey(object, @"can_be_deleted_only_for_self");
     BOOL hasDeleteAll = TGTDLibDictionaryHasKey(object, @"can_be_deleted_for_all_users");
-    if (!hasEdit && !hasDeleteSelf && !hasDeleteAll) {
+    if (!hasReply && !hasEdit && !hasDeleteSelf && !hasDeleteAll) {
         return nil;
     }
 
     NSMutableDictionary *capabilities = [NSMutableDictionary dictionary];
     [capabilities setObject:[NSNumber numberWithBool:YES] forKey:@"known"];
+    BOOL canReply = YES;
+    if (TGTDLibDictionaryHasKey(object, @"can_be_replied")) {
+        canReply = TGTDLibCapabilityBoolFromDictionary(object, @"can_be_replied");
+    }
+    [capabilities setObject:[NSNumber numberWithBool:canReply] forKey:@"can_be_replied"];
     [capabilities setObject:[NSNumber numberWithBool:TGTDLibCapabilityBoolFromDictionary(object, @"can_be_edited")] forKey:@"can_be_edited"];
     [capabilities setObject:[NSNumber numberWithBool:TGTDLibCapabilityBoolFromDictionary(object, @"can_be_deleted_only_for_self")] forKey:@"can_be_deleted_only_for_self"];
     [capabilities setObject:[NSNumber numberWithBool:TGTDLibCapabilityBoolFromDictionary(object, @"can_be_deleted_for_all_users")] forKey:@"can_be_deleted_for_all_users"];
@@ -237,6 +243,12 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
 - (void)applyChatPositionFromChatObject:(NSDictionary *)chatObject toChatItem:(TGChatItem *)item chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
+- (TGChatItem *)chatPreviewItemFromChatObject:(NSDictionary *)chatResponse
+                                  chatListType:(NSString *)chatListType
+                                      filterID:(NSNumber *)filterID
+                                downloadAvatar:(BOOL)downloadAvatar
+                         avatarDownloadCounter:(NSUInteger *)avatarDownloadsRemaining
+                                      timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
 - (BOOL)shouldAutoDownloadMessageContentObject:(id)contentObject downloadableInfo:(NSDictionary *)downloadableInfo;
 - (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
@@ -2643,6 +2655,67 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [item setPinned:([pinnedObject respondsToSelector:@selector(boolValue)] && [pinnedObject boolValue])];
 }
 
+- (TGChatItem *)chatPreviewItemFromChatObject:(NSDictionary *)chatResponse
+                                  chatListType:(NSString *)chatListType
+                                      filterID:(NSNumber *)filterID
+                                downloadAvatar:(BOOL)downloadAvatar
+                         avatarDownloadCounter:(NSUInteger *)avatarDownloadsRemaining
+                                      timeout:(NSTimeInterval)timeout {
+    if (![chatResponse isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id responseType = [chatResponse objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chat"]) {
+        return nil;
+    }
+
+    id chatID = [chatResponse objectForKey:@"id"];
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+
+    id titleValue = [chatResponse objectForKey:@"title"];
+    NSString *title = ([titleValue isKindOfClass:[NSString class]] && [(NSString *)titleValue length] > 0) ? (NSString *)titleValue : @"Untitled";
+    NSString *typeSummary = [self chatTypeSummaryForChatTypeObject:[chatResponse objectForKey:@"type"]];
+    id unreadValue = [chatResponse objectForKey:@"unread_count"];
+    NSNumber *unreadCount = [NSNumber numberWithInteger:0];
+    if ([unreadValue respondsToSelector:@selector(integerValue)]) {
+        unreadCount = [NSNumber numberWithInteger:[unreadValue integerValue]];
+    }
+
+    TGChatItem *item = [[[TGChatItem alloc] initWithChatID:[NSNumber numberWithLongLong:[chatID longLongValue]]
+                                                     title:title
+                                               typeSummary:typeSummary
+                                               unreadCount:unreadCount] autorelease];
+    [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:chatListType filterID:filterID];
+    BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
+    [item setServerNotificationsMuted:serverMuted];
+    [item setNotificationsMuted:serverMuted];
+    id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
+    if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
+        [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
+    }
+
+    BOOL shouldDownloadAvatar = downloadAvatar;
+    if (avatarDownloadsRemaining && *avatarDownloadsRemaining == 0) {
+        shouldDownloadAvatar = NO;
+    }
+    BOOL didRequestAvatarDownload = NO;
+    NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[chatResponse objectForKey:@"photo"]
+                                                  downloadMissing:shouldDownloadAvatar
+                                                          timeout:timeout
+                                               didRequestDownload:&didRequestAvatarDownload];
+    if (didRequestAvatarDownload && avatarDownloadsRemaining && *avatarDownloadsRemaining > 0) {
+        (*avatarDownloadsRemaining)--;
+    }
+    NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+    if ([avatarPath length] > 0) {
+        [item setAvatarLocalPath:avatarPath];
+    }
+
+    return item;
+}
+
 - (NSArray *)mainChatPreviewItemsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {
@@ -3005,6 +3078,98 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
+    [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
+    return items;
+}
+
+- (NSArray *)searchChatPreviewItemsWithQuery:(NSString *)query limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to search chats. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:77];
+        }
+        return nil;
+    }
+
+    NSString *safeQuery = [query isKindOfClass:[NSString class]] ? [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"";
+    NSUInteger safeLimit = limit;
+    if (safeLimit == 0 || safeLimit > 50) {
+        safeLimit = 30;
+    }
+    if ([safeQuery length] == 0) {
+        return [self mainChatPreviewItemsWithLimit:safeLimit timeout:timeout error:error];
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"searchChats" forKey:@"@type"];
+    [request setObject:safeQuery forKey:@"query"];
+    [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+
+    NSError *searchError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-search-chats"
+                                                           timeout:timeout
+                                                         errorCode:77
+                                                             error:&searchError];
+    if (!response) {
+        NSMutableDictionary *serverRequest = [NSMutableDictionary dictionary];
+        [serverRequest setObject:@"searchChatsOnServer" forKey:@"@type"];
+        [serverRequest setObject:safeQuery forKey:@"query"];
+        [serverRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+        response = [self sendTDLibRequestAndWaitForExtra:serverRequest
+                                             extraPrefix:@"telegraphica-search-chats-server"
+                                                 timeout:timeout
+                                               errorCode:78
+                                                   error:&searchError];
+    }
+    if (!response) {
+        if (error) {
+            *error = searchError;
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    id chatIDs = [response objectForKey:@"chat_ids"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chats"] || ![chatIDs isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib chat search returned an unexpected response." code:79];
+        }
+        return nil;
+    }
+
+    NSMutableArray *items = [NSMutableArray array];
+    NSTimeInterval chatTimeout = timeout;
+    if (chatTimeout > 1.0) {
+        chatTimeout = 1.0;
+    }
+    NSUInteger avatarDownloadsRemaining = 8;
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)chatIDs count] && [items count] < safeLimit; index++) {
+        id chatID = [(NSArray *)chatIDs objectAtIndex:index];
+        if (![chatID respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+        NSMutableDictionary *getChatRequest = [NSMutableDictionary dictionary];
+        [getChatRequest setObject:@"getChat" forKey:@"@type"];
+        [getChatRequest setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        NSError *chatError = nil;
+        NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:getChatRequest
+                                                               extraPrefix:@"telegraphica-search-get-chat"
+                                                                   timeout:chatTimeout
+                                                                 errorCode:80
+                                                                     error:&chatError];
+        TGChatItem *item = [self chatPreviewItemFromChatObject:chatResponse
+                                                   chatListType:@"chatListMain"
+                                                       filterID:nil
+                                                 downloadAvatar:YES
+                                          avatarDownloadCounter:&avatarDownloadsRemaining
+                                                       timeout:0.75];
+        if (item) {
+            [items addObject:item];
+        }
+    }
     [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
     return items;
 }
@@ -4659,6 +4824,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(message);
         if (capabilities) {
             [item setCapabilitiesKnown:YES];
+            [item setCanBeReplied:[[capabilities objectForKey:@"can_be_replied"] boolValue]];
             [item setCanBeEdited:[[capabilities objectForKey:@"can_be_edited"] boolValue]];
             [item setCanBeDeletedOnlyForSelf:[[capabilities objectForKey:@"can_be_deleted_only_for_self"] boolValue]];
             [item setCanBeDeletedForAllUsers:[[capabilities objectForKey:@"can_be_deleted_for_all_users"] boolValue]];
@@ -6074,6 +6240,25 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self sendPhotoMessageToChatID:chatID messageThreadID:nil messageTopicKind:nil localPath:localPath caption:caption timeout:timeout error:error];
 }
 
+- (NSMutableDictionary *)requestByApplyingReplyToMessageID:(NSNumber *)replyToMessageID
+                                                    request:(NSDictionary *)request
+                                              currentSchema:(BOOL)currentSchema {
+    NSMutableDictionary *replyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+    if (![replyToMessageID respondsToSelector:@selector(longLongValue)] || [replyToMessageID longLongValue] <= 0) {
+        return replyRequest;
+    }
+    if (currentSchema) {
+        NSDictionary *replyTarget = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     @"inputMessageReplyToMessage", @"@type",
+                                     [NSNumber numberWithLongLong:[replyToMessageID longLongValue]], @"message_id",
+                                     nil];
+        [replyRequest setObject:replyTarget forKey:@"reply_to"];
+    } else {
+        [replyRequest setObject:[NSNumber numberWithLongLong:[replyToMessageID longLongValue]] forKey:@"reply_to_message_id"];
+    }
+    return replyRequest;
+}
+
 - (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption width:(NSNumber *)width height:(NSNumber *)height currentSchema:(BOOL)currentSchema {
     NSNumber *safeWidth = ([width respondsToSelector:@selector(intValue)] && [width intValue] > 0) ? width : [NSNumber numberWithInt:0];
     NSNumber *safeHeight = ([height respondsToSelector:@selector(intValue)] && [height intValue] > 0) ? height : [NSNumber numberWithInt:0];
@@ -6168,6 +6353,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSString *)sendPhotoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendPhotoMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption replyToMessageID:nil timeout:timeout error:error];
+}
+
+- (NSString *)sendPhotoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:62];
@@ -6231,13 +6420,25 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:content forKey:@"input_message_content"];
 
     NSError *sendError = nil;
-    NSDictionary *response = [self sendMessageRequest:request
+    NSMutableDictionary *effectiveRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:request currentSchema:YES];
+    NSDictionary *response = [self sendMessageRequest:effectiveRequest
                                       messageThreadID:messageThreadID
                                      messageTopicKind:messageTopicKind
-                                          extraPrefix:@"telegraphica-send-photo"
+                                          extraPrefix:([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0 ? @"telegraphica-send-photo-reply" : @"telegraphica-send-photo")
                                               timeout:timeout
                                             errorCode:67
                                                 error:&sendError];
+    if (!response && [replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+        sendError = nil;
+        NSMutableDictionary *legacyReplyRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:request currentSchema:NO];
+        response = [self sendMessageRequest:legacyReplyRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-photo-legacy-reply"
+                                    timeout:timeout
+                                  errorCode:67
+                                      error:&sendError];
+    }
     if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSDictionary *inputPhoto = [NSDictionary dictionaryWithObjectsAndKeys:
                                     @"inputPhoto", @"@type",
@@ -6258,10 +6459,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
         NSMutableDictionary *currentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
         [currentRequest setObject:currentContent forKey:@"input_message_content"];
-        response = [self sendMessageRequest:currentRequest
+        NSMutableDictionary *effectiveCurrentRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:currentRequest currentSchema:YES];
+        response = [self sendMessageRequest:effectiveCurrentRequest
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
-                                extraPrefix:@"telegraphica-send-photo-current"
+                                extraPrefix:([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0 ? @"telegraphica-send-photo-current-reply" : @"telegraphica-send-photo-current")
                                     timeout:timeout
                                   errorCode:67
                                       error:&sendError];
@@ -6285,6 +6487,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSString *)sendMediaAlbumToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localMediaItems:(NSArray *)localMediaItems caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendMediaAlbumToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localMediaItems:localMediaItems caption:caption replyToMessageID:nil timeout:timeout error:error];
+}
+
+- (NSString *)sendMediaAlbumToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localMediaItems:(NSArray *)localMediaItems caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:103];
@@ -6368,7 +6574,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *currentRequest = [NSMutableDictionary dictionary];
     [currentRequest setObject:@"sendMessageAlbum" forKey:@"@type"];
     [currentRequest setObject:chatID forKey:@"chat_id"];
-    [currentRequest setObject:[NSNull null] forKey:@"reply_to"];
+    if ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+        NSDictionary *replyTarget = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     @"inputMessageReplyToMessage", @"@type",
+                                     [NSNumber numberWithLongLong:[replyToMessageID longLongValue]], @"message_id",
+                                     nil];
+        [currentRequest setObject:replyTarget forKey:@"reply_to"];
+    } else {
+        [currentRequest setObject:[NSNull null] forKey:@"reply_to"];
+    }
     [currentRequest setObject:[NSNull null] forKey:@"options"];
     [currentRequest setObject:currentContents forKey:@"input_message_contents"];
 
@@ -6386,7 +6600,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionary];
         [legacyRequest setObject:@"sendMessageAlbum" forKey:@"@type"];
         [legacyRequest setObject:chatID forKey:@"chat_id"];
-        [legacyRequest setObject:[NSNumber numberWithLongLong:0] forKey:@"reply_to_message_id"];
+        [legacyRequest setObject:[NSNumber numberWithLongLong:([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) ? [replyToMessageID longLongValue] : 0LL] forKey:@"reply_to_message_id"];
         [legacyRequest setObject:[NSNull null] forKey:@"options"];
         [legacyRequest setObject:legacyContents forKey:@"input_message_contents"];
         response = [self sendMessageRequest:legacyRequest
@@ -6568,6 +6782,28 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                         label:(NSString *)label
                                        timeout:(NSTimeInterval)timeout
                                          error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID
+                                messageThreadID:messageThreadID
+                               messageTopicKind:messageTopicKind
+                                      localPath:localPath
+                                        caption:caption
+                                    contentType:contentType
+                                          label:label
+                               replyToMessageID:nil
+                                        timeout:timeout
+                                          error:error];
+}
+
+- (NSString *)sendGenericFileMessageToChatID:(NSNumber *)chatID
+                              messageThreadID:(NSNumber *)messageThreadID
+                             messageTopicKind:(NSString *)messageTopicKind
+                                     localPath:(NSString *)localPath
+                                       caption:(NSString *)caption
+                                   contentType:(NSString *)contentType
+                                         label:(NSString *)label
+                              replyToMessageID:(NSNumber *)replyToMessageID
+                                       timeout:(NSTimeInterval)timeout
+                                         error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:69];
@@ -6602,13 +6838,25 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:content forKey:@"input_message_content"];
 
     NSError *sendError = nil;
-    NSDictionary *response = [self sendMessageRequest:request
+    NSMutableDictionary *effectiveRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:request currentSchema:YES];
+    NSDictionary *response = [self sendMessageRequest:effectiveRequest
                                       messageThreadID:messageThreadID
                                      messageTopicKind:messageTopicKind
-                                          extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@", [label lowercaseString]]
+                                          extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@%@", [label lowercaseString], ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0 ? @"-reply" : @"")]
                                               timeout:timeout
                                             errorCode:71
                                                 error:&sendError];
+    if (!response && [replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+        sendError = nil;
+        NSMutableDictionary *legacyReplyRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:request currentSchema:NO];
+        response = [self sendMessageRequest:legacyReplyRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-legacy-reply", [label lowercaseString]]
+                                    timeout:timeout
+                                  errorCode:71
+                                      error:&sendError];
+    }
     if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSDictionary *currentContent = [self genericInputMessageContentForInputFile:inputFile
                                                                         contentType:contentType
@@ -6616,10 +6864,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                                       currentSchema:YES];
         NSMutableDictionary *currentRequest = [NSMutableDictionary dictionaryWithDictionary:request];
         [currentRequest setObject:currentContent forKey:@"input_message_content"];
-        response = [self sendMessageRequest:currentRequest
+        NSMutableDictionary *effectiveCurrentRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:currentRequest currentSchema:YES];
+        response = [self sendMessageRequest:effectiveCurrentRequest
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
-                                extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-current", [label lowercaseString]]
+                                extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-current%@", [label lowercaseString], ([replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0 ? @"-reply" : @"")]
                                     timeout:timeout
                                   errorCode:71
                                       error:&sendError];
@@ -6631,7 +6880,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                                        currentSchema:NO];
         NSMutableDictionary *fallbackRequest = [NSMutableDictionary dictionaryWithDictionary:request];
         [fallbackRequest setObject:documentContent forKey:@"input_message_content"];
-        response = [self sendMessageRequest:fallbackRequest
+        NSMutableDictionary *effectiveFallbackRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:fallbackRequest currentSchema:YES];
+        response = [self sendMessageRequest:effectiveFallbackRequest
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
                                 extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-document-fallback", [label lowercaseString]]
@@ -6646,7 +6896,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                                              currentSchema:YES];
         NSMutableDictionary *currentFallbackRequest = [NSMutableDictionary dictionaryWithDictionary:request];
         [currentFallbackRequest setObject:currentDocumentContent forKey:@"input_message_content"];
-        response = [self sendMessageRequest:currentFallbackRequest
+        NSMutableDictionary *effectiveCurrentFallbackRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:currentFallbackRequest currentSchema:YES];
+        response = [self sendMessageRequest:effectiveCurrentFallbackRequest
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
                                 extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-document-current-fallback", [label lowercaseString]]
@@ -6675,12 +6926,24 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageDocument" label:@"Document" timeout:timeout error:error];
 }
 
+- (NSString *)sendDocumentMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageDocument" label:@"Document" replyToMessageID:replyToMessageID timeout:timeout error:error];
+}
+
 - (NSString *)sendVideoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageVideo" label:@"Video" timeout:timeout error:error];
 }
 
+- (NSString *)sendVideoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageVideo" label:@"Video" replyToMessageID:replyToMessageID timeout:timeout error:error];
+}
+
 - (NSString *)sendAudioMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageAudio" label:@"Audio" timeout:timeout error:error];
+}
+
+- (NSString *)sendAudioMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageAudio" label:@"Audio" replyToMessageID:replyToMessageID timeout:timeout error:error];
 }
 
 - (NSArray *)recentStickerItemsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
