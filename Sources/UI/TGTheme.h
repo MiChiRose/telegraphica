@@ -18,7 +18,6 @@ extern NSString * const TGThemeIdentifierFrutigerMetro;
 extern NSString * const TGThemeIdentifierFrutigerMetroDark;
 extern NSString * const TGThemeIdentifierY2KChrome;
 extern NSString * const TGThemeIdentifierY2KSilver;
-extern NSString * const TGThemeIdentifierPixelTerminal;
 extern NSString * const TGThemeIdentifierMatrixRain;
 extern NSString * const TGThemeIdentifierVectorPop;
 extern NSString * const TGThemeCategoryIdentifierLight;
