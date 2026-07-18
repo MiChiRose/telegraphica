@@ -6,6 +6,9 @@
 @interface TGDropOverlayView : NSView
 @end
 
+@interface TGNotificationDotView : NSView
+@end
+
 @interface TGMessageTableView : NSTableView {
     id _dropOverlayTarget;
 }
