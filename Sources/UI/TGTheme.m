@@ -390,6 +390,12 @@ static BOOL TGThemeUsesLayeredMaterials(void) {
     return TGThemeIsSkeuomorphicBlue() || TGThemeIsFrutigerAero() || TGThemeIsExperimental2000s();
 }
 
+static BOOL TGThemeUsesDarkLayeredCards(void) {
+    NSString *identifier = TGCurrentThemeIdentifier();
+    return [identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark] ||
+           TGThemeIsTerminalLikeIdentifier(identifier);
+}
+
 static TGThemePalette TGCurrentThemePalette(void) {
     return TGThemePaletteForIdentifier(TGCurrentThemeIdentifier());
 }
@@ -416,14 +422,23 @@ TG_THEME_COLOR_FUNCTION(TGClassicTableHeaderColor, tableHeader)
 TG_THEME_COLOR_FUNCTION(TGClassicLinkColor, link)
 
 NSColor *TGClassicCardInkColor(void) {
+    if (TGThemeUsesDarkLayeredCards()) {
+        return TGClassicInkColor();
+    }
     return [NSColor colorWithCalibratedWhite:0.08 alpha:1.0];
 }
 
 NSColor *TGClassicCardMutedInkColor(void) {
+    if (TGThemeUsesDarkLayeredCards()) {
+        return TGClassicMutedInkColor();
+    }
     return [NSColor colorWithCalibratedWhite:0.36 alpha:1.0];
 }
 
 NSColor *TGClassicCardLinkColor(void) {
+    if (TGThemeUsesDarkLayeredCards()) {
+        return TGClassicLinkColor();
+    }
     return TGColorFromHex(0x2d5d96);
 }
 
