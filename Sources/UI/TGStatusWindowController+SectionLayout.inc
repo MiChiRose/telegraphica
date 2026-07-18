@@ -239,6 +239,7 @@
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsStorageUsageButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
+    [self showView:self.settingsUpdateDotView visible:(showSettings && self.updateAvailable)];
     [self showView:self.settingsAppearanceButton visible:NO];
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
@@ -256,6 +257,7 @@
     [self showView:self.diagnosticsLabel visible:NO];
     [self showView:self.detailsScrollView visible:NO];
     [self showView:self.checkButton visible:NO];
+    [self refreshUpdateAvailabilityBadge];
 }
 
 - (CGFloat)composerInputHeightForWidth:(CGFloat)width {
@@ -1031,6 +1033,7 @@
     [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
+    [self.settingsUpdateDotView setFrame:NSMakeRect(rowWidth - 20.0, 9.0, 10.0, 10.0)];
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
         aboutWidth = 560.0;

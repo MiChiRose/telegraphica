@@ -419,6 +419,18 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [menu addItem:[NSMenuItem separatorItem]];
     }
     BOOL addedMessageAction = NO;
+    NSString *copyableText = ([[item editableText] length] > 0) ? [item editableText] : TGDisplayTextForMessageItem(item);
+    if ([copyableText length] > 0) {
+        NSMenuItem *copyTextItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.copyText")
+                                                               action:@selector(copyMessageTextFromMenu:)
+                                                        keyEquivalent:@""] autorelease];
+        [copyTextItem setRepresentedObject:item];
+        [copyTextItem setTarget:self];
+        [copyTextItem setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.78)];
+        [menu addItem:copyTextItem];
+        addedMessageAction = YES;
+    }
+
     NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
                                                         action:@selector(replyToMessageFromMenu:)
                                                  keyEquivalent:@""] autorelease];
@@ -561,6 +573,21 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [messageIDs addObject:[NSNumber numberWithLongLong:[item.messageID longLongValue]]];
     }
     return messageIDs;
+}
+
+- (void)copyMessageTextFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    NSString *text = ([[item editableText] length] > 0) ? [item editableText] : TGDisplayTextForMessageItem(item);
+    if ([text length] == 0) {
+        return;
+    }
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard clearContents];
+    [pasteboard setString:text forType:NSStringPboardType];
+    [self appendDetail:@"Message text copied to clipboard."];
 }
 
 - (void)editMessageFromMenu:(id)sender {
