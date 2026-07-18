@@ -862,6 +862,9 @@
 }
 
 - (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        return;
+    }
     if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
         return;
     }

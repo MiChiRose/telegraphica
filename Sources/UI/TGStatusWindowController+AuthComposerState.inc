@@ -579,7 +579,11 @@
     } else if (![previousState isEqualToString:@"ready"]) {
         self.activeSection = TGSectionChats;
         self.chatFilterRefreshRetryCount = 0;
-        if ([self.chatItems count] == 0) {
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            self.pendingLiveChatRefresh = NO;
+            self.pendingLiveMessageRefresh = NO;
+            [self appendDetail:@"Mountain Lion safe login mode: signed in; automatic profile/live sync is paused. Chats can be loaded manually with TDLib message database disabled."];
+        } else if ([self.chatItems count] == 0) {
             self.pendingLiveChatRefresh = YES;
             [self handlePendingLiveRefreshesIfPossible];
         }
@@ -721,7 +725,7 @@
     [self updateSendControls];
     [self refreshProfileDisplay];
     [self updateVisibleSection];
-    if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy) {
+    if ([state isEqualToString:@"ready"] && !self.profileSummaryLoaded && !self.controlsBusy && !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 

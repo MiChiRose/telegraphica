@@ -14,6 +14,8 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (NSString *)checkDatabaseEncryptionKeyWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)prepareAuthorizationFlowWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)configureNetworkProxyIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)networkDiagnosticsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
@@ -73,6 +75,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (NSArray *)drainSafeUpdateSummaries;
 - (NSString *)receiverStatusSummary;
 - (NSString *)loadedLibraryPath;
+- (BOOL)isAuthorizationNetworkTimeoutError:(NSError *)error;
 - (void)shutdownWithTimeout:(NSTimeInterval)timeout;
 
 @end
