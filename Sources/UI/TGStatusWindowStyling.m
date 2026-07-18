@@ -79,6 +79,29 @@
     [title release];
 }
 
+- (void)applySettingsSwitchTextStyle:(NSButton *)button {
+    if (!button) {
+        return;
+    }
+    NSString *title = [button title];
+    if (!title) {
+        title = @"";
+    }
+    NSFont *font = [button font];
+    if (!font) {
+        font = [NSFont systemFontOfSize:13.0];
+    }
+    NSColor *titleColor = [button isEnabled] ? TGClassicCardInkColor() : TGClassicCardMutedInkColor();
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                font, NSFontAttributeName,
+                                titleColor, NSForegroundColorAttributeName,
+                                nil];
+    NSAttributedString *attributedTitle = [[[NSAttributedString alloc] initWithString:title attributes:attributes] autorelease];
+    [button setAttributedTitle:attributedTitle];
+    [button setAttributedAlternateTitle:attributedTitle];
+    [button setNeedsDisplay:YES];
+}
+
 - (void)applyDestructiveSettingsButtonStyle:(NSButton *)button {
     [button setButtonType:NSMomentaryPushInButton];
     [button setBezelStyle:NSRegularSquareBezelStyle];

@@ -898,6 +898,7 @@
                 self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
                 self.profileBio = ([bio length] > 0) ? bio : nil;
                 [self refreshProfileDisplay];
+                [self updateSavedMessagesPresentationForChatItems];
                 [self layoutContentView];
                 [self updateVisibleSection];
                 self.profileSummaryLoaded = YES;

@@ -1,12 +1,47 @@
-@interface TGChatSearchPanelView : NSView {
+@interface TGChatSearchResultsTableView : NSTableView
+@end
+
+@implementation TGChatSearchResultsTableView
+
+- (BOOL)isOpaque {
+    return NO;
+}
+
+- (void)drawBackgroundInClipRect:(NSRect)clipRect {
+    (void)clipRect;
+}
+
+- (void)highlightSelectionInClipRect:(NSRect)clipRect {
+    NSInteger selectedRow = [self selectedRow];
+    if (selectedRow < 0 || selectedRow >= [self numberOfRows]) {
+        return;
+    }
+    NSRect rowRect = NSInsetRect([self rectOfRow:selectedRow], 4.0, 3.0);
+    if (!NSIntersectsRect(rowRect, clipRect)) {
+        return;
+    }
+    NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:rowRect xRadius:7.0 yRadius:7.0];
+    TGThemeDrawEnamelButtonInPath(selectedPath, rowRect, NO, YES, YES, [self isFlipped]);
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.30] set];
+    [selectedPath setLineWidth:1.0];
+    [selectedPath stroke];
+}
+
+@end
+
+@interface TGChatSearchPanelView : NSView <NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate> {
     id _target;
     SEL _queryChangedAction;
     SEL _commitAction;
     SEL _closeAction;
-    NSString *_query;
     NSString *_statusText;
     NSArray *_results;
-    NSInteger _selectedIndex;
+    NSSearchField *_searchField;
+    NSTextField *_titleField;
+    NSTextField *_statusField;
+    NSScrollView *_scrollView;
+    NSTableView *_tableView;
+    NSButton *_closeButton;
 }
 @property (nonatomic, assign) id target;
 @property (nonatomic, assign) SEL queryChangedAction;
@@ -17,6 +52,8 @@
 @property (nonatomic, retain) NSArray *results;
 @property (nonatomic, assign) NSInteger selectedIndex;
 - (TGSearchResultItem *)selectedResult;
+- (NSSearchField *)searchField;
+- (void)layoutPanelSubviews;
 @end
 
 @implementation TGChatSearchPanelView
@@ -25,26 +62,104 @@
 @synthesize queryChangedAction = _queryChangedAction;
 @synthesize commitAction = _commitAction;
 @synthesize closeAction = _closeAction;
-@synthesize query = _query;
 @synthesize statusText = _statusText;
 @synthesize results = _results;
-@synthesize selectedIndex = _selectedIndex;
 
 - (id)initWithFrame:(NSRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        _query = [@"" copy];
-        _statusText = [@"Start typing to find a chat" copy];
+        _statusText = [TGLoc(@"search.chats.recent") copy];
         _results = [[NSArray alloc] init];
-        _selectedIndex = -1;
+
+        _titleField = [[NSTextField alloc] initWithFrame:NSZeroRect];
+        [_titleField setEditable:NO];
+        [_titleField setBordered:NO];
+        [_titleField setDrawsBackground:NO];
+        [_titleField setSelectable:NO];
+        [_titleField setFont:[NSFont boldSystemFontOfSize:16.0]];
+        [_titleField setTextColor:TGClassicInkColor()];
+        [_titleField setStringValue:TGLoc(@"search.chats.title")];
+        [self addSubview:_titleField];
+
+        _searchField = [[NSSearchField alloc] initWithFrame:NSZeroRect];
+        [_searchField setDelegate:self];
+        [_searchField setTarget:self];
+        [_searchField setAction:@selector(commitSearch:)];
+        [[_searchField cell] setPlaceholderString:TGLoc(@"search.chats.placeholder")];
+        [self addSubview:_searchField];
+
+        _closeButton = [[NSButton alloc] initWithFrame:NSZeroRect];
+        [_closeButton setTitle:@"×"];
+        [_closeButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"×"] autorelease]];
+        [_closeButton setBordered:NO];
+        [_closeButton setFocusRingType:NSFocusRingTypeNone];
+        [_closeButton setFont:[NSFont boldSystemFontOfSize:15.0]];
+        [_closeButton setTarget:self];
+        [_closeButton setAction:@selector(closeSearch:)];
+        [self addSubview:_closeButton];
+
+        _statusField = [[NSTextField alloc] initWithFrame:NSZeroRect];
+        [_statusField setEditable:NO];
+        [_statusField setBordered:NO];
+        [_statusField setDrawsBackground:NO];
+        [_statusField setSelectable:NO];
+        [_statusField setFont:[NSFont systemFontOfSize:11.0]];
+        [_statusField setTextColor:TGClassicMutedInkColor()];
+        [_statusField setStringValue:_statusText ? _statusText : @""];
+        [self addSubview:_statusField];
+
+        _tableView = [[TGChatSearchResultsTableView alloc] initWithFrame:NSZeroRect];
+        [_tableView setHeaderView:nil];
+        [_tableView setRowHeight:46.0];
+        [_tableView setDelegate:self];
+        [_tableView setDataSource:self];
+        [_tableView setTarget:self];
+        [_tableView setDoubleAction:@selector(commitSearch:)];
+        [_tableView setAllowsEmptySelection:YES];
+        [_tableView setBackgroundColor:[NSColor clearColor]];
+        [_tableView setUsesAlternatingRowBackgroundColors:NO];
+        [_tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+        [_tableView setGridColor:[NSColor colorWithCalibratedWhite:1.0 alpha:0.38]];
+        [_tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+        [_tableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
+
+        NSTableColumn *titleColumn = [[[NSTableColumn alloc] initWithIdentifier:@"title"] autorelease];
+        [titleColumn setWidth:178.0];
+        [[titleColumn dataCell] setFont:[NSFont boldSystemFontOfSize:12.0]];
+        [[titleColumn dataCell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [_tableView addTableColumn:titleColumn];
+
+        NSTableColumn *detailsColumn = [[[NSTableColumn alloc] initWithIdentifier:@"details"] autorelease];
+        [detailsColumn setWidth:206.0];
+        [[detailsColumn dataCell] setFont:[NSFont systemFontOfSize:11.0]];
+        [[detailsColumn dataCell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [_tableView addTableColumn:detailsColumn];
+
+        _scrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
+        [_scrollView setHasVerticalScroller:YES];
+        [_scrollView setHasHorizontalScroller:NO];
+        [_scrollView setBorderType:NSNoBorder];
+        [_scrollView setDrawsBackground:NO];
+        [[_scrollView contentView] setDrawsBackground:NO];
+        [[_scrollView contentView] setBackgroundColor:[NSColor clearColor]];
+        [_scrollView setAutohidesScrollers:YES];
+        [_scrollView setDocumentView:_tableView];
+        [self addSubview:_scrollView];
+
+        [self layoutPanelSubviews];
     }
     return self;
 }
 
 - (void)dealloc {
-    [_query release];
     [_statusText release];
     [_results release];
+    [_searchField release];
+    [_titleField release];
+    [_statusField release];
+    [_scrollView release];
+    [_tableView release];
+    [_closeButton release];
     [super dealloc];
 }
 
@@ -52,17 +167,79 @@
     return YES;
 }
 
-- (BOOL)acceptsFirstResponder {
-    return YES;
+- (void)resizeSubviewsWithOldSize:(NSSize)oldSize {
+    (void)oldSize;
+    [self layoutPanelSubviews];
+}
+
+- (void)setFrameSize:(NSSize)newSize {
+    [super setFrameSize:newSize];
+    [self layoutPanelSubviews];
+}
+
+- (void)viewDidMoveToWindow {
+    [super viewDidMoveToWindow];
+    [self layoutPanelSubviews];
+}
+
+- (void)layoutPanelSubviews {
+    NSRect bounds = [self bounds];
+    CGFloat inset = 20.0;
+    CGFloat closeSide = 28.0;
+    [_titleField setFrame:NSMakeRect(inset + 4.0, 18.0, MAX(80.0, NSWidth(bounds) - (inset * 2.0) - closeSide - 12.0), 22.0)];
+    [_closeButton setFrame:NSMakeRect(NSWidth(bounds) - inset - closeSide, 15.0, closeSide, 26.0)];
+    [_searchField setFrame:NSMakeRect(inset + 10.0, 60.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), 28.0)];
+    [_statusField setFrame:NSMakeRect(inset + 12.0, 96.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 24.0), 18.0)];
+    [_scrollView setFrame:NSMakeRect(inset + 10.0, 126.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), MAX(80.0, NSHeight(bounds) - 148.0))];
+
+    CGFloat tableWidth = NSWidth([[_scrollView contentView] bounds]);
+    NSArray *columns = [_tableView tableColumns];
+    if ([columns count] >= 2) {
+        NSTableColumn *titleColumn = [columns objectAtIndex:0];
+        NSTableColumn *detailsColumn = [columns objectAtIndex:1];
+        CGFloat titleWidth = floor(MAX(135.0, tableWidth * 0.42));
+        [titleColumn setWidth:titleWidth];
+        [detailsColumn setWidth:MAX(100.0, tableWidth - titleWidth - 3.0)];
+    }
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    TGThemeDrawWindowBackgroundInRect(bounds, [self isFlipped]);
+
+    NSRect shellRect = NSInsetRect(bounds, 10.0, 10.0);
+    NSBezierPath *shellPath = [NSBezierPath bezierPathWithRoundedRect:shellRect xRadius:12.0 yRadius:12.0];
+    TGThemeDrawPanelBackgroundInPath(shellPath, shellRect, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [shellPath setLineWidth:1.0];
+    [shellPath stroke];
+
+    NSRect searchCardRect = NSMakeRect(18.0, 49.0, MAX(120.0, NSWidth(bounds) - 36.0), 66.0);
+    NSBezierPath *searchCardPath = [NSBezierPath bezierPathWithRoundedRect:searchCardRect xRadius:10.0 yRadius:10.0];
+    TGThemeDrawGroupedCardInPath(searchCardPath, searchCardRect, [self isFlipped]);
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
+    [searchCardPath setLineWidth:1.0];
+    [searchCardPath stroke];
+
+    NSRect resultsCardRect = NSInsetRect([_scrollView frame], -8.0, -8.0);
+    NSBezierPath *resultsCardPath = [NSBezierPath bezierPathWithRoundedRect:resultsCardRect xRadius:10.0 yRadius:10.0];
+    TGThemeDrawGroupedCardInPath(resultsCardPath, resultsCardRect, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [resultsCardPath setLineWidth:1.0];
+    [resultsCardPath stroke];
+}
+
+- (NSSearchField *)searchField {
+    return _searchField;
+}
+
+- (NSString *)query {
+    return [_searchField stringValue] ? [_searchField stringValue] : @"";
 }
 
 - (void)setQuery:(NSString *)query {
-    if (_query == query || [_query isEqualToString:query]) {
-        return;
-    }
-    [_query release];
-    _query = [query copy];
-    [self setNeedsDisplay:YES];
+    [_searchField setStringValue:(query ? query : @"")];
 }
 
 - (void)setStatusText:(NSString *)statusText {
@@ -71,7 +248,7 @@
     }
     [_statusText release];
     _statusText = [statusText copy];
-    [self setNeedsDisplay:YES];
+    [_statusField setStringValue:(_statusText ? _statusText : @"")];
 }
 
 - (void)setResults:(NSArray *)results {
@@ -80,25 +257,33 @@
     }
     [_results release];
     _results = [results retain];
-    if (_selectedIndex >= (NSInteger)[_results count]) {
-        _selectedIndex = [_results count] > 0 ? 0 : -1;
+    [_tableView reloadData];
+    if ([_results count] > 0) {
+        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+    } else {
+        [_tableView deselectAll:self];
     }
-    [self setNeedsDisplay:YES];
+}
+
+- (TGSearchResultItem *)selectedResult {
+    NSInteger selectedRow = [_tableView selectedRow];
+    if (selectedRow < 0 || (NSUInteger)selectedRow >= [_results count]) {
+        return nil;
+    }
+    id candidate = [_results objectAtIndex:(NSUInteger)selectedRow];
+    return [candidate isKindOfClass:[TGSearchResultItem class]] ? (TGSearchResultItem *)candidate : nil;
+}
+
+- (NSInteger)selectedIndex {
+    return [_tableView selectedRow];
 }
 
 - (void)setSelectedIndex:(NSInteger)selectedIndex {
-    _selectedIndex = selectedIndex;
-    [self setNeedsDisplay:YES];
-}
-
-- (NSRect)searchFieldRect {
-    NSRect bounds = [self bounds];
-    return NSMakeRect(22.0, 58.0, MAX(120.0, NSWidth(bounds) - 44.0), 30.0);
-}
-
-- (NSRect)resultsRect {
-    NSRect bounds = [self bounds];
-    return NSMakeRect(20.0, 116.0, MAX(120.0, NSWidth(bounds) - 40.0), MAX(80.0, NSHeight(bounds) - 136.0));
+    if (selectedIndex < 0 || (NSUInteger)selectedIndex >= [_results count]) {
+        [_tableView deselectAll:self];
+        return;
+    }
+    [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)selectedIndex] byExtendingSelection:NO];
 }
 
 - (void)sendAction:(SEL)selector {
@@ -107,204 +292,87 @@
     }
 }
 
-- (TGSearchResultItem *)selectedResult {
-    if (_selectedIndex < 0 || (NSUInteger)_selectedIndex >= [_results count]) {
-        return nil;
-    }
-    id candidate = [_results objectAtIndex:(NSUInteger)_selectedIndex];
-    return [candidate isKindOfClass:[TGSearchResultItem class]] ? (TGSearchResultItem *)candidate : nil;
-}
-
-- (void)notifyQueryChanged {
+- (void)controlTextDidChange:(NSNotification *)notification {
+    (void)notification;
     [self sendAction:_queryChangedAction];
 }
 
-- (void)commitSelection {
-    if ([self selectedResult] == nil && [_results count] > 0) {
-        self.selectedIndex = 0;
+- (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector {
+    (void)control;
+    (void)textView;
+    if (commandSelector == @selector(cancelOperation:)) {
+        [self closeSearch:self];
+        return YES;
+    }
+    if (commandSelector == @selector(insertNewline:) ||
+        commandSelector == @selector(insertNewlineIgnoringFieldEditor:)) {
+        [self commitSearch:self];
+        return YES;
+    }
+    return NO;
+}
+
+- (void)commitSearch:(id)sender {
+    (void)sender;
+    if (![self selectedResult] && [_results count] > 0) {
+        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
     }
     if ([self selectedResult]) {
         [self sendAction:_commitAction];
     }
 }
 
-- (void)drawRect:(NSRect)dirtyRect {
-    (void)dirtyRect;
-    NSRect bounds = [self bounds];
-    [[NSColor colorWithCalibratedRed:0.93 green:0.96 blue:0.98 alpha:1.0] set];
-    NSRectFill(bounds);
-
-    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont boldSystemFontOfSize:16.0], NSFontAttributeName,
-                                     TGClassicInkColor(), NSForegroundColorAttributeName,
-                                     nil];
-    [@"Search chats" drawInRect:NSMakeRect(22.0, 20.0, NSWidth(bounds) - 44.0, 24.0)
-                 withAttributes:titleAttributes];
-
-    NSRect searchRect = [self searchFieldRect];
-    NSBezierPath *searchPath = [NSBezierPath bezierPathWithRoundedRect:searchRect xRadius:7.0 yRadius:7.0];
-    [[NSColor whiteColor] set];
-    [searchPath fill];
-    [[NSColor colorWithCalibratedRed:0.60 green:0.70 blue:0.78 alpha:1.0] set];
-    [searchPath setLineWidth:1.0];
-    [searchPath stroke];
-
-    NSString *text = [_query length] > 0 ? _query : @"Chat, group, person";
-    NSColor *textColor = [_query length] > 0 ? TGClassicInkColor() : TGClassicMutedInkColor();
-    NSDictionary *queryAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont systemFontOfSize:13.0], NSFontAttributeName,
-                                     textColor, NSForegroundColorAttributeName,
-                                     nil];
-    [text drawInRect:NSMakeRect(NSMinX(searchRect) + 10.0, NSMinY(searchRect) + 7.0, NSWidth(searchRect) - 20.0, 18.0)
-      withAttributes:queryAttributes];
-    if ([[self window] firstResponder] == self) {
-        NSSize querySize = [_query sizeWithAttributes:queryAttributes];
-        CGFloat caretX = MIN(NSMinX(searchRect) + 10.0 + querySize.width + 1.0, NSMaxX(searchRect) - 8.0);
-        [[NSColor colorWithCalibratedWhite:0.25 alpha:0.8] set];
-        NSRectFill(NSMakeRect(caretX, NSMinY(searchRect) + 7.0, 1.0, 17.0));
-    }
-
-    NSDictionary *statusAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                      [NSFont systemFontOfSize:11.0], NSFontAttributeName,
-                                      TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                      nil];
-    NSString *status = [_statusText length] > 0 ? _statusText : @"";
-    [status drawInRect:NSMakeRect(24.0, 94.0, NSWidth(bounds) - 48.0, 16.0)
-        withAttributes:statusAttributes];
-
-    NSRect resultsRect = [self resultsRect];
-    NSBezierPath *resultsPath = [NSBezierPath bezierPathWithRoundedRect:resultsRect xRadius:8.0 yRadius:8.0];
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.92] set];
-    [resultsPath fill];
-    [[NSColor colorWithCalibratedRed:0.72 green:0.79 blue:0.84 alpha:1.0] set];
-    [resultsPath stroke];
-
-    if ([_results count] == 0) {
-        NSString *empty = [_query length] > 0 ? @"No chats found" : @"Recent chats will appear here";
-        NSDictionary *emptyAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                         [NSFont systemFontOfSize:12.0], NSFontAttributeName,
-                                         TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                         nil];
-        NSSize emptySize = [empty sizeWithAttributes:emptyAttributes];
-        [empty drawAtPoint:NSMakePoint(NSMidX(resultsRect) - floor(emptySize.width / 2.0),
-                                       NSMidY(resultsRect) - floor(emptySize.height / 2.0))
-            withAttributes:emptyAttributes];
-        return;
-    }
-
-    CGFloat rowHeight = 48.0;
-    NSUInteger count = MIN((NSUInteger)floor(NSHeight(resultsRect) / rowHeight), [_results count]);
-    NSUInteger index = 0;
-    for (index = 0; index < count; index++) {
-        TGSearchResultItem *result = [[_results objectAtIndex:index] isKindOfClass:[TGSearchResultItem class]] ? [_results objectAtIndex:index] : nil;
-        NSRect rowRect = NSMakeRect(NSMinX(resultsRect), NSMinY(resultsRect) + ((CGFloat)index * rowHeight), NSWidth(resultsRect), rowHeight);
-        if ((NSInteger)index == _selectedIndex) {
-            [[NSColor colorWithCalibratedRed:0.78 green:0.87 blue:0.94 alpha:1.0] set];
-            NSRectFill(NSInsetRect(rowRect, 1.0, 1.0));
-        }
-        if (index > 0) {
-            [[NSColor colorWithCalibratedRed:0.82 green:0.87 blue:0.90 alpha:1.0] set];
-            NSRectFill(NSMakeRect(NSMinX(rowRect) + 10.0, NSMinY(rowRect), NSWidth(rowRect) - 20.0, 1.0));
-        }
-        NSString *title = [result displayTitle] ? [result displayTitle] : @"Chat";
-        NSString *subtitle = [result displaySubtitle] ? [result displaySubtitle] : @"";
-        NSDictionary *rowTitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                            [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
-                                            TGClassicInkColor(), NSForegroundColorAttributeName,
-                                            nil];
-        NSDictionary *rowSubtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                               [NSFont systemFontOfSize:11.0], NSFontAttributeName,
-                                               TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                               nil];
-        [title drawInRect:NSMakeRect(NSMinX(rowRect) + 12.0, NSMinY(rowRect) + 8.0, NSWidth(rowRect) - 24.0, 16.0)
-          withAttributes:rowTitleAttributes];
-        if ([subtitle length] > 0) {
-            [subtitle drawInRect:NSMakeRect(NSMinX(rowRect) + 12.0, NSMinY(rowRect) + 26.0, NSWidth(rowRect) - 24.0, 14.0)
-                  withAttributes:rowSubtitleAttributes];
-        }
-    }
+- (void)closeSearch:(id)sender {
+    (void)sender;
+    [self sendAction:_closeAction];
 }
 
-- (void)mouseDown:(NSEvent *)event {
-    NSPoint point = [self convertPoint:[event locationInWindow] fromView:nil];
-    if (NSPointInRect(point, [self searchFieldRect])) {
-        [[self window] makeFirstResponder:self];
-        return;
-    }
-    NSRect resultsRect = [self resultsRect];
-    if (NSPointInRect(point, resultsRect) && [_results count] > 0) {
-        CGFloat rowHeight = 48.0;
-        NSInteger index = (NSInteger)floor((point.y - NSMinY(resultsRect)) / rowHeight);
-        if (index >= 0 && (NSUInteger)index < [_results count]) {
-            self.selectedIndex = index;
-            [self commitSelection];
-        }
-    }
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    (void)tableView;
+    return (NSInteger)[_results count];
 }
 
-- (void)keyDown:(NSEvent *)event {
-    NSUInteger flags = [event modifierFlags] & NSDeviceIndependentModifierFlagsMask;
-    NSString *chars = [event charactersIgnoringModifiers];
-    if ((flags & NSCommandKeyMask) && [chars length] > 0) {
-        unichar command = [chars characterAtIndex:0];
-        if (command == 'v' || command == 'V') {
-            NSString *paste = [[NSPasteboard generalPasteboard] stringForType:NSStringPboardType];
-            if ([paste length] > 0) {
-                self.query = [_query stringByAppendingString:paste];
-                self.selectedIndex = -1;
-                [self notifyQueryChanged];
-            }
-        }
-        return;
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    (void)tableView;
+    if (row < 0 || (NSUInteger)row >= [_results count]) {
+        return @"";
     }
-    if ([chars length] == 0) {
-        [super keyDown:event];
-        return;
+    id candidate = [_results objectAtIndex:(NSUInteger)row];
+    TGSearchResultItem *result = [candidate isKindOfClass:[TGSearchResultItem class]] ? (TGSearchResultItem *)candidate : nil;
+    NSString *identifier = [tableColumn identifier];
+    if ([identifier isEqualToString:@"title"]) {
+        return [result displayTitle] ? [result displayTitle] : @"Chat";
     }
+    NSString *subtitle = [result displaySubtitle];
+    return [subtitle length] > 0 ? subtitle : TGLoc(@"search.chats.openHint");
+}
 
-    unichar c = [chars characterAtIndex:0];
-    if (c == 27) {
-        [self sendAction:_closeAction];
+- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    (void)tableView;
+    if (![cell isKindOfClass:[NSTextFieldCell class]]) {
         return;
     }
-    if (c == NSCarriageReturnCharacter || c == NSEnterCharacter || c == NSNewlineCharacter) {
-        [self commitSelection];
-        return;
+    NSTextFieldCell *textCell = (NSTextFieldCell *)cell;
+    BOOL selected = (row == [_tableView selectedRow]);
+    NSString *identifier = [tableColumn identifier];
+    if ([identifier isEqualToString:@"title"]) {
+        [textCell setFont:[NSFont boldSystemFontOfSize:12.0]];
+        [textCell setTextColor:(selected ? TGClassicHeaderTextColor(1.0) : TGClassicInkColor())];
+    } else {
+        [textCell setFont:[NSFont systemFontOfSize:11.0]];
+        [textCell setTextColor:(selected ? TGClassicHeaderDetailTextColor(0.96) : TGClassicMutedInkColor())];
     }
-    if (c == NSUpArrowFunctionKey) {
-        if ([_results count] > 0) {
-            NSInteger next = (_selectedIndex <= 0) ? 0 : _selectedIndex - 1;
-            self.selectedIndex = next;
-        }
-        return;
-    }
-    if (c == NSDownArrowFunctionKey) {
-        if ([_results count] > 0) {
-            NSInteger next = (_selectedIndex < 0) ? 0 : MIN(_selectedIndex + 1, (NSInteger)[_results count] - 1);
-            self.selectedIndex = next;
-        }
-        return;
-    }
-    if (c == NSDeleteCharacter || c == 0x08) {
-        if ([_query length] > 0) {
-            self.query = [_query substringToIndex:[_query length] - 1];
-            self.selectedIndex = -1;
-            [self notifyQueryChanged];
-        }
-        return;
-    }
-    if ([[NSCharacterSet controlCharacterSet] characterIsMember:c]) {
-        return;
-    }
-    self.query = [_query stringByAppendingString:chars];
-    self.selectedIndex = -1;
-    [self notifyQueryChanged];
+    [textCell setDrawsBackground:NO];
+}
+
+- (void)tableViewSelectionDidChange:(NSNotification *)notification {
+    (void)notification;
 }
 
 - (void)resetCursorRects {
     [super resetCursorRects];
-    [self addCursorRect:[self searchFieldRect] cursor:[NSCursor IBeamCursor]];
-    [self addCursorRect:[self resultsRect] cursor:[NSCursor pointingHandCursor]];
+    [self addCursorRect:[_closeButton frame] cursor:[NSCursor pointingHandCursor]];
+    [self addCursorRect:[_scrollView frame] cursor:[NSCursor pointingHandCursor]];
 }
 
 @end

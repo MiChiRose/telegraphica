@@ -38,6 +38,10 @@ void TGMediaImageLoaderSetCacheLimitBytes(NSUInteger bytes) {
     [cache setCountLimit:(limit < (128 * 1024 * 1024)) ? 80 : 160];
 }
 
+void TGMediaImageLoaderClearCache(void) {
+    [TGMediaImageCache() removeAllObjects];
+}
+
 NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
         return nil;
@@ -68,7 +72,35 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     }
 
     properties = (NSDictionary *)CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
-    imageRef = CGImageSourceCreateImageAtIndex(source, 0, NULL);
+    NSUInteger sourceWidth = 0;
+    NSUInteger sourceHeight = 0;
+    if ([properties isKindOfClass:[NSDictionary class]]) {
+        id widthObject = [properties objectForKey:(NSString *)kCGImagePropertyPixelWidth];
+        id heightObject = [properties objectForKey:(NSString *)kCGImagePropertyPixelHeight];
+        if ([widthObject respondsToSelector:@selector(unsignedIntegerValue)]) {
+            sourceWidth = [widthObject unsignedIntegerValue];
+        }
+        if ([heightObject respondsToSelector:@selector(unsignedIntegerValue)]) {
+            sourceHeight = [heightObject unsignedIntegerValue];
+        }
+    }
+
+    NSUInteger maxSourceSide = MAX(sourceWidth, sourceHeight);
+    NSUInteger decodeMaxSide = 2200;
+    if (maxSourceSide > decodeMaxSide) {
+        NSDictionary *thumbnailOptions = [NSDictionary dictionaryWithObjectsAndKeys:
+                                          (id)kCFBooleanTrue, kCGImageSourceCreateThumbnailFromImageAlways,
+                                          (id)kCFBooleanTrue, kCGImageSourceCreateThumbnailWithTransform,
+                                          (id)kCFBooleanFalse, kCGImageSourceShouldCacheImmediately,
+                                          [NSNumber numberWithUnsignedInteger:decodeMaxSide], kCGImageSourceThumbnailMaxPixelSize,
+                                          nil];
+        imageRef = CGImageSourceCreateThumbnailAtIndex(source, 0, (CFDictionaryRef)thumbnailOptions);
+    } else {
+        NSDictionary *imageOptions = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      (id)kCFBooleanFalse, kCGImageSourceShouldCacheImmediately,
+                                      nil];
+        imageRef = CGImageSourceCreateImageAtIndex(source, 0, (CFDictionaryRef)imageOptions);
+    }
     if (!imageRef) {
         if (properties) {
             CFRelease(properties);
@@ -91,7 +123,7 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
         CFRelease(properties);
     }
 
-    if (orientation > 1) {
+    if (orientation > 1 && maxSourceSide <= decodeMaxSide) {
         CGFloat imageWidth = (CGFloat)CGImageGetWidth(imageRef);
         CGFloat imageHeight = (CGFloat)CGImageGetHeight(imageRef);
         NSInteger maxPixelSize = (NSInteger)MAX(imageWidth, imageHeight);

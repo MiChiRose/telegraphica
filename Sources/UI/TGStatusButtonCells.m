@@ -68,7 +68,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 5.0, 12.0, 4.0, 4.0, flipped)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 11.0, 7.0, 4.0, 4.0, flipped)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
-    } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
+    } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"] || [title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
         NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
         NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
         NSBezierPath *folderPath = [NSBezierPath bezierPath];

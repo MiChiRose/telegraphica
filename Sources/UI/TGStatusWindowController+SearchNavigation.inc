@@ -486,7 +486,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                                                                 error:&contextError] retain];
         NSString *errorMessage = [[contextError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (items) {
+            BOOL stillCurrentJump = (self.messageLoadingGeneration == generation);
+            if (items && stillCurrentJump) {
                 self.selectedChatID = chatID;
                 self.selectedChatTitle = ([chatTitle length] > 0 ? chatTitle : self.selectedChatTitle);
                 if (threadID) {
@@ -510,10 +511,10 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                     [self.searchHighlightTimer invalidate];
                     self.searchHighlightTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(clearSearchHighlightTimerFired:) userInfo:nil repeats:NO];
                 }
-            } else if ([errorMessage length] > 0) {
+            } else if ([errorMessage length] > 0 && stillCurrentJump) {
                 [self appendDetail:[NSString stringWithFormat:@"Search jump failed: %@", errorMessage]];
             }
-            if (self.messageLoadingGeneration == generation) {
+            if (stillCurrentJump) {
                 self.messageLoadingIndicatorVisible = NO;
                 [self.messageLoadingSpinner stopAnimation:self];
                 [self updateVisibleSection];
@@ -724,20 +725,39 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     return NO;
 }
 
+static NSString *TGPinnedPreviewDisplayString(NSString *preview) {
+    if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
+        return @"Pinned message";
+    }
+    NSDictionary *labels = [NSDictionary dictionaryWithObjectsAndKeys:
+                            @"Voice message", @"[Voice]",
+                            @"Image", @"[Photo]",
+                            @"Video", @"[Video]",
+                            @"GIF", @"[GIF]",
+                            @"Document", @"[Document]",
+                            @"Sticker", @"[Sticker]",
+                            @"Message", @"[Message]",
+                            @"Service message", @"[Service message]",
+                            @"Text", @"[Text]",
+                            nil];
+    NSString *mapped = [labels objectForKey:preview];
+    return ([mapped length] > 0) ? mapped : preview;
+}
+
 - (void)updatePinnedMessagePanelDisplay {
     NSUInteger pinnedCount = [self.pinnedMessageItems count];
     if (pinnedCount == 0 || !self.pinnedMessageItem) {
         [self.pinnedMessageTextField setStringValue:@""];
-        [self.pinnedMessageLabelField setStringValue:@"Pinned"];
+        [self.pinnedMessageLabelField setStringValue:TGLoc(@"pinned.title")];
         [self.pinnedMessageStripeField setStringValue:@""];
         return;
     }
     NSString *preview = [self.pinnedMessageItem preview];
-    [self.pinnedMessageTextField setStringValue:([preview length] > 0 ? preview : @"Pinned message")];
+    [self.pinnedMessageTextField setStringValue:TGPinnedPreviewDisplayString(preview)];
     if (pinnedCount > 1) {
-        [self.pinnedMessageLabelField setStringValue:[NSString stringWithFormat:@"Pinned %lu/%lu", (unsigned long)(self.pinnedMessageCarouselIndex + 1), (unsigned long)pinnedCount]];
+        [self.pinnedMessageLabelField setStringValue:[NSString stringWithFormat:@"%@ %lu/%lu", TGLoc(@"pinned.title"), (unsigned long)(self.pinnedMessageCarouselIndex + 1), (unsigned long)pinnedCount]];
     } else {
-        [self.pinnedMessageLabelField setStringValue:@"Pinned"];
+        [self.pinnedMessageLabelField setStringValue:TGLoc(@"pinned.title")];
     }
     NSUInteger visibleStripeCount = pinnedCount;
     if (visibleStripeCount > 6) {

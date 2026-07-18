@@ -1,5 +1,6 @@
 #import "TGAttachmentDescriptor.h"
 #import "../Services/TGResourcePolicy.h"
+#import <ImageIO/ImageIO.h>
 
 @implementation TGAttachmentDescriptor
 
@@ -18,6 +19,47 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
         return NO;
     }
     return [set containsObject:[extension lowercaseString]];
+}
+
+static void TGAttachmentReadImageDimensions(NSString *path, NSUInteger *width, NSUInteger *height) {
+    if (width) {
+        *width = 0;
+    }
+    if (height) {
+        *height = 0;
+    }
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
+        return;
+    }
+
+    CFURLRef fileURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
+                                                     (CFStringRef)path,
+                                                     kCFURLPOSIXPathStyle,
+                                                     false);
+    if (!fileURL) {
+        return;
+    }
+    CGImageSourceRef source = CGImageSourceCreateWithURL(fileURL, NULL);
+    CFRelease(fileURL);
+    if (!source) {
+        return;
+    }
+
+    NSDictionary *properties = (NSDictionary *)CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
+    if ([properties isKindOfClass:[NSDictionary class]]) {
+        id pixelWidth = [properties objectForKey:(NSString *)kCGImagePropertyPixelWidth];
+        id pixelHeight = [properties objectForKey:(NSString *)kCGImagePropertyPixelHeight];
+        if ([pixelWidth respondsToSelector:@selector(unsignedIntegerValue)] && width) {
+            *width = [pixelWidth unsignedIntegerValue];
+        }
+        if ([pixelHeight respondsToSelector:@selector(unsignedIntegerValue)] && height) {
+            *height = [pixelHeight unsignedIntegerValue];
+        }
+    }
+    if (properties) {
+        CFRelease(properties);
+    }
+    CFRelease(source);
 }
 
 + (NSArray *)supportedOpenPanelTypes {
@@ -56,24 +98,14 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
     NSArray *photoExtensions = [NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", @"gif", @"webp", nil];
     NSArray *videoExtensions = [NSArray arrayWithObjects:@"mp4", @"mov", @"m4v", @"webm", nil];
     NSArray *audioExtensions = [NSArray arrayWithObjects:@"mp3", @"m4a", @"aac", @"wav", @"aiff", @"ogg", @"oga", @"opus", nil];
+    NSArray *documentExtensions = [NSArray arrayWithObjects:@"pdf", @"zip", @"rar", @"7z", @"txt", @"rtf", @"doc", @"docx", @"xls", @"xlsx", @"ppt", @"pptx", nil];
 
     if (TGAttachmentExtensionInSet(descriptor.extension, photoExtensions)) {
         descriptor.kind = TGAttachmentKindPhoto;
         descriptor.typeLabel = @"Photo";
-        NSImage *image = [[[NSImage alloc] initWithContentsOfFile:standardPath] autorelease];
-        NSArray *representations = [image representations];
         NSUInteger bestWidth = 0;
         NSUInteger bestHeight = 0;
-        NSUInteger representationIndex = 0;
-        for (representationIndex = 0; representationIndex < [representations count]; representationIndex++) {
-            NSImageRep *representation = [representations objectAtIndex:representationIndex];
-            NSInteger pixelsWide = [representation pixelsWide];
-            NSInteger pixelsHigh = [representation pixelsHigh];
-            if (pixelsWide > 0 && pixelsHigh > 0 && (NSUInteger)pixelsWide * (NSUInteger)pixelsHigh > bestWidth * bestHeight) {
-                bestWidth = (NSUInteger)pixelsWide;
-                bestHeight = (NSUInteger)pixelsHigh;
-            }
-        }
+        TGAttachmentReadImageDimensions(standardPath, &bestWidth, &bestHeight);
         descriptor.pixelWidth = bestWidth;
         descriptor.pixelHeight = bestHeight;
     } else if (TGAttachmentExtensionInSet(descriptor.extension, videoExtensions)) {
@@ -82,12 +114,12 @@ static BOOL TGAttachmentExtensionInSet(NSString *extension, NSArray *set) {
     } else if (TGAttachmentExtensionInSet(descriptor.extension, audioExtensions)) {
         descriptor.kind = TGAttachmentKindAudio;
         descriptor.typeLabel = @"Audio";
-    } else if ([[TGAttachmentDescriptor supportedOpenPanelTypes] containsObject:descriptor.extension]) {
+    } else if (TGAttachmentExtensionInSet(descriptor.extension, documentExtensions) || [descriptor.extension length] == 0) {
         descriptor.kind = TGAttachmentKindDocument;
         descriptor.typeLabel = @"Document";
     } else {
         descriptor.kind = TGAttachmentKindDocument;
-        descriptor.typeLabel = @"Document";
+        descriptor.typeLabel = @"File";
     }
 
     return descriptor;

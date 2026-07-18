@@ -209,6 +209,8 @@
     [self showView:self.settingsFilesSectionField visible:showSettings];
     [self showView:self.settingsHelpSectionField visible:showSettings];
     [self showView:self.settingsStorageField visible:showSettings];
+    [self showView:self.settingsThemeCategoryLabel visible:showSettings];
+    [self showView:self.themeCategoryPopUpButton visible:showSettings];
     [self showView:self.settingsThemeLabel visible:showSettings];
     [self showView:self.themePopUpButton visible:showSettings];
     [self showView:self.settingsNotificationsEnabledButton visible:showSettings];
@@ -425,6 +427,12 @@
                                               bottomNavigationButtonY,
                                               bottomNavigationButtonWidth,
                                               bottomNavigationButtonHeight)];
+        if (navigationIndex == 0 && self.markAllChatsReadSpinner) {
+            [self.markAllChatsReadSpinner setFrame:NSMakeRect(buttonX + bottomNavigationButtonWidth - 22.0,
+                                                              bottomNavigationButtonY + 6.0,
+                                                              14.0,
+                                                              14.0)];
+        }
     }
     BOOL readyForMainShell = [self.currentAuthState isEqualToString:@"ready"];
     CGFloat loginAreaX = readyForMainShell ? mainX : margin;
@@ -992,7 +1000,7 @@
     settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat interfaceCardHeight = 88.0;
+    CGFloat interfaceCardHeight = 118.0;
     CGFloat interfaceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsThemeCardView setFrame:NSMakeRect(settingsGroupedX, interfaceCardY, settingsGroupedWidth, interfaceCardHeight)];
     [self.settingsAppearanceButton setFrame:NSMakeRect(rowLeft, interfaceCardY, 0.0, 0.0)];
@@ -1003,10 +1011,12 @@
     }
     CGFloat labelWidth = 88.0;
     CGFloat popupX = rowLeft + labelWidth + 8.0;
-    [self.settingsThemeLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 16.0, labelWidth, 22.0)];
-    [self.themePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 12.0, popupWidth, 28.0)];
-    [self.settingsLanguageLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 50.0, labelWidth, 22.0)];
-    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 46.0, popupWidth, 28.0)];
+    [self.settingsThemeCategoryLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 14.0, labelWidth, 22.0)];
+    [self.themeCategoryPopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 10.0, popupWidth, 28.0)];
+    [self.settingsThemeLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 46.0, labelWidth, 22.0)];
+    [self.themePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 42.0, popupWidth, 28.0)];
+    [self.settingsLanguageLabel setFrame:NSMakeRect(rowLeft, interfaceCardY + 80.0, labelWidth, 22.0)];
+    [self.settingsLanguagePopUpButton setFrame:NSMakeRect(popupX, interfaceCardY + 76.0, popupWidth, 28.0)];
     settingsNextY = interfaceCardY + interfaceCardHeight + settingsGroupGap;
 
     [self.settingsStorageField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
