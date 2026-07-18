@@ -13,14 +13,22 @@ extern NSString * const TGThemeIdentifierNordicNight;
 extern NSString * const TGThemeIdentifierTronGrid;
 extern NSString * const TGThemeIdentifierSkeuomorphicBlue;
 extern NSString * const TGThemeIdentifierFrutigerAero;
+extern NSString * const TGThemeIdentifierFrutigerAeroDream;
+extern NSString * const TGThemeCategoryIdentifierLight;
+extern NSString * const TGThemeCategoryIdentifierDark;
+extern NSString * const TGThemeCategoryIdentifierOldSchool;
 
 NSArray *TGThemeIdentifiers(void);
+NSArray *TGThemeCategoryIdentifiers(void);
+NSArray *TGThemeIdentifiersForCategory(NSString *categoryIdentifier);
+NSString *TGThemeCategoryIdentifierForThemeIdentifier(NSString *identifier);
 BOOL TGThemeIdentifierIsValid(NSString *identifier);
 NSString *TGThemeDisplayNameForIdentifier(NSString *identifier);
 void TGSetActiveThemeIdentifier(NSString *identifier);
 NSString *TGCurrentThemeIdentifier(void);
 BOOL TGThemeIsSkeuomorphicBlue(void);
 BOOL TGThemeIsFrutigerAero(void);
+BOOL TGThemeIsFrutigerAeroDream(void);
 
 NSColor *TGColorFromHex(NSUInteger hex);
 NSColor *TGClassicWindowBottomColor(void);

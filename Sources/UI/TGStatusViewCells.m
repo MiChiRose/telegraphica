@@ -4,6 +4,7 @@
 #import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
 #import "TGTheme.h"
+#import "TGLocalization.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
 
@@ -58,7 +59,20 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                    NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 26.0) / 2.0),
                                    26.0,
                                    26.0);
-    TGDrawAvatarInRect([item avatarLocalPath], [item title], avatarRect, selected, [controlView isFlipped]);
+    NSString *displayTitle = [item isSavedMessages] ? TGLoc(@"savedMessages") : [item title];
+    if ([item isSavedMessages]) {
+        NSBezierPath *savedPath = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
+        NSGradient *savedGradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x49b7ff)
+                                                                   endingColor:TGColorFromHex(0x1888d8)] autorelease];
+        [savedGradient drawInBezierPath:savedPath angle:90.0];
+        TGDrawTemplateIconAsset(@"bookmark",
+                                NSInsetRect(avatarRect, 6.0, 5.0),
+                                [NSColor whiteColor],
+                                1.0,
+                                [controlView isFlipped]);
+    } else {
+        TGDrawAvatarInRect([item avatarLocalPath], displayTitle, avatarRect, selected, [controlView isFlipped]);
+    }
 
     NSInteger unreadCount = [[item unreadCount] respondsToSelector:@selector(integerValue)] ? [[item unreadCount] integerValue] : 0;
     NSString *unreadString = @"";
@@ -97,7 +111,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (titleAvailableWidth < 40.0) {
         titleAvailableWidth = 40.0;
     }
-    NSSize titleSize = [[item title] sizeWithAttributes:titleAttributes];
+    NSSize titleSize = [displayTitle sizeWithAttributes:titleAttributes];
     CGFloat titleDrawWidth = titleAvailableWidth;
     if (([item notificationsMuted] || [item isPinned]) && titleSize.width < titleAvailableWidth) {
         titleDrawWidth = titleSize.width;
@@ -106,7 +120,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
                                   titleDrawWidth,
                                   16.0);
-    [[item title] drawInRect:titleRect withAttributes:titleAttributes];
+    [displayTitle drawInRect:titleRect withAttributes:titleAttributes];
     CGFloat iconX = NSMaxX(titleRect) + 4.0;
     if ([item isPinned]) {
         NSRect pinRect = NSMakeRect(iconX,

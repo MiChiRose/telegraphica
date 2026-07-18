@@ -20,6 +20,7 @@
     self.chatSearchWindowResultsView = panelView;
     self.chatSearchWindowTextField = [panelView searchField];
     [self.chatSearchWindow setContentView:panelView];
+    [panelView layoutPanelSubviews];
 }
 
 - (TGChatSearchPanelView *)chatSearchPanelView {

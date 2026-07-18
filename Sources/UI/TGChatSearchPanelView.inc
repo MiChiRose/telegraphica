@@ -22,6 +22,7 @@
 @property (nonatomic, assign) NSInteger selectedIndex;
 - (TGSearchResultItem *)selectedResult;
 - (NSSearchField *)searchField;
+- (void)layoutPanelSubviews;
 @end
 
 @implementation TGChatSearchPanelView
@@ -99,6 +100,8 @@
         [_scrollView setAutohidesScrollers:YES];
         [_scrollView setDocumentView:_tableView];
         [self addSubview:_scrollView];
+
+        [self layoutPanelSubviews];
     }
     return self;
 }
@@ -121,6 +124,16 @@
 
 - (void)resizeSubviewsWithOldSize:(NSSize)oldSize {
     (void)oldSize;
+    [self layoutPanelSubviews];
+}
+
+- (void)setFrameSize:(NSSize)newSize {
+    [super setFrameSize:newSize];
+    [self layoutPanelSubviews];
+}
+
+- (void)viewDidMoveToWindow {
+    [super viewDidMoveToWindow];
     [self layoutPanelSubviews];
 }
 

@@ -453,6 +453,7 @@
     [self.chatItems removeAllObjects];
     [self.chatItems addObjectsFromArray:items];
     [self applyLocalNotificationMuteStateToItems:self.chatItems];
+    [self updateSavedMessagesPresentationForChatItems];
     [self.chatTableView reloadData];
     [self updateApplicationBadge];
     self.autoChatListLoadArmed = YES;

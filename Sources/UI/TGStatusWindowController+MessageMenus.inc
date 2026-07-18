@@ -882,6 +882,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
 
 - (void)markAllChatsReadFromMenu:(id)sender {
     (void)sender;
+    [self setMarkAllChatsReadBusy:YES];
     NSMutableArray *seedItems = [NSMutableArray array];
     NSMutableSet *seenKeys = [NSMutableSet set];
     NSUInteger index = 0;
@@ -960,6 +961,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                     [self markChatItemRead:[itemsToRead objectAtIndex:readIndex]];
                 }
             }
+            [self setMarkAllChatsReadBusy:NO];
             [seedCopy release];
             [serverItems release];
             [errorMessage release];

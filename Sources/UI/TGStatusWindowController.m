@@ -131,6 +131,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSView *aboutPanelView;
 @property (nonatomic, retain) TGGroupedCardView *bottomNavigationView;
 @property (nonatomic, retain) NSArray *navigationButtons;
+@property (nonatomic, retain) NSProgressIndicator *markAllChatsReadSpinner;
 @property (nonatomic, retain) NSArray *drawerFolderButtons;
 @property (nonatomic, retain) NSArray *chatFilterInfos;
 @property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
@@ -282,6 +283,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *settingsFilesSectionField;
 @property (nonatomic, retain) NSTextField *settingsHelpSectionField;
 @property (nonatomic, retain) NSTextField *settingsThemeLabel;
+@property (nonatomic, retain) NSTextField *settingsThemeCategoryLabel;
+@property (nonatomic, retain) NSPopUpButton *themeCategoryPopUpButton;
 @property (nonatomic, retain) NSPopUpButton *themePopUpButton;
 @property (nonatomic, retain) NSButton *settingsNotificationsEnabledButton;
 @property (nonatomic, retain) NSButton *settingsNotificationSoundButton;
@@ -477,6 +480,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 - (void)cancelReplyTarget:(id)sender;
 - (void)forwardMessageFromMenu:(id)sender;
 - (void)forwardMessageToSavedMessagesFromMenu:(id)sender;
+- (void)updateSavedMessagesPresentationForChatItems;
+- (void)setMarkAllChatsReadBusy:(BOOL)busy;
 @end
 
 #include "TGChatSearchPanelView.inc"
@@ -497,6 +502,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize aboutPanelView = _aboutPanelView;
 @synthesize bottomNavigationView = _bottomNavigationView;
 @synthesize navigationButtons = _navigationButtons;
+@synthesize markAllChatsReadSpinner = _markAllChatsReadSpinner;
 @synthesize drawerFolderButtons = _drawerFolderButtons;
 @synthesize chatFilterInfos = _chatFilterInfos;
 @synthesize accountBadgeView = _accountBadgeView;
@@ -648,6 +654,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsFilesSectionField = _settingsFilesSectionField;
 @synthesize settingsHelpSectionField = _settingsHelpSectionField;
 @synthesize settingsThemeLabel = _settingsThemeLabel;
+@synthesize settingsThemeCategoryLabel = _settingsThemeCategoryLabel;
+@synthesize themeCategoryPopUpButton = _themeCategoryPopUpButton;
 @synthesize themePopUpButton = _themePopUpButton;
 @synthesize settingsNotificationsEnabledButton = _settingsNotificationsEnabledButton;
 @synthesize settingsNotificationSoundButton = _settingsNotificationSoundButton;
@@ -973,6 +981,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 }
 
 - (void)selectThemePopUpItemForIdentifier:(NSString *)identifier {
+    if (!TGThemeIdentifierIsValid(identifier)) {
+        identifier = TGCurrentThemeIdentifier();
+    }
+    NSString *categoryIdentifier = TGThemeCategoryIdentifierForThemeIdentifier(identifier);
+    [self selectThemeCategoryPopUpItemForIdentifier:categoryIdentifier];
+    [self populateThemePopUpButton:self.themePopUpButton
+             forCategoryIdentifier:categoryIdentifier
+                selectedIdentifier:identifier];
+
     NSArray *popUpButtons = [NSArray arrayWithObjects:
                              self.themePopUpButton ? self.themePopUpButton : (id)[NSNull null],
                              self.appearanceThemePopUpButton ? self.appearanceThemePopUpButton : (id)[NSNull null],
@@ -996,6 +1013,148 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         if ([popUpButton selectedItem] == nil && [items count] > 0) {
             [popUpButton selectItemAtIndex:0];
         }
+    }
+}
+
+- (NSString *)localizedThemeCategoryTitleForIdentifier:(NSString *)identifier {
+    if ([identifier isEqualToString:TGThemeCategoryIdentifierDark]) {
+        return TGLoc(@"settings.theme.category.dark");
+    }
+    if ([identifier isEqualToString:TGThemeCategoryIdentifierOldSchool]) {
+        return TGLoc(@"settings.theme.category.oldSchool");
+    }
+    return TGLoc(@"settings.theme.category.light");
+}
+
+- (void)populateThemeCategoryPopUp {
+    if (!self.themeCategoryPopUpButton) {
+        return;
+    }
+    NSString *selectedIdentifier = [[self.themeCategoryPopUpButton selectedItem] representedObject];
+    if (![selectedIdentifier isKindOfClass:[NSString class]]) {
+        selectedIdentifier = TGThemeCategoryIdentifierForThemeIdentifier(TGCurrentThemeIdentifier());
+    }
+    [self.themeCategoryPopUpButton removeAllItems];
+    NSArray *categoryIdentifiers = TGThemeCategoryIdentifiers();
+    NSUInteger index = 0;
+    for (index = 0; index < [categoryIdentifiers count]; index++) {
+        NSString *categoryIdentifier = [categoryIdentifiers objectAtIndex:index];
+        [self.themeCategoryPopUpButton addItemWithTitle:[self localizedThemeCategoryTitleForIdentifier:categoryIdentifier]];
+        [[self.themeCategoryPopUpButton lastItem] setRepresentedObject:categoryIdentifier];
+    }
+    [self selectThemeCategoryPopUpItemForIdentifier:selectedIdentifier];
+}
+
+- (void)selectThemeCategoryPopUpItemForIdentifier:(NSString *)identifier {
+    if (!self.themeCategoryPopUpButton) {
+        return;
+    }
+    if (![identifier isKindOfClass:[NSString class]] || [identifier length] == 0) {
+        identifier = TGThemeCategoryIdentifierForThemeIdentifier(TGCurrentThemeIdentifier());
+    }
+    NSArray *items = [self.themeCategoryPopUpButton itemArray];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        NSMenuItem *item = [items objectAtIndex:index];
+        if ([[item representedObject] isEqual:identifier]) {
+            [self.themeCategoryPopUpButton selectItem:item];
+            return;
+        }
+    }
+    if ([items count] > 0) {
+        [self.themeCategoryPopUpButton selectItemAtIndex:0];
+    }
+}
+
+- (void)populateThemePopUpButton:(NSPopUpButton *)popUpButton
+           forCategoryIdentifier:(NSString *)categoryIdentifier
+              selectedIdentifier:(NSString *)selectedIdentifier {
+    if (!popUpButton) {
+        return;
+    }
+    NSArray *themeIdentifiers = nil;
+    if (popUpButton == self.themePopUpButton) {
+        themeIdentifiers = TGThemeIdentifiersForCategory(categoryIdentifier);
+    } else {
+        themeIdentifiers = TGThemeIdentifiers();
+    }
+    if ([themeIdentifiers count] == 0) {
+        themeIdentifiers = TGThemeIdentifiers();
+    }
+    [popUpButton removeAllItems];
+    NSUInteger themeIndex = 0;
+    for (themeIndex = 0; themeIndex < [themeIdentifiers count]; themeIndex++) {
+        NSString *themeIdentifier = [themeIdentifiers objectAtIndex:themeIndex];
+        [popUpButton addItemWithTitle:TGThemeDisplayNameForIdentifier(themeIdentifier)];
+        [[popUpButton lastItem] setRepresentedObject:themeIdentifier];
+    }
+    NSArray *items = [popUpButton itemArray];
+    NSUInteger itemIndex = 0;
+    for (itemIndex = 0; itemIndex < [items count]; itemIndex++) {
+        NSMenuItem *item = [items objectAtIndex:itemIndex];
+        if ([[item representedObject] isEqual:selectedIdentifier]) {
+            [popUpButton selectItem:item];
+            return;
+        }
+    }
+    if ([items count] > 0) {
+        [popUpButton selectItemAtIndex:0];
+    }
+}
+
+- (void)updateSavedMessagesPresentationForChatItems {
+    long long profileID = 0;
+    if ([self.profileUserID respondsToSelector:@selector(longLongValue)]) {
+        profileID = [self.profileUserID longLongValue];
+    }
+    if (profileID == 0) {
+        return;
+    }
+
+    BOOL changed = NO;
+    NSArray *collections[2] = { self.chatItems, self.chatItemsBeforeTopicList };
+    NSUInteger collectionIndex = 0;
+    for (collectionIndex = 0; collectionIndex < 2; collectionIndex++) {
+        NSArray *collection = collections[collectionIndex];
+        NSUInteger index = 0;
+        for (index = 0; index < [collection count]; index++) {
+            id candidate = [collection objectAtIndex:index];
+            if (![candidate isKindOfClass:[TGChatItem class]]) {
+                continue;
+            }
+            TGChatItem *item = (TGChatItem *)candidate;
+            BOOL savedMessages = (![item isForumTopic] &&
+                                  [[item chatID] respondsToSelector:@selector(longLongValue)] &&
+                                  [[item chatID] longLongValue] == profileID);
+            if ([item isSavedMessages] != savedMessages) {
+                [item setSavedMessages:savedMessages];
+                changed = YES;
+            }
+            if (savedMessages && ![[item title] isEqualToString:TGLoc(@"savedMessages")]) {
+                [item setTitle:TGLoc(@"savedMessages")];
+                changed = YES;
+            }
+        }
+    }
+
+    if (changed) {
+        [self.chatTableView reloadData];
+        if (self.chatSearchWindow) {
+            [self updateChatSearchWindowResults];
+        }
+    }
+}
+
+- (void)setMarkAllChatsReadBusy:(BOOL)busy {
+    if (!self.markAllChatsReadSpinner) {
+        return;
+    }
+    if (busy) {
+        [self.markAllChatsReadSpinner setHidden:NO];
+        [self.markAllChatsReadSpinner startAnimation:self];
+    } else {
+        [self.markAllChatsReadSpinner stopAnimation:self];
+        [self.markAllChatsReadSpinner setHidden:YES];
     }
 }
 
@@ -1089,6 +1248,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsStorageField setStringValue:TGLoc(@"settings.section.sessions")];
     [self.settingsFilesSectionField setStringValue:TGLoc(@"settings.section.files")];
     [self.settingsHelpSectionField setStringValue:TGLoc(@"settings.section.help")];
+    [self.settingsThemeCategoryLabel setStringValue:TGLoc(@"settings.theme.category")];
     [self.settingsThemeLabel setStringValue:TGLoc(@"settings.theme")];
     [self.settingsLanguageLabel setStringValue:TGLoc(@"settings.language")];
     [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
@@ -1118,7 +1278,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.pinnedMessageLabelField setStringValue:TGLoc(@"pinned.title")];
     [self refreshLoginLocalizedText];
     [self refreshDownloadFolderButtonTitle];
+    [self populateThemeCategoryPopUp];
+    [self selectThemePopUpItemForIdentifier:TGCurrentThemeIdentifier()];
     [self selectLanguagePopUpItemForCode:TGLanguageCode()];
+    [self updateSavedMessagesPresentationForChatItems];
     [self refreshLoginLanguageButtons];
     if ([[self.chatsNavigationContextMenu itemArray] count] > 0) {
         [[[self.chatsNavigationContextMenu itemArray] objectAtIndex:0] setTitle:TGLoc(@"chat.readAll")];
@@ -1201,6 +1364,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyMutedLabelStyle:self.settingsStorageField];
     [self.settingsDownloadFolderHelpField setTextColor:cardMutedColor];
     [self.settingsActiveSessionsDetailField setTextColor:cardMutedColor];
+    [self.settingsThemeCategoryLabel setTextColor:cardInkColor];
     [self.settingsThemeLabel setTextColor:cardInkColor];
     [self.settingsLanguageLabel setTextColor:cardInkColor];
     [self.settingsMaxAutoDownloadLabel setTextColor:cardInkColor];
@@ -1539,6 +1703,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [navigationButtons addObject:navigationButton];
     }
     self.navigationButtons = navigationButtons;
+
+    self.markAllChatsReadSpinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 14, 14)] autorelease];
+    [self.markAllChatsReadSpinner setStyle:NSProgressIndicatorSpinningStyle];
+    [self.markAllChatsReadSpinner setControlSize:NSSmallControlSize];
+    [self.markAllChatsReadSpinner setDisplayedWhenStopped:NO];
+    [self.markAllChatsReadSpinner setHidden:YES];
+    [contentView addSubview:self.markAllChatsReadSpinner];
 
     self.drawerFolderButtons = [NSArray array];
 
@@ -2356,19 +2527,24 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyMutedLabelStyle:self.settingsHelpSectionField];
     [contentView addSubview:self.settingsHelpSectionField];
 
+    self.settingsThemeCategoryLabel = [self labelWithFrame:NSMakeRect(64, 362, 88, 24)
+                                                      text:@"Category"
+                                                      font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.settingsThemeCategoryLabel];
+
+    self.themeCategoryPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(154, 356, 300, 30) pullsDown:NO] autorelease];
+    [self populateThemeCategoryPopUp];
+    [self.themeCategoryPopUpButton setTarget:self];
+    [self.themeCategoryPopUpButton setAction:@selector(themeCategorySelectionChanged:)];
+    [self.themeCategoryPopUpButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.themeCategoryPopUpButton];
+
     self.settingsThemeLabel = [self labelWithFrame:NSMakeRect(64, 332, 88, 24)
                                               text:@"Theme"
                                               font:[NSFont systemFontOfSize:13.0]];
     [contentView addSubview:self.settingsThemeLabel];
 
     self.themePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(154, 326, 300, 30) pullsDown:NO] autorelease];
-    NSArray *themeIdentifiers = TGThemeIdentifiers();
-    NSUInteger themeIndex = 0;
-    for (themeIndex = 0; themeIndex < [themeIdentifiers count]; themeIndex++) {
-        NSString *themeIdentifier = [themeIdentifiers objectAtIndex:themeIndex];
-        [self.themePopUpButton addItemWithTitle:TGThemeDisplayNameForIdentifier(themeIdentifier)];
-        [[self.themePopUpButton lastItem] setRepresentedObject:themeIdentifier];
-    }
     [self.themePopUpButton setTarget:self];
     [self.themePopUpButton setAction:@selector(themeSelectionChanged:)];
     [self.themePopUpButton setAutoresizingMask:NSViewMaxYMargin];
@@ -2554,6 +2730,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                      self.settingsResourceSectionField,
                                      self.settingsFilesSectionField,
                                      self.settingsHelpSectionField,
+                                     self.settingsThemeCategoryLabel,
+                                     self.themeCategoryPopUpButton,
                                      self.settingsThemeLabel,
                                      self.themePopUpButton,
                                      self.settingsNotificationsEnabledButton,
@@ -3095,6 +3273,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_aboutPanelView release];
     [_bottomNavigationView release];
     [_navigationButtons release];
+    [_markAllChatsReadSpinner release];
     [_drawerFolderButtons release];
     [_chatFilterInfos release];
     [_accountBadgeView release];
@@ -3241,6 +3420,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsResourceSectionField release];
     [_settingsFilesSectionField release];
     [_settingsHelpSectionField release];
+    [_settingsThemeCategoryLabel release];
+    [_themeCategoryPopUpButton release];
     [_settingsThemeLabel release];
     [_themePopUpButton release];
     [_settingsAppearanceButton release];
