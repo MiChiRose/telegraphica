@@ -1023,6 +1023,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     if ([identifier isEqualToString:TGThemeCategoryIdentifierOldSchool]) {
         return TGLoc(@"settings.theme.category.oldSchool");
     }
+    if ([identifier isEqualToString:TGThemeCategoryIdentifierExperimental]) {
+        return TGLoc(@"settings.theme.category.experimental");
+    }
     return TGLoc(@"settings.theme.category.light");
 }
 

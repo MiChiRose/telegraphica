@@ -1,3 +1,34 @@
+@interface TGChatSearchResultsTableView : NSTableView
+@end
+
+@implementation TGChatSearchResultsTableView
+
+- (BOOL)isOpaque {
+    return NO;
+}
+
+- (void)drawBackgroundInClipRect:(NSRect)clipRect {
+    (void)clipRect;
+}
+
+- (void)highlightSelectionInClipRect:(NSRect)clipRect {
+    NSInteger selectedRow = [self selectedRow];
+    if (selectedRow < 0 || selectedRow >= [self numberOfRows]) {
+        return;
+    }
+    NSRect rowRect = NSInsetRect([self rectOfRow:selectedRow], 4.0, 3.0);
+    if (!NSIntersectsRect(rowRect, clipRect)) {
+        return;
+    }
+    NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:rowRect xRadius:7.0 yRadius:7.0];
+    TGThemeDrawEnamelButtonInPath(selectedPath, rowRect, NO, YES, YES, [self isFlipped]);
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.30] set];
+    [selectedPath setLineWidth:1.0];
+    [selectedPath stroke];
+}
+
+@end
+
 @interface TGChatSearchPanelView : NSView <NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate> {
     id _target;
     SEL _queryChangedAction;
@@ -59,7 +90,10 @@
 
         _closeButton = [[NSButton alloc] initWithFrame:NSZeroRect];
         [_closeButton setTitle:@"×"];
-        [_closeButton setFont:[NSFont boldSystemFontOfSize:14.0]];
+        [_closeButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"×"] autorelease]];
+        [_closeButton setBordered:NO];
+        [_closeButton setFocusRingType:NSFocusRingTypeNone];
+        [_closeButton setFont:[NSFont boldSystemFontOfSize:15.0]];
         [_closeButton setTarget:self];
         [_closeButton setAction:@selector(closeSearch:)];
         [self addSubview:_closeButton];
@@ -74,29 +108,40 @@
         [_statusField setStringValue:_statusText ? _statusText : @""];
         [self addSubview:_statusField];
 
-        _tableView = [[NSTableView alloc] initWithFrame:NSZeroRect];
+        _tableView = [[TGChatSearchResultsTableView alloc] initWithFrame:NSZeroRect];
         [_tableView setHeaderView:nil];
-        [_tableView setRowHeight:42.0];
+        [_tableView setRowHeight:46.0];
         [_tableView setDelegate:self];
         [_tableView setDataSource:self];
         [_tableView setTarget:self];
         [_tableView setDoubleAction:@selector(commitSearch:)];
         [_tableView setAllowsEmptySelection:YES];
+        [_tableView setBackgroundColor:[NSColor clearColor]];
+        [_tableView setUsesAlternatingRowBackgroundColors:NO];
+        [_tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+        [_tableView setGridColor:[NSColor colorWithCalibratedWhite:1.0 alpha:0.38]];
+        [_tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+        [_tableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
 
         NSTableColumn *titleColumn = [[[NSTableColumn alloc] initWithIdentifier:@"title"] autorelease];
         [titleColumn setWidth:178.0];
         [[titleColumn dataCell] setFont:[NSFont boldSystemFontOfSize:12.0]];
+        [[titleColumn dataCell] setLineBreakMode:NSLineBreakByTruncatingTail];
         [_tableView addTableColumn:titleColumn];
 
         NSTableColumn *detailsColumn = [[[NSTableColumn alloc] initWithIdentifier:@"details"] autorelease];
         [detailsColumn setWidth:206.0];
         [[detailsColumn dataCell] setFont:[NSFont systemFontOfSize:11.0]];
+        [[detailsColumn dataCell] setLineBreakMode:NSLineBreakByTruncatingTail];
         [_tableView addTableColumn:detailsColumn];
 
         _scrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
         [_scrollView setHasVerticalScroller:YES];
         [_scrollView setHasHorizontalScroller:NO];
-        [_scrollView setBorderType:NSBezelBorder];
+        [_scrollView setBorderType:NSNoBorder];
+        [_scrollView setDrawsBackground:NO];
+        [[_scrollView contentView] setDrawsBackground:NO];
+        [[_scrollView contentView] setBackgroundColor:[NSColor clearColor]];
         [_scrollView setAutohidesScrollers:YES];
         [_scrollView setDocumentView:_tableView];
         [self addSubview:_scrollView];
@@ -141,11 +186,11 @@
     NSRect bounds = [self bounds];
     CGFloat inset = 20.0;
     CGFloat closeSide = 28.0;
-    [_titleField setFrame:NSMakeRect(inset, 18.0, MAX(80.0, NSWidth(bounds) - (inset * 2.0) - closeSide - 8.0), 22.0)];
-    [_closeButton setFrame:NSMakeRect(NSWidth(bounds) - inset - closeSide, 16.0, closeSide, 24.0)];
-    [_searchField setFrame:NSMakeRect(inset, 54.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0)), 28.0)];
-    [_statusField setFrame:NSMakeRect(inset + 2.0, 88.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0)), 18.0)];
-    [_scrollView setFrame:NSMakeRect(inset, 112.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0)), MAX(80.0, NSHeight(bounds) - 132.0))];
+    [_titleField setFrame:NSMakeRect(inset + 4.0, 18.0, MAX(80.0, NSWidth(bounds) - (inset * 2.0) - closeSide - 12.0), 22.0)];
+    [_closeButton setFrame:NSMakeRect(NSWidth(bounds) - inset - closeSide, 15.0, closeSide, 26.0)];
+    [_searchField setFrame:NSMakeRect(inset + 10.0, 60.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), 28.0)];
+    [_statusField setFrame:NSMakeRect(inset + 12.0, 96.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 24.0), 18.0)];
+    [_scrollView setFrame:NSMakeRect(inset + 10.0, 126.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), MAX(80.0, NSHeight(bounds) - 148.0))];
 
     CGFloat tableWidth = NSWidth([[_scrollView contentView] bounds]);
     NSArray *columns = [_tableView tableColumns];
@@ -160,8 +205,29 @@
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    [[NSColor colorWithCalibratedRed:0.93 green:0.96 blue:0.98 alpha:1.0] set];
-    NSRectFill([self bounds]);
+    NSRect bounds = [self bounds];
+    TGThemeDrawWindowBackgroundInRect(bounds, [self isFlipped]);
+
+    NSRect shellRect = NSInsetRect(bounds, 10.0, 10.0);
+    NSBezierPath *shellPath = [NSBezierPath bezierPathWithRoundedRect:shellRect xRadius:12.0 yRadius:12.0];
+    TGThemeDrawPanelBackgroundInPath(shellPath, shellRect, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [shellPath setLineWidth:1.0];
+    [shellPath stroke];
+
+    NSRect searchCardRect = NSMakeRect(18.0, 49.0, MAX(120.0, NSWidth(bounds) - 36.0), 66.0);
+    NSBezierPath *searchCardPath = [NSBezierPath bezierPathWithRoundedRect:searchCardRect xRadius:10.0 yRadius:10.0];
+    TGThemeDrawGroupedCardInPath(searchCardPath, searchCardRect, [self isFlipped]);
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
+    [searchCardPath setLineWidth:1.0];
+    [searchCardPath stroke];
+
+    NSRect resultsCardRect = NSInsetRect([_scrollView frame], -8.0, -8.0);
+    NSBezierPath *resultsCardPath = [NSBezierPath bezierPathWithRoundedRect:resultsCardRect xRadius:10.0 yRadius:10.0];
+    TGThemeDrawGroupedCardInPath(resultsCardPath, resultsCardRect, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [resultsCardPath setLineWidth:1.0];
+    [resultsCardPath stroke];
 }
 
 - (NSSearchField *)searchField {
@@ -279,6 +345,24 @@
     }
     NSString *subtitle = [result displaySubtitle];
     return [subtitle length] > 0 ? subtitle : TGLoc(@"search.chats.openHint");
+}
+
+- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    (void)tableView;
+    if (![cell isKindOfClass:[NSTextFieldCell class]]) {
+        return;
+    }
+    NSTextFieldCell *textCell = (NSTextFieldCell *)cell;
+    BOOL selected = (row == [_tableView selectedRow]);
+    NSString *identifier = [tableColumn identifier];
+    if ([identifier isEqualToString:@"title"]) {
+        [textCell setFont:[NSFont boldSystemFontOfSize:12.0]];
+        [textCell setTextColor:(selected ? TGClassicHeaderTextColor(1.0) : TGClassicInkColor())];
+    } else {
+        [textCell setFont:[NSFont systemFontOfSize:11.0]];
+        [textCell setTextColor:(selected ? TGClassicHeaderDetailTextColor(0.96) : TGClassicMutedInkColor())];
+    }
+    [textCell setDrawsBackground:NO];
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
