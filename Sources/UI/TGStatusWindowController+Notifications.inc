@@ -401,6 +401,9 @@
     }
     [visibleErrorKey release];
     [self refreshProfileDisplay];
+    if ([self.currentAuthState isEqualToString:@"ready"]) {
+        [self rebuildDrawerFolderButtons];
+    }
     if ([self.activeSessionsWindow isVisible]) {
         [self reloadActiveSessions:nil];
     }

@@ -383,7 +383,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:8.0] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:12.0] forKey:NSFontAttributeName];
                 [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
                 NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];

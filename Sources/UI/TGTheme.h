@@ -12,6 +12,7 @@ extern NSString * const TGThemeIdentifierMidnightGraphite;
 extern NSString * const TGThemeIdentifierNordicNight;
 extern NSString * const TGThemeIdentifierTronGrid;
 extern NSString * const TGThemeIdentifierSkeuomorphicBlue;
+extern NSString * const TGThemeIdentifierFrutigerAero;
 
 NSArray *TGThemeIdentifiers(void);
 BOOL TGThemeIdentifierIsValid(NSString *identifier);
@@ -19,6 +20,7 @@ NSString *TGThemeDisplayNameForIdentifier(NSString *identifier);
 void TGSetActiveThemeIdentifier(NSString *identifier);
 NSString *TGCurrentThemeIdentifier(void);
 BOOL TGThemeIsSkeuomorphicBlue(void);
+BOOL TGThemeIsFrutigerAero(void);
 
 NSColor *TGColorFromHex(NSUInteger hex);
 NSColor *TGClassicWindowBottomColor(void);

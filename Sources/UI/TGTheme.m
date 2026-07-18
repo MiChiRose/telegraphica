@@ -12,6 +12,7 @@ NSString * const TGThemeIdentifierMidnightGraphite = @"midnight-graphite";
 NSString * const TGThemeIdentifierNordicNight = @"nordic-night";
 NSString * const TGThemeIdentifierTronGrid = @"tron-grid";
 NSString * const TGThemeIdentifierSkeuomorphicBlue = @"skeuomorphic-blue";
+NSString * const TGThemeIdentifierFrutigerAero = @"frutiger-aero";
 
 typedef struct {
     CGFloat red;
@@ -84,6 +85,7 @@ NSArray *TGThemeIdentifiers(void) {
             TGThemeIdentifierNordicNight,
             TGThemeIdentifierTronGrid,
             TGThemeIdentifierSkeuomorphicBlue,
+            TGThemeIdentifierFrutigerAero,
             nil];
 }
 
@@ -102,6 +104,7 @@ NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
     if ([identifier isEqualToString:TGThemeIdentifierNordicNight]) return @"Nordic Night";
     if ([identifier isEqualToString:TGThemeIdentifierTronGrid]) return @"Neon Grid";
     if ([identifier isEqualToString:TGThemeIdentifierSkeuomorphicBlue]) return @"Skeuomorphic Blue";
+    if ([identifier isEqualToString:TGThemeIdentifierFrutigerAero]) return @"Frutiger Aero";
     return @"VK Blue";
 }
 
@@ -206,6 +209,11 @@ static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
                                   0x7d9ab0, 0xb8c9d6, 0x102435, 0x345f7f, 0xd9e6ee, 0xf6f0e4,
                                   0x6f94ac, 0xc8bfae, 0x6a7070, 0xd8e4ea, 0x2f668d, 0xf6fbff, 0xd6e4ed);
     }
+    if ([identifier isEqualToString:TGThemeIdentifierFrutigerAero]) {
+        return TGThemePaletteMake(0x4aaed0, 0xe4f7f7, 0x2f91c0, 0xf4fbf8, 0x102d38, 0x52737c,
+                                  0x8bcbd4, 0xb9ecf1, 0x082f42, 0x1488b7, 0xcdf5ff, 0xffffff,
+                                  0x74c8d7, 0xb8d7d2, 0x4d7580, 0xd8f3f6, 0x1487b8, 0xf8ffff, 0xd8f5fa);
+    }
     return TGThemePaletteMake(0x182537, 0xecf3fb, 0x3c5d8a, 0xf8fbfe, 0x0e141d, 0x4e637c,
                               0x8ca6c4, 0xb3cce9, 0x091321, 0x305d96, 0xc2ddf8, 0xffffff,
                               0x5b88bd, 0xaabace, 0x465d77, 0xd6e4f4, 0x2d5d96, 0xf8fbff, 0xdce9f7);
@@ -227,6 +235,14 @@ NSString *TGCurrentThemeIdentifier(void) {
 
 BOOL TGThemeIsSkeuomorphicBlue(void) {
     return [TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierSkeuomorphicBlue];
+}
+
+BOOL TGThemeIsFrutigerAero(void) {
+    return [TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierFrutigerAero];
+}
+
+static BOOL TGThemeUsesLayeredMaterials(void) {
+    return TGThemeIsSkeuomorphicBlue() || TGThemeIsFrutigerAero();
 }
 
 static TGThemePalette TGCurrentThemePalette(void) {
@@ -313,7 +329,8 @@ NSColor *TGClassicHeaderDetailTextColor(CGFloat alpha) {
 typedef enum {
     TGSkeuomorphicPatternCanvas = 1,
     TGSkeuomorphicPatternPaper = 2,
-    TGSkeuomorphicPatternEnamel = 3
+    TGSkeuomorphicPatternEnamel = 3,
+    TGSkeuomorphicPatternAero = 4
 } TGSkeuomorphicPattern;
 
 static void TGDrawPatternDot(CGFloat x, CGFloat y, CGFloat alpha) {
@@ -325,11 +342,14 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
     static NSImage *canvasImage = nil;
     static NSImage *paperImage = nil;
     static NSImage *enamelImage = nil;
+    static NSImage *aeroImage = nil;
     NSImage **slot = NULL;
     if (pattern == TGSkeuomorphicPatternCanvas) {
         slot = &canvasImage;
     } else if (pattern == TGSkeuomorphicPatternPaper) {
         slot = &paperImage;
+    } else if (pattern == TGSkeuomorphicPatternAero) {
+        slot = &aeroImage;
     } else {
         slot = &enamelImage;
     }
@@ -342,6 +362,8 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         tileSize = 16.0;
     } else if (pattern == TGSkeuomorphicPatternPaper) {
         tileSize = 18.0;
+    } else if (pattern == TGSkeuomorphicPatternAero) {
+        tileSize = 48.0;
     } else {
         tileSize = 18.0;
     }
@@ -381,6 +403,22 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         NSRectFill(NSMakeRect(0.0, 15.0, tileSize, 1.0));
         TGDrawPatternDot(3.0, 4.0, 0.035);
         TGDrawPatternDot(11.0, 10.0, 0.028);
+    } else if (pattern == TGSkeuomorphicPatternAero) {
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.030] set];
+        NSBezierPath *bubble = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(5.0, 6.0, 14.0, 14.0)];
+        [bubble fill];
+        [[NSColor colorWithCalibratedRed:0.15 green:0.78 blue:0.92 alpha:0.032] set];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(28.0, 22.0, 11.0, 11.0)] fill];
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.045] set];
+        NSBezierPath *glint = [NSBezierPath bezierPath];
+        [glint setLineWidth:1.0];
+        [glint moveToPoint:NSMakePoint(0.0, 42.0)];
+        [glint curveToPoint:NSMakePoint(48.0, 35.0)
+              controlPoint1:NSMakePoint(16.0, 46.0)
+              controlPoint2:NSMakePoint(30.0, 30.0)];
+        [glint stroke];
+        [[NSColor colorWithCalibratedRed:0.0 green:0.36 blue:0.52 alpha:0.018] set];
+        NSRectFill(NSMakeRect(0.0, 23.0, tileSize, 1.0));
     } else {
         [[NSColor colorWithCalibratedWhite:1.0 alpha:0.035] set];
         NSRectFill(NSMakeRect(0.0, 2.0, tileSize, 1.0));
@@ -416,30 +454,42 @@ static void TGThemeDrawInnerShadow(NSBezierPath *path, NSRect rect, CGFloat alph
 
 void TGThemeDrawWindowBackgroundInRect(NSRect rect, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicWindowBottomColor() set];
         NSRectFill(rect);
         return;
     }
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3b5161)
-                                                          endingColor:TGColorFromHex(0x223747)] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x69c8e1)
+                                                  endingColor:TGColorFromHex(0xd8f6ee)] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3b5161)
+                                                  endingColor:TGColorFromHex(0x223747)] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternCanvas, 0.35);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternCanvas, 0.35);
 }
 
 void TGThemeDrawPanelBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicPanelBottomColor() set];
         [path fill];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xe6edf0)
-                                                          endingColor:TGColorFromHex(0xc5d2d9)] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf8ffff)
+                                                  endingColor:TGColorFromHex(0xcfeef2)] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xe6edf0)
+                                                  endingColor:TGColorFromHex(0xc5d2d9)] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternEnamel, 0.28);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternEnamel, 0.28);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.24] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMaxY(rect) - 1.0, NSWidth(rect), 1.0), NSCompositeSourceOver);
     [[NSColor colorWithCalibratedWhite:0.0 alpha:0.12] set];
@@ -449,17 +499,23 @@ void TGThemeDrawPanelBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flip
 
 void TGThemeDrawRailBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicWindowBottomColor() set];
         [path fill];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3a4d59)
-                                                          endingColor:TGColorFromHex(0x223644)] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2c9fca)
+                                                  endingColor:TGColorFromHex(0x16455e)] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3a4d59)
+                                                  endingColor:TGColorFromHex(0x223644)] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternCanvas, 0.35);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternCanvas, 0.35);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.14] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 1.0, NSMaxY(rect) - 1.0, NSWidth(rect) - 2.0, 1.0), NSCompositeSourceOver);
     [[NSColor colorWithCalibratedWhite:0.0 alpha:0.24] set];
@@ -469,15 +525,21 @@ void TGThemeDrawRailBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipp
 
 void TGThemeDrawHeaderBackgroundInRect(NSRect rect, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicHeaderBottomColor() set];
         NSRectFill(rect);
         return;
     }
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x4d789c)
-                                                          endingColor:TGColorFromHex(0x29465e)] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x63c7e8)
+                                                  endingColor:TGColorFromHex(0x207eaa)] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x4d789c)
+                                                  endingColor:TGColorFromHex(0x29465e)] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternCanvas, 0.32);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternCanvas, 0.32);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.18] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMaxY(rect) - 1.0, NSWidth(rect), 1.0), NSCompositeSourceOver);
     [[NSColor colorWithCalibratedWhite:0.0 alpha:0.25] set];
@@ -486,17 +548,23 @@ void TGThemeDrawHeaderBackgroundInRect(NSRect rect, BOOL flipped) {
 
 void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicTablePaperColor() set];
         [path fill];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xd8d7ce)
-                                                          endingColor:TGColorFromHex(0xf4f0e6)] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xe8fbff)
+                                                  endingColor:TGColorFromHex(0xf7fff8)] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xd8d7ce)
+                                                  endingColor:TGColorFromHex(0xf4f0e6)] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternPaper, 0.30);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternPaper, 0.30);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.24] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 2.0, NSMinY(rect) + 1.0, NSWidth(rect) - 4.0, 1.0), NSCompositeSourceOver);
     [NSGraphicsContext restoreGraphicsState];
@@ -507,17 +575,23 @@ void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL f
 
 void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
         [path fill];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf7f3e9)
-                                                          endingColor:TGColorFromHex(0xe7dfcf)] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
+                                                  endingColor:TGColorFromHex(0xdff7f4)] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf7f3e9)
+                                                  endingColor:TGColorFromHex(0xe7dfcf)] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternPaper, 0.25);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternPaper, 0.25);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.36] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMaxY(rect) - 1.0, NSWidth(rect), 1.0), NSCompositeSourceOver);
     [NSGraphicsContext restoreGraphicsState];
@@ -525,7 +599,7 @@ void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped)
 
 void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlighted, BOOL selected, BOOL enabled, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         NSColor *fillColor = selected ? TGClassicNavigationSelectedColor(enabled ? 1.0 : 0.46)
                                       : (highlighted ? TGClassicNavigationHighlightedColor(enabled ? 1.0 : 0.46)
                                                      : TGClassicNavigationNormalColor(enabled ? 1.0 : 0.46));
@@ -536,7 +610,18 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     CGFloat alpha = enabled ? 1.0 : 0.46;
     NSColor *top = nil;
     NSColor *bottom = nil;
-    if (highlighted) {
+    if (TGThemeIsFrutigerAero()) {
+        if (highlighted) {
+            top = TGColorFromRGBWithAlpha(TGRGBMake(0x1f81a9), alpha);
+            bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x115372), alpha);
+        } else if (selected) {
+            top = TGColorFromRGBWithAlpha(TGRGBMake(0x8ce9f5), alpha);
+            bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x2aa0cd), alpha);
+        } else {
+            top = TGColorFromRGBWithAlpha(TGRGBMake(0x62c7e7), alpha);
+            bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x267fa9), alpha);
+        }
+    } else if (highlighted) {
         top = TGColorFromRGBWithAlpha(TGRGBMake(0x335875), alpha);
         bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x1d3448), alpha);
     } else if (selected) {
@@ -550,7 +635,7 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     [path addClip];
     NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:top endingColor:bottom] autorelease];
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternEnamel, 0.20);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternEnamel, 0.20);
     if (!highlighted) {
         [[NSColor colorWithCalibratedWhite:1.0 alpha:(0.24 * alpha)] set];
         NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 2.0, NSMaxY(rect) - 2.0, NSWidth(rect) - 4.0, 1.0), NSCompositeSourceOver);
@@ -562,17 +647,23 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
 
 void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoing, BOOL flipped) {
     (void)flipped;
-    if (!TGThemeIsSkeuomorphicBlue()) {
+    if (!TGThemeUsesLayeredMaterials()) {
         [(outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor()) set];
         [path fill];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xe5eef4) : TGColorFromHex(0xfffbf2))
-                                                          endingColor:(outgoing ? TGColorFromHex(0xc7dcea) : TGColorFromHex(0xeee5d5))] autorelease];
+    NSGradient *gradient = nil;
+    if (TGThemeIsFrutigerAero()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xd8f8ff) : TGColorFromHex(0xffffff))
+                                                  endingColor:(outgoing ? TGColorFromHex(0xa9e7f2) : TGColorFromHex(0xe8fbf5))] autorelease];
+    } else {
+        gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xe5eef4) : TGColorFromHex(0xfffbf2))
+                                                  endingColor:(outgoing ? TGColorFromHex(0xc7dcea) : TGColorFromHex(0xeee5d5))] autorelease];
+    }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternPaper, outgoing ? 0.20 : 0.28);
+    TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGSkeuomorphicPatternAero : TGSkeuomorphicPatternPaper, outgoing ? 0.20 : 0.28);
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.30] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 5.0, NSMaxY(rect) - 2.0, NSWidth(rect) - 10.0, 1.0), NSCompositeSourceOver);
     [NSGraphicsContext restoreGraphicsState];

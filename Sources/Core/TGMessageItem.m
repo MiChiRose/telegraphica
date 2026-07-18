@@ -90,6 +90,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize replySenderDisplayName = _replySenderDisplayName;
 @synthesize forwardSourceDisplayName = _forwardSourceDisplayName;
 @synthesize capabilitiesKnown = _capabilitiesKnown;
+@synthesize canBeReplied = _canBeReplied;
 @synthesize canBeEdited = _canBeEdited;
 @synthesize canBeDeletedOnlyForSelf = _canBeDeletedOnlyForSelf;
 @synthesize canBeDeletedForAllUsers = _canBeDeletedForAllUsers;
@@ -111,6 +112,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         self.outgoing = outgoing;
         self.sending = NO;
         self.outgoingRead = NO;
+        self.canBeReplied = YES;
         self.preview = ([preview length] > 0) ? preview : @"[Message]";
     }
     return self;
@@ -342,6 +344,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setReplySenderDisplayName:_replySenderDisplayName];
     [copy setForwardSourceDisplayName:_forwardSourceDisplayName];
     [copy setCapabilitiesKnown:_capabilitiesKnown];
+    [copy setCanBeReplied:_canBeReplied];
     [copy setCanBeEdited:_canBeEdited];
     [copy setCanBeDeletedOnlyForSelf:_canBeDeletedOnlyForSelf];
     [copy setCanBeDeletedForAllUsers:_canBeDeletedForAllUsers];

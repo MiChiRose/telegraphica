@@ -7,7 +7,7 @@
                                                          styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                            backing:NSBackingStoreBuffered
                                                              defer:NO] autorelease];
-    [self.chatSearchWindow setTitle:@"Search chats"];
+    [self.chatSearchWindow setTitle:TGLoc(@"search.chats.title")];
     [self.chatSearchWindow setReleasedWhenClosed:NO];
     [self.chatSearchWindow setBackgroundColor:[NSColor colorWithCalibratedRed:0.93 green:0.96 blue:0.98 alpha:1.0]];
 
@@ -18,6 +18,7 @@
     [panelView setCommitAction:@selector(chatSearchWindowResultActivated:)];
     [panelView setCloseAction:@selector(closeChatSearchWindow:)];
     self.chatSearchWindowResultsView = panelView;
+    self.chatSearchWindowTextField = [panelView searchField];
     [self.chatSearchWindow setContentView:panelView];
 }
 
@@ -33,17 +34,20 @@
                                   (unsigned long)[self.chatItems count]]];
     TGChatSearchPanelView *panelView = [self chatSearchPanelView];
     [panelView setQuery:@""];
-    [panelView setStatusText:@"Recent chats. Type to filter by chat, group, or person."];
+    [panelView setStatusText:TGLoc(@"search.chats.recent")];
     [panelView setSelectedIndex:-1];
     [self updateChatSearchWindowResults];
     [self.chatSearchWindow center];
     [self.chatSearchWindow makeKeyAndOrderFront:self];
     [self.chatSearchWindow orderFrontRegardless];
-    [self.chatSearchWindow makeFirstResponder:panelView];
+    [self.chatSearchWindow makeFirstResponder:[panelView searchField]];
 }
 
 - (void)closeChatSearchWindow:(id)sender {
     (void)sender;
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(updateChatSearchWindowResults)
+                                               object:nil];
     [self.chatSearchWindow orderOut:self];
     if ([self.sendTextField isEnabled]) {
         [[self window] makeFirstResponder:self.sendTextField];
@@ -58,6 +62,8 @@
     [self buildChatSearchWindowIfNeeded];
     TGChatSearchPanelView *panelView = [self chatSearchPanelView];
     NSString *query = [[panelView query] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSUInteger generation = self.chatSearchGeneration + 1;
+    self.chatSearchGeneration = generation;
     [self.chatSearchWindowResults removeAllObjects];
     if ([query length] > 0) {
         [self.chatSearchWindowResults addObjectsFromArray:[self localChatSearchResultsForQuery:query]];
@@ -81,19 +87,112 @@
         }
     }
     if ([query length] == 0) {
-        [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? @"No loaded chats yet" : @"Recent chats. Type to filter by chat, group, or person.")];
+        [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? TGLoc(@"search.chats.loadingRecent") : TGLoc(@"search.chats.recent"))];
     } else {
-        [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? @"No chats found" : [NSString stringWithFormat:@"Found chats: %lu", (unsigned long)[self.chatSearchWindowResults count]])];
+        [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? TGLoc(@"search.chats.searching") : [NSString stringWithFormat:TGLoc(@"search.chats.loadedSearching"), (unsigned long)[self.chatSearchWindowResults count]])];
     }
     [panelView setResults:self.chatSearchWindowResults];
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: chat search query length=%lu results=%lu.",
                                   (unsigned long)[query length],
                                   (unsigned long)[self.chatSearchWindowResults count]]];
+
+    NSArray *localSnapshot = [[NSArray alloc] initWithArray:self.chatSearchWindowResults];
+    TGTDLibClient *client = [self.client retain];
+    NSString *queryCopy = [query copy];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *searchError = nil;
+        NSArray *serverItems = [[client searchChatPreviewItemsWithQuery:queryCopy
+                                                                  limit:30
+                                                                timeout:5.0
+                                                                  error:&searchError] retain];
+        NSString *errorMessage = [[searchError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.chatSearchGeneration != generation) {
+                [serverItems release];
+                [errorMessage release];
+                [localSnapshot release];
+                [queryCopy release];
+                [client release];
+                return;
+            }
+
+            [self.chatSearchWindowResults removeAllObjects];
+            NSMutableSet *seenKeys = [NSMutableSet set];
+            NSUInteger index = 0;
+            for (index = 0; index < [localSnapshot count]; index++) {
+                id localCandidate = [localSnapshot objectAtIndex:index];
+                if (![localCandidate isKindOfClass:[TGSearchResultItem class]]) {
+                    continue;
+                }
+                TGSearchResultItem *localResult = (TGSearchResultItem *)localCandidate;
+                NSString *key = [NSString stringWithFormat:@"%lld:%lld:%@",
+                                 [[localResult chatID] respondsToSelector:@selector(longLongValue)] ? [[localResult chatID] longLongValue] : 0LL,
+                                 [[localResult messageThreadID] respondsToSelector:@selector(longLongValue)] ? [[localResult messageThreadID] longLongValue] : 0LL,
+                                 [localResult messageTopicKind] ? [localResult messageTopicKind] : @""];
+                if ([seenKeys containsObject:key]) {
+                    continue;
+                }
+                [seenKeys addObject:key];
+                [self.chatSearchWindowResults addObject:localResult];
+            }
+            for (index = 0; index < [serverItems count]; index++) {
+                id candidate = [serverItems objectAtIndex:index];
+                if (![candidate isKindOfClass:[TGChatItem class]]) {
+                    continue;
+                }
+                TGChatItem *chatItem = (TGChatItem *)candidate;
+                NSNumber *resultChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
+                if (![resultChatID respondsToSelector:@selector(longLongValue)]) {
+                    continue;
+                }
+                NSString *key = [NSString stringWithFormat:@"%lld:%lld:%@",
+                                 [resultChatID longLongValue],
+                                 [[chatItem messageThreadID] respondsToSelector:@selector(longLongValue)] ? [[chatItem messageThreadID] longLongValue] : 0LL,
+                                 [chatItem messageTopicKind] ? [chatItem messageTopicKind] : @""];
+                if ([seenKeys containsObject:key]) {
+                    continue;
+                }
+                [seenKeys addObject:key];
+                TGSearchResultItem *result = [[[TGSearchResultItem alloc] init] autorelease];
+                [result setChatID:resultChatID];
+                [result setMessageThreadID:[chatItem messageThreadID]];
+                [result setMessageTopicKind:[chatItem messageTopicKind]];
+                [result setChatTitle:[[chatItem title] length] > 0 ? [chatItem title] : @"Chat"];
+                [result setSnippet:[chatItem typeSummary]];
+                [result setChatTitleOnly:YES];
+                [self.chatSearchWindowResults addObject:result];
+            }
+
+            TGChatSearchPanelView *activePanelView = [self chatSearchPanelView];
+            [activePanelView setResults:self.chatSearchWindowResults];
+            if ([self.chatSearchWindowResults count] > 0) {
+                [activePanelView setStatusText:([queryCopy length] == 0 ? TGLoc(@"search.chats.recent") : [NSString stringWithFormat:TGLoc(@"search.chats.found"), (unsigned long)[self.chatSearchWindowResults count]])];
+            } else if ([errorMessage length] > 0) {
+                [activePanelView setStatusText:[NSString stringWithFormat:TGLoc(@"search.chats.failed"), errorMessage]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: chat search failed: %@", errorMessage]];
+            } else {
+                [activePanelView setStatusText:([queryCopy length] == 0 ? TGLoc(@"search.chats.noLoaded") : TGLoc(@"search.chats.empty"))];
+            }
+            [serverItems release];
+            [errorMessage release];
+            [localSnapshot release];
+            [queryCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)chatSearchWindowQueryChanged:(id)sender {
     (void)sender;
-    [self updateChatSearchWindowResults];
+    TGChatSearchPanelView *panelView = [self chatSearchPanelView];
+    NSString *query = [[panelView query] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    [panelView setStatusText:([query length] == 0 ? TGLoc(@"search.chats.recent") : TGLoc(@"search.chats.searching"))];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(updateChatSearchWindowResults)
+                                               object:nil];
+    [self performSelector:@selector(updateChatSearchWindowResults) withObject:nil afterDelay:0.25];
 }
 
 - (void)chatSearchWindowTextCommitted:(id)sender {

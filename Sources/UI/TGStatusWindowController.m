@@ -188,6 +188,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *chatSearchWindowStatusField;
 @property (nonatomic, retain) NSMutableArray *chatSearchWindowResults;
 @property (nonatomic, retain) NSMutableArray *chatSearchWindowResultButtons;
+@property (nonatomic, assign) NSUInteger chatSearchGeneration;
 @property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
 @property (nonatomic, retain) NSTextField *pinnedMessageStripeField;
 @property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
@@ -553,6 +554,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize chatSearchWindowStatusField = _chatSearchWindowStatusField;
 @synthesize chatSearchWindowResults = _chatSearchWindowResults;
 @synthesize chatSearchWindowResultButtons = _chatSearchWindowResultButtons;
+@synthesize chatSearchGeneration = _chatSearchGeneration;
 @synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
 @synthesize pinnedMessageStripeField = _pinnedMessageStripeField;
 @synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
@@ -1113,10 +1115,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsAboutButton setTitle:TGLoc(@"settings.about")];
     [self.loginLogsButton setTitle:TGLoc(@"login.logs")];
     [self.loginLogsButton setToolTip:TGLoc(@"settings.logs")];
+    [self.pinnedMessageLabelField setStringValue:TGLoc(@"pinned.title")];
     [self refreshLoginLocalizedText];
     [self refreshDownloadFolderButtonTitle];
     [self selectLanguagePopUpItemForCode:TGLanguageCode()];
     [self refreshLoginLanguageButtons];
+    if ([[self.chatsNavigationContextMenu itemArray] count] > 0) {
+        [[[self.chatsNavigationContextMenu itemArray] objectAtIndex:0] setTitle:TGLoc(@"chat.readAll")];
+    }
 
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
@@ -1382,8 +1388,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     self.topicParentChatID = nil;
     self.topicParentTitle = nil;
     self.topicParentAvatarLocalPath = nil;
-    [self.chatsLabel setStringValue:@"Chats"];
-    [self.loadChatsButton setToolTip:@"Refresh chats"];
+    [self.chatsLabel setStringValue:TGLoc(@"chats")];
+    [self.loadChatsButton setToolTip:TGLoc(@"settings.sessions.refresh")];
 }
 
 - (void)clearProfileDisplayCache {
@@ -1521,7 +1527,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [navigationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         if (navigationTags[navigationIndex] == 0) {
             NSMenu *readAllMenu = [[[NSMenu alloc] initWithTitle:@"Chats"] autorelease];
-            NSMenuItem *readAllItem = [[[NSMenuItem alloc] initWithTitle:@"Read all chats"
+            NSMenuItem *readAllItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.readAll")
                                                                    action:@selector(markAllChatsReadFromMenu:)
                                                             keyEquivalent:@""] autorelease];
             [readAllItem setTarget:self];
@@ -1683,7 +1689,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     self.loginLanguageButtons = loginLanguageButtons;
 
     self.chatsLabel = [self labelWithFrame:NSMakeRect(24, 338, 76, 22)
-                                      text:@"Chats"
+                                      text:TGLoc(@"chats")
                                       font:[NSFont systemFontOfSize:13.0]];
     [self applyPanelHeaderLabelStyle:self.chatsLabel];
     [contentView addSubview:self.chatsLabel];
@@ -1939,7 +1945,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.pinnedMessageStripeField];
 
     self.pinnedMessageLabelField = [self labelWithFrame:NSMakeRect(44, 190, 90, 16)
-                                                   text:@"Pinned"
+                                                   text:TGLoc(@"pinned.title")
                                                    font:[NSFont boldSystemFontOfSize:10.0]];
     [self.pinnedMessageLabelField setTextColor:TGClassicMutedInkColor()];
     [contentView addSubview:self.pinnedMessageLabelField];
@@ -2754,7 +2760,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     NSMutableArray *folderItems = [NSMutableArray array];
     NSDictionary *allItem = [NSDictionary dictionaryWithObjectsAndKeys:
                              [NSNumber numberWithInteger:-1], @"id",
-                             @"All", @"title",
+                             TGLoc(@"drawer.all"), @"title",
                              nil];
     [folderItems addObject:allItem];
     if ([self.chatFilterInfos count] > 0) {
@@ -2779,7 +2785,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [folderButton setButtonType:NSToggleButton];
         [folderButton setBordered:NO];
         [folderButton setTag:[filterID integerValue]];
-        [folderButton setToolTip:([filterID integerValue] < 0) ? @"All chats" : [NSString stringWithFormat:@"%@ folder", buttonTitle]];
+        [folderButton setToolTip:([filterID integerValue] < 0) ? TGLoc(@"drawer.all.tooltip") : [NSString stringWithFormat:@"%@ folder", buttonTitle]];
         [folderButton setTarget:self];
         [folderButton setAction:@selector(folderFilterChanged:)];
         [folderButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];

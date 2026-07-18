@@ -686,7 +686,7 @@
     }
     self.suppressChatSelectionHandling = NO;
     self.chatItemsBeforeTopicList = nil;
-    [self.chatsLabel setStringValue:@"Chats"];
+    [self.chatsLabel setStringValue:TGLoc(@"chats")];
     [self updateAuthControlsForState:self.currentAuthState];
     [self layoutContentView];
     [self updateVisibleSection];

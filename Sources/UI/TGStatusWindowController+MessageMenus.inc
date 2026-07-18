@@ -431,13 +431,16 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         addedMessageAction = YES;
     }
 
-    NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
-                                                        action:@selector(replyToMessageFromMenu:)
-                                                 keyEquivalent:@""] autorelease];
-    [replyItem setRepresentedObject:item];
-    [replyItem setTarget:self];
-    [menu addItem:replyItem];
-    addedMessageAction = YES;
+    BOOL canReply = (![item capabilitiesKnown] || [item canBeReplied]);
+    if (canReply) {
+        NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:@"Reply"
+                                                            action:@selector(replyToMessageFromMenu:)
+                                                     keyEquivalent:@""] autorelease];
+        [replyItem setRepresentedObject:item];
+        [replyItem setTarget:self];
+        [menu addItem:replyItem];
+        addedMessageAction = YES;
+    }
 
     if (TGMessageItemHasCommentThread(item)) {
         NSMenuItem *commentsItem = [[[NSMenuItem alloc] initWithTitle:@"Open comments"
@@ -483,7 +486,9 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [readByItem setSubmenu:[self messageViewersSubmenuForItem:item]];
         [menu addItem:readByItem];
     }
-    if (([item canBeEdited] || [item outgoing]) && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
+    BOOL canEdit = (([item capabilitiesKnown] && [item canBeEdited]) ||
+                    (![item capabilitiesKnown] && [item outgoing]));
+    if (canEdit && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
         NSMenuItem *editItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.edit")
                                                            action:@selector(editMessageFromMenu:)
                                                     keyEquivalent:@""] autorelease];
@@ -492,7 +497,8 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [menu addItem:editItem];
         addedMessageAction = YES;
     }
-    if ([item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
+    BOOL canDelete = (![item capabilitiesKnown] || [item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers]);
+    if (canDelete && [item.messageID respondsToSelector:@selector(longLongValue)] && [item.chatID respondsToSelector:@selector(longLongValue)]) {
         NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.delete")
                                                              action:@selector(deleteMessageFromMenu:)
                                                       keyEquivalent:@""] autorelease];
@@ -876,7 +882,7 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
 
 - (void)markAllChatsReadFromMenu:(id)sender {
     (void)sender;
-    NSMutableArray *itemsToRead = [NSMutableArray array];
+    NSMutableArray *seedItems = [NSMutableArray array];
     NSMutableSet *seenKeys = [NSMutableSet set];
     NSUInteger index = 0;
     NSArray *collections[2] = { self.chatItems, self.chatItemsBeforeTopicList };
@@ -902,17 +908,65 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                 continue;
             }
             [seenKeys addObject:key];
-            [itemsToRead addObject:chatItem];
+            [seedItems addObject:chatItem];
         }
     }
-    if ([itemsToRead count] == 0) {
-        [self appendDetail:@"Read all: no unread chats in the loaded list."];
-        return;
-    }
-    [self appendDetail:[NSString stringWithFormat:@"Read all: marking %lu loaded chat(s) as read.", (unsigned long)[itemsToRead count]]];
-    for (index = 0; index < [itemsToRead count]; index++) {
-        [self markChatItemRead:[itemsToRead objectAtIndex:index]];
-    }
+    [self appendDetail:@"Read all: loading a wider unread chat set from TDLib..."];
+
+    NSArray *seedCopy = [[NSArray alloc] initWithArray:seedItems];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *loadError = nil;
+        NSArray *serverItems = [[client mainChatPreviewItemsWithLimit:500 timeout:8.0 error:&loadError] retain];
+        NSString *errorMessage = [[loadError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSMutableArray *itemsToRead = [NSMutableArray array];
+            NSMutableSet *finalSeenKeys = [NSMutableSet set];
+            NSArray *sources[2] = { seedCopy, serverItems };
+            NSUInteger sourceIndex = 0;
+            for (sourceIndex = 0; sourceIndex < 2; sourceIndex++) {
+                NSArray *source = sources[sourceIndex];
+                NSUInteger itemIndex = 0;
+                for (itemIndex = 0; itemIndex < [source count]; itemIndex++) {
+                    id candidate = [source objectAtIndex:itemIndex];
+                    if (![candidate isKindOfClass:[TGChatItem class]] ||
+                        ![[(TGChatItem *)candidate unreadCount] respondsToSelector:@selector(integerValue)] ||
+                        [[(TGChatItem *)candidate unreadCount] integerValue] <= 0) {
+                        continue;
+                    }
+                    TGChatItem *chatItem = (TGChatItem *)candidate;
+                    NSNumber *sourceChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
+                    NSNumber *sourceThreadID = [chatItem isForumTopic] ? [chatItem messageThreadID] : nil;
+                    if (![sourceChatID respondsToSelector:@selector(longLongValue)]) {
+                        continue;
+                    }
+                    NSString *key = [NSString stringWithFormat:@"%lld:%lld",
+                                     [sourceChatID longLongValue],
+                                     [sourceThreadID respondsToSelector:@selector(longLongValue)] ? [sourceThreadID longLongValue] : 0LL];
+                    if ([finalSeenKeys containsObject:key]) {
+                        continue;
+                    }
+                    [finalSeenKeys addObject:key];
+                    [itemsToRead addObject:chatItem];
+                }
+            }
+            if ([itemsToRead count] == 0) {
+                [self appendDetail:([errorMessage length] > 0 ? [NSString stringWithFormat:@"Read all: no unread chats found; wider load warning: %@", errorMessage] : @"Read all: no unread chats found.")];
+            } else {
+                [self appendDetail:[NSString stringWithFormat:@"Read all: marking %lu chat(s) as read.", (unsigned long)[itemsToRead count]]];
+                NSUInteger readIndex = 0;
+                for (readIndex = 0; readIndex < [itemsToRead count]; readIndex++) {
+                    [self markChatItemRead:[itemsToRead objectAtIndex:readIndex]];
+                }
+            }
+            [seedCopy release];
+            [serverItems release];
+            [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)toggleChatPinnedFromMenu:(id)sender {
