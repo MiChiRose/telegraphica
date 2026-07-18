@@ -416,15 +416,15 @@ TG_THEME_COLOR_FUNCTION(TGClassicTableHeaderColor, tableHeader)
 TG_THEME_COLOR_FUNCTION(TGClassicLinkColor, link)
 
 NSColor *TGClassicCardInkColor(void) {
-    return TGClassicInkColor();
+    return [NSColor colorWithCalibratedWhite:0.08 alpha:1.0];
 }
 
 NSColor *TGClassicCardMutedInkColor(void) {
-    return TGClassicMutedInkColor();
+    return [NSColor colorWithCalibratedWhite:0.36 alpha:1.0];
 }
 
 NSColor *TGClassicCardLinkColor(void) {
-    return TGClassicLinkColor();
+    return TGColorFromHex(0x2d5d96);
 }
 
 #define TG_THEME_ALPHA_COLOR_FUNCTION(name, field) \
@@ -837,7 +837,8 @@ static TGSkeuomorphicPattern TGThemeCurrentExperimentalPattern(void) {
 }
 
 static void TGThemeDrawPatternInClippedRect(NSRect rect, TGSkeuomorphicPattern pattern, CGFloat alpha) {
-    NSColor *patternColor = [[NSColor colorWithPatternImage:TGSkeuomorphicPatternImage(pattern)] colorWithAlphaComponent:alpha];
+    (void)alpha;
+    NSColor *patternColor = [NSColor colorWithPatternImage:TGSkeuomorphicPatternImage(pattern)];
     [patternColor set];
     NSRectFillUsingOperation(rect, NSCompositeSourceOver);
 }
