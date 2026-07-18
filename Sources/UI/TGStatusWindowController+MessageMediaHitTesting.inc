@@ -18,6 +18,24 @@
         return [NSArray array];
     }
 
+    if (TGChatMessagesAsBlocksEnabled()) {
+        NSArray *mediaItems = [item visualMediaItems];
+        if ([mediaItems count] == 0 || ![[mediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) {
+            return [NSArray array];
+        }
+        NSRect rowRect = NSInsetRect(cellFrame, 6.0, 2.0);
+        CGFloat iconSide = 28.0;
+        NSRect iconRect = NSMakeRect(NSMinX(rowRect) + 12.0,
+                                     NSMinY(rowRect) + floor((NSHeight(rowRect) - iconSide) / 2.0),
+                                     iconSide,
+                                     iconSide);
+        return [NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                         [mediaItems objectAtIndex:0], @"media_item",
+                                         [NSValue valueWithRect:iconRect], @"frame",
+                                         [NSNumber numberWithUnsignedInteger:0], @"tile_index",
+                                         nil]];
+    }
+
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;

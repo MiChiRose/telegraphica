@@ -367,6 +367,11 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         return;
     }
 
+    if (TGChatMessagesAsBlocksEnabled()) {
+        [self drawListMessageItem:item withFrame:cellFrame inView:controlView];
+        return;
+    }
+
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     BOOL showSenderDetails = self.showSenderDetails;
@@ -730,6 +735,168 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                  reactionSize.height + 3.0);
             [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];
         }
+    }
+}
+
+- (void)drawListMessageItem:(TGMessageItem *)item withFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL outgoing = [item outgoing];
+    BOOL flipped = [controlView isFlipped];
+    NSRect rowRect = NSInsetRect(cellFrame, 6.0, 2.0);
+    NSBezierPath *rowPath = [NSBezierPath bezierPathWithRoundedRect:rowRect xRadius:7.0 yRadius:7.0];
+    NSColor *rowColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
+    [[rowColor colorWithAlphaComponent:(outgoing ? 0.50 : 0.62)] set];
+    [rowPath fill];
+    [TGClassicTableGridColor() set];
+    [rowPath setLineWidth:0.8];
+    [rowPath stroke];
+
+    NSRect accentRect = NSMakeRect(NSMinX(rowRect), NSMinY(rowRect) + 1.0, 3.0, NSHeight(rowRect) - 2.0);
+    NSBezierPath *accentPath = [NSBezierPath bezierPathWithRoundedRect:accentRect xRadius:1.5 yRadius:1.5];
+    [(outgoing ? TGClassicNavigationSelectedColor(0.82) : TGClassicMutedInkColor()) set];
+    [accentPath fill];
+
+    CGFloat left = NSMinX(rowRect) + 12.0;
+    CGFloat top = flipped ? (NSMinY(rowRect) + 7.0) : (NSMaxY(rowRect) - 7.0);
+    CGFloat iconSide = 28.0;
+    NSRect iconRect = NSMakeRect(left,
+                                 NSMinY(rowRect) + floor((NSHeight(rowRect) - iconSide) / 2.0),
+                                 iconSide,
+                                 iconSide);
+    BOOL drewMediaIcon = NO;
+    if ([item isVisualMediaMessage]) {
+        NSArray *mediaItems = [item visualMediaItems];
+        NSDictionary *mediaItem = ([mediaItems count] > 0 && [[mediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) ? [mediaItems objectAtIndex:0] : nil;
+        if (mediaItem) {
+            TGDrawMediaItemInRect(mediaItem, iconRect, outgoing, flipped, YES, 0);
+            drewMediaIcon = YES;
+        }
+    }
+    if (!drewMediaIcon) {
+        if (TGMessageItemIsNonVisualPlayableMedia(item)) {
+            NSBezierPath *mediaCircle = [NSBezierPath bezierPathWithOvalInRect:iconRect];
+            [TGClassicNavigationSelectedColor(0.86) set];
+            [mediaCircle fill];
+            TGDrawTemplateIconAsset(@"play", NSInsetRect(iconRect, 8.0, 8.0), [NSColor whiteColor], 0.95, flipped);
+        } else if (TGMessageItemIsNonVisualDocument(item)) {
+            NSBezierPath *mediaCircle = [NSBezierPath bezierPathWithOvalInRect:iconRect];
+            [[NSColor colorWithCalibratedRed:0.05 green:0.67 blue:0.17 alpha:1.0] set];
+            [mediaCircle fill];
+            TGDrawTemplateIconAsset(@"document", NSInsetRect(iconRect, 7.0, 7.0), [NSColor whiteColor], 0.92, flipped);
+        } else if (self.showSenderDetails && !outgoing) {
+            TGDrawAvatarInRect([item senderAvatarLocalPath], [item senderDisplayName], iconRect, NO, flipped);
+        } else {
+            NSBezierPath *dotPath = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(iconRect, 7.0, 7.0)];
+            [(outgoing ? TGClassicNavigationSelectedColor(0.80) : TGClassicMutedInkColor()) set];
+            [dotPath fill];
+        }
+    }
+
+    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    TGChatMessageMetaFont(), NSFontAttributeName,
+                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
+    CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
+    CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
+    CGFloat timeRightPadding = 12.0;
+    NSRect timeRect = NSMakeRect(NSMaxX(rowRect) - timeRightPadding - timeSize.width - statusWidth - statusGap,
+                                 flipped ? (NSMinY(rowRect) + 8.0) : (NSMaxY(rowRect) - 18.0),
+                                 timeSize.width,
+                                 12.0);
+    if ([timeString length] > 0) {
+        [timeString drawInRect:timeRect withAttributes:timeAttributes];
+        TGDrawOutgoingStatusDotsForItem(item, timeRect, flipped);
+    }
+
+    CGFloat textX = NSMaxX(iconRect) + 10.0;
+    CGFloat textRight = NSMinX(timeRect) - 10.0;
+    if ([timeString length] == 0) {
+        textRight = NSMaxX(rowRect) - 12.0;
+    }
+    CGFloat textWidth = textRight - textX;
+    if (textWidth < 120.0) {
+        textWidth = MAX(120.0, NSMaxX(rowRect) - textX - 12.0);
+    }
+
+    NSString *senderTitle = nil;
+    if (self.showSenderDetails && [[item senderDisplayName] length] > 0 && !outgoing) {
+        senderTitle = [item senderDisplayName];
+    } else if (outgoing) {
+        senderTitle = TGLoc(@"message.you");
+        if ([senderTitle isEqualToString:@"message.you"]) {
+            senderTitle = @"You";
+        }
+    }
+    CGFloat textY = top;
+    if ([senderTitle length] > 0) {
+        NSDictionary *senderAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                          TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
+                                          TGClassicNavigationSelectedColor(0.92), NSForegroundColorAttributeName,
+                                          nil];
+        NSRect senderRect = NSMakeRect(textX,
+                                       flipped ? textY : (textY - 14.0),
+                                       textWidth,
+                                       14.0);
+        [senderTitle drawInRect:senderRect withAttributes:senderAttributes];
+        textY += flipped ? 15.0 : -15.0;
+    }
+
+    CGFloat contextHeight = TGMessageContextHeaderHeightForItem(item);
+    if (contextHeight > 0.0) {
+        NSString *contextTitle = ([[item forwardSourceDisplayName] length] > 0) ? [NSString stringWithFormat:@"Forwarded from %@", [item forwardSourceDisplayName]] : (([[item replySenderDisplayName] length] > 0) ? [item replySenderDisplayName] : @"Reply");
+        NSDictionary *contextAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           TGChatMessageSecondaryFont(), NSFontAttributeName,
+                                           TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                           nil];
+        NSRect contextRect = NSMakeRect(textX,
+                                        flipped ? textY : (textY - 14.0),
+                                        textWidth,
+                                        14.0);
+        [contextTitle drawInRect:contextRect withAttributes:contextAttributes];
+        textY += flipped ? 15.0 : -15.0;
+    }
+
+    NSString *messageText = TGDisplayTextForMessageItem(item);
+    if ([messageText length] == 0) {
+        if ([item isVisualMediaMessage]) {
+            messageText = [item visualMediaPlaceholderTitle];
+        } else if (TGMessageItemIsNonVisualPlayableMedia(item)) {
+            messageText = TGPlayableMediaTitleForMessageItem(item);
+        } else if (TGMessageItemIsNonVisualDocument(item)) {
+            messageText = @"Document";
+        }
+    }
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
+    NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    TGChatMessageBodyFont(), NSFontAttributeName,
+                                    TGClassicInkColor(), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+    NSAttributedString *attributedText = TGAttributedMessageString(messageText, textAttributes);
+    NSRect measuredRect = [attributedText boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
+                                                       options:NSStringDrawingUsesLineFragmentOrigin];
+    CGFloat textHeight = MAX(15.0, ceil(NSHeight(measuredRect)));
+    NSRect textRect = NSMakeRect(textX,
+                                 flipped ? textY : (textY - textHeight),
+                                 textWidth,
+                                 textHeight + 2.0);
+    [attributedText drawWithRect:textRect options:NSStringDrawingUsesLineFragmentOrigin];
+
+    CGFloat footerY = flipped ? (NSMaxY(textRect) + 4.0) : (NSMinY(textRect) - 20.0);
+    NSString *reactionSummary = [item reactionSummary];
+    NSString *commentTitle = nil;
+    if (TGMessageItemHasCommentThread(item)) {
+        NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
+        commentTitle = (replyCount > 0) ? [NSString stringWithFormat:TGLoc(replyCount == 1 ? @"message.comments.count.one" : @"message.comments.count.many"), (long)replyCount] : TGLoc(@"message.comments.add");
+    }
+    if ([reactionSummary length] > 0 || [commentTitle length] > 0) {
+        NSString *footer = ([reactionSummary length] > 0 && [commentTitle length] > 0) ? [NSString stringWithFormat:@"%@    %@", reactionSummary, commentTitle] : (([reactionSummary length] > 0) ? reactionSummary : commentTitle);
+        NSDictionary *footerAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                          TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
+                                          TGClassicNavigationSelectedColor(0.92), NSForegroundColorAttributeName,
+                                          nil];
+        [footer drawInRect:NSMakeRect(textX, footerY, textWidth, 16.0) withAttributes:footerAttributes];
     }
 }
 

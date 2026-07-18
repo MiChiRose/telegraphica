@@ -305,7 +305,7 @@ NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *base
 }
 
 CGFloat TGMessageExtraBlockVerticalPadding(void) {
-    return TGChatMessagesAsBlocksEnabled() ? 8.0 : 0.0;
+    return 0.0;
 }
 
 NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -718,6 +718,13 @@ CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
 CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item);
 
 CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth) {
+    if (TGChatMessagesAsBlocksEnabled()) {
+        CGFloat listWidth = availableWidth - 18.0;
+        if (listWidth < 210.0) {
+            listWidth = 210.0;
+        }
+        return listWidth;
+    }
     CGFloat widthRatio = ([item isVisualMediaMessage] ? 0.78 : 0.68);
     CGFloat maximumWidth = availableWidth * widthRatio;
     if (maximumWidth > TGMessageBubbleMaximumWidth) {
@@ -1022,6 +1029,52 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     if (!item) {
         return 48.0;
     }
+    if (TGChatMessagesAsBlocksEnabled()) {
+        CGFloat textWidth = availableWidth - 126.0;
+        if (textWidth < 150.0) {
+            textWidth = 150.0;
+        }
+        NSString *text = TGDisplayTextForMessageItem(item);
+        if ([text length] == 0) {
+            if ([item isVisualMediaMessage]) {
+                text = [item visualMediaPlaceholderTitle];
+            } else if (TGMessageItemIsNonVisualPlayableMedia(item)) {
+                text = TGPlayableMediaTitleForMessageItem(item);
+            } else if (TGMessageItemIsNonVisualDocument(item)) {
+                text = @"Document";
+            }
+        }
+        NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    TGChatMessageBodyFont(), NSFontAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+        CGFloat textHeight = 16.0;
+        if ([text length] > 0) {
+            NSRect measuredRect = [text boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
+                                                     options:NSStringDrawingUsesLineFragmentOrigin
+                                                  attributes:attributes];
+            textHeight = ceil(NSHeight(measuredRect));
+        }
+        CGFloat titleHeight = (showSenderDetails || [item outgoing]) ? 15.0 : 0.0;
+        CGFloat contextHeight = TGMessageContextHeaderHeightForItem(item);
+        CGFloat mediaHeight = [item isVisualMediaMessage] ? 44.0 : 0.0;
+        CGFloat contentHeight = MAX(textHeight + titleHeight + contextHeight, mediaHeight);
+        CGFloat rowHeight = contentHeight + 17.0;
+        if (TGMessageItemIsNonVisualPlayableMedia(item) || TGMessageItemIsNonVisualDocument(item)) {
+            rowHeight = MAX(rowHeight, 56.0);
+        }
+        if (TGMessageItemHasCommentThread(item)) {
+            rowHeight += 24.0;
+        }
+        if ([[item reactionSummary] length] > 0) {
+            rowHeight += 20.0;
+        }
+        if (rowHeight < 44.0) {
+            rowHeight = 44.0;
+        }
+        return ceil(rowHeight);
+    }
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
@@ -1082,6 +1135,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails) {
     if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
         return NSZeroRect;
+    }
+    if (TGChatMessagesAsBlocksEnabled()) {
+        return NSInsetRect(cellFrame, 6.0, 2.0);
     }
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
