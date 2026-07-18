@@ -15,8 +15,11 @@ NSString * const TGThemeIdentifierSkeuomorphicBlue = @"skeuomorphic-blue";
 NSString * const TGThemeIdentifierFrutigerAero = @"frutiger-aero";
 NSString * const TGThemeIdentifierFrutigerAeroDream = @"frutiger-aero-dream";
 NSString * const TGThemeIdentifierFrutigerMetro = @"frutiger-metro";
+NSString * const TGThemeIdentifierFrutigerMetroDark = @"frutiger-metro-dark";
 NSString * const TGThemeIdentifierY2KChrome = @"y2k-chrome";
+NSString * const TGThemeIdentifierY2KSilver = @"y2k-silver";
 NSString * const TGThemeIdentifierPixelTerminal = @"pixel-terminal";
+NSString * const TGThemeIdentifierMatrixRain = @"matrix-rain";
 NSString * const TGThemeIdentifierVectorPop = @"vector-pop";
 NSString * const TGThemeCategoryIdentifierLight = @"theme-category-light";
 NSString * const TGThemeCategoryIdentifierDark = @"theme-category-dark";
@@ -97,8 +100,11 @@ NSArray *TGThemeIdentifiers(void) {
             TGThemeIdentifierFrutigerAero,
             TGThemeIdentifierFrutigerAeroDream,
             TGThemeIdentifierFrutigerMetro,
+            TGThemeIdentifierFrutigerMetroDark,
             TGThemeIdentifierY2KChrome,
+            TGThemeIdentifierY2KSilver,
             TGThemeIdentifierPixelTerminal,
+            TGThemeIdentifierMatrixRain,
             TGThemeIdentifierVectorPop,
             nil];
 }
@@ -127,12 +133,15 @@ NSArray *TGThemeIdentifiersForCategory(NSString *categoryIdentifier) {
                 TGThemeIdentifierFrutigerAero,
                 TGThemeIdentifierFrutigerAeroDream,
                 TGThemeIdentifierFrutigerMetro,
+                TGThemeIdentifierFrutigerMetroDark,
                 nil];
     }
     if ([categoryIdentifier isEqualToString:TGThemeCategoryIdentifierExperimental]) {
         return [NSArray arrayWithObjects:
                 TGThemeIdentifierY2KChrome,
+                TGThemeIdentifierY2KSilver,
                 TGThemeIdentifierPixelTerminal,
+                TGThemeIdentifierMatrixRain,
                 TGThemeIdentifierVectorPop,
                 nil];
     }
@@ -175,10 +184,13 @@ NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
     if ([identifier isEqualToString:TGThemeIdentifierSkeuomorphicBlue]) return @"Skeuomorphic Blue";
     if ([identifier isEqualToString:TGThemeIdentifierFrutigerAero]) return @"Frutiger Aero (aqua)";
     if ([identifier isEqualToString:TGThemeIdentifierFrutigerAeroDream]) return @"Frutiger Aero (dream)";
-    if ([identifier isEqualToString:TGThemeIdentifierFrutigerMetro]) return @"Frutiger Metro";
+    if ([identifier isEqualToString:TGThemeIdentifierFrutigerMetro]) return @"Frutiger Metro Light";
+    if ([identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark]) return @"Frutiger Metro Dark";
     if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) return @"Y2K Chrome";
+    if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) return @"Y2K Silver";
     if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) return @"Pixel Terminal";
-    if ([identifier isEqualToString:TGThemeIdentifierVectorPop]) return @"Vector Pop";
+    if ([identifier isEqualToString:TGThemeIdentifierMatrixRain]) return @"Matrix Rain";
+    if ([identifier isEqualToString:TGThemeIdentifierVectorPop]) return @"Metro Pop";
     return @"VK Blue";
 }
 
@@ -298,20 +310,35 @@ static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
                                   0x93d2df, 0xc7eef7, 0x08324a, 0x1184bc, 0xd5f7ff, 0xffffff,
                                   0x70c8de, 0xb6d7df, 0x4b7584, 0xe0f6fb, 0x0f83bf, 0xf9ffff, 0xdff6ff);
     }
+    if ([identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark]) {
+        return TGThemePaletteMake(0x1b1009, 0x2b1a10, 0xd66b18, 0x24170f, 0xfff1df, 0xd5a47a,
+                                  0xb35e24, 0x5a2f18, 0xfff6e8, 0xff9c28, 0x4a2613, 0x281a11,
+                                  0xd9832d, 0x6a3c1d, 0xe2ae80, 0x3b2417, 0xffa336, 0xfff7ea, 0xf3bc8a);
+    }
     if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) {
         return TGThemePaletteMake(0x151a36, 0xeef3ff, 0x3f6ae5, 0xf9fbff, 0x111832, 0x5c6180,
                                   0x9eb1ff, 0xd9ddff, 0x101633, 0xd817b8, 0xdbe6ff, 0xffffff,
                                   0x8398ff, 0xcfd8f2, 0x5d6380, 0xe9edff, 0xb613a2, 0xffffff, 0xe8eeff);
     }
+    if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+        return TGThemePaletteMake(0x4e5668, 0xe9edf3, 0xaab5c8, 0xf8f9fc, 0x1a2333, 0x667085,
+                                  0x9fa9ba, 0xdce4f2, 0x162033, 0xa051ff, 0xe5ebf7, 0xffffff,
+                                  0xa0adbf, 0xc8d0dc, 0x687284, 0xf0f3f8, 0x7c4dff, 0xffffff, 0xe9eef7);
+    }
     if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-        return TGThemePaletteMake(0x111111, 0xf0f0e8, 0x242424, 0xfbfbf0, 0x111111, 0x606060,
-                                  0x9a9a88, 0xd9d9c9, 0x111111, 0x252525, 0xd9d9c9, 0xffffff,
-                                  0x888878, 0xc8c8b8, 0x555555, 0xe7e7d8, 0x111111, 0xffffff, 0xe8e8d8);
+        return TGThemePaletteMake(0x020603, 0x06120a, 0x0f2b17, 0x020803, 0xd7ffd5, 0x74aa71,
+                                  0x1d5f2c, 0x123f22, 0xeaffea, 0x6cff73, 0x0d3018, 0x06130a,
+                                  0x36b34f, 0x235f34, 0x7bcf80, 0x0b1d11, 0x63ff70, 0xeaffea, 0x83d486);
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierMatrixRain]) {
+        return TGThemePaletteMake(0x000000, 0x031006, 0x061f0b, 0x010602, 0xeaffee, 0x6bb970,
+                                  0x0d5920, 0x0b3917, 0xf3fff4, 0x39ff62, 0x093116, 0x030d05,
+                                  0x23d64b, 0x155a25, 0x78e882, 0x061609, 0x35ff5d, 0xedfff0, 0x7eff8a);
     }
     if ([identifier isEqualToString:TGThemeIdentifierVectorPop]) {
-        return TGThemePaletteMake(0x18212f, 0xf5f7ff, 0x1d6fd8, 0xffffff, 0x141a28, 0x5c6373,
-                                  0x9eb9ef, 0xd8ecff, 0x111827, 0xff4a8d, 0xdcecff, 0xffffff,
-                                  0x76a6eb, 0xd4d8e4, 0x576070, 0xe7f0ff, 0xff4a8d, 0xffffff, 0xe8f0ff);
+        return TGThemePaletteMake(0x091a28, 0xf2fff9, 0x129bd3, 0xffffff, 0x101820, 0x4d6470,
+                                  0x7fcbde, 0xd5f5fb, 0x0b1720, 0x62b929, 0xd8f5ff, 0xffffff,
+                                  0x5bb8d8, 0xbbd9d1, 0x526b75, 0xe4f8f2, 0x18a0d8, 0xffffff, 0xdaf6ee);
     }
     return TGThemePaletteMake(0x182537, 0xecf3fb, 0x3c5d8a, 0xf8fbfe, 0x0e141d, 0x4e637c,
                               0x8ca6c4, 0xb3cce9, 0x091321, 0x305d96, 0xc2ddf8, 0xffffff,
@@ -340,7 +367,8 @@ BOOL TGThemeIsFrutigerAero(void) {
     NSString *identifier = TGCurrentThemeIdentifier();
     return [identifier isEqualToString:TGThemeIdentifierFrutigerAero] ||
            [identifier isEqualToString:TGThemeIdentifierFrutigerAeroDream] ||
-           [identifier isEqualToString:TGThemeIdentifierFrutigerMetro];
+           [identifier isEqualToString:TGThemeIdentifierFrutigerMetro] ||
+           [identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark];
 }
 
 BOOL TGThemeIsFrutigerAeroDream(void) {
@@ -351,11 +379,22 @@ BOOL TGThemeIsFrutigerMetro(void) {
     return [TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierFrutigerMetro];
 }
 
+BOOL TGThemeIsFrutigerMetroDark(void) {
+    return [TGCurrentThemeIdentifier() isEqualToString:TGThemeIdentifierFrutigerMetroDark];
+}
+
 BOOL TGThemeIsExperimental2000s(void) {
     NSString *identifier = TGCurrentThemeIdentifier();
     return [identifier isEqualToString:TGThemeIdentifierY2KChrome] ||
+           [identifier isEqualToString:TGThemeIdentifierY2KSilver] ||
            [identifier isEqualToString:TGThemeIdentifierPixelTerminal] ||
+           [identifier isEqualToString:TGThemeIdentifierMatrixRain] ||
            [identifier isEqualToString:TGThemeIdentifierVectorPop];
+}
+
+static BOOL TGThemeIsTerminalLikeIdentifier(NSString *identifier) {
+    return [identifier isEqualToString:TGThemeIdentifierPixelTerminal] ||
+           [identifier isEqualToString:TGThemeIdentifierMatrixRain];
 }
 
 static BOOL TGThemeUsesLayeredMaterials(void) {
@@ -450,9 +489,12 @@ typedef enum {
     TGSkeuomorphicPatternAero = 4,
     TGSkeuomorphicPatternAeroDream = 5,
     TGSkeuomorphicPatternMetro = 6,
-    TGSkeuomorphicPatternY2K = 7,
-    TGSkeuomorphicPatternPixel = 8,
-    TGSkeuomorphicPatternVector = 9
+    TGSkeuomorphicPatternMetroDark = 7,
+    TGSkeuomorphicPatternY2K = 8,
+    TGSkeuomorphicPatternY2KSilver = 9,
+    TGSkeuomorphicPatternPixel = 10,
+    TGSkeuomorphicPatternMatrix = 11,
+    TGSkeuomorphicPatternVector = 12
 } TGSkeuomorphicPattern;
 
 static void TGDrawPatternDot(CGFloat x, CGFloat y, CGFloat alpha) {
@@ -467,8 +509,11 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
     static NSImage *aeroImage = nil;
     static NSImage *aeroDreamImage = nil;
     static NSImage *metroImage = nil;
+    static NSImage *metroDarkImage = nil;
     static NSImage *y2kImage = nil;
+    static NSImage *y2kSilverImage = nil;
     static NSImage *pixelImage = nil;
+    static NSImage *matrixImage = nil;
     static NSImage *vectorImage = nil;
     NSImage **slot = NULL;
     if (pattern == TGSkeuomorphicPatternCanvas) {
@@ -481,10 +526,16 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         slot = &aeroDreamImage;
     } else if (pattern == TGSkeuomorphicPatternMetro) {
         slot = &metroImage;
+    } else if (pattern == TGSkeuomorphicPatternMetroDark) {
+        slot = &metroDarkImage;
     } else if (pattern == TGSkeuomorphicPatternY2K) {
         slot = &y2kImage;
+    } else if (pattern == TGSkeuomorphicPatternY2KSilver) {
+        slot = &y2kSilverImage;
     } else if (pattern == TGSkeuomorphicPatternPixel) {
         slot = &pixelImage;
+    } else if (pattern == TGSkeuomorphicPatternMatrix) {
+        slot = &matrixImage;
     } else if (pattern == TGSkeuomorphicPatternVector) {
         slot = &vectorImage;
     } else {
@@ -505,12 +556,18 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         tileSize = 128.0;
     } else if (pattern == TGSkeuomorphicPatternMetro) {
         tileSize = 96.0;
+    } else if (pattern == TGSkeuomorphicPatternMetroDark) {
+        tileSize = 128.0;
     } else if (pattern == TGSkeuomorphicPatternY2K) {
         tileSize = 72.0;
+    } else if (pattern == TGSkeuomorphicPatternY2KSilver) {
+        tileSize = 96.0;
     } else if (pattern == TGSkeuomorphicPatternPixel) {
-        tileSize = 16.0;
+        tileSize = 24.0;
+    } else if (pattern == TGSkeuomorphicPatternMatrix) {
+        tileSize = 96.0;
     } else if (pattern == TGSkeuomorphicPatternVector) {
-        tileSize = 64.0;
+        tileSize = 128.0;
     } else {
         tileSize = 18.0;
     }
@@ -640,6 +697,39 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(35.0, 55.0, 7.0, 7.0)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(41.0, 29.0, 6.0, 6.0)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(59.0, 55.0, 6.0, 6.0)] fill];
+    } else if (pattern == TGSkeuomorphicPatternMetroDark) {
+        [[NSColor colorWithCalibratedRed:1.0 green:0.42 blue:0.06 alpha:0.075] set];
+        NSUInteger dotY = 0;
+        for (dotY = 0; dotY < 8; dotY++) {
+            NSUInteger dotX = 0;
+            for (dotX = 0; dotX < 8; dotX++) {
+                CGFloat x = (CGFloat)dotX * 16.0 + ((dotY % 2) ? 8.0 : 0.0);
+                CGFloat y = (CGFloat)dotY * 16.0;
+                [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(x + 3.0, y + 3.0, 7.0, 7.0)] fill];
+            }
+        }
+
+        NSBezierPath *orangeRibbon = [NSBezierPath bezierPath];
+        [[NSColor colorWithCalibratedRed:1.0 green:0.54 blue:0.12 alpha:0.16] set];
+        [orangeRibbon setLineWidth:9.0];
+        [orangeRibbon moveToPoint:NSMakePoint(-14.0, 32.0)];
+        [orangeRibbon curveToPoint:NSMakePoint(142.0, 74.0)
+                      controlPoint1:NSMakePoint(30.0, 70.0)
+                      controlPoint2:NSMakePoint(90.0, 18.0)];
+        [orangeRibbon stroke];
+
+        NSBezierPath *inkSwoop = [NSBezierPath bezierPath];
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.20] set];
+        [inkSwoop setLineWidth:3.0];
+        [inkSwoop moveToPoint:NSMakePoint(4.0, 102.0)];
+        [inkSwoop curveToPoint:NSMakePoint(118.0, 10.0)
+                 controlPoint1:NSMakePoint(28.0, 56.0)
+                 controlPoint2:NSMakePoint(76.0, 144.0)];
+        [inkSwoop stroke];
+
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.12] set];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(84.0, 18.0, 28.0, 28.0)] stroke];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(92.0, 26.0, 12.0, 12.0)] fill];
     } else if (pattern == TGSkeuomorphicPatternY2K) {
         [[NSColor colorWithCalibratedWhite:1.0 alpha:0.070] set];
         [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(4.0, 6.0, 24.0, 24.0)] fill];
@@ -650,28 +740,99 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
         NSRectFill(NSMakeRect(0.0, 50.0, tileSize, 2.0));
         [[NSColor colorWithCalibratedRed:0.12 green:0.75 blue:1.0 alpha:0.070] set];
         NSRectFill(NSMakeRect(18.0, 0.0, 2.0, tileSize));
+    } else if (pattern == TGSkeuomorphicPatternY2KSilver) {
+        NSGradient *chromeWash = [[[NSGradient alloc] initWithColorsAndLocations:
+                                   [NSColor colorWithCalibratedWhite:1.0 alpha:0.20], 0.0,
+                                   [NSColor colorWithCalibratedWhite:0.52 alpha:0.12], 0.44,
+                                   [NSColor colorWithCalibratedWhite:1.0 alpha:0.16], 0.68,
+                                   [NSColor colorWithCalibratedWhite:0.35 alpha:0.10], 1.0,
+                                   nil] autorelease];
+        [chromeWash drawInRect:NSMakeRect(0.0, 0.0, tileSize, tileSize) angle:24.0];
+
+        [[NSColor colorWithCalibratedRed:0.56 green:0.38 blue:1.0 alpha:0.08] set];
+        NSBezierPath *wireA = [NSBezierPath bezierPath];
+        [wireA setLineWidth:1.0];
+        [wireA moveToPoint:NSMakePoint(-8.0, 18.0)];
+        [wireA curveToPoint:NSMakePoint(105.0, 72.0)
+              controlPoint1:NSMakePoint(22.0, 52.0)
+              controlPoint2:NSMakePoint(70.0, 18.0)];
+        [wireA stroke];
+
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.11] set];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(7.0, 8.0, 30.0, 30.0)] stroke];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(62.0, 50.0, 18.0, 18.0)] fill];
+
+        [[NSColor colorWithCalibratedRed:1.0 green:0.48 blue:0.94 alpha:0.09] set];
+        NSRectFill(NSMakeRect(0.0, 70.0, tileSize, 2.0));
+        [[NSColor colorWithCalibratedRed:0.26 green:0.95 blue:1.0 alpha:0.08] set];
+        NSRectFill(NSMakeRect(42.0, 0.0, 2.0, tileSize));
     } else if (pattern == TGSkeuomorphicPatternPixel) {
-        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.080] set];
+        [[NSColor colorWithCalibratedRed:0.09 green:0.55 blue:0.15 alpha:0.13] set];
         NSRectFill(NSMakeRect(0.0, 0.0, tileSize, 1.0));
         NSRectFill(NSMakeRect(0.0, 8.0, tileSize, 1.0));
-        NSRectFill(NSMakeRect(0.0, 0.0, 1.0, tileSize));
-        NSRectFill(NSMakeRect(8.0, 0.0, 1.0, tileSize));
-        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.050] set];
-        NSRectFill(NSMakeRect(4.0, 4.0, 2.0, 2.0));
-        NSRectFill(NSMakeRect(12.0, 10.0, 2.0, 2.0));
+        NSRectFill(NSMakeRect(0.0, 16.0, tileSize, 1.0));
+        [[NSColor colorWithCalibratedRed:0.13 green:1.0 blue:0.28 alpha:0.13] set];
+        NSRectFill(NSMakeRect(3.0, 5.0, 2.0, 2.0));
+        NSRectFill(NSMakeRect(11.0, 13.0, 3.0, 2.0));
+        NSRectFill(NSMakeRect(18.0, 2.0, 2.0, 4.0));
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.028] set];
+        NSRectFill(NSMakeRect(0.0, 4.0, tileSize, 1.0));
+        NSRectFill(NSMakeRect(0.0, 12.0, tileSize, 1.0));
+    } else if (pattern == TGSkeuomorphicPatternMatrix) {
+        [[NSColor colorWithCalibratedRed:0.13 green:1.0 blue:0.28 alpha:0.12] set];
+        NSUInteger column = 0;
+        for (column = 0; column < 8; column++) {
+            CGFloat x = 5.0 + (CGFloat)column * 12.0;
+            NSUInteger glyph = 0;
+            for (glyph = 0; glyph < 6; glyph++) {
+                CGFloat y = (CGFloat)((column * 9 + glyph * 13) % 96);
+                CGFloat a = 0.03 + ((CGFloat)((glyph + column) % 4) * 0.018);
+                [[NSColor colorWithCalibratedRed:0.28 green:1.0 blue:0.40 alpha:a] set];
+                NSRectFill(NSMakeRect(x, y, 2.0, 6.0));
+                if ((glyph + column) % 3 == 0) {
+                    NSRectFill(NSMakeRect(x + 4.0, y + 2.0, 2.0, 2.0));
+                }
+            }
+        }
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.035] set];
+        NSRectFill(NSMakeRect(0.0, 14.0, tileSize, 1.0));
+        NSRectFill(NSMakeRect(0.0, 46.0, tileSize, 1.0));
+        NSRectFill(NSMakeRect(0.0, 78.0, tileSize, 1.0));
     } else if (pattern == TGSkeuomorphicPatternVector) {
-        [[NSColor colorWithCalibratedRed:0.12 green:0.42 blue:0.92 alpha:0.060] set];
-        NSRectFill(NSMakeRect(0.0, 18.0, tileSize, 1.0));
-        NSRectFill(NSMakeRect(32.0, 0.0, 1.0, tileSize));
-        [[NSColor colorWithCalibratedRed:1.0 green:0.28 blue:0.55 alpha:0.085] set];
-        NSBezierPath *triangle = [NSBezierPath bezierPath];
-        [triangle moveToPoint:NSMakePoint(12.0, 9.0)];
-        [triangle lineToPoint:NSMakePoint(28.0, 38.0)];
-        [triangle lineToPoint:NSMakePoint(3.0, 38.0)];
-        [triangle closePath];
-        [triangle fill];
-        [[NSColor colorWithCalibratedRed:0.34 green:0.84 blue:0.45 alpha:0.080] set];
-        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(40.0, 30.0, 14.0, 14.0)] fill];
+        [[NSColor colorWithCalibratedRed:0.05 green:0.55 blue:0.86 alpha:0.075] set];
+        NSUInteger ray = 0;
+        for (ray = 0; ray < 7; ray++) {
+            NSBezierPath *band = [NSBezierPath bezierPath];
+            CGFloat x = -20.0 + (CGFloat)ray * 24.0;
+            [band moveToPoint:NSMakePoint(64.0, 64.0)];
+            [band lineToPoint:NSMakePoint(x, 140.0)];
+            [band lineToPoint:NSMakePoint(x + 15.0, 140.0)];
+            [band closePath];
+            [band fill];
+        }
+
+        [[NSColor colorWithCalibratedRed:0.36 green:0.78 blue:0.18 alpha:0.095] set];
+        NSBezierPath *inkCloud = [NSBezierPath bezierPath];
+        [inkCloud appendBezierPathWithOvalInRect:NSMakeRect(8.0, 8.0, 26.0, 26.0)];
+        [inkCloud appendBezierPathWithOvalInRect:NSMakeRect(28.0, 19.0, 18.0, 18.0)];
+        [inkCloud appendBezierPathWithOvalInRect:NSMakeRect(86.0, 70.0, 24.0, 24.0)];
+        [inkCloud fill];
+
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.14] set];
+        NSBezierPath *speakerLine = [NSBezierPath bezierPath];
+        [speakerLine setLineWidth:5.0];
+        [speakerLine moveToPoint:NSMakePoint(4.0, 98.0)];
+        [speakerLine curveToPoint:NSMakePoint(122.0, 22.0)
+                    controlPoint1:NSMakePoint(36.0, 118.0)
+                    controlPoint2:NSMakePoint(78.0, -8.0)];
+        [speakerLine stroke];
+
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.18] set];
+        NSBezierPath *whiteCut = [NSBezierPath bezierPath];
+        [whiteCut setLineWidth:3.0];
+        [whiteCut moveToPoint:NSMakePoint(12.0, 31.0)];
+        [whiteCut lineToPoint:NSMakePoint(118.0, 116.0)];
+        [whiteCut stroke];
     } else {
         [[NSColor colorWithCalibratedWhite:1.0 alpha:0.035] set];
         NSRectFill(NSMakeRect(0.0, 2.0, tileSize, 1.0));
@@ -689,6 +850,9 @@ static NSImage *TGSkeuomorphicPatternImage(TGSkeuomorphicPattern pattern) {
 }
 
 static TGSkeuomorphicPattern TGThemeCurrentAeroPattern(void) {
+    if (TGThemeIsFrutigerMetroDark()) {
+        return TGSkeuomorphicPatternMetroDark;
+    }
     if (TGThemeIsFrutigerMetro()) {
         return TGSkeuomorphicPatternMetro;
     }
@@ -700,8 +864,14 @@ static TGSkeuomorphicPattern TGThemeCurrentExperimentalPattern(void) {
     if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) {
         return TGSkeuomorphicPatternY2K;
     }
+    if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+        return TGSkeuomorphicPatternY2KSilver;
+    }
     if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
         return TGSkeuomorphicPatternPixel;
+    }
+    if ([identifier isEqualToString:TGThemeIdentifierMatrixRain]) {
+        return TGSkeuomorphicPatternMatrix;
     }
     return TGSkeuomorphicPatternVector;
 }
@@ -733,15 +903,18 @@ void TGThemeDrawWindowBackgroundInRect(NSRect rect, BOOL flipped) {
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2b2b2b)
-                                                      endingColor:TGColorFromHex(0x111111)] autorelease];
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x06120a)
+                                                      endingColor:TGColorFromHex(0x000000)] autorelease];
         } else if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3b65e8)
                                                       endingColor:TGColorFromHex(0xe8efff)] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xdde5f2)
+                                                      endingColor:TGColorFromHex(0x667184)] autorelease];
         } else {
-            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf7fbff)
-                                                      endingColor:TGColorFromHex(0x1f73d7)] autorelease];
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf6fff8)
+                                                      endingColor:TGColorFromHex(0x159bd4)] autorelease];
         }
         [gradient drawInRect:rect angle:90.0];
         TGThemeDrawPatternInClippedRect(rect, TGThemeCurrentExperimentalPattern(), 0.30);
@@ -764,6 +937,9 @@ void TGThemeDrawWindowBackgroundInRect(NSRect rect, BOOL flipped) {
         [sunGradient drawInBezierPath:[NSBezierPath bezierPathWithOvalInRect:sunRect] angle:90.0];
         TGThemeDrawPatternInClippedRect(rect, TGSkeuomorphicPatternAeroDream, 0.35);
         return;
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3b1f10)
+                                                  endingColor:TGColorFromHex(0x120905)] autorelease];
     } else if (TGThemeIsFrutigerMetro()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf6fcff)
                                                   endingColor:TGColorFromHex(0x65cde6)] autorelease];
@@ -790,13 +966,19 @@ void TGThemeDrawPanelBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flip
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf6f6ec)
-                                                      endingColor:TGColorFromHex(0xdcdccc)] autorelease];
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x0a1d0f)
+                                                      endingColor:TGColorFromHex(0x031007)] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
+                                                      endingColor:TGColorFromHex(0xd3dce9)] autorelease];
         } else {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
                                                       endingColor:TGColorFromHex(0xe2edff)] autorelease];
         }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3a2315)
+                                                  endingColor:TGColorFromHex(0x1d1008)] autorelease];
     } else if (TGThemeIsFrutigerAero()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf8ffff)
                                                   endingColor:TGColorFromHex(0xcfeef2)] autorelease];
@@ -825,16 +1007,22 @@ void TGThemeDrawRailBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipp
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2a2a2a)
-                                                      endingColor:TGColorFromHex(0x111111)] autorelease];
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x0d2a13)
+                                                      endingColor:TGColorFromHex(0x020804)] autorelease];
         } else if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x4d69d8)
                                                       endingColor:TGColorFromHex(0x20264c)] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xbec8d8)
+                                                      endingColor:TGColorFromHex(0x596273)] autorelease];
         } else {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2b7fdb)
                                                       endingColor:TGColorFromHex(0x17345d)] autorelease];
         }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x4d2a14)
+                                                  endingColor:TGColorFromHex(0x1b0f08)] autorelease];
     } else if (TGThemeIsFrutigerAero()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2c9fca)
                                                   endingColor:TGColorFromHex(0x16455e)] autorelease];
@@ -861,16 +1049,22 @@ void TGThemeDrawHeaderBackgroundInRect(NSRect rect, BOOL flipped) {
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x333333)
-                                                      endingColor:TGColorFromHex(0x1f1f1f)] autorelease];
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x12421d)
+                                                      endingColor:TGColorFromHex(0x041208)] autorelease];
         } else if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x7890ff)
                                                       endingColor:TGColorFromHex(0x3151d6)] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf4f6fa)
+                                                      endingColor:TGColorFromHex(0x8a96aa)] autorelease];
         } else {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x42a4ee)
                                                       endingColor:TGColorFromHex(0x185fc2)] autorelease];
         }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf08a2a)
+                                                  endingColor:TGColorFromHex(0x8a3d12)] autorelease];
     } else if (TGThemeIsFrutigerAero()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x63c7e8)
                                                   endingColor:TGColorFromHex(0x207eaa)] autorelease];
@@ -898,13 +1092,19 @@ void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL f
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf9f9ee)
-                                                      endingColor:TGColorFromHex(0xe6e6d8)] autorelease];
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x07170b)
+                                                      endingColor:TGColorFromHex(0x020904)] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
+                                                      endingColor:TGColorFromHex(0xe7ecf3)] autorelease];
         } else {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
                                                       endingColor:TGColorFromHex(0xe9f3ff)] autorelease];
         }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2a1b12)
+                                                  endingColor:TGColorFromHex(0x180d07)] autorelease];
     } else if (TGThemeIsFrutigerAero()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xe8fbff)
                                                   endingColor:TGColorFromHex(0xf7fff8)] autorelease];
@@ -934,13 +1134,19 @@ void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped)
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x0a1b0e)
+                                                      endingColor:TGColorFromHex(0x041006)] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
-                                                      endingColor:TGColorFromHex(0xe8e8dc)] autorelease];
+                                                      endingColor:TGColorFromHex(0xe4e9f2)] autorelease];
         } else {
             gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
                                                       endingColor:TGColorFromHex(0xeaf4ff)] autorelease];
         }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x342116)
+                                                  endingColor:TGColorFromHex(0x21130b)] autorelease];
     } else if (TGThemeIsFrutigerAero()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
                                                   endingColor:TGColorFromHex(0xdff7f4)] autorelease];
@@ -970,16 +1176,16 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     NSColor *bottom = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
             if (highlighted) {
-                top = TGColorFromRGBWithAlpha(TGRGBMake(0x292929), alpha);
-                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x111111), alpha);
+                top = TGColorFromRGBWithAlpha(TGRGBMake(0x0b2411), alpha);
+                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x020804), alpha);
             } else if (selected) {
-                top = TGColorFromRGBWithAlpha(TGRGBMake(0x4a4a4a), alpha);
-                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x202020), alpha);
+                top = TGColorFromRGBWithAlpha(TGRGBMake(0x1f7a32), alpha);
+                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x083114), alpha);
             } else {
-                top = TGColorFromRGBWithAlpha(TGRGBMake(0x353535), alpha);
-                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x171717), alpha);
+                top = TGColorFromRGBWithAlpha(TGRGBMake(0x145122), alpha);
+                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x041407), alpha);
             }
         } else if ([identifier isEqualToString:TGThemeIdentifierY2KChrome]) {
             if (highlighted) {
@@ -992,6 +1198,17 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
                 top = TGColorFromRGBWithAlpha(TGRGBMake(0x7c93ff), alpha);
                 bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x3552dd), alpha);
             }
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            if (highlighted) {
+                top = TGColorFromRGBWithAlpha(TGRGBMake(0x6c7586), alpha);
+                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x363f4f), alpha);
+            } else if (selected) {
+                top = TGColorFromRGBWithAlpha(TGRGBMake(0xffffff), alpha);
+                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x9aa7bc), alpha);
+            } else {
+                top = TGColorFromRGBWithAlpha(TGRGBMake(0xe8edf6), alpha);
+                bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x8f9bae), alpha);
+            }
         } else {
             if (highlighted) {
                 top = TGColorFromRGBWithAlpha(TGRGBMake(0x1253a5), alpha);
@@ -1003,6 +1220,17 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
                 top = TGColorFromRGBWithAlpha(TGRGBMake(0x48a9f2), alpha);
                 bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x1969c9), alpha);
             }
+        }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        if (highlighted) {
+            top = TGColorFromRGBWithAlpha(TGRGBMake(0x6a3215), alpha);
+            bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x2a1509), alpha);
+        } else if (selected) {
+            top = TGColorFromRGBWithAlpha(TGRGBMake(0xffa14a), alpha);
+            bottom = TGColorFromRGBWithAlpha(TGRGBMake(0xbd5318), alpha);
+        } else {
+            top = TGColorFromRGBWithAlpha(TGRGBMake(0xd36d22), alpha);
+            bottom = TGColorFromRGBWithAlpha(TGRGBMake(0x7b3714), alpha);
         }
     } else if (TGThemeIsFrutigerAero()) {
         if (highlighted) {
@@ -1051,13 +1279,19 @@ void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoi
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
-        if ([identifier isEqualToString:TGThemeIdentifierPixelTerminal]) {
-            gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xe6e6d6) : TGColorFromHex(0xffffff))
-                                                      endingColor:(outgoing ? TGColorFromHex(0xcfcfbd) : TGColorFromHex(0xefefe3))] autorelease];
+        if (TGThemeIsTerminalLikeIdentifier(identifier)) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0x10361a) : TGColorFromHex(0x07170b))
+                                                      endingColor:(outgoing ? TGColorFromHex(0x08200f) : TGColorFromHex(0x020904))] autorelease];
+        } else if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) {
+            gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xeaf0f8) : TGColorFromHex(0xffffff))
+                                                      endingColor:(outgoing ? TGColorFromHex(0xcfd9e8) : TGColorFromHex(0xecf0f6))] autorelease];
         } else {
             gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xddecff) : TGColorFromHex(0xffffff))
                                                       endingColor:(outgoing ? TGColorFromHex(0xc0dcff) : TGColorFromHex(0xecf4ff))] autorelease];
         }
+    } else if (TGThemeIsFrutigerMetroDark()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0x4a2816) : TGColorFromHex(0x2b1a10))
+                                                  endingColor:(outgoing ? TGColorFromHex(0x2f180c) : TGColorFromHex(0x1d1009))] autorelease];
     } else if (TGThemeIsFrutigerAero()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xd8f8ff) : TGColorFromHex(0xffffff))
                                                   endingColor:(outgoing ? TGColorFromHex(0xa9e7f2) : TGColorFromHex(0xe8fbf5))] autorelease];
