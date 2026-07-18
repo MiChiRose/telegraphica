@@ -43,6 +43,37 @@ static BOOL TGTDLibDictionaryHasKey(NSDictionary *dictionary, NSString *key) {
     return ([dictionary isKindOfClass:[NSDictionary class]] && [dictionary objectForKey:key] != nil);
 }
 
+static BOOL TGTDLibCanGetMessageThreadFromObject(NSDictionary *object) {
+    if (![object isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    id directValue = [object objectForKey:@"can_get_message_thread"];
+    if ([directValue respondsToSelector:@selector(boolValue)] && [directValue boolValue]) {
+        return YES;
+    }
+
+    NSDictionary *interactionInfo = [[object objectForKey:@"interaction_info"] isKindOfClass:[NSDictionary class]] ? [object objectForKey:@"interaction_info"] : nil;
+    NSDictionary *replyInfo = [[interactionInfo objectForKey:@"reply_info"] isKindOfClass:[NSDictionary class]] ? [interactionInfo objectForKey:@"reply_info"] : nil;
+    id replyInfoCanGetThread = [replyInfo objectForKey:@"can_get_message_thread"];
+    if ([replyInfoCanGetThread respondsToSelector:@selector(boolValue)] && [replyInfoCanGetThread boolValue]) {
+        return YES;
+    }
+
+    NSArray *nestedKeys = [NSArray arrayWithObjects:@"message_properties", @"messageProperties", @"properties", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [nestedKeys count]; index++) {
+        id nested = [object objectForKey:[nestedKeys objectAtIndex:index]];
+        if (![nested isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        id nestedValue = [(NSDictionary *)nested objectForKey:@"can_get_message_thread"];
+        if ([nestedValue respondsToSelector:@selector(boolValue)] && [nestedValue boolValue]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 static NSComparisonResult TGTDLibCompareChatItemsByPinnedOrder(id leftObject, id rightObject, void *context) {
     (void)context;
     if (![leftObject isKindOfClass:[TGChatItem class]] || ![rightObject isKindOfClass:[TGChatItem class]]) {
@@ -4633,6 +4664,18 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             [item setCanBeDeletedForAllUsers:[[capabilities objectForKey:@"can_be_deleted_for_all_users"] boolValue]];
             [item setEditDate:[capabilities objectForKey:@"edit_date"]];
         }
+        if (TGTDLibCanGetMessageThreadFromObject(message)) {
+            [item setCanGetMessageThread:YES];
+        }
+        NSDictionary *interactionInfo = [message objectForKey:@"interaction_info"];
+        NSDictionary *replyInfo = [interactionInfo isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)interactionInfo objectForKey:@"reply_info"] : nil;
+        id replyCount = [replyInfo isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)replyInfo objectForKey:@"reply_count"] : nil;
+        if ([replyCount respondsToSelector:@selector(integerValue)] && [replyCount integerValue] >= 0) {
+            [item setMessageThreadReplyCount:[NSNumber numberWithInteger:[replyCount integerValue]]];
+            if ([replyCount integerValue] > 0 || TGTDLibCanGetMessageThreadFromObject(message)) {
+                [item setCanGetMessageThread:YES];
+            }
+        }
         if (!outgoing) {
             NSDictionary *senderSummary = [self senderSummaryFromMessageObject:message timeout:0.9];
             id senderID = [senderSummary objectForKey:@"sender_id"];
@@ -4977,8 +5020,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSNumber *threadID = [self messageThreadIDFromMessageObject:message];
         NSString *threadKind = [self messageTopicKindFromMessageObject:message];
         if (![threadID respondsToSelector:@selector(longLongValue)] || [threadID longLongValue] <= 0) {
-            id canGetThread = [message objectForKey:@"can_get_message_thread"];
-            if ([canGetThread respondsToSelector:@selector(boolValue)] && [canGetThread boolValue] && [messageID respondsToSelector:@selector(longLongValue)]) {
+            if (TGTDLibCanGetMessageThreadFromObject(message) && [messageID respondsToSelector:@selector(longLongValue)]) {
                 threadID = [NSNumber numberWithLongLong:[messageID longLongValue]];
                 threadKind = @"thread";
             }

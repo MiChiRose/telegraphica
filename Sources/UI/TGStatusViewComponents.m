@@ -68,6 +68,31 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @end
 
+@implementation TGNotificationDotView
+
+- (NSView *)hitTest:(NSPoint)aPoint {
+    (void)aPoint;
+    return nil;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = NSInsetRect([self bounds], 1.0, 1.0);
+    NSBezierPath *outer = [NSBezierPath bezierPathWithOvalInRect:bounds];
+    [[NSColor colorWithCalibratedRed:0.820 green:0.120 blue:0.110 alpha:1.0] set];
+    [outer fill];
+
+    NSRect highlightRect = NSMakeRect(NSMinX(bounds) + 2.0,
+                                      [self isFlipped] ? (NSMinY(bounds) + 2.0) : (NSMaxY(bounds) - 5.0),
+                                      NSWidth(bounds) - 4.0,
+                                      3.0);
+    NSBezierPath *highlight = [NSBezierPath bezierPathWithOvalInRect:highlightRect];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.35] set];
+    [highlight fill];
+}
+
+@end
+
 @implementation TGMessageTableView
 
 @synthesize dropOverlayTarget = _dropOverlayTarget;
@@ -90,15 +115,33 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     }
 }
 
+- (void)copy:(id)sender {
+    SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
+    if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+        [_dropOverlayTarget performSelector:selector withObject:sender ? sender : self];
+        return;
+    }
+    if (![[self nextResponder] tryToPerform:@selector(copy:) with:sender]) {
+        NSBeep();
+    }
+}
+
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
-    if ([event type] == NSKeyDown &&
-        (([event modifierFlags] & NSCommandKeyMask) != 0) &&
-        ([[event charactersIgnoringModifiers] isEqualToString:@"v"] ||
-         [[event charactersIgnoringModifiers] isEqualToString:@"V"])) {
-        SEL selector = NSSelectorFromString(@"messageTableViewPaste:");
-        if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
-            [_dropOverlayTarget performSelector:selector withObject:self];
-            return YES;
+    if ([event type] == NSKeyDown && (([event modifierFlags] & NSCommandKeyMask) != 0)) {
+        NSString *characters = [event charactersIgnoringModifiers];
+        if ([characters isEqualToString:@"v"] || [characters isEqualToString:@"V"]) {
+            SEL selector = NSSelectorFromString(@"messageTableViewPaste:");
+            if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+                [_dropOverlayTarget performSelector:selector withObject:self];
+                return YES;
+            }
+        }
+        if ([characters isEqualToString:@"c"] || [characters isEqualToString:@"C"]) {
+            SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
+            if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
+                [_dropOverlayTarget performSelector:selector withObject:self];
+                return YES;
+            }
         }
     }
     return [super performKeyEquivalent:event];

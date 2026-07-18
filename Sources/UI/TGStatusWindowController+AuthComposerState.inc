@@ -348,6 +348,11 @@
     }
 }
 
+- (BOOL)isComposerActivelyEditing {
+    NSText *editor = [self.sendTextField currentEditor];
+    return (editor != nil && [[self window] firstResponder] == editor);
+}
+
 - (void)refocusComposerIfPossible {
     if (![self.currentAuthState isEqualToString:@"ready"] ||
         !self.selectedChatID ||
@@ -357,7 +362,29 @@
     }
     [self updateSendControls];
     [self.sendTextField setEnabled:YES];
+
+    NSText *existingEditor = [self.sendTextField currentEditor];
+    if (existingEditor != nil && [[self window] firstResponder] == existingEditor) {
+        return;
+    }
+
+    NSRange previousSelection = NSMakeRange(NSNotFound, 0);
+    if (existingEditor != nil) {
+        previousSelection = [existingEditor selectedRange];
+    }
+
     [[self window] makeFirstResponder:self.sendTextField];
+
+    NSText *editor = [self.sendTextField currentEditor];
+    if (editor != nil) {
+        NSUInteger textLength = [[self.sendTextField stringValue] length];
+        if (previousSelection.location != NSNotFound &&
+            NSMaxRange(previousSelection) <= textLength) {
+            [editor setSelectedRange:previousSelection];
+        } else {
+            [editor setSelectedRange:NSMakeRange(textLength, 0)];
+        }
+    }
 }
 
 - (void)consumePendingComposerRefocus:(id)sender {
@@ -379,6 +406,13 @@
 }
 
 - (void)requestComposerRefocus {
+    if ([self isComposerActivelyEditing]) {
+        self.composerRefocusPending = NO;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(consumePendingComposerRefocus:)
+                                                   object:nil];
+        return;
+    }
     self.composerRefocusPending = YES;
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(consumePendingComposerRefocus:)

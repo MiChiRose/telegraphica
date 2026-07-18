@@ -95,6 +95,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize canBeDeletedForAllUsers = _canBeDeletedForAllUsers;
 @synthesize editDate = _editDate;
 @synthesize editableText = _editableText;
+@synthesize canGetMessageThread = _canGetMessageThread;
+@synthesize messageThreadReplyCount = _messageThreadReplyCount;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -345,6 +347,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setCanBeDeletedForAllUsers:_canBeDeletedForAllUsers];
     [copy setEditDate:_editDate];
     [copy setEditableText:_editableText];
+    [copy setCanGetMessageThread:_canGetMessageThread];
+    [copy setMessageThreadReplyCount:_messageThreadReplyCount];
     return copy;
 }
 
@@ -394,6 +398,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_forwardSourceDisplayName release];
     [_editDate release];
     [_editableText release];
+    [_messageThreadReplyCount release];
     [super dealloc];
 }
 
