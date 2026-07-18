@@ -125,6 +125,11 @@ NSString *TGCurrentApplicationVersionString(void) {
     return ([version length] > 0) ? version : @"0.0.0";
 }
 
+BOOL TGCurrentApplicationVersionIsMountainLionBuild(void) {
+    NSString *version = TGCurrentApplicationVersionString();
+    return ([version isKindOfClass:[NSString class]] && [[version lowercaseString] hasSuffix:@"-ml"]);
+}
+
 NSString *TGUpdateManifestURLString(void) {
     NSString *overrideURL = [[NSUserDefaults standardUserDefaults] stringForKey:TGUpdateManifestURLDefaultsKey];
     if ([overrideURL length] > 0) {

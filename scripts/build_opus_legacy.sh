@@ -23,6 +23,12 @@ if [ -z "$SDK_PATH" ]; then
     exit 1
 fi
 
+SDK_LINK="$ROOT_DIR/$BUILD_DIR/Toolchain/MacOSX.sdk"
+rm -f "$SDK_LINK"
+mkdir -p "$(dirname "$SDK_LINK")"
+ln -s "$SDK_PATH" "$SDK_LINK"
+SDK_PATH="$SDK_LINK"
+
 mkdir -p "$PREFIX" "$HELPER_DIR" "$LOG_DIR"
 
 COMMON_CFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=$DEPLOYMENT_TARGET -O2"

@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 
 NSString *TGCurrentApplicationVersionString(void);
+BOOL TGCurrentApplicationVersionIsMountainLionBuild(void);
 NSString *TGUpdateManifestURLString(void);
 NSString *TGUpdateProjectReleasesURLString(void);
 NSURL *TGUpdateProjectReleasesURL(void);
