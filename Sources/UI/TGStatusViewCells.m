@@ -759,37 +759,27 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat top = flipped ? (NSMinY(rowRect) + 7.0) : (NSMaxY(rowRect) - 7.0);
     CGFloat iconSide = 28.0;
     NSRect iconRect = NSMakeRect(left,
-                                 NSMinY(rowRect) + floor((NSHeight(rowRect) - iconSide) / 2.0),
+                                 NSMinY(rowRect) + 7.0,
                                  iconSide,
                                  iconSide);
-    BOOL drewMediaIcon = NO;
-    if ([item isVisualMediaMessage]) {
-        NSArray *mediaItems = [item visualMediaItems];
-        NSDictionary *mediaItem = ([mediaItems count] > 0 && [[mediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) ? [mediaItems objectAtIndex:0] : nil;
-        if (mediaItem) {
-            TGDrawMediaItemInRect(mediaItem, iconRect, outgoing, flipped, YES, 0);
-            drewMediaIcon = YES;
-        }
+    if (NSHeight(rowRect) <= 48.0) {
+        iconRect.origin.y = NSMinY(rowRect) + floor((NSHeight(rowRect) - iconSide) / 2.0);
     }
-    if (!drewMediaIcon) {
-        if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-            NSBezierPath *mediaCircle = [NSBezierPath bezierPathWithOvalInRect:iconRect];
-            [TGClassicNavigationSelectedColor(0.86) set];
-            [mediaCircle fill];
-            TGDrawTemplateIconAsset(@"play", NSInsetRect(iconRect, 8.0, 8.0), [NSColor whiteColor], 0.95, flipped);
-        } else if (TGMessageItemIsNonVisualDocument(item)) {
-            NSBezierPath *mediaCircle = [NSBezierPath bezierPathWithOvalInRect:iconRect];
-            [[NSColor colorWithCalibratedRed:0.05 green:0.67 blue:0.17 alpha:1.0] set];
-            [mediaCircle fill];
-            TGDrawTemplateIconAsset(@"document", NSInsetRect(iconRect, 7.0, 7.0), [NSColor whiteColor], 0.92, flipped);
-        } else if (self.showSenderDetails && !outgoing) {
-            TGDrawAvatarInRect([item senderAvatarLocalPath], [item senderDisplayName], iconRect, NO, flipped);
-        } else {
-            NSBezierPath *dotPath = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(iconRect, 7.0, 7.0)];
-            [(outgoing ? TGClassicNavigationSelectedColor(0.80) : TGClassicMutedInkColor()) set];
-            [dotPath fill];
+    NSString *avatarTitle = nil;
+    NSString *avatarPath = nil;
+    if (outgoing) {
+        avatarTitle = TGLoc(@"message.you");
+        if ([avatarTitle isEqualToString:@"message.you"]) {
+            avatarTitle = @"You";
         }
+    } else {
+        avatarTitle = [item senderDisplayName];
+        avatarPath = [item senderAvatarLocalPath];
     }
+    if ([avatarTitle length] == 0) {
+        avatarTitle = outgoing ? @"You" : @"T";
+    }
+    TGDrawAvatarInRect(avatarPath, avatarTitle, iconRect, NO, flipped);
 
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -858,30 +848,74 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
 
     NSString *messageText = TGDisplayTextForMessageItem(item);
+    BOOL messageTextIsPlaceholder = NO;
     if ([messageText length] == 0) {
         if ([item isVisualMediaMessage]) {
             messageText = [item visualMediaPlaceholderTitle];
+            messageTextIsPlaceholder = YES;
         } else if (TGMessageItemIsNonVisualPlayableMedia(item)) {
             messageText = TGPlayableMediaTitleForMessageItem(item);
+            messageTextIsPlaceholder = YES;
         } else if (TGMessageItemIsNonVisualDocument(item)) {
             messageText = @"Document";
+            messageTextIsPlaceholder = YES;
         }
     }
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageBodyFont(), NSFontAttributeName,
-                                    TGClassicInkColor(), NSForegroundColorAttributeName,
+                                    messageTextIsPlaceholder ? TGClassicMutedInkColor() : TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
     NSAttributedString *attributedText = TGAttributedMessageString(messageText, textAttributes);
-    NSRect measuredRect = [attributedText boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
-                                                       options:NSStringDrawingUsesLineFragmentOrigin];
-    CGFloat textHeight = MAX(15.0, ceil(NSHeight(measuredRect)));
-    NSRect textRect = NSMakeRect(textX,
-                                 flipped ? textY : (textY - textHeight),
-                                 textWidth,
-                                 textHeight + 2.0);
-    [attributedText drawWithRect:textRect options:NSStringDrawingUsesLineFragmentOrigin];
+    NSRect textRect = NSZeroRect;
+    if ([item isVisualMediaMessage]) {
+        NSRect mediaRect = TGListMessageMediaRectForItem(item, cellFrame, self.showSenderDetails);
+        NSArray *mediaItems = [item visualMediaItems];
+        NSArray *tileRects = TGMediaTileRectsForMessageItem(item, mediaRect);
+        NSUInteger tileIndex = 0;
+        for (tileIndex = 0; tileIndex < [tileRects count] && tileIndex < [mediaItems count]; tileIndex++) {
+            id mediaObject = [mediaItems objectAtIndex:tileIndex];
+            if (![mediaObject isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            NSUInteger overflowCount = 0;
+            if (tileIndex == [tileRects count] - 1 && [mediaItems count] > [tileRects count]) {
+                overflowCount = [mediaItems count] - [tileRects count];
+            }
+            NSRect tileRect = [[tileRects objectAtIndex:tileIndex] rectValue];
+            tileRect = TGStickerAdjustedMediaRect((NSDictionary *)mediaObject, tileRect, flipped);
+            TGDrawMediaItemInRect((NSDictionary *)mediaObject, tileRect, outgoing, flipped, [mediaItems count] > 1, overflowCount);
+        }
+        CGFloat captionY = NSMaxY(mediaRect) + 6.0;
+        if ([messageText length] > 0 && !NSIsEmptyRect(mediaRect)) {
+            CGFloat captionWidth = MIN(textWidth, NSWidth(rowRect) - textX - 14.0);
+            NSRect measuredRect = [attributedText boundingRectWithSize:NSMakeSize(captionWidth, 12000.0)
+                                                               options:NSStringDrawingUsesLineFragmentOrigin];
+            CGFloat textHeight = MAX(15.0, ceil(NSHeight(measuredRect)));
+            textRect = NSMakeRect(textX, captionY, captionWidth, textHeight + 2.0);
+            [attributedText drawWithRect:textRect options:NSStringDrawingUsesLineFragmentOrigin];
+        } else {
+            textRect = mediaRect;
+        }
+    } else if (TGMessageItemIsNonVisualPlayableMedia(item)) {
+        NSRect playableRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(260.0, NSWidth(rowRect) - textX - 58.0), 50.0);
+        TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
+        textRect = playableRect;
+    } else if (TGMessageItemIsNonVisualDocument(item)) {
+        NSRect documentRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(300.0, NSWidth(rowRect) - textX - 58.0), 50.0);
+        TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
+        textRect = documentRect;
+    } else {
+        NSRect measuredRect = [attributedText boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
+                                                           options:NSStringDrawingUsesLineFragmentOrigin];
+        CGFloat textHeight = MAX(15.0, ceil(NSHeight(measuredRect)));
+        textRect = NSMakeRect(textX,
+                              flipped ? textY : (textY - textHeight),
+                              textWidth,
+                              textHeight + 2.0);
+        [attributedText drawWithRect:textRect options:NSStringDrawingUsesLineFragmentOrigin];
+    }
 
     CGFloat footerY = flipped ? (NSMaxY(textRect) + 4.0) : (NSMinY(textRect) - 20.0);
     NSString *reactionSummary = [item reactionSummary];

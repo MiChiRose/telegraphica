@@ -20,6 +20,15 @@
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     (void)sender;
+    return NO;
+}
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+    (void)sender;
+    if (!flag) {
+        [self.statusWindowController showWindow:self];
+        [NSApp activateIgnoringOtherApps:YES];
+    }
     return YES;
 }
 

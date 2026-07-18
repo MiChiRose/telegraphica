@@ -601,7 +601,11 @@
                 [alert addButtonWithTitle:TGLoc(@"update.downloaded.open")];
                 [alert addButtonWithTitle:@"OK"];
                 if ([alert runModal] == NSAlertFirstButtonReturn) {
-                    [[NSWorkspace sharedWorkspace] openFile:targetPathCopy];
+                    BOOL openedInstaller = [[NSWorkspace sharedWorkspace] openFile:targetPathCopy];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: open installer %@ for %@.", openedInstaller ? @"requested" : @"failed", targetPathCopy]];
+                    if (openedInstaller) {
+                        [NSApp performSelector:@selector(terminate:) withObject:self afterDelay:0.35];
+                    }
                 }
             }
             [infoCopy release];

@@ -20,20 +20,26 @@
 
     if (TGChatMessagesAsBlocksEnabled()) {
         NSArray *mediaItems = [item visualMediaItems];
-        if ([mediaItems count] == 0 || ![[mediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) {
+        if ([mediaItems count] == 0) {
             return [NSArray array];
         }
-        NSRect rowRect = NSInsetRect(cellFrame, 6.0, 2.0);
-        CGFloat iconSide = 28.0;
-        NSRect iconRect = NSMakeRect(NSMinX(rowRect) + 12.0,
-                                     NSMinY(rowRect) + floor((NSHeight(rowRect) - iconSide) / 2.0),
-                                     iconSide,
-                                     iconSide);
-        return [NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
-                                         [mediaItems objectAtIndex:0], @"media_item",
-                                         [NSValue valueWithRect:iconRect], @"frame",
-                                         [NSNumber numberWithUnsignedInteger:0], @"tile_index",
-                                         nil]];
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+        NSRect mediaRect = TGListMessageMediaRectForItem(item, cellFrame, showSenderDetails);
+        NSArray *tileRects = TGMediaTileRectsForMessageItem(item, mediaRect);
+        NSMutableArray *entries = [NSMutableArray array];
+        NSUInteger index = 0;
+        for (index = 0; index < [tileRects count] && index < [mediaItems count]; index++) {
+            id mediaItem = [mediaItems objectAtIndex:index];
+            if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                mediaItem, @"media_item",
+                                [tileRects objectAtIndex:index], @"frame",
+                                [NSNumber numberWithUnsignedInteger:index], @"tile_index",
+                                nil]];
+        }
+        return entries;
     }
 
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);

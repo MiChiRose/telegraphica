@@ -1025,6 +1025,50 @@ CGFloat TGMessageMediaFooterHeightForItem(TGMessageItem *item) {
     return ([TGShortTimeStringFromDateValue([item date]) length] > 0) ? 18.0 : 0.0;
 }
 
+NSSize TGListMessageMediaDisplaySizeForItem(TGMessageItem *item, CGFloat availableWidth) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage]) {
+        return NSZeroSize;
+    }
+
+    CGFloat maximumWidth = availableWidth - 86.0;
+    if (maximumWidth > 300.0) {
+        maximumWidth = 300.0;
+    }
+    if (maximumWidth < 150.0) {
+        maximumWidth = 150.0;
+    }
+    return TGPhotoDisplaySizeForMessageItem(item, maximumWidth);
+}
+
+NSRect TGListMessageMediaRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage] || NSIsEmptyRect(cellFrame)) {
+        return NSZeroRect;
+    }
+
+    NSRect rowRect = NSInsetRect(cellFrame, 6.0, 2.0);
+    CGFloat avatarSide = 28.0;
+    CGFloat left = NSMinX(rowRect) + 12.0;
+    CGFloat textX = left + avatarSide + 10.0;
+    CGFloat mediaTop = NSMinY(rowRect) + 8.0;
+    if (showSenderDetails || [item outgoing]) {
+        mediaTop += 15.0;
+    }
+    mediaTop += TGMessageContextHeaderHeightForItem(item);
+
+    NSSize mediaSize = TGListMessageMediaDisplaySizeForItem(item, NSWidth(cellFrame));
+    if (mediaSize.width <= 0.0 || mediaSize.height <= 0.0) {
+        return NSZeroRect;
+    }
+
+    CGFloat maximumRight = NSMaxX(rowRect) - 52.0;
+    if ((textX + mediaSize.width) > maximumRight && maximumRight > textX + 80.0) {
+        CGFloat shrink = (maximumRight - textX) / mediaSize.width;
+        mediaSize.width *= shrink;
+        mediaSize.height *= shrink;
+    }
+    return NSMakeRect(textX, mediaTop, ceil(mediaSize.width), ceil(mediaSize.height));
+}
+
 CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth, BOOL showSenderDetails) {
     if (!item) {
         return 48.0;
@@ -1058,11 +1102,15 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         }
         CGFloat titleHeight = (showSenderDetails || [item outgoing]) ? 15.0 : 0.0;
         CGFloat contextHeight = TGMessageContextHeaderHeightForItem(item);
-        CGFloat mediaHeight = [item isVisualMediaMessage] ? 44.0 : 0.0;
-        CGFloat contentHeight = MAX(textHeight + titleHeight + contextHeight, mediaHeight);
+        CGFloat mediaHeight = 0.0;
+        if ([item isVisualMediaMessage]) {
+            NSSize mediaSize = TGListMessageMediaDisplaySizeForItem(item, availableWidth);
+            mediaHeight = mediaSize.height + ((textHeight > 0.0 && ![item isStickerMessage]) ? (textHeight + 8.0) : 0.0);
+        }
+        CGFloat contentHeight = MAX(textHeight + titleHeight + contextHeight, mediaHeight + titleHeight + contextHeight);
         CGFloat rowHeight = contentHeight + 17.0;
         if (TGMessageItemIsNonVisualPlayableMedia(item) || TGMessageItemIsNonVisualDocument(item)) {
-            rowHeight = MAX(rowHeight, 56.0);
+            rowHeight = MAX(rowHeight, 70.0);
         }
         if (TGMessageItemHasCommentThread(item)) {
             rowHeight += 24.0;

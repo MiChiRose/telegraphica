@@ -51,6 +51,8 @@ CGFloat TGComposerLineHeight(void);
 NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item);
 void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL flipped);
 CGFloat TGMessageMediaFooterHeightForItem(TGMessageItem *item);
+NSSize TGListMessageMediaDisplaySizeForItem(TGMessageItem *item, CGFloat availableWidth);
+NSRect TGListMessageMediaRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails);
 CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth, BOOL showSenderDetails);
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails);
 void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
