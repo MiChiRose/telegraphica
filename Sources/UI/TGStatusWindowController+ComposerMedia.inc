@@ -905,10 +905,20 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     }
     NSString *localPath = TGMediaItemLocalPath(item);
     if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-        return YES;
+        NSImage *image = TGImageWithCorrectOrientationFromFile(localPath);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
+        }
+        if (image) {
+            return YES;
+        }
     }
     NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(item);
-    return ([miniThumbnailData length] > 0);
+    if ([miniThumbnailData length] > 0) {
+        NSImage *image = [[[NSImage alloc] initWithData:miniThumbnailData] autorelease];
+        return (image != nil);
+    }
+    return NO;
 }
 
 - (NSDictionary *)stickerPickerRenderableRailItemFromItem:(NSDictionary *)item client:(TGTDLibClient *)client {
@@ -987,9 +997,17 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         for (loadIndex = 0; loadIndex < [setIDsToLoad count]; loadIndex++) {
             NSNumber *setID = [setIDsToLoad objectAtIndex:loadIndex];
             NSError *setError = nil;
-            NSArray *items = [[client stickerItemsForStickerSetID:setID limit:1 timeout:8.0 error:&setError] copy];
-            NSDictionary *rawFirstItem = ([items count] > 0 && [[items objectAtIndex:0] isKindOfClass:[NSDictionary class]]) ? [items objectAtIndex:0] : nil;
-            NSDictionary *firstItem = [[self stickerPickerRenderableRailItemFromItem:rawFirstItem client:client] retain];
+            NSArray *items = [[client stickerItemsForStickerSetID:setID limit:8 timeout:12.0 error:&setError] copy];
+            NSDictionary *firstItem = nil;
+            NSUInteger itemIndex = 0;
+            for (itemIndex = 0; itemIndex < [items count]; itemIndex++) {
+                NSDictionary *rawItem = [[items objectAtIndex:itemIndex] isKindOfClass:[NSDictionary class]] ? [items objectAtIndex:itemIndex] : nil;
+                firstItem = [self stickerPickerRenderableRailItemFromItem:rawItem client:client];
+                if (firstItem) {
+                    break;
+                }
+            }
+            [firstItem retain];
             NSString *errorMessage = [[setError localizedDescription] copy];
             dispatch_async(dispatch_get_main_queue(), ^{
                 NSString *key = [setID stringValue];
@@ -998,7 +1016,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: rail preview loaded for set %@", key]];
                         [self updateStickerPickerRailThumbnailForSetID:setID withItem:firstItem];
                     } else {
-                        [self.stickerPickerRailPreviewState setObject:@"done" forKey:key];
+                        [self.stickerPickerRailPreviewState removeObjectForKey:key];
                         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: rail preview unavailable for set %@%@",
                                                       key,
                                                       [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
@@ -1110,9 +1128,22 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     }
 }
 
+- (void)scrollStickerPickerSetRailToTop {
+    NSScrollView *scrollView = self.stickerPickerSetScrollView;
+    NSView *documentView = self.stickerPickerSetContentView;
+    if (!scrollView || !documentView) {
+        return;
+    }
+    NSRect visibleRect = [[scrollView contentView] bounds];
+    CGFloat maxY = MAX(0.0, NSHeight([documentView frame]) - NSHeight(visibleRect));
+    [[scrollView documentView] scrollPoint:NSMakePoint(0.0, maxY)];
+    [scrollView reflectScrolledClipView:[scrollView contentView]];
+}
+
 - (void)reloadStickerPickerSetsIfNeeded {
     if ([self.stickerPickerStickerSets count] > 0) {
         [self rebuildStickerPickerSetRail];
+        [self scrollStickerPickerSetRailToTop];
         [self preloadStickerPickerRailPreviews];
         return;
     }
@@ -1127,6 +1158,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             if (resultIsCurrent) {
                 self.stickerPickerStickerSets = ([sets count] > 0 ? sets : [NSArray array]);
                 [self rebuildStickerPickerSetRail];
+                [self scrollStickerPickerSetRailToTop];
                 [self preloadStickerPickerRailPreviews];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded installed sticker sets count=%lu%@",
                                               (unsigned long)[self.stickerPickerStickerSets count],
