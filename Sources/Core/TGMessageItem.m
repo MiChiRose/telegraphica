@@ -114,6 +114,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize pollAnonymous = _pollAnonymous;
 @synthesize pollMultipleChoice = _pollMultipleChoice;
 @synthesize pollQuiz = _pollQuiz;
+@synthesize pendingPollOptionIndexes = _pendingPollOptionIndexes;
+@synthesize pollVoteState = _pollVoteState;
+@synthesize pollVoteMessage = _pollVoteMessage;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -344,6 +347,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setSending:_sending];
     [copy setFailedToSend:_failedToSend];
     [copy setOutgoingRead:_outgoingRead];
+    [copy setPinned:_pinned];
     [copy setContentType:_contentType];
     [copy setMediaLocalPath:_mediaLocalPath];
     [copy setMediaWidth:_mediaWidth];
@@ -388,6 +392,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setPollAnonymous:_pollAnonymous];
     [copy setPollMultipleChoice:_pollMultipleChoice];
     [copy setPollQuiz:_pollQuiz];
+    [copy setPendingPollOptionIndexes:_pendingPollOptionIndexes];
+    [copy setPollVoteState:_pollVoteState];
+    [copy setPollVoteMessage:_pollVoteMessage];
     return copy;
 }
 
@@ -449,6 +456,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_pollOptions release];
     [_pollTotalVoterCount release];
     [_pollID release];
+    [_pendingPollOptionIndexes release];
+    [_pollVoteState release];
+    [_pollVoteMessage release];
     [super dealloc];
 }
 

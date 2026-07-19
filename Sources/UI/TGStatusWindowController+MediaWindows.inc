@@ -1,3 +1,538 @@
+static NSString *TGMediaCenterFilterIdentifierForIndex(NSInteger index) {
+    switch (index) {
+        case 1: return @"photos";
+        case 2: return @"videos";
+        case 3: return @"documents";
+        case 4: return @"audio";
+        case 5: return @"voice";
+        case 6: return @"stickers";
+        case 7: return @"animations";
+        case 8: return @"videoNotes";
+        case 9: return @"polls";
+        default: return @"all";
+    }
+}
+
+static NSArray *TGMediaCenterFilterIdentifiersForSelection(NSInteger index) {
+    NSString *single = TGMediaCenterFilterIdentifierForIndex(index);
+    if (![single isEqualToString:@"all"]) {
+        return [NSArray arrayWithObject:single];
+    }
+    return [NSArray arrayWithObjects:@"photos", @"videos", @"documents", @"audio", @"voice", @"stickers", @"animations", @"videoNotes", @"polls", nil];
+}
+
+static NSString *TGMediaCenterReadableSize(unsigned long long bytes) {
+    if (bytes == 0) {
+        return @"0 B";
+    }
+    double value = (double)bytes;
+    NSArray *units = [NSArray arrayWithObjects:@"B", @"KB", @"MB", @"GB", nil];
+    NSUInteger unit = 0;
+    while (value >= 1024.0 && unit + 1 < [units count]) {
+        value /= 1024.0;
+        unit++;
+    }
+    if (unit == 0) {
+        return [NSString stringWithFormat:@"%llu %@", bytes, [units objectAtIndex:unit]];
+    }
+    return [NSString stringWithFormat:@"%.1f %@", value, [units objectAtIndex:unit]];
+}
+
+static unsigned long long TGMediaCenterFileSizeAtPath(NSString *path) {
+    if ([path length] == 0) {
+        return 0;
+    }
+    NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+    NSNumber *size = [attributes objectForKey:NSFileSize];
+    return [size respondsToSelector:@selector(unsignedLongLongValue)] ? [size unsignedLongLongValue] : 0;
+}
+
+static NSDictionary *TGMediaCenterFirstMediaDictionaryForItem(TGMessageItem *item) {
+    NSArray *mediaItems = [item mediaItems];
+    if ([mediaItems count] > 0 && [[mediaItems objectAtIndex:0] isKindOfClass:[NSDictionary class]]) {
+        return [mediaItems objectAtIndex:0];
+    }
+    return nil;
+}
+
+static NSString *TGMediaCenterLocalPathForItem(TGMessageItem *item) {
+    NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
+    NSString *path = media ? TGMediaItemFullLocalPath(media) : nil;
+    if ([path length] == 0) {
+        path = [item mediaLocalPath];
+    }
+    if ([path length] == 0 && media) {
+        path = TGMediaItemLocalPath(media);
+    }
+    return path;
+}
+
+static NSNumber *TGMediaCenterFileIDForItem(TGMessageItem *item) {
+    NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
+    NSNumber *fileID = media ? TGMediaItemFullFileID(media) : nil;
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        fileID = [item mediaFileID];
+    }
+    return fileID;
+}
+
+static unsigned long long TGMediaCenterSizeForItem(TGMessageItem *item) {
+    NSNumber *declaredSize = [item downloadFileSize];
+    if ([declaredSize respondsToSelector:@selector(unsignedLongLongValue)] && [declaredSize unsignedLongLongValue] > 0) {
+        return [declaredSize unsignedLongLongValue];
+    }
+    return TGMediaCenterFileSizeAtPath(TGMediaCenterLocalPathForItem(item));
+}
+
+static NSString *TGMediaCenterTypeTitleForItem(TGMessageItem *item) {
+    if ([item isPhotoMessage]) {
+        return @"Photo";
+    }
+    if ([[item contentType] isEqualToString:@"messageVideo"]) {
+        return @"Video";
+    }
+    if ([item isVoiceNoteMessage]) {
+        return @"Voice";
+    }
+    if ([item isVideoNoteMessage]) {
+        return @"Video note";
+    }
+    if ([item isStickerMessage]) {
+        return @"Sticker";
+    }
+    if ([[item contentType] isEqualToString:@"messageAnimation"]) {
+        return @"GIF";
+    }
+    if ([[item contentType] isEqualToString:@"messageAudio"]) {
+        return @"Audio";
+    }
+    if ([item isPollMessage]) {
+        return @"Poll";
+    }
+    if ([item isDocumentMessage]) {
+        return @"Document";
+    }
+    return @"Media";
+}
+
+static NSString *TGMediaCenterTitleForItem(TGMessageItem *item) {
+    NSString *fileName = [item downloadFileName];
+    if ([fileName length] > 0) {
+        return fileName;
+    }
+    NSString *preview = [item preview];
+    if ([preview length] > 0) {
+        return preview;
+    }
+    return TGMediaCenterTypeTitleForItem(item);
+}
+
+static NSString *TGMediaCenterDateStringForItem(TGMessageItem *item) {
+    NSNumber *dateNumber = [item date];
+    if (![dateNumber respondsToSelector:@selector(doubleValue)] || [dateNumber doubleValue] <= 0.0) {
+        return @"";
+    }
+    NSDate *date = [NSDate dateWithTimeIntervalSince1970:[dateNumber doubleValue]];
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    [formatter setDateStyle:NSDateFormatterShortStyle];
+    [formatter setTimeStyle:NSDateFormatterShortStyle];
+    return [formatter stringFromDate:date];
+}
+
+static BOOL TGMediaCenterItemHasLocalFile(TGMessageItem *item) {
+    NSString *path = TGMediaCenterLocalPathForItem(item);
+    return ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]);
+}
+
+static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessageItem *right, NSInteger sortIndex) {
+    if (sortIndex == 2) {
+        unsigned long long leftSize = TGMediaCenterSizeForItem(left);
+        unsigned long long rightSize = TGMediaCenterSizeForItem(right);
+        if (leftSize > rightSize) {
+            return NSOrderedAscending;
+        }
+        if (leftSize < rightSize) {
+            return NSOrderedDescending;
+        }
+    }
+    long long leftDate = [[left date] respondsToSelector:@selector(longLongValue)] ? [[left date] longLongValue] : 0LL;
+    long long rightDate = [[right date] respondsToSelector:@selector(longLongValue)] ? [[right date] longLongValue] : 0LL;
+    if (sortIndex == 1) {
+        if (leftDate < rightDate) return NSOrderedAscending;
+        if (leftDate > rightDate) return NSOrderedDescending;
+    } else {
+        if (leftDate > rightDate) return NSOrderedAscending;
+        if (leftDate < rightDate) return NSOrderedDescending;
+    }
+    return NSOrderedSame;
+}
+
+- (void)ensureMediaCenterWindow {
+    if (self.mediaCenterWindow) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(0, 0, 680, 520);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO] autorelease];
+    [window setTitle:@"Media center"];
+    [window setMinSize:NSMakeSize(560.0, 360.0)];
+    [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
+
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [window setContentView:contentView];
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20.0, 476.0, 260.0, 24.0)
+                                              text:@"Media center"
+                                              font:[NSFont boldSystemFontOfSize:18.0]];
+    [titleField setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:titleField];
+
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(20.0, 438.0, 260.0, 26.0)] autorelease];
+    [searchField setPlaceholderString:@"Search by filename or caption"];
+    [searchField setTarget:self];
+    [searchField setAction:@selector(reloadMediaCenter:)];
+    [searchField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:searchField];
+    self.mediaCenterSearchField = searchField;
+
+    NSPopUpButton *filterPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(292.0, 438.0, 146.0, 26.0) pullsDown:NO] autorelease];
+    [filterPopup addItemsWithTitles:[NSArray arrayWithObjects:@"All media", @"Photos", @"Videos", @"Documents", @"Audio", @"Voice", @"Stickers", @"GIFs", @"Video notes", @"Polls", nil]];
+    [filterPopup setTarget:self];
+    [filterPopup setAction:@selector(reloadMediaCenter:)];
+    [filterPopup setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:filterPopup];
+    self.mediaCenterFilterPopUpButton = filterPopup;
+
+    NSPopUpButton *sortPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(448.0, 438.0, 116.0, 26.0) pullsDown:NO] autorelease];
+    [sortPopup addItemsWithTitles:[NSArray arrayWithObjects:@"Newest", @"Oldest", @"Largest", nil]];
+    [sortPopup setTarget:self];
+    [sortPopup setAction:@selector(rebuildMediaCenterRows)];
+    [sortPopup setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:sortPopup];
+    self.mediaCenterSortPopUpButton = sortPopup;
+
+    NSButton *refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(576.0, 438.0, 82.0, 28.0)] autorelease];
+    [refreshButton setTitle:@"Refresh"];
+    [refreshButton setTarget:self];
+    [refreshButton setAction:@selector(reloadMediaCenter:)];
+    [self applyUtilityButtonStyle:refreshButton];
+    [refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:refreshButton];
+
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20.0, 410.0, 640.0, 18.0)
+                                               text:@"Choose a chat to view media."
+                                               font:[NSFont systemFontOfSize:12.0]];
+    [self applyMutedLabelStyle:statusField];
+    [statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:statusField];
+    self.mediaCenterStatusField = statusField;
+
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20.0, 20.0, 638.0, 382.0)] autorelease];
+    [scrollView setHasVerticalScroller:YES];
+    [scrollView setBorderType:NSNoBorder];
+    [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [[scrollView contentView] setDrawsBackground:NO];
+    NSView *resultsView = [[[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 620.0, 80.0)] autorelease];
+    [scrollView setDocumentView:resultsView];
+    [contentView addSubview:scrollView];
+    self.mediaCenterScrollView = scrollView;
+    self.mediaCenterResultsView = resultsView;
+
+    self.mediaCenterWindow = window;
+}
+
+- (void)layoutMediaCenterWindowSubviews {
+    if (!self.mediaCenterWindow) {
+        return;
+    }
+    NSView *contentView = [self.mediaCenterWindow contentView];
+    NSRect bounds = [contentView bounds];
+    CGFloat width = NSWidth(bounds);
+    CGFloat height = NSHeight(bounds);
+    [self.mediaCenterSearchField setFrame:NSMakeRect(20.0, height - 82.0, MAX(180.0, width - 420.0), 26.0)];
+    [self.mediaCenterFilterPopUpButton setFrame:NSMakeRect(width - 388.0, height - 82.0, 146.0, 26.0)];
+    [self.mediaCenterSortPopUpButton setFrame:NSMakeRect(width - 232.0, height - 82.0, 116.0, 26.0)];
+    [self.mediaCenterStatusField setFrame:NSMakeRect(20.0, height - 110.0, width - 40.0, 18.0)];
+    [self.mediaCenterScrollView setFrame:NSMakeRect(20.0, 20.0, width - 40.0, MAX(120.0, height - 138.0))];
+}
+
+- (void)rebuildMediaCenterRows {
+    if (!self.mediaCenterResultsView) {
+        return;
+    }
+    NSArray *subviews = [[self.mediaCenterResultsView subviews] copy];
+    NSUInteger removeIndex = 0;
+    for (removeIndex = 0; removeIndex < [subviews count]; removeIndex++) {
+        [[subviews objectAtIndex:removeIndex] removeFromSuperview];
+    }
+    [subviews release];
+
+    NSInteger sortIndex = [self.mediaCenterSortPopUpButton indexOfSelectedItem];
+    NSArray *items = [[self.mediaCenterItems sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+        return TGMediaCenterCompareItems(left, right, sortIndex);
+    }] retain];
+
+    CGFloat width = MAX(520.0, NSWidth([self.mediaCenterScrollView bounds]) - 18.0);
+    CGFloat rowHeight = 78.0;
+    CGFloat y = MAX(0.0, (CGFloat)[items count] * rowHeight);
+    [self.mediaCenterResultsView setFrame:NSMakeRect(0.0, 0.0, width, MAX(80.0, y))];
+
+    if ([items count] == 0) {
+        NSTextField *empty = [self labelWithFrame:NSMakeRect(18.0, 36.0, width - 36.0, 20.0)
+                                             text:@"No media found for this filter."
+                                             font:[NSFont systemFontOfSize:13.0]];
+        [self applyMutedLabelStyle:empty];
+        [self.mediaCenterResultsView addSubview:empty];
+        [items release];
+        return;
+    }
+
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        TGMessageItem *item = [items objectAtIndex:index];
+        y -= rowHeight;
+        TGGroupedCardView *row = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(0.0, y + 6.0, width, rowHeight - 10.0)] autorelease];
+        [row setAutoresizingMask:NSViewWidthSizable];
+        [self.mediaCenterResultsView addSubview:row];
+
+        NSTextField *title = [self labelWithFrame:NSMakeRect(12.0, 38.0, width - 318.0, 18.0)
+                                             text:TGMediaCenterTitleForItem(item)
+                                             font:[NSFont boldSystemFontOfSize:12.0]];
+        [row addSubview:title];
+
+        NSString *state = TGMediaCenterItemHasLocalFile(item) ? @"downloaded" : @"cloud";
+        NSString *details = [NSString stringWithFormat:@"%@ · %@ · %@ · %@",
+                             TGMediaCenterTypeTitleForItem(item),
+                             TGMediaCenterReadableSize(TGMediaCenterSizeForItem(item)),
+                             TGMediaCenterDateStringForItem(item),
+                             state];
+        NSTextField *subtitle = [self labelWithFrame:NSMakeRect(12.0, 16.0, width - 318.0, 18.0)
+                                                text:details
+                                                font:[NSFont systemFontOfSize:11.0]];
+        [self applyMutedLabelStyle:subtitle];
+        [row addSubview:subtitle];
+
+        NSArray *buttonTitles = [NSArray arrayWithObjects:@"Open", @"Download", @"Go", @"Delete local", nil];
+        SEL actions[4] = {@selector(openMediaCenterItem:), @selector(downloadMediaCenterItem:), @selector(goToMediaCenterItem:), @selector(deleteLocalMediaCenterItem:)};
+        CGFloat buttonX = width - 292.0;
+        NSUInteger buttonIndex = 0;
+        for (buttonIndex = 0; buttonIndex < [buttonTitles count]; buttonIndex++) {
+            CGFloat buttonWidth = (buttonIndex == 3) ? 88.0 : 62.0;
+            NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(buttonX, 20.0, buttonWidth, 26.0)] autorelease];
+            [button setTitle:[buttonTitles objectAtIndex:buttonIndex]];
+            [button setTarget:self];
+            [button setAction:actions[buttonIndex]];
+            [button setTag:(NSInteger)index];
+            [self applyUtilityButtonStyle:button];
+            if (buttonIndex == 0 || buttonIndex == 3) {
+                [button setEnabled:TGMediaCenterItemHasLocalFile(item)];
+            }
+            [row addSubview:button];
+            buttonX += buttonWidth + 8.0;
+        }
+    }
+    [items release];
+}
+
+- (TGMessageItem *)mediaCenterItemForSender:(id)sender {
+    NSInteger index = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
+    NSArray *items = [self.mediaCenterItems sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+        return TGMediaCenterCompareItems(left, right, [self.mediaCenterSortPopUpButton indexOfSelectedItem]);
+    }];
+    if (index < 0 || (NSUInteger)index >= [items count]) {
+        return nil;
+    }
+    return [items objectAtIndex:(NSUInteger)index];
+}
+
+- (void)reloadMediaCenter:(id)sender {
+    (void)sender;
+    [self ensureMediaCenterWindow];
+    [self layoutMediaCenterWindowSubviews];
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *threadID = [self.selectedMessageThreadID retain];
+    NSString *topicKind = [self.selectedMessageTopicKind copy];
+    NSString *query = [[self.mediaCenterSearchField stringValue] copy];
+    NSArray *filters = [TGMediaCenterFilterIdentifiersForSelection([self.mediaCenterFilterPopUpButton indexOfSelectedItem]) retain];
+    NSUInteger generation = self.mediaCenterGeneration + 1;
+    self.mediaCenterGeneration = generation;
+    [self.mediaCenterStatusField setStringValue:@"Loading media..."];
+    [self.mediaCenterItems removeAllObjects];
+    [self rebuildMediaCenterRows];
+
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        [self.mediaCenterStatusField setStringValue:@"Open a chat first."];
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        [query release];
+        [filters release];
+        return;
+    }
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSMutableArray *foundItems = [NSMutableArray array];
+        NSMutableSet *seenKeys = [NSMutableSet set];
+        NSError *lastError = nil;
+        NSUInteger filterIndex = 0;
+        for (filterIndex = 0; filterIndex < [filters count]; filterIndex++) {
+            NSString *filter = [filters objectAtIndex:filterIndex];
+            NSError *searchError = nil;
+            NSArray *results = [client searchMessagePreviewItemsForChatID:chatID
+                                                           messageThreadID:threadID
+                                                          messageTopicKind:topicKind
+                                                                     query:query
+                                                                    filter:filter
+                                                             fromMessageID:nil
+                                                                     limit:30
+                                                                   timeout:8.0
+                                                                     error:&searchError];
+            if (!results) {
+                lastError = searchError;
+                continue;
+            }
+            NSUInteger resultIndex = 0;
+            for (resultIndex = 0; resultIndex < [results count]; resultIndex++) {
+                TGMessageItem *item = [results objectAtIndex:resultIndex];
+                NSString *key = [NSString stringWithFormat:@"%@:%@",
+                                 [item chatID] ? [item chatID] : chatID,
+                                 [item messageID] ? [item messageID] : [NSNumber numberWithUnsignedInteger:resultIndex]];
+                if (![seenKeys containsObject:key]) {
+                    [seenKeys addObject:key];
+                    [foundItems addObject:item];
+                }
+            }
+        }
+        NSString *errorMessage = [[lastError localizedDescription] copy];
+        NSArray *itemsCopy = [foundItems copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.mediaCenterGeneration == generation) {
+                [self.mediaCenterItems removeAllObjects];
+                [self.mediaCenterItems addObjectsFromArray:itemsCopy];
+                unsigned long long cacheBytes = 0;
+                NSUInteger cacheIndex = 0;
+                for (cacheIndex = 0; cacheIndex < [self.mediaCenterItems count]; cacheIndex++) {
+                    cacheBytes += TGMediaCenterFileSizeAtPath(TGMediaCenterLocalPathForItem([self.mediaCenterItems objectAtIndex:cacheIndex]));
+                }
+                if ([self.mediaCenterItems count] > 0) {
+                    [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:@"%lu item(s), local cache %@. Showing first page for legacy performance.",
+                                                                 (unsigned long)[self.mediaCenterItems count],
+                                                                 TGMediaCenterReadableSize(cacheBytes)]];
+                } else if ([errorMessage length] > 0) {
+                    [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:@"Media search failed: %@", errorMessage]];
+                } else {
+                    [self.mediaCenterStatusField setStringValue:@"No media found."];
+                }
+                [self rebuildMediaCenterRows];
+            }
+            [itemsCopy release];
+            [errorMessage release];
+            [chatID release];
+            [threadID release];
+            [topicKind release];
+            [query release];
+            [filters release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)openMediaCenter:(id)sender {
+    (void)sender;
+    [self ensureMediaCenterWindow];
+    [self layoutMediaCenterWindowSubviews];
+    [self.mediaCenterWindow center];
+    [self.mediaCenterWindow makeKeyAndOrderFront:nil];
+    [self.mediaCenterWindow makeFirstResponder:self.mediaCenterSearchField];
+    [self reloadMediaCenter:nil];
+}
+
+- (void)downloadMediaCenterItem:(id)sender {
+    TGMessageItem *item = [self.mediaCenterItemForSender:sender];
+    NSNumber *fileID = TGMediaCenterFileIDForItem(item);
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        [self.mediaCenterStatusField setStringValue:@"This item has no downloadable file id yet."];
+        return;
+    }
+    NSNumber *fileIDCopy = [fileID retain];
+    TGTDLibClient *client = [self.client retain];
+    [self.mediaCenterStatusField setStringValue:@"Downloading media..."];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        NSString *path = [[client downloadedLocalPathForFileID:fileIDCopy timeout:18.0 error:&error] copy];
+        NSString *message = [[error localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([path length] > 0) {
+                [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:@"Downloaded %@", [path lastPathComponent]]];
+            } else {
+                [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:@"Download failed: %@", ([message length] > 0 ? message : @"TDLib did not return a local path.")]];
+            }
+            [self rebuildMediaCenterRows];
+            [path release];
+            [message release];
+            [fileIDCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)openMediaCenterItem:(id)sender {
+    TGMessageItem *item = [self mediaCenterItemForSender:sender];
+    NSString *path = TGMediaCenterLocalPathForItem(item);
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self.mediaCenterStatusField setStringValue:@"Download this item before opening it."];
+        return;
+    }
+    if (![[NSWorkspace sharedWorkspace] openFile:path]) {
+        [self.mediaCenterStatusField setStringValue:@"Could not open this file with a system app."];
+    }
+}
+
+- (void)goToMediaCenterItem:(id)sender {
+    TGMessageItem *item = [self mediaCenterItemForSender:sender];
+    if (!item) {
+        return;
+    }
+    TGSearchResultItem *result = [[[TGSearchResultItem alloc] init] autorelease];
+    result.chatID = [item chatID] ? [item chatID] : self.selectedChatID;
+    result.messageID = [item messageID];
+    result.messageThreadID = self.selectedMessageThreadID;
+    result.messageTopicKind = self.selectedMessageTopicKind;
+    result.chatTitle = self.selectedChatTitle;
+    result.senderName = [item senderDisplayName];
+    result.date = [item date];
+    result.snippet = TGMediaCenterTitleForItem(item);
+    result.mediaType = TGMediaCenterTypeTitleForItem(item);
+    result.messageItem = item;
+    [self jumpToSearchResult:result];
+}
+
+- (void)deleteLocalMediaCenterItem:(id)sender {
+    TGMessageItem *item = [self mediaCenterItemForSender:sender];
+    NSString *path = TGMediaCenterLocalPathForItem(item);
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self.mediaCenterStatusField setStringValue:@"No local file to delete."];
+        return;
+    }
+    NSError *error = nil;
+    if ([[NSFileManager defaultManager] removeItemAtPath:path error:&error]) {
+        [self.mediaCenterStatusField setStringValue:@"Deleted local copy only. Cloud message is untouched."];
+    } else {
+        [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:@"Could not delete local copy: %@", [error localizedDescription]]];
+    }
+    [self rebuildMediaCenterRows];
+}
+
 - (void)ensureMediaPlaybackWindow {
     if (self.mediaPlaybackWindow) {
         return;

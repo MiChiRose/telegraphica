@@ -168,6 +168,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSButton *chatSearchButton;
 @property (nonatomic, retain) NSButton *conversationSearchButton;
+@property (nonatomic, retain) NSButton *mediaCenterButton;
 @property (nonatomic, retain) TGGroupedCardView *searchPanelView;
 @property (nonatomic, retain) NSTextField *searchTextField;
 @property (nonatomic, retain) NSPopUpButton *searchScopePopUpButton;
@@ -193,6 +194,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSMutableArray *chatSearchWindowResults;
 @property (nonatomic, retain) NSMutableArray *chatSearchWindowResultButtons;
 @property (nonatomic, assign) NSUInteger chatSearchGeneration;
+@property (nonatomic, retain) NSWindow *mediaCenterWindow;
+@property (nonatomic, retain) NSSearchField *mediaCenterSearchField;
+@property (nonatomic, retain) NSPopUpButton *mediaCenterFilterPopUpButton;
+@property (nonatomic, retain) NSPopUpButton *mediaCenterSortPopUpButton;
+@property (nonatomic, retain) NSTextField *mediaCenterStatusField;
+@property (nonatomic, retain) NSScrollView *mediaCenterScrollView;
+@property (nonatomic, retain) NSView *mediaCenterResultsView;
+@property (nonatomic, retain) NSMutableArray *mediaCenterItems;
+@property (nonatomic, assign) NSUInteger mediaCenterGeneration;
 @property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
 @property (nonatomic, retain) NSTextField *pinnedMessageStripeField;
 @property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
@@ -393,10 +403,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *photoSendErrorField;
 @property (nonatomic, retain) NSTextField *photoSendMetaField;
 @property (nonatomic, retain) NSButton *photoSendSendButton;
+@property (nonatomic, retain) NSScrollView *photoSendQueueScrollView;
+@property (nonatomic, retain) NSView *photoSendQueueContentView;
 @property (nonatomic, copy) NSString *pendingPhotoSendPath;
 @property (nonatomic, retain) TGAttachmentDescriptor *pendingAttachmentDescriptor;
 @property (nonatomic, retain) NSArray *pendingAttachmentDescriptors;
 @property (nonatomic, retain) TGFileTransferState *pendingAttachmentTransferState;
+@property (nonatomic, retain) NSArray *pendingAttachmentQueueItems;
+@property (nonatomic, assign) BOOL pendingAttachmentCancelRequested;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendChatID;
 @property (nonatomic, retain) NSNumber *pendingPhotoSendThreadID;
 @property (nonatomic, copy) NSString *pendingPhotoSendTopicKind;
@@ -404,6 +418,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSScrollView *stickerPickerScrollView;
 @property (nonatomic, retain) NSView *stickerPickerContentView;
 @property (nonatomic, retain) NSButton *stickerPickerRecentButton;
+@property (nonatomic, retain) NSButton *stickerPickerFavoriteButton;
+@property (nonatomic, retain) NSSearchField *stickerPickerSearchField;
 @property (nonatomic, retain) NSScrollView *stickerPickerSetScrollView;
 @property (nonatomic, retain) NSView *stickerPickerSetContentView;
 @property (nonatomic, copy) NSArray *stickerPickerItems;
@@ -499,6 +515,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 - (void)cancelReplyTarget:(id)sender;
 - (void)forwardMessageFromMenu:(id)sender;
 - (void)forwardMessageToSavedMessagesFromMenu:(id)sender;
+- (void)submitPollAnswerForMessageItem:(TGMessageItem *)item optionIndexes:(NSArray *)optionIndexes;
+- (void)togglePollOptionForMessageItem:(TGMessageItem *)item optionIndex:(NSUInteger)optionIndex;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
 @end
@@ -555,6 +573,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize chatSearchButton = _chatSearchButton;
 @synthesize conversationSearchButton = _conversationSearchButton;
+@synthesize mediaCenterButton = _mediaCenterButton;
 @synthesize searchPanelView = _searchPanelView;
 @synthesize searchTextField = _searchTextField;
 @synthesize searchScopePopUpButton = _searchScopePopUpButton;
@@ -580,6 +599,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize chatSearchWindowResults = _chatSearchWindowResults;
 @synthesize chatSearchWindowResultButtons = _chatSearchWindowResultButtons;
 @synthesize chatSearchGeneration = _chatSearchGeneration;
+@synthesize mediaCenterWindow = _mediaCenterWindow;
+@synthesize mediaCenterSearchField = _mediaCenterSearchField;
+@synthesize mediaCenterFilterPopUpButton = _mediaCenterFilterPopUpButton;
+@synthesize mediaCenterSortPopUpButton = _mediaCenterSortPopUpButton;
+@synthesize mediaCenterStatusField = _mediaCenterStatusField;
+@synthesize mediaCenterScrollView = _mediaCenterScrollView;
+@synthesize mediaCenterResultsView = _mediaCenterResultsView;
+@synthesize mediaCenterItems = _mediaCenterItems;
+@synthesize mediaCenterGeneration = _mediaCenterGeneration;
 @synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
 @synthesize pinnedMessageStripeField = _pinnedMessageStripeField;
 @synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
@@ -780,10 +808,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize photoSendErrorField = _photoSendErrorField;
 @synthesize photoSendMetaField = _photoSendMetaField;
 @synthesize photoSendSendButton = _photoSendSendButton;
+@synthesize photoSendQueueScrollView = _photoSendQueueScrollView;
+@synthesize photoSendQueueContentView = _photoSendQueueContentView;
 @synthesize pendingPhotoSendPath = _pendingPhotoSendPath;
 @synthesize pendingAttachmentDescriptor = _pendingAttachmentDescriptor;
 @synthesize pendingAttachmentDescriptors = _pendingAttachmentDescriptors;
 @synthesize pendingAttachmentTransferState = _pendingAttachmentTransferState;
+@synthesize pendingAttachmentQueueItems = _pendingAttachmentQueueItems;
+@synthesize pendingAttachmentCancelRequested = _pendingAttachmentCancelRequested;
 @synthesize pendingPhotoSendChatID = _pendingPhotoSendChatID;
 @synthesize pendingPhotoSendThreadID = _pendingPhotoSendThreadID;
 @synthesize pendingPhotoSendTopicKind = _pendingPhotoSendTopicKind;
@@ -791,6 +823,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize stickerPickerScrollView = _stickerPickerScrollView;
 @synthesize stickerPickerContentView = _stickerPickerContentView;
 @synthesize stickerPickerRecentButton = _stickerPickerRecentButton;
+@synthesize stickerPickerFavoriteButton = _stickerPickerFavoriteButton;
+@synthesize stickerPickerSearchField = _stickerPickerSearchField;
 @synthesize stickerPickerSetScrollView = _stickerPickerSetScrollView;
 @synthesize stickerPickerSetContentView = _stickerPickerSetContentView;
 @synthesize stickerPickerItems = _stickerPickerItems;
@@ -899,6 +933,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         self.searchResultItems = [NSMutableArray array];
         self.chatSearchWindowResults = [NSMutableArray array];
         self.chatSearchWindowResultButtons = [NSMutableArray array];
+        self.mediaCenterItems = [NSMutableArray array];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
@@ -1972,6 +2007,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.chatSearchButton];
 
+    self.mediaCenterButton = [[[NSButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
+    [self.mediaCenterButton setTitle:@"media"];
+    [self.mediaCenterButton setToolTip:@"Media center"];
+    [self.mediaCenterButton setTarget:self];
+    [self.mediaCenterButton setAction:@selector(openMediaCenter:)];
+    [self.mediaCenterButton setEnabled:NO];
+    [self applyHeaderIconButtonStyle:self.mediaCenterButton];
+    [self.mediaCenterButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.mediaCenterButton];
+
     self.topicBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 332, 32, 32)] autorelease];
     [self.topicBackButton setTitle:@"‹"];
     [self.topicBackButton setToolTip:@"Back to chats"];
@@ -2277,6 +2322,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.searchFilterPopUpButton addItemWithTitle:@"Аудио"];
     [self.searchFilterPopUpButton addItemWithTitle:@"GIF"];
     [self.searchFilterPopUpButton addItemWithTitle:@"Кружки"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Стикеры"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Опросы"];
     [self.searchFilterPopUpButton setTarget:self];
     [self.searchFilterPopUpButton setAction:@selector(searchFilterChanged:)];
     [self.searchFilterPopUpButton setHidden:YES];
@@ -3452,6 +3499,15 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_chatSearchWindowStatusField release];
     [_chatSearchWindowResults release];
     [_chatSearchWindowResultButtons release];
+    [_mediaCenterButton release];
+    [_mediaCenterWindow release];
+    [_mediaCenterSearchField release];
+    [_mediaCenterFilterPopUpButton release];
+    [_mediaCenterSortPopUpButton release];
+    [_mediaCenterStatusField release];
+    [_mediaCenterScrollView release];
+    [_mediaCenterResultsView release];
+    [_mediaCenterItems release];
     [_pinnedMessagePanelView release];
     [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];
@@ -3682,10 +3738,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_photoSendErrorField release];
     [_photoSendMetaField release];
     [_photoSendSendButton release];
+    [_photoSendQueueScrollView release];
+    [_photoSendQueueContentView release];
     [_pendingPhotoSendPath release];
     [_pendingAttachmentDescriptor release];
     [_pendingAttachmentDescriptors release];
     [_pendingAttachmentTransferState release];
+    [_pendingAttachmentQueueItems release];
     [_pendingPhotoSendChatID release];
     [_pendingPhotoSendThreadID release];
     [_pendingPhotoSendTopicKind release];
@@ -3693,6 +3752,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_stickerPickerScrollView release];
     [_stickerPickerContentView release];
     [_stickerPickerRecentButton release];
+    [_stickerPickerFavoriteButton release];
+    [_stickerPickerSearchField release];
     [_stickerPickerSetScrollView release];
     [_stickerPickerSetContentView release];
     [_stickerPickerItems release];

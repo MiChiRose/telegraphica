@@ -165,6 +165,23 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     return image;
 }
 
+static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
+    NSString *displayName = [summary objectForKey:@"display_name"];
+    NSString *title = [displayName length] > 0 ? displayName : TGLoc(@"message.viewers.unknown");
+    id viewDate = [summary objectForKey:@"view_date"];
+    if ([viewDate respondsToSelector:@selector(integerValue)] && [viewDate integerValue] > 0) {
+        NSDate *date = [NSDate dateWithTimeIntervalSince1970:[viewDate integerValue]];
+        NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+        [formatter setDateStyle:NSDateFormatterNoStyle];
+        [formatter setTimeStyle:NSDateFormatterShortStyle];
+        NSString *time = [formatter stringFromDate:date];
+        if ([time length] > 0) {
+            title = [NSString stringWithFormat:@"%@ · %@", title, time];
+        }
+    }
+    return title;
+}
+
 - (NSMenu *)messageViewersSubmenuForItem:(TGMessageItem *)item {
     NSMenu *submenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"message.whoRead")] autorelease];
     if (![self.currentAuthState isEqualToString:@"ready"]) {
@@ -176,42 +193,61 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         return submenu;
     }
 
-    NSError *viewersError = nil;
-    NSArray *viewers = [self.client messageViewersForChatID:item.chatID
-                                                  messageID:item.messageID
-                                                      limit:20
-                                                    timeout:3.0
-                                                      error:&viewersError];
-    if (!viewers) {
-        NSString *message = [[viewersError localizedDescription] length] > 0 ? [viewersError localizedDescription] : TGLoc(@"message.viewers.unavailable");
-        NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:message
-                                                              action:nil
-                                                       keyEquivalent:@""] autorelease];
-        [unavailable setEnabled:NO];
-        [submenu addItem:unavailable];
-        return submenu;
-    }
-    if ([viewers count] == 0) {
-        NSMenuItem *empty = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.viewers.empty")
-                                                        action:nil
-                                                 keyEquivalent:@""] autorelease];
-        [empty setEnabled:NO];
-        [submenu addItem:empty];
-        return submenu;
-    }
+    NSMenuItem *loading = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.viewers.loading")
+                                                      action:nil
+                                               keyEquivalent:@""] autorelease];
+    [loading setEnabled:NO];
+    [submenu addItem:loading];
 
-    NSUInteger index = 0;
-    for (index = 0; index < [viewers count]; index++) {
-        NSDictionary *summary = [viewers objectAtIndex:index];
-        NSString *displayName = [summary objectForKey:@"display_name"];
-        NSString *title = [displayName length] > 0 ? displayName : TGLoc(@"message.viewers.unknown");
-        NSMenuItem *viewerItem = [[[NSMenuItem alloc] initWithTitle:title
-                                                             action:nil
-                                                      keyEquivalent:@""] autorelease];
-        [viewerItem setEnabled:NO];
-        [viewerItem setImage:TGMessageViewerMenuAvatarImage(summary)];
-        [submenu addItem:viewerItem];
-    }
+    NSMenu *submenuRetained = [submenu retain];
+    NSNumber *chatID = [item.chatID retain];
+    NSNumber *messageID = [item.messageID retain];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *viewersError = nil;
+        NSArray *viewers = [[client messageViewersForChatID:chatID
+                                                  messageID:messageID
+                                                      limit:20
+                                                    timeout:5.0
+                                                      error:&viewersError] retain];
+        NSString *errorMessage = [[viewersError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [submenuRetained removeAllItems];
+            if (!viewers) {
+                NSString *message = [errorMessage length] > 0 ? errorMessage : TGLoc(@"message.viewers.unavailable");
+                NSMenuItem *unavailable = [[[NSMenuItem alloc] initWithTitle:message
+                                                                      action:nil
+                                                               keyEquivalent:@""] autorelease];
+                [unavailable setEnabled:NO];
+                [submenuRetained addItem:unavailable];
+            } else if ([viewers count] == 0) {
+                NSMenuItem *empty = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.viewers.empty")
+                                                                action:nil
+                                                         keyEquivalent:@""] autorelease];
+                [empty setEnabled:NO];
+                [submenuRetained addItem:empty];
+            } else {
+                NSUInteger index = 0;
+                for (index = 0; index < [viewers count]; index++) {
+                    NSDictionary *summary = [viewers objectAtIndex:index];
+                    NSMenuItem *viewerItem = [[[NSMenuItem alloc] initWithTitle:TGMessageViewerMenuTitle(summary)
+                                                                         action:nil
+                                                                  keyEquivalent:@""] autorelease];
+                    [viewerItem setEnabled:NO];
+                    [viewerItem setImage:TGMessageViewerMenuAvatarImage(summary)];
+                    [submenuRetained addItem:viewerItem];
+                }
+            }
+            [viewers release];
+            [errorMessage release];
+            [chatID release];
+            [messageID release];
+            [client release];
+            [submenuRetained release];
+        });
+        [pool drain];
+    });
     return submenu;
 }
 
@@ -914,22 +950,47 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         ![optionIndex respondsToSelector:@selector(unsignedIntegerValue)]) {
         return;
     }
+    NSNumber *selectedOption = [NSNumber numberWithInteger:[optionIndex integerValue]];
+    if ([item isPollMultipleChoice]) {
+        [self togglePollOptionForMessageItem:item optionIndex:[selectedOption unsignedIntegerValue]];
+    } else {
+        [self submitPollAnswerForMessageItem:item optionIndexes:[NSArray arrayWithObject:selectedOption]];
+    }
+}
+
+- (void)submitPollAnswerForMessageItem:(TGMessageItem *)item optionIndexes:(NSArray *)optionIndexes {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![[item messageID] respondsToSelector:@selector(longLongValue)] ||
+        ![optionIndexes isKindOfClass:[NSArray class]] ||
+        [optionIndexes count] == 0 ||
+        [item isPollClosed] ||
+        [[item pollVoteState] isEqualToString:@"sending"]) {
+        return;
+    }
+
     TGTDLibClient *client = [self.client retain];
     NSNumber *chatID = [[item chatID] retain];
     NSNumber *messageID = [[item messageID] retain];
-    NSNumber *selectedOption = [[NSNumber numberWithInteger:[optionIndex integerValue]] retain];
+    NSArray *selectedOptions = [optionIndexes copy];
+    [item setPollVoteState:@"sending"];
+    [item setPollVoteMessage:TGLoc(@"message.poll.sending")];
     [self.statusField setStringValue:TGLoc(@"message.poll.sending")];
+    [self.messageTableView reloadData];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *voteError = nil;
         BOOL ok = [client setPollAnswerForChatID:chatID
                                        messageID:messageID
-                                   optionIndexes:[NSArray arrayWithObject:selectedOption]
+                                   optionIndexes:selectedOptions
                                          timeout:8.0
                                            error:&voteError];
         NSString *errorMessage = [[voteError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
+            [item setPollVoteState:(ok ? @"sent" : @"failed")];
+            [item setPollVoteMessage:(ok ? TGLoc(@"message.poll.sent") : ([errorMessage length] > 0 ? errorMessage : TGLoc(@"message.poll.failed")))];
             if (ok) {
+                [item setPendingPollOptionIndexes:nil];
                 [self.statusField setStringValue:TGLoc(@"message.poll.sent")];
                 [self appendDetail:@"Poll vote accepted by TDLib."];
                 [self refreshSelectedChatMessages:self];
@@ -938,13 +999,45 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
                 [self appendDetail:[NSString stringWithFormat:@"Poll vote failed: %@", [errorMessage length] > 0 ? errorMessage : @"TDLib rejected the vote"]];
             }
             [errorMessage release];
-            [selectedOption release];
+            [selectedOptions release];
             [messageID release];
             [chatID release];
             [client release];
         });
         [pool drain];
     });
+}
+
+- (void)togglePollOptionForMessageItem:(TGMessageItem *)item optionIndex:(NSUInteger)optionIndex {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item isPollMultipleChoice] ||
+        [item isPollClosed] ||
+        [[item pollVoteState] isEqualToString:@"sending"]) {
+        return;
+    }
+    NSMutableArray *selected = [NSMutableArray array];
+    NSArray *existing = [item pendingPollOptionIndexes];
+    NSUInteger index = 0;
+    BOOL removed = NO;
+    for (index = 0; index < [existing count]; index++) {
+        id object = [existing objectAtIndex:index];
+        if (![object respondsToSelector:@selector(unsignedIntegerValue)]) {
+            continue;
+        }
+        if ([object unsignedIntegerValue] == optionIndex) {
+            removed = YES;
+            continue;
+        }
+        [selected addObject:[NSNumber numberWithUnsignedInteger:[object unsignedIntegerValue]]];
+    }
+    if (!removed) {
+        [selected addObject:[NSNumber numberWithUnsignedInteger:optionIndex]];
+    }
+    [selected sortUsingSelector:@selector(compare:)];
+    [item setPollVoteState:nil];
+    [item setPollVoteMessage:nil];
+    [item setPendingPollOptionIndexes:([selected count] > 0 ? selected : nil)];
+    [self.messageTableView reloadData];
 }
 
 - (void)openMessageCommentsFromMenu:(id)sender {

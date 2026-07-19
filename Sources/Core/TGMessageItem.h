@@ -55,6 +55,9 @@
 @property (nonatomic, assign, getter=isPollAnonymous) BOOL pollAnonymous;
 @property (nonatomic, assign, getter=isPollMultipleChoice) BOOL pollMultipleChoice;
 @property (nonatomic, assign, getter=isPollQuiz) BOOL pollQuiz;
+@property (nonatomic, copy) NSArray *pendingPollOptionIndexes;
+@property (nonatomic, copy) NSString *pollVoteState;
+@property (nonatomic, copy) NSString *pollVoteMessage;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID

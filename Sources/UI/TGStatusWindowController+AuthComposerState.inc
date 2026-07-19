@@ -717,6 +717,7 @@
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
     [self.conversationSearchButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
+    [self.mediaCenterButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.logoutButton setEnabled:([state isEqualToString:@"ready"] && !self.controlsBusy)];
     [self updateSendControls];
     [self refreshProfileDisplay];
@@ -752,6 +753,7 @@
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
     [self.conversationSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
+    [self.mediaCenterButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.attachPhotoButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.stickerButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.voiceRecordButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
@@ -767,6 +769,7 @@
         [self.loadMessagesButton setEnabled:NO];
         [self.loadOlderMessagesButton setEnabled:NO];
         [self.conversationSearchButton setEnabled:NO];
+        [self.mediaCenterButton setEnabled:NO];
         [self.logoutButton setEnabled:NO];
         [self.chatTableView setEnabled:NO];
         [self.messageTableView setEnabled:NO];

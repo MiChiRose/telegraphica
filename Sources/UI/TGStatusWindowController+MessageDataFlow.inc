@@ -1405,6 +1405,12 @@
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsPinnedMessageRefresh = YES;
             }
+        } else if ([kind isEqualToString:@"poll_update"]) {
+            if (selectedChatID && [self.messageItems count] > 0) {
+                needsMessageRefresh = YES;
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Polls: live update received%@; refreshing selected messages.",
+                                              [summary objectForKey:@"poll_id"] ? [NSString stringWithFormat:@" poll=%@", [summary objectForKey:@"poll_id"]] : @""]];
+            }
         } else if ([kind isEqualToString:@"account_unread"]) {
             id unreadCount = [summary objectForKey:@"count"];
             if ([unreadCount respondsToSelector:@selector(unsignedIntegerValue)]) {

@@ -38,9 +38,12 @@
     [panelView setStatusText:TGLoc(@"search.chats.recent")];
     [panelView setSelectedIndex:-1];
     [self updateChatSearchWindowResults];
+    [panelView layoutPanelSubviews];
+    [panelView setNeedsDisplay:YES];
     [self.chatSearchWindow center];
     [self.chatSearchWindow makeKeyAndOrderFront:self];
     [self.chatSearchWindow orderFrontRegardless];
+    [panelView displayIfNeeded];
     [self.chatSearchWindow makeFirstResponder:[panelView searchField]];
 }
 
@@ -93,6 +96,9 @@
         [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? TGLoc(@"search.chats.searching") : [NSString stringWithFormat:TGLoc(@"search.chats.loadedSearching"), (unsigned long)[self.chatSearchWindowResults count]])];
     }
     [panelView setResults:self.chatSearchWindowResults];
+    [panelView layoutPanelSubviews];
+    [panelView setNeedsDisplay:YES];
+    [panelView displayIfNeeded];
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: chat search query length=%lu results=%lu.",
                                   (unsigned long)[query length],
                                   (unsigned long)[self.chatSearchWindowResults count]]];
@@ -126,6 +132,9 @@
                             [self.chatSearchWindowResults addObject:result];
                         }
                         [activePanelView setResults:self.chatSearchWindowResults];
+                        [activePanelView layoutPanelSubviews];
+                        [activePanelView setNeedsDisplay:YES];
+                        [activePanelView displayIfNeeded];
                         if ([self.chatSearchWindowResults count] > 0) {
                             [activePanelView setStatusText:TGLoc(@"search.chats.recent")];
                         } else if ([errorMessage length] > 0) {
@@ -215,6 +224,9 @@
 
             TGChatSearchPanelView *activePanelView = [self chatSearchPanelView];
             [activePanelView setResults:self.chatSearchWindowResults];
+            [activePanelView layoutPanelSubviews];
+            [activePanelView setNeedsDisplay:YES];
+            [activePanelView displayIfNeeded];
             if ([self.chatSearchWindowResults count] > 0) {
                 [activePanelView setStatusText:([queryCopy length] == 0 ? TGLoc(@"search.chats.recent") : [NSString stringWithFormat:TGLoc(@"search.chats.found"), (unsigned long)[self.chatSearchWindowResults count]])];
             } else if ([errorMessage length] > 0) {
