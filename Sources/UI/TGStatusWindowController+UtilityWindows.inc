@@ -79,6 +79,8 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
     [self.activeSessionsTerminatePopup removeAllItems];
     [self.activeSessionsTerminatePopup addItemWithTitle:TGLoc(@"settings.sessions.selectDevice")];
     [[[self.activeSessionsTerminatePopup menu] itemAtIndex:0] setRepresentedObject:nil];
+    self.activeSessionsSelectableSessions = [NSArray array];
+    [self.activeSessionsTableView reloadData];
     self.activeSessionsSummary = nil;
     if ([errorMessage length] > 0 || ![summary isKindOfClass:[NSDictionary class]]) {
         NSString *message = [NSString stringWithFormat:TGLoc(@"settings.sessions.failed"),
@@ -102,6 +104,7 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
     [[self.activeSessionsTextView textStorage] setAttributedString:output];
 
     NSArray *sessions = [summary objectForKey:@"sessions"];
+    NSMutableArray *selectableSessions = [NSMutableArray array];
     if ([sessions isKindOfClass:[NSArray class]]) {
         NSUInteger index = 0;
         for (index = 0; index < [sessions count]; index++) {
@@ -114,15 +117,20 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
                 continue;
             }
             NSString *title = TGActiveSessionMenuTitle(session, TGLoc(@"settings.sessions.unknownDevice"));
+            [selectableSessions addObject:session];
             [self.activeSessionsTerminatePopup addItemWithTitle:title];
             [[[self.activeSessionsTerminatePopup menu] itemAtIndex:([[self.activeSessionsTerminatePopup itemArray] count] - 1)] setRepresentedObject:sessionID];
         }
     }
+    self.activeSessionsSelectableSessions = selectableSessions;
+    [self.activeSessionsTableView reloadData];
     BOOL hasTerminableSessions = ([[self.activeSessionsTerminatePopup itemArray] count] > 1);
     if (hasTerminableSessions) {
         [self.activeSessionsTerminatePopup selectItemAtIndex:1];
+        [self.activeSessionsTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
     } else {
         [self.activeSessionsTerminatePopup selectItemAtIndex:0];
+        [self.activeSessionsTableView deselectAll:nil];
     }
     [self.activeSessionsTerminatePopup setEnabled:hasTerminableSessions];
     [self.activeSessionsTerminateButton setEnabled:hasTerminableSessions];
@@ -196,8 +204,8 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
                                          ([errorMessage length] > 0 ? errorMessage : TGLoc(@"settings.sessions.unknownError"))];
                     [self.activeSessionsStatusField setStringValue:message];
                     [self.activeSessionsRefreshButton setEnabled:YES];
-                    [self.activeSessionsTerminateButton setEnabled:([[self.activeSessionsTerminatePopup itemArray] count] > 0)];
-                    [self.activeSessionsTerminatePopup setEnabled:([[self.activeSessionsTerminatePopup itemArray] count] > 0)];
+                    [self.activeSessionsTerminateButton setEnabled:([[self.activeSessionsTerminatePopup itemArray] count] > 1)];
+                    [self.activeSessionsTerminatePopup setEnabled:([[self.activeSessionsTerminatePopup itemArray] count] > 1)];
                 }
             }
             [errorMessage release];
@@ -206,6 +214,19 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
         });
         [pool drain];
     });
+}
+
+- (void)activeSessionsTerminatePopupSelectionDidChange:(id)sender {
+    (void)sender;
+    NSInteger popupIndex = [self.activeSessionsTerminatePopup indexOfSelectedItem];
+    if (popupIndex > 0 && (NSUInteger)(popupIndex - 1) < [self.activeSessionsSelectableSessions count]) {
+        [self.activeSessionsTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)(popupIndex - 1)] byExtendingSelection:NO];
+        [self.activeSessionsTableView scrollRowToVisible:(popupIndex - 1)];
+        [self.activeSessionsTerminateButton setEnabled:YES];
+    } else {
+        [self.activeSessionsTableView deselectAll:nil];
+        [self.activeSessionsTerminateButton setEnabled:NO];
+    }
 }
 
 - (void)reloadActiveSessions:(id)sender {
@@ -219,6 +240,8 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
     [self.activeSessionsStatusField setStringValue:TGLoc(@"settings.sessions.loading")];
     [self.activeSessionsRefreshButton setEnabled:NO];
     [self.activeSessionsTextView setString:@""];
+    self.activeSessionsSelectableSessions = [NSArray array];
+    [self.activeSessionsTableView reloadData];
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -270,16 +293,39 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
         NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30, 112, 560, 300)] autorelease];
         [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self applySkeuomorphicScrollStyle:scrollView];
-        NSTextView *textView = [[[NSTextView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
-        [textView setEditable:NO];
-        [textView setSelectable:YES];
-        [textView setDrawsBackground:NO];
-        [scrollView setDocumentView:textView];
+        NSTableView *sessionsTable = [[[NSTableView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
+        [sessionsTable setHeaderView:nil];
+        [sessionsTable setRowHeight:74.0];
+        [sessionsTable setAllowsMultipleSelection:NO];
+        [sessionsTable setAllowsEmptySelection:YES];
+        [sessionsTable setUsesAlternatingRowBackgroundColors:NO];
+        [sessionsTable setBackgroundColor:[NSColor clearColor]];
+        [sessionsTable setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
+        [sessionsTable setGridColor:TGClassicTableGridColor()];
+        [sessionsTable setDelegate:self];
+        [sessionsTable setDataSource:self];
+        NSTableColumn *sessionColumn = [[[NSTableColumn alloc] initWithIdentifier:@"active_session"] autorelease];
+        [sessionColumn setWidth:NSWidth([[scrollView contentView] bounds])];
+        [sessionColumn setResizingMask:NSTableColumnAutoresizingMask];
+        NSTextFieldCell *sessionCell = [[[NSTextFieldCell alloc] init] autorelease];
+        [sessionCell setFont:[NSFont systemFontOfSize:12.0]];
+        [sessionCell setWraps:NO];
+        [sessionCell setScrollable:NO];
+        [sessionColumn setDataCell:sessionCell];
+        [sessionsTable addTableColumn:sessionColumn];
+        [scrollView setDocumentView:sessionsTable];
         [contentView addSubview:scrollView];
+        self.activeSessionsTableView = sessionsTable;
+        NSTextView *textView = [[[NSTextView alloc] initWithFrame:NSZeroRect] autorelease];
+        [textView setEditable:NO];
+        [textView setSelectable:NO];
+        [textView setDrawsBackground:NO];
         self.activeSessionsTextView = textView;
 
         NSPopUpButton *terminatePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30, 70, 402, 28) pullsDown:NO] autorelease];
         [terminatePopup setEnabled:NO];
+        [terminatePopup setTarget:self];
+        [terminatePopup setAction:@selector(activeSessionsTerminatePopupSelectionDidChange:)];
         [terminatePopup setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
         [contentView addSubview:terminatePopup];
         self.activeSessionsTerminatePopup = terminatePopup;

@@ -1,4 +1,7 @@
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    if (tableView == self.activeSessionsTableView) {
+        return (NSInteger)[self.activeSessionsSelectableSessions count];
+    }
     if (tableView == self.searchResultsTableView) {
         return (NSInteger)[self.searchResultItems count];
     }
@@ -25,6 +28,9 @@
 }
 
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
+    if (tableView == self.activeSessionsTableView) {
+        return 74.0;
+    }
     if (tableView == self.searchResultsTableView) {
         return 44.0;
     }
@@ -145,6 +151,18 @@
         [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
         return;
     }
+    if (tableView == self.activeSessionsTableView) {
+        BOOL selected = [tableView isRowSelected:row];
+        [textCell setFont:[NSFont systemFontOfSize:12.0]];
+        [textCell setTextColor:(selected ? TGClassicSelectedRowTextColor() : TGClassicInkColor())];
+        [textCell setDrawsBackground:selected];
+        if (selected) {
+            [textCell setBackgroundColor:TGClassicSelectedRowColor()];
+        }
+        [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
+        [textCell setAlignment:NSLeftTextAlignment];
+        return;
+    }
     if (tableView == self.chatTableView && [identifier isEqual:@"chat"] && [cell isKindOfClass:[TGChatListCell class]]) {
         TGChatItem *chatItem = nil;
         if (row >= 0 && (NSUInteger)row < [self.chatItems count]) {
@@ -212,6 +230,45 @@
 }
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    if (tableView == self.activeSessionsTableView) {
+        if (row < 0 || (NSUInteger)row >= [self.activeSessionsSelectableSessions count]) {
+            return @"";
+        }
+        id candidate = [self.activeSessionsSelectableSessions objectAtIndex:(NSUInteger)row];
+        if (![candidate isKindOfClass:[NSDictionary class]]) {
+            return @"";
+        }
+        NSDictionary *session = (NSDictionary *)candidate;
+        id rawDevice = [session objectForKey:@"device_model"];
+        id rawApplication = [session objectForKey:@"application_name"];
+        id rawPlatform = [session objectForKey:@"platform"];
+        id rawLocation = [session objectForKey:@"location"];
+        id rawLastActive = [session objectForKey:@"last_active_date"];
+        NSString *device = [rawDevice isKindOfClass:[NSString class]] ? rawDevice : nil;
+        NSString *application = [rawApplication isKindOfClass:[NSString class]] ? rawApplication : nil;
+        NSString *platform = [rawPlatform isKindOfClass:[NSString class]] ? rawPlatform : nil;
+        NSString *location = [rawLocation isKindOfClass:[NSString class]] ? rawLocation : nil;
+        NSString *lastActive = [rawLastActive isKindOfClass:[NSString class]] ? rawLastActive : ([rawLastActive respondsToSelector:@selector(description)] ? [rawLastActive description] : nil);
+        NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : TGLoc(@"settings.sessions.unknownDevice"));
+        NSMutableArray *lines = [NSMutableArray arrayWithObject:title];
+        NSMutableArray *details = [NSMutableArray array];
+        if ([application length] > 0 && ![application isEqualToString:title]) {
+            [details addObject:application];
+        }
+        if ([platform length] > 0 && ![platform isEqualToString:title]) {
+            [details addObject:platform];
+        }
+        if ([location length] > 0) {
+            [details addObject:location];
+        }
+        if ([details count] > 0) {
+            [lines addObject:[details componentsJoinedByString:@" · "]];
+        }
+        if ([lastActive length] > 0) {
+            [lines addObject:lastActive];
+        }
+        return [lines componentsJoinedByString:@"\n"];
+    }
     if (tableView == self.searchResultsTableView) {
         if (row < 0 || (NSUInteger)row >= [self.searchResultItems count]) {
             return @"";
@@ -279,6 +336,17 @@
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
     if ([notification object] == self.searchResultsTableView) {
+        return;
+    }
+    if ([notification object] == self.activeSessionsTableView) {
+        NSInteger row = [self.activeSessionsTableView selectedRow];
+        if (row >= 0 && (NSUInteger)row < [self.activeSessionsSelectableSessions count]) {
+            [self.activeSessionsTerminatePopup selectItemAtIndex:(row + 1)];
+            [self.activeSessionsTerminateButton setEnabled:YES];
+        } else {
+            [self.activeSessionsTerminatePopup selectItemAtIndex:0];
+            [self.activeSessionsTerminateButton setEnabled:NO];
+        }
         return;
     }
     if ([notification object] != self.chatTableView) {

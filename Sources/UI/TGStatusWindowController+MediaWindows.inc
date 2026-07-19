@@ -447,6 +447,14 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
 
 - (void)openMediaCenter:(id)sender {
     (void)sender;
+    if (!self.selectedChatID) {
+        [[TGLogger sharedLogger] log:@"Media Center: open requested without a selected chat."];
+        NSBeep();
+        return;
+    }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: opening for chat=%lld thread=%@.",
+                                  [self.selectedChatID longLongValue],
+                                  self.selectedMessageThreadID ? [self.selectedMessageThreadID description] : @"none"]];
     [self ensureMediaCenterWindow];
     [self layoutMediaCenterWindowSubviews];
     [self.mediaCenterWindow center];

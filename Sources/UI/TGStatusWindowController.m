@@ -371,6 +371,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *appearanceWindow;
 @property (nonatomic, retain) NSWindow *activeSessionsWindow;
 @property (nonatomic, retain) NSTextView *activeSessionsTextView;
+@property (nonatomic, retain) NSTableView *activeSessionsTableView;
+@property (nonatomic, retain) NSArray *activeSessionsSelectableSessions;
 @property (nonatomic, retain) NSTextField *activeSessionsStatusField;
 @property (nonatomic, retain) NSButton *activeSessionsRefreshButton;
 @property (nonatomic, retain) NSPopUpButton *activeSessionsTerminatePopup;
@@ -776,6 +778,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize appearanceWindow = _appearanceWindow;
 @synthesize activeSessionsWindow = _activeSessionsWindow;
 @synthesize activeSessionsTextView = _activeSessionsTextView;
+@synthesize activeSessionsTableView = _activeSessionsTableView;
+@synthesize activeSessionsSelectableSessions = _activeSessionsSelectableSessions;
 @synthesize activeSessionsStatusField = _activeSessionsStatusField;
 @synthesize activeSessionsRefreshButton = _activeSessionsRefreshButton;
 @synthesize activeSessionsTerminatePopup = _activeSessionsTerminatePopup;
@@ -3707,6 +3711,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_appearanceWindow release];
     [_activeSessionsWindow release];
     [_activeSessionsTextView release];
+    [_activeSessionsTableView release];
+    [_activeSessionsSelectableSessions release];
     [_activeSessionsStatusField release];
     [_activeSessionsRefreshButton release];
     [_activeSessionsTerminatePopup release];
