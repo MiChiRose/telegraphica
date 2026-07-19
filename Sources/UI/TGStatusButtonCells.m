@@ -345,6 +345,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         assetName = @"add-ellipse";
     } else if ([title isEqualToString:@"zoom-out"]) {
         assetName = @"remove-ellipse";
+    } else if ([title isEqualToString:@"media"] || [title isEqualToString:@"media-center"]) {
+        assetName = @"image";
     }
     if ([assetName length] > 0) {
         NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,

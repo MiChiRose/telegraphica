@@ -85,10 +85,10 @@
         [_searchField setDelegate:self];
         [_searchField setTarget:self];
         [_searchField setAction:@selector(commitSearch:)];
-        [_searchField setBezeled:YES];
-        [_searchField setBordered:YES];
-        [_searchField setDrawsBackground:YES];
-        [_searchField setBackgroundColor:[NSColor colorWithCalibratedWhite:1.0 alpha:0.96]];
+        [_searchField setBezeled:NO];
+        [_searchField setBordered:NO];
+        [_searchField setDrawsBackground:NO];
+        [_searchField setFocusRingType:NSFocusRingTypeNone];
         [[_searchField cell] setPlaceholderString:TGLoc(@"search.chats.placeholder")];
         [self addSubview:_searchField];
 
@@ -226,6 +226,13 @@
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
     [searchCardPath setLineWidth:1.0];
     [searchCardPath stroke];
+
+    NSRect inputRect = NSInsetRect([_searchField frame], -2.0, -2.0);
+    NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:8.0 yRadius:8.0];
+    TGThemeDrawRecessedBackgroundInPath(inputPath, inputRect, [self isFlipped]);
+    [TGClassicTableGridColor() set];
+    [inputPath setLineWidth:1.0];
+    [inputPath stroke];
 
     NSRect resultsCardRect = NSInsetRect([_scrollView frame], -8.0, -8.0);
     NSBezierPath *resultsCardPath = [NSBezierPath bezierPathWithRoundedRect:resultsCardRect xRadius:10.0 yRadius:10.0];

@@ -2008,8 +2008,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [contentView addSubview:self.chatSearchButton];
 
     self.mediaCenterButton = [[[NSButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
-    [self.mediaCenterButton setTitle:@"media"];
-    [self.mediaCenterButton setToolTip:@"Media center"];
+    [self.mediaCenterButton setTitle:@"media-center"];
+    [self.mediaCenterButton setToolTip:TGLoc(@"media.center.title")];
     [self.mediaCenterButton setTarget:self];
     [self.mediaCenterButton setAction:@selector(openMediaCenter:)];
     [self.mediaCenterButton setEnabled:NO];
