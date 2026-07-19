@@ -1,7 +1,6 @@
 #import "TGStickerPickerLayout.h"
 #import "TGStatusButtonCells.h"
 #import "TGTheme.h"
-#import "TGTransparentSpinnerView.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
 
@@ -34,7 +33,7 @@
 @end
 
 @interface TGStickerPickerLoadingView ()
-@property (nonatomic, retain) TGTransparentSpinnerView *spinner;
+@property (nonatomic, retain) NSProgressIndicator *spinner;
 @end
 
 @implementation TGStickerPickerLoadingView
@@ -46,15 +45,18 @@
     if (self) {
         NSRect bounds = [self bounds];
         CGFloat side = MIN(NSWidth(bounds), NSHeight(bounds));
-        if (side < 18.0) {
-            side = 18.0;
-        }
         NSRect spinnerFrame = NSMakeRect(NSMidX(bounds) - floor(side / 2.0),
                                          NSMidY(bounds) - floor(side / 2.0),
                                          side,
                                          side);
-        _spinner = [[TGTransparentSpinnerView alloc] initWithFrame:spinnerFrame];
+        _spinner = [[NSProgressIndicator alloc] initWithFrame:spinnerFrame];
+        [_spinner setStyle:NSProgressIndicatorSpinningStyle];
+        [_spinner setIndeterminate:YES];
         [_spinner setDisplayedWhenStopped:NO];
+        [_spinner setControlSize:(side <= 18.0 ? NSSmallControlSize : NSRegularControlSize)];
+        if ([_spinner respondsToSelector:@selector(setUsesThreadedAnimation:)]) {
+            [_spinner setUsesThreadedAnimation:YES];
+        }
         [_spinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
         [self addSubview:_spinner];
     }
@@ -124,8 +126,7 @@ NSButton *TGStickerPickerButtonWithFrame(NSRect frame, NSDictionary *item, NSInt
         [button setImageScaling:NSImageScaleProportionallyUpOrDown];
         [button setImagePosition:NSImageOnly];
     } else if (loading) {
-        [button setTitle:@"loading"];
-        [button setFont:[NSFont systemFontOfSize:12.0]];
+        [button setTitle:@""];
     } else {
         NSString *emoji = [item objectForKey:@"emoji"];
         [button setTitle:([emoji length] > 0 ? emoji : @"☺")];

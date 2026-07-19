@@ -893,9 +893,22 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         }
     }
     if (changed) {
+        [self.stickerPickerRailPreviewState setObject:@"done" forKey:[setID stringValue]];
         self.stickerPickerStickerSets = updatedSets;
         [self rebuildStickerPickerSetRail];
     }
+}
+
+- (BOOL)stickerPickerItemHasRenderableRailPreview:(NSDictionary *)item {
+    if (![item isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    NSString *localPath = TGMediaItemLocalPath(item);
+    if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
+        return YES;
+    }
+    NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(item);
+    return ([miniThumbnailData length] > 0);
 }
 
 - (BOOL)stickerPickerSetNeedsRailPreview:(NSDictionary *)setInfo {
@@ -903,12 +916,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return NO;
     }
     NSDictionary *railItem = [[setInfo objectForKey:@"rail_item"] isKindOfClass:[NSDictionary class]] ? [setInfo objectForKey:@"rail_item"] : nil;
-    if (railItem) {
+    if ([self stickerPickerItemHasRenderableRailPreview:railItem]) {
         return NO;
     }
     NSDictionary *thumbnail = [[setInfo objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [setInfo objectForKey:@"thumbnail"] : nil;
-    if (thumbnail && ([[TGMediaItemLocalPath(thumbnail) lastPathComponent] length] > 0 ||
-                      [TGMediaItemMiniThumbnailData(thumbnail) length] > 0)) {
+    if ([self stickerPickerItemHasRenderableRailPreview:thumbnail]) {
         return NO;
     }
     NSNumber *setID = [setInfo objectForKey:@"id"];
@@ -1026,9 +1038,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             continue;
         }
         NSDictionary *set = (NSDictionary *)candidate;
-        NSDictionary *thumbnail = [[set objectForKey:@"rail_item"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"rail_item"] : nil;
-        if (!thumbnail) {
-            thumbnail = [[set objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"thumbnail"] : nil;
+        NSDictionary *thumbnail = nil;
+        NSDictionary *railItem = [[set objectForKey:@"rail_item"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"rail_item"] : nil;
+        if ([self stickerPickerItemHasRenderableRailPreview:railItem]) {
+            thumbnail = railItem;
+        } else {
+            NSDictionary *setThumbnail = [[set objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"thumbnail"] : nil;
+            if ([self stickerPickerItemHasRenderableRailPreview:setThumbnail]) {
+                thumbnail = setThumbnail;
+            }
         }
         NSMutableDictionary *buttonItem = [NSMutableDictionary dictionary];
         if (thumbnail) {
@@ -1037,7 +1055,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         if ([buttonItem count] == 0) {
             NSNumber *setID = [set objectForKey:@"id"];
             NSString *state = ([setID respondsToSelector:@selector(stringValue)] ? [self.stickerPickerRailPreviewState objectForKey:[setID stringValue]] : nil);
-            if ([state isEqualToString:@"loading"]) {
+            if ([setID respondsToSelector:@selector(longLongValue)] && [setID longLongValue] != 0LL && ![state isEqualToString:@"done"]) {
                 [buttonItem setObject:[NSNumber numberWithBool:YES] forKey:@"sticker_loading"];
             } else {
                 [buttonItem setObject:@"stickers" forKey:@"emoji"];

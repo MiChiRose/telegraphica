@@ -607,28 +607,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         if ([title length] == 0) {
             title = @"?";
         }
-        if ([title isEqualToString:@"loading"]) {
-            NSPoint center = NSMakePoint(NSMidX(contentRect), NSMidY(contentRect));
-            CGFloat radius = 11.0;
-            CGFloat innerRadius = 4.0;
-            NSUInteger spokeIndex = 0;
-            for (spokeIndex = 0; spokeIndex < 12; spokeIndex++) {
-                CGFloat alphaValue = 0.18 + ((CGFloat)spokeIndex / 12.0) * 0.72;
-                CGFloat angle = ((CGFloat)spokeIndex / 12.0) * 2.0 * 3.14159265358979323846;
-                NSPoint start = NSMakePoint(center.x + cos(angle) * innerRadius,
-                                            center.y + sin(angle) * innerRadius);
-                NSPoint end = NSMakePoint(center.x + cos(angle) * radius,
-                                          center.y + sin(angle) * radius);
-                NSBezierPath *spoke = [NSBezierPath bezierPath];
-                [spoke setLineWidth:2.0];
-                [spoke setLineCapStyle:NSRoundLineCapStyle];
-                [[TGClassicMutedInkColor() colorWithAlphaComponent:alphaValue] setStroke];
-                [spoke moveToPoint:start];
-                [spoke lineToPoint:end];
-                [spoke stroke];
-            }
-            return;
-        }
         if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
             NSRect iconRect = NSMakeRect(NSMidX(contentRect) - 12.0,
                                          NSMidY(contentRect) - 12.0,
