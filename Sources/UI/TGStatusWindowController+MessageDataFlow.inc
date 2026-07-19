@@ -1457,6 +1457,9 @@
     if (self.controlsBusy) {
         return;
     }
+    if (!self.client) {
+        self.client = [[[TGTDLibClient alloc] init] autorelease];
+    }
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Connecting..."];
     [self appendDetail:@"Connecting to Telegram core..."];

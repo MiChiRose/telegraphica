@@ -4,6 +4,8 @@ NSString * const TGChatDisplayPreferencesDidChangeNotification = @"TGChatDisplay
 
 static NSString * const TGChatMessagesAsBlocksDefaultsKey = @"TelegraphicaChatMessagesAsBlocks";
 static NSString * const TGChatMessageTextSizeDefaultsKey = @"TelegraphicaChatMessageTextSizeLevel";
+static NSString * const TGChatMessagesAsBlocksOverridesDefaultsKey = @"TelegraphicaChatMessagesAsBlocksOverrides";
+static NSString * const TGChatMessageTextSizeOverridesDefaultsKey = @"TelegraphicaChatMessageTextSizeLevelOverrides";
 
 static NSInteger TGClampedChatMessageTextSizeLevel(NSInteger level) {
     if (level < TGChatMessageTextSizeSmall) {
@@ -17,6 +19,22 @@ static NSInteger TGClampedChatMessageTextSizeLevel(NSInteger level) {
 
 static void TGPostChatDisplayPreferencesDidChange(void) {
     [[NSNotificationCenter defaultCenter] postNotificationName:TGChatDisplayPreferencesDidChangeNotification object:nil];
+}
+
+static NSString *TGChatDisplayPreferencesTargetKey(NSNumber *chatID, NSNumber *messageThreadID) {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    long long threadID = ([messageThreadID respondsToSelector:@selector(longLongValue)] ? [messageThreadID longLongValue] : 0LL);
+    return [NSString stringWithFormat:@"%lld:%lld", [chatID longLongValue], threadID];
+}
+
+static NSMutableDictionary *TGMutableOverridesDictionaryForKey(NSString *defaultsKey) {
+    NSDictionary *stored = [[NSUserDefaults standardUserDefaults] dictionaryForKey:defaultsKey];
+    if ([stored isKindOfClass:[NSDictionary class]]) {
+        return [NSMutableDictionary dictionaryWithDictionary:stored];
+    }
+    return [NSMutableDictionary dictionary];
 }
 
 BOOL TGChatMessagesAsBlocksEnabled(void) {
@@ -34,6 +52,48 @@ void TGSetChatMessagesAsBlocksEnabled(BOOL enabled) {
     TGPostChatDisplayPreferencesDidChange();
 }
 
+BOOL TGChatMessagesAsBlocksEnabledForTarget(NSNumber *chatID, NSNumber *messageThreadID) {
+    NSString *targetKey = TGChatDisplayPreferencesTargetKey(chatID, messageThreadID);
+    NSDictionary *overrides = [[NSUserDefaults standardUserDefaults] dictionaryForKey:TGChatMessagesAsBlocksOverridesDefaultsKey];
+    id value = [overrides objectForKey:targetKey];
+    if ([value respondsToSelector:@selector(boolValue)]) {
+        return [value boolValue];
+    }
+    return TGChatMessagesAsBlocksEnabled();
+}
+
+void TGSetChatMessagesAsBlocksEnabledForTarget(NSNumber *chatID, NSNumber *messageThreadID, BOOL enabled) {
+    NSString *targetKey = TGChatDisplayPreferencesTargetKey(chatID, messageThreadID);
+    if ([targetKey length] == 0) {
+        TGSetChatMessagesAsBlocksEnabled(enabled);
+        return;
+    }
+    NSMutableDictionary *overrides = TGMutableOverridesDictionaryForKey(TGChatMessagesAsBlocksOverridesDefaultsKey);
+    NSNumber *current = [overrides objectForKey:targetKey];
+    if ([current respondsToSelector:@selector(boolValue)] && [current boolValue] == enabled) {
+        return;
+    }
+    [overrides setObject:[NSNumber numberWithBool:enabled] forKey:targetKey];
+    [[NSUserDefaults standardUserDefaults] setObject:overrides forKey:TGChatMessagesAsBlocksOverridesDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    TGPostChatDisplayPreferencesDidChange();
+}
+
+void TGClearChatMessagesAsBlocksOverrideForTarget(NSNumber *chatID, NSNumber *messageThreadID) {
+    NSString *targetKey = TGChatDisplayPreferencesTargetKey(chatID, messageThreadID);
+    if ([targetKey length] == 0) {
+        return;
+    }
+    NSMutableDictionary *overrides = TGMutableOverridesDictionaryForKey(TGChatMessagesAsBlocksOverridesDefaultsKey);
+    if (![overrides objectForKey:targetKey]) {
+        return;
+    }
+    [overrides removeObjectForKey:targetKey];
+    [[NSUserDefaults standardUserDefaults] setObject:overrides forKey:TGChatMessagesAsBlocksOverridesDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    TGPostChatDisplayPreferencesDidChange();
+}
+
 NSInteger TGChatMessageTextSizeLevel(void) {
     id stored = [[NSUserDefaults standardUserDefaults] objectForKey:TGChatMessageTextSizeDefaultsKey];
     if (![stored respondsToSelector:@selector(integerValue)]) {
@@ -48,6 +108,49 @@ void TGSetChatMessageTextSizeLevel(NSInteger level) {
         return;
     }
     [[NSUserDefaults standardUserDefaults] setInteger:clamped forKey:TGChatMessageTextSizeDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    TGPostChatDisplayPreferencesDidChange();
+}
+
+NSInteger TGChatMessageTextSizeLevelForTarget(NSNumber *chatID, NSNumber *messageThreadID) {
+    NSString *targetKey = TGChatDisplayPreferencesTargetKey(chatID, messageThreadID);
+    NSDictionary *overrides = [[NSUserDefaults standardUserDefaults] dictionaryForKey:TGChatMessageTextSizeOverridesDefaultsKey];
+    id value = [overrides objectForKey:targetKey];
+    if ([value respondsToSelector:@selector(integerValue)]) {
+        return TGClampedChatMessageTextSizeLevel([value integerValue]);
+    }
+    return TGChatMessageTextSizeLevel();
+}
+
+void TGSetChatMessageTextSizeLevelForTarget(NSNumber *chatID, NSNumber *messageThreadID, NSInteger level) {
+    NSString *targetKey = TGChatDisplayPreferencesTargetKey(chatID, messageThreadID);
+    if ([targetKey length] == 0) {
+        TGSetChatMessageTextSizeLevel(level);
+        return;
+    }
+    NSInteger clamped = TGClampedChatMessageTextSizeLevel(level);
+    NSMutableDictionary *overrides = TGMutableOverridesDictionaryForKey(TGChatMessageTextSizeOverridesDefaultsKey);
+    NSNumber *current = [overrides objectForKey:targetKey];
+    if ([current respondsToSelector:@selector(integerValue)] && TGClampedChatMessageTextSizeLevel([current integerValue]) == clamped) {
+        return;
+    }
+    [overrides setObject:[NSNumber numberWithInteger:clamped] forKey:targetKey];
+    [[NSUserDefaults standardUserDefaults] setObject:overrides forKey:TGChatMessageTextSizeOverridesDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    TGPostChatDisplayPreferencesDidChange();
+}
+
+void TGClearChatMessageTextSizeOverrideForTarget(NSNumber *chatID, NSNumber *messageThreadID) {
+    NSString *targetKey = TGChatDisplayPreferencesTargetKey(chatID, messageThreadID);
+    if ([targetKey length] == 0) {
+        return;
+    }
+    NSMutableDictionary *overrides = TGMutableOverridesDictionaryForKey(TGChatMessageTextSizeOverridesDefaultsKey);
+    if (![overrides objectForKey:targetKey]) {
+        return;
+    }
+    [overrides removeObjectForKey:targetKey];
+    [[NSUserDefaults standardUserDefaults] setObject:overrides forKey:TGChatMessageTextSizeOverridesDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
     TGPostChatDisplayPreferencesDidChange();
 }

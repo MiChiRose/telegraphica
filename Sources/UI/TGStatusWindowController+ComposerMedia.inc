@@ -44,6 +44,12 @@ static NSString *TGAttachmentBatchProgressText(NSUInteger index, NSUInteger coun
     return [NSString stringWithFormat:@"Sending %lu of %lu...", (unsigned long)index, (unsigned long)count];
 }
 
+static long long TGLocalFailedOutgoingMessageID(void) {
+    static long long counter = 0;
+    counter--;
+    return counter;
+}
+
 static BOOL TGAttachmentDescriptorsCanSendAsMediaAlbum(NSArray *descriptors) {
     if ([descriptors count] < 2 || [descriptors count] > 10) {
         return NO;
@@ -792,7 +798,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 430, 430);
+    NSRect frame = NSMakeRect(0, 0, 520, 444);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -805,19 +811,38 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(18, 392, 394, 20)
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(104, 406, 398, 20)
                                                text:@"Recent stickers"
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 18, 394, 362)] autorelease];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 392, 68, 30)] autorelease];
+    [recentButton setTitle:@"Recent"];
+    [recentButton setTarget:self];
+    [recentButton setAction:@selector(selectRecentStickerPickerTab:)];
+    [self applyUtilityButtonStyle:recentButton];
+    [contentView addSubview:recentButton];
+    self.stickerPickerRecentButton = recentButton;
+
+    NSScrollView *setScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 18, 68, 364)] autorelease];
+    [setScrollView setBorderType:NSBezelBorder];
+    [setScrollView setHasVerticalScroller:YES];
+    [setScrollView setAutohidesScrollers:YES];
+    [setScrollView setAutoresizingMask:NSViewHeightSizable];
+    NSView *setContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 50, 362)] autorelease];
+    [setScrollView setDocumentView:setContentView];
+    [contentView addSubview:setScrollView];
+    self.stickerPickerSetScrollView = setScrollView;
+    self.stickerPickerSetContentView = setContentView;
+
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(104, 18, 398, 376)] autorelease];
     [scrollView setBorderType:NSBezelBorder];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setAutohidesScrollers:YES];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 376, 360)] autorelease];
+    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 376, 374)] autorelease];
     [scrollView setDocumentView:gridView];
     [[scrollView contentView] setPostsBoundsChangedNotifications:YES];
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -829,7 +854,123 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerContentView = gridView;
     self.stickerPickerPlaybackCoordinator = [[[TGInlineMediaPlaybackCoordinator alloc] initWithHostView:gridView
                                                                                            maximumActiveItems:5] autorelease];
+    self.stickerPickerSetCache = [NSMutableDictionary dictionary];
     self.stickerPickerWindow = window;
+}
+
+- (void)selectRecentStickerPickerTab:(id)sender {
+    (void)sender;
+    self.stickerPickerSelectedSetID = nil;
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self reloadStickerPickerItems];
+}
+
+- (void)selectStickerSetFromPickerButton:(id)sender {
+    NSInteger setIndex = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
+    id represented = (setIndex >= 0 && (NSUInteger)setIndex < [self.stickerPickerStickerSets count]) ? [self.stickerPickerStickerSets objectAtIndex:(NSUInteger)setIndex] : nil;
+    if (![represented isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSNumber *setID = [(NSDictionary *)represented objectForKey:@"id"];
+    if (![setID respondsToSelector:@selector(longLongValue)] || [setID longLongValue] == 0LL) {
+        return;
+    }
+    self.stickerPickerSelectedSetID = setID;
+    [[NSUserDefaults standardUserDefaults] setObject:[setID stringValue] forKey:@"TelegraphicaStickerPickerLastSetID"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self reloadStickerPickerItemsForSet:(NSDictionary *)represented];
+}
+
+- (void)rebuildStickerPickerSetRail {
+    NSView *setView = self.stickerPickerSetContentView;
+    if (!setView) {
+        return;
+    }
+    NSArray *oldSubviews = [[setView subviews] copy];
+    NSUInteger removeIndex = 0;
+    for (removeIndex = 0; removeIndex < [oldSubviews count]; removeIndex++) {
+        [[oldSubviews objectAtIndex:removeIndex] removeFromSuperview];
+    }
+    [oldSubviews release];
+
+    CGFloat buttonSide = 48.0;
+    CGFloat gap = 8.0;
+    NSUInteger count = [self.stickerPickerStickerSets count];
+    CGFloat contentHeight = MAX(362.0, gap + (CGFloat)count * (buttonSide + gap));
+    [setView setFrame:NSMakeRect(0, 0, 50.0, contentHeight)];
+
+    NSUInteger index = 0;
+    for (index = 0; index < count; index++) {
+        id candidate = [self.stickerPickerStickerSets objectAtIndex:index];
+        if (![candidate isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *set = (NSDictionary *)candidate;
+        NSDictionary *thumbnail = [[set objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"thumbnail"] : nil;
+        NSMutableDictionary *buttonItem = [NSMutableDictionary dictionary];
+        if (thumbnail) {
+            [buttonItem addEntriesFromDictionary:thumbnail];
+        }
+        NSString *title = [set objectForKey:@"title"];
+        if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
+            title = [set objectForKey:@"name"];
+        }
+        if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
+            [buttonItem setObject:title forKey:@"emoji"];
+        }
+        CGFloat y = contentHeight - gap - buttonSide - (CGFloat)index * (buttonSide + gap);
+        NSButton *button = TGStickerPickerButtonWithFrame(NSMakeRect(1.0, y, buttonSide, buttonSide),
+                                                          buttonItem,
+                                                          (NSInteger)index,
+                                                          self,
+                                                          @selector(selectStickerSetFromPickerButton:));
+        NSString *tooltip = [set objectForKey:@"title"];
+        if ([tooltip isKindOfClass:[NSString class]] && [tooltip length] > 0) {
+            [button setToolTip:tooltip];
+        }
+        [setView addSubview:button];
+    }
+}
+
+- (void)reloadStickerPickerSetsIfNeeded {
+    if ([self.stickerPickerStickerSets count] > 0) {
+        [self rebuildStickerPickerSetRail];
+        return;
+    }
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *setError = nil;
+        NSArray *sets = [[client installedStickerSetInfoItemsWithTimeout:8.0 error:&setError] copy];
+        NSString *errorMessage = [[setError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL resultIsCurrent = (client == self.client);
+            if (resultIsCurrent) {
+                self.stickerPickerStickerSets = ([sets count] > 0 ? sets : [NSArray array]);
+                [self rebuildStickerPickerSetRail];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded installed sticker sets count=%lu%@",
+                                              (unsigned long)[self.stickerPickerStickerSets count],
+                                              [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
+                NSString *lastSetID = [[NSUserDefaults standardUserDefaults] stringForKey:@"TelegraphicaStickerPickerLastSetID"];
+                if ([lastSetID length] > 0 && [self.stickerPickerItems count] == 0) {
+                    NSUInteger index = 0;
+                    for (index = 0; index < [self.stickerPickerStickerSets count]; index++) {
+                        NSDictionary *set = [self.stickerPickerStickerSets objectAtIndex:index];
+                        NSNumber *setID = [set objectForKey:@"id"];
+                        if ([setID respondsToSelector:@selector(longLongValue)] && [[setID stringValue] isEqualToString:lastSetID]) {
+                            self.stickerPickerSelectedSetID = setID;
+                            [self reloadStickerPickerItemsForSet:set];
+                            break;
+                        }
+                    }
+                }
+            }
+            [sets release];
+            [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)stickerPickerScrollViewDidScroll:(NSNotification *)notification {
@@ -932,6 +1073,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)reloadStickerPickerItems {
     [self.stickerPickerStatusField setStringValue:@"Loading stickers..."];
+    self.stickerPickerSelectedSetID = nil;
     TGTDLibClient *client = [self.client retain];
     NSUInteger generation = self.stickerPickerLoadGeneration + 1;
     self.stickerPickerLoadGeneration = generation;
@@ -967,6 +1109,70 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     });
 }
 
+- (void)reloadStickerPickerItemsForSet:(NSDictionary *)setInfo {
+    NSNumber *setID = [setInfo objectForKey:@"id"];
+    if (![setID respondsToSelector:@selector(longLongValue)] || [setID longLongValue] == 0LL) {
+        [self reloadStickerPickerItems];
+        return;
+    }
+    NSString *cacheKey = [setID stringValue];
+    NSArray *cachedItems = [self.stickerPickerSetCache objectForKey:cacheKey];
+    NSString *title = [setInfo objectForKey:@"title"];
+    if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
+        title = [setInfo objectForKey:@"name"];
+    }
+    if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
+        title = @"Sticker set";
+    }
+    if ([cachedItems count] > 0) {
+        self.stickerPickerItems = cachedItems;
+        [self.stickerPickerStatusField setStringValue:title];
+        [self rebuildStickerPickerGrid];
+        return;
+    }
+
+    [self.stickerPickerStatusField setStringValue:[NSString stringWithFormat:@"Loading %@...", title]];
+    self.stickerPickerItems = [NSArray array];
+    [self rebuildStickerPickerGrid];
+
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *selectedSetID = [setID retain];
+    NSString *titleCopy = [title copy];
+    NSUInteger generation = self.stickerPickerLoadGeneration + 1;
+    self.stickerPickerLoadGeneration = generation;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *setError = nil;
+        NSArray *items = [[client stickerItemsForStickerSetID:selectedSetID limit:72 timeout:10.0 error:&setError] copy];
+        NSString *errorMessage = [[setError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL resultIsCurrent = (generation == self.stickerPickerLoadGeneration &&
+                                    client == self.client &&
+                                    [self.stickerPickerSelectedSetID respondsToSelector:@selector(longLongValue)] &&
+                                    [self.stickerPickerSelectedSetID longLongValue] == [selectedSetID longLongValue]);
+            if (resultIsCurrent) {
+                if ([items count] > 0) {
+                    [self.stickerPickerSetCache setObject:items forKey:cacheKey];
+                    self.stickerPickerItems = items;
+                    [self.stickerPickerStatusField setStringValue:titleCopy];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded set %@ count=%lu", titleCopy, (unsigned long)[items count]]];
+                } else {
+                    self.stickerPickerItems = [NSArray array];
+                    [self.stickerPickerStatusField setStringValue:([errorMessage length] > 0 ? errorMessage : @"This sticker set is empty")];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: set %@ unavailable: %@", titleCopy, [errorMessage length] > 0 ? errorMessage : @"empty response"]];
+                }
+                [self rebuildStickerPickerGrid];
+            }
+            [items release];
+            [errorMessage release];
+            [titleCopy release];
+            [selectedSetID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)showStickerPicker:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
@@ -978,7 +1184,20 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self.stickerPickerWindow setTitle:TGLoc(@"stickers")];
     [self.stickerPickerWindow center];
     [self.stickerPickerWindow makeKeyAndOrderFront:nil];
-    if ([self.stickerPickerItems count] == 0) {
+    [self reloadStickerPickerSetsIfNeeded];
+    if (self.stickerPickerSelectedSetID && [self.stickerPickerItems count] == 0) {
+        NSString *selectedID = [self.stickerPickerSelectedSetID stringValue];
+        NSUInteger index = 0;
+        for (index = 0; index < [self.stickerPickerStickerSets count]; index++) {
+            NSDictionary *set = [self.stickerPickerStickerSets objectAtIndex:index];
+            NSNumber *setID = [set objectForKey:@"id"];
+            if ([setID respondsToSelector:@selector(longLongValue)] && [[setID stringValue] isEqualToString:selectedID]) {
+                [self reloadStickerPickerItemsForSet:set];
+                return;
+            }
+        }
+        [self reloadStickerPickerItems];
+    } else if ([self.stickerPickerItems count] == 0) {
         [self reloadStickerPickerItems];
     } else {
         [self rebuildStickerPickerGrid];
@@ -1630,6 +1849,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 }
             } else {
                 NSString *message = ([sendErrorMessage length] > 0) ? sendErrorMessage : @"Text message was not confirmed.";
+                if (selectionStillCurrent) {
+                    [self addFailedTextMessageForChatID:chatID
+                                        messageThreadID:messageThreadID
+                                       messageTopicKind:messageTopicKind
+                                                   text:messageText
+                                       replyToMessageID:replyToMessageID
+                                          sentPartCount:sentPartCount
+                                         totalPartCount:[messageChunks count]
+                                                  error:message];
+                }
                 if (TGStatusErrorLooksOffline(message)) {
                     [self setOfflineModeActive:YES reason:@"Network appears unavailable. Message was not retried automatically to avoid duplicate sends."];
                 } else {
@@ -1663,6 +1892,181 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [messageText release];
             [messageChunks release];
             [replyToMessageID release];
+        });
+
+        [client release];
+        [pool drain];
+    });
+}
+
+- (TGMessageItem *)failedTextMessageItemForChatID:(NSNumber *)chatID
+                                  messageThreadID:(NSNumber *)messageThreadID
+                                 messageTopicKind:(NSString *)messageTopicKind
+                                             text:(NSString *)text
+                                 replyToMessageID:(NSNumber *)replyToMessageID
+                                    sentPartCount:(NSUInteger)sentPartCount
+                                   totalPartCount:(NSUInteger)totalPartCount
+                                            error:(NSString *)errorMessage {
+    TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:chatID
+                                                       messageID:[NSNumber numberWithLongLong:TGLocalFailedOutgoingMessageID()]
+                                                            date:[NSNumber numberWithInteger:(NSInteger)[[NSDate date] timeIntervalSince1970]]
+                                                        outgoing:YES
+                                                         preview:([text length] > 0 ? text : TGLoc(@"message.sendFailed"))] autorelease];
+    [item setContentType:@"messageText"];
+    [item setEditableText:text];
+    [item setFailedToSend:YES];
+    [item setCanBeReplied:NO];
+    [item setCanBeEdited:NO];
+    [item setCanBeDeletedOnlyForSelf:YES];
+    [item setCanBeDeletedForAllUsers:NO];
+    [item setCapabilitiesKnown:YES];
+    [item setRetryMessageThreadID:messageThreadID];
+    [item setRetryMessageTopicKind:messageTopicKind];
+    [item setRetryText:text];
+    [item setRetryReplyToMessageID:replyToMessageID];
+    [item setRetrySentPartCount:[NSNumber numberWithUnsignedInteger:sentPartCount]];
+    [item setRetryTotalPartCount:[NSNumber numberWithUnsignedInteger:totalPartCount]];
+    [item setSendFailureSummary:([errorMessage length] > 0 ? errorMessage : TGLoc(@"message.sendFailed"))];
+    if (replyToMessageID) {
+        [item setReplyToMessageID:replyToMessageID];
+        [item setReplyPreview:TGLoc(@"message.original")];
+    }
+    return item;
+}
+
+- (void)addFailedTextMessageForChatID:(NSNumber *)chatID
+                      messageThreadID:(NSNumber *)messageThreadID
+                     messageTopicKind:(NSString *)messageTopicKind
+                                 text:(NSString *)text
+                     replyToMessageID:(NSNumber *)replyToMessageID
+                        sentPartCount:(NSUInteger)sentPartCount
+                       totalPartCount:(NSUInteger)totalPartCount
+                                error:(NSString *)errorMessage {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || [text length] == 0) {
+        return;
+    }
+    TGMessageItem *item = [self failedTextMessageItemForChatID:chatID
+                                               messageThreadID:messageThreadID
+                                              messageTopicKind:messageTopicKind
+                                                          text:text
+                                              replyToMessageID:replyToMessageID
+                                                 sentPartCount:sentPartCount
+                                                totalPartCount:totalPartCount
+                                                         error:errorMessage];
+    [self.messageItems addObject:item];
+    [self.messageTableView reloadData];
+    [self scrollMessagesToNewestIfAvailable];
+}
+
+- (void)removeFailedTextMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    NSUInteger index = [self.messageItems indexOfObjectIdenticalTo:item];
+    if (index != NSNotFound) {
+        [self.messageItems removeObjectAtIndex:index];
+        [self.messageTableView reloadData];
+    }
+}
+
+- (void)retryFailedTextMessageFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item failedToSend] || [[item retryText] length] == 0) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [self appendDetail:@"Message retry is available only after sign-in is ready."];
+        return;
+    }
+    NSUInteger sentPartCount = [[item retrySentPartCount] respondsToSelector:@selector(unsignedIntegerValue)] ? [[item retrySentPartCount] unsignedIntegerValue] : 0;
+    NSUInteger totalPartCount = [[item retryTotalPartCount] respondsToSelector:@selector(unsignedIntegerValue)] ? [[item retryTotalPartCount] unsignedIntegerValue] : 1;
+    NSString *warning = (totalPartCount > 1)
+        ? [NSString stringWithFormat:TGLoc(@"message.retry.confirm.partial"), (unsigned long)sentPartCount, (unsigned long)totalPartCount]
+        : TGLoc(@"message.retry.confirm.message");
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"message.retry.confirm.title")];
+    [alert setInformativeText:warning];
+    [alert addButtonWithTitle:TGLoc(@"message.retrySend")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageThreadID = [[item retryMessageThreadID] retain];
+    NSString *messageTopicKind = [[item retryMessageTopicKind] copy];
+    NSString *messageText = [[item retryText] copy];
+    NSNumber *replyToMessageID = [[item retryReplyToMessageID] retain];
+    NSArray *messageChunks = [TGOutgoingTextMessageChunks(messageText) retain];
+    TGMessageItem *failedItem = [item retain];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:TGLoc(@"message.retry.sending")];
+    [self appendDetail:@"Retrying failed text message by explicit user action."];
+
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSError *stateError = nil;
+        NSUInteger retrySentPartCount = 0;
+        NSUInteger retryTotalPartCount = [messageChunks count];
+        NSUInteger chunkIndex = 0;
+        for (chunkIndex = 0; chunkIndex < retryTotalPartCount; chunkIndex++) {
+            NSString *chunkText = [messageChunks objectAtIndex:chunkIndex];
+            NSError *chunkError = nil;
+            NSNumber *chunkReplyToMessageID = (chunkIndex == 0) ? replyToMessageID : nil;
+            NSString *sendSummary = [client sendTextMessageToChatID:chatID
+                                                    messageThreadID:messageThreadID
+                                                  messageTopicKind:messageTopicKind
+                                                               text:chunkText
+                                                    replyToMessageID:chunkReplyToMessageID
+                                                            timeout:8.0
+                                                              error:&chunkError];
+            if ([sendSummary length] == 0) {
+                sendError = chunkError;
+                break;
+            }
+            retrySentPartCount++;
+        }
+        NSString *authorizationState = [[client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError] copy];
+        NSString *sendErrorMessage = [[sendError localizedDescription] copy];
+        BOOL sendSucceeded = (retryTotalPartCount > 0 && retrySentPartCount == retryTotalPartCount);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (sendSucceeded) {
+                [self setOfflineModeActive:NO reason:nil];
+                [self.statusField setStringValue:TGLoc(@"message.retry.sent")];
+                [self removeFailedTextMessageItem:failedItem];
+                self.forceMessageScrollToNewest = YES;
+                self.pendingLiveChatRefresh = YES;
+                self.pendingLiveMessageRefresh = YES;
+                [self handlePendingLiveRefreshesIfPossible];
+                [self requestComposerRefocus];
+            } else {
+                NSString *message = ([sendErrorMessage length] > 0) ? sendErrorMessage : TGLoc(@"message.sendFailed");
+                [failedItem setRetrySentPartCount:[NSNumber numberWithUnsignedInteger:retrySentPartCount]];
+                [failedItem setRetryTotalPartCount:[NSNumber numberWithUnsignedInteger:retryTotalPartCount]];
+                [failedItem setSendFailureSummary:message];
+                [self.statusField setStringValue:TGLoc(@"message.retry.failed")];
+                [self.messageTableView reloadData];
+                [self appendDetail:@"Retry did not confirm the text message. It was not retried again automatically."];
+                if (TGStatusErrorLooksOffline(message)) {
+                    [self setOfflineModeActive:YES reason:@"Network appears unavailable. Retry stopped to avoid duplicate sends."];
+                }
+            }
+            if ([authorizationState length] > 0) {
+                [self updateAuthControlsForState:authorizationState];
+            }
+            [self setControlsBusy:NO];
+            [authorizationState release];
+            [sendErrorMessage release];
+            [failedItem release];
+            [chatID release];
+            [messageThreadID release];
+            [messageTopicKind release];
+            [messageText release];
+            [replyToMessageID release];
+            [messageChunks release];
         });
 
         [client release];

@@ -244,6 +244,7 @@
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsStorageUsageButton visible:showSettings];
+    [self showView:self.settingsDeleteLocalDataButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsUpdateDotView visible:(showSettings && self.updateAvailable)];
     [self showView:self.settingsAppearanceButton visible:NO];
@@ -931,12 +932,8 @@
     if (settingsDocWidth < 340.0) {
         settingsDocWidth = settingsScrollWidth;
     }
-    CGFloat settingsBottomPadding = 32.0;
-    CGFloat settingsDocHeight = 1180.0 + settingsBottomPadding;
-    if (settingsDocHeight < settingsScrollHeight) {
-        settingsDocHeight = settingsScrollHeight;
-    }
-    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
+    CGFloat settingsBottomPadding = 42.0;
+    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsScrollHeight)];
     NSClipView *settingsClipView = [self.settingsScrollView contentView];
     NSPoint settingsClipOrigin = [settingsClipView bounds].origin;
     if (settingsClipOrigin.x != 0.0) {
@@ -1044,12 +1041,13 @@
     settingsNextY = sessionsCardY + sessionsCardHeight + settingsGroupGap;
 
     [self.settingsFilesSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat filesCardHeight = 108.0;
+    CGFloat filesCardHeight = 140.0;
     CGFloat filesCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
     [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
     [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 38.0, rowWidth, 28.0)];
     [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
+    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
     settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
     [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
@@ -1060,6 +1058,18 @@
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
     [self.settingsUpdateDotView setFrame:NSMakeRect(rowWidth - 20.0, 9.0, 10.0, 10.0)];
+
+    CGFloat settingsDocHeight = helpCardY + helpCardHeight + settingsBottomPadding;
+    if (settingsDocHeight < settingsScrollHeight) {
+        settingsDocHeight = settingsScrollHeight;
+    }
+    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
+    NSPoint finalSettingsClipOrigin = [settingsClipView bounds].origin;
+    CGFloat maxSettingsClipY = MAX(0.0, settingsDocHeight - settingsScrollHeight);
+    if (finalSettingsClipOrigin.y > maxSettingsClipY) {
+        [settingsClipView setBoundsOrigin:NSMakePoint(0.0, maxSettingsClipY)];
+    }
+
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
         aboutWidth = 560.0;

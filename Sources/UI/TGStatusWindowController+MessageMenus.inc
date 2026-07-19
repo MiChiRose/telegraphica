@@ -93,6 +93,48 @@
     return menuItem;
 }
 
+- (NSMenuItem *)pollOptionMenuItemWithTitle:(NSString *)title optionIndex:(NSUInteger)optionIndex messageItem:(TGMessageItem *)item chosen:(BOOL)chosen {
+    NSMutableDictionary *payload = [NSMutableDictionary dictionary];
+    [payload setObject:item forKey:@"message"];
+    [payload setObject:[NSNumber numberWithUnsignedInteger:optionIndex] forKey:@"option_index"];
+
+    NSString *displayTitle = chosen ? [NSString stringWithFormat:@"✓ %@", title] : title;
+    NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:displayTitle
+                                                       action:@selector(votePollOptionFromMenu:)
+                                                keyEquivalent:@""] autorelease];
+    [menuItem setRepresentedObject:payload];
+    [menuItem setTarget:self];
+    [menuItem setEnabled:(!chosen && ![item pollClosed])];
+    return menuItem;
+}
+
+- (NSMenu *)pollOptionsMenuForItem:(TGMessageItem *)item {
+    NSMenu *pollMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"message.poll.vote")] autorelease];
+    NSArray *options = [item pollOptions];
+    NSUInteger index = 0;
+    for (index = 0; index < [options count]; index++) {
+        id candidate = [options objectAtIndex:index];
+        if (![candidate isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *option = (NSDictionary *)candidate;
+        NSString *optionText = [option objectForKey:TGMessagePollOptionTextKey];
+        if (![optionText isKindOfClass:[NSString class]] || [optionText length] == 0) {
+            optionText = [NSString stringWithFormat:TGLoc(@"message.poll.optionFallback"), (unsigned long)(index + 1)];
+        }
+        BOOL chosen = [[option objectForKey:TGMessagePollOptionChosenKey] boolValue];
+        [pollMenu addItem:[self pollOptionMenuItemWithTitle:optionText optionIndex:index messageItem:item chosen:chosen]];
+    }
+    if ([[pollMenu itemArray] count] == 0) {
+        NSMenuItem *emptyItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.poll.noOptions")
+                                                            action:nil
+                                                     keyEquivalent:@""] autorelease];
+        [emptyItem setEnabled:NO];
+        [pollMenu addItem:emptyItem];
+    }
+    return pollMenu;
+}
+
 - (NSMenuItem *)chatCurrentMuteStateMenuItemForChatItem:(TGChatItem *)item {
     NSString *title = @"Notifications are on";
     NSNumber *chatID = [self notificationChatIDForChatItem:item];
@@ -407,6 +449,31 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
     if (![self messageItem:item atRow:row containsTablePoint:tablePoint]) {
         return;
     }
+    if ([item failedToSend]) {
+        NSMenuItem *retryItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.retrySend")
+                                                            action:@selector(retryFailedTextMessageFromMenu:)
+                                                     keyEquivalent:@""] autorelease];
+        [retryItem setRepresentedObject:item];
+        [retryItem setTarget:self];
+        [retryItem setImage:TGTemplateIconAssetImage(@"reload", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
+        [menu addItem:retryItem];
+
+        NSMenuItem *copyUnsentItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.copyUnsentText")
+                                                                  action:@selector(copyMessageTextFromMenu:)
+                                                           keyEquivalent:@""] autorelease];
+        [copyUnsentItem setRepresentedObject:item];
+        [copyUnsentItem setTarget:self];
+        [copyUnsentItem setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.78)];
+        [menu addItem:copyUnsentItem];
+        if ([[item sendFailureSummary] length] > 0) {
+            NSMenuItem *errorItem = [[[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"%@: %@", TGLoc(@"message.sendFailed"), [item sendFailureSummary]]
+                                                                action:nil
+                                                         keyEquivalent:@""] autorelease];
+            [errorItem setEnabled:NO];
+            [menu addItem:errorItem];
+        }
+        return;
+    }
     if (TGMessageItemHasDownloadableAttachment(item)) {
         NSString *downloadTitle = [item isDocumentMessage] ? TGLoc(@"message.downloadDocument") : TGLoc(@"message.downloadMedia");
         NSMenuItem *downloadItem = [[[NSMenuItem alloc] initWithTitle:downloadTitle
@@ -428,6 +495,17 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         [copyTextItem setTarget:self];
         [copyTextItem setImage:TGTemplateIconAssetImage(@"document", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.78)];
         [menu addItem:copyTextItem];
+        addedMessageAction = YES;
+    }
+
+    if ([item isPollMessage]) {
+        NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.poll.vote")
+                                                           action:nil
+                                                    keyEquivalent:@""] autorelease];
+        [pollItem setImage:TGTemplateIconAssetImage(@"poll", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.80)];
+        [pollItem setSubmenu:[self pollOptionsMenuForItem:item]];
+        [pollItem setEnabled:(![item pollClosed] && [[item pollOptions] count] > 0)];
+        [menu addItem:pollItem];
         addedMessageAction = YES;
     }
 
@@ -587,6 +665,9 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         return;
     }
     NSString *text = ([[item editableText] length] > 0) ? [item editableText] : TGDisplayTextForMessageItem(item);
+    if ([text length] == 0 && [[item retryText] length] > 0) {
+        text = [item retryText];
+    }
     if ([text length] == 0) {
         return;
     }
@@ -818,6 +899,52 @@ static NSImage *TGMessageViewerMenuAvatarImage(NSDictionary *summary) {
         return;
     }
     [self downloadAttachmentForMessageItem:item];
+}
+
+- (void)votePollOptionFromMenu:(id)sender {
+    NSDictionary *payload = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![payload isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    TGMessageItem *item = [payload objectForKey:@"message"];
+    NSNumber *optionIndex = [payload objectForKey:@"option_index"];
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![[item messageID] respondsToSelector:@selector(longLongValue)] ||
+        ![optionIndex respondsToSelector:@selector(unsignedIntegerValue)]) {
+        return;
+    }
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageID = [[item messageID] retain];
+    NSNumber *selectedOption = [[NSNumber numberWithInteger:[optionIndex integerValue]] retain];
+    [self.statusField setStringValue:TGLoc(@"message.poll.sending")];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *voteError = nil;
+        BOOL ok = [client setPollAnswerForChatID:chatID
+                                       messageID:messageID
+                                   optionIndexes:[NSArray arrayWithObject:selectedOption]
+                                         timeout:8.0
+                                           error:&voteError];
+        NSString *errorMessage = [[voteError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (ok) {
+                [self.statusField setStringValue:TGLoc(@"message.poll.sent")];
+                [self appendDetail:@"Poll vote accepted by TDLib."];
+                [self refreshSelectedChatMessages:self];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"message.poll.failed")];
+                [self appendDetail:[NSString stringWithFormat:@"Poll vote failed: %@", [errorMessage length] > 0 ? errorMessage : @"TDLib rejected the vote"]];
+            }
+            [errorMessage release];
+            [selectedOption release];
+            [messageID release];
+            [chatID release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)openMessageCommentsFromMenu:(id)sender {

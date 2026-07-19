@@ -430,7 +430,7 @@ NSColor *TGClassicCardInkColor(void) {
 
 NSColor *TGClassicCardMutedInkColor(void) {
     if (TGThemeIsFrutigerMetroDark()) {
-        return TGColorFromHex(0xffd7ad);
+        return TGColorFromHex(0xffe5c7);
     }
     if (TGThemeUsesDarkLayeredCards()) {
         return TGClassicMutedInkColor();

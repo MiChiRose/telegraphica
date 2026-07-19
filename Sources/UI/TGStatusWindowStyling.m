@@ -158,6 +158,9 @@
     }
     NSTextFieldCell *textFieldCell = (NSTextFieldCell *)[textField cell];
     NSString *placeholder = [textFieldCell placeholderString];
+    if ([placeholder length] == 0 && [textFieldCell respondsToSelector:@selector(placeholderAttributedString)]) {
+        placeholder = [[textFieldCell placeholderAttributedString] string];
+    }
     if ([placeholder length] == 0 || ![textFieldCell respondsToSelector:@selector(setPlaceholderAttributedString:)]) {
         return;
     }

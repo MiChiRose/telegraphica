@@ -85,6 +85,10 @@
         [_searchField setDelegate:self];
         [_searchField setTarget:self];
         [_searchField setAction:@selector(commitSearch:)];
+        [_searchField setBezeled:YES];
+        [_searchField setBordered:YES];
+        [_searchField setDrawsBackground:YES];
+        [_searchField setBackgroundColor:[NSColor colorWithCalibratedWhite:1.0 alpha:0.96]];
         [[_searchField cell] setPlaceholderString:TGLoc(@"search.chats.placeholder")];
         [self addSubview:_searchField];
 
@@ -201,6 +205,7 @@
         [titleColumn setWidth:titleWidth];
         [detailsColumn setWidth:MAX(100.0, tableWidth - titleWidth - 3.0)];
     }
+    [self setNeedsDisplay:YES];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {

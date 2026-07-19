@@ -39,6 +39,9 @@
 
 - (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {
     [self.activeSessionsRefreshButton setEnabled:YES];
+    [self.activeSessionsTerminateButton setEnabled:NO];
+    [self.activeSessionsTerminatePopup removeAllItems];
+    self.activeSessionsSummary = nil;
     if ([errorMessage length] > 0 || ![summary isKindOfClass:[NSDictionary class]]) {
         NSString *message = [NSString stringWithFormat:TGLoc(@"settings.sessions.failed"),
                              ([errorMessage length] > 0 ? errorMessage : TGLoc(@"settings.sessions.unknownError"))];
@@ -46,6 +49,7 @@
         [self.activeSessionsTextView setString:@""];
         return;
     }
+    self.activeSessionsSummary = summary;
 
     TGActiveSessionsLocalizationBlock localize = ^NSString *(NSString *key) {
         return TGLoc(key);
@@ -58,6 +62,109 @@
                                                                             textColor:TGClassicInkColor()
                                                                            mutedColor:TGClassicMutedInkColor()];
     [[self.activeSessionsTextView textStorage] setAttributedString:output];
+
+    NSArray *sessions = [summary objectForKey:@"sessions"];
+    if ([sessions isKindOfClass:[NSArray class]]) {
+        NSUInteger index = 0;
+        for (index = 0; index < [sessions count]; index++) {
+            NSDictionary *session = [sessions objectAtIndex:index];
+            if (![session isKindOfClass:[NSDictionary class]] || [[session objectForKey:@"is_current"] boolValue]) {
+                continue;
+            }
+            NSNumber *sessionID = [session objectForKey:@"id"];
+            if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
+                continue;
+            }
+            NSString *device = [session objectForKey:@"device_model"];
+            NSString *application = [session objectForKey:@"application_name"];
+            NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : TGLoc(@"settings.sessions.unknownDevice"));
+            [self.activeSessionsTerminatePopup addItemWithTitle:title];
+            [[[self.activeSessionsTerminatePopup menu] itemAtIndex:([[self.activeSessionsTerminatePopup itemArray] count] - 1)] setRepresentedObject:sessionID];
+        }
+    }
+    BOOL hasTerminableSessions = ([[self.activeSessionsTerminatePopup itemArray] count] > 0);
+    [self.activeSessionsTerminatePopup setEnabled:hasTerminableSessions];
+    [self.activeSessionsTerminateButton setEnabled:hasTerminableSessions];
+}
+
+- (void)terminateSelectedActiveSession:(id)sender {
+    (void)sender;
+    NSMenuItem *selectedItem = [self.activeSessionsTerminatePopup selectedItem];
+    NSNumber *sessionID = [selectedItem representedObject];
+    if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
+        NSBeep();
+        return;
+    }
+    BOOL foundFreshTerminableSession = NO;
+    NSArray *sessions = [self.activeSessionsSummary objectForKey:@"sessions"];
+    if ([sessions isKindOfClass:[NSArray class]]) {
+        NSUInteger index = 0;
+        for (index = 0; index < [sessions count]; index++) {
+            NSDictionary *session = [sessions objectAtIndex:index];
+            if (![session isKindOfClass:[NSDictionary class]] || [[session objectForKey:@"is_current"] boolValue]) {
+                continue;
+            }
+            NSNumber *knownSessionID = [session objectForKey:@"id"];
+            if ([knownSessionID respondsToSelector:@selector(longLongValue)] &&
+                [knownSessionID longLongValue] == [sessionID longLongValue]) {
+                foundFreshTerminableSession = YES;
+                break;
+            }
+        }
+    }
+    if (!foundFreshTerminableSession) {
+        [self.activeSessionsStatusField setStringValue:TGLoc(@"settings.sessions.stale")];
+        [self reloadActiveSessions:nil];
+        NSBeep();
+        return;
+    }
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"settings.sessions.terminate.title")];
+    [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"settings.sessions.terminate.message"),
+                               [selectedItem title] ? [selectedItem title] : TGLoc(@"settings.sessions.unknownDevice")]];
+    [alert addButtonWithTitle:TGLoc(@"settings.sessions.terminate")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+
+    NSUInteger requestGeneration = self.activeSessionsRequestGeneration + 1;
+    self.activeSessionsRequestGeneration = requestGeneration;
+    [self.activeSessionsStatusField setStringValue:TGLoc(@"settings.sessions.terminating")];
+    [self.activeSessionsRefreshButton setEnabled:NO];
+    [self.activeSessionsTerminateButton setEnabled:NO];
+    [self.activeSessionsTerminatePopup setEnabled:NO];
+
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *sessionIDCopy = [[NSNumber numberWithLongLong:[sessionID longLongValue]] retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *terminateError = nil;
+        BOOL ok = [client terminateActiveSessionWithID:sessionIDCopy timeout:8.0 error:&terminateError];
+        NSString *errorMessage = [[terminateError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (requestGeneration == self.activeSessionsRequestGeneration &&
+                self.client == client &&
+                [self.currentAuthState isEqualToString:@"ready"]) {
+                if (ok) {
+                    [self.activeSessionsStatusField setStringValue:TGLoc(@"settings.sessions.terminate.done")];
+                    [self reloadActiveSessions:nil];
+                } else {
+                    NSString *message = [NSString stringWithFormat:TGLoc(@"settings.sessions.terminate.failed"),
+                                         ([errorMessage length] > 0 ? errorMessage : TGLoc(@"settings.sessions.unknownError"))];
+                    [self.activeSessionsStatusField setStringValue:message];
+                    [self.activeSessionsRefreshButton setEnabled:YES];
+                    [self.activeSessionsTerminateButton setEnabled:([[self.activeSessionsTerminatePopup itemArray] count] > 0)];
+                    [self.activeSessionsTerminatePopup setEnabled:([[self.activeSessionsTerminatePopup itemArray] count] > 0)];
+                }
+            }
+            [errorMessage release];
+            [sessionIDCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)reloadActiveSessions:(id)sender {
@@ -119,7 +226,7 @@
         TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 58, 584, 366)] autorelease];
         [cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [contentView addSubview:cardView];
-        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30, 70, 560, 342)] autorelease];
+        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30, 104, 560, 308)] autorelease];
         [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self applySkeuomorphicScrollStyle:scrollView];
         NSTextView *textView = [[[NSTextView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
@@ -129,6 +236,22 @@
         [scrollView setDocumentView:textView];
         [contentView addSubview:scrollView];
         self.activeSessionsTextView = textView;
+
+        NSPopUpButton *terminatePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30, 62, 300, 28) pullsDown:NO] autorelease];
+        [terminatePopup setEnabled:NO];
+        [terminatePopup setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+        [contentView addSubview:terminatePopup];
+        self.activeSessionsTerminatePopup = terminatePopup;
+
+        NSButton *terminateButton = [[[NSButton alloc] initWithFrame:NSMakeRect(342, 62, 128, 28)] autorelease];
+        [terminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
+        [terminateButton setTarget:self];
+        [terminateButton setAction:@selector(terminateSelectedActiveSession:)];
+        [self applyDestructiveSettingsButtonStyle:terminateButton];
+        [terminateButton setEnabled:NO];
+        [terminateButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+        [contentView addSubview:terminateButton];
+        self.activeSessionsTerminateButton = terminateButton;
 
         NSButton *refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(350, 18, 120, 30)] autorelease];
         [refreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
@@ -148,6 +271,7 @@
     }
     [self.activeSessionsWindow setTitle:TGLoc(@"settings.section.sessions")];
     [self.activeSessionsRefreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
+    [self.activeSessionsTerminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
     [self.activeSessionsWindow center];
     [self.activeSessionsWindow makeKeyAndOrderFront:nil];
     [self reloadActiveSessions:nil];

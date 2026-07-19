@@ -59,6 +59,8 @@
 		111111111111111111111150 /* TGOutgoingMessageTextChunker.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111295 /* TGOutgoingMessageTextChunker.m */; };
 		111111111111111111111151 /* TGTransparentSpinnerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111297 /* TGTransparentSpinnerView.m */; };
 		111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111299 /* TGChatDisplayPreferences.m */; };
+		111111111111111111111154 /* TGLocalDataReset.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111311 /* TGLocalDataReset.m */; };
+		111111111111111111111155 /* TGMessagePollSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111313 /* TGMessagePollSupport.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -72,12 +74,16 @@
 		111111111111111111111207 /* TGKeychainHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGKeychainHelper.m; sourceTree = "<group>"; };
 		111111111111111111111208 /* TGLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLogger.h; sourceTree = "<group>"; };
 		111111111111111111111209 /* TGLogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLogger.m; sourceTree = "<group>"; };
+		111111111111111111111310 /* TGLocalDataReset.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocalDataReset.h; sourceTree = "<group>"; };
+		111111111111111111111311 /* TGLocalDataReset.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocalDataReset.m; sourceTree = "<group>"; };
 		111111111111111111111210 /* TGStatusWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111211 /* TGStatusWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStatusWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111212 /* TGChatItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatItem.h; sourceTree = "<group>"; };
 		111111111111111111111213 /* TGChatItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatItem.m; sourceTree = "<group>"; };
 		111111111111111111111214 /* TGMessageItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageItem.h; sourceTree = "<group>"; };
 		111111111111111111111215 /* TGMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageItem.m; sourceTree = "<group>"; };
+		111111111111111111111312 /* TGMessagePollSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessagePollSupport.h; sourceTree = "<group>"; };
+		111111111111111111111313 /* TGMessagePollSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessagePollSupport.m; sourceTree = "<group>"; };
 		111111111111111111111216 /* TGActiveSessionsPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGActiveSessionsPresentation.h; sourceTree = "<group>"; };
 		111111111111111111111217 /* TGActiveSessionsPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGActiveSessionsPresentation.m; sourceTree = "<group>"; };
 		111111111111111111111218 /* TGLocalization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocalization.h; sourceTree = "<group>"; };
@@ -230,6 +236,8 @@
 				111111111111111111111213 /* TGChatItem.m */,
 				111111111111111111111214 /* TGMessageItem.h */,
 				111111111111111111111215 /* TGMessageItem.m */,
+				111111111111111111111312 /* TGMessagePollSupport.h */,
+				111111111111111111111313 /* TGMessagePollSupport.m */,
 				111111111111111111111294 /* TGOutgoingMessageTextChunker.h */,
 				111111111111111111111295 /* TGOutgoingMessageTextChunker.m */,
 				111111111111111111111286 /* TGSearchResultItem.h */,
@@ -245,6 +253,8 @@
 				111111111111111111111207 /* TGKeychainHelper.m */,
 				111111111111111111111208 /* TGLogger.h */,
 				111111111111111111111209 /* TGLogger.m */,
+				111111111111111111111310 /* TGLocalDataReset.h */,
+				111111111111111111111311 /* TGLocalDataReset.m */,
 				111111111111111111111280 /* TGResourcePolicy.h */,
 				111111111111111111111281 /* TGResourcePolicy.m */,
 			);
@@ -454,6 +464,8 @@
 				111111111111111111111150 /* TGOutgoingMessageTextChunker.m in Sources */,
 				111111111111111111111151 /* TGTransparentSpinnerView.m in Sources */,
 				111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */,
+				111111111111111111111154 /* TGLocalDataReset.m in Sources */,
+				111111111111111111111155 /* TGMessagePollSupport.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

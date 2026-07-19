@@ -5,11 +5,11 @@
     NSString *text = TGDisplayTextForMessageItem(item);
     if ([text length] == 0) {
         if ([item isStickerMessage]) {
-            text = @"Sticker";
+            text = TGLoc(@"media.sticker");
         } else if ([item isVoiceNoteMessage]) {
-            text = @"Voice message";
+            text = TGLoc(@"media.voice");
         } else if ([item isVideoNoteMessage]) {
-            text = @"Video note";
+            text = TGLoc(@"media.videoNote");
         } else if ([item isVisualMediaMessage]) {
             text = [item visualMediaPlaceholderTitle];
         } else {
@@ -20,23 +20,23 @@
     if ([text length] > 120) {
         text = [[text substringToIndex:117] stringByAppendingString:@"..."];
     }
-    return ([text length] > 0) ? text : @"Message";
+    return ([text length] > 0) ? text : TGLoc(@"message");
 }
 
 - (void)updateReplyPanelContent {
     TGMessageItem *item = self.replyTargetMessageItem;
     if (![item isKindOfClass:[TGMessageItem class]]) {
-        [self.replyPanelTitleField setStringValue:@"Reply"];
+        [self.replyPanelTitleField setStringValue:TGLoc(@"reply")];
         [self.replyPanelTextField setStringValue:@""];
         return;
     }
     NSString *title = nil;
     if ([[item senderDisplayName] length] > 0) {
-        title = [NSString stringWithFormat:@"Reply to %@", [item senderDisplayName]];
+        title = [NSString stringWithFormat:TGLoc(@"reply.to"), [item senderDisplayName]];
     } else if ([item outgoing]) {
-        title = @"Reply to yourself";
+        title = TGLoc(@"reply.toSelf");
     } else {
-        title = @"Reply";
+        title = TGLoc(@"reply");
     }
     [self.replyPanelTitleField setStringValue:title];
     [self.replyPanelTextField setStringValue:[self shortPreviewForReplyMessageItem:item]];

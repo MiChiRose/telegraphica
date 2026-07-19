@@ -1,6 +1,7 @@
 #import "AppDelegate.h"
 #import "Services/TGLogger.h"
 #import "UI/TGStatusWindowController.h"
+#include <stdlib.h>
 
 @implementation AppDelegate
 
@@ -15,7 +16,19 @@
 
     self.statusWindowController = [[[TGStatusWindowController alloc] init] autorelease];
     [self.statusWindowController showWindow:self];
+
+    if (getenv("TELEGRAPHICA_SMOKE_LAUNCH")) {
+        [[TGLogger sharedLogger] log:@"Smoke launch mode: main window initialized; terminating cleanly."];
+        [self performSelector:@selector(terminateSmokeLaunch:) withObject:nil afterDelay:0.25];
+        return;
+    }
+
     [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (void)terminateSmokeLaunch:(id)sender {
+    (void)sender;
+    [NSApp terminate:self];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {

@@ -66,6 +66,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize date = _date;
 @synthesize outgoing = _outgoing;
 @synthesize sending = _sending;
+@synthesize failedToSend = _failedToSend;
 @synthesize outgoingRead = _outgoingRead;
 @synthesize pinned = _pinned;
 @synthesize preview = _preview;
@@ -98,6 +99,21 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize editableText = _editableText;
 @synthesize canGetMessageThread = _canGetMessageThread;
 @synthesize messageThreadReplyCount = _messageThreadReplyCount;
+@synthesize retryMessageThreadID = _retryMessageThreadID;
+@synthesize retryMessageTopicKind = _retryMessageTopicKind;
+@synthesize retryText = _retryText;
+@synthesize retryReplyToMessageID = _retryReplyToMessageID;
+@synthesize retrySentPartCount = _retrySentPartCount;
+@synthesize retryTotalPartCount = _retryTotalPartCount;
+@synthesize sendFailureSummary = _sendFailureSummary;
+@synthesize pollQuestion = _pollQuestion;
+@synthesize pollOptions = _pollOptions;
+@synthesize pollTotalVoterCount = _pollTotalVoterCount;
+@synthesize pollID = _pollID;
+@synthesize pollClosed = _pollClosed;
+@synthesize pollAnonymous = _pollAnonymous;
+@synthesize pollMultipleChoice = _pollMultipleChoice;
+@synthesize pollQuiz = _pollQuiz;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -164,6 +180,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 
 - (BOOL)isVideoNoteMessage {
     return [self.contentType isEqualToString:@"messageVideoNote"];
+}
+
+- (BOOL)isPollMessage {
+    return [self.contentType isEqualToString:@"messagePoll"];
 }
 
 - (BOOL)isPlayableMediaMessage {
@@ -322,6 +342,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
                                                                    outgoing:_outgoing
                                                                     preview:_preview];
     [copy setSending:_sending];
+    [copy setFailedToSend:_failedToSend];
     [copy setOutgoingRead:_outgoingRead];
     [copy setContentType:_contentType];
     [copy setMediaLocalPath:_mediaLocalPath];
@@ -352,6 +373,21 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setEditableText:_editableText];
     [copy setCanGetMessageThread:_canGetMessageThread];
     [copy setMessageThreadReplyCount:_messageThreadReplyCount];
+    [copy setRetryMessageThreadID:_retryMessageThreadID];
+    [copy setRetryMessageTopicKind:_retryMessageTopicKind];
+    [copy setRetryText:_retryText];
+    [copy setRetryReplyToMessageID:_retryReplyToMessageID];
+    [copy setRetrySentPartCount:_retrySentPartCount];
+    [copy setRetryTotalPartCount:_retryTotalPartCount];
+    [copy setSendFailureSummary:_sendFailureSummary];
+    [copy setPollQuestion:_pollQuestion];
+    [copy setPollOptions:_pollOptions];
+    [copy setPollTotalVoterCount:_pollTotalVoterCount];
+    [copy setPollID:_pollID];
+    [copy setPollClosed:_pollClosed];
+    [copy setPollAnonymous:_pollAnonymous];
+    [copy setPollMultipleChoice:_pollMultipleChoice];
+    [copy setPollQuiz:_pollQuiz];
     return copy;
 }
 
@@ -402,6 +438,17 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_editDate release];
     [_editableText release];
     [_messageThreadReplyCount release];
+    [_retryMessageThreadID release];
+    [_retryMessageTopicKind release];
+    [_retryText release];
+    [_retryReplyToMessageID release];
+    [_retrySentPartCount release];
+    [_retryTotalPartCount release];
+    [_sendFailureSummary release];
+    [_pollQuestion release];
+    [_pollOptions release];
+    [_pollTotalVoterCount release];
+    [_pollID release];
     [super dealloc];
 }
 

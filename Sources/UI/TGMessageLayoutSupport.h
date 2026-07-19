@@ -32,12 +32,15 @@ CGFloat TGMaximumBubbleWidthForItem(TGMessageItem *item, CGFloat availableWidth)
 BOOL TGMessageItemIsNonVisualPlayableMedia(TGMessageItem *item);
 BOOL TGMessageItemIsAudioOnlyPlayableMedia(TGMessageItem *item);
 BOOL TGMessageItemIsNonVisualDocument(TGMessageItem *item);
+BOOL TGMessageItemIsPollContent(TGMessageItem *item);
 BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item);
 NSString *TGPlayableMediaTitleForMessageItem(TGMessageItem *item);
 CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
 CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
 CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item);
+CGFloat TGPollBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
+CGFloat TGPollBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
 CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
@@ -57,6 +60,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails);
 void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped);
+void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped);
 void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped);
 long long TGMessageSortValue(id value);
 NSInteger TGCompareMessageItemsAscending(id left, id right, void *context);

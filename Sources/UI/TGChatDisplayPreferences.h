@@ -11,9 +11,15 @@ typedef enum {
 
 BOOL TGChatMessagesAsBlocksEnabled(void);
 void TGSetChatMessagesAsBlocksEnabled(BOOL enabled);
+BOOL TGChatMessagesAsBlocksEnabledForTarget(NSNumber *chatID, NSNumber *messageThreadID);
+void TGSetChatMessagesAsBlocksEnabledForTarget(NSNumber *chatID, NSNumber *messageThreadID, BOOL enabled);
+void TGClearChatMessagesAsBlocksOverrideForTarget(NSNumber *chatID, NSNumber *messageThreadID);
 
 NSInteger TGChatMessageTextSizeLevel(void);
 void TGSetChatMessageTextSizeLevel(NSInteger level);
+NSInteger TGChatMessageTextSizeLevelForTarget(NSNumber *chatID, NSNumber *messageThreadID);
+void TGSetChatMessageTextSizeLevelForTarget(NSNumber *chatID, NSNumber *messageThreadID, NSInteger level);
+void TGClearChatMessageTextSizeOverrideForTarget(NSNumber *chatID, NSNumber *messageThreadID);
 NSString *TGChatMessageTextSizeLocalizationKeyForLevel(NSInteger level);
 
 CGFloat TGChatMessageBodyFontSize(void);

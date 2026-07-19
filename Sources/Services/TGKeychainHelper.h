@@ -8,7 +8,7 @@
 - (NSData *)readDataForAccount:(NSString *)account;
 - (BOOL)saveString:(NSString *)value forAccount:(NSString *)account;
 - (NSString *)readStringForAccount:(NSString *)account;
-- (void)deleteForAccount:(NSString *)account;
+- (BOOL)deleteForAccount:(NSString *)account;
 - (OSStatus)lastStatus;
 
 @end

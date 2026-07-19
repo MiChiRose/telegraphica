@@ -32,8 +32,7 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
         return NO;
     }
     if (!value) {
-        [self deleteForAccount:account];
-        return YES;
+        return [self deleteForAccount:account];
     }
     [self prepareForKeychainInteraction];
 
@@ -124,9 +123,10 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
 #endif
 }
 
-- (void)deleteForAccount:(NSString *)account {
+- (BOOL)deleteForAccount:(NSString *)account {
     if ([account length] == 0) {
-        return;
+        self.lastStatusValue = errSecParam;
+        return NO;
     }
     [self prepareForKeychainInteraction];
 
@@ -134,7 +134,39 @@ static NSString * const TGKeychainServiceName = @"com.michirose.telegraphica.aut
     [query setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
     [query setObject:TGKeychainServiceName forKey:(__bridge id)kSecAttrService];
     [query setObject:account forKey:(__bridge id)kSecAttrAccount];
-    SecItemDelete((__bridge CFDictionaryRef)query);
+    OSStatus status = SecItemDelete((__bridge CFDictionaryRef)query);
+    if (status == errSecSuccess || status == errSecItemNotFound) {
+        self.lastStatusValue = status;
+        return YES;
+    }
+
+    SecKeychainItemRef item = NULL;
+    const char *service = [TGKeychainServiceName UTF8String];
+    const char *accountName = [account UTF8String];
+    if (!service || !accountName) {
+        self.lastStatusValue = errSecParam;
+        return NO;
+    }
+    status = SecKeychainFindGenericPassword(NULL,
+                                            (UInt32)strlen(service),
+                                            service,
+                                            (UInt32)strlen(accountName),
+                                            accountName,
+                                            NULL,
+                                            NULL,
+                                            &item);
+    if (status == errSecItemNotFound) {
+        self.lastStatusValue = status;
+        return YES;
+    }
+    if (status != errSecSuccess || item == NULL) {
+        self.lastStatusValue = status;
+        return NO;
+    }
+    status = SecKeychainItemDelete(item);
+    CFRelease(item);
+    self.lastStatusValue = status;
+    return (status == errSecSuccess || status == errSecItemNotFound);
 }
 
 - (OSStatus)lastStatus {
