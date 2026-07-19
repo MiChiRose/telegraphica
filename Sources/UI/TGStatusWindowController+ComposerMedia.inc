@@ -798,7 +798,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 520, 444);
+    NSRect frame = NSMakeRect(0, 0, 532, 456);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -807,18 +807,18 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
-    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    NSView *contentView = [[[TGStickerPickerBackgroundView alloc] initWithFrame:frame] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(104, 406, 398, 20)
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(108, 418, 402, 20)
                                                text:@"Recent stickers"
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 392, 68, 30)] autorelease];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 404, 72, 30)] autorelease];
     [recentButton setTitle:@"Recent"];
     [recentButton setTarget:self];
     [recentButton setAction:@selector(selectRecentStickerPickerTab:)];
@@ -826,23 +826,33 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
 
-    NSScrollView *setScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 18, 68, 364)] autorelease];
-    [setScrollView setBorderType:NSBezelBorder];
+    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 14, 84, 382)] autorelease];
+    [railPanel setAutoresizingMask:NSViewHeightSizable];
+    [contentView addSubview:railPanel];
+
+    NSScrollView *setScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 22, 72, 366)] autorelease];
+    [setScrollView setBorderType:NSNoBorder];
+    [setScrollView setDrawsBackground:NO];
     [setScrollView setHasVerticalScroller:YES];
     [setScrollView setAutohidesScrollers:YES];
     [setScrollView setAutoresizingMask:NSViewHeightSizable];
-    NSView *setContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 50, 362)] autorelease];
+    NSView *setContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 56, 362)] autorelease];
     [setScrollView setDocumentView:setContentView];
     [contentView addSubview:setScrollView];
     self.stickerPickerSetScrollView = setScrollView;
     self.stickerPickerSetContentView = setContentView;
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(104, 18, 398, 376)] autorelease];
-    [scrollView setBorderType:NSBezelBorder];
+    TGStickerPickerPanelView *gridPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(100, 14, 420, 396)] autorelease];
+    [gridPanel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:gridPanel];
+
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(108, 22, 402, 380)] autorelease];
+    [scrollView setBorderType:NSNoBorder];
+    [scrollView setDrawsBackground:NO];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setAutohidesScrollers:YES];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 376, 374)] autorelease];
+    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 380, 374)] autorelease];
     [scrollView setDocumentView:gridView];
     [[scrollView contentView] setPostsBoundsChangedNotifications:YES];
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -854,6 +864,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerContentView = gridView;
     self.stickerPickerPlaybackCoordinator = nil;
     self.stickerPickerSetCache = [NSMutableDictionary dictionary];
+    self.stickerPickerRailPreviewState = [NSMutableDictionary dictionary];
     self.stickerPickerWindow = window;
 }
 
@@ -885,6 +896,86 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         self.stickerPickerStickerSets = updatedSets;
         [self rebuildStickerPickerSetRail];
     }
+}
+
+- (BOOL)stickerPickerSetNeedsRailPreview:(NSDictionary *)setInfo {
+    if (![setInfo isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    NSDictionary *railItem = [[setInfo objectForKey:@"rail_item"] isKindOfClass:[NSDictionary class]] ? [setInfo objectForKey:@"rail_item"] : nil;
+    if (railItem) {
+        return NO;
+    }
+    NSDictionary *thumbnail = [[setInfo objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [setInfo objectForKey:@"thumbnail"] : nil;
+    if (thumbnail && ([[TGMediaItemLocalPath(thumbnail) lastPathComponent] length] > 0 ||
+                      [TGMediaItemMiniThumbnailData(thumbnail) length] > 0)) {
+        return NO;
+    }
+    NSNumber *setID = [setInfo objectForKey:@"id"];
+    if (![setID respondsToSelector:@selector(longLongValue)] || [setID longLongValue] == 0LL) {
+        return NO;
+    }
+    NSString *key = [setID stringValue];
+    NSString *state = [self.stickerPickerRailPreviewState objectForKey:key];
+    return !([state isEqualToString:@"loading"] || [state isEqualToString:@"done"]);
+}
+
+- (void)preloadStickerPickerRailPreviews {
+    if ([self.stickerPickerStickerSets count] == 0 || !self.client) {
+        return;
+    }
+    TGTDLibClient *client = [self.client retain];
+    NSArray *setsSnapshot = [self.stickerPickerStickerSets copy];
+    NSMutableArray *setIDsToLoad = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [setsSnapshot count]; index++) {
+        NSDictionary *setInfo = [[setsSnapshot objectAtIndex:index] isKindOfClass:[NSDictionary class]] ? [setsSnapshot objectAtIndex:index] : nil;
+        if (![self stickerPickerSetNeedsRailPreview:setInfo]) {
+            continue;
+        }
+        NSNumber *setID = [setInfo objectForKey:@"id"];
+        NSString *key = [setID stringValue];
+        [self.stickerPickerRailPreviewState setObject:@"loading" forKey:key];
+        [setIDsToLoad addObject:setID];
+    }
+    if ([setIDsToLoad count] == 0) {
+        [setsSnapshot release];
+        [client release];
+        return;
+    }
+    [self rebuildStickerPickerSetRail];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSUInteger loadIndex = 0;
+        for (loadIndex = 0; loadIndex < [setIDsToLoad count]; loadIndex++) {
+            NSNumber *setID = [setIDsToLoad objectAtIndex:loadIndex];
+            NSError *setError = nil;
+            NSArray *items = [[client stickerItemsForStickerSetID:setID limit:1 timeout:8.0 error:&setError] copy];
+            NSDictionary *firstItem = ([items count] > 0 && [[items objectAtIndex:0] isKindOfClass:[NSDictionary class]]) ? [[items objectAtIndex:0] retain] : nil;
+            NSString *errorMessage = [[setError localizedDescription] copy];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *key = [setID stringValue];
+                if (client == self.client) {
+                    if (firstItem) {
+                        [self updateStickerPickerRailThumbnailForSetID:setID withItem:firstItem];
+                        [self.stickerPickerRailPreviewState setObject:@"done" forKey:key];
+                    } else {
+                        [self.stickerPickerRailPreviewState setObject:@"done" forKey:key];
+                        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: rail preview unavailable for set %@%@",
+                                                      key,
+                                                      [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
+                        [self rebuildStickerPickerSetRail];
+                    }
+                }
+                [firstItem release];
+                [items release];
+                [errorMessage release];
+            });
+        }
+        [setsSnapshot release];
+        [client release];
+        [pool drain];
+    });
 }
 
 - (void)selectRecentStickerPickerTab:(id)sender {
@@ -926,7 +1017,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     CGFloat gap = 8.0;
     NSUInteger count = [self.stickerPickerStickerSets count];
     CGFloat contentHeight = MAX(362.0, gap + (CGFloat)count * (buttonSide + gap));
-    [setView setFrame:NSMakeRect(0, 0, 50.0, contentHeight)];
+    [setView setFrame:NSMakeRect(0, 0, 56.0, contentHeight)];
 
     NSUInteger index = 0;
     for (index = 0; index < count; index++) {
@@ -944,10 +1035,17 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [buttonItem addEntriesFromDictionary:thumbnail];
         }
         if ([buttonItem count] == 0) {
-            [buttonItem setObject:@"stickers" forKey:@"emoji"];
+            NSNumber *setID = [set objectForKey:@"id"];
+            NSString *state = ([setID respondsToSelector:@selector(stringValue)] ? [self.stickerPickerRailPreviewState objectForKey:[setID stringValue]] : nil);
+            if ([state isEqualToString:@"loading"]) {
+                [buttonItem setObject:[NSNumber numberWithBool:YES] forKey:@"sticker_loading"];
+            } else {
+                [buttonItem setObject:@"stickers" forKey:@"emoji"];
+            }
         }
         CGFloat y = contentHeight - gap - buttonSide - (CGFloat)index * (buttonSide + gap);
-        NSButton *button = TGStickerPickerButtonWithFrame(NSMakeRect(1.0, y, buttonSide, buttonSide),
+        NSRect buttonFrame = NSMakeRect(4.0, y, buttonSide, buttonSide);
+        NSButton *button = TGStickerPickerButtonWithFrame(buttonFrame,
                                                           buttonItem,
                                                           (NSInteger)index,
                                                           self,
@@ -957,12 +1055,21 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [button setToolTip:tooltip];
         }
         [setView addSubview:button];
+        if (TGStickerPickerItemNeedsLoadingIndicator(buttonItem)) {
+            TGStickerPickerLoadingView *spinner = [[[TGStickerPickerLoadingView alloc] initWithFrame:NSMakeRect(NSMidX(buttonFrame) - 11.0,
+                                                                                                                NSMidY(buttonFrame) - 11.0,
+                                                                                                                22.0,
+                                                                                                                22.0)] autorelease];
+            [spinner startAnimation:nil];
+            [setView addSubview:spinner];
+        }
     }
 }
 
 - (void)reloadStickerPickerSetsIfNeeded {
     if ([self.stickerPickerStickerSets count] > 0) {
         [self rebuildStickerPickerSetRail];
+        [self preloadStickerPickerRailPreviews];
         return;
     }
     TGTDLibClient *client = [self.client retain];
@@ -976,6 +1083,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             if (resultIsCurrent) {
                 self.stickerPickerStickerSets = ([sets count] > 0 ? sets : [NSArray array]);
                 [self rebuildStickerPickerSetRail];
+                [self preloadStickerPickerRailPreviews];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded installed sticker sets count=%lu%@",
                                               (unsigned long)[self.stickerPickerStickerSets count],
                                               [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
@@ -1072,7 +1180,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     CGFloat buttonSide = 58.0;
     CGFloat gap = 10.0;
     NSUInteger columns = 5;
-    CGFloat contentWidth = 376.0;
+    CGFloat contentWidth = 380.0;
     NSUInteger count = [self.stickerPickerItems count];
     NSUInteger rows = (count == 0) ? 1 : ((count + columns - 1) / columns);
     CGFloat contentHeight = rows * (buttonSide + gap) + gap;
@@ -1080,6 +1188,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         contentHeight = 360.0;
     }
     [gridView setFrame:NSMakeRect(0, 0, contentWidth, contentHeight)];
+
+    if (count == 0 && [[self.stickerPickerStatusField stringValue] hasPrefix:@"Loading"]) {
+        TGStickerPickerLoadingView *spinner = [[[TGStickerPickerLoadingView alloc] initWithFrame:NSMakeRect(floor((contentWidth - 30.0) / 2.0),
+                                                                                                    floor((contentHeight - 30.0) / 2.0),
+                                                                                                    30.0,
+                                                                                                    30.0)] autorelease];
+        [spinner startAnimation:nil];
+        [gridView addSubview:spinner];
+    }
 
     NSUInteger index = 0;
     for (index = 0; index < count; index++) {

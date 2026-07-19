@@ -409,6 +409,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, copy) NSArray *stickerPickerItems;
 @property (nonatomic, copy) NSArray *stickerPickerStickerSets;
 @property (nonatomic, retain) NSMutableDictionary *stickerPickerSetCache;
+@property (nonatomic, retain) NSMutableDictionary *stickerPickerRailPreviewState;
 @property (nonatomic, retain) NSNumber *stickerPickerSelectedSetID;
 @property (nonatomic, retain) NSTextField *stickerPickerStatusField;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *stickerPickerPlaybackCoordinator;
@@ -795,6 +796,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize stickerPickerItems = _stickerPickerItems;
 @synthesize stickerPickerStickerSets = _stickerPickerStickerSets;
 @synthesize stickerPickerSetCache = _stickerPickerSetCache;
+@synthesize stickerPickerRailPreviewState = _stickerPickerRailPreviewState;
 @synthesize stickerPickerSelectedSetID = _stickerPickerSelectedSetID;
 @synthesize stickerPickerStatusField = _stickerPickerStatusField;
 @synthesize stickerPickerPlaybackCoordinator = _stickerPickerPlaybackCoordinator;
@@ -3696,6 +3698,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_stickerPickerItems release];
     [_stickerPickerStickerSets release];
     [_stickerPickerSetCache release];
+    [_stickerPickerRailPreviewState release];
     [_stickerPickerSelectedSetID release];
     [_stickerPickerStatusField release];
     [_stickerPickerPlaybackCoordinator release];
