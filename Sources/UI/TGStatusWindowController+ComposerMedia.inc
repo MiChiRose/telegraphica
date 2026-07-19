@@ -911,6 +911,30 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     return ([miniThumbnailData length] > 0);
 }
 
+- (NSDictionary *)stickerPickerRenderableRailItemFromItem:(NSDictionary *)item client:(TGTDLibClient *)client {
+    if (![item isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    if ([self stickerPickerItemHasRenderableRailPreview:item]) {
+        return item;
+    }
+    NSNumber *fileID = TGMediaItemFullFileID(item);
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0 || !client) {
+        return nil;
+    }
+    NSError *downloadError = nil;
+    NSString *downloadedPath = [client downloadedLocalPathForFileID:fileID timeout:6.0 error:&downloadError];
+    if ([downloadedPath length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:downloadedPath]) {
+        return nil;
+    }
+    NSMutableDictionary *renderableItem = [NSMutableDictionary dictionaryWithDictionary:item];
+    [renderableItem setObject:downloadedPath forKey:@"local_path"];
+    if ([[renderableItem objectForKey:@"full_local_path"] length] == 0) {
+        [renderableItem setObject:downloadedPath forKey:@"full_local_path"];
+    }
+    return renderableItem;
+}
+
 - (BOOL)stickerPickerSetNeedsRailPreview:(NSDictionary *)setInfo {
     if (![setInfo isKindOfClass:[NSDictionary class]]) {
         return NO;
@@ -955,6 +979,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [client release];
         return;
     }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: rail preview preload queued count=%lu", (unsigned long)[setIDsToLoad count]]];
     [self rebuildStickerPickerSetRail];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -963,14 +988,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             NSNumber *setID = [setIDsToLoad objectAtIndex:loadIndex];
             NSError *setError = nil;
             NSArray *items = [[client stickerItemsForStickerSetID:setID limit:1 timeout:8.0 error:&setError] copy];
-            NSDictionary *firstItem = ([items count] > 0 && [[items objectAtIndex:0] isKindOfClass:[NSDictionary class]]) ? [[items objectAtIndex:0] retain] : nil;
+            NSDictionary *rawFirstItem = ([items count] > 0 && [[items objectAtIndex:0] isKindOfClass:[NSDictionary class]]) ? [items objectAtIndex:0] : nil;
+            NSDictionary *firstItem = [[self stickerPickerRenderableRailItemFromItem:rawFirstItem client:client] retain];
             NSString *errorMessage = [[setError localizedDescription] copy];
             dispatch_async(dispatch_get_main_queue(), ^{
                 NSString *key = [setID stringValue];
                 if (client == self.client) {
                     if (firstItem) {
+                        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: rail preview loaded for set %@", key]];
                         [self updateStickerPickerRailThumbnailForSetID:setID withItem:firstItem];
-                        [self.stickerPickerRailPreviewState setObject:@"done" forKey:key];
                     } else {
                         [self.stickerPickerRailPreviewState setObject:@"done" forKey:key];
                         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: rail preview unavailable for set %@%@",
