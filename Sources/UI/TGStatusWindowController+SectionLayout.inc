@@ -107,6 +107,7 @@
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.conversationSearchButton visible:showChats];
+    [self showView:self.mediaCenterButton visible:showChats];
     BOOL showCommentThreadBack = (showChats &&
                                   [self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                   [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
@@ -555,10 +556,12 @@
 
     CGFloat conversationRefreshX = conversationX + conversationWidth - 12.0 - headerButtonSize;
     CGFloat conversationJumpX = conversationRefreshX - 6.0 - headerButtonSize;
-    CGFloat conversationSearchX = conversationJumpX - 6.0 - headerButtonSize;
+    CGFloat conversationMediaX = conversationJumpX - 6.0 - headerButtonSize;
+    CGFloat conversationSearchX = conversationMediaX - 6.0 - headerButtonSize;
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messageJumpToNewestButton setFrame:NSMakeRect(conversationJumpX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.mediaCenterButton setFrame:NSMakeRect(conversationMediaX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.conversationSearchButton setFrame:NSMakeRect(conversationSearchX, headerButtonY, headerButtonSize, headerButtonSize)];
     BOOL layoutCommentThreadBack = ([self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                     [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
@@ -620,14 +623,14 @@
         CGFloat searchHeight = (hasSearchResults || (hasSearchText && self.searchLoading)) ? 174.0 : 78.0;
         CGFloat searchY = messageTop - searchHeight;
         [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
-        BOOL compactSearchControls = (self.chatTitleSearchOnly || self.searchInlineCurrentChatOnly);
-        CGFloat searchFieldWidth = compactSearchControls ? (panelWidth - 82.0) : (panelWidth - 326.0);
+        BOOL hidesScopeControl = (self.chatTitleSearchOnly || self.searchInlineCurrentChatOnly);
+        CGFloat searchFieldWidth = hidesScopeControl ? (panelWidth - 212.0) : (panelWidth - 326.0);
         [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, searchFieldWidth, 24.0)];
         [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 306.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
         [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 168.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
         [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
-        [self.searchScopePopUpButton setHidden:compactSearchControls];
-        [self.searchFilterPopUpButton setHidden:compactSearchControls];
+        [self.searchScopePopUpButton setHidden:hidesScopeControl];
+        [self.searchFilterPopUpButton setHidden:NO];
         [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
         [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
         [self.searchResultsScrollView setHidden:!(hasSearchResults || self.searchLoading)];

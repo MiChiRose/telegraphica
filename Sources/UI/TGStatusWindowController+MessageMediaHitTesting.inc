@@ -430,6 +430,46 @@
             return;
         }
     }
+    if (TGMessageItemIsPollContent((TGMessageItem *)item)) {
+        NSRect pollRect = bubbleRect;
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item];
+        CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem((TGMessageItem *)item, showSenderDetails);
+        if (senderHeaderHeight > 0.0) {
+            if ([self.messageTableView isFlipped]) {
+                pollRect.origin.y += senderHeaderHeight;
+            }
+            pollRect.size.height -= senderHeaderHeight;
+        }
+        CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem((TGMessageItem *)item);
+        if (contextHeaderHeight > 0.0) {
+            if ([self.messageTableView isFlipped]) {
+                pollRect.origin.y += contextHeaderHeight;
+            }
+            pollRect.size.height -= contextHeaderHeight;
+        }
+        pollRect.size.height -= (TGMessageCommentBarHeightForItem((TGMessageItem *)item) +
+                                 TGReactionBandHeightForMessageItem((TGMessageItem *)item));
+        if (TGPollPointIsInConfirmRect((TGMessageItem *)item, pollRect, tablePoint, [self.messageTableView isFlipped])) {
+            NSArray *pendingPollOptions = [(TGMessageItem *)item pendingPollOptionIndexes];
+            if ([pendingPollOptions count] > 0) {
+                [self submitPollAnswerForMessageItem:(TGMessageItem *)item optionIndexes:pendingPollOptions];
+            }
+            return;
+        }
+        NSInteger optionIndex = TGPollOptionIndexForPoint((TGMessageItem *)item,
+                                                          pollRect,
+                                                          tablePoint,
+                                                          [self.messageTableView isFlipped]);
+        if (optionIndex != NSNotFound) {
+            if ([(TGMessageItem *)item isPollMultipleChoice]) {
+                [self togglePollOptionForMessageItem:(TGMessageItem *)item optionIndex:(NSUInteger)optionIndex];
+            } else {
+                [self submitPollAnswerForMessageItem:(TGMessageItem *)item
+                                       optionIndexes:[NSArray arrayWithObject:[NSNumber numberWithInteger:optionIndex]]];
+            }
+            return;
+        }
+    }
     NSDictionary *mediaItem = [self mediaItemForItem:(TGMessageItem *)item
                                         inCellFrame:cellFrame
                                             atPoint:tablePoint];

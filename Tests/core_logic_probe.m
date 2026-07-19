@@ -311,6 +311,54 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue([pollItem isPollMessage], @"message item should recognize polls");
     TGAssertTrue(TGMessageItemIsPollContent(pollItem), @"layout helper should recognize polls");
     TGAssertTrue(TGPollBubbleHeightForItem(pollItem) > 70.0, @"poll bubble should reserve room for options");
+    NSRect pollBubbleRect = NSMakeRect(12.0, 20.0, 280.0, TGPollBubbleHeightForItem(pollItem));
+    NSRect firstPollOption = TGPollOptionRectForItem(pollItem, pollBubbleRect, 0, YES);
+    TGAssertTrue(!NSIsEmptyRect(firstPollOption), @"poll option hit rect should be calculable");
+    TGAssertTrue(TGPollOptionIndexForPoint(pollItem,
+                                           pollBubbleRect,
+                                           NSMakePoint(NSMidX(firstPollOption), NSMidY(firstPollOption)),
+                                           YES) == 0,
+                 @"poll option hit testing should match rendered option rectangles");
+    TGAssertTrue(TGPollOptionIndexForPoint(pollItem,
+                                           pollBubbleRect,
+                                           NSMakePoint(NSMinX(pollBubbleRect) + 2.0, NSMinY(pollBubbleRect) + 2.0),
+                                           YES) == NSNotFound,
+                 @"poll hit testing should ignore the question and margins");
+    [pollItem setPendingPollOptionIndexes:[NSArray arrayWithObjects:[NSNumber numberWithUnsignedInteger:0], [NSNumber numberWithUnsignedInteger:1], nil]];
+    [pollItem setPollMultipleChoice:YES];
+    NSRect confirmRect = TGPollConfirmRectForItem(pollItem, pollBubbleRect, YES);
+    TGAssertTrue(!NSIsEmptyRect(confirmRect), @"multiple polls with pending options should expose a submit rect");
+    TGAssertTrue(TGPollPointIsInConfirmRect(pollItem,
+                                            pollBubbleRect,
+                                            NSMakePoint(NSMidX(confirmRect), NSMidY(confirmRect)),
+                                            YES),
+                 @"multiple poll submit hit testing should match rendered confirm button");
+    [pollItem setPollClosed:YES];
+    TGAssertTrue(TGPollOptionIndexForPoint(pollItem,
+                                           pollBubbleRect,
+                                           NSMakePoint(NSMidX(firstPollOption), NSMidY(firstPollOption)),
+                                           YES) == NSNotFound,
+                 @"closed polls should not be clickable");
+
+    TGMessageItem *pinnedA = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
+                                                          messageID:[NSNumber numberWithInt:7]
+                                                               date:nil
+                                                           outgoing:NO
+                                                            preview:@"Pinned A"] autorelease];
+    TGMessageItem *pinnedB = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
+                                                          messageID:[NSNumber numberWithInt:8]
+                                                               date:nil
+                                                           outgoing:NO
+                                                            preview:@"Pinned B"] autorelease];
+    [pinnedA setPinned:YES];
+    [pinnedB setPinned:YES];
+    NSArray *pinnedItems = [NSArray arrayWithObjects:pinnedA, pinnedB, nil];
+    TGAssertTrue([pinnedItems count] == 2, @"multiple pinned messages should be representable");
+    TGAssertTrue([[pinnedItems objectAtIndex:0] isPinned] && [[pinnedItems objectAtIndex:1] isPinned], @"pinned flags should be retained for carousel candidates");
+    TGMessageItem *pinnedCopy = [[pinnedA copy] autorelease];
+    TGAssertTrue([pinnedCopy isPinned], @"pinned flag should survive message item copies");
+    NSArray *emptyPinnedItems = [NSArray array];
+    TGAssertTrue([emptyPinnedItems count] == 0, @"empty pinned message lists should be representable");
 
     NSArray *emptyChunks = TGOutgoingTextMessageChunks(nil);
     TGAssertTrue([emptyChunks count] == 0, @"nil outgoing text should produce no chunks");

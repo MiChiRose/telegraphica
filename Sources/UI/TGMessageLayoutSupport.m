@@ -947,8 +947,97 @@ CGFloat TGPollBubbleHeightForItem(TGMessageItem *item) {
         optionCount = 1;
     }
     CGFloat optionHeight = MAX(24.0, TGChatMessageBodyFontSize() + 12.0);
-    CGFloat height = 18.0 + questionHeight + 8.0 + ((CGFloat)optionCount * (optionHeight + 6.0)) + 20.0;
+    BOOL needsConfirm = [item isPollMultipleChoice] && [[item pendingPollOptionIndexes] count] > 0;
+    CGFloat confirmHeight = needsConfirm ? 30.0 : 0.0;
+    CGFloat height = 18.0 + questionHeight + 8.0 + ((CGFloat)optionCount * (optionHeight + 6.0)) + confirmHeight + 20.0;
     return ceil(height);
+}
+
+NSRect TGPollContentRectForBubbleRect(NSRect bubbleRect) {
+    return NSInsetRect(bubbleRect, 13.0, 10.0);
+}
+
+NSRect TGPollOptionRectForItem(TGMessageItem *item, NSRect bubbleRect, NSUInteger optionIndex, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(bubbleRect)) {
+        return NSZeroRect;
+    }
+
+    NSArray *options = [item pollOptions];
+    NSUInteger optionCount = [options count];
+    if (optionCount == 0) {
+        optionCount = 1;
+    }
+    if (optionIndex >= optionCount) {
+        return NSZeroRect;
+    }
+
+    NSRect contentRect = TGPollContentRectForBubbleRect(bubbleRect);
+    NSString *question = [item pollQuestion];
+    if ([question length] == 0) {
+        question = [item preview];
+    }
+    NSDictionary *questionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        TGChatMessageBoldBodyFont(), NSFontAttributeName,
+                                        TGMessageTextParagraphStyle(), NSParagraphStyleAttributeName,
+                                        nil];
+    CGFloat questionHeight = 18.0;
+    if ([question length] > 0) {
+        NSRect questionMeasure = [question boundingRectWithSize:NSMakeSize(NSWidth(contentRect), 4000.0)
+                                                        options:NSStringDrawingUsesLineFragmentOrigin
+                                                     attributes:questionAttributes];
+        questionHeight = MAX(18.0, ceil(NSHeight(questionMeasure)));
+    }
+
+    CGFloat optionHeight = MAX(24.0, TGChatMessageBodyFontSize() + 12.0);
+    CGFloat firstY = flipped ? (NSMinY(contentRect) + questionHeight + 10.0)
+                             : (NSMaxY(contentRect) - questionHeight - 10.0 - optionHeight);
+    CGFloat offset = ((CGFloat)optionIndex * (optionHeight + 6.0));
+    CGFloat y = flipped ? (firstY + offset) : (firstY - offset);
+    return NSMakeRect(NSMinX(contentRect), y, NSWidth(contentRect), optionHeight);
+}
+
+NSInteger TGPollOptionIndexForPoint(TGMessageItem *item, NSRect bubbleRect, NSPoint point, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] || [item isPollClosed] || [[item pollVoteState] isEqualToString:@"sending"]) {
+        return NSNotFound;
+    }
+    NSArray *options = [item pollOptions];
+    NSUInteger count = [options count];
+    NSUInteger index = 0;
+    for (index = 0; index < count; index++) {
+        NSRect optionRect = TGPollOptionRectForItem(item, bubbleRect, index, flipped);
+        if (!NSIsEmptyRect(optionRect) && NSPointInRect(point, optionRect)) {
+            return (NSInteger)index;
+        }
+    }
+    return NSNotFound;
+}
+
+NSRect TGPollConfirmRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item isPollMultipleChoice] ||
+        [[item pendingPollOptionIndexes] count] == 0 ||
+        [item isPollClosed] ||
+        [[item pollVoteState] isEqualToString:@"sending"] ||
+        NSIsEmptyRect(bubbleRect)) {
+        return NSZeroRect;
+    }
+    NSArray *options = [item pollOptions];
+    NSUInteger optionCount = [options count];
+    if (optionCount == 0) {
+        return NSZeroRect;
+    }
+    NSRect lastOptionRect = TGPollOptionRectForItem(item, bubbleRect, optionCount - 1, flipped);
+    if (NSIsEmptyRect(lastOptionRect)) {
+        return NSZeroRect;
+    }
+    CGFloat width = MIN(148.0, NSWidth(lastOptionRect));
+    CGFloat y = flipped ? (NSMaxY(lastOptionRect) + 7.0) : (NSMinY(lastOptionRect) - 31.0);
+    return NSMakeRect(NSMinX(lastOptionRect), y, width, 24.0);
+}
+
+BOOL TGPollPointIsInConfirmRect(TGMessageItem *item, NSRect bubbleRect, NSPoint point, BOOL flipped) {
+    NSRect confirmRect = TGPollConfirmRectForItem(item, bubbleRect, flipped);
+    return (!NSIsEmptyRect(confirmRect) && NSPointInRect(point, confirmRect));
 }
 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
@@ -1449,7 +1538,7 @@ void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgo
         return;
     }
 
-    NSRect contentRect = NSInsetRect(bubbleRect, 13.0, 10.0);
+    NSRect contentRect = TGPollContentRectForBubbleRect(bubbleRect);
     NSString *question = [item pollQuestion];
     if ([question length] == 0) {
         question = [item preview];
@@ -1520,10 +1609,14 @@ void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgo
             ratio = 1.0;
         }
         BOOL chosen = [[option objectForKey:TGMessagePollOptionChosenKey] boolValue];
-        NSRect optionRect = flipped ? NSMakeRect(NSMinX(contentRect), cursorY, NSWidth(contentRect), optionHeight)
-                                    : NSMakeRect(NSMinX(contentRect), cursorY - optionHeight, NSWidth(contentRect), optionHeight);
+        BOOL pending = [[item pendingPollOptionIndexes] containsObject:[NSNumber numberWithUnsignedInteger:optionIndex]];
+        BOOL active = chosen || pending || [[option objectForKey:TGMessagePollOptionBeingChosenKey] boolValue];
+        NSRect optionRect = TGPollOptionRectForItem(item, bubbleRect, optionIndex, flipped);
+        if (NSIsEmptyRect(optionRect)) {
+            continue;
+        }
         NSBezierPath *track = [NSBezierPath bezierPathWithRoundedRect:optionRect xRadius:6.0 yRadius:6.0];
-        [[TGClassicMutedInkColor() colorWithAlphaComponent:0.10] set];
+        [[TGClassicMutedInkColor() colorWithAlphaComponent:(pending ? 0.17 : 0.10)] set];
         [track fill];
         if (ratio > 0.0) {
             NSRect fillRect = optionRect;
@@ -1532,12 +1625,32 @@ void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgo
                 fillRect.size.width = 8.0;
             }
             NSBezierPath *fill = [NSBezierPath bezierPathWithRoundedRect:fillRect xRadius:6.0 yRadius:6.0];
-            [[(chosen ? TGClassicNavigationSelectedColor(0.90) : TGClassicNavigationSelectedColor(0.50)) colorWithAlphaComponent:(chosen ? 0.30 : 0.18)] set];
+            [[(active ? TGClassicNavigationSelectedColor(0.90) : TGClassicNavigationSelectedColor(0.50)) colorWithAlphaComponent:(active ? 0.32 : 0.18)] set];
             [fill fill];
         }
-        [TGClassicPanelStrokeColor() set];
-        [track setLineWidth:(chosen ? 1.1 : 0.7)];
+        [(active ? TGClassicNavigationSelectedStrokeColor(0.84) : TGClassicPanelStrokeColor()) set];
+        [track setLineWidth:(active ? 1.2 : 0.7)];
         [track stroke];
+
+        CGFloat indicatorSide = [item isPollMultipleChoice] ? 11.0 : 10.0;
+        NSRect indicatorRect = NSMakeRect(NSMinX(optionRect) + 7.0,
+                                          NSMinY(optionRect) + floor((NSHeight(optionRect) - indicatorSide) / 2.0),
+                                          indicatorSide,
+                                          indicatorSide);
+        NSBezierPath *indicatorPath = [item isPollMultipleChoice] ? [NSBezierPath bezierPathWithRoundedRect:indicatorRect xRadius:2.0 yRadius:2.0]
+                                                                 : [NSBezierPath bezierPathWithOvalInRect:indicatorRect];
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.72] set];
+        [indicatorPath fill];
+        [(active ? TGClassicNavigationSelectedStrokeColor(0.92) : TGClassicPanelStrokeColor()) set];
+        [indicatorPath setLineWidth:1.0];
+        [indicatorPath stroke];
+        if (active) {
+            NSRect markRect = NSInsetRect(indicatorRect, 3.0, 3.0);
+            NSBezierPath *markPath = [item isPollMultipleChoice] ? [NSBezierPath bezierPathWithRoundedRect:markRect xRadius:1.0 yRadius:1.0]
+                                                                : [NSBezierPath bezierPathWithOvalInRect:markRect];
+            [TGClassicNavigationSelectedColor(0.94) set];
+            [markPath fill];
+        }
 
         NSString *voteText = [NSString stringWithFormat:TGLoc((votes == 1) ? @"message.poll.votes.one" : @"message.poll.votes.many"), (long)votes];
         NSString *percent = [NSString stringWithFormat:@"%ld%% · %@", (long)lround(ratio * 100.0), voteText];
@@ -1546,9 +1659,9 @@ void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgo
                                         NSMinY(optionRect) + floor((NSHeight(optionRect) - percentSize.height) / 2.0),
                                         percentSize.width + 1.0,
                                         percentSize.height + 2.0);
-        NSRect textRect = NSMakeRect(NSMinX(optionRect) + 8.0,
+        NSRect textRect = NSMakeRect(NSMaxX(indicatorRect) + 7.0,
                                      NSMinY(optionRect) + floor((NSHeight(optionRect) - TGChatMessageBodyFontSize() - 4.0) / 2.0),
-                                     NSWidth(optionRect) - NSWidth(percentRect) - 20.0,
+                                     NSWidth(optionRect) - NSWidth(percentRect) - indicatorSide - 34.0,
                                      TGChatMessageBodyFontSize() + 6.0);
         [text drawInRect:textRect withAttributes:optionAttributes];
         [percent drawInRect:percentRect withAttributes:percentAttributes];
@@ -1557,11 +1670,42 @@ void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgo
 
     NSString *footer = [NSString stringWithFormat:@"%ld %@", (long)totalVotes, (totalVotes == 1 ? @"vote" : @"votes")];
     if ([item isPollClosed]) {
-        footer = [footer stringByAppendingString:@" - closed"];
+        footer = [footer stringByAppendingFormat:@" - %@", TGLoc(@"message.poll.closed")];
+    } else if ([item isPollQuiz]) {
+        footer = [footer stringByAppendingFormat:@" - %@", TGLoc(@"message.poll.quiz")];
+    } else if ([[item pollVoteState] isEqualToString:@"sending"]) {
+        footer = TGLoc(@"message.poll.sending");
+    } else if ([[item pollVoteState] isEqualToString:@"sent"]) {
+        footer = TGLoc(@"message.poll.sent");
+    } else if ([[item pollVoteState] isEqualToString:@"failed"] && [[item pollVoteMessage] length] > 0) {
+        footer = [item pollVoteMessage];
+    } else if ([item isPollMultipleChoice] && [[item pendingPollOptionIndexes] count] > 0) {
+        footer = TGLoc(@"message.poll.multipleHint");
+    }
+    NSRect confirmRect = TGPollConfirmRectForItem(item, bubbleRect, flipped);
+    if (!NSIsEmptyRect(confirmRect)) {
+        NSBezierPath *confirmPath = [NSBezierPath bezierPathWithRoundedRect:confirmRect xRadius:7.0 yRadius:7.0];
+        [TGClassicNavigationSelectedColor(0.92) set];
+        [confirmPath fill];
+        [TGClassicNavigationSelectedStrokeColor(0.88) set];
+        [confirmPath setLineWidth:0.9];
+        [confirmPath stroke];
+        NSDictionary *confirmAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
+                                           [NSColor whiteColor], NSForegroundColorAttributeName,
+                                           nil];
+        NSString *confirmTitle = TGLoc(@"message.poll.submit");
+        NSSize confirmSize = [confirmTitle sizeWithAttributes:confirmAttributes];
+        NSRect confirmTextRect = NSMakeRect(NSMidX(confirmRect) - floor(confirmSize.width / 2.0),
+                                            NSMidY(confirmRect) - floor(confirmSize.height / 2.0),
+                                            confirmSize.width + 1.0,
+                                            confirmSize.height + 1.0);
+        [confirmTitle drawInRect:confirmTextRect withAttributes:confirmAttributes];
+        cursorY += flipped ? 30.0 : -30.0;
     }
     NSDictionary *footerAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                       TGChatMessageMetaFont(), NSFontAttributeName,
-                                      TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                      ([[item pollVoteState] isEqualToString:@"failed"] ? [NSColor colorWithCalibratedRed:0.72 green:0.14 blue:0.12 alpha:0.95] : TGClassicMutedInkColor()), NSForegroundColorAttributeName,
                                       nil];
     NSRect footerRect = flipped ? NSMakeRect(NSMinX(contentRect), cursorY + 1.0, NSWidth(contentRect), 14.0)
                                 : NSMakeRect(NSMinX(contentRect), cursorY - 15.0, NSWidth(contentRect), 14.0);

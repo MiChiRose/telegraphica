@@ -44,6 +44,68 @@ static NSString *TGAttachmentBatchProgressText(NSUInteger index, NSUInteger coun
     return [NSString stringWithFormat:@"Sending %lu of %lu...", (unsigned long)index, (unsigned long)count];
 }
 
+static NSString *TGAttachmentQueueStateText(TGFileTransferStateKind state) {
+    switch (state) {
+        case TGFileTransferStatePreparing:
+            return @"Ready";
+        case TGFileTransferStateSending:
+            return @"Sending";
+        case TGFileTransferStateSucceeded:
+            return @"Sent";
+        case TGFileTransferStateFailed:
+            return @"Failed";
+        case TGFileTransferStateCancelled:
+            return @"Cancelled";
+    }
+    return @"Ready";
+}
+
+static NSArray *TGAttachmentQueueItemsFromDescriptors(NSArray *descriptors) {
+    NSMutableArray *items = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [descriptors count]; index++) {
+        id descriptor = [descriptors objectAtIndex:index];
+        if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+            [items addObject:[TGAttachmentQueueItem itemWithDescriptor:(TGAttachmentDescriptor *)descriptor
+                                                                 index:index
+                                                                 state:TGFileTransferStatePreparing
+                                                               message:@"Ready"]];
+        }
+    }
+    return items;
+}
+
+static NSArray *TGAttachmentDescriptorsFromQueueItems(NSArray *queueItems, BOOL failedOnly) {
+    NSMutableArray *descriptors = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [queueItems count]; index++) {
+        id itemObject = [queueItems objectAtIndex:index];
+        if (![itemObject isKindOfClass:[TGAttachmentQueueItem class]]) {
+            continue;
+        }
+        TGAttachmentQueueItem *item = (TGAttachmentQueueItem *)itemObject;
+        if (failedOnly && ![item isFailed]) {
+            continue;
+        }
+        if ([item.descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+            [descriptors addObject:item.descriptor];
+        }
+    }
+    return descriptors;
+}
+
+static NSUInteger TGAttachmentQueueFailedCount(NSArray *queueItems) {
+    NSUInteger failedCount = 0;
+    NSUInteger index = 0;
+    for (index = 0; index < [queueItems count]; index++) {
+        id itemObject = [queueItems objectAtIndex:index];
+        if ([itemObject isKindOfClass:[TGAttachmentQueueItem class]] && [(TGAttachmentQueueItem *)itemObject isFailed]) {
+            failedCount++;
+        }
+    }
+    return failedCount;
+}
+
 static long long TGLocalFailedOutgoingMessageID(void) {
     static long long counter = 0;
     counter--;
@@ -113,14 +175,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:titleField];
     self.photoSendTitleField = titleField;
 
-    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(44, 124, 432, 376)] autorelease];
+    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(44, 204, 432, 296)] autorelease];
     [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
     [imageView setImageFrameStyle:NSImageFrameGrayBezel];
     [imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:imageView];
     self.photoSendPreviewImageView = imageView;
 
-    NSTextField *metaField = [self labelWithFrame:NSMakeRect(44, 108, 432, 16)
+    NSTextField *metaField = [self labelWithFrame:NSMakeRect(44, 188, 432, 16)
                                              text:@""
                                              font:[NSFont systemFontOfSize:11.0]];
     [self applyMutedLabelStyle:metaField];
@@ -129,6 +191,19 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [metaField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:metaField];
     self.photoSendMetaField = metaField;
+
+    NSScrollView *queueScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(44, 112, 432, 70)] autorelease];
+    [queueScrollView setBorderType:NSBezelBorder];
+    [queueScrollView setHasVerticalScroller:YES];
+    [queueScrollView setAutohidesScrollers:YES];
+    [queueScrollView setDrawsBackground:YES];
+    [queueScrollView setBackgroundColor:[NSColor colorWithCalibratedWhite:0.985 alpha:1.0]];
+    [queueScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    NSView *queueContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 428, 70)] autorelease];
+    [queueScrollView setDocumentView:queueContentView];
+    [contentView addSubview:queueScrollView];
+    self.photoSendQueueScrollView = queueScrollView;
+    self.photoSendQueueContentView = queueContentView;
 
     TGComposerInputBackgroundView *captionBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(44, 76, 432, 30)] autorelease];
     [captionBackground setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
@@ -238,6 +313,82 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     return canvas;
 }
 
+- (void)rebuildAttachmentQueueList {
+    NSView *queueView = self.photoSendQueueContentView;
+    if (!queueView) {
+        return;
+    }
+    NSArray *oldSubviews = [[queueView subviews] copy];
+    NSUInteger removeIndex = 0;
+    for (removeIndex = 0; removeIndex < [oldSubviews count]; removeIndex++) {
+        [[oldSubviews objectAtIndex:removeIndex] removeFromSuperview];
+    }
+    [oldSubviews release];
+
+    NSArray *queueItems = self.pendingAttachmentQueueItems;
+    CGFloat rowHeight = 24.0;
+    CGFloat contentHeight = MAX(72.0, (CGFloat)[queueItems count] * rowHeight);
+    [queueView setFrame:NSMakeRect(0.0, 0.0, 428.0, contentHeight)];
+
+    NSUInteger index = 0;
+    for (index = 0; index < [queueItems count]; index++) {
+        id itemObject = [queueItems objectAtIndex:index];
+        if (![itemObject isKindOfClass:[TGAttachmentQueueItem class]]) {
+            continue;
+        }
+        TGAttachmentQueueItem *item = (TGAttachmentQueueItem *)itemObject;
+        TGAttachmentDescriptor *descriptor = item.descriptor;
+        CGFloat y = contentHeight - rowHeight - (CGFloat)index * rowHeight;
+
+        NSTextField *nameField = [self labelWithFrame:NSMakeRect(8.0, y + 4.0, 238.0, 16.0)
+                                                 text:([descriptor.fileName length] > 0 ? descriptor.fileName : @"File")
+                                                 font:[NSFont systemFontOfSize:11.0]];
+        [[nameField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
+        [queueView addSubview:nameField];
+
+        NSTextField *stateField = [self labelWithFrame:NSMakeRect(252.0, y + 4.0, 86.0, 16.0)
+                                                  text:TGAttachmentQueueStateText(item.transferState.state)
+                                                  font:[NSFont boldSystemFontOfSize:11.0]];
+        if (item.transferState.state == TGFileTransferStateFailed) {
+            [stateField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+        } else if (item.transferState.state == TGFileTransferStateSucceeded) {
+            [stateField setTextColor:[NSColor colorWithCalibratedRed:0.130 green:0.520 blue:0.250 alpha:1.0]];
+        } else {
+            [self applyMutedLabelStyle:stateField];
+        }
+        [queueView addSubview:stateField];
+
+        NSTextField *sizeField = [self labelWithFrame:NSMakeRect(342.0, y + 4.0, 76.0, 16.0)
+                                                 text:[descriptor readableSize]
+                                                 font:[NSFont systemFontOfSize:11.0]];
+        [self applyMutedLabelStyle:sizeField];
+        [sizeField setAlignment:NSRightTextAlignment];
+        [queueView addSubview:sizeField];
+    }
+    [queueView setNeedsDisplay:YES];
+}
+
+- (void)setAttachmentQueueItemAtIndex:(NSUInteger)index state:(TGFileTransferStateKind)state message:(NSString *)message {
+    if (index >= [self.pendingAttachmentQueueItems count]) {
+        return;
+    }
+    id itemObject = [self.pendingAttachmentQueueItems objectAtIndex:index];
+    if (![itemObject isKindOfClass:[TGAttachmentQueueItem class]]) {
+        return;
+    }
+    TGAttachmentQueueItem *item = (TGAttachmentQueueItem *)itemObject;
+    item.transferState = [TGFileTransferState stateWithState:state
+                                               progressKnown:(state == TGFileTransferStateSucceeded)
+                                                    progress:(state == TGFileTransferStateSucceeded ? 1.0 : 0.0)
+                                                     message:message];
+    [self rebuildAttachmentQueueList];
+}
+
+- (void)resetAttachmentQueueItemsForDescriptors:(NSArray *)descriptors {
+    self.pendingAttachmentQueueItems = TGAttachmentQueueItemsFromDescriptors(descriptors);
+    [self rebuildAttachmentQueueList];
+}
+
 - (void)presentAttachmentPreviewForDescriptors:(NSArray *)descriptors {
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
@@ -284,6 +435,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.pendingAttachmentDescriptor = descriptor;
     self.pendingAttachmentDescriptors = safeDescriptors;
     self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStatePreparing progressKnown:NO progress:0.0 message:@"Ready to send"];
+    self.pendingAttachmentCancelRequested = NO;
     self.pendingPhotoSendPath = descriptor.path;
     self.pendingPhotoSendChatID = self.selectedChatID;
     self.pendingPhotoSendThreadID = self.selectedMessageThreadID;
@@ -298,6 +450,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self.photoSendErrorField setHidden:YES];
     [self.photoSendSendButton setTitle:TGLoc(@"send")];
     [self.photoSendSendButton setEnabled:YES];
+    [self resetAttachmentQueueItemsForDescriptors:safeDescriptors];
     [self.photoSendPreviewWindow center];
     [self.photoSendPreviewWindow makeKeyAndOrderFront:nil];
     [[self.photoSendPreviewWindow contentView] setNeedsDisplay:YES];
@@ -331,10 +484,19 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)cancelPendingPhotoSend:(id)sender {
     (void)sender;
+    if (self.controlsBusy && self.photoSendPreviewWindow && [self.photoSendPreviewWindow isVisible]) {
+        self.pendingAttachmentCancelRequested = YES;
+        [self.photoSendErrorField setStringValue:@"Cancelling after the current file..."];
+        [self.photoSendErrorField setHidden:NO];
+        [self appendDetail:@"Attachment queue: cancellation requested."];
+        return;
+    }
     self.pendingPhotoSendPath = nil;
     self.pendingAttachmentDescriptor = nil;
     self.pendingAttachmentDescriptors = nil;
     self.pendingAttachmentTransferState = nil;
+    self.pendingAttachmentQueueItems = nil;
+    self.pendingAttachmentCancelRequested = NO;
     self.pendingPhotoSendChatID = nil;
     self.pendingPhotoSendThreadID = nil;
     self.pendingPhotoSendTopicKind = nil;
@@ -496,6 +658,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self setControlsBusy:YES];
     [self.statusField setStringValue:[NSString stringWithFormat:@"Sending %@...", [descriptorCopy.typeLabel lowercaseString]]];
     self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSending progressKnown:NO progress:0.0 message:@"Sending"];
+    [self setAttachmentQueueItemAtIndex:0 state:TGFileTransferStateSending message:@"Sending"];
     [self appendDetail:[NSString stringWithFormat:@"Submitting %@ to TDLib: %@", [descriptorCopy.typeLabel lowercaseString], descriptorCopy.fileName]];
 
     TGTDLibClient *client = [self.client retain];
@@ -540,12 +703,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue] && sameThread && sameTopicKind);
             if ([summary length] > 0) {
                 self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateSucceeded progressKnown:NO progress:1.0 message:@"Sent"];
+                [self setAttachmentQueueItemAtIndex:0 state:TGFileTransferStateSucceeded message:@"Sent"];
                 [self.statusField setStringValue:@"File sent"];
                 [self appendDetail:@"TDLib send: file message accepted by TDLib."];
                 self.pendingPhotoSendPath = nil;
                 self.pendingAttachmentDescriptor = nil;
                 self.pendingAttachmentDescriptors = nil;
                 self.pendingAttachmentTransferState = nil;
+                self.pendingAttachmentQueueItems = nil;
+                self.pendingAttachmentCancelRequested = NO;
                 self.pendingPhotoSendChatID = nil;
                 self.pendingPhotoSendThreadID = nil;
                 self.pendingPhotoSendTopicKind = nil;
@@ -570,10 +736,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             } else {
                 NSString *message = ([errorMessage length] > 0) ? errorMessage : @"File send was not confirmed.";
                 self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateFailed progressKnown:NO progress:0.0 message:message];
+                [self setAttachmentQueueItemAtIndex:0 state:TGFileTransferStateFailed message:message];
                 [self.statusField setStringValue:@"File send failed"];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib send: %@", message]];
                 if (self.photoSendPreviewWindow && [self.photoSendPreviewWindow isVisible]) {
-                    [self.photoSendSendButton setTitle:TGLoc(@"send")];
+                    [self.photoSendSendButton setTitle:@"Retry failed"];
                     [self.photoSendSendButton setEnabled:YES];
                     [self.photoSendErrorField setStringValue:message];
                     [self.photoSendErrorField setHidden:NO];
@@ -607,6 +774,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSString *firstCaption = [safeCaption copy];
     NSNumber *replyToMessageID = [[self composerReplyToMessageIDForChatID:chatID] retain];
     BOOL sendAsAlbum = TGAttachmentDescriptorsCanSendAsMediaAlbum(descriptorCopies);
+    self.pendingAttachmentCancelRequested = NO;
+    [self resetAttachmentQueueItemsForDescriptors:descriptorCopies];
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Composer: sending %lu attachment(s); mediaAlbum=%@.",
                                   (unsigned long)[descriptorCopies count],
                                   sendAsAlbum ? @"yes" : @"no"]];
@@ -622,8 +791,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSString *firstErrorMessage = nil;
         NSUInteger sentCount = 0;
+        BOOL cancelled = NO;
         if (sendAsAlbum) {
             NSError *sendError = nil;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSUInteger albumIndex = 0;
+                for (albumIndex = 0; albumIndex < [descriptorCopies count]; albumIndex++) {
+                    [self setAttachmentQueueItemAtIndex:albumIndex state:TGFileTransferStateSending message:@"Sending album"];
+                }
+            });
             NSArray *albumItems = TGAttachmentMediaAlbumItemsFromDescriptors(descriptorCopies);
             NSString *summary = [[client sendMediaAlbumToChatID:chatID
                                                 messageThreadID:messageThreadID
@@ -635,18 +811,44 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 	                                                          error:&sendError] copy];
             if ([summary length] > 0) {
                 sentCount = [descriptorCopies count];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSUInteger albumIndex = 0;
+                    for (albumIndex = 0; albumIndex < [descriptorCopies count]; albumIndex++) {
+                        [self setAttachmentQueueItemAtIndex:albumIndex state:TGFileTransferStateSucceeded message:@"Sent"];
+                    }
+                });
             } else {
                 NSString *rawErrorMessage = ([[sendError localizedDescription] length] > 0 ? [sendError localizedDescription] : @"Media album send was not confirmed.");
                 firstErrorMessage = [rawErrorMessage copy];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSUInteger albumIndex = 0;
+                    for (albumIndex = 0; albumIndex < [descriptorCopies count]; albumIndex++) {
+                        [self setAttachmentQueueItemAtIndex:albumIndex state:TGFileTransferStateFailed message:firstErrorMessage];
+                    }
+                });
             }
             [summary release];
         } else {
             NSUInteger index = 0;
             for (index = 0; index < [descriptorCopies count]; index++) {
+                if (self.pendingAttachmentCancelRequested) {
+                    cancelled = YES;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        NSUInteger cancelIndex = index;
+                        for (cancelIndex = index; cancelIndex < [descriptorCopies count]; cancelIndex++) {
+                            [self setAttachmentQueueItemAtIndex:cancelIndex state:TGFileTransferStateCancelled message:@"Cancelled"];
+                        }
+                    });
+                    break;
+                }
                 TGAttachmentDescriptor *descriptor = [descriptorCopies objectAtIndex:index];
                 NSString *captionForMessage = (index == 0) ? firstCaption : @"";
                 NSError *sendError = nil;
                 NSString *summary = nil;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self setAttachmentQueueItemAtIndex:index state:TGFileTransferStateSending message:@"Sending"];
+                    [self.statusField setStringValue:TGAttachmentBatchProgressText(index + 1, [descriptorCopies count])];
+                });
                 if (descriptor.kind == TGAttachmentKindPhoto) {
                     summary = [[client sendPhotoMessageToChatID:chatID
                                                 messageThreadID:messageThreadID
@@ -687,10 +889,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 if ([summary length] > 0) {
                     sentCount++;
                     [summary release];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self setAttachmentQueueItemAtIndex:index state:TGFileTransferStateSucceeded message:@"Sent"];
+                    });
                 } else {
                     NSString *rawErrorMessage = ([[sendError localizedDescription] length] > 0 ? [sendError localizedDescription] : @"Attachment send was not confirmed.");
                     firstErrorMessage = [rawErrorMessage copy];
                     [summary release];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self setAttachmentQueueItemAtIndex:index state:TGFileTransferStateFailed message:firstErrorMessage];
+                    });
                     break;
                 }
             }
@@ -712,6 +920,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 self.pendingAttachmentDescriptor = nil;
                 self.pendingAttachmentDescriptors = nil;
                 self.pendingAttachmentTransferState = nil;
+                self.pendingAttachmentQueueItems = nil;
+                self.pendingAttachmentCancelRequested = NO;
                 self.pendingPhotoSendChatID = nil;
                 self.pendingPhotoSendThreadID = nil;
                 self.pendingPhotoSendTopicKind = nil;
@@ -734,12 +944,13 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                     [self performSelector:@selector(refreshSelectedMessagesAfterMediaSend) withObject:nil afterDelay:1.25];
                 }
             } else {
-                NSString *message = ([firstErrorMessage length] > 0) ? firstErrorMessage : @"Attachment send was not confirmed.";
-                self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:TGFileTransferStateFailed progressKnown:NO progress:0.0 message:message];
-                [self.statusField setStringValue:@"Media send failed"];
+                NSString *message = cancelled ? @"Attachment queue cancelled." : (([firstErrorMessage length] > 0) ? firstErrorMessage : @"Attachment send was not confirmed.");
+                self.pendingAttachmentTransferState = [TGFileTransferState stateWithState:(cancelled ? TGFileTransferStateCancelled : TGFileTransferStateFailed) progressKnown:NO progress:0.0 message:message];
+                [self.statusField setStringValue:(cancelled ? @"Media send cancelled" : @"Media send failed")];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib send: sent %lu of %lu; %@", (unsigned long)sentCount, (unsigned long)[descriptorCopies count], message]];
-                [self.photoSendSendButton setTitle:TGLoc(@"send")];
-                [self.photoSendSendButton setEnabled:YES];
+                NSUInteger failedCount = TGAttachmentQueueFailedCount(self.pendingAttachmentQueueItems);
+                [self.photoSendSendButton setTitle:(failedCount > 0 ? @"Retry failed" : TGLoc(@"send"))];
+                [self.photoSendSendButton setEnabled:(failedCount > 0)];
                 [self.photoSendErrorField setStringValue:message];
                 [self.photoSendErrorField setHidden:NO];
             }
@@ -767,6 +978,20 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSString *topicKind = [self.pendingPhotoSendTopicKind copy];
     TGAttachmentDescriptor *descriptor = [self.pendingAttachmentDescriptor retain];
     NSArray *descriptors = [self.pendingAttachmentDescriptors retain];
+    NSArray *queueItems = [self.pendingAttachmentQueueItems retain];
+    BOOL retryingFailedDescriptors = NO;
+    if (TGAttachmentQueueFailedCount(queueItems) > 0) {
+        NSArray *failedDescriptors = TGAttachmentDescriptorsFromQueueItems(queueItems, YES);
+        if ([failedDescriptors count] > 0) {
+            [descriptors release];
+            descriptors = [failedDescriptors retain];
+            retryingFailedDescriptors = YES;
+            if ([descriptors count] > 0) {
+                [descriptor release];
+                descriptor = [[descriptors objectAtIndex:0] retain];
+            }
+        }
+    }
     NSString *effectivePath = [path length] > 0 ? path : [descriptor path];
     if (![effectivePath length] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         [self.photoSendErrorField setStringValue:@"Attachment target is no longer available."];
@@ -776,6 +1001,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [self.photoSendErrorField setHidden:YES];
         [self.photoSendSendButton setTitle:TGLoc(@"sending")];
         [self.photoSendSendButton setEnabled:NO];
+        if (retryingFailedDescriptors) {
+            [self resetAttachmentQueueItemsForDescriptors:descriptors];
+            self.pendingAttachmentDescriptors = descriptors;
+            self.pendingAttachmentDescriptor = descriptor;
+        }
         if ([descriptors count] > 1) {
             [self submitAttachmentDescriptors:descriptors caption:caption chatID:chatID messageThreadID:threadID messageTopicKind:topicKind];
         } else if ([descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
@@ -791,6 +1021,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [topicKind release];
     [descriptor release];
     [descriptors release];
+    [queueItems release];
 }
 
 - (void)ensureStickerPickerWindow {
@@ -825,6 +1056,29 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self applyUtilityButtonStyle:recentButton];
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
+
+    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(96, 404, 80, 30)] autorelease];
+    [favoriteButton setTitle:@"Favorites"];
+    [favoriteButton setTarget:self];
+    [favoriteButton setAction:@selector(selectFavoriteStickerPickerTab:)];
+    [self applyUtilityButtonStyle:favoriteButton];
+    [contentView addSubview:favoriteButton];
+    self.stickerPickerFavoriteButton = favoriteButton;
+
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(184, 406, 144, 24)] autorelease];
+    [[searchField cell] setPlaceholderString:@"Emoji"];
+    [searchField setTarget:self];
+    [searchField setAction:@selector(searchStickerPickerByEmoji:)];
+    [contentView addSubview:searchField];
+    self.stickerPickerSearchField = searchField;
+
+    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(336, 404, 92, 30)] autorelease];
+    [removeSetButton setTitle:@"Remove set"];
+    [removeSetButton setTarget:self];
+    [removeSetButton setAction:@selector(removeSelectedStickerSetFromPicker:)];
+    [removeSetButton setToolTip:@"Remove the selected sticker set from installed sets"];
+    [self applyUtilityButtonStyle:removeSetButton];
+    [contentView addSubview:removeSetButton];
 
     TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 14, 84, 382)] autorelease];
     [railPanel setAutoresizingMask:NSViewHeightSizable];
@@ -1037,8 +1291,29 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 - (void)selectRecentStickerPickerTab:(id)sender {
     (void)sender;
     self.stickerPickerSelectedSetID = nil;
+    [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
     [self reloadStickerPickerItems];
+}
+
+- (void)selectFavoriteStickerPickerTab:(id)sender {
+    (void)sender;
+    self.stickerPickerSelectedSetID = nil;
+    [self.stickerPickerSearchField setStringValue:@""];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self reloadFavoriteStickerPickerItems];
+}
+
+- (void)searchStickerPickerByEmoji:(id)sender {
+    (void)sender;
+    NSString *query = [[self.stickerPickerSearchField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([query length] == 0) {
+        [self reloadStickerPickerItems];
+        return;
+    }
+    self.stickerPickerSelectedSetID = nil;
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self reloadStickerPickerItemsForEmoji:query];
 }
 
 - (void)selectStickerSetFromPickerButton:(id)sender {
@@ -1052,9 +1327,73 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
     self.stickerPickerSelectedSetID = setID;
+    [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] setObject:[setID stringValue] forKey:@"TelegraphicaStickerPickerLastSetID"];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [self reloadStickerPickerItemsForSet:(NSDictionary *)represented];
+}
+
+- (void)removeSelectedStickerSetFromPicker:(id)sender {
+    (void)sender;
+    NSNumber *setID = [self.stickerPickerSelectedSetID retain];
+    if (![setID respondsToSelector:@selector(longLongValue)] || [setID longLongValue] == 0LL) {
+        [self.stickerPickerStatusField setStringValue:@"Select an installed sticker set first."];
+        [setID release];
+        return;
+    }
+
+    NSString *setTitle = @"this sticker set";
+    NSUInteger index = 0;
+    for (index = 0; index < [self.stickerPickerStickerSets count]; index++) {
+        NSDictionary *set = [self.stickerPickerStickerSets objectAtIndex:index];
+        NSNumber *candidateID = [set objectForKey:@"id"];
+        if ([candidateID respondsToSelector:@selector(longLongValue)] && [candidateID longLongValue] == [setID longLongValue]) {
+            NSString *title = [set objectForKey:@"title"];
+            if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
+                setTitle = title;
+            }
+            break;
+        }
+    }
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:@"Remove sticker set?"];
+    [alert setInformativeText:[NSString stringWithFormat:@"Remove %@ from your installed sticker sets?", setTitle]];
+    [alert addButtonWithTitle:@"Remove"];
+    [alert addButtonWithTitle:@"Cancel"];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        [setID release];
+        return;
+    }
+
+    [self.stickerPickerStatusField setStringValue:@"Removing sticker set..."];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *changeError = nil;
+        BOOL ok = [client setStickerSetInstalledForStickerSetID:setID installed:NO timeout:8.0 error:&changeError];
+        NSString *errorMessage = [[changeError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (ok) {
+                [self.stickerPickerSetCache removeObjectForKey:[setID stringValue]];
+                [self.stickerPickerRailPreviewState removeObjectForKey:[setID stringValue]];
+                self.stickerPickerStickerSets = [NSArray array];
+                self.stickerPickerSelectedSetID = nil;
+                [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+                [self reloadStickerPickerSetsIfNeeded];
+                [self reloadStickerPickerItems];
+                [self.stickerPickerStatusField setStringValue:@"Sticker set removed."];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: removed sticker set %@", setID]];
+            } else {
+                [self.stickerPickerStatusField setStringValue:([errorMessage length] > 0 ? errorMessage : @"Could not remove sticker set.")];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: remove set failed %@ error=%@", setID, [errorMessage length] > 0 ? errorMessage : @"unknown"]];
+            }
+            [errorMessage release];
+            [setID release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)rebuildStickerPickerSetRail {
@@ -1327,6 +1666,63 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [self rebuildStickerPickerGrid];
             [items release];
             [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)reloadFavoriteStickerPickerItems {
+    [self.stickerPickerStatusField setStringValue:@"Loading favorite stickers..."];
+    self.stickerPickerSelectedSetID = nil;
+    TGTDLibClient *client = [self.client retain];
+    NSUInteger generation = self.stickerPickerLoadGeneration + 1;
+    self.stickerPickerLoadGeneration = generation;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *stickerError = nil;
+        NSArray *items = [[client favoriteStickerItemsWithLimit:40 timeout:8.0 error:&stickerError] copy];
+        NSString *errorMessage = [[stickerError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL resultIsCurrent = (generation == self.stickerPickerLoadGeneration && client == self.client);
+            if (resultIsCurrent) {
+                self.stickerPickerItems = ([items count] > 0 ? items : [NSArray array]);
+                [self.stickerPickerStatusField setStringValue:([items count] > 0 ? @"Favorite stickers" : ([errorMessage length] > 0 ? errorMessage : @"No favorite stickers yet"))];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded favorite stickers count=%lu%@", (unsigned long)[items count], [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
+                [self rebuildStickerPickerGrid];
+            }
+            [items release];
+            [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)reloadStickerPickerItemsForEmoji:(NSString *)emoji {
+    NSString *query = [emoji copy];
+    [self.stickerPickerStatusField setStringValue:[NSString stringWithFormat:@"Searching %@...", query]];
+    self.stickerPickerItems = [NSArray array];
+    [self rebuildStickerPickerGrid];
+    TGTDLibClient *client = [self.client retain];
+    NSUInteger generation = self.stickerPickerLoadGeneration + 1;
+    self.stickerPickerLoadGeneration = generation;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *stickerError = nil;
+        NSArray *items = [[client stickerItemsForEmoji:query limit:60 timeout:8.0 error:&stickerError] copy];
+        NSString *errorMessage = [[stickerError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL resultIsCurrent = (generation == self.stickerPickerLoadGeneration && client == self.client);
+            if (resultIsCurrent) {
+                self.stickerPickerItems = ([items count] > 0 ? items : [NSArray array]);
+                [self.stickerPickerStatusField setStringValue:([items count] > 0 ? [NSString stringWithFormat:@"Stickers for %@", query] : ([errorMessage length] > 0 ? errorMessage : @"No stickers found"))];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: emoji search query=%@ count=%lu%@", query, (unsigned long)[items count], [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
+                [self rebuildStickerPickerGrid];
+            }
+            [items release];
+            [errorMessage release];
+            [query release];
             [client release];
         });
         [pool drain];
@@ -1945,7 +2341,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self presentPhotoSendPreviewForPath:path];
 }
 
-- (void)attachPhoto:(id)sender {
+- (void)attachFileFromComposerMenu:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
@@ -1978,6 +2374,165 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         }
     }
     [self presentAttachmentPreviewForDescriptors:descriptors];
+}
+
+- (NSArray *)pollOptionsFromText:(NSString *)optionsText {
+    NSMutableArray *options = [NSMutableArray array];
+    NSMutableSet *seen = [NSMutableSet set];
+    NSArray *lines = [optionsText componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    NSUInteger index = 0;
+    for (index = 0; index < [lines count] && [options count] < 10; index++) {
+        NSString *line = [[lines objectAtIndex:index] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *normalized = [line lowercaseString];
+        if ([line length] == 0 || [seen containsObject:normalized]) {
+            continue;
+        }
+        [seen addObject:normalized];
+        [options addObject:line];
+    }
+    return options;
+}
+
+- (void)createPollFromComposerMenu:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        [self appendDetail:@"Select a chat after sign-in is ready before creating a poll."];
+        return;
+    }
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"poll.create.title")];
+    [alert setInformativeText:TGLoc(@"poll.create.hint")];
+    [alert addButtonWithTitle:TGLoc(@"send")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+
+    NSView *accessory = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 390, 194)] autorelease];
+    NSTextField *questionLabel = [self labelWithFrame:NSMakeRect(0, 170, 390, 18)
+                                                 text:TGLoc(@"poll.create.question")
+                                                 font:[NSFont systemFontOfSize:12.0]];
+    [accessory addSubview:questionLabel];
+    NSTextField *questionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 145, 390, 22)] autorelease];
+    [questionField setStringValue:@""];
+    [accessory addSubview:questionField];
+
+    NSTextField *optionsLabel = [self labelWithFrame:NSMakeRect(0, 120, 390, 18)
+                                                text:TGLoc(@"poll.create.options")
+                                                font:[NSFont systemFontOfSize:12.0]];
+    [accessory addSubview:optionsLabel];
+    NSScrollView *optionsScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 42, 390, 76)] autorelease];
+    [optionsScroll setHasVerticalScroller:YES];
+    [optionsScroll setBorderType:NSBezelBorder];
+    NSTextView *optionsView = [[[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 372, 76)] autorelease];
+    [optionsView setString:@"\n"];
+    [optionsScroll setDocumentView:optionsView];
+    [accessory addSubview:optionsScroll];
+
+    NSButton *multipleButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 20, 185, 18)] autorelease];
+    [multipleButton setButtonType:NSSwitchButton];
+    [multipleButton setTitle:TGLoc(@"poll.create.multiple")];
+    [accessory addSubview:multipleButton];
+    NSButton *anonymousButton = [[[NSButton alloc] initWithFrame:NSMakeRect(198, 20, 185, 18)] autorelease];
+    [anonymousButton setButtonType:NSSwitchButton];
+    [anonymousButton setTitle:TGLoc(@"poll.create.anonymous")];
+    [anonymousButton setState:NSOnState];
+    [accessory addSubview:anonymousButton];
+
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(0, 0, 390, 16)
+                                              text:@""
+                                              font:[NSFont systemFontOfSize:11.0]];
+    [errorField setTextColor:[NSColor colorWithCalibratedRed:0.72 green:0.14 blue:0.12 alpha:1.0]];
+    [accessory addSubview:errorField];
+    [alert setAccessoryView:accessory];
+
+    NSInteger result = [alert runModal];
+    if (result != NSAlertFirstButtonReturn) {
+        [self requestComposerRefocus];
+        return;
+    }
+
+    NSString *question = [[questionField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSArray *options = [self pollOptionsFromText:[optionsView string]];
+    if ([question length] == 0 || [options count] < 2) {
+        NSString *message = ([question length] == 0) ? TGLoc(@"poll.create.error.question") : TGLoc(@"poll.create.error.options");
+        NSRunAlertPanel(TGLoc(@"poll.create.failed"), message, TGLoc(@"ok"), nil, nil);
+        [self requestComposerRefocus];
+        return;
+    }
+
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    NSString *questionCopy = [question copy];
+    NSArray *optionsCopy = [options copy];
+    BOOL allowMultiple = ([multipleButton state] == NSOnState);
+    BOOL anonymous = ([anonymousButton state] == NSOnState);
+    TGTDLibClient *client = [self.client retain];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:TGLoc(@"poll.create.sending")];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Polls: create requested options=%lu multiple=%@ anonymous=%@.",
+                                  (unsigned long)[optionsCopy count],
+                                  allowMultiple ? @"yes" : @"no",
+                                  anonymous ? @"yes" : @"no"]];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSString *summary = [[client sendPollMessageToChatID:chatID
+                                             messageThreadID:messageThreadID
+                                            messageTopicKind:messageTopicKind
+                                                    question:questionCopy
+                                                     options:optionsCopy
+                                        allowMultipleAnswers:allowMultiple
+                                                   anonymous:anonymous
+                                                     timeout:8.0
+                                                       error:&sendError] copy];
+        NSString *errorMessage = [[sendError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([summary length] > 0) {
+                [self.statusField setStringValue:TGLoc(@"poll.create.sent")];
+                [self appendDetail:@"Poll sent."];
+                self.forceMessageScrollToNewest = YES;
+                [self refreshSelectedChatMessages:self];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"poll.create.failed")];
+                [self appendDetail:[NSString stringWithFormat:@"Poll send failed: %@", [errorMessage length] > 0 ? errorMessage : @"unknown error"]];
+            }
+            [self setControlsBusy:NO];
+            [self requestComposerRefocus];
+            [summary release];
+            [errorMessage release];
+            [optionsCopy release];
+            [questionCopy release];
+            [messageTopicKind release];
+            [messageThreadID release];
+            [chatID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)attachPhoto:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
+        [self appendDetail:@"Select a chat after sign-in is ready before attaching a photo."];
+        return;
+    }
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:TGLoc(@"attach.photo")] autorelease];
+    NSMenuItem *attachItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"attach.file")
+                                                        action:@selector(attachFileFromComposerMenu:)
+                                                 keyEquivalent:@""] autorelease];
+    [attachItem setTarget:self];
+    [menu addItem:attachItem];
+    NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"poll.create.menu")
+                                                      action:@selector(createPollFromComposerMenu:)
+                                               keyEquivalent:@""] autorelease];
+    [pollItem setTarget:self];
+    [menu addItem:pollItem];
+    [menu popUpMenuPositioningItem:nil
+                        atLocation:NSMakePoint(0.0, NSHeight([self.attachPhotoButton bounds]) + 2.0)
+                            inView:self.attachPhotoButton];
 }
 
 - (void)sendMessage:(id)sender {

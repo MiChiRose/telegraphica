@@ -8,6 +8,8 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         case 6: return @"audio";
         case 7: return @"animations";
         case 8: return @"videoNotes";
+        case 9: return @"stickers";
+        case 10: return @"polls";
         default: return @"all";
     }
 }

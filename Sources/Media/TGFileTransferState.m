@@ -1,4 +1,5 @@
 #import "TGFileTransferState.h"
+#import "TGAttachmentDescriptor.h"
 
 @implementation TGFileTransferState
 
@@ -27,6 +28,40 @@
 
 - (void)dealloc {
     [_message release];
+    [super dealloc];
+}
+
+@end
+
+@implementation TGAttachmentQueueItem
+
+@synthesize descriptor = _descriptor;
+@synthesize transferState = _transferState;
+@synthesize index = _index;
+
++ (TGAttachmentQueueItem *)itemWithDescriptor:(TGAttachmentDescriptor *)descriptor index:(NSUInteger)index state:(TGFileTransferStateKind)state message:(NSString *)message {
+    TGAttachmentQueueItem *item = [[[TGAttachmentQueueItem alloc] init] autorelease];
+    item.descriptor = descriptor;
+    item.index = index;
+    item.transferState = [TGFileTransferState stateWithState:state
+                                               progressKnown:NO
+                                                    progress:0.0
+                                                     message:message];
+    return item;
+}
+
+- (BOOL)isFailed {
+    return self.transferState.state == TGFileTransferStateFailed;
+}
+
+- (BOOL)isTerminal {
+    TGFileTransferStateKind state = self.transferState.state;
+    return state == TGFileTransferStateSucceeded || state == TGFileTransferStateFailed || state == TGFileTransferStateCancelled;
+}
+
+- (void)dealloc {
+    [_descriptor release];
+    [_transferState release];
     [super dealloc];
 }
 
