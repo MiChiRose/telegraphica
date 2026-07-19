@@ -1,3 +1,39 @@
+static NSNumber *TGActiveSessionSelectableIdentifier(NSDictionary *session) {
+    if (![session isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id rawID = [session objectForKey:@"id"];
+    if (![rawID respondsToSelector:@selector(longLongValue)] || [rawID longLongValue] == 0) {
+        rawID = [session objectForKey:@"session_id"];
+    }
+    if (![rawID respondsToSelector:@selector(longLongValue)] || [rawID longLongValue] == 0) {
+        return nil;
+    }
+    return [NSNumber numberWithLongLong:[rawID longLongValue]];
+}
+
+static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unknownDevice) {
+    NSString *device = [session objectForKey:@"device_model"];
+    NSString *application = [session objectForKey:@"application_name"];
+    NSString *platform = [session objectForKey:@"platform"];
+    NSString *location = [session objectForKey:@"location"];
+    NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : unknownDevice);
+    NSMutableArray *details = [NSMutableArray array];
+    if ([application length] > 0 && ![application isEqualToString:title]) {
+        [details addObject:application];
+    }
+    if ([platform length] > 0 && ![platform isEqualToString:title]) {
+        [details addObject:platform];
+    }
+    if ([location length] > 0) {
+        [details addObject:location];
+    }
+    if ([details count] == 0) {
+        return title;
+    }
+    return [NSString stringWithFormat:@"%@ — %@", title, [details componentsJoinedByString:@", "]];
+}
+
 - (void)openSelectedChatProfile:(id)sender {
     (void)sender;
     if (!self.selectedChatID) {
@@ -41,6 +77,8 @@
     [self.activeSessionsRefreshButton setEnabled:YES];
     [self.activeSessionsTerminateButton setEnabled:NO];
     [self.activeSessionsTerminatePopup removeAllItems];
+    [self.activeSessionsTerminatePopup addItemWithTitle:TGLoc(@"settings.sessions.selectDevice")];
+    [[[self.activeSessionsTerminatePopup menu] itemAtIndex:0] setRepresentedObject:nil];
     self.activeSessionsSummary = nil;
     if ([errorMessage length] > 0 || ![summary isKindOfClass:[NSDictionary class]]) {
         NSString *message = [NSString stringWithFormat:TGLoc(@"settings.sessions.failed"),
@@ -71,18 +109,21 @@
             if (![session isKindOfClass:[NSDictionary class]] || [[session objectForKey:@"is_current"] boolValue]) {
                 continue;
             }
-            NSNumber *sessionID = [session objectForKey:@"id"];
+            NSNumber *sessionID = TGActiveSessionSelectableIdentifier(session);
             if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
                 continue;
             }
-            NSString *device = [session objectForKey:@"device_model"];
-            NSString *application = [session objectForKey:@"application_name"];
-            NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : TGLoc(@"settings.sessions.unknownDevice"));
+            NSString *title = TGActiveSessionMenuTitle(session, TGLoc(@"settings.sessions.unknownDevice"));
             [self.activeSessionsTerminatePopup addItemWithTitle:title];
             [[[self.activeSessionsTerminatePopup menu] itemAtIndex:([[self.activeSessionsTerminatePopup itemArray] count] - 1)] setRepresentedObject:sessionID];
         }
     }
-    BOOL hasTerminableSessions = ([[self.activeSessionsTerminatePopup itemArray] count] > 0);
+    BOOL hasTerminableSessions = ([[self.activeSessionsTerminatePopup itemArray] count] > 1);
+    if (hasTerminableSessions) {
+        [self.activeSessionsTerminatePopup selectItemAtIndex:1];
+    } else {
+        [self.activeSessionsTerminatePopup selectItemAtIndex:0];
+    }
     [self.activeSessionsTerminatePopup setEnabled:hasTerminableSessions];
     [self.activeSessionsTerminateButton setEnabled:hasTerminableSessions];
 }
@@ -104,7 +145,7 @@
             if (![session isKindOfClass:[NSDictionary class]] || [[session objectForKey:@"is_current"] boolValue]) {
                 continue;
             }
-            NSNumber *knownSessionID = [session objectForKey:@"id"];
+            NSNumber *knownSessionID = TGActiveSessionSelectableIdentifier(session);
             if ([knownSessionID respondsToSelector:@selector(longLongValue)] &&
                 [knownSessionID longLongValue] == [sessionID longLongValue]) {
                 foundFreshTerminableSession = YES;
@@ -226,7 +267,7 @@
         TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 58, 584, 366)] autorelease];
         [cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [contentView addSubview:cardView];
-        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30, 104, 560, 308)] autorelease];
+        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30, 112, 560, 300)] autorelease];
         [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self applySkeuomorphicScrollStyle:scrollView];
         NSTextView *textView = [[[NSTextView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
@@ -237,13 +278,13 @@
         [contentView addSubview:scrollView];
         self.activeSessionsTextView = textView;
 
-        NSPopUpButton *terminatePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30, 62, 300, 28) pullsDown:NO] autorelease];
+        NSPopUpButton *terminatePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30, 70, 402, 28) pullsDown:NO] autorelease];
         [terminatePopup setEnabled:NO];
         [terminatePopup setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
         [contentView addSubview:terminatePopup];
         self.activeSessionsTerminatePopup = terminatePopup;
 
-        NSButton *terminateButton = [[[NSButton alloc] initWithFrame:NSMakeRect(342, 62, 128, 28)] autorelease];
+        NSButton *terminateButton = [[[NSButton alloc] initWithFrame:NSMakeRect(444, 70, 146, 28)] autorelease];
         [terminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
         [terminateButton setTarget:self];
         [terminateButton setAction:@selector(terminateSelectedActiveSession:)];

@@ -8261,7 +8261,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"last_active_date", nil];
+    NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"session_id", @"last_active_date", nil];
     NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", nil];
     NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"location", nil];
     NSMutableArray *safeSessions = [NSMutableArray arrayWithCapacity:[(NSArray *)sessionsObject count]];
