@@ -456,7 +456,7 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
 }
 
 - (void)downloadMediaCenterItem:(id)sender {
-    TGMessageItem *item = [self.mediaCenterItemForSender:sender];
+    TGMessageItem *item = [self mediaCenterItemForSender:sender];
     NSNumber *fileID = TGMediaCenterFileIDForItem(item);
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
         [self.mediaCenterStatusField setStringValue:@"This item has no downloadable file id yet."];
