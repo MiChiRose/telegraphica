@@ -470,9 +470,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         bubbleHeight = 42.0;
     }
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    if (!nonVisualPlayable && !nonVisualDocument && !pollContent) {
-        bubbleHeight += reactionBandHeight;
-    }
+    bubbleHeight += reactionBandHeight;
     CGFloat commentBarHeight = TGMessageCommentBarHeightForItem(item);
     bubbleHeight += commentBarHeight;
 
@@ -603,9 +601,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             }
             playableRect.size.height -= contextHeaderHeight;
         }
-        if (commentBarHeight > 0.0) {
-            playableRect.size.height -= commentBarHeight;
-        }
+        playableRect.size.height -= (commentBarHeight + reactionBandHeight);
         TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
     }
 
@@ -623,9 +619,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             }
             documentRect.size.height -= contextHeaderHeight;
         }
-        if (commentBarHeight > 0.0) {
-            documentRect.size.height -= commentBarHeight;
-        }
+        documentRect.size.height -= (commentBarHeight + reactionBandHeight);
         TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
     }
 
@@ -643,9 +637,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             }
             pollRect.size.height -= contextHeaderHeight;
         }
-        if (commentBarHeight > 0.0) {
-            pollRect.size.height -= commentBarHeight;
-        }
+        pollRect.size.height -= (commentBarHeight + reactionBandHeight);
         TGDrawPollContentForItem(item, pollRect, outgoing, flipped);
     }
 
@@ -960,11 +952,20 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
     if ([reactionSummary length] > 0 || [commentTitle length] > 0) {
         NSString *footer = ([reactionSummary length] > 0 && [commentTitle length] > 0) ? [NSString stringWithFormat:@"%@    %@", reactionSummary, commentTitle] : (([reactionSummary length] > 0) ? reactionSummary : commentTitle);
+        NSMutableParagraphStyle *footerParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [footerParagraph setLineBreakMode:NSLineBreakByTruncatingTail];
         NSDictionary *footerAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                           TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
                                           TGClassicNavigationSelectedColor(0.92), NSForegroundColorAttributeName,
+                                          footerParagraph, NSParagraphStyleAttributeName,
                                           nil];
-        [footer drawInRect:NSMakeRect(textX, footerY, textWidth, 16.0) withAttributes:footerAttributes];
+        CGFloat footerMaxY = NSMaxY(rowRect) - 5.0;
+        if (flipped && footerY + 16.0 > footerMaxY) {
+            footerY = footerMaxY - 16.0;
+        } else if (!flipped && footerY < NSMinY(rowRect) + 5.0) {
+            footerY = NSMinY(rowRect) + 5.0;
+        }
+        [footer drawInRect:NSMakeRect(textX, footerY, MAX(40.0, textWidth), 16.0) withAttributes:footerAttributes];
     }
 }
 

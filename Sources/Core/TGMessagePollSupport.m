@@ -26,6 +26,14 @@ static NSString *TGMessagePollTrimmedString(NSString *string, NSUInteger maximum
     return [prefix stringByAppendingString:@"..."];
 }
 
+static NSInteger TGMessagePollIntegerForFirstKey(NSDictionary *dictionary, NSString *firstKey, NSString *secondKey) {
+    id value = [dictionary objectForKey:firstKey];
+    if (![value respondsToSelector:@selector(integerValue)] && [secondKey length] > 0) {
+        value = [dictionary objectForKey:secondKey];
+    }
+    return [value respondsToSelector:@selector(integerValue)] ? [value integerValue] : 0;
+}
+
 NSString *TGMessagePollTextFromFormattedObject(id object) {
     if ([object isKindOfClass:[NSString class]]) {
         return TGMessagePollTrimmedString((NSString *)object, 4060);
@@ -52,8 +60,8 @@ static NSDictionary *TGMessagePollOptionInfoFromObject(id optionObject) {
 
     NSMutableDictionary *info = [NSMutableDictionary dictionary];
     [info setObject:text forKey:TGMessagePollOptionTextKey];
-    id voteCount = [option objectForKey:@"vote_count"];
-    [info setObject:([voteCount respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[voteCount integerValue]] : [NSNumber numberWithInteger:0])
+    NSInteger voteCount = TGMessagePollIntegerForFirstKey(option, @"voter_count", @"vote_count");
+    [info setObject:[NSNumber numberWithInteger:voteCount]
              forKey:TGMessagePollOptionVoteCountKey];
     id chosen = [option objectForKey:@"is_chosen"];
     [info setObject:[NSNumber numberWithBool:([chosen respondsToSelector:@selector(boolValue)] && [chosen boolValue])]
@@ -98,8 +106,18 @@ NSDictionary *TGMessagePollInfoFromContentObject(id contentObject) {
     NSMutableDictionary *info = [NSMutableDictionary dictionary];
     [info setObject:question forKey:TGMessagePollQuestionKey];
     [info setObject:options forKey:TGMessagePollOptionsKey];
-    id total = [poll objectForKey:@"total_voter_count"];
-    [info setObject:([total respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[total integerValue]] : [NSNumber numberWithInteger:0])
+    NSInteger totalVotes = TGMessagePollIntegerForFirstKey(poll, @"total_voter_count", nil);
+    if (totalVotes <= 0) {
+        NSUInteger optionIndex = 0;
+        for (optionIndex = 0; optionIndex < [options count]; optionIndex++) {
+            NSDictionary *option = [options objectAtIndex:optionIndex];
+            id optionVotes = [option objectForKey:TGMessagePollOptionVoteCountKey];
+            if ([optionVotes respondsToSelector:@selector(integerValue)]) {
+                totalVotes += [optionVotes integerValue];
+            }
+        }
+    }
+    [info setObject:[NSNumber numberWithInteger:totalVotes]
              forKey:TGMessagePollTotalVoterCountKey];
     id closed = [poll objectForKey:@"is_closed"];
     [info setObject:[NSNumber numberWithBool:([closed respondsToSelector:@selector(boolValue)] && [closed boolValue])]

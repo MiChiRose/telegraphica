@@ -852,10 +852,39 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:scrollView];
     self.stickerPickerScrollView = scrollView;
     self.stickerPickerContentView = gridView;
-    self.stickerPickerPlaybackCoordinator = [[[TGInlineMediaPlaybackCoordinator alloc] initWithHostView:gridView
-                                                                                           maximumActiveItems:5] autorelease];
+    self.stickerPickerPlaybackCoordinator = nil;
     self.stickerPickerSetCache = [NSMutableDictionary dictionary];
     self.stickerPickerWindow = window;
+}
+
+- (void)updateStickerPickerRailThumbnailForSetID:(NSNumber *)setID withItem:(NSDictionary *)item {
+    if (![setID respondsToSelector:@selector(longLongValue)] || ![item isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSMutableArray *updatedSets = [NSMutableArray arrayWithCapacity:[self.stickerPickerStickerSets count]];
+    BOOL changed = NO;
+    NSUInteger index = 0;
+    for (index = 0; index < [self.stickerPickerStickerSets count]; index++) {
+        id candidate = [self.stickerPickerStickerSets objectAtIndex:index];
+        if (![candidate isKindOfClass:[NSDictionary class]]) {
+            [updatedSets addObject:candidate];
+            continue;
+        }
+        NSDictionary *set = (NSDictionary *)candidate;
+        NSNumber *candidateID = [set objectForKey:@"id"];
+        if ([candidateID respondsToSelector:@selector(longLongValue)] && [candidateID longLongValue] == [setID longLongValue]) {
+            NSMutableDictionary *mutableSet = [NSMutableDictionary dictionaryWithDictionary:set];
+            [mutableSet setObject:item forKey:@"rail_item"];
+            [updatedSets addObject:mutableSet];
+            changed = YES;
+        } else {
+            [updatedSets addObject:set];
+        }
+    }
+    if (changed) {
+        self.stickerPickerStickerSets = updatedSets;
+        [self rebuildStickerPickerSetRail];
+    }
 }
 
 - (void)selectRecentStickerPickerTab:(id)sender {
@@ -906,17 +935,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             continue;
         }
         NSDictionary *set = (NSDictionary *)candidate;
-        NSDictionary *thumbnail = [[set objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"thumbnail"] : nil;
+        NSDictionary *thumbnail = [[set objectForKey:@"rail_item"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"rail_item"] : nil;
+        if (!thumbnail) {
+            thumbnail = [[set objectForKey:@"thumbnail"] isKindOfClass:[NSDictionary class]] ? [set objectForKey:@"thumbnail"] : nil;
+        }
         NSMutableDictionary *buttonItem = [NSMutableDictionary dictionary];
         if (thumbnail) {
             [buttonItem addEntriesFromDictionary:thumbnail];
         }
-        NSString *title = [set objectForKey:@"title"];
-        if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
-            title = [set objectForKey:@"name"];
-        }
-        if ([title isKindOfClass:[NSString class]] && [title length] > 0) {
-            [buttonItem setObject:title forKey:@"emoji"];
+        if ([buttonItem count] == 0) {
+            [buttonItem setObject:@"stickers" forKey:@"emoji"];
         }
         CGFloat y = contentHeight - gap - buttonSide - (CGFloat)index * (buttonSide + gap);
         NSButton *button = TGStickerPickerButtonWithFrame(NSMakeRect(1.0, y, buttonSide, buttonSide),
@@ -981,6 +1009,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (void)refreshStickerPickerPlayback {
+    if (!self.stickerPickerPlaybackCoordinator) {
+        return;
+    }
     if (![self.stickerPickerWindow isVisible] || !self.stickerPickerContentView) {
         [self.stickerPickerPlaybackCoordinator removeAllPlayback];
         return;
@@ -1127,6 +1158,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     if ([cachedItems count] > 0) {
         self.stickerPickerItems = cachedItems;
         [self.stickerPickerStatusField setStringValue:title];
+        [self updateStickerPickerRailThumbnailForSetID:setID withItem:[cachedItems objectAtIndex:0]];
         [self rebuildStickerPickerGrid];
         return;
     }
@@ -1154,6 +1186,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 if ([items count] > 0) {
                     [self.stickerPickerSetCache setObject:items forKey:cacheKey];
                     self.stickerPickerItems = items;
+                    [self updateStickerPickerRailThumbnailForSetID:selectedSetID withItem:[items objectAtIndex:0]];
                     [self.stickerPickerStatusField setStringValue:titleCopy];
                     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded set %@ count=%lu", titleCopy, (unsigned long)[items count]]];
                 } else {

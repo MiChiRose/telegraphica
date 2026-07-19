@@ -1274,9 +1274,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     if (height < 42.0) {
         height = 42.0;
     }
-    if (!TGMessageItemIsNonVisualPlayableMedia(item) && !nonVisualDocument && !TGMessageItemIsPollContent(item)) {
-        height += TGReactionBandHeightForMessageItem(item);
-    }
+    height += TGReactionBandHeightForMessageItem(item);
     height += TGMessageCommentBarHeightForItem(item);
     return height + 10.0 + TGMessageExtraBlockVerticalPadding();
 }
@@ -1541,7 +1539,8 @@ void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgo
         [track setLineWidth:(chosen ? 1.1 : 0.7)];
         [track stroke];
 
-        NSString *percent = [NSString stringWithFormat:@"%ld%%", (long)lround(ratio * 100.0)];
+        NSString *voteText = [NSString stringWithFormat:TGLoc((votes == 1) ? @"message.poll.votes.one" : @"message.poll.votes.many"), (long)votes];
+        NSString *percent = [NSString stringWithFormat:@"%ld%% · %@", (long)lround(ratio * 100.0), voteText];
         NSSize percentSize = [percent sizeWithAttributes:percentAttributes];
         NSRect percentRect = NSMakeRect(NSMaxX(optionRect) - percentSize.width - 8.0,
                                         NSMinY(optionRect) + floor((NSHeight(optionRect) - percentSize.height) / 2.0),

@@ -932,17 +932,36 @@
     if (settingsDocWidth < 340.0) {
         settingsDocWidth = settingsScrollWidth;
     }
-    CGFloat settingsBottomPadding = 42.0;
-    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsScrollHeight)];
-    NSClipView *settingsClipView = [self.settingsScrollView contentView];
-    NSPoint settingsClipOrigin = [settingsClipView bounds].origin;
-    if (settingsClipOrigin.x != 0.0) {
-        [settingsClipView setBoundsOrigin:NSMakePoint(0.0, settingsClipOrigin.y)];
-    }
-
     CGFloat settingsLabelHeight = 16.0;
     CGFloat settingsLabelGap = 7.0;
     CGFloat settingsGroupGap = 12.0;
+    CGFloat settingsBottomPadding = 58.0;
+    CGFloat notificationCardHeight = 140.0;
+    CGFloat drawerCardHeight = 78.0;
+    CGFloat resourceCardHeight = 276.0;
+    CGFloat interfaceCardHeight = 184.0;
+    CGFloat sessionsCardHeight = 72.0;
+    CGFloat filesCardHeight = 140.0;
+    CGFloat helpCardHeight = 112.0;
+    CGFloat settingsDocHeight = 18.0;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + interfaceCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + sessionsCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + filesCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + helpCardHeight + settingsBottomPadding;
+    if (settingsDocHeight < settingsScrollHeight) {
+        settingsDocHeight = settingsScrollHeight;
+    }
+    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
+    NSClipView *settingsClipView = [self.settingsScrollView contentView];
+    NSPoint settingsClipOrigin = [settingsClipView bounds].origin;
+    CGFloat maxSettingsClipY = MAX(0.0, settingsDocHeight - settingsScrollHeight);
+    if (settingsClipOrigin.x != 0.0 || settingsClipOrigin.y > maxSettingsClipY) {
+        [settingsClipView setBoundsOrigin:NSMakePoint(0.0, MIN(settingsClipOrigin.y, maxSettingsClipY))];
+    }
+
     CGFloat settingsGroupedWidth = settingsDocWidth - 56.0;
     if (settingsGroupedWidth > 760.0) {
         settingsGroupedWidth = 760.0;
@@ -955,7 +974,6 @@
     CGFloat rowWidth = settingsGroupedWidth - 44.0;
     CGFloat settingsNextY = 18.0;
 
-    CGFloat notificationCardHeight = 140.0;
     [self.settingsStateField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat notificationCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsAccountCardView setFrame:NSMakeRect(settingsGroupedX, notificationCardY, settingsGroupedWidth, notificationCardHeight)];
@@ -967,7 +985,6 @@
     settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
 
     [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat drawerCardHeight = 78.0;
     CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsDrawerCardView setFrame:NSMakeRect(settingsGroupedX, drawerCardY, settingsGroupedWidth, drawerCardHeight)];
     [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 12.0, rowWidth, 22.0)];
@@ -975,7 +992,6 @@
     settingsNextY = drawerCardY + drawerCardHeight + settingsGroupGap;
 
     [self.settingsResourceSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat resourceCardHeight = 276.0;
     CGFloat resourceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsResourceCardView setFrame:NSMakeRect(settingsGroupedX, resourceCardY, settingsGroupedWidth, resourceCardHeight)];
     [self.settingsEconomyModeButton setFrame:NSMakeRect(rowLeft, resourceCardY + 12.0, rowWidth, 22.0)];
@@ -1001,7 +1017,6 @@
     settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat interfaceCardHeight = 184.0;
     CGFloat interfaceCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsThemeCardView setFrame:NSMakeRect(settingsGroupedX, interfaceCardY, settingsGroupedWidth, interfaceCardHeight)];
     [self.settingsAppearanceButton setFrame:NSMakeRect(rowLeft, interfaceCardY, 0.0, 0.0)];
@@ -1033,7 +1048,6 @@
     settingsNextY = interfaceCardY + interfaceCardHeight + settingsGroupGap;
 
     [self.settingsStorageField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat sessionsCardHeight = 72.0;
     CGFloat sessionsCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsSessionCardView setFrame:NSMakeRect(settingsGroupedX, sessionsCardY, settingsGroupedWidth, sessionsCardHeight)];
     [self.settingsActiveSessionsDetailField setFrame:NSMakeRect(rowLeft, sessionsCardY + 10.0, rowWidth, 18.0)];
@@ -1041,7 +1055,6 @@
     settingsNextY = sessionsCardY + sessionsCardHeight + settingsGroupGap;
 
     [self.settingsFilesSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat filesCardHeight = 140.0;
     CGFloat filesCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
     [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
@@ -1051,25 +1064,12 @@
     settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
     [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
-    CGFloat helpCardHeight = 112.0;
     CGFloat helpCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsHelpCardView setFrame:NSMakeRect(settingsGroupedX, helpCardY, settingsGroupedWidth, helpCardHeight)];
     [self.settingsLogsButton setFrame:NSMakeRect(rowLeft, helpCardY + 10.0, rowWidth, 28.0)];
     [self.settingsAboutButton setFrame:NSMakeRect(rowLeft, helpCardY + 42.0, rowWidth, 28.0)];
     [self.settingsCheckUpdatesButton setFrame:NSMakeRect(rowLeft, helpCardY + 74.0, rowWidth, 28.0)];
     [self.settingsUpdateDotView setFrame:NSMakeRect(rowWidth - 20.0, 9.0, 10.0, 10.0)];
-
-    CGFloat settingsDocHeight = helpCardY + helpCardHeight + settingsBottomPadding;
-    if (settingsDocHeight < settingsScrollHeight) {
-        settingsDocHeight = settingsScrollHeight;
-    }
-    [self.settingsContentView setFrame:NSMakeRect(0.0, 0.0, settingsDocWidth, settingsDocHeight)];
-    NSPoint finalSettingsClipOrigin = [settingsClipView bounds].origin;
-    CGFloat maxSettingsClipY = MAX(0.0, settingsDocHeight - settingsScrollHeight);
-    if (finalSettingsClipOrigin.y > maxSettingsClipY) {
-        [settingsClipView setBoundsOrigin:NSMakePoint(0.0, maxSettingsClipY)];
-    }
-
     CGFloat aboutWidth = groupedWidth;
     if (aboutWidth > 560.0) {
         aboutWidth = 560.0;

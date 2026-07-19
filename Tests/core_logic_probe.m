@@ -278,7 +278,7 @@ static void TGTestMessageItemsAndLayout(void) {
                                   [NSArray arrayWithObjects:
                                    [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSDictionary dictionaryWithObject:@"Yes" forKey:@"text"], @"text",
-                                    [NSNumber numberWithInt:3], @"vote_count",
+                                    [NSNumber numberWithInt:3], @"voter_count",
                                     [NSNumber numberWithBool:YES], @"is_chosen",
                                     nil],
                                    [NSDictionary dictionaryWithObjectsAndKeys:
@@ -296,6 +296,9 @@ static void TGTestMessageItemsAndLayout(void) {
     NSDictionary *pollInfo = TGMessagePollInfoFromContentObject(pollContent);
     TGAssertEqualObjects(TGMessagePollPreviewTextFromInfo(pollInfo), @"Coffee?", @"poll preview should use the question");
     TGAssertTrue([[pollInfo objectForKey:TGMessagePollOptionsKey] count] == 2, @"poll parser should keep options");
+    NSArray *pollOptions = [pollInfo objectForKey:TGMessagePollOptionsKey];
+    TGAssertTrue([[[pollOptions objectAtIndex:0] objectForKey:TGMessagePollOptionVoteCountKey] integerValue] == 3,
+                 @"poll parser should read TDLib voter_count values");
     TGMessageItem *pollItem = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
                                                            messageID:[NSNumber numberWithInt:6]
                                                                 date:nil
