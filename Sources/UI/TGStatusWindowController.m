@@ -1,5 +1,6 @@
 #import "TGStatusWindowController.h"
 #import "TGActiveSessionsPresentation.h"
+#import "TGChatDisplayPreferences.h"
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
@@ -27,9 +28,11 @@
 #import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGMessagePollSupport.h"
 #import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
+#import "../Services/TGLocalDataReset.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import <AVFoundation/AVFoundation.h>
@@ -310,9 +313,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *settingsActiveSessionsDetailField;
 @property (nonatomic, retain) NSTextField *settingsLanguageLabel;
 @property (nonatomic, retain) NSPopUpButton *settingsLanguagePopUpButton;
+@property (nonatomic, retain) NSButton *settingsMessagesAsBlocksButton;
+@property (nonatomic, retain) NSTextField *settingsChatTextSizeSectionField;
+@property (nonatomic, retain) NSSlider *settingsChatTextSizeSlider;
+@property (nonatomic, retain) NSTextField *settingsChatTextSizeValueField;
 @property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
 @property (nonatomic, retain) NSButton *settingsStorageUsageButton;
+@property (nonatomic, retain) NSButton *settingsDeleteLocalDataButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) TGNotificationDotView *settingsUpdateDotView;
 @property (nonatomic, retain) NSButton *settingsAppearanceButton;
@@ -355,7 +363,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextView *activeSessionsTextView;
 @property (nonatomic, retain) NSTextField *activeSessionsStatusField;
 @property (nonatomic, retain) NSButton *activeSessionsRefreshButton;
+@property (nonatomic, retain) NSPopUpButton *activeSessionsTerminatePopup;
+@property (nonatomic, retain) NSButton *activeSessionsTerminateButton;
 @property (nonatomic, retain) NSButton *activeSessionsCloseButton;
+@property (nonatomic, retain) NSDictionary *activeSessionsSummary;
 @property (nonatomic, assign) NSUInteger activeSessionsRequestGeneration;
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
@@ -392,7 +403,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *stickerPickerWindow;
 @property (nonatomic, retain) NSScrollView *stickerPickerScrollView;
 @property (nonatomic, retain) NSView *stickerPickerContentView;
+@property (nonatomic, retain) NSButton *stickerPickerRecentButton;
+@property (nonatomic, retain) NSScrollView *stickerPickerSetScrollView;
+@property (nonatomic, retain) NSView *stickerPickerSetContentView;
 @property (nonatomic, copy) NSArray *stickerPickerItems;
+@property (nonatomic, copy) NSArray *stickerPickerStickerSets;
+@property (nonatomic, retain) NSMutableDictionary *stickerPickerSetCache;
+@property (nonatomic, retain) NSMutableDictionary *stickerPickerRailPreviewState;
+@property (nonatomic, retain) NSNumber *stickerPickerSelectedSetID;
 @property (nonatomic, retain) NSTextField *stickerPickerStatusField;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *stickerPickerPlaybackCoordinator;
 @property (nonatomic, assign) NSUInteger stickerPickerLoadGeneration;
@@ -442,6 +460,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL autoChatListLoadArmed;
 @property (nonatomic, assign) BOOL autoChatListRefreshArmed;
 @property (nonatomic, assign) BOOL forceMessageScrollToNewest;
+@property (nonatomic, assign) BOOL messageItemsRepresentFocusedContext;
 @property (nonatomic, assign) BOOL initialConnectStarted;
 @property (nonatomic, assign) BOOL profileSummaryLoaded;
 @property (nonatomic, assign) BOOL profileSummaryLoading;
@@ -681,9 +700,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize settingsActiveSessionsDetailField = _settingsActiveSessionsDetailField;
 @synthesize settingsLanguageLabel = _settingsLanguageLabel;
 @synthesize settingsLanguagePopUpButton = _settingsLanguagePopUpButton;
+@synthesize settingsMessagesAsBlocksButton = _settingsMessagesAsBlocksButton;
+@synthesize settingsChatTextSizeSectionField = _settingsChatTextSizeSectionField;
+@synthesize settingsChatTextSizeSlider = _settingsChatTextSizeSlider;
+@synthesize settingsChatTextSizeValueField = _settingsChatTextSizeValueField;
 @synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
 @synthesize settingsStorageUsageButton = _settingsStorageUsageButton;
+@synthesize settingsDeleteLocalDataButton = _settingsDeleteLocalDataButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsUpdateDotView = _settingsUpdateDotView;
 @synthesize settingsAppearanceButton = _settingsAppearanceButton;
@@ -726,7 +750,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize activeSessionsTextView = _activeSessionsTextView;
 @synthesize activeSessionsStatusField = _activeSessionsStatusField;
 @synthesize activeSessionsRefreshButton = _activeSessionsRefreshButton;
+@synthesize activeSessionsTerminatePopup = _activeSessionsTerminatePopup;
+@synthesize activeSessionsTerminateButton = _activeSessionsTerminateButton;
 @synthesize activeSessionsCloseButton = _activeSessionsCloseButton;
+@synthesize activeSessionsSummary = _activeSessionsSummary;
 @synthesize activeSessionsRequestGeneration = _activeSessionsRequestGeneration;
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
@@ -763,7 +790,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize stickerPickerWindow = _stickerPickerWindow;
 @synthesize stickerPickerScrollView = _stickerPickerScrollView;
 @synthesize stickerPickerContentView = _stickerPickerContentView;
+@synthesize stickerPickerRecentButton = _stickerPickerRecentButton;
+@synthesize stickerPickerSetScrollView = _stickerPickerSetScrollView;
+@synthesize stickerPickerSetContentView = _stickerPickerSetContentView;
 @synthesize stickerPickerItems = _stickerPickerItems;
+@synthesize stickerPickerStickerSets = _stickerPickerStickerSets;
+@synthesize stickerPickerSetCache = _stickerPickerSetCache;
+@synthesize stickerPickerRailPreviewState = _stickerPickerRailPreviewState;
+@synthesize stickerPickerSelectedSetID = _stickerPickerSelectedSetID;
 @synthesize stickerPickerStatusField = _stickerPickerStatusField;
 @synthesize stickerPickerPlaybackCoordinator = _stickerPickerPlaybackCoordinator;
 @synthesize stickerPickerLoadGeneration = _stickerPickerLoadGeneration;
@@ -813,6 +847,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize autoChatListLoadArmed = _autoChatListLoadArmed;
 @synthesize autoChatListRefreshArmed = _autoChatListRefreshArmed;
 @synthesize forceMessageScrollToNewest = _forceMessageScrollToNewest;
+@synthesize messageItemsRepresentFocusedContext = _messageItemsRepresentFocusedContext;
 @synthesize initialConnectStarted = _initialConnectStarted;
 @synthesize profileSummaryLoaded = _profileSummaryLoaded;
 @synthesize profileSummaryLoading = _profileSummaryLoading;
@@ -895,6 +930,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(chatFiltersDidChange:)
                                                      name:TGTDLibChatFiltersDidChangeNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(chatDisplayPreferencesDidChange:)
+                                                     name:TGChatDisplayPreferencesDidChangeNotification
                                                    object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
@@ -1215,10 +1254,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [[self.authTextField cell] setPlaceholderString:@"+123456789"];
+        [self applyComposerPlaceholderStyle:self.authTextField];
     } else if ([state isEqualToString:@"waitCode"]) {
         [[self.authTextField cell] setPlaceholderString:label];
+        [self applyComposerPlaceholderStyle:self.authTextField];
     } else if ([state isEqualToString:@"waitPassword"]) {
         [[self.authSecureField cell] setPlaceholderString:label];
+        [self applyComposerPlaceholderStyle:self.authSecureField];
     }
 }
 
@@ -1233,6 +1275,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyDestructiveSettingsButtonStyle:self.logoutButton];
     [self.settingsTitleField setStringValue:TGLoc(@"settings")];
     [[self.sendTextField cell] setPlaceholderString:TGLoc(@"message.placeholder")];
+    [self applyComposerPlaceholderStyle:self.sendTextField];
     [self.attachPhotoButton setToolTip:TGLoc(@"attach.photo")];
     [self.stickerButton setToolTip:TGLoc(@"stickers")];
     [self.voiceRecordButton setToolTip:TGLoc(@"voice")];
@@ -1254,10 +1297,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsThemeCategoryLabel setStringValue:TGLoc(@"settings.theme.category")];
     [self.settingsThemeLabel setStringValue:TGLoc(@"settings.theme")];
     [self.settingsLanguageLabel setStringValue:TGLoc(@"settings.language")];
+    [self.settingsMessagesAsBlocksButton setTitle:TGLoc(@"settings.messages.blocks")];
+    [self.settingsChatTextSizeSectionField setStringValue:TGLoc(@"settings.chatText")];
+    [self refreshChatDisplayPreferenceControls];
     [self.settingsDownloadFolderHelpField setStringValue:TGLoc(@"settings.downloads.help")];
     [self.settingsActiveSessionsDetailField setStringValue:TGLoc(@"settings.sessions.help")];
     [self.settingsActiveSessionsButton setTitle:TGLoc(@"settings.sessions.open")];
     [self.settingsStorageUsageButton setTitle:TGLoc(@"storage.open")];
+    [self.settingsDeleteLocalDataButton setTitle:TGLoc(@"settings.localData.delete")];
     [self.settingsEconomyModeButton setTitle:TGLoc(@"settings.resources.economy")];
     [self.settingsAutoDownloadPhotosButton setTitle:TGLoc(@"settings.resources.photos")];
     [self.settingsAutoDownloadVideosButton setTitle:TGLoc(@"settings.resources.videos")];
@@ -1270,6 +1317,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsResourceHintField setStringValue:TGLoc(@"settings.resources.hint")];
     [self.activeSessionsWindow setTitle:TGLoc(@"settings.section.sessions")];
     [self.activeSessionsRefreshButton setTitle:TGLoc(@"settings.sessions.refresh")];
+    [self.activeSessionsTerminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
     [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
     [self.profileRefreshButton setTitle:TGLoc(@"profile.refresh")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
@@ -1370,6 +1418,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsThemeCategoryLabel setTextColor:cardInkColor];
     [self.settingsThemeLabel setTextColor:cardInkColor];
     [self.settingsLanguageLabel setTextColor:cardInkColor];
+    [self.pinnedMessageLabelField setTextColor:cardMutedColor];
+    [self.pinnedMessageTextField setTextColor:cardInkColor];
+    [self.settingsChatTextSizeSectionField setTextColor:cardInkColor];
+    [self.settingsChatTextSizeValueField setTextColor:cardMutedColor];
     [self.settingsMaxAutoDownloadLabel setTextColor:cardInkColor];
     [self.settingsMaxAnimationsLabel setTextColor:cardInkColor];
     [self.settingsMediaCacheLimitLabel setTextColor:cardInkColor];
@@ -1385,6 +1437,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                       self.settingsNotificationsWhenActiveButton,
                                       self.settingsDrawerHiddenButton,
                                       self.settingsTypingIndicatorsButton,
+                                      self.settingsMessagesAsBlocksButton,
                                       self.settingsEconomyModeButton,
                                       self.settingsAutoDownloadPhotosButton,
                                       self.settingsAutoDownloadVideosButton,
@@ -1403,8 +1456,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.authTextFieldBackgroundView setNeedsDisplay:YES];
     [self.authSecondaryTextFieldBackgroundView setNeedsDisplay:YES];
     [self applyComposerTextFieldStyle:self.sendTextField];
+    [self applyComposerPlaceholderStyle:self.sendTextField];
     [self.sendTextFieldBackgroundView setNeedsDisplay:YES];
     [self applyComposerTextFieldStyle:self.photoSendCaptionField];
+    [self applyComposerPlaceholderStyle:self.photoSendCaptionField];
     [self.photoSendCaptionBackgroundView setNeedsDisplay:YES];
     [self.voiceRecordingIndicatorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
     [self.settingsAppearanceButton setNeedsDisplay:YES];
@@ -2215,9 +2270,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     self.searchFilterPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(442, 318, 112, 26) pullsDown:NO] autorelease];
     [self.searchFilterPopUpButton addItemWithTitle:@"Все"];
     [self.searchFilterPopUpButton addItemWithTitle:@"Фото"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Видео"];
     [self.searchFilterPopUpButton addItemWithTitle:@"Документы"];
     [self.searchFilterPopUpButton addItemWithTitle:@"Ссылки"];
     [self.searchFilterPopUpButton addItemWithTitle:@"Голосовые"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Аудио"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"GIF"];
+    [self.searchFilterPopUpButton addItemWithTitle:@"Кружки"];
     [self.searchFilterPopUpButton setTarget:self];
     [self.searchFilterPopUpButton setAction:@selector(searchFilterChanged:)];
     [self.searchFilterPopUpButton setHidden:YES];
@@ -2662,6 +2721,39 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.settingsLanguagePopUpButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsLanguagePopUpButton];
 
+    self.settingsMessagesAsBlocksButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 166, 260, 22)] autorelease];
+    [self.settingsMessagesAsBlocksButton setButtonType:NSSwitchButton];
+    [self.settingsMessagesAsBlocksButton setTitle:@"Messages as blocks"];
+    [self.settingsMessagesAsBlocksButton setTarget:self];
+    [self.settingsMessagesAsBlocksButton setAction:@selector(chatDisplaySettingChanged:)];
+    [self.settingsMessagesAsBlocksButton setState:TGChatMessagesAsBlocksEnabled() ? NSOnState : NSOffState];
+    [self.settingsMessagesAsBlocksButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsMessagesAsBlocksButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsMessagesAsBlocksButton];
+
+    self.settingsChatTextSizeSectionField = [self labelWithFrame:NSMakeRect(64, 134, 130, 22)
+                                                            text:@"Text size"
+                                                            font:[NSFont systemFontOfSize:13.0]];
+    [contentView addSubview:self.settingsChatTextSizeSectionField];
+
+    self.settingsChatTextSizeSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(164, 128, 190, 28)] autorelease];
+    [self.settingsChatTextSizeSlider setMinValue:0.0];
+    [self.settingsChatTextSizeSlider setMaxValue:3.0];
+    [self.settingsChatTextSizeSlider setNumberOfTickMarks:4];
+    [self.settingsChatTextSizeSlider setAllowsTickMarkValuesOnly:YES];
+    [self.settingsChatTextSizeSlider setContinuous:NO];
+    [self.settingsChatTextSizeSlider setTarget:self];
+    [self.settingsChatTextSizeSlider setAction:@selector(chatDisplaySettingChanged:)];
+    [self.settingsChatTextSizeSlider setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsChatTextSizeSlider];
+
+    self.settingsChatTextSizeValueField = [self labelWithFrame:NSMakeRect(364, 134, 120, 22)
+                                                          text:@"Normal"
+                                                          font:[NSFont systemFontOfSize:12.0]];
+    [self applyMutedLabelStyle:self.settingsChatTextSizeValueField];
+    [contentView addSubview:self.settingsChatTextSizeValueField];
+    [self refreshChatDisplayPreferenceControls];
+
     self.settingsActiveSessionsDetailField = [self labelWithFrame:NSMakeRect(64, 174, 420, 18)
                                                               text:@"Devices currently signed in to this account"
                                                               font:[NSFont systemFontOfSize:11.0]];
@@ -2697,6 +2789,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];
+
+    self.settingsDeleteLocalDataButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 120, 260, 22)] autorelease];
+    [self.settingsDeleteLocalDataButton setTitle:@"Delete local data"];
+    [self.settingsDeleteLocalDataButton setTarget:self];
+    [self.settingsDeleteLocalDataButton setAction:@selector(deleteLocalData:)];
+    [self applyDestructiveSettingsButtonStyle:self.settingsDeleteLocalDataButton];
+    [self.settingsDeleteLocalDataButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsDeleteLocalDataButton];
 
     self.settingsCheckUpdatesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 152, 260, 22)] autorelease];
     [self.settingsCheckUpdatesButton setTitle:@"Check for Updates"];
@@ -2778,11 +2878,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
                                      self.settingsResourceHintField,
                                      self.settingsLanguageLabel,
                                      self.settingsLanguagePopUpButton,
+                                     self.settingsMessagesAsBlocksButton,
+                                     self.settingsChatTextSizeSectionField,
+                                     self.settingsChatTextSizeSlider,
+                                     self.settingsChatTextSizeValueField,
                                      self.settingsActiveSessionsDetailField,
                                      self.settingsActiveSessionsButton,
                                      self.settingsDownloadFolderHelpField,
                                      self.settingsDownloadFolderButton,
                                      self.settingsStorageUsageButton,
+                                     self.settingsDeleteLocalDataButton,
                                      self.settingsCheckUpdatesButton,
                                      self.settingsAppearanceButton,
                                      self.settingsLogsButton,
@@ -3473,9 +3578,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_settingsActiveSessionsDetailField release];
     [_settingsLanguageLabel release];
     [_settingsLanguagePopUpButton release];
+    [_settingsMessagesAsBlocksButton release];
+    [_settingsChatTextSizeSectionField release];
+    [_settingsChatTextSizeSlider release];
+    [_settingsChatTextSizeValueField release];
     [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
     [_settingsStorageUsageButton release];
+    [_settingsDeleteLocalDataButton release];
     [_settingsCheckUpdatesButton release];
     [_settingsUpdateDotView release];
     [_storageUsageWindowController release];
@@ -3543,7 +3653,10 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_activeSessionsTextView release];
     [_activeSessionsStatusField release];
     [_activeSessionsRefreshButton release];
+    [_activeSessionsTerminatePopup release];
+    [_activeSessionsTerminateButton release];
     [_activeSessionsCloseButton release];
+    [_activeSessionsSummary release];
     [_mediaPreviewWindow release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];
@@ -3579,7 +3692,14 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_stickerPickerWindow release];
     [_stickerPickerScrollView release];
     [_stickerPickerContentView release];
+    [_stickerPickerRecentButton release];
+    [_stickerPickerSetScrollView release];
+    [_stickerPickerSetContentView release];
     [_stickerPickerItems release];
+    [_stickerPickerStickerSets release];
+    [_stickerPickerSetCache release];
+    [_stickerPickerRailPreviewState release];
+    [_stickerPickerSelectedSetID release];
     [_stickerPickerStatusField release];
     [_stickerPickerPlaybackCoordinator release];
     [_voiceRecorder release];

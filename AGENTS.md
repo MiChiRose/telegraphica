@@ -25,6 +25,13 @@ These project rules apply to Codex work in this repository.
 - Keep branch write scopes clear when multiple agents are active.
 - Ask the user questions during development when product, credential, legacy-machine, or HITL decisions are genuinely unclear.
 
+## Remote HITL Builds
+
+- Prefer the configured `telegraphica-mavericks` SSH alias for old-Mac HITL builds when it is available; do not use raw IP addresses unless the user explicitly asks.
+- After copying, building, and launching a HITL build on the old Mac, clean up obsolete Telegraphica-only transfer archives and scratch build clutter created by that run. Use narrow exact-path cleanup and do not touch user files, `~/Library/Application Support/Telegraphica`, TDLib databases, Telegram sessions, credentials, or unrelated Desktop items.
+- When reporting a successful remote HITL build that has already been launched on the old Mac, do not include a terminal command block. Instead, state what changed and give a concise checklist of what the user should verify in the already-running app.
+- When the app was not launched remotely, provide the normal complete old-Mac terminal command block for manual HITL.
+
 ## Project Constraints
 
 - Target OS: OS X 10.9.5 Mavericks.

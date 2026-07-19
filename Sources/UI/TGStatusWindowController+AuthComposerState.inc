@@ -845,6 +845,7 @@
     if (![detail isKindOfClass:[NSString class]] || [detail length] == 0) {
         return;
     }
+    detail = [TGLogger redactedDiagnosticMessage:detail];
     NSString *current = [self.detailsView string];
     NSString *section = TGLogSectionForDetail(detail);
     NSMutableString *addition = [NSMutableString string];

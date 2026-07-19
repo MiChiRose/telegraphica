@@ -18,6 +18,30 @@
         return [NSArray array];
     }
 
+    if (TGChatMessagesAsBlocksEnabled()) {
+        NSArray *mediaItems = [item visualMediaItems];
+        if ([mediaItems count] == 0) {
+            return [NSArray array];
+        }
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+        NSRect mediaRect = TGListMessageMediaRectForItem(item, cellFrame, showSenderDetails);
+        NSArray *tileRects = TGMediaTileRectsForMessageItem(item, mediaRect);
+        NSMutableArray *entries = [NSMutableArray array];
+        NSUInteger index = 0;
+        for (index = 0; index < [tileRects count] && index < [mediaItems count]; index++) {
+            id mediaItem = [mediaItems objectAtIndex:index];
+            if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                mediaItem, @"media_item",
+                                [tileRects objectAtIndex:index], @"frame",
+                                [NSNumber numberWithUnsignedInteger:index], @"tile_index",
+                                nil]];
+        }
+        return entries;
+    }
+
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
@@ -452,9 +476,9 @@
     self.selectedMessageThreadID = threadID;
     self.selectedMessageTopicKind = @"thread";
     if ([self.selectedChatTitle length] == 0) {
-        self.selectedChatTitle = @"Comments";
-    } else if ([self.selectedChatTitle rangeOfString:@"comments" options:NSCaseInsensitiveSearch].location == NSNotFound) {
-        self.selectedChatTitle = [NSString stringWithFormat:@"%@ comments", self.selectedChatTitle];
+        self.selectedChatTitle = TGLoc(@"message.comments.threadTitle");
+    } else if ([self.selectedChatTitle rangeOfString:TGLoc(@"message.comments.threadSuffix") options:NSCaseInsensitiveSearch].location == NSNotFound) {
+        self.selectedChatTitle = [NSString stringWithFormat:@"%@ %@", self.selectedChatTitle, TGLoc(@"message.comments.threadSuffix")];
     }
     self.showingForumTopicList = NO;
     self.pinnedMessageItems = [NSArray array];

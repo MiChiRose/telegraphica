@@ -2,6 +2,7 @@
 #import "TGTDLibBundledCredentials.h"
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
+#import "TGMessagePollSupport.h"
 #import "../Services/TGKeychainHelper.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
@@ -4530,6 +4531,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSString *text = [self textFromFormattedTextObject:[content objectForKey:@"text"]];
         return ([text length] > 0) ? text : @"[Text]";
     }
+    if ([type isEqualToString:@"messagePoll"]) {
+        NSDictionary *pollInfo = TGMessagePollInfoFromContentObject(content);
+        NSString *pollPreview = TGMessagePollPreviewTextFromInfo(pollInfo);
+        return ([pollPreview length] > 0) ? pollPreview : @"Poll";
+    }
 
     NSDictionary *labels = [NSDictionary dictionaryWithObjectsAndKeys:
                             @"Image", @"messagePhoto",
@@ -4786,6 +4792,26 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        if ([contentType isEqualToString:@"messagePoll"] && [contentObject isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *pollInfo = TGMessagePollInfoFromContentObject(contentObject);
+            if ([pollInfo count] > 0) {
+                NSString *question = [pollInfo objectForKey:TGMessagePollQuestionKey];
+                if ([question length] > 0) {
+                    [item setPollQuestion:question];
+                    [item setPreview:question];
+                }
+                NSArray *options = [pollInfo objectForKey:TGMessagePollOptionsKey];
+                if ([options isKindOfClass:[NSArray class]]) {
+                    [item setPollOptions:options];
+                }
+                [item setPollTotalVoterCount:[pollInfo objectForKey:TGMessagePollTotalVoterCountKey]];
+                [item setPollID:[pollInfo objectForKey:TGMessagePollIDKey]];
+                [item setPollClosed:[[pollInfo objectForKey:TGMessagePollClosedKey] boolValue]];
+                [item setPollAnonymous:[[pollInfo objectForKey:TGMessagePollAnonymousKey] boolValue]];
+                [item setPollMultipleChoice:[[pollInfo objectForKey:TGMessagePollMultipleChoiceKey] boolValue]];
+                [item setPollQuiz:[[pollInfo objectForKey:TGMessagePollQuizKey] boolValue]];
+            }
+        }
         id pinnedObject = [message objectForKey:@"is_pinned"];
         if ([pinnedObject respondsToSelector:@selector(boolValue)]) {
             [item setPinned:[pinnedObject boolValue]];
@@ -5430,12 +5456,20 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *type = nil;
     if ([filterName isEqualToString:@"photos"]) {
         type = @"searchMessagesFilterPhoto";
+    } else if ([filterName isEqualToString:@"videos"]) {
+        type = @"searchMessagesFilterVideo";
     } else if ([filterName isEqualToString:@"documents"]) {
         type = @"searchMessagesFilterDocument";
     } else if ([filterName isEqualToString:@"links"]) {
         type = @"searchMessagesFilterUrl";
     } else if ([filterName isEqualToString:@"voice"]) {
         type = @"searchMessagesFilterVoiceNote";
+    } else if ([filterName isEqualToString:@"audio"]) {
+        type = @"searchMessagesFilterAudio";
+    } else if ([filterName isEqualToString:@"animations"] || [filterName isEqualToString:@"gifs"]) {
+        type = @"searchMessagesFilterAnimation";
+    } else if ([filterName isEqualToString:@"videoNotes"]) {
+        type = @"searchMessagesFilterVideoNote";
     }
     if ([type length] == 0) {
         return (NSDictionary *)[NSNull null];
@@ -5970,6 +6004,61 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
         if (error && *error == nil) {
             *error = [self errorWithDescription:@"TDLib pin/unpin message returned an unexpected response." code:102];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)setPollAnswerForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID optionIndexes:(NSArray *)optionIndexes timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat or poll message identifier is missing." code:152];
+        }
+        return NO;
+    }
+    if (![optionIndexes isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Poll answer options are missing." code:152];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to vote in polls. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:153];
+        }
+        return NO;
+    }
+
+    NSMutableArray *safeOptions = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [optionIndexes count]; index++) {
+        id option = [optionIndexes objectAtIndex:index];
+        if ([option respondsToSelector:@selector(integerValue)] && [option integerValue] >= 0) {
+            [safeOptions addObject:[NSNumber numberWithInteger:[option integerValue]]];
+        }
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"setPollAnswer" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+    [request setObject:safeOptions forKey:@"option_ids"];
+
+    NSError *pollError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-set-poll-answer"
+                                                           timeout:timeout
+                                                         errorCode:154
+                                                             error:&pollError];
+    id responseType = [response objectForKey:@"@type"];
+    if (!response || ![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = pollError ? pollError : [self errorWithDescription:@"TDLib did not accept the poll answer." code:154];
         }
         return NO;
     }
@@ -7013,6 +7102,139 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return items;
 }
 
+- (NSArray *)installedStickerSetInfoItemsWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load sticker sets. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:155];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getInstalledStickerSets" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithBool:NO] forKey:@"is_masks"];
+
+    NSError *setError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-installed-sticker-sets"
+                                                           timeout:timeout
+                                                         errorCode:156
+                                                             error:&setError];
+    if (!response) {
+        if (error) {
+            *error = setError ? setError : [self errorWithDescription:@"TDLib did not return installed sticker sets." code:156];
+        }
+        return nil;
+    }
+
+    id setsObject = [response objectForKey:@"sets"];
+    if (![setsObject isKindOfClass:[NSArray class]]) {
+        setsObject = [response objectForKey:@"sticker_sets"];
+    }
+    if (![setsObject isKindOfClass:[NSArray class]]) {
+        return [NSArray array];
+    }
+
+    NSMutableArray *items = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)setsObject count]; index++) {
+        id setObject = [(NSArray *)setsObject objectAtIndex:index];
+        if (![setObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *set = (NSDictionary *)setObject;
+        id setID = [set objectForKey:@"id"];
+        if (![setID respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+        NSMutableDictionary *item = [NSMutableDictionary dictionary];
+        [item setObject:[NSNumber numberWithLongLong:[setID longLongValue]] forKey:@"id"];
+        id title = [set objectForKey:@"title"];
+        if ([title isKindOfClass:[NSString class]] && [(NSString *)title length] > 0) {
+            [item setObject:title forKey:@"title"];
+        }
+        id name = [set objectForKey:@"name"];
+        if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+            [item setObject:name forKey:@"name"];
+        }
+        id count = [set objectForKey:@"sticker_count"];
+        if ([count respondsToSelector:@selector(integerValue)]) {
+            [item setObject:[NSNumber numberWithInteger:[count integerValue]] forKey:@"sticker_count"];
+        }
+        NSDictionary *thumbnail = [self stickerPreviewInfoFromStickerObject:[set objectForKey:@"thumbnail"]
+                                                            downloadMissing:YES
+                                                                    timeout:0.5
+                                                         didRequestDownload:NULL];
+        if ([thumbnail count] > 0) {
+            [item setObject:thumbnail forKey:@"thumbnail"];
+        }
+        [items addObject:item];
+    }
+    return items;
+}
+
+- (NSArray *)stickerItemsForStickerSetID:(NSNumber *)stickerSetID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![stickerSetID respondsToSelector:@selector(longLongValue)] || [stickerSetID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"Sticker set identifier is missing." code:157];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load a sticker set. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:158];
+        }
+        return nil;
+    }
+
+    NSUInteger safeLimit = limit;
+    if (safeLimit == 0 || safeLimit > 120) {
+        safeLimit = 80;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getStickerSet" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[stickerSetID longLongValue]] forKey:@"set_id"];
+
+    NSError *setError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-sticker-set"
+                                                           timeout:timeout
+                                                         errorCode:159
+                                                             error:&setError];
+    if (!response) {
+        if (error) {
+            *error = setError ? setError : [self errorWithDescription:@"TDLib did not return the sticker set." code:159];
+        }
+        return nil;
+    }
+    id stickersObject = [response objectForKey:@"stickers"];
+    if (![stickersObject isKindOfClass:[NSArray class]]) {
+        return [NSArray array];
+    }
+
+    NSMutableArray *items = [NSMutableArray array];
+    NSUInteger index = 0;
+    NSUInteger downloadsRemaining = safeLimit;
+    for (index = 0; index < [(NSArray *)stickersObject count] && [items count] < safeLimit; index++) {
+        BOOL didRequestDownload = NO;
+        NSDictionary *info = [self stickerPreviewInfoFromStickerObject:[(NSArray *)stickersObject objectAtIndex:index]
+                                                       downloadMissing:(downloadsRemaining > 0)
+                                                               timeout:1.0
+                                                    didRequestDownload:&didRequestDownload];
+        if (didRequestDownload && downloadsRemaining > 0) {
+            downloadsRemaining--;
+        }
+        if ([info count] > 0) {
+            [items addObject:info];
+        }
+    }
+    return items;
+}
+
 - (NSString *)sendStickerMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind stickerFileID:(NSNumber *)stickerFileID emoji:(NSString *)emoji width:(NSNumber *)width height:(NSNumber *)height timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)] || ![stickerFileID respondsToSelector:@selector(integerValue)] || [stickerFileID integerValue] <= 0) {
         if (error) {
@@ -7750,7 +7972,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSArray *numberKeys = [NSArray arrayWithObjects:@"last_active_date", nil];
+    NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"last_active_date", nil];
     NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", nil];
     NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"location", nil];
     NSMutableArray *safeSessions = [NSMutableArray arrayWithCapacity:[(NSArray *)sessionsObject count]];
@@ -7818,6 +8040,44 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                         forKey:@"inactive_session_ttl_days"];
     }
     return [NSDictionary dictionaryWithDictionary:safeSummary];
+}
+
+- (BOOL)terminateActiveSessionWithID:(NSNumber *)sessionID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self cachedAuthorizationStateSummary];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to terminate active sessions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:94];
+        }
+        return NO;
+    }
+    if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib terminateSession requires a valid session id." code:94];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"terminateSession" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[sessionID longLongValue]] forKey:@"session_id"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-terminate-session"
+                                                            timeout:timeout
+                                                          errorCode:94
+                                                              error:error];
+    if (!response) {
+        return NO;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]) {
+        return YES;
+    }
+    if (error) {
+        *error = [self errorWithDescription:@"TDLib terminateSession returned an unexpected response." code:94];
+    }
+    return NO;
 }
 
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
