@@ -1,24 +1,25 @@
 static NSString *TGMediaCenterFilterIdentifierForIndex(NSInteger index) {
     switch (index) {
-        case 1: return @"photos";
-        case 2: return @"videos";
-        case 3: return @"documents";
-        case 4: return @"audio";
-        case 5: return @"voice";
+        case 1: return @"documents";
+        case 2: return @"links";
+        case 3: return @"audio";
+        case 4: return @"voice";
+        case 5: return @"animations";
         case 6: return @"stickers";
-        case 7: return @"animations";
-        case 8: return @"videoNotes";
-        case 9: return @"polls";
+        case 7: return @"polls";
         default: return @"all";
     }
 }
 
 static NSArray *TGMediaCenterFilterIdentifiersForSelection(NSInteger index) {
+    if (index == 0) {
+        return [NSArray arrayWithObjects:@"photos", @"videos", @"videoNotes", nil];
+    }
     NSString *single = TGMediaCenterFilterIdentifierForIndex(index);
     if (![single isEqualToString:@"all"]) {
         return [NSArray arrayWithObject:single];
     }
-    return [NSArray arrayWithObjects:@"photos", @"videos", @"documents", @"audio", @"voice", @"stickers", @"animations", @"videoNotes", @"polls", nil];
+    return [NSArray arrayWithObjects:@"photos", @"videos", @"videoNotes", @"documents", @"links", @"audio", @"voice", @"animations", @"stickers", @"polls", nil];
 }
 
 static NSString *TGMediaCenterReadableSize(unsigned long long bytes) {
@@ -139,9 +140,20 @@ static NSString *TGMediaCenterDateStringForItem(TGMessageItem *item) {
     return [formatter stringFromDate:date];
 }
 
-static BOOL TGMediaCenterItemHasLocalFile(TGMessageItem *item) {
+static NSImage *TGMediaCenterThumbnailForItem(TGMessageItem *item) {
+    NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
+    NSData *miniData = media ? TGMediaItemMiniThumbnailData(media) : nil;
+    if ([miniData length] > 0) {
+        NSImage *miniImage = [[[NSImage alloc] initWithData:miniData] autorelease];
+        if (miniImage) {
+            return miniImage;
+        }
+    }
     NSString *path = TGMediaCenterLocalPathForItem(item);
-    return ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]);
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        return nil;
+    }
+    return TGImageWithCorrectOrientationFromFile(path);
 }
 
 static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessageItem *right, NSInteger sortIndex) {
@@ -172,13 +184,13 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 680, 520);
+    NSRect frame = NSMakeRect(0, 0, 760, 680);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
-    [window setTitle:@"Media center"];
-    [window setMinSize:NSMakeSize(560.0, 360.0)];
+    [window setTitle:@"Chat info"];
+    [window setMinSize:NSMakeSize(560.0, 460.0)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
@@ -186,37 +198,85 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20.0, 476.0, 260.0, 24.0)
-                                              text:@"Media center"
-                                              font:[NSFont boldSystemFontOfSize:18.0]];
-    [titleField setAutoresizingMask:NSViewMaxYMargin];
+    CGFloat avatarSize = 92.0;
+    TGProfileAvatarView *avatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(floor((NSWidth(frame) - avatarSize) / 2.0),
+                                                                                     548.0,
+                                                                                     avatarSize,
+                                                                                     avatarSize)] autorelease];
+    [avatarView setDisplayName:([self.selectedChatTitle length] > 0 ? self.selectedChatTitle : @"Chat")];
+    [avatarView setAvatarLocalPath:self.selectedChatAvatarLocalPath];
+    [avatarView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:avatarView];
+
+    NSString *titleText = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Selected chat";
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(80.0, 516.0, NSWidth(frame) - 160.0, 26.0)
+                                              text:titleText
+                                              font:[NSFont boldSystemFontOfSize:20.0]];
+    [titleField setAlignment:NSCenterTextAlignment];
+    [titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:titleField];
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(20.0, 438.0, 260.0, 26.0)] autorelease];
-    [[searchField cell] setPlaceholderString:@"Search by filename or caption"];
-    [searchField setTarget:self];
-    [searchField setAction:@selector(reloadMediaCenter:)];
-    [searchField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    [contentView addSubview:searchField];
-    self.mediaCenterSearchField = searchField;
+    NSMutableString *subtitle = [NSMutableString string];
+    if ([self.selectedChatTypeSummary length] > 0) {
+        [subtitle appendString:self.selectedChatTypeSummary];
+    }
+    if ([self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
+        if ([subtitle length] > 0) {
+            [subtitle appendString:@" · "];
+        }
+        [subtitle appendFormat:@"ID %lld", [self.selectedChatID longLongValue]];
+    }
+    NSTextField *subtitleField = [self labelWithFrame:NSMakeRect(80.0, 492.0, NSWidth(frame) - 160.0, 20.0)
+                                                 text:([subtitle length] > 0 ? subtitle : @"Chat details")
+                                                 font:[NSFont systemFontOfSize:13.0]];
+    [subtitleField setAlignment:NSCenterTextAlignment];
+    [self applyMutedLabelStyle:subtitleField];
+    [subtitleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:subtitleField];
 
-    NSPopUpButton *filterPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(292.0, 438.0, 146.0, 26.0) pullsDown:NO] autorelease];
-    [filterPopup addItemsWithTitles:[NSArray arrayWithObjects:@"All media", @"Photos", @"Videos", @"Documents", @"Audio", @"Voice", @"Stickers", @"GIFs", @"Video notes", @"Polls", nil]];
-    [filterPopup setTarget:self];
-    [filterPopup setAction:@selector(reloadMediaCenter:)];
-    [filterPopup setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
-    [contentView addSubview:filterPopup];
-    self.mediaCenterFilterPopUpButton = filterPopup;
+    TGGroupedCardView *infoCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(36.0, 422.0, NSWidth(frame) - 72.0, 58.0)] autorelease];
+    [infoCard setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:infoCard];
+
+    NSTextField *infoTitle = [self labelWithFrame:NSMakeRect(18.0, 31.0, NSWidth([infoCard bounds]) - 36.0, 18.0)
+                                             text:@"Shared media and files"
+                                             font:[NSFont boldSystemFontOfSize:12.0]];
+    [infoTitle setAutoresizingMask:NSViewWidthSizable];
+    [infoCard addSubview:infoTitle];
+
+    NSTextField *infoText = [self labelWithFrame:NSMakeRect(18.0, 12.0, NSWidth([infoCard bounds]) - 36.0, 16.0)
+                                            text:@"Newest items are shown first. Click a tile to jump to the message."
+                                            font:[NSFont systemFontOfSize:11.0]];
+    [self applyMutedLabelStyle:infoText];
+    [infoText setAutoresizingMask:NSViewWidthSizable];
+    [infoCard addSubview:infoText];
+
+    NSSegmentedControl *tabControl = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(36.0, 382.0, NSWidth(frame) - 72.0, 28.0)] autorelease];
+    NSArray *tabTitles = [NSArray arrayWithObjects:@"Media", @"Files", @"Links", @"Music", @"Voice", @"GIF", @"Stickers", @"Polls", nil];
+    [tabControl setSegmentCount:[tabTitles count]];
+    NSUInteger tabIndex = 0;
+    for (tabIndex = 0; tabIndex < [tabTitles count]; tabIndex++) {
+        [tabControl setLabel:[tabTitles objectAtIndex:tabIndex] forSegment:tabIndex];
+        [tabControl setWidth:82.0 forSegment:tabIndex];
+    }
+    [tabControl setSelectedSegment:0];
+    [tabControl setTarget:self];
+    [tabControl setAction:@selector(reloadMediaCenter:)];
+    if ([[tabControl cell] respondsToSelector:@selector(setTrackingMode:)]) {
+        [[tabControl cell] setTrackingMode:NSSegmentSwitchTrackingSelectOne];
+    }
+    [tabControl setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:tabControl];
+    self.mediaCenterTabControl = tabControl;
 
     NSPopUpButton *sortPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(448.0, 438.0, 116.0, 26.0) pullsDown:NO] autorelease];
     [sortPopup addItemsWithTitles:[NSArray arrayWithObjects:@"Newest", @"Oldest", @"Largest", nil]];
     [sortPopup setTarget:self];
     [sortPopup setAction:@selector(rebuildMediaCenterRows)];
-    [sortPopup setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
-    [contentView addSubview:sortPopup];
+    [sortPopup setHidden:YES];
     self.mediaCenterSortPopUpButton = sortPopup;
 
-    NSButton *refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(576.0, 438.0, 82.0, 28.0)] autorelease];
+    NSButton *refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(NSWidth(frame) - 118.0, 346.0, 82.0, 26.0)] autorelease];
     [refreshButton setTitle:@"Refresh"];
     [refreshButton setTarget:self];
     [refreshButton setAction:@selector(reloadMediaCenter:)];
@@ -224,7 +284,7 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     [refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:refreshButton];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20.0, 410.0, 640.0, 18.0)
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(36.0, 350.0, NSWidth(frame) - 170.0, 18.0)
                                                text:@"Choose a chat to view media."
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
@@ -232,12 +292,12 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     [contentView addSubview:statusField];
     self.mediaCenterStatusField = statusField;
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20.0, 20.0, 638.0, 382.0)] autorelease];
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(36.0, 24.0, NSWidth(frame) - 72.0, 314.0)] autorelease];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setBorderType:NSNoBorder];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[scrollView contentView] setDrawsBackground:NO];
-    NSView *resultsView = [[[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 620.0, 80.0)] autorelease];
+    TGFlippedDocumentView *resultsView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0.0, 0.0, NSWidth(frame) - 90.0, 80.0)] autorelease];
     [scrollView setDocumentView:resultsView];
     [contentView addSubview:scrollView];
     self.mediaCenterScrollView = scrollView;
@@ -254,11 +314,9 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    [self.mediaCenterSearchField setFrame:NSMakeRect(20.0, height - 82.0, MAX(180.0, width - 420.0), 26.0)];
-    [self.mediaCenterFilterPopUpButton setFrame:NSMakeRect(width - 388.0, height - 82.0, 146.0, 26.0)];
-    [self.mediaCenterSortPopUpButton setFrame:NSMakeRect(width - 232.0, height - 82.0, 116.0, 26.0)];
-    [self.mediaCenterStatusField setFrame:NSMakeRect(20.0, height - 110.0, width - 40.0, 18.0)];
-    [self.mediaCenterScrollView setFrame:NSMakeRect(20.0, 20.0, width - 40.0, MAX(120.0, height - 138.0))];
+    [self.mediaCenterTabControl setFrame:NSMakeRect(36.0, height - 298.0, width - 72.0, 28.0)];
+    [self.mediaCenterStatusField setFrame:NSMakeRect(36.0, height - 330.0, width - 170.0, 18.0)];
+    [self.mediaCenterScrollView setFrame:NSMakeRect(36.0, 24.0, width - 72.0, MAX(120.0, height - 362.0))];
 }
 
 - (void)rebuildMediaCenterRows {
@@ -277,13 +335,24 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
         return TGMediaCenterCompareItems(left, right, sortIndex);
     }] retain];
 
-    CGFloat width = MAX(520.0, NSWidth([self.mediaCenterScrollView bounds]) - 18.0);
-    CGFloat rowHeight = 78.0;
-    CGFloat y = MAX(0.0, (CGFloat)[items count] * rowHeight);
-    [self.mediaCenterResultsView setFrame:NSMakeRect(0.0, 0.0, width, MAX(80.0, y))];
+    CGFloat width = MAX(420.0, NSWidth([self.mediaCenterScrollView bounds]) - 18.0);
+    CGFloat gap = 8.0;
+    CGFloat tileWidth = 112.0;
+    CGFloat tileHeight = 136.0;
+    NSUInteger columns = (NSUInteger)floor((width + gap) / (tileWidth + gap));
+    if (columns < 2) {
+        columns = 2;
+    }
+    tileWidth = floor((width - gap * ((CGFloat)columns + 1.0)) / (CGFloat)columns);
+    if (tileWidth > 132.0) {
+        tileWidth = 132.0;
+    }
+    NSUInteger rows = ([items count] == 0) ? 1 : (([items count] + columns - 1) / columns);
+    CGFloat contentHeight = gap + (CGFloat)rows * (tileHeight + gap);
+    [self.mediaCenterResultsView setFrame:NSMakeRect(0.0, 0.0, width, MAX(100.0, contentHeight))];
 
     if ([items count] == 0) {
-        NSTextField *empty = [self labelWithFrame:NSMakeRect(18.0, 36.0, width - 36.0, 20.0)
+        NSTextField *empty = [self labelWithFrame:NSMakeRect(18.0, 34.0, width - 36.0, 20.0)
                                              text:@"No media found for this filter."
                                              font:[NSFont systemFontOfSize:13.0]];
         [self applyMutedLabelStyle:empty];
@@ -295,47 +364,57 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     NSUInteger index = 0;
     for (index = 0; index < [items count]; index++) {
         TGMessageItem *item = [items objectAtIndex:index];
-        y -= rowHeight;
-        TGGroupedCardView *row = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(0.0, y + 6.0, width, rowHeight - 10.0)] autorelease];
-        [row setAutoresizingMask:NSViewWidthSizable];
-        [self.mediaCenterResultsView addSubview:row];
+        NSUInteger column = index % columns;
+        NSUInteger rowIndex = index / columns;
+        CGFloat tileX = gap + (CGFloat)column * (tileWidth + gap);
+        CGFloat tileY = gap + (CGFloat)rowIndex * (tileHeight + gap);
+        TGGroupedCardView *tile = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(tileX, tileY, tileWidth, tileHeight)] autorelease];
+        [self.mediaCenterResultsView addSubview:tile];
 
-        NSTextField *title = [self labelWithFrame:NSMakeRect(12.0, 38.0, width - 318.0, 18.0)
-                                             text:TGMediaCenterTitleForItem(item)
-                                             font:[NSFont boldSystemFontOfSize:12.0]];
-        [row addSubview:title];
-
-        NSString *state = TGMediaCenterItemHasLocalFile(item) ? @"downloaded" : @"cloud";
-        NSString *details = [NSString stringWithFormat:@"%@ · %@ · %@ · %@",
-                             TGMediaCenterTypeTitleForItem(item),
-                             TGMediaCenterReadableSize(TGMediaCenterSizeForItem(item)),
-                             TGMediaCenterDateStringForItem(item),
-                             state];
-        NSTextField *subtitle = [self labelWithFrame:NSMakeRect(12.0, 16.0, width - 318.0, 18.0)
-                                                text:details
-                                                font:[NSFont systemFontOfSize:11.0]];
-        [self applyMutedLabelStyle:subtitle];
-        [row addSubview:subtitle];
-
-        NSArray *buttonTitles = [NSArray arrayWithObjects:@"Open", @"Download", @"Go", @"Delete local", nil];
-        SEL actions[4] = {@selector(openMediaCenterItem:), @selector(downloadMediaCenterItem:), @selector(goToMediaCenterItem:), @selector(deleteLocalMediaCenterItem:)};
-        CGFloat buttonX = width - 292.0;
-        NSUInteger buttonIndex = 0;
-        for (buttonIndex = 0; buttonIndex < [buttonTitles count]; buttonIndex++) {
-            CGFloat buttonWidth = (buttonIndex == 3) ? 88.0 : 62.0;
-            NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(buttonX, 20.0, buttonWidth, 26.0)] autorelease];
-            [button setTitle:[buttonTitles objectAtIndex:buttonIndex]];
-            [button setTarget:self];
-            [button setAction:actions[buttonIndex]];
-            [button setTag:(NSInteger)index];
-            [self applyUtilityButtonStyle:button];
-            if (buttonIndex == 0 || buttonIndex == 3) {
-                [button setEnabled:TGMediaCenterItemHasLocalFile(item)];
-            }
-            [row addSubview:button];
-            buttonX += buttonWidth + 8.0;
+        NSRect previewRect = NSMakeRect(8.0, 8.0, tileWidth - 16.0, 86.0);
+        NSImage *thumbnail = TGMediaCenterThumbnailForItem(item);
+        if (thumbnail) {
+            NSImageView *imageView = [[[NSImageView alloc] initWithFrame:previewRect] autorelease];
+            [imageView setImage:thumbnail];
+            [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
+            [imageView setImageFrameStyle:NSImageFrameNone];
+            [tile addSubview:imageView];
+        } else {
+            NSTextField *typeField = [self labelWithFrame:NSMakeRect(10.0, 32.0, tileWidth - 20.0, 24.0)
+                                                     text:TGMediaCenterTypeTitleForItem(item)
+                                                     font:[NSFont boldSystemFontOfSize:13.0]];
+            [typeField setAlignment:NSCenterTextAlignment];
+            [tile addSubview:typeField];
         }
+
+        NSString *titleText = TGMediaCenterTitleForItem(item);
+        NSTextField *title = [self labelWithFrame:NSMakeRect(8.0, 99.0, tileWidth - 16.0, 18.0)
+                                             text:titleText
+                                             font:[NSFont boldSystemFontOfSize:11.0]];
+        [[title cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [tile addSubview:title];
+
+        NSString *details = [NSString stringWithFormat:@"%@ · %@",
+                             TGMediaCenterReadableSize(TGMediaCenterSizeForItem(item)),
+                             TGMediaCenterDateStringForItem(item)];
+        NSTextField *subtitle = [self labelWithFrame:NSMakeRect(8.0, 116.0, tileWidth - 16.0, 16.0)
+                                                text:details
+                                                font:[NSFont systemFontOfSize:10.0]];
+        [[subtitle cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [self applyMutedLabelStyle:subtitle];
+        [tile addSubview:subtitle];
+
+        NSButton *button = [[[TGPointingHandButton alloc] initWithFrame:[tile bounds]] autorelease];
+        [button setTitle:@""];
+        [button setBordered:NO];
+        [button setTransparent:YES];
+        [button setTarget:self];
+        [button setAction:@selector(goToMediaCenterItem:)];
+        [button setTag:(NSInteger)index];
+        [tile addSubview:button];
     }
+    [[self.mediaCenterScrollView contentView] scrollToPoint:NSMakePoint(0.0, 0.0)];
+    [self.mediaCenterScrollView reflectScrolledClipView:[self.mediaCenterScrollView contentView]];
     [items release];
 }
 
@@ -357,8 +436,18 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *threadID = [self.selectedMessageThreadID retain];
     NSString *topicKind = [self.selectedMessageTopicKind copy];
-    NSString *query = [[self.mediaCenterSearchField stringValue] copy];
-    NSArray *filters = [TGMediaCenterFilterIdentifiersForSelection([self.mediaCenterFilterPopUpButton indexOfSelectedItem]) retain];
+    NSString *query = nil;
+    if (self.mediaCenterSearchField) {
+        query = [[self.mediaCenterSearchField stringValue] copy];
+    }
+    if (!query) {
+        query = [@"" copy];
+    }
+    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
+    if (selectedTab < 0) {
+        selectedTab = 0;
+    }
+    NSArray *filters = [TGMediaCenterFilterIdentifiersForSelection(selectedTab) retain];
     NSUInteger generation = self.mediaCenterGeneration + 1;
     self.mediaCenterGeneration = generation;
     [self.mediaCenterStatusField setStringValue:@"Loading media..."];
@@ -391,7 +480,7 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
                                                                      query:query
                                                                     filter:filter
                                                              fromMessageID:nil
-                                                                     limit:30
+                                                                     limit:36
                                                                    timeout:8.0
                                                                      error:&searchError];
             if (!results) {
@@ -457,6 +546,9 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
                                   self.selectedMessageThreadID ? [self.selectedMessageThreadID description] : @"none"]];
     @try {
         [[TGLogger sharedLogger] log:@"Media Center: ensuring window."];
+        if (self.mediaCenterWindow) {
+            [self.mediaCenterWindow close];
+        }
         [self ensureMediaCenterWindow];
         if (!self.mediaCenterWindow) {
             [[TGLogger sharedLogger] log:@"Media Center: failed to create window."];
@@ -473,7 +565,7 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
         [self.mediaCenterWindow center];
         [self.mediaCenterWindow makeKeyAndOrderFront:self];
         [self.mediaCenterWindow orderFrontRegardless];
-        [self.mediaCenterWindow makeFirstResponder:self.mediaCenterSearchField];
+        [self.mediaCenterWindow makeFirstResponder:nil];
         [self.mediaCenterWindow displayIfNeeded];
         [NSApp activateIgnoringOtherApps:YES];
         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: window ordered visible=%@ key=%@ frame=%@.",

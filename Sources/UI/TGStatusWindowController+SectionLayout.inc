@@ -107,9 +107,8 @@
     [self showView:self.loadMessagesButton visible:showChats];
     [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.conversationSearchButton visible:showChats];
-    [self showView:self.mediaCenterButton visible:showChats];
-    BOOL canUseChatHeaderActions = (showChats && self.selectedChatID != nil);
-    [self.mediaCenterButton setEnabled:canUseChatHeaderActions];
+    [self showView:self.mediaCenterButton visible:NO];
+    [self.mediaCenterButton setEnabled:NO];
     BOOL showCommentThreadBack = (showChats &&
                                   [self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                   [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
@@ -561,12 +560,11 @@
 
     CGFloat conversationRefreshX = conversationX + conversationWidth - 12.0 - headerButtonSize;
     CGFloat conversationJumpX = conversationRefreshX - 6.0 - headerButtonSize;
-    CGFloat conversationMediaX = conversationJumpX - 6.0 - headerButtonSize;
-    CGFloat conversationSearchX = conversationMediaX - 6.0 - headerButtonSize;
+    CGFloat conversationSearchX = conversationJumpX - 6.0 - headerButtonSize;
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messageJumpToNewestButton setFrame:NSMakeRect(conversationJumpX, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.mediaCenterButton setFrame:NSMakeRect(conversationMediaX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.mediaCenterButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, 0.0, 0.0)];
     [self.conversationSearchButton setFrame:NSMakeRect(conversationSearchX, headerButtonY, headerButtonSize, headerButtonSize)];
     BOOL layoutCommentThreadBack = ([self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                     [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
@@ -609,7 +607,6 @@
 
     NSArray *chatHeaderControls = [NSArray arrayWithObjects:
                                    self.conversationSearchButton,
-                                   self.mediaCenterButton,
                                    self.messageJumpToNewestButton,
                                    self.loadMessagesButton,
                                    self.loadOlderMessagesButton,
@@ -1136,6 +1133,11 @@
         [self layoutMediaPlaybackLayer];
         return;
     }
+    if ([notification object] == self.mediaCenterWindow) {
+        [self layoutMediaCenterWindowSubviews];
+        [self rebuildMediaCenterRows];
+        return;
+    }
     if ([notification object] != [self window]) {
         return;
     }
@@ -1190,6 +1192,19 @@
         self.mediaPlaybackTimeField = nil;
         self.mediaPlaybackCloseButton = nil;
         self.mediaPlaybackWindow = nil;
+    }
+    if ([notification object] == self.mediaCenterWindow) {
+        self.mediaCenterGeneration = self.mediaCenterGeneration + 1;
+        [self.mediaCenterWindow setDelegate:nil];
+        self.mediaCenterSearchField = nil;
+        self.mediaCenterFilterPopUpButton = nil;
+        self.mediaCenterSortPopUpButton = nil;
+        self.mediaCenterTabControl = nil;
+        self.mediaCenterStatusField = nil;
+        self.mediaCenterScrollView = nil;
+        self.mediaCenterResultsView = nil;
+        [self.mediaCenterItems removeAllObjects];
+        self.mediaCenterWindow = nil;
     }
     if ([notification object] == self.voicePreviewWindow) {
         if ([self.voiceRecorder isRecording]) {

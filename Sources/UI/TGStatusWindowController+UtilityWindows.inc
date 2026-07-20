@@ -69,42 +69,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 }
 
 - (void)openSelectedChatProfile:(id)sender {
-    (void)sender;
-    if (!self.selectedChatID) {
-        return;
-    }
-
-    NSString *title = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Selected chat";
-    title = [title stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if ([title length] == 0) {
-        title = @"Selected chat";
-    }
-
-    NSMutableString *details = [NSMutableString string];
-    if ([self.selectedChatTypeSummary length] > 0) {
-        [details appendFormat:@"%@\n", self.selectedChatTypeSummary];
-    }
-    if ([self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
-        [details appendFormat:@"Chat ID: %lld", [self.selectedChatID longLongValue]];
-    }
-    if ([self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]) {
-        if ([details length] > 0) {
-            [details appendString:@"\n"];
-        }
-        [details appendFormat:@"Topic ID: %lld", [self.selectedMessageThreadID longLongValue]];
-    }
-
-    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setMessageText:title];
-    [alert setInformativeText:([details length] > 0) ? details : @"No additional profile fields are available yet."];
-    [alert addButtonWithTitle:@"Close"];
-    if ([self.selectedChatAvatarLocalPath length] > 0) {
-        NSImage *avatarImage = [[[NSImage alloc] initWithContentsOfFile:self.selectedChatAvatarLocalPath] autorelease];
-        if (avatarImage) {
-            [alert setIcon:avatarImage];
-        }
-    }
-    [alert runModal];
+    [self openMediaCenter:sender];
 }
 
 - (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {
