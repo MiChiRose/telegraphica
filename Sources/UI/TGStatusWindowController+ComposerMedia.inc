@@ -1029,7 +1029,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 532, 476);
+    NSRect frame = NSMakeRect(0, 0, 560, 500);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -1042,33 +1042,35 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(108, 446, 402, 18)
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 520, 18)
                                                text:TGLoc(@"stickers.recent")
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 408, 72, 30)] autorelease];
-    [recentButton setTitle:TGLoc(@"stickers.recent.tab")];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 428, 66, 30)] autorelease];
+    [recentButton setTitle:TGLoc(@"stickers.recent.short")];
     [recentButton setTarget:self];
     [recentButton setAction:@selector(selectRecentStickerPickerTab:)];
+    [recentButton setToolTip:TGLoc(@"stickers.recent.tab")];
     [self applyUtilityButtonStyle:recentButton];
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
 
-    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(96, 408, 80, 30)] autorelease];
-    [favoriteButton setTitle:TGLoc(@"stickers.favorites.tab")];
+    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(94, 428, 66, 30)] autorelease];
+    [favoriteButton setTitle:TGLoc(@"stickers.favorites.short")];
     [favoriteButton setTarget:self];
     [favoriteButton setAction:@selector(selectFavoriteStickerPickerTab:)];
+    [favoriteButton setToolTip:TGLoc(@"stickers.favorites.tab")];
     [self applyUtilityButtonStyle:favoriteButton];
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
-    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(184, 409, 144, 28)] autorelease];
+    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(176, 429, 196, 28)] autorelease];
     [contentView addSubview:stickerSearchBackground];
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(194, 414, 124, 18)] autorelease];
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(186, 434, 176, 18)] autorelease];
     [self applyComposerTextFieldStyle:searchField];
     if ([[searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
         [[searchField cell] setSearchButtonCell:nil];
@@ -1083,41 +1085,42 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:searchField];
     self.stickerPickerSearchField = searchField;
 
-    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(336, 408, 92, 30)] autorelease];
-    [removeSetButton setTitle:TGLoc(@"stickers.removeSet")];
+    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(384, 428, 76, 30)] autorelease];
+    [removeSetButton setTitle:TGLoc(@"stickers.removeSet.short")];
     [removeSetButton setTarget:self];
     [removeSetButton setAction:@selector(removeSelectedStickerSetFromPicker:)];
-    [removeSetButton setToolTip:@"Remove the selected sticker set from installed sets"];
+    [removeSetButton setToolTip:TGLoc(@"stickers.removeSet")];
     [self applyUtilityButtonStyle:removeSetButton];
     [contentView addSubview:removeSetButton];
 
-    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 14, 84, 384)] autorelease];
-    [railPanel setAutoresizingMask:NSViewHeightSizable];
+    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 352, 536, 66)] autorelease];
+    [railPanel setAutoresizingMask:NSViewWidthSizable];
     [contentView addSubview:railPanel];
 
-    NSScrollView *setScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 22, 72, 368)] autorelease];
+    NSScrollView *setScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20, 360, 520, 50)] autorelease];
     [setScrollView setBorderType:NSNoBorder];
     [setScrollView setDrawsBackground:NO];
-    [setScrollView setHasVerticalScroller:YES];
+    [setScrollView setHasVerticalScroller:NO];
+    [setScrollView setHasHorizontalScroller:YES];
     [setScrollView setAutohidesScrollers:YES];
-    [setScrollView setAutoresizingMask:NSViewHeightSizable];
-    NSView *setContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 56, 362)] autorelease];
+    [setScrollView setAutoresizingMask:NSViewWidthSizable];
+    NSView *setContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 514, 50)] autorelease];
     [setScrollView setDocumentView:setContentView];
     [contentView addSubview:setScrollView];
     self.stickerPickerSetScrollView = setScrollView;
     self.stickerPickerSetContentView = setContentView;
 
-    TGStickerPickerPanelView *gridPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(100, 14, 420, 384)] autorelease];
+    TGStickerPickerPanelView *gridPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 14, 536, 330)] autorelease];
     [gridPanel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:gridPanel];
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(108, 22, 402, 368)] autorelease];
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20, 22, 520, 314)] autorelease];
     [scrollView setBorderType:NSNoBorder];
     [scrollView setDrawsBackground:NO];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setAutohidesScrollers:YES];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 380, 374)] autorelease];
+    NSView *gridView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 500, 314)] autorelease];
     [scrollView setDocumentView:gridView];
     [[scrollView contentView] setPostsBoundsChangedNotifications:YES];
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -1422,8 +1425,13 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     CGFloat buttonSide = 48.0;
     CGFloat gap = 8.0;
     NSUInteger count = [self.stickerPickerStickerSets count];
-    CGFloat contentHeight = MAX(362.0, gap + (CGFloat)count * (buttonSide + gap));
-    [setView setFrame:NSMakeRect(0, 0, 56.0, contentHeight)];
+    CGFloat visibleWidth = 514.0;
+    if (self.stickerPickerSetScrollView) {
+        visibleWidth = NSWidth([[self.stickerPickerSetScrollView contentView] bounds]);
+    }
+    CGFloat contentWidth = MAX(visibleWidth, gap + (CGFloat)count * (buttonSide + gap));
+    CGFloat contentHeight = 50.0;
+    [setView setFrame:NSMakeRect(0, 0, contentWidth, contentHeight)];
 
     NSUInteger index = 0;
     for (index = 0; index < count; index++) {
@@ -1455,8 +1463,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 [buttonItem setObject:@"stickers" forKey:@"emoji"];
             }
         }
-        CGFloat y = contentHeight - gap - buttonSide - (CGFloat)index * (buttonSide + gap);
-        NSRect buttonFrame = NSMakeRect(4.0, y, buttonSide, buttonSide);
+        CGFloat x = gap + (CGFloat)index * (buttonSide + gap);
+        NSRect buttonFrame = NSMakeRect(x, 1.0, buttonSide, buttonSide);
         NSButton *button = TGStickerPickerButtonWithFrame(buttonFrame,
                                                           buttonItem,
                                                           (NSInteger)index,
@@ -1484,9 +1492,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     if (!scrollView || !documentView) {
         return;
     }
-    NSRect visibleRect = [[scrollView contentView] bounds];
-    CGFloat maxY = MAX(0.0, NSHeight([documentView frame]) - NSHeight(visibleRect));
-    [[scrollView documentView] scrollPoint:NSMakePoint(0.0, maxY)];
+    [[scrollView documentView] scrollPoint:NSMakePoint(0.0, 0.0)];
     [scrollView reflectScrolledClipView:[scrollView contentView]];
 }
 
@@ -1605,13 +1611,20 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
     CGFloat buttonSide = 58.0;
     CGFloat gap = 10.0;
-    NSUInteger columns = 5;
-    CGFloat contentWidth = 380.0;
+    CGFloat contentWidth = 500.0;
+    if (self.stickerPickerScrollView) {
+        contentWidth = MAX(380.0, NSWidth([[self.stickerPickerScrollView contentView] bounds]));
+    }
+    NSUInteger columns = MAX(4, (NSUInteger)floor((contentWidth - gap) / (buttonSide + gap)));
     NSUInteger count = [self.stickerPickerItems count];
     NSUInteger rows = (count == 0) ? 1 : ((count + columns - 1) / columns);
     CGFloat contentHeight = rows * (buttonSide + gap) + gap;
-    if (contentHeight < 360.0) {
-        contentHeight = 360.0;
+    CGFloat minimumContentHeight = 314.0;
+    if (self.stickerPickerScrollView) {
+        minimumContentHeight = NSHeight([[self.stickerPickerScrollView contentView] bounds]);
+    }
+    if (contentHeight < minimumContentHeight) {
+        contentHeight = minimumContentHeight;
     }
     [gridView setFrame:NSMakeRect(0, 0, contentWidth, contentHeight)];
 
