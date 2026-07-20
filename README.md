@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.4.9-blue" alt="version v0.4.9" />
+    <img src="https://img.shields.io/badge/version-v0.5.0-blue" alt="version v0.5.0" />
     <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -54,7 +54,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Open Beta: `v0.4.9`
+## Current Open Beta: `v0.5.0`
 
 This open beta is ready for broader legacy-Mac testing. Telegraphica is still
 young software, but the everyday loop is now useful enough for real feedback:
@@ -117,7 +117,7 @@ Compiled beta builds live in:
 
 1. Open the latest release page.
 2. Click **Assets** if the download list is collapsed.
-3. Download **`Telegraphica-v0.4.9-macos10.9-x86_64.dmg`**.
+3. Download **`Telegraphica-v0.5.0-macos10.9-x86_64.dmg`**.
 4. Open the downloaded DMG.
 5. Drag **Telegraphica.app** into **Applications**.
 6. Launch Telegraphica and sign in with your Telegram phone number.
@@ -129,8 +129,8 @@ If you are not sure which file to download, choose the file ending in
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.4.9-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
-| `Telegraphica-v0.4.9-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
+| `Telegraphica-v0.5.0-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
+| `Telegraphica-v0.5.0-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
 | `.sha256` files | Checksum verification | You do not need these files to install Telegraphica. |
 
 ### First Launch

@@ -1,4 +1,5 @@
 #import "TGTheme.h"
+#import "TGVisualWorldThemeSpec.h"
 
 NSString * const TGThemeDefaultsKey = @"TelegraphicaThemeIdentifier";
 NSString * const TGThemeIdentifierVKBlue = @"vk-blue";
@@ -20,10 +21,21 @@ NSString * const TGThemeIdentifierY2KChrome = @"y2k-chrome";
 NSString * const TGThemeIdentifierY2KSilver = @"y2k-silver";
 NSString * const TGThemeIdentifierMatrixRain = @"matrix-rain";
 NSString * const TGThemeIdentifierVectorPop = @"vector-pop";
+NSString * const TGThemeIdentifierVisualMacintoshDesktop = @"visual-macintosh-desktop";
+NSString * const TGThemeIdentifierVisualBlueprint = @"visual-blueprint";
+NSString * const TGThemeIdentifierVisualNotebook = @"visual-notebook";
+NSString * const TGThemeIdentifierVisualCRTTerminal = @"visual-crt-terminal";
+NSString * const TGThemeIdentifierVisualNewspaper = @"visual-newspaper";
+NSString * const TGThemeIdentifierVisualOldComputer = @"visual-old-computer";
+NSString * const TGThemeIdentifierVisualGreenhouse = @"visual-greenhouse";
+NSString * const TGThemeIdentifierVisualSpaceTerminal = @"visual-space-terminal";
+NSString * const TGThemeIdentifierVisualVinylStudio = @"visual-vinyl-studio";
+NSString * const TGThemeIdentifierVisualPostcard = @"visual-postcard";
 NSString * const TGThemeCategoryIdentifierLight = @"theme-category-light";
 NSString * const TGThemeCategoryIdentifierDark = @"theme-category-dark";
 NSString * const TGThemeCategoryIdentifierOldSchool = @"theme-category-old-school";
 NSString * const TGThemeCategoryIdentifierExperimental = @"theme-category-experimental";
+NSString * const TGThemeCategoryIdentifierVisualWorlds = @"theme-category-visual-worlds";
 
 typedef struct {
     CGFloat red;
@@ -84,27 +96,28 @@ NSColor *TGColorFromHex(NSUInteger hex) {
 }
 
 NSArray *TGThemeIdentifiers(void) {
-    return [NSArray arrayWithObjects:
-            TGThemeIdentifierVKBlue,
-            TGThemeIdentifierCoffee,
-            TGThemeIdentifierCoralPlum,
-            TGThemeIdentifierIceNavy,
-            TGThemeIdentifierRubyObsidian,
-            TGThemeIdentifierEggshellBurgundy,
-            TGThemeIdentifierMelonOlive,
-            TGThemeIdentifierMidnightGraphite,
-            TGThemeIdentifierNordicNight,
-            TGThemeIdentifierTronGrid,
-            TGThemeIdentifierSkeuomorphicBlue,
-            TGThemeIdentifierFrutigerAero,
-            TGThemeIdentifierFrutigerAeroDream,
-            TGThemeIdentifierFrutigerMetro,
-            TGThemeIdentifierFrutigerMetroDark,
-            TGThemeIdentifierY2KChrome,
-            TGThemeIdentifierY2KSilver,
-            TGThemeIdentifierMatrixRain,
-            TGThemeIdentifierVectorPop,
-            nil];
+    NSArray *baseIdentifiers = [NSArray arrayWithObjects:
+                                TGThemeIdentifierVKBlue,
+                                TGThemeIdentifierCoffee,
+                                TGThemeIdentifierCoralPlum,
+                                TGThemeIdentifierIceNavy,
+                                TGThemeIdentifierRubyObsidian,
+                                TGThemeIdentifierEggshellBurgundy,
+                                TGThemeIdentifierMelonOlive,
+                                TGThemeIdentifierMidnightGraphite,
+                                TGThemeIdentifierNordicNight,
+                                TGThemeIdentifierTronGrid,
+                                TGThemeIdentifierSkeuomorphicBlue,
+                                TGThemeIdentifierFrutigerAero,
+                                TGThemeIdentifierFrutigerAeroDream,
+                                TGThemeIdentifierFrutigerMetro,
+                                TGThemeIdentifierFrutigerMetroDark,
+                                TGThemeIdentifierY2KChrome,
+                                TGThemeIdentifierY2KSilver,
+                                TGThemeIdentifierMatrixRain,
+                                TGThemeIdentifierVectorPop,
+                                nil];
+    return [baseIdentifiers arrayByAddingObjectsFromArray:TGVisualWorldThemeIdentifiers()];
 }
 
 NSArray *TGThemeCategoryIdentifiers(void) {
@@ -113,6 +126,7 @@ NSArray *TGThemeCategoryIdentifiers(void) {
             TGThemeCategoryIdentifierDark,
             TGThemeCategoryIdentifierOldSchool,
             TGThemeCategoryIdentifierExperimental,
+            TGThemeCategoryIdentifierVisualWorlds,
             nil];
 }
 
@@ -141,6 +155,9 @@ NSArray *TGThemeIdentifiersForCategory(NSString *categoryIdentifier) {
                 TGThemeIdentifierMatrixRain,
                 TGThemeIdentifierVectorPop,
                 nil];
+    }
+    if ([categoryIdentifier isEqualToString:TGThemeCategoryIdentifierVisualWorlds]) {
+        return TGVisualWorldThemeIdentifiers();
     }
     return [NSArray arrayWithObjects:
             TGThemeIdentifierCoffee,
@@ -187,6 +204,8 @@ NSString *TGThemeDisplayNameForIdentifier(NSString *identifier) {
     if ([identifier isEqualToString:TGThemeIdentifierY2KSilver]) return @"Y2K Silver";
     if ([identifier isEqualToString:TGThemeIdentifierMatrixRain]) return @"Matrix Rain";
     if ([identifier isEqualToString:TGThemeIdentifierVectorPop]) return @"Metro Pop";
+    TGVisualWorldThemeSpec *visualSpec = TGVisualWorldThemeSpecForIdentifier(identifier);
+    if (visualSpec) return visualSpec.displayName;
     return @"VK Blue";
 }
 
@@ -240,7 +259,36 @@ static TGThemePalette TGThemePaletteMake(NSUInteger window,
     return palette;
 }
 
+static TGThemePalette TGThemePaletteForVisualWorldSpec(TGVisualWorldThemeSpec *spec) {
+    NSUInteger selectedText = spec.darkCards ? spec.textHex : 0xffffff;
+    NSUInteger navigationText = 0xffffff;
+    NSUInteger navigationMutedText = spec.darkCards ? spec.mutedHex : 0xe7eef6;
+    return TGThemePaletteMake(spec.backgroundHex,
+                              spec.panelHex,
+                              spec.primaryHex,
+                              spec.surfaceHex,
+                              spec.textHex,
+                              spec.mutedHex,
+                              spec.borderHex,
+                              spec.primaryHex,
+                              selectedText,
+                              spec.primaryHex,
+                              spec.outgoingHex,
+                              spec.incomingHex,
+                              spec.secondaryHex,
+                              spec.borderHex,
+                              spec.mutedHex,
+                              spec.panelHex,
+                              spec.primaryHex,
+                              navigationText,
+                              navigationMutedText);
+}
+
 static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
+    TGVisualWorldThemeSpec *visualSpec = TGVisualWorldThemeSpecForIdentifier(identifier);
+    if (visualSpec) {
+        return TGThemePaletteForVisualWorldSpec(visualSpec);
+    }
     if ([identifier isEqualToString:TGThemeIdentifierCoffee]) {
         return TGThemePaletteMake(0x33291f, 0xe7ddc6, 0x6a5437, 0xf5ecd8, 0x21170f, 0x6b563b,
                                   0x92734a, 0xd8bd83, 0x20160e, 0x7a5524, 0xd7b46e, 0xfffbf1,
@@ -307,7 +355,7 @@ static TGThemePalette TGThemePaletteForIdentifier(NSString *identifier) {
                                   0x70c8de, 0xb6d7df, 0x4b7584, 0xe0f6fb, 0x0f83bf, 0xf9ffff, 0xdff6ff);
     }
     if ([identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark]) {
-        return TGThemePaletteMake(0x17110f, 0x251a15, 0xb96124, 0x211814, 0xfff4e8, 0xe4b88c,
+        return TGThemePaletteMake(0x17110f, 0x251a15, 0xb96124, 0x211814, 0xfff4e8, 0xffd7ad,
                                   0x8f5631, 0x57321f, 0xfff8ee, 0xffb35a, 0x3b271d, 0x241b16,
                                   0xb66a35, 0x6d4b34, 0xe5b990, 0x322119, 0xff9b3d, 0xfff8ec, 0xf1c59c);
     }
@@ -382,16 +430,24 @@ BOOL TGThemeIsExperimental2000s(void) {
            [identifier isEqualToString:TGThemeIdentifierVectorPop];
 }
 
+BOOL TGThemeIsVisualWorld(void) {
+    return TGVisualWorldThemeIdentifierIsValid(TGCurrentThemeIdentifier());
+}
+
 static BOOL TGThemeIsTerminalLikeIdentifier(NSString *identifier) {
     return [identifier isEqualToString:TGThemeIdentifierMatrixRain];
 }
 
 static BOOL TGThemeUsesLayeredMaterials(void) {
-    return TGThemeIsSkeuomorphicBlue() || TGThemeIsFrutigerAero() || TGThemeIsExperimental2000s();
+    return TGThemeIsSkeuomorphicBlue() || TGThemeIsFrutigerAero() || TGThemeIsExperimental2000s() || TGThemeIsVisualWorld();
 }
 
 static BOOL TGThemeUsesDarkLayeredCards(void) {
     NSString *identifier = TGCurrentThemeIdentifier();
+    TGVisualWorldThemeSpec *visualSpec = TGVisualWorldThemeSpecForIdentifier(identifier);
+    if (visualSpec) {
+        return visualSpec.darkCards;
+    }
     return [identifier isEqualToString:TGThemeIdentifierFrutigerMetroDark] ||
            TGThemeIsTerminalLikeIdentifier(identifier);
 }
@@ -429,6 +485,9 @@ NSColor *TGClassicCardInkColor(void) {
 }
 
 NSColor *TGClassicCardMutedInkColor(void) {
+    if (TGThemeIsFrutigerMetroDark()) {
+        return TGColorFromHex(0xffe5c7);
+    }
     if (TGThemeUsesDarkLayeredCards()) {
         return TGClassicMutedInkColor();
     }
@@ -875,6 +934,10 @@ void TGThemeDrawWindowBackgroundInRect(NSRect rect, BOOL flipped) {
         NSRectFill(rect);
         return;
     }
+    if (TGThemeIsVisualWorld()) {
+        TGVisualWorldDrawWindowBackground(TGCurrentThemeIdentifier(), rect);
+        return;
+    }
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
@@ -936,6 +999,20 @@ void TGThemeDrawPanelBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flip
         [path fill];
         return;
     }
+    if (TGThemeIsVisualWorld()) {
+        [NSGraphicsContext saveGraphicsState];
+        [path addClip];
+        NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGClassicPanelBottomColor()
+                                                              endingColor:TGClassicTablePaperColor()] autorelease];
+        [gradient drawInRect:rect angle:90.0];
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.24);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.22] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMaxY(rect) - 1.0, NSWidth(rect), 1.0), NSCompositeSourceOver);
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.13] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMinY(rect), NSWidth(rect), 1.0), NSCompositeSourceOver);
+        [NSGraphicsContext restoreGraphicsState];
+        return;
+    }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
     NSGradient *gradient = nil;
@@ -975,6 +1052,20 @@ void TGThemeDrawRailBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipp
     if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicWindowBottomColor() set];
         [path fill];
+        return;
+    }
+    if (TGThemeIsVisualWorld()) {
+        [NSGraphicsContext saveGraphicsState];
+        [path addClip];
+        NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGClassicPanelBottomColor()
+                                                              endingColor:TGClassicWindowBottomColor()] autorelease];
+        [gradient drawInRect:rect angle:90.0];
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.30);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.14] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 1.0, NSMaxY(rect) - 1.0, NSWidth(rect) - 2.0, 1.0), NSCompositeSourceOver);
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.24] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 1.0, NSMinY(rect), NSWidth(rect) - 2.0, 1.0), NSCompositeSourceOver);
+        [NSGraphicsContext restoreGraphicsState];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
@@ -1021,6 +1112,18 @@ void TGThemeDrawHeaderBackgroundInRect(NSRect rect, BOOL flipped) {
         NSRectFill(rect);
         return;
     }
+    if (TGThemeIsVisualWorld()) {
+        TGThemePalette palette = TGCurrentThemePalette();
+        NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromRGB(palette.navigationHighlighted)
+                                                              endingColor:TGColorFromRGB(palette.header)] autorelease];
+        [gradient drawInRect:rect angle:90.0];
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.20);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.18] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMaxY(rect) - 1.0, NSWidth(rect), 1.0), NSCompositeSourceOver);
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.24] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMinY(rect), NSWidth(rect), 1.0), NSCompositeSourceOver);
+        return;
+    }
     NSGradient *gradient = nil;
     if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
@@ -1060,6 +1163,21 @@ void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL f
     if (!TGThemeUsesLayeredMaterials()) {
         [TGClassicTablePaperColor() set];
         [path fill];
+        return;
+    }
+    if (TGThemeIsVisualWorld()) {
+        [NSGraphicsContext saveGraphicsState];
+        [path addClip];
+        NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGClassicTablePaperColor()
+                                                              endingColor:TGClassicIncomingBubbleBottomColor()] autorelease];
+        [gradient drawInRect:rect angle:90.0];
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.13);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.22] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 2.0, NSMinY(rect) + 1.0, NSWidth(rect) - 4.0, 1.0), NSCompositeSourceOver);
+        [NSGraphicsContext restoreGraphicsState];
+        [TGClassicPanelStrokeColor() set];
+        [path setLineWidth:1.0];
+        [path stroke];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
@@ -1102,6 +1220,18 @@ void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped)
     if (!TGThemeUsesLayeredMaterials()) {
         [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
         [path fill];
+        return;
+    }
+    if (TGThemeIsVisualWorld()) {
+        [NSGraphicsContext saveGraphicsState];
+        [path addClip];
+        NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:TGClassicIncomingBubbleBottomColor()
+                                                              endingColor:TGClassicTablePaperColor()] autorelease];
+        [gradient drawInRect:rect angle:90.0];
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.11);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
+        NSRectFillUsingOperation(NSMakeRect(NSMinX(rect), NSMaxY(rect) - 1.0, NSWidth(rect), 1.0), NSCompositeSourceOver);
+        [NSGraphicsContext restoreGraphicsState];
         return;
     }
     [NSGraphicsContext saveGraphicsState];
@@ -1149,7 +1279,19 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     CGFloat alpha = enabled ? 1.0 : 0.46;
     NSColor *top = nil;
     NSColor *bottom = nil;
-    if (TGThemeIsExperimental2000s()) {
+    if (TGThemeIsVisualWorld()) {
+        TGThemePalette palette = TGCurrentThemePalette();
+        if (highlighted) {
+            top = TGColorFromRGBWithAlpha(palette.navigationHighlighted, alpha);
+            bottom = TGColorFromRGBWithAlpha(palette.panelStroke, alpha);
+        } else if (selected) {
+            top = TGColorFromRGBWithAlpha(palette.navigationHighlighted, alpha);
+            bottom = TGColorFromRGBWithAlpha(palette.navigationSelected, alpha);
+        } else {
+            top = TGColorFromRGBWithAlpha(palette.navigationSelected, alpha);
+            bottom = TGColorFromRGBWithAlpha(palette.header, alpha);
+        }
+    } else if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
         if (TGThemeIsTerminalLikeIdentifier(identifier)) {
             if (highlighted) {
@@ -1232,7 +1374,11 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     [path addClip];
     NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:top endingColor:bottom] autorelease];
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternEnamel), 0.20);
+    if (TGThemeIsVisualWorld()) {
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.16);
+    } else {
+        TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternEnamel), 0.20);
+    }
     if (!highlighted) {
         [[NSColor colorWithCalibratedWhite:1.0 alpha:(0.24 * alpha)] set];
         NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 2.0, NSMaxY(rect) - 2.0, NSWidth(rect) - 4.0, 1.0), NSCompositeSourceOver);
@@ -1252,7 +1398,10 @@ void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoi
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
     NSGradient *gradient = nil;
-    if (TGThemeIsExperimental2000s()) {
+    if (TGThemeIsVisualWorld()) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor())
+                                                  endingColor:(outgoing ? TGClassicOutgoingBubbleStrokeColor() : TGClassicIncomingBubbleStrokeColor())] autorelease];
+    } else if (TGThemeIsExperimental2000s()) {
         NSString *identifier = TGCurrentThemeIdentifier();
         if (TGThemeIsTerminalLikeIdentifier(identifier)) {
             gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0x10361a) : TGColorFromHex(0x07170b))
@@ -1275,7 +1424,11 @@ void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoi
                                                   endingColor:(outgoing ? TGColorFromHex(0xc7dcea) : TGColorFromHex(0xeee5d5))] autorelease];
     }
     [gradient drawInRect:rect angle:90.0];
-    TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternPaper), outgoing ? 0.20 : 0.28);
+    if (TGThemeIsVisualWorld()) {
+        TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, outgoing ? 0.08 : 0.12);
+    } else {
+        TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternPaper), outgoing ? 0.20 : 0.28);
+    }
     [[NSColor colorWithCalibratedWhite:1.0 alpha:0.30] set];
     NSRectFillUsingOperation(NSMakeRect(NSMinX(rect) + 5.0, NSMaxY(rect) - 2.0, NSWidth(rect) - 10.0, 1.0), NSCompositeSourceOver);
     [NSGraphicsContext restoreGraphicsState];

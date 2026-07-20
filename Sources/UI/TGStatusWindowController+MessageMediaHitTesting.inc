@@ -18,6 +18,30 @@
         return [NSArray array];
     }
 
+    if (TGChatMessagesAsBlocksEnabled()) {
+        NSArray *mediaItems = [item visualMediaItems];
+        if ([mediaItems count] == 0) {
+            return [NSArray array];
+        }
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+        NSRect mediaRect = TGListMessageMediaRectForItem(item, cellFrame, showSenderDetails);
+        NSArray *tileRects = TGMediaTileRectsForMessageItem(item, mediaRect);
+        NSMutableArray *entries = [NSMutableArray array];
+        NSUInteger index = 0;
+        for (index = 0; index < [tileRects count] && index < [mediaItems count]; index++) {
+            id mediaItem = [mediaItems objectAtIndex:index];
+            if (![mediaItem isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            [entries addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                mediaItem, @"media_item",
+                                [tileRects objectAtIndex:index], @"frame",
+                                [NSNumber numberWithUnsignedInteger:index], @"tile_index",
+                                nil]];
+        }
+        return entries;
+    }
+
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
@@ -406,6 +430,46 @@
             return;
         }
     }
+    if (TGMessageItemIsPollContent((TGMessageItem *)item)) {
+        NSRect pollRect = bubbleRect;
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item];
+        CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem((TGMessageItem *)item, showSenderDetails);
+        if (senderHeaderHeight > 0.0) {
+            if ([self.messageTableView isFlipped]) {
+                pollRect.origin.y += senderHeaderHeight;
+            }
+            pollRect.size.height -= senderHeaderHeight;
+        }
+        CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem((TGMessageItem *)item);
+        if (contextHeaderHeight > 0.0) {
+            if ([self.messageTableView isFlipped]) {
+                pollRect.origin.y += contextHeaderHeight;
+            }
+            pollRect.size.height -= contextHeaderHeight;
+        }
+        pollRect.size.height -= (TGMessageCommentBarHeightForItem((TGMessageItem *)item) +
+                                 TGReactionBandHeightForMessageItem((TGMessageItem *)item));
+        if (TGPollPointIsInConfirmRect((TGMessageItem *)item, pollRect, tablePoint, [self.messageTableView isFlipped])) {
+            NSArray *pendingPollOptions = [(TGMessageItem *)item pendingPollOptionIndexes];
+            if ([pendingPollOptions count] > 0) {
+                [self submitPollAnswerForMessageItem:(TGMessageItem *)item optionIndexes:pendingPollOptions];
+            }
+            return;
+        }
+        NSInteger optionIndex = TGPollOptionIndexForPoint((TGMessageItem *)item,
+                                                          pollRect,
+                                                          tablePoint,
+                                                          [self.messageTableView isFlipped]);
+        if (optionIndex != NSNotFound) {
+            if ([(TGMessageItem *)item isPollMultipleChoice]) {
+                [self togglePollOptionForMessageItem:(TGMessageItem *)item optionIndex:(NSUInteger)optionIndex];
+            } else {
+                [self submitPollAnswerForMessageItem:(TGMessageItem *)item
+                                       optionIndexes:[NSArray arrayWithObject:[NSNumber numberWithInteger:optionIndex]]];
+            }
+            return;
+        }
+    }
     NSDictionary *mediaItem = [self mediaItemForItem:(TGMessageItem *)item
                                         inCellFrame:cellFrame
                                             atPoint:tablePoint];
@@ -452,9 +516,9 @@
     self.selectedMessageThreadID = threadID;
     self.selectedMessageTopicKind = @"thread";
     if ([self.selectedChatTitle length] == 0) {
-        self.selectedChatTitle = @"Comments";
-    } else if ([self.selectedChatTitle rangeOfString:@"comments" options:NSCaseInsensitiveSearch].location == NSNotFound) {
-        self.selectedChatTitle = [NSString stringWithFormat:@"%@ comments", self.selectedChatTitle];
+        self.selectedChatTitle = TGLoc(@"message.comments.threadTitle");
+    } else if ([self.selectedChatTitle rangeOfString:TGLoc(@"message.comments.threadSuffix") options:NSCaseInsensitiveSearch].location == NSNotFound) {
+        self.selectedChatTitle = [NSString stringWithFormat:@"%@ %@", self.selectedChatTitle, TGLoc(@"message.comments.threadSuffix")];
     }
     self.showingForumTopicList = NO;
     self.pinnedMessageItems = [NSArray array];

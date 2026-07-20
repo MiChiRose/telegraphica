@@ -53,9 +53,15 @@ static NSString *TGLoggerRedactedMessage(NSString *message) {
         }
     }
     NSString *redacted = message;
+    redacted = TGLoggerRedactedByPattern(redacted, @"(Downloaded (cached fallback )?to\\s+).+", @"$1<redacted-path>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"(Submitting [^\\n:]+ to TDLib:\\s+).+", @"$1<redacted-file>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"\\b((chat|folder)\\s+(title|name)|title|preview|caption|message\\s+(text|preview|body)|text|file(name)?|path)\\s*[:=]\\s*(\"[^\"]*\"|'[^']*'|[^,;\\n]+)", @"$1=<redacted>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"(chat id|chat_id|message id|message_id|file id|file_id)[:= ]+[^\\s,;]+", @"$1=<redacted-id>");
     redacted = TGLoggerRedactedByPattern(redacted, @"([?&](token|hash|code|key|password)=)[^\\s&]+", @"$1<redacted>");
     redacted = TGLoggerRedactedByPattern(redacted, @"\\+?[0-9][0-9 ()-]{7,}[0-9]", @"<redacted-number>");
     redacted = TGLoggerRedactedByPattern(redacted, @"\\b[A-Fa-f0-9]{32,}\\b", @"<redacted-token>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"(/Users/[^\\n\\r]+)", @"<redacted-path>");
+    redacted = TGLoggerRedactedByPattern(redacted, @"\\b[0-9]{5,}\\b", @"<redacted-number>");
     return redacted;
 }
 
@@ -79,6 +85,10 @@ static NSString *TGLoggerRedactedMessage(NSString *message) {
         return TGLoggerFlagEnabled(envFlag);
     }
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"TelegraphicaDebugEnabled"];
+}
+
++ (NSString *)redactedDiagnosticMessage:(NSString *)message {
+    return TGLoggerRedactedMessage(message);
 }
 
 - (NSString *)diagnosticLogPath {
@@ -166,6 +176,15 @@ static NSString *TGLoggerRedactedMessage(NSString *message) {
 - (void)clearLog {
     @synchronized (self) {
         [self.logLines removeAllObjects];
+    }
+}
+
+- (void)clearDiagnosticFile {
+    @synchronized (self) {
+        NSString *path = [self diagnosticLogPath];
+        if ([path length] > 0) {
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
     }
 }
 
