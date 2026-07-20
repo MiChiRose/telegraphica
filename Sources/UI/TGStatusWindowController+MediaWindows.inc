@@ -548,6 +548,14 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
         [[TGLogger sharedLogger] log:@"Media Center: ensuring window."];
         if (self.mediaCenterWindow) {
             [self.mediaCenterWindow close];
+            self.mediaCenterWindow = nil;
+            self.mediaCenterSearchField = nil;
+            self.mediaCenterFilterPopUpButton = nil;
+            self.mediaCenterSortPopUpButton = nil;
+            self.mediaCenterStatusField = nil;
+            self.mediaCenterScrollView = nil;
+            self.mediaCenterResultsView = nil;
+            self.mediaCenterTabControl = nil;
         }
         [self ensureMediaCenterWindow];
         if (!self.mediaCenterWindow) {

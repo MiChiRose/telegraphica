@@ -23,6 +23,8 @@ NSString *TGLoc(NSString *key) {
     NSString *language = TGLanguageCode();
     NSDictionary *ru = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Чаты", @"chats",
+                        @"Чаты закрыты", @"closedChats.title",
+                        @"Выберите недавний личный диалог, чтобы продолжить общение.", @"closedChats.hint",
                         @"Все чаты", @"drawer.all",
                         @"Все чаты", @"drawer.all.tooltip",
                         @"Закреплённое сообщение", @"pinned.title",
@@ -305,6 +307,8 @@ NSString *TGLoc(NSString *key) {
                         nil];
     NSDictionary *be = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Чаты", @"chats",
+                        @"Чаты закрыты", @"closedChats.title",
+                        @"Выберыце нядаўні асабісты дыялог, каб працягнуць размову.", @"closedChats.hint",
                         @"Усе чаты", @"drawer.all",
                         @"Усе чаты", @"drawer.all.tooltip",
                         @"Замацаванае паведамленне", @"pinned.title",
@@ -587,6 +591,8 @@ NSString *TGLoc(NSString *key) {
                         nil];
     NSDictionary *en = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Chats", @"chats",
+                        @"Chats are closed", @"closedChats.title",
+                        @"Choose a recent private chat to continue the conversation.", @"closedChats.hint",
                         @"All chats", @"drawer.all",
                         @"All chats", @"drawer.all.tooltip",
                         @"Pinned message", @"pinned.title",

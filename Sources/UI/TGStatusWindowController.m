@@ -275,6 +275,11 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @property (nonatomic, retain) NSTextField *typingIndicatorField;
 @property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
 @property (nonatomic, retain) NSButton *selectedChatProfileButton;
+@property (nonatomic, retain) TGGroupedCardView *closedChatPlaceholderView;
+@property (nonatomic, retain) NSTextField *closedChatTitleField;
+@property (nonatomic, retain) NSTextField *closedChatHintField;
+@property (nonatomic, retain) NSArray *closedChatSuggestionViews;
+@property (nonatomic, retain) NSArray *closedChatSuggestionItems;
 @property (nonatomic, retain) NSView *chatScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *chatScrollView;
 @property (nonatomic, retain) NSTableView *chatTableView;
@@ -522,6 +527,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @property (nonatomic, assign) BOOL showingForumTopicList;
+@property (nonatomic, assign) BOOL chatNavigationClosed;
+@property (nonatomic, retain) NSNumber *suppressedForumTopicAutoOpenChatID;
+@property (nonatomic, assign) NSUInteger forumTopicNavigationGeneration;
 @property (nonatomic, assign) CGFloat mediaPreviewZoomScale;
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
 @property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
@@ -937,6 +945,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
+@synthesize chatNavigationClosed = _chatNavigationClosed;
+@synthesize suppressedForumTopicAutoOpenChatID = _suppressedForumTopicAutoOpenChatID;
+@synthesize forumTopicNavigationGeneration = _forumTopicNavigationGeneration;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
 @synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
 @synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
@@ -969,6 +980,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
         self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
+        self.closedChatSuggestionViews = [NSArray array];
+        self.closedChatSuggestionItems = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
         NSString *storedUpdateVersion = [[NSUserDefaults standardUserDefaults] stringForKey:TGAvailableUpdateVersionDefaultsKey];
@@ -2253,6 +2266,27 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [self.messageJumpToNewestButton setHidden:YES];
     [contentView addSubview:self.messageJumpToNewestButton];
 
+    self.closedChatPlaceholderView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(0, 0, 420, 212)] autorelease];
+    [self.closedChatPlaceholderView setHidden:YES];
+    [self.closedChatPlaceholderView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
+    [contentView addSubview:self.closedChatPlaceholderView];
+
+    self.closedChatTitleField = [self labelWithFrame:NSMakeRect(0, 0, 360, 24)
+                                                text:TGLoc(@"closedChats.title")
+                                                font:[NSFont boldSystemFontOfSize:15.0]];
+    [self.closedChatTitleField setAlignment:NSCenterTextAlignment];
+    [self.closedChatTitleField setAutoresizingMask:NSViewWidthSizable];
+    [self.closedChatPlaceholderView addSubview:self.closedChatTitleField];
+
+    self.closedChatHintField = [self labelWithFrame:NSMakeRect(0, 0, 360, 34)
+                                               text:TGLoc(@"closedChats.hint")
+                                               font:[NSFont systemFontOfSize:12.0]];
+    [self.closedChatHintField setAlignment:NSCenterTextAlignment];
+    [self.closedChatHintField setTextColor:TGClassicMutedInkColor()];
+    [[self.closedChatHintField cell] setLineBreakMode:NSLineBreakByWordWrapping];
+    [self.closedChatHintField setAutoresizingMask:NSViewWidthSizable];
+    [self.closedChatPlaceholderView addSubview:self.closedChatHintField];
+
     self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
     [self.messageDropOverlayView setHidden:YES];
     [self.messageDropOverlayView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -3401,6 +3435,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 #include "TGStatusWindowController+Notifications.inc"
 
+#include "TGStatusWindowController+ClosedChatNavigation.inc"
+
 #include "TGStatusWindowController+SectionLayout.inc"
 
 #include "TGStatusWindowController+ResourceSettings.inc"
@@ -3586,6 +3622,11 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [_typingIndicatorField release];
     [_selectedChatAvatarView release];
     [_selectedChatProfileButton release];
+    [_closedChatPlaceholderView release];
+    [_closedChatTitleField release];
+    [_closedChatHintField release];
+    [_closedChatSuggestionViews release];
+    [_closedChatSuggestionItems release];
     [_chatScrollSurfaceView release];
     [_chatScrollView release];
     [_chatTableView release];
@@ -3826,6 +3867,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [_typingIndicatorText release];
     [_pendingNotificationChatID release];
     [_pendingNotificationThreadID release];
+    [_suppressedForumTopicAutoOpenChatID release];
     [super dealloc];
 }
 
