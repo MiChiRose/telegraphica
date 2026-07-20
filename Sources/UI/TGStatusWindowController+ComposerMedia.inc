@@ -1050,24 +1050,28 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerStatusField = statusField;
 
     NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 428, 66, 30)] autorelease];
+    [recentButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.recent.short")] autorelease]];
     [recentButton setTitle:TGLoc(@"stickers.recent.short")];
     [recentButton setImage:TGTemplateIconAssetImage(@"history", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
     [recentButton setImagePosition:NSImageLeft];
+    [recentButton setBordered:NO];
+    [recentButton setFocusRingType:NSFocusRingTypeNone];
     [recentButton setTarget:self];
     [recentButton setAction:@selector(selectRecentStickerPickerTab:)];
     [recentButton setToolTip:TGLoc(@"stickers.recent.tab")];
-    [self applyUtilityButtonStyle:recentButton];
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
 
     NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(94, 428, 66, 30)] autorelease];
+    [favoriteButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.favorites.short")] autorelease]];
     [favoriteButton setTitle:TGLoc(@"stickers.favorites.short")];
-    [favoriteButton setImage:TGTemplateIconAssetImage(@"star", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
     [favoriteButton setImagePosition:NSImageLeft];
+    [favoriteButton setBordered:NO];
+    [favoriteButton setFocusRingType:NSFocusRingTypeNone];
     [favoriteButton setTarget:self];
     [favoriteButton setAction:@selector(selectFavoriteStickerPickerTab:)];
     [favoriteButton setToolTip:TGLoc(@"stickers.favorites.tab")];
-    [self applyUtilityButtonStyle:favoriteButton];
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
@@ -1090,13 +1094,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerSearchField = searchField;
 
     NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(394, 428, 42, 30)] autorelease];
+    [removeSetButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:@""] autorelease]];
     [removeSetButton setTitle:@""];
-    [removeSetButton setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(16.0, 16.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [removeSetButton setImage:TGTemplateIconAssetImage(@"folder-remove", NSMakeSize(17.0, 17.0), TGClassicHeaderTextColor(0.96), 1.0)];
     [removeSetButton setImagePosition:NSImageOnly];
+    [removeSetButton setBordered:NO];
+    [removeSetButton setFocusRingType:NSFocusRingTypeNone];
     [removeSetButton setTarget:self];
     [removeSetButton setAction:@selector(removeSelectedStickerSetFromPicker:)];
     [removeSetButton setToolTip:TGLoc(@"stickers.removeSet")];
-    [self applyUtilityButtonStyle:removeSetButton];
     [contentView addSubview:removeSetButton];
 
     TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 352, 536, 66)] autorelease];

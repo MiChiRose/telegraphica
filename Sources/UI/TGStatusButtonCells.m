@@ -616,3 +616,55 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 }
 
 @end
+
+@implementation TGStickerPickerTabButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:7.0 yRadius:7.0];
+    TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, NO, enabled, [controlView isFlipped]);
+    [TGClassicNavigationNormalStrokeColor(0.78) set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSString *title = [self title] ? [self title] : @"";
+    NSImage *image = [self image];
+    BOOL imageOnly = ([title length] == 0);
+    CGFloat iconSide = imageOnly ? 17.0 : 14.0;
+    CGFloat contentWidth = imageOnly ? iconSide : NSWidth(buttonRect) - 12.0;
+    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - floor(iconSide / 2.0),
+                                 NSMidY(buttonRect) - floor(iconSide / 2.0),
+                                 iconSide,
+                                 iconSide);
+    if (!imageOnly) {
+        iconRect.origin.x = NSMinX(buttonRect) + 8.0;
+    }
+    if (image) {
+        [image drawInRect:iconRect
+                 fromRect:NSMakeRect(0.0, 0.0, [image size].width, [image size].height)
+                operation:NSCompositeSourceOver
+                 fraction:alpha
+           respectFlipped:YES
+                    hints:nil];
+    }
+
+    if (!imageOnly) {
+        NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                    TGClassicHeaderTextColor(alpha), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+        NSRect titleRect = NSMakeRect(NSMaxX(iconRect) + 5.0,
+                                      NSMidY(buttonRect) - 8.0,
+                                      MAX(8.0, contentWidth - iconSide - 7.0),
+                                      17.0);
+        [title drawInRect:titleRect withAttributes:attributes];
+    }
+}
+
+@end

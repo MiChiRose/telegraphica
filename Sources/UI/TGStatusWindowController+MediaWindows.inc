@@ -192,6 +192,29 @@ static BOOL TGMediaCenterSelectionUsesGroups(NSInteger index) {
     return (index == 7);
 }
 
+static CGFloat TGMediaCenterTabWidthForIndex(NSUInteger index) {
+    switch (index) {
+        case 0: return 76.0;
+        case 1: return 80.0;
+        case 2: return 82.0;
+        case 3: return 82.0;
+        case 4: return 84.0;
+        case 5: return 62.0;
+        case 6: return 78.0;
+        case 7: return 84.0;
+        default: return 76.0;
+    }
+}
+
+static CGFloat TGMediaCenterTabsWidth(NSUInteger count) {
+    CGFloat width = 0.0;
+    NSUInteger index = 0;
+    for (index = 0; index < count; index++) {
+        width += TGMediaCenterTabWidthForIndex(index);
+    }
+    return width;
+}
+
 static NSString *TGMediaCenterExtensionBadgeForItem(TGMessageItem *item) {
     NSString *fileName = [item downloadFileName];
     NSString *extension = [[fileName pathExtension] lowercaseString];
@@ -365,7 +388,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSUInteger tabIndex = 0;
     for (tabIndex = 0; tabIndex < [tabTitles count]; tabIndex++) {
         [tabControl setLabel:[tabTitles objectAtIndex:tabIndex] forSegment:tabIndex];
-        [tabControl setWidth:76.0 forSegment:tabIndex];
+        [tabControl setWidth:TGMediaCenterTabWidthForIndex(tabIndex) forSegment:tabIndex];
     }
     [tabControl setSelectedSegment:0];
     [tabControl setTarget:self];
@@ -432,7 +455,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    CGFloat tabWidth = 608.0;
+    NSUInteger segmentCount = [self.mediaCenterTabControl segmentCount];
+    CGFloat tabWidth = TGMediaCenterTabsWidth(segmentCount);
     if (tabWidth > width - 72.0) {
         tabWidth = width - 72.0;
     }
@@ -956,6 +980,11 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     if (!item) {
         return;
     }
+    if ([item isPlayableMediaMessage]) {
+        [self openPlayableMediaForMessageItem:item];
+        [self closeMediaCenterInlinePreview:nil];
+        return;
+    }
     NSString *path = TGMediaCenterLocalPathForItem(item);
     BOOL preferAnimated = ([[item contentType] isEqualToString:@"messageAnimation"]);
     if ([path length] == 0 || ![self openMediaPreviewAtPath:path preferAnimated:preferAnimated]) {
@@ -1445,17 +1474,32 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         return;
     }
 
-    NSString *path = [item mediaLocalPath];
+    NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
+    NSString *path = media ? TGMediaItemPlayableLocalPath(media) : nil;
+    if ([path length] == 0 && media) {
+        path = TGMediaItemFullLocalPath(media);
+    }
+    if ([path length] == 0) {
+        path = TGMediaCenterLocalPathForItem(item);
+    }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        NSNumber *duration = [item mediaDuration];
+        if (![duration respondsToSelector:@selector(doubleValue)] && media) {
+            duration = [media objectForKey:@"duration"];
+        }
+        NSString *mimeType = [item mediaMimeType];
+        if ([mimeType length] == 0 && media) {
+            mimeType = [media objectForKey:@"mime_type"];
+        }
         [self openPlayableMediaAtPath:path
                                 title:TGPlayableMediaTitleForMessageItem(item)
-                             duration:[item mediaDuration]
+                             duration:duration
                             audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)
-                              mimeType:[item mediaMimeType]];
+                              mimeType:mimeType];
         return;
     }
 
-    NSNumber *fileID = [item mediaFileID];
+    NSNumber *fileID = TGMediaCenterFileIDForItem(item);
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
         [self appendDetail:@"Playable message does not have a downloadable file id yet."];
         return;
@@ -1472,13 +1516,22 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if ([downloadedPath length] > 0) {
+                NSNumber *duration = [item mediaDuration];
+                NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
+                if (![duration respondsToSelector:@selector(doubleValue)] && media) {
+                    duration = [media objectForKey:@"duration"];
+                }
+                NSString *mimeType = [item mediaMimeType];
+                if ([mimeType length] == 0 && media) {
+                    mimeType = [media objectForKey:@"mime_type"];
+                }
                 [self setOfflineModeActive:NO reason:nil];
                 [self.statusField setStringValue:@"Connected"];
                 [self openPlayableMediaAtPath:downloadedPath
                                         title:titleCopy
-                                     duration:[item mediaDuration]
+                                     duration:duration
                                     audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)
-                                      mimeType:[item mediaMimeType]];
+                                      mimeType:mimeType];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {
@@ -1662,13 +1715,15 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         return;
     }
 
-    if (scale < 0.10) {
-        scale = 0.10;
+    CGFloat minimumScale = self.mediaPreviewMinimumZoomScale > 0.0 ? self.mediaPreviewMinimumZoomScale : 0.10;
+    if (scale < minimumScale) {
+        scale = minimumScale;
     }
     if (scale > 6.0) {
         scale = 6.0;
     }
     self.mediaPreviewZoomScale = scale;
+    [self.mediaPreviewZoomOutButton setEnabled:(scale > minimumScale + 0.001)];
 
     NSSize imageSize = [image size];
     CGFloat width = ceil(imageSize.width * scale);
@@ -1703,6 +1758,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     if (scale > 1.0) {
         scale = 1.0;
     }
+    self.mediaPreviewMinimumZoomScale = scale;
     [self applyMediaPreviewZoomScale:scale];
 }
 
@@ -1761,6 +1817,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     [self ensureMediaPreviewWindow];
     self.mediaPreviewPath = path;
+    self.mediaPreviewMinimumZoomScale = 0.0;
     [self.mediaPreviewImageView setImage:image];
     [self.mediaPreviewImageView setAnimates:YES];
     [self.mediaPreviewWindow setTitle:@""];
