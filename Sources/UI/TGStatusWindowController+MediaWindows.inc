@@ -1,4 +1,4 @@
-static const NSUInteger TGMediaCenterPageLimit = 50;
+static const NSUInteger TGMediaCenterPageLimit = 30;
 
 static NSString *TGMediaCenterFilterIdentifierForIndex(NSInteger index) {
     switch (index) {
@@ -337,7 +337,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         return;
     }
     CGFloat gap = 6.0;
-    CGFloat tabY = height - 298.0;
+    CGFloat tabY = height - 242.0;
     CGFloat tabWidth = width - 104.0;
     CGFloat buttonWidth = floor((tabWidth - gap * (CGFloat)(count - 1)) / (CGFloat)count);
     if (buttonWidth < 70.0) {
@@ -476,23 +476,6 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [subtitleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:subtitleField];
 
-    TGGroupedCardView *infoCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(36.0, 422.0, NSWidth(frame) - 72.0, 58.0)] autorelease];
-    [infoCard setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    [contentView addSubview:infoCard];
-
-    NSTextField *infoTitle = [self labelWithFrame:NSMakeRect(18.0, 31.0, NSWidth([infoCard bounds]) - 36.0, 18.0)
-                                             text:TGLoc(@"media.center.titleCard")
-                                             font:[NSFont boldSystemFontOfSize:12.0]];
-    [infoTitle setAutoresizingMask:NSViewWidthSizable];
-    [infoCard addSubview:infoTitle];
-
-    NSTextField *infoText = [self labelWithFrame:NSMakeRect(18.0, 12.0, NSWidth([infoCard bounds]) - 36.0, 16.0)
-                                            text:TGLoc(@"media.center.hint")
-                                            font:[NSFont systemFontOfSize:11.0]];
-    [self applyMutedLabelStyle:infoText];
-    [infoText setAutoresizingMask:NSViewWidthSizable];
-    [infoCard addSubview:infoText];
-
     NSArray *tabTitles = [NSArray arrayWithObjects:
                           TGLoc(@"media.center.tab.media"),
                           TGLoc(@"media.center.tab.files"),
@@ -586,9 +569,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     CGFloat height = NSHeight(bounds);
     [self.mediaCenterContentCardView setFrame:NSMakeRect(28.0, 18.0, width - 56.0, height - 48.0)];
     [self layoutMediaCenterTabButtonsForWidth:width height:height];
-    [self.mediaCenterStatusField setFrame:NSMakeRect(52.0, height - 334.0, width - 136.0, 18.0)];
-    [self.mediaCenterRefreshButton setFrame:NSMakeRect(width - 72.0, height - 342.0, 34.0, 30.0)];
-    [self.mediaCenterScrollView setFrame:NSMakeRect(36.0, 24.0, width - 72.0, MAX(120.0, height - 370.0))];
+    [self.mediaCenterStatusField setFrame:NSMakeRect(52.0, height - 274.0, width - 136.0, 18.0)];
+    [self.mediaCenterRefreshButton setFrame:NSMakeRect(width - 72.0, height - 282.0, 34.0, 30.0)];
+    [self.mediaCenterScrollView setFrame:NSMakeRect(36.0, 24.0, width - 72.0, MAX(120.0, height - 316.0))];
     [self.mediaCenterLoadingSpinner setFrame:NSMakeRect(floor((width - 24.0) / 2.0),
                                                         floor((height - 24.0) / 2.0) - 64.0,
                                                         24.0,
@@ -879,6 +862,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     BOOL groupsMode = TGMediaCenterSelectionUsesGroups(selectedTab);
     NSArray *filters = [TGMediaCenterFilterIdentifiersForSelection(selectedTab) retain];
     if (append && (groupsMode || self.mediaCenterLoading || self.mediaCenterLoadingMore || self.mediaCenterExhausted)) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: pagination skipped append=%@ groups=%@ loading=%@ loadingMore=%@ exhausted=%@.",
+                                      append ? @"yes" : @"no",
+                                      groupsMode ? @"yes" : @"no",
+                                      self.mediaCenterLoading ? @"yes" : @"no",
+                                      self.mediaCenterLoadingMore ? @"yes" : @"no",
+                                      self.mediaCenterExhausted ? @"yes" : @"no"]];
         [chatID release];
         [threadID release];
         [topicKind release];
@@ -902,6 +891,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     }
     [self.mediaCenterLoadingSpinner setHidden:NO];
     [self.mediaCenterLoadingSpinner startAnimation:self];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: loading page append=%@ tab=%ld filters=%@ query='%@' currentItems=%lu.",
+                                  append ? @"yes" : @"no",
+                                  (long)selectedTab,
+                                  filters,
+                                  query,
+                                  (unsigned long)[self.mediaCenterItems count]]];
 
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         self.mediaCenterLoading = NO;
@@ -969,6 +964,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                                          error:&searchError];
                 if (!results) {
                     lastError = searchError;
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: page filter=%@ failed: %@.",
+                                                  filter,
+                                                  [searchError localizedDescription]]];
                     continue;
                 }
                 NSNumber *oldestMessageID = TGMediaCenterOldestMessageIDFromItems(results);
@@ -978,6 +976,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                 if ([results count] < TGMediaCenterPageLimit) {
                     [updatedExhausted addObject:filter];
                 }
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: page filter=%@ anchor=%@ received=%lu oldest=%@ exhausted=%@.",
+                                              filter,
+                                              fromMessageID ? [fromMessageID description] : @"none",
+                                              (unsigned long)[results count],
+                                              oldestMessageID ? [oldestMessageID description] : @"none",
+                                              [updatedExhausted containsObject:filter] ? @"yes" : @"no"]];
                 NSUInteger resultIndex = 0;
                 for (resultIndex = 0; resultIndex < [results count]; resultIndex++) {
                     TGMessageItem *item = [results objectAtIndex:resultIndex];
@@ -1009,6 +1013,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                 [self.mediaCenterExhaustedFilterIdentifiers removeAllObjects];
                 [self.mediaCenterExhaustedFilterIdentifiers unionSet:exhaustedCopy];
                 self.mediaCenterExhausted = groupsMode || exhaustedAllFilters || (!groupsMode && [itemsCopy count] == 0 && append);
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: page applied append=%@ addedCandidates=%lu totalBeforeApply=%lu exhausted=%@ anchors=%@.",
+                                              append ? @"yes" : @"no",
+                                              (unsigned long)[itemsCopy count],
+                                              (unsigned long)[self.mediaCenterItems count],
+                                              self.mediaCenterExhausted ? @"yes" : @"no",
+                                              anchorsCopy]];
                 NSUInteger itemIndex = 0;
                 for (itemIndex = 0; itemIndex < [itemsCopy count]; itemIndex++) {
                     id object = [itemsCopy objectAtIndex:itemIndex];
@@ -1022,6 +1032,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                         [self.mediaCenterItems addObject:object];
                     }
                 }
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: page total after apply=%lu.",
+                                              (unsigned long)[self.mediaCenterItems count]]];
                 [self updateMediaCenterLoadedStatusForGroupsMode:groupsMode errorMessage:errorMessage];
                 [self rebuildMediaCenterRowsPreservingScroll:append];
             }
@@ -1062,6 +1074,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     CGFloat visibleBottom = NSMaxY([clipView bounds]);
     CGFloat documentHeight = NSHeight([self.mediaCenterResultsView frame]);
     if (documentHeight - visibleBottom <= 120.0) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: scroll reached bottom visibleBottom=%.1f documentHeight=%.1f.",
+                                      visibleBottom,
+                                      documentHeight]];
         [self loadMediaCenterPageAppending:YES sender:nil];
     }
 }
