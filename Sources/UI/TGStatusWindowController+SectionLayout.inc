@@ -1218,7 +1218,8 @@
         self.mediaCenterSearchField = nil;
         self.mediaCenterFilterPopUpButton = nil;
         self.mediaCenterSortPopUpButton = nil;
-        self.mediaCenterTabControl = nil;
+        self.mediaCenterTabButtons = nil;
+        self.mediaCenterSelectedTabIndex = 0;
         self.mediaCenterStatusField = nil;
         self.mediaCenterScrollView = nil;
         self.mediaCenterResultsView = nil;

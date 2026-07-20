@@ -96,15 +96,15 @@
     if (cardWidth < 320.0) {
         cardWidth = 320.0;
     }
-    CGFloat cardHeight = ([self.closedChatSuggestionViews count] > 4) ? 230.0 : 150.0;
+    CGFloat cardHeight = ([self.closedChatSuggestionViews count] > 4) ? 308.0 : 190.0;
     if (NSHeight(messageSurfaceFrame) < cardHeight + 24.0) {
-        cardHeight = MAX(130.0, NSHeight(messageSurfaceFrame) - 24.0);
+        cardHeight = MAX(154.0, NSHeight(messageSurfaceFrame) - 24.0);
     }
     CGFloat cardX = NSMinX(messageSurfaceFrame) + floor((NSWidth(messageSurfaceFrame) - cardWidth) / 2.0);
     CGFloat cardY = NSMinY(messageSurfaceFrame) + floor((NSHeight(messageSurfaceFrame) - cardHeight) / 2.0);
     [self.closedChatPlaceholderView setFrame:NSMakeRect(cardX, cardY, cardWidth, cardHeight)];
-    [self.closedChatTitleField setFrame:NSMakeRect(24.0, cardHeight - 42.0, cardWidth - 48.0, 22.0)];
-    [self.closedChatHintField setFrame:NSMakeRect(38.0, 18.0, cardWidth - 76.0, 34.0)];
+    [self.closedChatTitleField setFrame:NSMakeRect(24.0, cardHeight - 46.0, cardWidth - 48.0, 22.0)];
+    [self.closedChatHintField setFrame:NSMakeRect(38.0, 22.0, cardWidth - 76.0, 36.0)];
 
     NSUInteger count = [self.closedChatSuggestionViews count];
     if (count == 0) {
@@ -116,9 +116,12 @@
     CGFloat gap = 12.0;
     CGFloat rowWidth = ((CGFloat)columns * tileWidth) + ((CGFloat)(columns - 1) * gap);
     CGFloat startX = floor((cardWidth - rowWidth) / 2.0);
-    CGFloat firstRowY = cardHeight - 130.0;
-    if (firstRowY < 56.0) {
-        firstRowY = 56.0;
+    CGFloat firstRowY = cardHeight - 132.0;
+    if (count > 4) {
+        firstRowY = cardHeight - 132.0;
+    }
+    if (firstRowY < 82.0) {
+        firstRowY = 82.0;
     }
     NSUInteger index = 0;
     for (index = 0; index < count; index++) {
@@ -126,7 +129,7 @@
         NSUInteger row = index / columns;
         NSUInteger column = index % columns;
         CGFloat tileX = startX + ((tileWidth + gap) * (CGFloat)column);
-        CGFloat tileY = firstRowY - ((tileHeight + 8.0) * (CGFloat)row);
+        CGFloat tileY = firstRowY - ((tileHeight + 12.0) * (CGFloat)row);
         [tile setFrame:NSMakeRect(tileX, tileY, tileWidth, tileHeight)];
     }
 }

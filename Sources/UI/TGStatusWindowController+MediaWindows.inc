@@ -192,29 +192,6 @@ static BOOL TGMediaCenterSelectionUsesGroups(NSInteger index) {
     return (index == 7);
 }
 
-static CGFloat TGMediaCenterTabWidthForIndex(NSUInteger index) {
-    switch (index) {
-        case 0: return 88.0;
-        case 1: return 92.0;
-        case 2: return 96.0;
-        case 3: return 96.0;
-        case 4: return 94.0;
-        case 5: return 74.0;
-        case 6: return 98.0;
-        case 7: return 112.0;
-        default: return 86.0;
-    }
-}
-
-static CGFloat TGMediaCenterTabsWidth(NSUInteger count) {
-    CGFloat width = 0.0;
-    NSUInteger index = 0;
-    for (index = 0; index < count; index++) {
-        width += TGMediaCenterTabWidthForIndex(index);
-    }
-    return width;
-}
-
 static NSString *TGMediaCenterExtensionBadgeForItem(TGMessageItem *item) {
     NSString *fileName = [item downloadFileName];
     NSString *extension = [[fileName pathExtension] lowercaseString];
@@ -301,6 +278,57 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     }
 }
 
+- (NSInteger)mediaCenterCurrentTabIndex {
+    NSInteger selected = self.mediaCenterSelectedTabIndex;
+    NSUInteger count = [self.mediaCenterTabButtons count];
+    if (selected < 0 || (NSUInteger)selected >= count) {
+        selected = 0;
+    }
+    return selected;
+}
+
+- (void)updateMediaCenterTabButtonStates {
+    NSInteger selected = [self mediaCenterCurrentTabIndex];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.mediaCenterTabButtons count]; index++) {
+        NSButton *button = [self.mediaCenterTabButtons objectAtIndex:index];
+        [button setState:((NSInteger)index == selected) ? NSOnState : NSOffState];
+        [button setNeedsDisplay:YES];
+    }
+}
+
+- (void)layoutMediaCenterTabButtonsForWidth:(CGFloat)width height:(CGFloat)height {
+    NSUInteger count = [self.mediaCenterTabButtons count];
+    if (count == 0) {
+        return;
+    }
+    CGFloat gap = 6.0;
+    CGFloat tabY = height - 298.0;
+    CGFloat tabWidth = width - 104.0;
+    CGFloat buttonWidth = floor((tabWidth - gap * (CGFloat)(count - 1)) / (CGFloat)count);
+    if (buttonWidth < 70.0) {
+        buttonWidth = 70.0;
+    }
+    CGFloat rowWidth = (buttonWidth * (CGFloat)count) + (gap * (CGFloat)(count - 1));
+    CGFloat startX = floor((width - rowWidth) / 2.0);
+    NSUInteger index = 0;
+    for (index = 0; index < count; index++) {
+        NSButton *button = [self.mediaCenterTabButtons objectAtIndex:index];
+        CGFloat x = startX + (buttonWidth + gap) * (CGFloat)index;
+        [button setFrame:NSMakeRect(x, tabY, buttonWidth, 30.0)];
+    }
+}
+
+- (void)selectMediaCenterTab:(id)sender {
+    NSInteger index = [sender respondsToSelector:@selector(tag)] ? [sender tag] : 0;
+    if (index < 0 || (NSUInteger)index >= [self.mediaCenterTabButtons count]) {
+        index = 0;
+    }
+    self.mediaCenterSelectedTabIndex = index;
+    [self updateMediaCenterTabButtonStates];
+    [self reloadMediaCenter:sender];
+}
+
 - (void)ensureMediaCenterWindow {
     if (self.mediaCenterWindow) {
         return;
@@ -378,8 +406,6 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [infoText setAutoresizingMask:NSViewWidthSizable];
     [infoCard addSubview:infoText];
 
-    CGFloat initialTabWidth = TGMediaCenterTabsWidth(8);
-    NSSegmentedControl *tabControl = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(floor((NSWidth(frame) - initialTabWidth) / 2.0), 382.0, initialTabWidth, 28.0)] autorelease];
     NSArray *tabTitles = [NSArray arrayWithObjects:
                           TGLoc(@"media.center.tab.media"),
                           TGLoc(@"media.center.tab.files"),
@@ -390,21 +416,26 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                           TGLoc(@"media.center.tab.polls"),
                           TGLoc(@"media.center.tab.groups"),
                           nil];
-    [tabControl setSegmentCount:[tabTitles count]];
+    NSMutableArray *tabButtons = [NSMutableArray array];
     NSUInteger tabIndex = 0;
     for (tabIndex = 0; tabIndex < [tabTitles count]; tabIndex++) {
-        [tabControl setLabel:[tabTitles objectAtIndex:tabIndex] forSegment:tabIndex];
-        [tabControl setWidth:TGMediaCenterTabWidthForIndex(tabIndex) forSegment:tabIndex];
+        NSString *title = [tabTitles objectAtIndex:tabIndex];
+        NSButton *tabButton = [[[TGPointingHandButton alloc] initWithFrame:NSMakeRect(0.0, 382.0, 80.0, 30.0)] autorelease];
+        [tabButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:title] autorelease]];
+        [tabButton setTitle:title];
+        [tabButton setImage:nil];
+        [tabButton setButtonType:NSToggleButton];
+        [tabButton setTag:(NSInteger)tabIndex];
+        [tabButton setTarget:self];
+        [tabButton setAction:@selector(selectMediaCenterTab:)];
+        [tabButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+        [contentView addSubview:tabButton];
+        [tabButtons addObject:tabButton];
     }
-    [tabControl setSelectedSegment:0];
-    [tabControl setTarget:self];
-    [tabControl setAction:@selector(reloadMediaCenter:)];
-    if ([[tabControl cell] respondsToSelector:@selector(setTrackingMode:)]) {
-        [[tabControl cell] setTrackingMode:NSSegmentSwitchTrackingSelectOne];
-    }
-    [tabControl setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    [contentView addSubview:tabControl];
-    self.mediaCenterTabControl = tabControl;
+    self.mediaCenterTabButtons = tabButtons;
+    self.mediaCenterSelectedTabIndex = 0;
+    [self updateMediaCenterTabButtonStates];
+    [self layoutMediaCenterTabButtonsForWidth:NSWidth(frame) height:NSHeight(frame)];
 
     NSPopUpButton *sortPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(448.0, 438.0, 116.0, 26.0) pullsDown:NO] autorelease];
     [sortPopup addItemsWithTitles:[NSArray arrayWithObjects:@"Newest", @"Oldest", @"Largest", nil]];
@@ -461,13 +492,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    NSUInteger segmentCount = [self.mediaCenterTabControl segmentCount];
-    CGFloat tabWidth = TGMediaCenterTabsWidth(segmentCount);
     [self.mediaCenterContentCardView setFrame:NSMakeRect(28.0, 18.0, width - 56.0, height - 48.0)];
-    if (tabWidth > width - 64.0) {
-        tabWidth = width - 64.0;
-    }
-    [self.mediaCenterTabControl setFrame:NSMakeRect(floor((width - tabWidth) / 2.0), height - 298.0, tabWidth, 28.0)];
+    [self layoutMediaCenterTabButtonsForWidth:width height:height];
     [self.mediaCenterStatusField setFrame:NSMakeRect(52.0, height - 334.0, width - 136.0, 18.0)];
     [self.mediaCenterRefreshButton setFrame:NSMakeRect(width - 72.0, height - 342.0, 34.0, 30.0)];
     [self.mediaCenterScrollView setFrame:NSMakeRect(36.0, 24.0, width - 72.0, MAX(120.0, height - 370.0))];
@@ -670,7 +696,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     }
     [subviews release];
 
-    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
+    NSInteger selectedTab = [self mediaCenterCurrentTabIndex];
     NSInteger sortIndex = [self.mediaCenterSortPopUpButton indexOfSelectedItem];
     NSArray *items = nil;
     if (TGMediaCenterSelectionUsesGroups(selectedTab)) {
@@ -711,7 +737,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 
 - (TGMessageItem *)mediaCenterItemForSender:(id)sender {
     NSInteger index = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
-    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
+    NSInteger selectedTab = [self mediaCenterCurrentTabIndex];
     if (TGMediaCenterSelectionUsesGroups(selectedTab)) {
         return nil;
     }
@@ -740,7 +766,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     if (!query) {
         query = [@"" copy];
     }
-    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
+    NSInteger selectedTab = [self mediaCenterCurrentTabIndex];
     if (selectedTab < 0) {
         selectedTab = 0;
     }
@@ -887,7 +913,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
             self.mediaCenterStatusField = nil;
             self.mediaCenterScrollView = nil;
             self.mediaCenterResultsView = nil;
-            self.mediaCenterTabControl = nil;
+            self.mediaCenterTabButtons = nil;
+            self.mediaCenterSelectedTabIndex = 0;
             self.mediaCenterRefreshButton = nil;
             self.mediaCenterLoadingSpinner = nil;
             self.mediaCenterPreviewOverlayView = nil;
