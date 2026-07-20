@@ -1042,14 +1042,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 274, 18)
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 134, 18)
                                                text:TGLoc(@"stickers.recent")
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(308, 458, 104, 30)] autorelease];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(166, 458, 116, 30)] autorelease];
     [recentButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.recent.tab")] autorelease]];
     [recentButton setTitle:TGLoc(@"stickers.recent.tab")];
     [recentButton setImage:TGTemplateIconAssetImage(@"history", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1062,7 +1062,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
 
-    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(424, 458, 104, 30)] autorelease];
+    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(292, 458, 124, 30)] autorelease];
     [favoriteButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.favorites.tab")] autorelease]];
     [favoriteButton setTitle:TGLoc(@"stickers.favorites.tab")];
     [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];

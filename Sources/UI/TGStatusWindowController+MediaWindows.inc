@@ -194,15 +194,15 @@ static BOOL TGMediaCenterSelectionUsesGroups(NSInteger index) {
 
 static CGFloat TGMediaCenterTabWidthForIndex(NSUInteger index) {
     switch (index) {
-        case 0: return 80.0;
-        case 1: return 84.0;
-        case 2: return 86.0;
-        case 3: return 86.0;
-        case 4: return 88.0;
-        case 5: return 66.0;
-        case 6: return 88.0;
-        case 7: return 94.0;
-        default: return 76.0;
+        case 0: return 88.0;
+        case 1: return 92.0;
+        case 2: return 96.0;
+        case 3: return 96.0;
+        case 4: return 94.0;
+        case 5: return 74.0;
+        case 6: return 98.0;
+        case 7: return 112.0;
+        default: return 86.0;
     }
 }
 
@@ -306,13 +306,13 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 760, 680);
+    NSRect frame = NSMakeRect(0, 0, 840, 680);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@"Chat info"];
-    [window setMinSize:NSMakeSize(740.0, 520.0)];
+    [window setMinSize:NSMakeSize(820.0, 520.0)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
