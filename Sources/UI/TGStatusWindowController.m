@@ -176,7 +176,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     }
 
     NSPoint origin = visibleBounds.origin;
-    origin.x += delta;
+    origin.x -= delta;
     if (origin.x < 0.0) {
         origin.x = 0.0;
     } else if (origin.x > maxX) {
