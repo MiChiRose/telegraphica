@@ -65,7 +65,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     if ([details count] == 0) {
         return title;
     }
-    return [NSString stringWithFormat:@"%@   %@", title, [details componentsJoinedByString:@" · "]];
+    return [NSString stringWithFormat:@"%@\n%@", title, [details componentsJoinedByString:@" · "]];
 }
 
 - (void)openSelectedChatProfile:(id)sender {
@@ -357,7 +357,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [self applySkeuomorphicScrollStyle:scrollView];
         NSTableView *sessionsTable = [[[NSTableView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
         [sessionsTable setHeaderView:nil];
-        [sessionsTable setRowHeight:28.0];
+        [sessionsTable setRowHeight:58.0];
         [sessionsTable setAllowsMultipleSelection:NO];
         [sessionsTable setAllowsEmptySelection:NO];
         [sessionsTable setUsesAlternatingRowBackgroundColors:NO];
@@ -372,7 +372,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         NSTextFieldCell *sessionCell = [[[NSTextFieldCell alloc] initTextCell:@""] autorelease];
         [sessionCell setFont:[NSFont systemFontOfSize:12.0]];
         [sessionCell setLineBreakMode:NSLineBreakByTruncatingTail];
-        [sessionCell setWraps:NO];
+        [sessionCell setWraps:YES];
         [sessionCell setScrollable:NO];
         [sessionColumn setDataCell:sessionCell];
         [sessionsTable addTableColumn:sessionColumn];

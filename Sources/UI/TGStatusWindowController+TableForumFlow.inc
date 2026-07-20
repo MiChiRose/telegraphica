@@ -29,7 +29,7 @@
 
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
     if (tableView == self.activeSessionsTableView) {
-        return 28.0;
+        return 58.0;
     }
     if (tableView == self.searchResultsTableView) {
         return 44.0;
@@ -160,6 +160,7 @@
             [textCell setBackgroundColor:TGClassicSelectedRowColor()];
         }
         [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
+        [textCell setWraps:YES];
         [textCell setAlignment:NSLeftTextAlignment];
         return;
     }

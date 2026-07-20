@@ -1065,8 +1065,19 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(184, 411, 144, 24)] autorelease];
+    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(184, 409, 144, 28)] autorelease];
+    [contentView addSubview:stickerSearchBackground];
+
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(194, 414, 124, 18)] autorelease];
+    [self applyComposerTextFieldStyle:searchField];
+    if ([[searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
+        [[searchField cell] setSearchButtonCell:nil];
+    }
+    if ([[searchField cell] respondsToSelector:@selector(setCancelButtonCell:)]) {
+        [[searchField cell] setCancelButtonCell:nil];
+    }
     [[searchField cell] setPlaceholderString:TGLoc(@"stickers.search.placeholder")];
+    [self applyComposerPlaceholderStyle:searchField];
     [searchField setTarget:self];
     [searchField setAction:@selector(searchStickerPickerByEmoji:)];
     [contentView addSubview:searchField];

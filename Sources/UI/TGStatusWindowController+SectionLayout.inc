@@ -108,9 +108,7 @@
     [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.conversationSearchButton visible:showChats];
     [self showView:self.mediaCenterButton visible:showChats];
-    BOOL canUseChatHeaderActions = (showChats &&
-                                    [self.currentAuthState isEqualToString:@"ready"] &&
-                                    self.selectedChatID != nil);
+    BOOL canUseChatHeaderActions = (showChats && self.selectedChatID != nil);
     [self.mediaCenterButton setEnabled:canUseChatHeaderActions];
     BOOL showCommentThreadBack = (showChats &&
                                   [self.selectedMessageTopicKind isEqualToString:@"thread"] &&

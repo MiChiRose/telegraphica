@@ -80,6 +80,29 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 @end
 
+@interface TGHeaderActionButton : TGPointingHandButton
+@end
+
+@implementation TGHeaderActionButton
+
+- (void)mouseDown:(NSEvent *)event {
+    if (![self isEnabled] || [self isHidden]) {
+        [super mouseDown:event];
+        return;
+    }
+    if (![self target] || ![self action] || ![[self target] respondsToSelector:[self action]]) {
+        [super mouseDown:event];
+        return;
+    }
+    [[self cell] setHighlighted:YES];
+    [self setNeedsDisplay:YES];
+    [[self target] performSelector:[self action] withObject:self];
+    [[self cell] setHighlighted:NO];
+    [self setNeedsDisplay:YES];
+}
+
+@end
+
 @interface TGReplyCancelButton : TGPointingHandButton
 @end
 
@@ -2011,14 +2034,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.chatSearchButton];
 
-    self.mediaCenterButton = [[[NSButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
+    self.mediaCenterButton = [[[TGHeaderActionButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
     [self.mediaCenterButton setTitle:@"media-center"];
     [self.mediaCenterButton setToolTip:TGLoc(@"media.center.title")];
     [self.mediaCenterButton setTarget:self];
     [self.mediaCenterButton setAction:@selector(openMediaCenter:)];
     [self.mediaCenterButton setEnabled:NO];
     [self applyHeaderIconButtonStyle:self.mediaCenterButton];
-    [self.mediaCenterButton sendActionOn:NSLeftMouseUpMask];
     [self.mediaCenterButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.mediaCenterButton];
 
