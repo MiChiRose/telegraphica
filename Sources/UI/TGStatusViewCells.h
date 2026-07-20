@@ -27,7 +27,10 @@
 @property (nonatomic, assign) BOOL errorState;
 @end
 
-@interface TGGroupedCardView : NSView
+@interface TGGroupedCardView : NSView {
+    BOOL _drawsInterior;
+}
+@property (nonatomic, assign) BOOL drawsInterior;
 @end
 
 @interface TGFlippedDocumentView : NSView

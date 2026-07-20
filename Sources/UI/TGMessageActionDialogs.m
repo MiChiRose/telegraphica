@@ -77,4 +77,13 @@
     return TGMessageDeleteChoiceCancel;
 }
 
++ (BOOL)confirmPlainDeleteMessage {
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"message.delete.title")];
+    [alert setInformativeText:TGLoc(@"message.delete.hint")];
+    [alert addButtonWithTitle:TGLoc(@"message.delete.action")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    return ([alert runModal] == NSAlertFirstButtonReturn);
+}
+
 @end

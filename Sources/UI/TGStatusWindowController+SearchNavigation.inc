@@ -1,9 +1,15 @@
 static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     switch (index) {
         case 1: return @"photos";
-        case 2: return @"documents";
-        case 3: return @"links";
-        case 4: return @"voice";
+        case 2: return @"videos";
+        case 3: return @"documents";
+        case 4: return @"links";
+        case 5: return @"voice";
+        case 6: return @"audio";
+        case 7: return @"animations";
+        case 8: return @"videoNotes";
+        case 9: return @"stickers";
+        case 10: return @"polls";
         default: return @"all";
     }
 }
@@ -500,9 +506,11 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
                 [self refreshSelectedChatHeaderDisplay];
                 [self.messageItems removeAllObjects];
                 [self.messageItems addObjectsFromArray:[self messageItemsInDisplayOrderFromItems:items]];
+                self.messageItemsRepresentFocusedContext = YES;
                 [self updateOutgoingReadStateForVisibleMessages];
                 [self markVisiblePinnedMessagesFromPinnedItems];
                 [self.messageTableView reloadData];
+                [self updateMessageJumpToNewestButtonVisibility];
                 NSUInteger index = [self indexOfMessageID:messageID inMessageItems:self.messageItems];
                 if (index != NSNotFound) {
                     [self.messageTableView scrollRowToVisible:index];
@@ -714,6 +722,13 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
 
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
     if ([event type] == NSKeyDown &&
+        (([event modifierFlags] & (NSCommandKeyMask | NSAlternateKeyMask | NSControlKeyMask)) == 0) &&
+        [[event charactersIgnoringModifiers] length] > 0 &&
+        [[event charactersIgnoringModifiers] characterAtIndex:0] == 27) {
+        [self closeCurrentChatNavigation:event];
+        return YES;
+    }
+    if ([event type] == NSKeyDown &&
         (([event modifierFlags] & NSCommandKeyMask) != 0) &&
         ([[event charactersIgnoringModifiers] isEqualToString:@"v"] || [[event charactersIgnoringModifiers] isEqualToString:@"V"]) &&
         [self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]]) {
@@ -727,18 +742,18 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
 
 static NSString *TGPinnedPreviewDisplayString(NSString *preview) {
     if (![preview isKindOfClass:[NSString class]] || [preview length] == 0) {
-        return @"Pinned message";
+        return TGLoc(@"pinned.title");
     }
     NSDictionary *labels = [NSDictionary dictionaryWithObjectsAndKeys:
-                            @"Voice message", @"[Voice]",
-                            @"Image", @"[Photo]",
-                            @"Video", @"[Video]",
-                            @"GIF", @"[GIF]",
-                            @"Document", @"[Document]",
-                            @"Sticker", @"[Sticker]",
-                            @"Message", @"[Message]",
-                            @"Service message", @"[Service message]",
-                            @"Text", @"[Text]",
+                            TGLoc(@"media.voice"), @"[Voice]",
+                            TGLoc(@"media.image"), @"[Photo]",
+                            TGLoc(@"media.video"), @"[Video]",
+                            TGLoc(@"media.gif"), @"[GIF]",
+                            TGLoc(@"media.document"), @"[Document]",
+                            TGLoc(@"media.sticker"), @"[Sticker]",
+                            TGLoc(@"message"), @"[Message]",
+                            TGLoc(@"media.service"), @"[Service message]",
+                            TGLoc(@"media.text"), @"[Text]",
                             nil];
     NSString *mapped = [labels objectForKey:preview];
     return ([mapped length] > 0) ? mapped : preview;

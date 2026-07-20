@@ -163,8 +163,7 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    [[NSColor colorWithCalibratedWhite:0.925 alpha:1.0] set];
-    NSRectFill([self bounds]);
+    TGThemeDrawWindowBackgroundInRect([self bounds], [self isFlipped]);
 }
 
 @end

@@ -239,6 +239,12 @@
 }
 
 - (BOOL)shouldShowMessageJumpToNewestButton {
+    if (self.messageItemsRepresentFocusedContext &&
+        [self.currentAuthState isEqualToString:@"ready"] &&
+        self.selectedChatID &&
+        ![self.messageScrollView isHidden]) {
+        return YES;
+    }
     if ([self.messageItems count] <= 20 || !self.messageScrollView || [self.messageScrollView isHidden]) {
         return NO;
     }
@@ -261,14 +267,26 @@
 
 - (void)updateMessageJumpToNewestButtonVisibility {
     BOOL ready = ([self.currentAuthState isEqualToString:@"ready"] &&
-                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
+                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
+                  self.selectedChatID != nil);
     [self.messageJumpToNewestButton setHidden:!ready];
-    [self.messageJumpToNewestButton setEnabled:(ready && [self shouldShowMessageJumpToNewestButton])];
+    [self.messageJumpToNewestButton setEnabled:ready];
 }
 
 - (void)jumpToNewestMessages:(id)sender {
     (void)sender;
     self.forceMessageScrollToNewest = YES;
+    if (self.messageItemsRepresentFocusedContext && self.selectedChatID) {
+        NSNumber *chatID = [self.selectedChatID retain];
+        self.messageItemsRepresentFocusedContext = NO;
+        self.olderMessagesExhausted = NO;
+        self.messageLoadingIndicatorVisible = YES;
+        [self.messageLoadingSpinner startAnimation:self];
+        [self updateVisibleSection];
+        [self reloadMessagesForChatID:chatID interactive:NO];
+        [chatID release];
+        return;
+    }
     [self scrollMessagesToNewestIfAvailable];
     [self performSelector:@selector(scrollMessagesToNewestIfAvailable) withObject:nil afterDelay:0.0];
     [self updateMessageJumpToNewestButtonVisibility];
@@ -1091,7 +1109,7 @@
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
     NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
-    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0);
+    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0 || self.forceMessageScrollToNewest);
     NSUInteger messageLoadingGeneration = 0;
     if (shouldShowMessageLoading) {
         messageLoadingGeneration = self.messageLoadingGeneration + 1;
@@ -1134,6 +1152,10 @@
                 }
             } else if (itemsCopy) {
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
+                if (self.forceMessageScrollToNewest) {
+                    preserveOlder = NO;
+                }
+                self.messageItemsRepresentFocusedContext = NO;
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
                 [self scheduleMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
                 [self setOfflineModeActive:NO reason:nil];
@@ -1384,6 +1406,12 @@
             if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsPinnedMessageRefresh = YES;
             }
+        } else if ([kind isEqualToString:@"poll_update"]) {
+            if (selectedChatID && [self.messageItems count] > 0) {
+                needsMessageRefresh = YES;
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Polls: live update received%@; refreshing selected messages.",
+                                              [summary objectForKey:@"poll_id"] ? [NSString stringWithFormat:@" poll=%@", [summary objectForKey:@"poll_id"]] : @""]];
+            }
         } else if ([kind isEqualToString:@"account_unread"]) {
             id unreadCount = [summary objectForKey:@"count"];
             if ([unreadCount respondsToSelector:@selector(unsignedIntegerValue)]) {
@@ -1436,6 +1464,9 @@
     if (self.controlsBusy) {
         return;
     }
+    if (!self.client) {
+        self.client = [[[TGTDLibClient alloc] init] autorelease];
+    }
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Connecting..."];
     [self appendDetail:@"Connecting to Telegram core..."];
@@ -1445,13 +1476,14 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *probeError = nil;
         NSError *authorizationError = nil;
-        NSError *parametersError = nil;
         NSError *encryptionKeyError = nil;
         NSError *finalAuthorizationError = nil;
         NSError *postLoginProbeError = nil;
         NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
         NSString *parametersSummary = nil;
+        BOOL parametersAttempted = NO;
+        BOOL parametersMissingConfiguration = NO;
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
@@ -1461,11 +1493,11 @@
                 authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
-                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
+                parametersAttempted = YES;
+                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
+                parametersMissingConfiguration = ([parametersSummary length] == 0);
             }
-            NSInteger parametersErrorCode = [parametersError code];
-            BOOL missingInternalConfiguration = parametersError &&
-                (parametersErrorCode == 12 || parametersErrorCode == 13 || parametersErrorCode == 14);
+            BOOL missingInternalConfiguration = parametersMissingConfiguration;
             if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
                 finalAuthorizationState = @"waitApiCredentials";
             }
@@ -1516,8 +1548,8 @@
                 }
                 if (parametersSummary) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummary]];
-                } else if (parametersError) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", [parametersError localizedDescription]]];
+                } else if (parametersAttempted) {
+                    [self appendDetail:@"TDLib parameters: could not set local parameters; current auth state requires API credentials or local configuration."];
                 }
                 if (encryptionKeySummary) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummary]];

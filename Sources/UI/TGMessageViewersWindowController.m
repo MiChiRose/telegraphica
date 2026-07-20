@@ -1,4 +1,5 @@
 #import "TGMessageViewersWindowController.h"
+#import "TGLocalization.h"
 
 @interface TGMessageViewersWindowController ()
 @property (nonatomic, retain) NSTextField *titleField;
@@ -25,7 +26,7 @@
     self = [super initWithWindow:window];
     if (self) {
         self.messagePreview = messagePreview;
-        [[self window] setTitle:@"Who read"];
+        [[self window] setTitle:TGLoc(@"message.whoRead")];
         [self buildViews];
         [self showLoading];
     }
@@ -62,14 +63,14 @@
                                       font:[NSFont boldSystemFontOfSize:18.0]
                                      color:[NSColor colorWithCalibratedWhite:0.08 alpha:1.0]];
     [self.titleField setAlignment:NSCenterTextAlignment];
-    [self.titleField setStringValue:@"Who read this message"];
+    [self.titleField setStringValue:TGLoc(@"message.viewers.title")];
     [root addSubview:self.titleField];
 
     self.subtitleField = [self labelWithFrame:NSMakeRect(34, 268, 352, 18)
                                          font:[NSFont systemFontOfSize:12.0]
                                         color:[NSColor colorWithCalibratedWhite:0.35 alpha:1.0]];
     [self.subtitleField setAlignment:NSCenterTextAlignment];
-    [self.subtitleField setStringValue:([self.messagePreview length] > 0 ? self.messagePreview : @"Message")];
+    [self.subtitleField setStringValue:([self.messagePreview length] > 0 ? self.messagePreview : TGLoc(@"message"))];
     [root addSubview:self.subtitleField];
 
     self.scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 24, 372, 232)] autorelease];
@@ -97,23 +98,23 @@
                                          font:[NSFont systemFontOfSize:13.0]
                                         color:color];
     [label setAlignment:NSCenterTextAlignment];
-    [label setStringValue:([message length] > 0 ? message : @"No data")];
+    [label setStringValue:([message length] > 0 ? message : TGLoc(@"message.viewers.noData"))];
     [self.contentView addSubview:label];
 }
 
 - (void)showLoading {
-    [self setSingleMessage:@"Loading readers..." color:[NSColor colorWithCalibratedWhite:0.38 alpha:1.0]];
+    [self setSingleMessage:TGLoc(@"message.viewers.loading") color:[NSColor colorWithCalibratedWhite:0.38 alpha:1.0]];
 }
 
 - (void)showErrorMessage:(NSString *)message {
-    [self setSingleMessage:([message length] > 0 ? message : @"Readers are unavailable for this message.")
+    [self setSingleMessage:([message length] > 0 ? message : TGLoc(@"message.viewers.unavailable"))
                      color:[NSColor colorWithCalibratedRed:0.62 green:0.12 blue:0.10 alpha:1.0]];
 }
 
 - (void)showViewerSummaries:(NSArray *)viewerSummaries {
     [self clearContent];
     if ([viewerSummaries count] == 0) {
-        [self setSingleMessage:@"Nobody has read it yet." color:[NSColor colorWithCalibratedWhite:0.38 alpha:1.0]];
+        [self setSingleMessage:TGLoc(@"message.viewers.empty") color:[NSColor colorWithCalibratedWhite:0.38 alpha:1.0]];
         return;
     }
 

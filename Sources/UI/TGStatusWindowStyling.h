@@ -12,6 +12,7 @@
 - (void)applyDestructiveSettingsButtonStyle:(NSButton *)button;
 - (void)applySkeuomorphicTextFieldStyle:(NSTextField *)textField;
 - (void)applyComposerTextFieldStyle:(NSTextField *)textField;
+- (void)applyComposerPlaceholderStyle:(NSTextField *)textField;
 - (void)applyHeaderIconButtonStyle:(NSButton *)button;
 - (void)applySkeuomorphicScrollStyle:(NSScrollView *)scrollView;
 - (void)applySkeuomorphicTableStyle:(NSTableView *)tableView;

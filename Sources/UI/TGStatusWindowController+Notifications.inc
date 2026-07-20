@@ -372,6 +372,31 @@
     [self refreshSelectedChatHeaderDisplay];
 }
 
+- (void)refreshChatDisplayPreferenceControls {
+    [self.settingsMessagesAsBlocksButton setState:(TGChatMessagesAsBlocksEnabled() ? NSOnState : NSOffState)];
+    NSInteger level = TGChatMessageTextSizeLevel();
+    [self.settingsChatTextSizeSlider setIntegerValue:level];
+    [self.settingsChatTextSizeValueField setStringValue:TGLoc(TGChatMessageTextSizeLocalizationKeyForLevel(level))];
+    [self.settingsChatTextSizeValueField setNeedsDisplay:YES];
+}
+
+- (void)chatDisplayPreferencesDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self refreshChatDisplayPreferenceControls];
+    [self.messageTableView noteHeightOfRowsWithIndexesChanged:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, [self.messageItems count])]];
+    [self.messageTableView reloadData];
+    [self scheduleInlineMediaPlaybackRefresh];
+}
+
+- (void)chatDisplaySettingChanged:(id)sender {
+    if (sender == self.settingsMessagesAsBlocksButton) {
+        TGSetChatMessagesAsBlocksEnabled([self.settingsMessagesAsBlocksButton state] == NSOnState);
+    } else if (sender == self.settingsChatTextSizeSlider) {
+        TGSetChatMessageTextSizeLevel(lround([self.settingsChatTextSizeSlider doubleValue]));
+    }
+    [self refreshChatDisplayPreferenceControls];
+}
+
 - (void)languageSelectionChanged:(id)sender {
     NSMenuItem *selectedItem = [self.settingsLanguagePopUpButton selectedItem];
     NSString *code = [selectedItem representedObject];
@@ -576,7 +601,11 @@
                 [alert addButtonWithTitle:TGLoc(@"update.downloaded.open")];
                 [alert addButtonWithTitle:@"OK"];
                 if ([alert runModal] == NSAlertFirstButtonReturn) {
-                    [[NSWorkspace sharedWorkspace] openFile:targetPathCopy];
+                    BOOL openedInstaller = [[NSWorkspace sharedWorkspace] openFile:targetPathCopy];
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Updater: open installer %@ for %@.", openedInstaller ? @"requested" : @"failed", targetPathCopy]];
+                    if (openedInstaller) {
+                        [NSApp performSelector:@selector(terminate:) withObject:self afterDelay:0.35];
+                    }
                 }
             }
             [infoCopy release];

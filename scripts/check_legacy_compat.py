@@ -103,6 +103,8 @@ def check_project(errors):
         fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "ARC must stay disabled until the legacy build lane proves otherwise.")
     if "x86_64" not in text:
         fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "x86_64 architecture setting is missing.")
+    if "TGLocalDataReset.m" not in text:
+        fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "TGLocalDataReset.m must be part of the Xcode project.")
 
 
 def check_gitignore(errors):
@@ -116,12 +118,123 @@ def check_gitignore(errors):
             fail(errors, ".gitignore", "Missing ignore entry for %s." % expected)
 
 
+def check_local_data_reset(errors):
+    rel = os.path.join("Sources", "Services", "TGLocalDataReset.m")
+    path = os.path.join(ROOT, rel)
+    if not os.path.exists(path):
+        fail(errors, rel, "Missing local data reset service.")
+        return
+    text = read_text(path)
+    required = [
+        "Application Support",
+        "Library/Caches",
+        "TGMediaImageLoaderClearCache",
+        "clearDiagnosticFile",
+        "deleteForAccount",
+        "shutdownWithTimeout",
+        "Telegram cloud data remains online",
+    ]
+    for needle in required:
+        if needle not in text:
+            fail(errors, rel, "Local data reset is missing expected safety step: %s." % needle)
+    forbidden = [
+        "NSDownloadsDirectory",
+        "NSDocumentDirectory",
+        "NSDesktopDirectory",
+        "removeItemAtPath:NSHomeDirectory",
+        "stringByAppendingPathComponent:@\"Downloads\"",
+        "stringByAppendingPathComponent:@\"Desktop\"",
+    ]
+    for needle in forbidden:
+        if needle in text:
+            fail(errors, rel, "Local data reset must not target user-owned locations: %s." % needle)
+
+
+def check_diagnostic_redaction(errors):
+    logger_rel = os.path.join("Sources", "Services", "TGLogger.m")
+    logger_path = os.path.join(ROOT, logger_rel)
+    auth_rel = os.path.join("Sources", "UI", "TGStatusWindowController+AuthComposerState.inc")
+    auth_path = os.path.join(ROOT, auth_rel)
+    if not os.path.exists(logger_path) or not os.path.exists(auth_path):
+        return
+    logger_text = read_text(logger_path)
+    auth_text = read_text(auth_path)
+    for needle in ["api_hash", "/Users/", "chat id", "message id", "file id"]:
+        if needle not in logger_text:
+            fail(errors, logger_rel, "Diagnostic redaction should cover %s." % needle)
+    if "redactedDiagnosticMessage" not in auth_text:
+        fail(errors, auth_rel, "appendDetail must pass Diagnostic Logs through TGLogger redaction.")
+
+    def redact_sample(message):
+        lowered = message.lower()
+        sensitive = [
+            "api_hash",
+            "authentication_code",
+            "authentication code",
+            "auth code",
+            "phone_number",
+            "phone number",
+            "database_encryption_key",
+            "encryption_key",
+            "password",
+            "\"code\"",
+            "login code",
+            "api id",
+            "api_id",
+        ]
+        for marker in sensitive:
+            if marker in lowered:
+                return "<redacted sensitive log line>"
+        redacted = message
+        redacted = re.sub(r"(Downloaded (cached fallback )?to\s+).+", r"\1<redacted-path>", redacted, flags=re.I)
+        redacted = re.sub(r"(Submitting [^\n:]+ to TDLib:\s+).+", r"\1<redacted-file>", redacted, flags=re.I)
+        redacted = re.sub(r"\b((chat|folder)\s+(title|name)|title|preview|caption|message\s+(text|preview|body)|text|file(name)?|path)\s*[:=]\s*(\"[^\"]*\"|'[^']*'|[^,;\n]+)", r"\1=<redacted>", redacted, flags=re.I)
+        redacted = re.sub(r"(chat id|chat_id|message id|message_id|file id|file_id)[:= ]+[^\s,;]+", r"\1=<redacted-id>", redacted, flags=re.I)
+        redacted = re.sub(r"([?&](token|hash|code|key|password)=)[^\s&]+", r"\1<redacted>", redacted, flags=re.I)
+        redacted = re.sub(r"\+?[0-9][0-9 ()-]{7,}[0-9]", "<redacted-number>", redacted)
+        redacted = re.sub(r"\b[A-Fa-f0-9]{32,}\b", "<redacted-token>", redacted)
+        redacted = re.sub(r"(/Users/[^\n\r]+)", "<redacted-path>", redacted)
+        redacted = re.sub(r"\b[0-9]{5,}\b", "<redacted-number>", redacted)
+        return redacted
+
+    samples = [
+        "Downloaded to /Users/Test User/Desktop/private photo.png",
+        "Submitting document to TDLib: salary-contract.rtf",
+        "chat_id=123456789 message_id=9988776655 file_id=8877665544",
+        "chat title=Family Folder folder name=Secret Work",
+        "preview=hello private message text=never log caption=secret",
+        "phone_number=+375 29 123 45 67 api_hash=0123456789abcdef0123456789abcdef",
+    ]
+    forbidden_fragments = [
+        "/Users/Test User",
+        "private photo.png",
+        "salary-contract.rtf",
+        "123456789",
+        "9988776655",
+        "8877665544",
+        "Family",
+        "Secret Work",
+        "hello private",
+        "never log",
+        "+375",
+        "0123456789abcdef",
+    ]
+    for sample in samples:
+        redacted = redact_sample(sample)
+        for fragment in forbidden_fragments:
+            if fragment in redacted:
+                fail(errors, logger_rel, "Diagnostic redaction sample leaked %s from %r." % (fragment, sample))
+                break
+
+
 def main():
     errors = []
     check_sources(errors)
     check_plist(errors)
     check_project(errors)
     check_gitignore(errors)
+    check_local_data_reset(errors)
+    check_diagnostic_redaction(errors)
 
     if errors:
         print("Legacy compatibility check failed:")
