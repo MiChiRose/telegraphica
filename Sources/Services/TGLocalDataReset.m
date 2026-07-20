@@ -101,6 +101,8 @@ static void TGLocalDataResetClearDefaults(void) {
 
     NSArray *ownedPaths = [NSArray arrayWithObjects:
                            [supportPath stringByAppendingPathComponent:@"tdlib"],
+                           [supportPath stringByAppendingPathComponent:@"tdlib-mountain-lion"],
+                           [supportPath stringByAppendingPathComponent:@"tdlib-mountain-lion-backups"],
                            [supportPath stringByAppendingPathComponent:@"tdlib-config.plist"],
                            [supportPath stringByAppendingPathComponent:@"remote-tdlib-config-url.txt"],
                            logsPath,

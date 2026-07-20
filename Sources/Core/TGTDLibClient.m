@@ -32,6 +32,11 @@ static NSString * const TGTDLibProxyPasswordEnvironmentKey = @"TELEGRAPHICA_TDLI
 static NSString * const TGTDLibProxySecretEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_SECRET";
 static NSString * const TGTDLibProxyHTTPOnlyEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_HTTP_ONLY";
 static NSString * const TGTDLibMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
+static NSString * const TGTDLibDefaultDatabaseDirectoryName = @"tdlib";
+static NSString * const TGTDLibMountainLionDatabaseDirectoryName = @"tdlib-mountain-lion";
+static NSString * const TGTDLibDefaultFilesDirectoryName = @"tdlib-files";
+static NSString * const TGTDLibMountainLionFilesDirectoryName = @"tdlib-files-mountain-lion";
+static NSString * const TGTDLibMountainLionBinlogMarkerName = @"telegraphica-ml-binlog-only-store";
 static NSTimeInterval const TGTDLibRemoteConfigurationTimeout = 8.0;
 static NSUInteger const TGTDLibMaxPendingResponses = 64;
 static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
@@ -2041,6 +2046,74 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:error];
 }
 
+- (BOOL)prepareMountainLionBinlogStoreAtPath:(NSString *)targetPath sourcePath:(NSString *)sourcePath error:(NSError **)error {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *sourceBinlog = [sourcePath stringByAppendingPathComponent:@"td.binlog"];
+    NSString *targetBinlog = [targetPath stringByAppendingPathComponent:@"td.binlog"];
+    NSString *targetMarker = [targetPath stringByAppendingPathComponent:TGTDLibMountainLionBinlogMarkerName];
+    if ([fileManager fileExistsAtPath:targetMarker] && [fileManager fileExistsAtPath:targetBinlog]) {
+        NSArray *cacheFileNames = [NSArray arrayWithObjects:@"db.sqlite", @"db.sqlite-shm", @"db.sqlite-wal", nil];
+        BOOL removedCache = NO;
+        for (NSString *cacheFileName in cacheFileNames) {
+            NSString *cachePath = [targetPath stringByAppendingPathComponent:cacheFileName];
+            if ([fileManager fileExistsAtPath:cachePath]) {
+                if (![fileManager removeItemAtPath:cachePath error:error]) {
+                    return NO;
+                }
+                removedCache = YES;
+            }
+        }
+        if (removedCache) {
+            [[TGLogger sharedLogger] log:@"Mountain Lion TDLib store: removed SQLite chat cache before starting legacy TDLib."];
+        }
+        return YES;
+    }
+
+    if (![fileManager fileExistsAtPath:sourceBinlog]) {
+        if (![self ensureDirectoryAtPath:targetPath error:error]) {
+            return NO;
+        }
+        NSString *marker = @"Telegraphica Mountain Lion TDLib store keeps only td.binlog and removes SQLite chat cache before TDLib startup.";
+        return [marker writeToFile:targetMarker atomically:YES encoding:NSUTF8StringEncoding error:error];
+    }
+
+    NSString *backupRoot = [[targetPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"tdlib-mountain-lion-backups"];
+    if (![self ensureDirectoryAtPath:backupRoot error:error]) {
+        return NO;
+    }
+
+    NSString *stagingName = [NSString stringWithFormat:@"tdlib-mountain-lion-staging-%llu", (unsigned long long)[[NSDate date] timeIntervalSince1970]];
+    NSString *stagingPath = [backupRoot stringByAppendingPathComponent:stagingName];
+    if (![self ensureDirectoryAtPath:stagingPath error:error]) {
+        return NO;
+    }
+    if (![fileManager copyItemAtPath:sourceBinlog toPath:[stagingPath stringByAppendingPathComponent:@"td.binlog"] error:error]) {
+        [fileManager removeItemAtPath:stagingPath error:NULL];
+        return NO;
+    }
+    NSString *marker = @"Telegraphica Mountain Lion TDLib store keeps only td.binlog and removes SQLite chat cache before TDLib startup.";
+    if (![marker writeToFile:[stagingPath stringByAppendingPathComponent:TGTDLibMountainLionBinlogMarkerName] atomically:YES encoding:NSUTF8StringEncoding error:error]) {
+        [fileManager removeItemAtPath:stagingPath error:NULL];
+        return NO;
+    }
+
+    if ([fileManager fileExistsAtPath:targetPath]) {
+        NSString *backupName = [NSString stringWithFormat:@"tdlib-mountain-lion-%llu", (unsigned long long)[[NSDate date] timeIntervalSince1970]];
+        NSString *backupPath = [backupRoot stringByAppendingPathComponent:backupName];
+        if (![fileManager moveItemAtPath:targetPath toPath:backupPath error:error]) {
+            [fileManager removeItemAtPath:stagingPath error:NULL];
+            return NO;
+        }
+    }
+
+    if (![fileManager moveItemAtPath:stagingPath toPath:targetPath error:error]) {
+        return NO;
+    }
+
+    [[TGLogger sharedLogger] log:@"Mountain Lion TDLib store: prepared binlog-only store to avoid legacy chat cache crashes."];
+    return YES;
+}
+
 - (NSDictionary *)localTDLibParametersWithError:(NSError **)error {
     NSDictionary *configuration = [self localTDLibConfigurationWithError:error];
     if (!configuration) {
@@ -2059,8 +2132,17 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSString *databasePath = [supportPath stringByAppendingPathComponent:@"tdlib"];
-    NSString *filesPath = [cachePath stringByAppendingPathComponent:@"tdlib-files"];
+    BOOL mountainLionSafeLoginMode = TGTDLibMountainLionSafeLoginModeEnabled();
+    NSString *databaseDirectoryName = mountainLionSafeLoginMode ? TGTDLibMountainLionDatabaseDirectoryName : TGTDLibDefaultDatabaseDirectoryName;
+    NSString *filesDirectoryName = mountainLionSafeLoginMode ? TGTDLibMountainLionFilesDirectoryName : TGTDLibDefaultFilesDirectoryName;
+    NSString *databasePath = [supportPath stringByAppendingPathComponent:databaseDirectoryName];
+    NSString *filesPath = [cachePath stringByAppendingPathComponent:filesDirectoryName];
+    if (mountainLionSafeLoginMode) {
+        NSString *sourceDatabasePath = [supportPath stringByAppendingPathComponent:TGTDLibDefaultDatabaseDirectoryName];
+        if (![self prepareMountainLionBinlogStoreAtPath:databasePath sourcePath:sourceDatabasePath error:error]) {
+            return nil;
+        }
+    }
     if (![self ensureDirectoryAtPath:databasePath error:error] || ![self ensureDirectoryAtPath:filesPath error:error]) {
         return nil;
     }
@@ -2086,7 +2168,6 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
-    BOOL mountainLionSafeLoginMode = TGTDLibMountainLionSafeLoginModeEnabled();
     [parameters setObject:[self boolValueForKey:@"use_test_dc" inConfiguration:configuration defaultValue:NO] forKey:@"use_test_dc"];
     [parameters setObject:databasePath forKey:@"database_directory"];
     [parameters setObject:filesPath forKey:@"files_directory"];
@@ -2094,7 +2175,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [parameters setObject:[self boolValueForKey:@"use_chat_info_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_chat_info_database"];
     [parameters setObject:[self boolValueForKey:@"use_message_database" inConfiguration:configuration defaultValue:!mountainLionSafeLoginMode] forKey:@"use_message_database"];
     if (mountainLionSafeLoginMode) {
+        [parameters setObject:[NSNumber numberWithBool:NO] forKey:@"use_chat_info_database"];
         [parameters setObject:[NSNumber numberWithBool:NO] forKey:@"use_message_database"];
+        [[TGLogger sharedLogger] log:@"Mountain Lion TDLib parameters: chat info and message databases disabled for legacy TDLib stability."];
     }
     [parameters setObject:[self boolValueForKey:@"use_secret_chats" inConfiguration:configuration defaultValue:NO] forKey:@"use_secret_chats"];
     [parameters setObject:apiID forKey:@"api_id"];
@@ -2553,6 +2636,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSError *responseError = nil;
     NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:(NSString *)extraObject timeout:timeout errorCode:16 error:&responseError];
     if (!response) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib parameters %@ request did not return before timeout.", schemaName]];
         if (error) {
             NSString *message = responseError ? [responseError localizedDescription] : [NSString stringWithFormat:@"TDLib did not acknowledge %@ local parameters before the probe timed out.", schemaName];
             *error = [self errorWithDescription:message code:16];
@@ -2564,6 +2648,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL receivedOK = ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]);
     NSString *summary = [self summaryForAuthorizationStateObject:response];
     if ([summary hasPrefix:@"error"]) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib parameters %@ rejected: %@", schemaName, summary]];
         if (error) {
             NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, summary];
             *error = [self errorWithDescription:message code:16];
@@ -2577,6 +2662,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *nextSummary = [self waitForAuthorizationStateDifferentFromState:@"waitTdlibParameters" afterGeneration:generation timeout:timeout];
     if ([nextSummary length] > 0) {
         if ([nextSummary hasPrefix:@"error"]) {
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib parameters %@ rejected after wait: %@", schemaName, nextSummary]];
             if (error) {
                 NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, nextSummary];
                 *error = [self errorWithDescription:message code:16];
@@ -2592,6 +2678,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     if (error) {
         NSString *message = [NSString stringWithFormat:@"TDLib did not acknowledge %@ local parameters before the probe timed out.", schemaName];
+        [[TGLogger sharedLogger] log:message];
         *error = [self errorWithDescription:message code:17];
     }
     return nil;
