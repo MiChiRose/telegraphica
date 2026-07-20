@@ -193,7 +193,7 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     [contentView addSubview:titleField];
 
     NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(20.0, 438.0, 260.0, 26.0)] autorelease];
-    [searchField setPlaceholderString:@"Search by filename or caption"];
+    [[searchField cell] setPlaceholderString:@"Search by filename or caption"];
     [searchField setTarget:self];
     [searchField setAction:@selector(reloadMediaCenter:)];
     [searchField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
