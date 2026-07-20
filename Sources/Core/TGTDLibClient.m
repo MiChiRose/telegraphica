@@ -8282,10 +8282,26 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         for (keyIndex = 0; keyIndex < [numberKeys count]; keyIndex++) {
             NSString *key = [numberKeys objectAtIndex:keyIndex];
             id value = [session objectForKey:key];
-            if (![value isKindOfClass:[NSNumber class]] || TGTDLibObjectIsBoolean(value)) {
+            long long numberValue = 0;
+            BOOL hasNumberValue = NO;
+            if ([value isKindOfClass:[NSNumber class]] && !TGTDLibObjectIsBoolean(value)) {
+                numberValue = [value longLongValue];
+                hasNumberValue = YES;
+            } else if ([value isKindOfClass:[NSString class]]) {
+                NSString *stringValue = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if ([stringValue length] > 0) {
+                    NSScanner *scanner = [NSScanner scannerWithString:stringValue];
+                    long long scannedValue = 0;
+                    if ([scanner scanLongLong:&scannedValue] && [scanner isAtEnd]) {
+                        numberValue = scannedValue;
+                        hasNumberValue = YES;
+                    }
+                }
+            }
+            if (!hasNumberValue) {
                 continue;
             }
-            [safeSession setObject:[NSNumber numberWithLongLong:[value longLongValue]] forKey:key];
+            [safeSession setObject:[NSNumber numberWithLongLong:numberValue] forKey:key];
         }
         for (keyIndex = 0; keyIndex < [booleanKeys count]; keyIndex++) {
             NSString *key = [booleanKeys objectAtIndex:keyIndex];
@@ -8327,6 +8343,14 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         !TGTDLibObjectIsBoolean(inactiveSessionTTLDays)) {
         [safeSummary setObject:[NSNumber numberWithInteger:[inactiveSessionTTLDays integerValue]]
                         forKey:@"inactive_session_ttl_days"];
+    } else if ([inactiveSessionTTLDays isKindOfClass:[NSString class]]) {
+        NSString *ttlString = [(NSString *)inactiveSessionTTLDays stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSScanner *ttlScanner = [NSScanner scannerWithString:ttlString];
+        NSInteger ttlValue = 0;
+        if ([ttlScanner scanInteger:&ttlValue] && [ttlScanner isAtEnd]) {
+            [safeSummary setObject:[NSNumber numberWithInteger:ttlValue]
+                            forKey:@"inactive_session_ttl_days"];
+        }
     }
     return [NSDictionary dictionaryWithDictionary:safeSummary];
 }

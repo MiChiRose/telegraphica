@@ -2018,6 +2018,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.mediaCenterButton setAction:@selector(openMediaCenter:)];
     [self.mediaCenterButton setEnabled:NO];
     [self applyHeaderIconButtonStyle:self.mediaCenterButton];
+    [self.mediaCenterButton sendActionOn:NSLeftMouseUpMask];
     [self.mediaCenterButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.mediaCenterButton];
 
@@ -2221,6 +2222,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"jump-newest"] autorelease]];
     [self.messageJumpToNewestButton setTarget:self];
     [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
+    [self.messageJumpToNewestButton sendActionOn:NSLeftMouseUpMask];
     [self.messageJumpToNewestButton setEnabled:NO];
     [self.messageJumpToNewestButton setHidden:YES];
     [contentView addSubview:self.messageJumpToNewestButton];

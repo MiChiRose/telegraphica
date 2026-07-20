@@ -34,6 +34,40 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
     return [NSString stringWithFormat:@"%@ — %@", title, [details componentsJoinedByString:@", "]];
 }
 
+static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unknownDevice, NSString *languageCode) {
+    NSString *device = [session objectForKey:@"device_model"];
+    NSString *application = [session objectForKey:@"application_name"];
+    NSString *platform = [session objectForKey:@"platform"];
+    NSString *systemVersion = [session objectForKey:@"system_version"];
+    NSString *location = [session objectForKey:@"location"];
+    NSString *title = ([device length] > 0) ? device : (([application length] > 0) ? application : unknownDevice);
+    NSMutableArray *details = [NSMutableArray array];
+    if ([application length] > 0 && ![application isEqualToString:title]) {
+        [details addObject:application];
+    }
+    if ([platform length] > 0) {
+        NSString *platformText = platform;
+        if ([systemVersion length] > 0) {
+            platformText = [platformText stringByAppendingFormat:@" %@", systemVersion];
+        }
+        if (![platformText isEqualToString:title]) {
+            [details addObject:platformText];
+        }
+    }
+    if ([location length] > 0) {
+        [details addObject:location];
+    }
+    NSString *lastActive = [TGActiveSessionsPresentation dateTextForTimestamp:[session objectForKey:@"last_active_date"]
+                                                                 languageCode:languageCode];
+    if ([lastActive length] > 0) {
+        [details addObject:lastActive];
+    }
+    if ([details count] == 0) {
+        return title;
+    }
+    return [NSString stringWithFormat:@"%@   %@", title, [details componentsJoinedByString:@" · "]];
+}
+
 - (void)openSelectedChatProfile:(id)sender {
     (void)sender;
     if (!self.selectedChatID) {
@@ -105,15 +139,22 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
 
     NSArray *sessions = [summary objectForKey:@"sessions"];
     NSMutableArray *selectableSessions = [NSMutableArray array];
+    NSUInteger sessionsWithIdentifier = 0;
+    NSUInteger currentSessions = 0;
     if ([sessions isKindOfClass:[NSArray class]]) {
         NSUInteger index = 0;
         for (index = 0; index < [sessions count]; index++) {
             NSDictionary *session = [sessions objectAtIndex:index];
-            if (![session isKindOfClass:[NSDictionary class]] || [[session objectForKey:@"is_current"] boolValue]) {
+            if (![session isKindOfClass:[NSDictionary class]]) {
                 continue;
             }
             NSNumber *sessionID = TGActiveSessionSelectableIdentifier(session);
             if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
+                continue;
+            }
+            sessionsWithIdentifier++;
+            if ([[session objectForKey:@"is_current"] boolValue]) {
+                currentSessions++;
                 continue;
             }
             NSString *title = TGActiveSessionMenuTitle(session, TGLoc(@"settings.sessions.unknownDevice"));
@@ -124,6 +165,11 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
     }
     self.activeSessionsSelectableSessions = selectableSessions;
     [self.activeSessionsTableView reloadData];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Active Sessions: received=%lu with_id=%lu current=%lu selectable=%lu.",
+                                  ([sessions isKindOfClass:[NSArray class]] ? (unsigned long)[sessions count] : 0UL),
+                                  (unsigned long)sessionsWithIdentifier,
+                                  (unsigned long)currentSessions,
+                                  (unsigned long)[selectableSessions count]]];
     BOOL hasTerminableSessions = ([[self.activeSessionsTerminatePopup itemArray] count] > 1);
     if (hasTerminableSessions) {
         [self.activeSessionsTerminatePopup selectItemAtIndex:1];
@@ -140,6 +186,22 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
     (void)sender;
     NSMenuItem *selectedItem = [self.activeSessionsTerminatePopup selectedItem];
     NSNumber *sessionID = [selectedItem representedObject];
+    NSInteger selectedRow = [self.activeSessionsTableView selectedRow];
+    if ((![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) &&
+        selectedRow >= 0 && (NSUInteger)selectedRow < [self.activeSessionsSelectableSessions count]) {
+        id selectedSession = [self.activeSessionsSelectableSessions objectAtIndex:(NSUInteger)selectedRow];
+        if ([selectedSession isKindOfClass:[NSDictionary class]]) {
+            sessionID = TGActiveSessionSelectableIdentifier((NSDictionary *)selectedSession);
+            NSString *fallbackTitle = TGActiveSessionMenuTitle((NSDictionary *)selectedSession, TGLoc(@"settings.sessions.unknownDevice"));
+            NSInteger menuIndex = selectedRow + 1;
+            if (menuIndex > 0 && menuIndex < (NSInteger)[[self.activeSessionsTerminatePopup itemArray] count]) {
+                [self.activeSessionsTerminatePopup selectItemAtIndex:menuIndex];
+                selectedItem = [self.activeSessionsTerminatePopup selectedItem];
+            } else if ([fallbackTitle length] > 0) {
+                selectedItem = [[[NSMenuItem alloc] initWithTitle:fallbackTitle action:NULL keyEquivalent:@""] autorelease];
+            }
+        }
+    }
     if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
         NSBeep();
         return;
@@ -295,9 +357,9 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
         [self applySkeuomorphicScrollStyle:scrollView];
         NSTableView *sessionsTable = [[[NSTableView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
         [sessionsTable setHeaderView:nil];
-        [sessionsTable setRowHeight:74.0];
+        [sessionsTable setRowHeight:28.0];
         [sessionsTable setAllowsMultipleSelection:NO];
-        [sessionsTable setAllowsEmptySelection:YES];
+        [sessionsTable setAllowsEmptySelection:NO];
         [sessionsTable setUsesAlternatingRowBackgroundColors:NO];
         [sessionsTable setBackgroundColor:[NSColor clearColor]];
         [sessionsTable setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
@@ -307,8 +369,9 @@ static NSString *TGActiveSessionMenuTitle(NSDictionary *session, NSString *unkno
         NSTableColumn *sessionColumn = [[[NSTableColumn alloc] initWithIdentifier:@"active_session"] autorelease];
         [sessionColumn setWidth:NSWidth([[scrollView contentView] bounds])];
         [sessionColumn setResizingMask:NSTableColumnAutoresizingMask];
-        NSTextFieldCell *sessionCell = [[[NSTextFieldCell alloc] init] autorelease];
+        NSTextFieldCell *sessionCell = [[[NSTextFieldCell alloc] initTextCell:@""] autorelease];
         [sessionCell setFont:[NSFont systemFontOfSize:12.0]];
+        [sessionCell setLineBreakMode:NSLineBreakByTruncatingTail];
         [sessionCell setWraps:NO];
         [sessionCell setScrollable:NO];
         [sessionColumn setDataCell:sessionCell];

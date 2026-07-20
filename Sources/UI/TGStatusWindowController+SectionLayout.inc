@@ -108,6 +108,10 @@
     [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.conversationSearchButton visible:showChats];
     [self showView:self.mediaCenterButton visible:showChats];
+    BOOL canUseChatHeaderActions = (showChats &&
+                                    [self.currentAuthState isEqualToString:@"ready"] &&
+                                    self.selectedChatID != nil);
+    [self.mediaCenterButton setEnabled:canUseChatHeaderActions];
     BOOL showCommentThreadBack = (showChats &&
                                   [self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                   [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
@@ -121,7 +125,10 @@
     [self showView:self.messageScrollView visible:showChats];
     [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
     [self showView:self.messageJumpToNewestButton visible:showChats];
-    [self.messageJumpToNewestButton setEnabled:(showChats && [self shouldShowMessageJumpToNewestButton])];
+    BOOL canJumpToNewest = (showChats &&
+                            [self.currentAuthState isEqualToString:@"ready"] &&
+                            self.selectedChatID != nil);
+    [self.messageJumpToNewestButton setEnabled:canJumpToNewest];
     BOOL showSearchPanel = (showChats && self.searchPanelVisible);
     [self showView:self.searchPanelView visible:showSearchPanel];
     [self showView:self.searchTextField visible:showSearchPanel];
@@ -592,10 +599,31 @@
                                                    headerLabelY - 8.0,
                                                    selectedTitleWidth,
                                                    14.0)];
+    CGFloat profileHitMaxX = NSMinX([self.conversationSearchButton frame]) - 10.0;
+    CGFloat profileHitWidth = profileHitMaxX - selectedAvatarX;
+    if (profileHitWidth < selectedAvatarSize) {
+        profileHitWidth = selectedAvatarSize;
+    }
     [self.selectedChatProfileButton setFrame:NSMakeRect(selectedAvatarX,
                                                         selectedAvatarY - 2.0,
-                                                        NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
+                                                        profileHitWidth,
                                                         selectedAvatarSize + 4.0)];
+
+    NSArray *chatHeaderControls = [NSArray arrayWithObjects:
+                                   self.conversationSearchButton,
+                                   self.mediaCenterButton,
+                                   self.messageJumpToNewestButton,
+                                   self.loadMessagesButton,
+                                   self.loadOlderMessagesButton,
+                                   self.commentThreadBackButton,
+                                   nil];
+    NSUInteger chatHeaderControlIndex = 0;
+    for (chatHeaderControlIndex = 0; chatHeaderControlIndex < [chatHeaderControls count]; chatHeaderControlIndex++) {
+        NSView *control = [chatHeaderControls objectAtIndex:chatHeaderControlIndex];
+        if ([control superview]) {
+            [[control superview] addSubview:control positioned:NSWindowAbove relativeTo:nil];
+        }
+    }
 
     CGFloat estimatedSendFieldWidth = conversationWidth - 198.0;
     if (estimatedSendFieldWidth < 160.0) {

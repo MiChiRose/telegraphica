@@ -321,7 +321,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     (void)controlView;
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
-    CGFloat alpha = enabled ? 1.0 : 0.48;
+    CGFloat alpha = enabled ? 1.0 : 0.24;
     NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
     NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
     TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, YES, enabled, [controlView isFlipped]);
