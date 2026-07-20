@@ -2,10 +2,10 @@
 
 <div align="center">
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
-  <p><b>An experimental, unofficial Telegram client for OS X 10.9.5 Mavericks.</b></p>
+  <p><b>An experimental, unofficial Telegram client for macOS 10.9 and newer.</b></p>
   <p>
     <img src="https://img.shields.io/badge/version-v0.5.0-blue" alt="version v0.5.0" />
-    <img src="https://img.shields.io/badge/macOS-10.9.5%20Mavericks-black" alt="OS X 10.9.5 Mavericks" />
+    <img src="https://img.shields.io/badge/macOS-10.9%2B-black" alt="macOS 10.9 and newer" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
     <img src="https://img.shields.io/badge/status-open%20beta-brightgreen" alt="open beta status" />
@@ -13,9 +13,10 @@
   </p>
 </div>
 
-Telegraphica is a small native Cocoa/AppKit Telegram client built for people
-who still use Intel Macs on **OS X 10.9.5 Mavericks** and do not want to give up
-working hardware just because modern clients moved on.
+Telegraphica is a small native Cocoa/AppKit Telegram client available for
+**macOS 10.9 and newer**. It is built primarily for people who still use Intel
+Macs on **macOS 10.9-10.13** and do not want to give up working hardware just
+because modern clients moved on.
 
 It is not a Telegram clone, not an official Telegram app, and not a branded
 Telegram distribution. It is an independent legacy-Mac experiment that talks to
@@ -147,7 +148,7 @@ Telegraphica is intentionally built around a conservative Objective-C lane:
 
 | Item | Target |
 | --- | --- |
-| OS | OS X 10.9.5 Mavericks |
+| OS | macOS 10.9 and newer, with primary support focused on macOS 10.9-10.13 |
 | CPU | Intel `x86_64` |
 | UI | Cocoa / AppKit |
 | Language | Objective-C, non-ARC |
@@ -299,10 +300,11 @@ PRODUCT.md                     Product and design direction
 
 ## Compatibility & Security
 
-**Supported target:** OS X 10.9.5 Mavericks on Intel `x86_64`.
+**Supported target:** macOS 10.9 and newer on Intel `x86_64`.
 
-Modern macOS can be used for editing and smoke checks, but the real target is
-the old Mac lane.
+Primary compatibility work is focused on macOS 10.9-10.13. Newer macOS versions
+may work, but the old Intel Mac lane remains the main target for testing and
+release confidence.
 
 **Security posture:**
 
