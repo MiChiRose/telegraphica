@@ -1214,6 +1214,7 @@
     }
     if ([notification object] == self.mediaCenterWindow) {
         self.mediaCenterGeneration = self.mediaCenterGeneration + 1;
+        [self stopObservingMediaCenterScrollView];
         [self.mediaCenterWindow setDelegate:nil];
         self.mediaCenterSearchField = nil;
         self.mediaCenterFilterPopUpButton = nil;
@@ -1231,6 +1232,7 @@
         self.mediaCenterPreviewTitleField = nil;
         self.mediaCenterPreviewCloseButton = nil;
         [self.mediaCenterItems removeAllObjects];
+        [self resetMediaCenterPaginationState];
         self.mediaCenterWindow = nil;
     }
     if ([notification object] == self.voicePreviewWindow) {

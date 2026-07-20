@@ -635,7 +635,6 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSImage *image = [self image];
     BOOL imageOnly = ([title length] == 0);
     CGFloat iconSide = imageOnly ? 17.0 : 14.0;
-    CGFloat contentWidth = imageOnly ? iconSide : NSWidth(buttonRect) - 12.0;
     NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - floor(iconSide / 2.0),
                                  NSMidY(buttonRect) - floor(iconSide / 2.0),
                                  iconSide,
@@ -654,15 +653,18 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
     if (!imageOnly) {
         NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [paragraph setAlignment:NSCenterTextAlignment];
         [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
         NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
                                     TGClassicHeaderTextColor(alpha), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
-        NSRect titleRect = NSMakeRect(NSMaxX(iconRect) + 5.0,
+        CGFloat titleLeft = image ? (NSMaxX(iconRect) + 5.0) : (NSMinX(buttonRect) + 8.0);
+        CGFloat titleRightInset = 8.0;
+        NSRect titleRect = NSMakeRect(titleLeft,
                                       NSMidY(buttonRect) - 8.0,
-                                      MAX(8.0, contentWidth - iconSide - 7.0),
+                                      MAX(8.0, NSMaxX(buttonRect) - titleLeft - titleRightInset),
                                       17.0);
         [title drawInRect:titleRect withAttributes:attributes];
     }
