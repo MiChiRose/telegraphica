@@ -5,21 +5,26 @@ static NSString *TGMediaCenterFilterIdentifierForIndex(NSInteger index) {
         case 3: return @"audio";
         case 4: return @"voice";
         case 5: return @"animations";
-        case 6: return @"stickers";
-        case 7: return @"polls";
+        case 6: return @"polls";
         default: return @"all";
     }
 }
 
 static NSArray *TGMediaCenterFilterIdentifiersForSelection(NSInteger index) {
     if (index == 0) {
-        return [NSArray arrayWithObjects:@"photos", @"videos", @"videoNotes", nil];
+        return [NSArray arrayWithObjects:@"photos", @"videos", nil];
+    }
+    if (index == 4) {
+        return [NSArray arrayWithObjects:@"voice", @"videoNotes", nil];
+    }
+    if (index == 7) {
+        return [NSArray array];
     }
     NSString *single = TGMediaCenterFilterIdentifierForIndex(index);
     if (![single isEqualToString:@"all"]) {
         return [NSArray arrayWithObject:single];
     }
-    return [NSArray arrayWithObjects:@"photos", @"videos", @"videoNotes", @"documents", @"links", @"audio", @"voice", @"animations", @"stickers", @"polls", nil];
+    return [NSArray arrayWithObjects:@"photos", @"videos", @"documents", @"links", @"audio", @"voice", @"videoNotes", @"animations", @"polls", nil];
 }
 
 static NSString *TGMediaCenterReadableSize(unsigned long long bytes) {
@@ -180,7 +185,11 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
 }
 
 static BOOL TGMediaCenterSelectionUsesGrid(NSInteger index) {
-    return (index == 0 || index == 5 || index == 6);
+    return (index == 0 || index == 5);
+}
+
+static BOOL TGMediaCenterSelectionUsesGroups(NSInteger index) {
+    return (index == 7);
 }
 
 static NSString *TGMediaCenterExtensionBadgeForItem(TGMessageItem *item) {
@@ -341,13 +350,22 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [infoText setAutoresizingMask:NSViewWidthSizable];
     [infoCard addSubview:infoText];
 
-    NSSegmentedControl *tabControl = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(36.0, 382.0, NSWidth(frame) - 72.0, 28.0)] autorelease];
-    NSArray *tabTitles = [NSArray arrayWithObjects:@"Media", @"Files", @"Links", @"Music", @"Voice", @"GIF", @"Stickers", @"Polls", nil];
+    NSSegmentedControl *tabControl = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(66.0, 382.0, NSWidth(frame) - 132.0, 28.0)] autorelease];
+    NSArray *tabTitles = [NSArray arrayWithObjects:
+                          TGLoc(@"media.center.tab.media"),
+                          TGLoc(@"media.center.tab.files"),
+                          TGLoc(@"media.center.tab.links"),
+                          TGLoc(@"media.center.tab.music"),
+                          TGLoc(@"media.center.tab.voice"),
+                          TGLoc(@"media.center.tab.gif"),
+                          TGLoc(@"media.center.tab.polls"),
+                          TGLoc(@"media.center.tab.groups"),
+                          nil];
     [tabControl setSegmentCount:[tabTitles count]];
     NSUInteger tabIndex = 0;
     for (tabIndex = 0; tabIndex < [tabTitles count]; tabIndex++) {
         [tabControl setLabel:[tabTitles objectAtIndex:tabIndex] forSegment:tabIndex];
-        [tabControl setWidth:82.0 forSegment:tabIndex];
+        [tabControl setWidth:76.0 forSegment:tabIndex];
     }
     [tabControl setSelectedSegment:0];
     [tabControl setTarget:self];
@@ -414,10 +432,14 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    [self.mediaCenterTabControl setFrame:NSMakeRect(36.0, height - 298.0, width - 72.0, 28.0)];
-    [self.mediaCenterStatusField setFrame:NSMakeRect(36.0, height - 330.0, width - 88.0, 18.0)];
-    [self.mediaCenterRefreshButton setFrame:NSMakeRect(width - 72.0, height - 336.0, 34.0, 30.0)];
-    [self.mediaCenterScrollView setFrame:NSMakeRect(36.0, 24.0, width - 72.0, MAX(120.0, height - 362.0))];
+    CGFloat tabWidth = 608.0;
+    if (tabWidth > width - 72.0) {
+        tabWidth = width - 72.0;
+    }
+    [self.mediaCenterTabControl setFrame:NSMakeRect(floor((width - tabWidth) / 2.0), height - 298.0, tabWidth, 28.0)];
+    [self.mediaCenterStatusField setFrame:NSMakeRect(52.0, height - 334.0, width - 136.0, 18.0)];
+    [self.mediaCenterRefreshButton setFrame:NSMakeRect(width - 72.0, height - 342.0, 34.0, 30.0)];
+    [self.mediaCenterScrollView setFrame:NSMakeRect(36.0, 24.0, width - 72.0, MAX(120.0, height - 370.0))];
     [self.mediaCenterLoadingSpinner setFrame:NSMakeRect(floor((width - 24.0) / 2.0),
                                                         floor((height - 24.0) / 2.0) - 64.0,
                                                         24.0,
@@ -568,6 +590,44 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     }
 }
 
+- (void)buildMediaCenterGroupRowsWithItems:(NSArray *)items width:(CGFloat)width {
+    CGFloat rowHeight = 66.0;
+    CGFloat gap = 8.0;
+    CGFloat contentHeight = gap + (CGFloat)[items count] * (rowHeight + gap);
+    [self.mediaCenterResultsView setFrame:NSMakeRect(0.0, 0.0, width, MAX(100.0, contentHeight))];
+
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        id object = [items objectAtIndex:index];
+        if (![object isKindOfClass:[TGChatItem class]]) {
+            continue;
+        }
+        TGChatItem *chatItem = (TGChatItem *)object;
+        CGFloat y = gap + (CGFloat)index * (rowHeight + gap);
+        TGGroupedCardView *row = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(gap, y, width - gap * 2.0, rowHeight)] autorelease];
+        [self.mediaCenterResultsView addSubview:row];
+
+        TGProfileAvatarView *avatar = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(12.0, 12.0, 42.0, 42.0)] autorelease];
+        [avatar setDisplayName:([chatItem.title length] > 0 ? chatItem.title : @"Group")];
+        [avatar setAvatarLocalPath:chatItem.avatarLocalPath];
+        [row addSubview:avatar];
+
+        NSTextField *title = [self labelWithFrame:NSMakeRect(68.0, 13.0, NSWidth([row bounds]) - 86.0, 22.0)
+                                             text:([chatItem.title length] > 0 ? chatItem.title : TGLoc(@"media.center.group.untitled"))
+                                             font:[NSFont boldSystemFontOfSize:13.0]];
+        [[title cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [row addSubview:title];
+
+        NSString *details = ([chatItem.typeSummary length] > 0 ? chatItem.typeSummary : TGLoc(@"media.center.tab.groups"));
+        NSTextField *subtitle = [self labelWithFrame:NSMakeRect(68.0, 36.0, NSWidth([row bounds]) - 86.0, 18.0)
+                                                text:details
+                                                font:[NSFont systemFontOfSize:12.0]];
+        [[subtitle cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [self applyMutedLabelStyle:subtitle];
+        [row addSubview:subtitle];
+    }
+}
+
 - (void)rebuildMediaCenterRows {
     if (!self.mediaCenterResultsView) {
         return;
@@ -579,16 +639,26 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     }
     [subviews release];
 
+    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
     NSInteger sortIndex = [self.mediaCenterSortPopUpButton indexOfSelectedItem];
-    NSArray *items = [[self.mediaCenterItems sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
-        return TGMediaCenterCompareItems(left, right, sortIndex);
-    }] retain];
+    NSArray *items = nil;
+    if (TGMediaCenterSelectionUsesGroups(selectedTab)) {
+        items = [[self.mediaCenterItems sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+            NSString *leftTitle = [left isKindOfClass:[TGChatItem class]] ? [(TGChatItem *)left title] : @"";
+            NSString *rightTitle = [right isKindOfClass:[TGChatItem class]] ? [(TGChatItem *)right title] : @"";
+            return [leftTitle localizedCaseInsensitiveCompare:rightTitle];
+        }] retain];
+    } else {
+        items = [[self.mediaCenterItems sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+            return TGMediaCenterCompareItems(left, right, sortIndex);
+        }] retain];
+    }
 
     CGFloat width = MAX(420.0, NSWidth([self.mediaCenterScrollView bounds]) - 18.0);
 
     if ([items count] == 0) {
         NSTextField *empty = [self labelWithFrame:NSMakeRect(18.0, 34.0, width - 36.0, 20.0)
-                                             text:(self.mediaCenterLoading ? TGLoc(@"media.center.loading") : TGLoc(@"media.center.empty"))
+                                             text:(self.mediaCenterLoading ? TGLoc(@"media.center.loading") : (TGMediaCenterSelectionUsesGroups(selectedTab) ? TGLoc(@"media.center.groups.empty") : TGLoc(@"media.center.empty")))
                                              font:[NSFont systemFontOfSize:13.0]];
         [self applyMutedLabelStyle:empty];
         [self.mediaCenterResultsView addSubview:empty];
@@ -596,8 +666,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         return;
     }
 
-    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
-    if (TGMediaCenterSelectionUsesGrid(selectedTab)) {
+    if (TGMediaCenterSelectionUsesGroups(selectedTab)) {
+        [self buildMediaCenterGroupRowsWithItems:items width:width];
+    } else if (TGMediaCenterSelectionUsesGrid(selectedTab)) {
         [self buildMediaCenterGridRowsWithItems:items width:width];
     } else {
         [self buildMediaCenterListRowsWithItems:items width:width];
@@ -609,13 +680,18 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 
 - (TGMessageItem *)mediaCenterItemForSender:(id)sender {
     NSInteger index = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
+    NSInteger selectedTab = self.mediaCenterTabControl ? [self.mediaCenterTabControl selectedSegment] : 0;
+    if (TGMediaCenterSelectionUsesGroups(selectedTab)) {
+        return nil;
+    }
     NSArray *items = [self.mediaCenterItems sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
         return TGMediaCenterCompareItems(left, right, [self.mediaCenterSortPopUpButton indexOfSelectedItem]);
     }];
     if (index < 0 || (NSUInteger)index >= [items count]) {
         return nil;
     }
-    return [items objectAtIndex:(NSUInteger)index];
+    id object = [items objectAtIndex:(NSUInteger)index];
+    return [object isKindOfClass:[TGMessageItem class]] ? (TGMessageItem *)object : nil;
 }
 
 - (void)reloadMediaCenter:(id)sender {
@@ -625,6 +701,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *threadID = [self.selectedMessageThreadID retain];
     NSString *topicKind = [self.selectedMessageTopicKind copy];
+    NSString *selectedTypeSummary = [self.selectedChatTypeSummary copy];
     NSString *query = nil;
     if (self.mediaCenterSearchField) {
         query = [[self.mediaCenterSearchField stringValue] copy];
@@ -636,6 +713,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     if (selectedTab < 0) {
         selectedTab = 0;
     }
+    BOOL groupsMode = TGMediaCenterSelectionUsesGroups(selectedTab);
     NSArray *filters = [TGMediaCenterFilterIdentifiersForSelection(selectedTab) retain];
     NSUInteger generation = self.mediaCenterGeneration + 1;
     self.mediaCenterGeneration = generation;
@@ -651,6 +729,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [chatID release];
         [threadID release];
         [topicKind release];
+        [selectedTypeSummary release];
         [query release];
         [filters release];
         return;
@@ -662,32 +741,54 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         NSMutableArray *foundItems = [NSMutableArray array];
         NSMutableSet *seenKeys = [NSMutableSet set];
         NSError *lastError = nil;
-        NSUInteger filterIndex = 0;
-        for (filterIndex = 0; filterIndex < [filters count]; filterIndex++) {
-            NSString *filter = [filters objectAtIndex:filterIndex];
-            NSError *searchError = nil;
-            NSArray *results = [client searchMessagePreviewItemsForChatID:chatID
-                                                           messageThreadID:threadID
-                                                          messageTopicKind:topicKind
-                                                                     query:query
-                                                                    filter:filter
-                                                             fromMessageID:nil
-                                                                     limit:36
-                                                                   timeout:8.0
-                                                                     error:&searchError];
-            if (!results) {
-                lastError = searchError;
-                continue;
+        if (groupsMode) {
+            NSString *typeSummary = ([selectedTypeSummary length] > 0 ? [selectedTypeSummary lowercaseString] : @"");
+            BOOL privateChat = ([chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] > 0LL);
+            if ([typeSummary rangeOfString:@"private"].location != NSNotFound) {
+                privateChat = YES;
             }
-            NSUInteger resultIndex = 0;
-            for (resultIndex = 0; resultIndex < [results count]; resultIndex++) {
-                TGMessageItem *item = [results objectAtIndex:resultIndex];
-                NSString *key = [NSString stringWithFormat:@"%@:%@",
-                                 [item chatID] ? [item chatID] : chatID,
-                                 [item messageID] ? [item messageID] : [NSNumber numberWithUnsignedInteger:resultIndex]];
-                if (![seenKeys containsObject:key]) {
-                    [seenKeys addObject:key];
-                    [foundItems addObject:item];
+            if (!privateChat) {
+                lastError = [NSError errorWithDomain:@"TelegraphicaMediaCenter"
+                                                code:601
+                                            userInfo:[NSDictionary dictionaryWithObject:TGLoc(@"media.center.groups.privateOnly")
+                                                                                 forKey:NSLocalizedDescriptionKey]];
+            } else {
+                NSError *groupsError = nil;
+                NSArray *groups = [client commonGroupChatPreviewItemsForUserID:chatID limit:36 timeout:8.0 error:&groupsError];
+                if (groups) {
+                    [foundItems addObjectsFromArray:groups];
+                } else {
+                    lastError = groupsError;
+                }
+            }
+        } else {
+            NSUInteger filterIndex = 0;
+            for (filterIndex = 0; filterIndex < [filters count]; filterIndex++) {
+                NSString *filter = [filters objectAtIndex:filterIndex];
+                NSError *searchError = nil;
+                NSArray *results = [client searchMessagePreviewItemsForChatID:chatID
+                                                               messageThreadID:threadID
+                                                              messageTopicKind:topicKind
+                                                                         query:query
+                                                                        filter:filter
+                                                                 fromMessageID:nil
+                                                                         limit:36
+                                                                       timeout:8.0
+                                                                         error:&searchError];
+                if (!results) {
+                    lastError = searchError;
+                    continue;
+                }
+                NSUInteger resultIndex = 0;
+                for (resultIndex = 0; resultIndex < [results count]; resultIndex++) {
+                    TGMessageItem *item = [results objectAtIndex:resultIndex];
+                    NSString *key = [NSString stringWithFormat:@"%@:%@",
+                                     [item chatID] ? [item chatID] : chatID,
+                                     [item messageID] ? [item messageID] : [NSNumber numberWithUnsignedInteger:resultIndex]];
+                    if (![seenKeys containsObject:key]) {
+                        [seenKeys addObject:key];
+                        [foundItems addObject:item];
+                    }
                 }
             }
         }
@@ -701,16 +802,22 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                 unsigned long long cacheBytes = 0;
                 NSUInteger cacheIndex = 0;
                 for (cacheIndex = 0; cacheIndex < [self.mediaCenterItems count]; cacheIndex++) {
-                    cacheBytes += TGMediaCenterFileSizeAtPath(TGMediaCenterLocalPathForItem([self.mediaCenterItems objectAtIndex:cacheIndex]));
+                    id object = [self.mediaCenterItems objectAtIndex:cacheIndex];
+                    if ([object isKindOfClass:[TGMessageItem class]]) {
+                        cacheBytes += TGMediaCenterFileSizeAtPath(TGMediaCenterLocalPathForItem((TGMessageItem *)object));
+                    }
                 }
-                if ([self.mediaCenterItems count] > 0) {
+                if ([self.mediaCenterItems count] > 0 && groupsMode) {
+                    [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.groups.loadedStatus"),
+                                                                 (unsigned long)[self.mediaCenterItems count]]];
+                } else if ([self.mediaCenterItems count] > 0) {
                     [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.loadedStatus"),
                                                                  (unsigned long)[self.mediaCenterItems count],
                                                                  TGMediaCenterReadableSize(cacheBytes)]];
                 } else if ([errorMessage length] > 0) {
                     [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.failed"), errorMessage]];
                 } else {
-                    [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.empty")];
+                    [self.mediaCenterStatusField setStringValue:(groupsMode ? TGLoc(@"media.center.groups.empty") : TGLoc(@"media.center.empty"))];
                 }
                 [self rebuildMediaCenterRows];
             }
@@ -719,6 +826,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
             [chatID release];
             [threadID release];
             [topicKind release];
+            [selectedTypeSummary release];
             [query release];
             [filters release];
             [client release];
@@ -848,52 +956,13 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     if (!item) {
         return;
     }
-    NSImage *image = TGMediaCenterPreviewImageForItem(item);
-    if (!image) {
+    NSString *path = TGMediaCenterLocalPathForItem(item);
+    BOOL preferAnimated = ([[item contentType] isEqualToString:@"messageAnimation"]);
+    if ([path length] == 0 || ![self openMediaPreviewAtPath:path preferAnimated:preferAnimated]) {
         [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.previewUnavailable")];
         return;
     }
     [self closeMediaCenterInlinePreview:nil];
-    NSView *contentView = [self.mediaCenterWindow contentView];
-    TGGroupedCardView *overlay = [[[TGGroupedCardView alloc] initWithFrame:[self.mediaCenterScrollView frame]] autorelease];
-    [overlay setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(18.0,
-                                                              NSHeight([overlay bounds]) - 36.0,
-                                                              NSWidth([overlay bounds]) - 72.0,
-                                                              20.0)
-                                              text:TGMediaCenterTitleForItem(item)
-                                              font:[NSFont boldSystemFontOfSize:13.0]];
-    [[titleField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
-    [overlay addSubview:titleField];
-
-    NSButton *closeButton = [[[TGHeaderActionButton alloc] initWithFrame:NSMakeRect(NSWidth([overlay bounds]) - 44.0,
-                                                                                   NSHeight([overlay bounds]) - 40.0,
-                                                                                   28.0,
-                                                                                   26.0)] autorelease];
-    [closeButton setTitle:@"×"];
-    [closeButton setTarget:self];
-    [closeButton setAction:@selector(closeMediaCenterInlinePreview:)];
-    [self applyHeaderIconButtonStyle:closeButton];
-    [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
-    [overlay addSubview:closeButton];
-
-    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(18.0,
-                                                                            18.0,
-                                                                            NSWidth([overlay bounds]) - 36.0,
-                                                                            MAX(80.0, NSHeight([overlay bounds]) - 64.0))] autorelease];
-    [imageView setImage:image];
-    [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
-    [imageView setImageFrameStyle:NSImageFrameNone];
-    [imageView setAnimates:YES];
-    [imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [overlay addSubview:imageView];
-
-    [contentView addSubview:overlay positioned:NSWindowAbove relativeTo:self.mediaCenterScrollView];
-    self.mediaCenterPreviewOverlayView = overlay;
-    self.mediaCenterPreviewImageView = imageView;
-    self.mediaCenterPreviewTitleField = titleField;
-    self.mediaCenterPreviewCloseButton = closeButton;
 }
 
 - (void)goToMediaCenterItem:(id)sender {
@@ -912,6 +981,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     result.snippet = TGMediaCenterTitleForItem(item);
     result.mediaType = TGMediaCenterTypeTitleForItem(item);
     result.messageItem = item;
+    [self.mediaCenterWindow close];
     [self jumpToSearchResult:result];
 }
 
