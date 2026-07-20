@@ -65,6 +65,7 @@ static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvai
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
+static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 @interface TGPointingHandButton : NSButton
 @end

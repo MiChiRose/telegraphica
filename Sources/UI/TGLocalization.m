@@ -301,6 +301,7 @@ NSString *TGLoc(NSString *key) {
                         @"Все права защищены.", @"about.rights",
                         @"Автор: Yura Menschikov", @"about.author",
                         @"Проект на GitHub", @"about.project",
+                        @"Канал Telegraphica в Telegram", @"about.channel",
                         nil];
     NSDictionary *be = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Чаты", @"chats",
@@ -582,6 +583,7 @@ NSString *TGLoc(NSString *key) {
                         @"Усе правы абаронены.", @"about.rights",
                         @"Аўтар: Yura Menschikov", @"about.author",
                         @"Праект на GitHub", @"about.project",
+                        @"Канал Telegraphica у Telegram", @"about.channel",
                         nil];
     NSDictionary *en = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Chats", @"chats",
@@ -863,6 +865,7 @@ NSString *TGLoc(NSString *key) {
                         @"All rights reserved.", @"about.rights",
                         @"Author: Yura Menschikov", @"about.author",
                         @"Project on GitHub", @"about.project",
+                        @"Telegraphica Telegram channel", @"about.channel",
                         nil];
     NSDictionary *dictionary = [language isEqualToString:@"be"] ? be : ([language isEqualToString:@"en"] ? en : ru);
     NSString *value = [dictionary objectForKey:key];

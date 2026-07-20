@@ -1051,6 +1051,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
     NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 428, 66, 30)] autorelease];
     [recentButton setTitle:TGLoc(@"stickers.recent.short")];
+    [recentButton setImage:TGTemplateIconAssetImage(@"history", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [recentButton setImagePosition:NSImageLeft];
     [recentButton setTarget:self];
     [recentButton setAction:@selector(selectRecentStickerPickerTab:)];
     [recentButton setToolTip:TGLoc(@"stickers.recent.tab")];
@@ -1060,6 +1062,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
     NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(94, 428, 66, 30)] autorelease];
     [favoriteButton setTitle:TGLoc(@"stickers.favorites.short")];
+    [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [favoriteButton setImagePosition:NSImageLeft];
     [favoriteButton setTarget:self];
     [favoriteButton setAction:@selector(selectFavoriteStickerPickerTab:)];
     [favoriteButton setToolTip:TGLoc(@"stickers.favorites.tab")];
@@ -1067,10 +1071,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
-    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(176, 429, 196, 28)] autorelease];
+    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(176, 429, 208, 28)] autorelease];
     [contentView addSubview:stickerSearchBackground];
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(186, 434, 176, 18)] autorelease];
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(186, 434, 188, 18)] autorelease];
     [self applyComposerTextFieldStyle:searchField];
     if ([[searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
         [[searchField cell] setSearchButtonCell:nil];
@@ -1085,8 +1089,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:searchField];
     self.stickerPickerSearchField = searchField;
 
-    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(384, 428, 76, 30)] autorelease];
-    [removeSetButton setTitle:TGLoc(@"stickers.removeSet.short")];
+    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(394, 428, 42, 30)] autorelease];
+    [removeSetButton setTitle:@""];
+    [removeSetButton setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(16.0, 16.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [removeSetButton setImagePosition:NSImageOnly];
     [removeSetButton setTarget:self];
     [removeSetButton setAction:@selector(removeSelectedStickerSetFromPicker:)];
     [removeSetButton setToolTip:TGLoc(@"stickers.removeSet")];

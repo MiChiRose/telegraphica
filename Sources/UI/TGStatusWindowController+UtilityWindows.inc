@@ -644,8 +644,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
                                         TGClassicLinkColor(), NSForegroundColorAttributeName,
                                         [NSNumber numberWithInteger:NSUnderlineStyleSingle], NSUnderlineStyleAttributeName,
                                         nil];
-        NSButton *authorButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 140, 340, 24)] autorelease];
+        NSButton *authorButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 142, 340, 24)] autorelease];
         [authorButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.author") attributes:linkAttributes] autorelease]];
+        [authorButton setImage:TGTemplateIconAssetImage(@"instagram", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
+        [authorButton setImagePosition:NSImageLeft];
         [authorButton setBordered:NO];
         [authorButton setButtonType:NSMomentaryPushInButton];
         [authorButton setTarget:self];
@@ -654,8 +656,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [[authorButton cell] setAlignment:NSCenterTextAlignment];
         [contentView addSubview:authorButton];
 
-        NSButton *projectButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 108, 340, 24)] autorelease];
+        NSButton *projectButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 112, 340, 24)] autorelease];
         [projectButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.project") attributes:linkAttributes] autorelease]];
+        [projectButton setImage:TGTemplateIconAssetImage(@"github", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
+        [projectButton setImagePosition:NSImageLeft];
         [projectButton setBordered:NO];
         [projectButton setButtonType:NSMomentaryPushInButton];
         [projectButton setTarget:self];
@@ -663,6 +667,18 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [projectButton setToolTip:TGProjectURLString];
         [[projectButton cell] setAlignment:NSCenterTextAlignment];
         [contentView addSubview:projectButton];
+
+        NSButton *channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 82, 340, 24)] autorelease];
+        [channelButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.channel") attributes:linkAttributes] autorelease]];
+        [channelButton setImage:TGTemplateIconAssetImage(@"discover-compass", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
+        [channelButton setImagePosition:NSImageLeft];
+        [channelButton setBordered:NO];
+        [channelButton setButtonType:NSMomentaryPushInButton];
+        [channelButton setTarget:self];
+        [channelButton setAction:@selector(openChannelPage:)];
+        [channelButton setToolTip:TGChannelURLString];
+        [[channelButton cell] setAlignment:NSCenterTextAlignment];
+        [contentView addSubview:channelButton];
 
         NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(180, 18, 120, 30)];
         [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin)];
@@ -683,6 +699,12 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 - (void)openAuthorPage:(id)sender {
     (void)sender;
     [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGAuthorURLString]];
+}
+
+- (void)openChannelPage:(id)sender {
+    (void)sender;
+    [self.aboutWindow orderOut:nil];
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGChannelURLString]];
 }
 
 - (void)themeSelectionChanged:(id)sender {
