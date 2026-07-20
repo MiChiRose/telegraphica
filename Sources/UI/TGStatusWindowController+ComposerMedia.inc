@@ -1113,7 +1113,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [setScrollView setBorderType:NSNoBorder];
     [setScrollView setDrawsBackground:NO];
     [setScrollView setHasVerticalScroller:NO];
-    [setScrollView setHasHorizontalScroller:YES];
+    [setScrollView setHasHorizontalScroller:NO];
     [setScrollView setAutohidesScrollers:YES];
     [setScrollView setAutoresizingMask:NSViewWidthSizable];
     NSView *setContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 514, 50)] autorelease];
@@ -1508,6 +1508,24 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [scrollView reflectScrolledClipView:[scrollView contentView]];
 }
 
+- (void)scrollStickerPickerGridToTop {
+    NSScrollView *scrollView = self.stickerPickerScrollView;
+    NSView *documentView = self.stickerPickerContentView;
+    if (!scrollView || !documentView) {
+        return;
+    }
+    NSClipView *clipView = [scrollView contentView];
+    NSRect visibleBounds = [clipView bounds];
+    NSRect documentFrame = [documentView frame];
+    CGFloat targetY = NSHeight(documentFrame) - NSHeight(visibleBounds);
+    if (targetY < 0.0) {
+        targetY = 0.0;
+    }
+    [clipView scrollToPoint:NSMakePoint(0.0, targetY)];
+    [scrollView reflectScrolledClipView:clipView];
+    [self refreshStickerPickerPlayback];
+}
+
 - (void)reloadStickerPickerSetsIfNeeded {
     if ([self.stickerPickerStickerSets count] > 0) {
         [self rebuildStickerPickerSetRail];
@@ -1700,6 +1718,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: recent stickers unavailable: %@", [errorMessage length] > 0 ? errorMessage : @"empty response"]];
             }
             [self rebuildStickerPickerGrid];
+            [self scrollStickerPickerGridToTop];
             [items release];
             [errorMessage release];
             [client release];
@@ -1726,6 +1745,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 [self.stickerPickerStatusField setStringValue:([items count] > 0 ? @"Favorite stickers" : ([errorMessage length] > 0 ? errorMessage : @"No favorite stickers yet"))];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: loaded favorite stickers count=%lu%@", (unsigned long)[items count], [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
                 [self rebuildStickerPickerGrid];
+                [self scrollStickerPickerGridToTop];
             }
             [items release];
             [errorMessage release];
@@ -1740,6 +1760,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self.stickerPickerStatusField setStringValue:[NSString stringWithFormat:@"Searching %@...", query]];
     self.stickerPickerItems = [NSArray array];
     [self rebuildStickerPickerGrid];
+    [self scrollStickerPickerGridToTop];
     TGTDLibClient *client = [self.client retain];
     NSUInteger generation = self.stickerPickerLoadGeneration + 1;
     self.stickerPickerLoadGeneration = generation;
@@ -1755,6 +1776,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 [self.stickerPickerStatusField setStringValue:([items count] > 0 ? [NSString stringWithFormat:@"Stickers for %@", query] : ([errorMessage length] > 0 ? errorMessage : @"No stickers found"))];
                 [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: emoji search query=%@ count=%lu%@", query, (unsigned long)[items count], [errorMessage length] > 0 ? [NSString stringWithFormat:@" error=%@", errorMessage] : @""]];
                 [self rebuildStickerPickerGrid];
+                [self scrollStickerPickerGridToTop];
             }
             [items release];
             [errorMessage release];
@@ -1785,12 +1807,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [self.stickerPickerStatusField setStringValue:title];
         [self updateStickerPickerRailThumbnailForSetID:setID withItem:[cachedItems objectAtIndex:0]];
         [self rebuildStickerPickerGrid];
+        [self scrollStickerPickerGridToTop];
         return;
     }
 
     [self.stickerPickerStatusField setStringValue:[NSString stringWithFormat:@"Loading %@...", title]];
     self.stickerPickerItems = [NSArray array];
     [self rebuildStickerPickerGrid];
+    [self scrollStickerPickerGridToTop];
 
     TGTDLibClient *client = [self.client retain];
     NSNumber *selectedSetID = [setID retain];
@@ -1820,6 +1844,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Stickers: set %@ unavailable: %@", titleCopy, [errorMessage length] > 0 ? errorMessage : @"empty response"]];
                 }
                 [self rebuildStickerPickerGrid];
+                [self scrollStickerPickerGridToTop];
             }
             [items release];
             [errorMessage release];

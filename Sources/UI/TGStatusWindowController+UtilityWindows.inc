@@ -672,8 +672,77 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 
 - (void)openChannelPage:(id)sender {
     (void)sender;
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"about.channel.open.title")];
+    [alert setInformativeText:TGLoc(@"about.channel.open.message")];
+    [alert addButtonWithTitle:TGLoc(@"about.channel.open.app")];
+    [alert addButtonWithTitle:TGLoc(@"about.channel.open.browser")];
+    [alert addButtonWithTitle:TGLoc(@"common.cancel")];
+
+    NSInteger result = [alert runModal];
+    if (result == NSAlertSecondButtonReturn) {
+        [self.aboutWindow orderOut:nil];
+        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGChannelURLString]];
+        return;
+    }
+    if (result != NSAlertFirstButtonReturn) {
+        return;
+    }
+
     [self.aboutWindow orderOut:nil];
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGChannelURLString]];
+    [self openTelegraphicaChannelInApp];
+}
+
+- (void)openTelegraphicaChannelInApp {
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGChannelURLString]];
+        return;
+    }
+
+    [self appendDetail:TGLoc(@"about.channel.opening")];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *lookupError = nil;
+        TGChatItem *channelItem = [[client publicChatPreviewItemForUsername:@"macos_telegraphica"
+                                                                    timeout:8.0
+                                                                      error:&lookupError] retain];
+        NSString *errorMessage = [[lookupError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (channelItem) {
+                NSUInteger existingIndex = [self indexOfChatID:[channelItem chatID] inChatItems:self.chatItems];
+                if (existingIndex == NSNotFound) {
+                    [self.chatItems insertObject:channelItem atIndex:0];
+                    [self applyLocalNotificationMuteStateToItems:self.chatItems];
+                    [self updateSavedMessagesPresentationForChatItems];
+                    [self.chatTableView reloadData];
+                    existingIndex = 0;
+                }
+                self.activeSection = TGSectionChats;
+                [self updateVisibleSection];
+                [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:existingIndex] byExtendingSelection:NO];
+                [self.chatTableView scrollRowToVisible:existingIndex];
+                [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                                 object:self.chatTableView]];
+                [self appendDetail:TGLoc(@"about.channel.opened")];
+            } else {
+                NSString *message = [errorMessage length] > 0 ? errorMessage : TGLoc(@"about.channel.open.failed");
+                [self appendDetail:[NSString stringWithFormat:@"%@ %@", TGLoc(@"about.channel.open.failed"), message]];
+                NSAlert *fallback = [[[NSAlert alloc] init] autorelease];
+                [fallback setMessageText:TGLoc(@"about.channel.open.failed")];
+                [fallback setInformativeText:TGLoc(@"about.channel.open.browserFallback")];
+                [fallback addButtonWithTitle:TGLoc(@"about.channel.open.browser")];
+                [fallback addButtonWithTitle:TGLoc(@"common.cancel")];
+                if ([fallback runModal] == NSAlertFirstButtonReturn) {
+                    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGChannelURLString]];
+                }
+            }
+            [channelItem release];
+            [errorMessage release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)themeSelectionChanged:(id)sender {

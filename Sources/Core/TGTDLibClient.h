@@ -24,6 +24,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (NSArray *)mainChatPreviewItemsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)chatPreviewItemsForChatFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error;
 - (NSArray *)searchChatPreviewItemsWithQuery:(NSString *)query limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (id)publicChatPreviewItemForUsername:(NSString *)username timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)mainChatListExhausted;
 - (void)invalidateMainChatListExhaustion;
 - (NSArray *)recentMessagePreviewItemsForChatID:(NSNumber *)chatID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;

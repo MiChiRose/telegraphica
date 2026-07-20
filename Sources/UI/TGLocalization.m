@@ -340,6 +340,15 @@ NSString *TGLoc(NSString *key) {
                         @"Автор: Yura Menschikov", @"about.author",
                         @"Проект на GitHub", @"about.project",
                         @"Канал Telegraphica в Telegram", @"about.channel",
+                        @"Открыть канал Telegraphica", @"about.channel.open.title",
+                        @"Где открыть канал @macos_telegraphica?", @"about.channel.open.message",
+                        @"В Telegraphica", @"about.channel.open.app",
+                        @"В браузере", @"about.channel.open.browser",
+                        @"Отмена", @"common.cancel",
+                        @"Открываю канал Telegraphica...", @"about.channel.opening",
+                        @"Канал Telegraphica открыт.", @"about.channel.opened",
+                        @"Не удалось открыть канал в Telegraphica.", @"about.channel.open.failed",
+                        @"Можно открыть канал в браузере.", @"about.channel.open.browserFallback",
                         nil];
     NSDictionary *be = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Чаты", @"chats",
@@ -660,6 +669,15 @@ NSString *TGLoc(NSString *key) {
                         @"Аўтар: Yura Menschikov", @"about.author",
                         @"Праект на GitHub", @"about.project",
                         @"Канал Telegraphica у Telegram", @"about.channel",
+                        @"Адкрыць канал Telegraphica", @"about.channel.open.title",
+                        @"Дзе адкрыць канал @macos_telegraphica?", @"about.channel.open.message",
+                        @"У Telegraphica", @"about.channel.open.app",
+                        @"У браўзеры", @"about.channel.open.browser",
+                        @"Скасаваць", @"common.cancel",
+                        @"Адкрываю канал Telegraphica...", @"about.channel.opening",
+                        @"Канал Telegraphica адкрыты.", @"about.channel.opened",
+                        @"Не ўдалося адкрыць канал у Telegraphica.", @"about.channel.open.failed",
+                        @"Можна адкрыць канал у браўзеры.", @"about.channel.open.browserFallback",
                         nil];
     NSDictionary *en = [NSDictionary dictionaryWithObjectsAndKeys:
                         @"Chats", @"chats",
@@ -980,6 +998,15 @@ NSString *TGLoc(NSString *key) {
                         @"Author: Yura Menschikov", @"about.author",
                         @"Project on GitHub", @"about.project",
                         @"Telegraphica Telegram channel", @"about.channel",
+                        @"Open Telegraphica channel", @"about.channel.open.title",
+                        @"Where should @macos_telegraphica be opened?", @"about.channel.open.message",
+                        @"In Telegraphica", @"about.channel.open.app",
+                        @"In browser", @"about.channel.open.browser",
+                        @"Cancel", @"common.cancel",
+                        @"Opening Telegraphica channel...", @"about.channel.opening",
+                        @"Telegraphica channel opened.", @"about.channel.opened",
+                        @"Could not open the channel in Telegraphica.", @"about.channel.open.failed",
+                        @"You can open the channel in the browser instead.", @"about.channel.open.browserFallback",
                         nil];
     NSDictionary *dictionary = [language isEqualToString:@"be"] ? be : ([language isEqualToString:@"en"] ? en : ru);
     NSString *value = [dictionary objectForKey:key];

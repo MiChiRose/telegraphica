@@ -3280,6 +3280,57 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return items;
 }
 
+- (id)publicChatPreviewItemForUsername:(NSString *)username timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to open public chat. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:193];
+        }
+        return nil;
+    }
+
+    NSString *safeUsername = [username isKindOfClass:[NSString class]] ? [username stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"";
+    if ([safeUsername hasPrefix:@"@"]) {
+        safeUsername = [safeUsername substringFromIndex:1];
+    }
+    if ([safeUsername length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Public chat username is empty." code:194];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"searchPublicChat" forKey:@"@type"];
+    [request setObject:safeUsername forKey:@"username"];
+
+    NSError *searchError = nil;
+    NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:request
+                                                            extraPrefix:@"telegraphica-public-chat"
+                                                                timeout:timeout
+                                                              errorCode:195
+                                                                  error:&searchError];
+    if (!chatResponse) {
+        if (error) {
+            *error = searchError;
+        }
+        return nil;
+    }
+
+    NSUInteger avatarDownloadsRemaining = 1;
+    TGChatItem *item = [self chatPreviewItemFromChatObject:chatResponse
+                                               chatListType:@"chatListMain"
+                                                   filterID:nil
+                                             downloadAvatar:YES
+                                      avatarDownloadCounter:&avatarDownloadsRemaining
+                                                   timeout:1.0];
+    if (!item && error) {
+        *error = [self errorWithDescription:@"TDLib public chat lookup returned an unexpected response." code:196];
+    }
+    return item;
+}
+
 - (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject {
     if (![topicObject isKindOfClass:[NSDictionary class]]) {
         return nil;
