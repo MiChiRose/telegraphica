@@ -89,6 +89,12 @@
         [_searchField setBordered:NO];
         [_searchField setDrawsBackground:NO];
         [_searchField setFocusRingType:NSFocusRingTypeNone];
+        if ([[_searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
+            [[_searchField cell] setSearchButtonCell:nil];
+        }
+        if ([[_searchField cell] respondsToSelector:@selector(setCancelButtonCell:)]) {
+            [[_searchField cell] setCancelButtonCell:nil];
+        }
         [[_searchField cell] setPlaceholderString:TGLoc(@"search.chats.placeholder")];
         [self addSubview:_searchField];
 
@@ -192,7 +198,7 @@
     CGFloat closeSide = 28.0;
     [_titleField setFrame:NSMakeRect(inset + 4.0, 18.0, MAX(80.0, NSWidth(bounds) - (inset * 2.0) - closeSide - 12.0), 22.0)];
     [_closeButton setFrame:NSMakeRect(NSWidth(bounds) - inset - closeSide, 15.0, closeSide, 26.0)];
-    [_searchField setFrame:NSMakeRect(inset + 10.0, 60.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), 28.0)];
+    [_searchField setFrame:NSMakeRect(inset + 42.0, 64.0, MAX(92.0, NSWidth(bounds) - (inset * 2.0) - 52.0), 20.0)];
     [_statusField setFrame:NSMakeRect(inset + 12.0, 96.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 24.0), 18.0)];
     [_scrollView setFrame:NSMakeRect(inset + 10.0, 126.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), MAX(80.0, NSHeight(bounds) - 148.0))];
 
@@ -228,11 +234,18 @@
     [searchCardPath stroke];
 
     NSRect inputRect = NSInsetRect([_searchField frame], -2.0, -2.0);
+    inputRect.origin.x -= 30.0;
+    inputRect.size.width += 30.0;
     NSBezierPath *inputPath = [NSBezierPath bezierPathWithRoundedRect:inputRect xRadius:8.0 yRadius:8.0];
     TGThemeDrawRecessedBackgroundInPath(inputPath, inputRect, [self isFlipped]);
     [TGClassicTableGridColor() set];
     [inputPath setLineWidth:1.0];
     [inputPath stroke];
+    TGDrawTemplateIconAsset(@"search",
+                            NSMakeRect(NSMinX(inputRect) + 8.0, NSMidY(inputRect) - 7.0, 14.0, 14.0),
+                            TGClassicMutedInkColor(),
+                            1.0,
+                            [self isFlipped]);
 
     NSRect resultsCardRect = NSInsetRect([_scrollView frame], -8.0, -8.0);
     NSBezierPath *resultsCardPath = [NSBezierPath bezierPathWithRoundedRect:resultsCardRect xRadius:10.0 yRadius:10.0];

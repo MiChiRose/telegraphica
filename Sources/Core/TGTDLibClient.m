@@ -2890,6 +2890,93 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return ([info count] > 0) ? info : nil;
 }
 
+- (NSArray *)commonGroupChatPreviewItemsForUserID:(NSNumber *)userID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![userID respondsToSelector:@selector(longLongValue)] || [userID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"User identifier is missing for common groups." code:187];
+        }
+        return nil;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load common groups. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:188];
+        }
+        return nil;
+    }
+
+    NSUInteger safeLimit = limit;
+    if (safeLimit == 0 || safeLimit > 50) {
+        safeLimit = 30;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getGroupsInCommon" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"user_id"];
+    [request setObject:[NSNumber numberWithLongLong:0LL] forKey:@"offset_chat_id"];
+    [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+
+    NSError *groupsError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-common-groups"
+                                                           timeout:timeout
+                                                         errorCode:189
+                                                             error:&groupsError];
+    if (!response) {
+        if (error) {
+            *error = groupsError;
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    id chatIDs = [response objectForKey:@"chat_ids"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"chats"] || ![chatIDs isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib common groups returned an unexpected response." code:190];
+        }
+        return nil;
+    }
+
+    NSMutableArray *items = [NSMutableArray array];
+    NSTimeInterval chatTimeout = timeout;
+    if (chatTimeout > 1.0) {
+        chatTimeout = 1.0;
+    }
+    NSUInteger avatarDownloadsRemaining = 10;
+    NSUInteger index = 0;
+    for (index = 0; index < [(NSArray *)chatIDs count] && [items count] < safeLimit; index++) {
+        id chatID = [(NSArray *)chatIDs objectAtIndex:index];
+        if (![chatID respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+        NSMutableDictionary *getChatRequest = [NSMutableDictionary dictionary];
+        [getChatRequest setObject:@"getChat" forKey:@"@type"];
+        [getChatRequest setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+
+        NSError *chatError = nil;
+        NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:getChatRequest
+                                                               extraPrefix:@"telegraphica-common-group-chat"
+                                                                   timeout:chatTimeout
+                                                                 errorCode:191
+                                                                     error:&chatError];
+        TGChatItem *item = [self chatPreviewItemFromChatObject:chatResponse
+                                                   chatListType:@"chatListMain"
+                                                       filterID:nil
+                                                 downloadAvatar:YES
+                                          avatarDownloadCounter:&avatarDownloadsRemaining
+                                                       timeout:0.75];
+        if (item) {
+            [items addObject:item];
+        }
+    }
+
+    [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
+    return items;
+}
+
 - (NSArray *)chatFilterChatIDsForFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error {
     if (exhausted) {
         *exhausted = NO;
@@ -3191,6 +3278,57 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
     return items;
+}
+
+- (id)publicChatPreviewItemForUsername:(NSString *)username timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to open public chat. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:193];
+        }
+        return nil;
+    }
+
+    NSString *safeUsername = [username isKindOfClass:[NSString class]] ? [username stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"";
+    if ([safeUsername hasPrefix:@"@"]) {
+        safeUsername = [safeUsername substringFromIndex:1];
+    }
+    if ([safeUsername length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Public chat username is empty." code:194];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"searchPublicChat" forKey:@"@type"];
+    [request setObject:safeUsername forKey:@"username"];
+
+    NSError *searchError = nil;
+    NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:request
+                                                            extraPrefix:@"telegraphica-public-chat"
+                                                                timeout:timeout
+                                                              errorCode:195
+                                                                  error:&searchError];
+    if (!chatResponse) {
+        if (error) {
+            *error = searchError;
+        }
+        return nil;
+    }
+
+    NSUInteger avatarDownloadsRemaining = 1;
+    TGChatItem *item = [self chatPreviewItemFromChatObject:chatResponse
+                                               chatListType:@"chatListMain"
+                                                   filterID:nil
+                                             downloadAvatar:YES
+                                      avatarDownloadCounter:&avatarDownloadsRemaining
+                                                   timeout:1.0];
+    if (!item && error) {
+        *error = [self errorWithDescription:@"TDLib public chat lookup returned an unexpected response." code:196];
+    }
+    return item;
 }
 
 - (NSNumber *)forumTopicIDFromTopicObject:(NSDictionary *)topicObject {
@@ -8282,10 +8420,26 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         for (keyIndex = 0; keyIndex < [numberKeys count]; keyIndex++) {
             NSString *key = [numberKeys objectAtIndex:keyIndex];
             id value = [session objectForKey:key];
-            if (![value isKindOfClass:[NSNumber class]] || TGTDLibObjectIsBoolean(value)) {
+            long long numberValue = 0;
+            BOOL hasNumberValue = NO;
+            if ([value isKindOfClass:[NSNumber class]] && !TGTDLibObjectIsBoolean(value)) {
+                numberValue = [value longLongValue];
+                hasNumberValue = YES;
+            } else if ([value isKindOfClass:[NSString class]]) {
+                NSString *stringValue = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if ([stringValue length] > 0) {
+                    NSScanner *scanner = [NSScanner scannerWithString:stringValue];
+                    long long scannedValue = 0;
+                    if ([scanner scanLongLong:&scannedValue] && [scanner isAtEnd]) {
+                        numberValue = scannedValue;
+                        hasNumberValue = YES;
+                    }
+                }
+            }
+            if (!hasNumberValue) {
                 continue;
             }
-            [safeSession setObject:[NSNumber numberWithLongLong:[value longLongValue]] forKey:key];
+            [safeSession setObject:[NSNumber numberWithLongLong:numberValue] forKey:key];
         }
         for (keyIndex = 0; keyIndex < [booleanKeys count]; keyIndex++) {
             NSString *key = [booleanKeys objectAtIndex:keyIndex];
@@ -8327,6 +8481,14 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         !TGTDLibObjectIsBoolean(inactiveSessionTTLDays)) {
         [safeSummary setObject:[NSNumber numberWithInteger:[inactiveSessionTTLDays integerValue]]
                         forKey:@"inactive_session_ttl_days"];
+    } else if ([inactiveSessionTTLDays isKindOfClass:[NSString class]]) {
+        NSString *ttlString = [(NSString *)inactiveSessionTTLDays stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSScanner *ttlScanner = [NSScanner scannerWithString:ttlString];
+        NSInteger ttlValue = 0;
+        if ([ttlScanner scanInteger:&ttlValue] && [ttlScanner isAtEnd]) {
+            [safeSummary setObject:[NSNumber numberWithInteger:ttlValue]
+                            forKey:@"inactive_session_ttl_days"];
+        }
     }
     return [NSDictionary dictionaryWithDictionary:safeSummary];
 }

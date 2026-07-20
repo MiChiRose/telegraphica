@@ -8,6 +8,7 @@
 #import "TGOutgoingMessageTextChunker.h"
 #import "TGResourcePolicy.h"
 #import "TGTheme.h"
+#import "TGVisualWorldThemeSpec.h"
 #include <math.h>
 
 NSString * const TGInlineMediaKindGIF = @"gif";
@@ -105,10 +106,28 @@ static void TGTestThemes(void) {
     TGAssertTrue([categories containsObject:TGThemeCategoryIdentifierDark], @"dark theme category should exist");
     TGAssertTrue([categories containsObject:TGThemeCategoryIdentifierOldSchool], @"retro theme category should exist");
     TGAssertTrue([categories containsObject:TGThemeCategoryIdentifierExperimental], @"experimental theme category should exist");
+    TGAssertTrue([categories containsObject:TGThemeCategoryIdentifierVisualWorlds], @"visual worlds theme category should exist");
     TGAssertEqualObjects(TGThemeCategoryIdentifierForThemeIdentifier(TGThemeIdentifierMatrixRain),
                          TGThemeCategoryIdentifierExperimental,
                          @"Matrix Rain should be experimental");
     TGAssertTrue([TGThemeDisplayNameForIdentifier(TGThemeIdentifierY2KChrome) length] > 0, @"theme display name should be non-empty");
+
+    NSArray *visualIdentifiers = TGThemeIdentifiersForCategory(TGThemeCategoryIdentifierVisualWorlds);
+    TGAssertTrue([visualIdentifiers count] == 10, @"Visual Worlds should ship ten themes");
+    TGAssertTrue(TGThemeIdentifierIsValid(TGThemeIdentifierVisualMacintoshDesktop), @"Macintosh Desktop visual theme should be valid");
+    TGAssertTrue(TGThemeIdentifierIsValid(TGThemeIdentifierVisualPostcard), @"Postcard visual theme should be valid");
+    TGAssertEqualObjects(TGThemeCategoryIdentifierForThemeIdentifier(TGThemeIdentifierVisualBlueprint),
+                         TGThemeCategoryIdentifierVisualWorlds,
+                         @"Blueprint should belong to Visual Worlds");
+    TGAssertTrue(TGVisualWorldThemeIdentifierIsValid(TGThemeIdentifierVisualCRTTerminal), @"CRT spec should be registered");
+    TGVisualWorldThemeSpec *visualSpec = TGVisualWorldThemeSpecForIdentifier(TGThemeIdentifierVisualNotebook);
+    TGAssertTrue([visualSpec.displayName length] > 0, @"Visual spec should have a display name");
+    TGAssertTrue([visualSpec.themeDescription length] > 0, @"Visual spec should have a description");
+    TGAssertTrue(visualSpec.backgroundHex != 0 && visualSpec.textHex != 0, @"Visual spec should define colors");
+    TGAssertTrue(TGVisualWorldThemeSpecForIdentifier(@"missing-visual-world") == nil, @"Unknown visual theme spec should fail closed");
+    TGSetActiveThemeIdentifier(TGThemeIdentifierVisualSpaceTerminal);
+    TGAssertTrue(TGThemeIsVisualWorld(), @"Visual helper should match active visual theme");
+    TGAssertEqualObjects(TGCurrentThemeIdentifier(), TGThemeIdentifierVisualSpaceTerminal, @"visual theme should persist in active theme state");
 }
 
 static NSUInteger TGNotificationCountForName(NSString *name, void (^block)(void)) {

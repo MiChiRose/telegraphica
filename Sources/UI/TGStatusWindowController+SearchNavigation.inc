@@ -722,6 +722,13 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
 
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
     if ([event type] == NSKeyDown &&
+        (([event modifierFlags] & (NSCommandKeyMask | NSAlternateKeyMask | NSControlKeyMask)) == 0) &&
+        [[event charactersIgnoringModifiers] length] > 0 &&
+        [[event charactersIgnoringModifiers] characterAtIndex:0] == 27) {
+        [self closeCurrentChatNavigation:event];
+        return YES;
+    }
+    if ([event type] == NSKeyDown &&
         (([event modifierFlags] & NSCommandKeyMask) != 0) &&
         ([[event charactersIgnoringModifiers] isEqualToString:@"v"] || [[event charactersIgnoringModifiers] isEqualToString:@"V"]) &&
         [self handlePasteAttachmentFromPasteboard:[NSPasteboard generalPasteboard]]) {

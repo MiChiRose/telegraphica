@@ -272,6 +272,16 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 
 @implementation TGGroupedCardView
 
+@synthesize drawsInterior = _drawsInterior;
+
+- (id)initWithFrame:(NSRect)frameRect {
+    self = [super initWithFrame:frameRect];
+    if (self) {
+        _drawsInterior = YES;
+    }
+    return self;
+}
+
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect bounds = [self bounds];
@@ -279,10 +289,12 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect
                                                              xRadius:14.0
                                                              yRadius:14.0];
-    TGThemeDrawGroupedCardInPath(cardPath, cardRect, [self isFlipped]);
-    [[NSColor colorWithCalibratedWhite:0.78 alpha:0.62] set];
-    [cardPath setLineWidth:1.0];
-    [cardPath stroke];
+    if (self.drawsInterior) {
+        TGThemeDrawGroupedCardInPath(cardPath, cardRect, [self isFlipped]);
+        [[NSColor colorWithCalibratedWhite:0.78 alpha:0.62] set];
+        [cardPath setLineWidth:1.0];
+        [cardPath stroke];
+    }
 }
 
 @end

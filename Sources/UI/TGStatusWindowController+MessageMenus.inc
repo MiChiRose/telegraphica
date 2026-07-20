@@ -883,10 +883,34 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     }
 
     BOOL hasKnownDeleteOptions = ([item capabilitiesKnown] && ([item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers]));
-    TGMessageDeleteChoice choice = [TGMessageActionDialogs deleteChoiceWithCanDeleteOnlyForSelf:(hasKnownDeleteOptions ? [item canBeDeletedOnlyForSelf] : YES)
-                                                                           canDeleteForAllUsers:(hasKnownDeleteOptions ? [item canBeDeletedForAllUsers] : YES)];
-    if (choice == TGMessageDeleteChoiceCancel) {
-        return;
+    BOOL canDeleteOnlyForSelf = (hasKnownDeleteOptions ? [item canBeDeletedOnlyForSelf] : YES);
+    BOOL canDeleteForAllUsers = (hasKnownDeleteOptions ? [item canBeDeletedForAllUsers] : YES);
+    BOOL savedMessagesChat = NO;
+    if ([self.profileUserID respondsToSelector:@selector(longLongValue)] &&
+        [[item chatID] respondsToSelector:@selector(longLongValue)] &&
+        [self.profileUserID longLongValue] != 0LL &&
+        [[item chatID] longLongValue] == [self.profileUserID longLongValue]) {
+        savedMessagesChat = YES;
+    }
+    NSString *typeSummary = ([self.selectedChatTypeSummary isKindOfClass:[NSString class]] ? [self.selectedChatTypeSummary lowercaseString] : @"");
+    BOOL selectedGroupLikeChat = ([typeSummary rangeOfString:@"group"].location != NSNotFound);
+    BOOL outgoingGroupMessage = (selectedGroupLikeChat && [item outgoing] && canDeleteForAllUsers);
+
+    TGMessageDeleteChoice choice = TGMessageDeleteChoiceCancel;
+    BOOL singleDeleteMode = (savedMessagesChat ||
+                             outgoingGroupMessage ||
+                             (hasKnownDeleteOptions && (canDeleteOnlyForSelf != canDeleteForAllUsers)));
+    if (singleDeleteMode) {
+        if (![TGMessageActionDialogs confirmPlainDeleteMessage]) {
+            return;
+        }
+        choice = (canDeleteForAllUsers ? TGMessageDeleteChoiceForEveryone : TGMessageDeleteChoiceOnlyForSelf);
+    } else {
+        choice = [TGMessageActionDialogs deleteChoiceWithCanDeleteOnlyForSelf:canDeleteOnlyForSelf
+                                                         canDeleteForAllUsers:canDeleteForAllUsers];
+        if (choice == TGMessageDeleteChoiceCancel) {
+            return;
+        }
     }
 
     NSNumber *chatID = [[item chatID] retain];

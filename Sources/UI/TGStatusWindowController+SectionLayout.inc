@@ -104,25 +104,39 @@
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
-    [self showView:self.loadMessagesButton visible:showChats];
+    BOOL showClosedChatPlaceholder = (showChats && self.chatNavigationClosed);
+    BOOL showConversationContent = (showChats && !showClosedChatPlaceholder);
+    [self showView:self.loadMessagesButton visible:showConversationContent];
     [self showView:self.loadOlderMessagesButton visible:NO];
-    [self showView:self.conversationSearchButton visible:showChats];
-    [self showView:self.mediaCenterButton visible:showChats];
+    [self showView:self.conversationSearchButton visible:showConversationContent];
+    [self showView:self.mediaCenterButton visible:NO];
+    [self.mediaCenterButton setEnabled:NO];
     BOOL showCommentThreadBack = (showChats &&
+                                  !showClosedChatPlaceholder &&
                                   [self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                   [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
     [self showView:self.commentThreadBackButton visible:showCommentThreadBack];
-    [self showView:self.selectedChatField visible:showChats];
-    [self showView:self.typingIndicatorField visible:(showChats && [[self.typingIndicatorField stringValue] length] > 0)];
-    BOOL showSelectedChatProfile = (showChats && self.selectedChatID != nil);
+    [self showView:self.selectedChatField visible:showConversationContent];
+    [self showView:self.typingIndicatorField visible:(showConversationContent && [[self.typingIndicatorField stringValue] length] > 0)];
+    BOOL showSelectedChatProfile = (showConversationContent && self.selectedChatID != nil);
     [self showView:self.selectedChatAvatarView visible:showSelectedChatProfile];
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
-    [self showView:self.messageScrollSurfaceView visible:showChats];
-    [self showView:self.messageScrollView visible:showChats];
-    [self showView:self.messageLoadingSpinner visible:(showChats && self.messageLoadingIndicatorVisible)];
-    [self showView:self.messageJumpToNewestButton visible:showChats];
-    [self.messageJumpToNewestButton setEnabled:(showChats && [self shouldShowMessageJumpToNewestButton])];
-    BOOL showSearchPanel = (showChats && self.searchPanelVisible);
+    [self showView:self.messageScrollSurfaceView visible:showConversationContent];
+    [self showView:self.messageScrollView visible:showConversationContent];
+    [self showView:self.closedChatPlaceholderView visible:showClosedChatPlaceholder];
+    [self showView:self.closedChatTitleField visible:showClosedChatPlaceholder];
+    [self showView:self.closedChatHintField visible:showClosedChatPlaceholder];
+    NSUInteger closedSuggestionVisibilityIndex = 0;
+    for (closedSuggestionVisibilityIndex = 0; closedSuggestionVisibilityIndex < [self.closedChatSuggestionViews count]; closedSuggestionVisibilityIndex++) {
+        [self showView:[self.closedChatSuggestionViews objectAtIndex:closedSuggestionVisibilityIndex] visible:showClosedChatPlaceholder];
+    }
+    [self showView:self.messageLoadingSpinner visible:(showConversationContent && self.messageLoadingIndicatorVisible)];
+    [self showView:self.messageJumpToNewestButton visible:showConversationContent];
+    BOOL canJumpToNewest = (showConversationContent &&
+                            [self.currentAuthState isEqualToString:@"ready"] &&
+                            self.selectedChatID != nil);
+    [self.messageJumpToNewestButton setEnabled:canJumpToNewest];
+    BOOL showSearchPanel = (showConversationContent && self.searchPanelVisible);
     [self showView:self.searchPanelView visible:showSearchPanel];
     [self showView:self.searchTextField visible:showSearchPanel];
     [self showView:self.searchScopePopUpButton visible:showSearchPanel];
@@ -131,34 +145,34 @@
     [self showView:self.searchStatusField visible:showSearchPanel];
     [self showView:self.searchResultsScrollView visible:showSearchPanel];
     [self showView:self.searchResultsTableView visible:showSearchPanel];
-    BOOL showPinnedPanel = (showChats && !self.searchPanelVisible && self.pinnedMessageItem != nil);
+    BOOL showPinnedPanel = (showConversationContent && !self.searchPanelVisible && self.pinnedMessageItem != nil);
     [self showView:self.pinnedMessagePanelView visible:showPinnedPanel];
     [self showView:self.pinnedMessageStripeField visible:showPinnedPanel];
     [self showView:self.pinnedMessageLabelField visible:showPinnedPanel];
     [self showView:self.pinnedMessageTextField visible:showPinnedPanel];
     [self showView:self.pinnedMessageButton visible:showPinnedPanel];
-    BOOL showReplyPanel = (showChats && self.replyTargetMessageItem != nil);
+    BOOL showReplyPanel = (showConversationContent && self.replyTargetMessageItem != nil);
     [self showView:self.replyPanelView visible:showReplyPanel];
     [self showView:self.replyPanelTitleField visible:showReplyPanel];
     [self showView:self.replyPanelTextField visible:showReplyPanel];
     [self showView:self.replyPanelCancelButton visible:showReplyPanel];
-    if (showChats) {
+    if (showConversationContent) {
         [self scheduleInlineMediaPlaybackRefresh];
     } else {
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     }
-    if (!showChats) {
+    if (!showConversationContent) {
         self.messageDropOverlayVisible = NO;
     }
-    [self showView:self.messageDropOverlayView visible:(showChats && self.messageDropOverlayVisible)];
+    [self showView:self.messageDropOverlayView visible:(showConversationContent && self.messageDropOverlayVisible)];
     [self showView:self.sendLabel visible:NO];
-    [self showView:self.attachPhotoButton visible:showChats];
-    [self showView:self.stickerButton visible:showChats];
-    [self showView:self.voiceRecordButton visible:showChats];
+    [self showView:self.attachPhotoButton visible:showConversationContent];
+    [self showView:self.stickerButton visible:showConversationContent];
+    [self showView:self.voiceRecordButton visible:showConversationContent];
     [self showView:self.voiceRecordingIndicatorField visible:NO];
-    [self showView:self.sendTextFieldBackgroundView visible:showChats];
-    [self showView:self.sendTextField visible:showChats];
-    [self showView:self.sendMessageButton visible:showChats];
+    [self showView:self.sendTextFieldBackgroundView visible:showConversationContent];
+    [self showView:self.sendTextField visible:showConversationContent];
+    [self showView:self.sendMessageButton visible:showConversationContent];
 
     BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
@@ -526,10 +540,15 @@
     } else {
         [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
     }
-    [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, sidebarWidth - (chatHeaderTitleX - mainX) - 58.0, 20.0)];
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.chatSearchButton setFrame:NSMakeRect(mainX + sidebarWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
+    CGFloat chatHeaderTitleMaxX = NSMinX([self.chatSearchButton frame]) - 8.0;
+    CGFloat chatHeaderTitleWidth = chatHeaderTitleMaxX - chatHeaderTitleX;
+    if (chatHeaderTitleWidth < 42.0) {
+        chatHeaderTitleWidth = 42.0;
+    }
+    [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, chatHeaderTitleWidth, 20.0)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
     CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -556,12 +575,11 @@
 
     CGFloat conversationRefreshX = conversationX + conversationWidth - 12.0 - headerButtonSize;
     CGFloat conversationJumpX = conversationRefreshX - 6.0 - headerButtonSize;
-    CGFloat conversationMediaX = conversationJumpX - 6.0 - headerButtonSize;
-    CGFloat conversationSearchX = conversationMediaX - 6.0 - headerButtonSize;
+    CGFloat conversationSearchX = conversationJumpX - 6.0 - headerButtonSize;
     [self.loadOlderMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadMessagesButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.messageJumpToNewestButton setFrame:NSMakeRect(conversationJumpX, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.mediaCenterButton setFrame:NSMakeRect(conversationMediaX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.mediaCenterButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, 0.0, 0.0)];
     [self.conversationSearchButton setFrame:NSMakeRect(conversationSearchX, headerButtonY, headerButtonSize, headerButtonSize)];
     BOOL layoutCommentThreadBack = ([self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                     [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
@@ -579,8 +597,8 @@
     [self.selectedChatAvatarView setFrame:NSMakeRect(selectedAvatarX, selectedAvatarY, selectedAvatarSize, selectedAvatarSize)];
     CGFloat selectedTitleX = NSMaxX([self.selectedChatAvatarView frame]) + 8.0;
     CGFloat selectedTitleWidth = NSMinX([self.conversationSearchButton frame]) - selectedTitleX - 12.0;
-    if (selectedTitleWidth < 120.0) {
-        selectedTitleWidth = 120.0;
+    if (selectedTitleWidth < 40.0) {
+        selectedTitleWidth = 40.0;
     }
     BOOL hasTypingText = ([[self.typingIndicatorField stringValue] length] > 0);
     CGFloat selectedTitleY = hasTypingText ? (headerLabelY + 4.0) : headerLabelY;
@@ -592,10 +610,30 @@
                                                    headerLabelY - 8.0,
                                                    selectedTitleWidth,
                                                    14.0)];
+    CGFloat profileHitMaxX = NSMinX([self.conversationSearchButton frame]) - 10.0;
+    CGFloat profileHitWidth = profileHitMaxX - selectedAvatarX;
+    if (profileHitWidth < selectedAvatarSize) {
+        profileHitWidth = selectedAvatarSize;
+    }
     [self.selectedChatProfileButton setFrame:NSMakeRect(selectedAvatarX,
                                                         selectedAvatarY - 2.0,
-                                                        NSMaxX([self.selectedChatField frame]) - selectedAvatarX,
+                                                        profileHitWidth,
                                                         selectedAvatarSize + 4.0)];
+
+    NSArray *chatHeaderControls = [NSArray arrayWithObjects:
+                                   self.conversationSearchButton,
+                                   self.messageJumpToNewestButton,
+                                   self.loadMessagesButton,
+                                   self.loadOlderMessagesButton,
+                                   self.commentThreadBackButton,
+                                   nil];
+    NSUInteger chatHeaderControlIndex = 0;
+    for (chatHeaderControlIndex = 0; chatHeaderControlIndex < [chatHeaderControls count]; chatHeaderControlIndex++) {
+        NSView *control = [chatHeaderControls objectAtIndex:chatHeaderControlIndex];
+        if ([control superview]) {
+            [[control superview] addSubview:control positioned:NSWindowAbove relativeTo:nil];
+        }
+    }
 
     CGFloat estimatedSendFieldWidth = conversationWidth - 198.0;
     if (estimatedSendFieldWidth < 160.0) {
@@ -611,6 +649,9 @@
     CGFloat replyPanelHeight = hasReplyPanel ? 46.0 : 0.0;
     CGFloat replyPanelGap = hasReplyPanel ? 6.0 : 0.0;
     CGFloat messageBottom = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    if (self.chatNavigationClosed) {
+        messageBottom = mainY + 18.0;
+    }
     CGFloat messageTop = mainTop - TGPanelHeaderHeight - 7.0;
     CGFloat panelInsetX = conversationX + 8.0;
     CGFloat panelWidth = conversationWidth - 16.0;
@@ -669,6 +710,7 @@
                                                     NSMidY(messageSurfaceFrame) - 12.0,
                                                     24.0,
                                                     24.0)];
+    [self layoutClosedChatPlaceholderViewInFrame:messageSurfaceFrame];
     CGFloat dropOverlayInset = (NSHeight(messageSurfaceFrame) > 130.0) ? 24.0 : 12.0;
     [self.messageDropOverlayView setFrame:NSInsetRect(messageSurfaceFrame, dropOverlayInset, dropOverlayInset)];
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
@@ -1110,6 +1152,11 @@
         [self layoutMediaPlaybackLayer];
         return;
     }
+    if ([notification object] == self.mediaCenterWindow) {
+        [self layoutMediaCenterWindowSubviews];
+        [self rebuildMediaCenterRows];
+        return;
+    }
     if ([notification object] != [self window]) {
         return;
     }
@@ -1164,6 +1211,29 @@
         self.mediaPlaybackTimeField = nil;
         self.mediaPlaybackCloseButton = nil;
         self.mediaPlaybackWindow = nil;
+    }
+    if ([notification object] == self.mediaCenterWindow) {
+        self.mediaCenterGeneration = self.mediaCenterGeneration + 1;
+        [self stopObservingMediaCenterScrollView];
+        [self.mediaCenterWindow setDelegate:nil];
+        self.mediaCenterSearchField = nil;
+        self.mediaCenterFilterPopUpButton = nil;
+        self.mediaCenterSortPopUpButton = nil;
+        self.mediaCenterTabButtons = nil;
+        self.mediaCenterSelectedTabIndex = 0;
+        self.mediaCenterStatusField = nil;
+        self.mediaCenterScrollView = nil;
+        self.mediaCenterResultsView = nil;
+        self.mediaCenterRefreshButton = nil;
+        self.mediaCenterLoadingSpinner = nil;
+        self.mediaCenterLoading = NO;
+        self.mediaCenterPreviewOverlayView = nil;
+        self.mediaCenterPreviewImageView = nil;
+        self.mediaCenterPreviewTitleField = nil;
+        self.mediaCenterPreviewCloseButton = nil;
+        [self.mediaCenterItems removeAllObjects];
+        [self resetMediaCenterPaginationState];
+        self.mediaCenterWindow = nil;
     }
     if ([notification object] == self.voicePreviewWindow) {
         if ([self.voiceRecorder isRecording]) {

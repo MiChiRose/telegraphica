@@ -28,6 +28,7 @@
 		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
 		111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */; };
 		111111111111111111111121 /* TGTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111236 /* TGTheme.m */; };
+		111111111111111111111156 /* TGVisualWorldThemeSpec.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111315 /* TGVisualWorldThemeSpec.m */; };
 		111111111111111111111122 /* TGTGSAnimationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111238 /* TGTGSAnimationView.m */; };
 		111111111111111111111123 /* TGMediaItemSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111242 /* TGMediaItemSupport.m */; };
 		111111111111111111111124 /* TGTGSFileValidator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111244 /* TGTGSFileValidator.m */; };
@@ -101,6 +102,8 @@
 		111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGInlineMediaPlaybackCoordinator.m; sourceTree = "<group>"; };
 		111111111111111111111235 /* TGTheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTheme.h; sourceTree = "<group>"; };
 		111111111111111111111236 /* TGTheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTheme.m; sourceTree = "<group>"; };
+		111111111111111111111314 /* TGVisualWorldThemeSpec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGVisualWorldThemeSpec.h; sourceTree = "<group>"; };
+		111111111111111111111315 /* TGVisualWorldThemeSpec.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGVisualWorldThemeSpec.m; sourceTree = "<group>"; };
 		111111111111111111111237 /* TGTGSAnimationView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTGSAnimationView.h; sourceTree = "<group>"; };
 		111111111111111111111238 /* TGTGSAnimationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTGSAnimationView.m; sourceTree = "<group>"; };
 		111111111111111111111239 /* TGMediaItemSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaItemSupport.h; sourceTree = "<group>"; };
@@ -266,6 +269,8 @@
 			children = (
 				111111111111111111111235 /* TGTheme.h */,
 				111111111111111111111236 /* TGTheme.m */,
+				111111111111111111111314 /* TGVisualWorldThemeSpec.h */,
+				111111111111111111111315 /* TGVisualWorldThemeSpec.m */,
 				111111111111111111111273 /* TGAnimationSupport.h */,
 				111111111111111111111274 /* TGAnimationSupport.m */,
 				111111111111111111111275 /* TGIconAssets.h */,
@@ -434,6 +439,7 @@
 				111111111111111111111118 /* TGMediaImageLoader.m in Sources */,
 				111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */,
 				111111111111111111111121 /* TGTheme.m in Sources */,
+				111111111111111111111156 /* TGVisualWorldThemeSpec.m in Sources */,
 				111111111111111111111122 /* TGTGSAnimationView.m in Sources */,
 				111111111111111111111123 /* TGMediaItemSupport.m in Sources */,
 				111111111111111111111124 /* TGTGSFileValidator.m in Sources */,

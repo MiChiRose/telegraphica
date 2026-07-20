@@ -65,6 +65,7 @@ static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvai
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
+static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 @interface TGPointingHandButton : NSButton
 @end
@@ -76,6 +77,29 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     if ([self isEnabled] && ![self isHidden]) {
         [self addCursorRect:[self bounds] cursor:[NSCursor pointingHandCursor]];
     }
+}
+
+@end
+
+@interface TGHeaderActionButton : TGPointingHandButton
+@end
+
+@implementation TGHeaderActionButton
+
+- (void)mouseDown:(NSEvent *)event {
+    if (![self isEnabled] || [self isHidden]) {
+        [super mouseDown:event];
+        return;
+    }
+    if (![self target] || ![self action] || ![[self target] respondsToSelector:[self action]]) {
+        [super mouseDown:event];
+        return;
+    }
+    [[self cell] setHighlighted:YES];
+    [self setNeedsDisplay:YES];
+    [[self target] performSelector:[self action] withObject:self];
+    [[self cell] setHighlighted:NO];
+    [self setNeedsDisplay:YES];
 }
 
 @end
@@ -115,6 +139,52 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [crossPath moveToPoint:NSMakePoint(NSMinX(iconRect) + 1.0, NSMaxY(iconRect) - 1.0)];
     [crossPath lineToPoint:NSMakePoint(NSMaxX(iconRect) - 1.0, NSMinY(iconRect) + 1.0)];
     [crossPath stroke];
+}
+
+@end
+
+@interface TGStickerSetRailScrollView : NSScrollView
+@end
+
+@implementation TGStickerSetRailScrollView
+
+- (void)scrollWheel:(NSEvent *)event {
+    NSClipView *clipView = [self contentView];
+    NSView *documentView = [self documentView];
+    if (!clipView || !documentView) {
+        [super scrollWheel:event];
+        return;
+    }
+
+    NSRect visibleBounds = [clipView bounds];
+    NSRect documentFrame = [documentView frame];
+    CGFloat maxX = NSWidth(documentFrame) - NSWidth(visibleBounds);
+    if (maxX <= 0.0) {
+        return;
+    }
+
+    CGFloat deltaX = [event scrollingDeltaX];
+    CGFloat deltaY = [event scrollingDeltaY];
+    if (![event hasPreciseScrollingDeltas]) {
+        deltaX *= 10.0;
+        deltaY *= 10.0;
+    }
+
+    CGFloat delta = (fabs(deltaX) >= fabs(deltaY)) ? deltaX : deltaY;
+    if (fabs(delta) < 0.01) {
+        return;
+    }
+
+    NSPoint origin = visibleBounds.origin;
+    origin.x -= delta;
+    if (origin.x < 0.0) {
+        origin.x = 0.0;
+    } else if (origin.x > maxX) {
+        origin.x = maxX;
+    }
+
+    [clipView scrollToPoint:origin];
+    [self reflectScrolledClipView:clipView];
 }
 
 @end
@@ -195,14 +265,29 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSMutableArray *chatSearchWindowResultButtons;
 @property (nonatomic, assign) NSUInteger chatSearchGeneration;
 @property (nonatomic, retain) NSWindow *mediaCenterWindow;
+@property (nonatomic, retain) TGGroupedCardView *mediaCenterContentCardView;
 @property (nonatomic, retain) NSSearchField *mediaCenterSearchField;
+@property (nonatomic, retain) NSArray *mediaCenterTabButtons;
+@property (nonatomic, assign) NSInteger mediaCenterSelectedTabIndex;
 @property (nonatomic, retain) NSPopUpButton *mediaCenterFilterPopUpButton;
 @property (nonatomic, retain) NSPopUpButton *mediaCenterSortPopUpButton;
 @property (nonatomic, retain) NSTextField *mediaCenterStatusField;
 @property (nonatomic, retain) NSScrollView *mediaCenterScrollView;
 @property (nonatomic, retain) NSView *mediaCenterResultsView;
+@property (nonatomic, retain) NSButton *mediaCenterRefreshButton;
+@property (nonatomic, retain) NSProgressIndicator *mediaCenterLoadingSpinner;
+@property (nonatomic, assign) BOOL mediaCenterLoading;
+@property (nonatomic, retain) NSView *mediaCenterPreviewOverlayView;
+@property (nonatomic, retain) NSImageView *mediaCenterPreviewImageView;
+@property (nonatomic, retain) NSTextField *mediaCenterPreviewTitleField;
+@property (nonatomic, retain) NSButton *mediaCenterPreviewCloseButton;
 @property (nonatomic, retain) NSMutableArray *mediaCenterItems;
+@property (nonatomic, retain) NSMutableDictionary *mediaCenterPaginationAnchorsByFilter;
+@property (nonatomic, retain) NSMutableSet *mediaCenterExhaustedFilterIdentifiers;
+@property (nonatomic, retain) NSMutableSet *mediaCenterSeenKeys;
 @property (nonatomic, assign) NSUInteger mediaCenterGeneration;
+@property (nonatomic, assign) BOOL mediaCenterLoadingMore;
+@property (nonatomic, assign) BOOL mediaCenterExhausted;
 @property (nonatomic, retain) TGGroupedCardView *pinnedMessagePanelView;
 @property (nonatomic, retain) NSTextField *pinnedMessageStripeField;
 @property (nonatomic, retain) NSTextField *pinnedMessageLabelField;
@@ -250,6 +335,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSTextField *typingIndicatorField;
 @property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
 @property (nonatomic, retain) NSButton *selectedChatProfileButton;
+@property (nonatomic, retain) TGGroupedCardView *closedChatPlaceholderView;
+@property (nonatomic, retain) NSTextField *closedChatTitleField;
+@property (nonatomic, retain) NSTextField *closedChatHintField;
+@property (nonatomic, retain) NSArray *closedChatSuggestionViews;
+@property (nonatomic, retain) NSArray *closedChatSuggestionItems;
 @property (nonatomic, retain) NSView *chatScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *chatScrollView;
 @property (nonatomic, retain) NSTableView *chatTableView;
@@ -371,6 +461,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, retain) NSWindow *appearanceWindow;
 @property (nonatomic, retain) NSWindow *activeSessionsWindow;
 @property (nonatomic, retain) NSTextView *activeSessionsTextView;
+@property (nonatomic, retain) NSTableView *activeSessionsTableView;
+@property (nonatomic, retain) NSArray *activeSessionsSelectableSessions;
 @property (nonatomic, retain) NSTextField *activeSessionsStatusField;
 @property (nonatomic, retain) NSButton *activeSessionsRefreshButton;
 @property (nonatomic, retain) NSPopUpButton *activeSessionsTerminatePopup;
@@ -495,7 +587,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @property (nonatomic, assign) BOOL showingForumTopicList;
+@property (nonatomic, assign) BOOL chatNavigationClosed;
+@property (nonatomic, retain) NSNumber *suppressedForumTopicAutoOpenChatID;
+@property (nonatomic, assign) NSUInteger forumTopicNavigationGeneration;
 @property (nonatomic, assign) CGFloat mediaPreviewZoomScale;
+@property (nonatomic, assign) CGFloat mediaPreviewMinimumZoomScale;
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
 @property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
@@ -600,14 +696,29 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize chatSearchWindowResultButtons = _chatSearchWindowResultButtons;
 @synthesize chatSearchGeneration = _chatSearchGeneration;
 @synthesize mediaCenterWindow = _mediaCenterWindow;
+@synthesize mediaCenterContentCardView = _mediaCenterContentCardView;
 @synthesize mediaCenterSearchField = _mediaCenterSearchField;
+@synthesize mediaCenterTabButtons = _mediaCenterTabButtons;
+@synthesize mediaCenterSelectedTabIndex = _mediaCenterSelectedTabIndex;
 @synthesize mediaCenterFilterPopUpButton = _mediaCenterFilterPopUpButton;
 @synthesize mediaCenterSortPopUpButton = _mediaCenterSortPopUpButton;
 @synthesize mediaCenterStatusField = _mediaCenterStatusField;
 @synthesize mediaCenterScrollView = _mediaCenterScrollView;
 @synthesize mediaCenterResultsView = _mediaCenterResultsView;
+@synthesize mediaCenterRefreshButton = _mediaCenterRefreshButton;
+@synthesize mediaCenterLoadingSpinner = _mediaCenterLoadingSpinner;
+@synthesize mediaCenterLoading = _mediaCenterLoading;
+@synthesize mediaCenterPreviewOverlayView = _mediaCenterPreviewOverlayView;
+@synthesize mediaCenterPreviewImageView = _mediaCenterPreviewImageView;
+@synthesize mediaCenterPreviewTitleField = _mediaCenterPreviewTitleField;
+@synthesize mediaCenterPreviewCloseButton = _mediaCenterPreviewCloseButton;
 @synthesize mediaCenterItems = _mediaCenterItems;
+@synthesize mediaCenterPaginationAnchorsByFilter = _mediaCenterPaginationAnchorsByFilter;
+@synthesize mediaCenterExhaustedFilterIdentifiers = _mediaCenterExhaustedFilterIdentifiers;
+@synthesize mediaCenterSeenKeys = _mediaCenterSeenKeys;
 @synthesize mediaCenterGeneration = _mediaCenterGeneration;
+@synthesize mediaCenterLoadingMore = _mediaCenterLoadingMore;
+@synthesize mediaCenterExhausted = _mediaCenterExhausted;
 @synthesize pinnedMessagePanelView = _pinnedMessagePanelView;
 @synthesize pinnedMessageStripeField = _pinnedMessageStripeField;
 @synthesize pinnedMessageLabelField = _pinnedMessageLabelField;
@@ -776,6 +887,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize appearanceWindow = _appearanceWindow;
 @synthesize activeSessionsWindow = _activeSessionsWindow;
 @synthesize activeSessionsTextView = _activeSessionsTextView;
+@synthesize activeSessionsTableView = _activeSessionsTableView;
+@synthesize activeSessionsSelectableSessions = _activeSessionsSelectableSessions;
 @synthesize activeSessionsStatusField = _activeSessionsStatusField;
 @synthesize activeSessionsRefreshButton = _activeSessionsRefreshButton;
 @synthesize activeSessionsTerminatePopup = _activeSessionsTerminatePopup;
@@ -907,7 +1020,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 @synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
+@synthesize chatNavigationClosed = _chatNavigationClosed;
+@synthesize suppressedForumTopicAutoOpenChatID = _suppressedForumTopicAutoOpenChatID;
+@synthesize forumTopicNavigationGeneration = _forumTopicNavigationGeneration;
 @synthesize mediaPreviewZoomScale = _mediaPreviewZoomScale;
+@synthesize mediaPreviewMinimumZoomScale = _mediaPreviewMinimumZoomScale;
 @synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
 @synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
 @synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
@@ -934,11 +1051,16 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
         self.chatSearchWindowResults = [NSMutableArray array];
         self.chatSearchWindowResultButtons = [NSMutableArray array];
         self.mediaCenterItems = [NSMutableArray array];
+        self.mediaCenterPaginationAnchorsByFilter = [NSMutableDictionary dictionary];
+        self.mediaCenterExhaustedFilterIdentifiers = [NSMutableSet set];
+        self.mediaCenterSeenKeys = [NSMutableSet set];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
         self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
+        self.closedChatSuggestionViews = [NSArray array];
+        self.closedChatSuggestionItems = [NSArray array];
         self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
         self.activeSection = TGSectionChats;
         NSString *storedUpdateVersion = [[NSUserDefaults standardUserDefaults] stringForKey:TGAvailableUpdateVersionDefaultsKey];
@@ -1099,6 +1221,9 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     }
     if ([identifier isEqualToString:TGThemeCategoryIdentifierExperimental]) {
         return TGLoc(@"settings.theme.category.experimental");
+    }
+    if ([identifier isEqualToString:TGThemeCategoryIdentifierVisualWorlds]) {
+        return TGLoc(@"settings.theme.category.visualWorlds");
     }
     return TGLoc(@"settings.theme.category.light");
 }
@@ -2007,12 +2132,13 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.chatSearchButton];
 
-    self.mediaCenterButton = [[[NSButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
+    self.mediaCenterButton = [[[TGHeaderActionButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
     [self.mediaCenterButton setTitle:@"media-center"];
     [self.mediaCenterButton setToolTip:TGLoc(@"media.center.title")];
     [self.mediaCenterButton setTarget:self];
     [self.mediaCenterButton setAction:@selector(openMediaCenter:)];
     [self.mediaCenterButton setEnabled:NO];
+    [self.mediaCenterButton setHidden:YES];
     [self applyHeaderIconButtonStyle:self.mediaCenterButton];
     [self.mediaCenterButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.mediaCenterButton];
@@ -2217,9 +2343,31 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [self.messageJumpToNewestButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"jump-newest"] autorelease]];
     [self.messageJumpToNewestButton setTarget:self];
     [self.messageJumpToNewestButton setAction:@selector(jumpToNewestMessages:)];
+    [self.messageJumpToNewestButton sendActionOn:NSLeftMouseUpMask];
     [self.messageJumpToNewestButton setEnabled:NO];
     [self.messageJumpToNewestButton setHidden:YES];
     [contentView addSubview:self.messageJumpToNewestButton];
+
+    self.closedChatPlaceholderView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(0, 0, 420, 212)] autorelease];
+    [self.closedChatPlaceholderView setHidden:YES];
+    [self.closedChatPlaceholderView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
+    [contentView addSubview:self.closedChatPlaceholderView];
+
+    self.closedChatTitleField = [self labelWithFrame:NSMakeRect(0, 0, 360, 24)
+                                                text:TGLoc(@"closedChats.title")
+                                                font:[NSFont boldSystemFontOfSize:15.0]];
+    [self.closedChatTitleField setAlignment:NSCenterTextAlignment];
+    [self.closedChatTitleField setAutoresizingMask:NSViewWidthSizable];
+    [self.closedChatPlaceholderView addSubview:self.closedChatTitleField];
+
+    self.closedChatHintField = [self labelWithFrame:NSMakeRect(0, 0, 360, 34)
+                                               text:TGLoc(@"closedChats.hint")
+                                               font:[NSFont systemFontOfSize:12.0]];
+    [self.closedChatHintField setAlignment:NSCenterTextAlignment];
+    [self.closedChatHintField setTextColor:TGClassicMutedInkColor()];
+    [[self.closedChatHintField cell] setLineBreakMode:NSLineBreakByWordWrapping];
+    [self.closedChatHintField setAutoresizingMask:NSViewWidthSizable];
+    [self.closedChatPlaceholderView addSubview:self.closedChatHintField];
 
     self.messageDropOverlayView = [[[TGDropOverlayView alloc] initWithFrame:NSMakeRect(42, 90, 672, 84)] autorelease];
     [self.messageDropOverlayView setHidden:YES];
@@ -3369,6 +3517,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
 
 #include "TGStatusWindowController+Notifications.inc"
 
+#include "TGStatusWindowController+ClosedChatNavigation.inc"
+
 #include "TGStatusWindowController+SectionLayout.inc"
 
 #include "TGStatusWindowController+ResourceSettings.inc"
@@ -3501,13 +3651,24 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_chatSearchWindowResultButtons release];
     [_mediaCenterButton release];
     [_mediaCenterWindow release];
+    [_mediaCenterContentCardView release];
     [_mediaCenterSearchField release];
+    [_mediaCenterTabButtons release];
     [_mediaCenterFilterPopUpButton release];
     [_mediaCenterSortPopUpButton release];
     [_mediaCenterStatusField release];
     [_mediaCenterScrollView release];
     [_mediaCenterResultsView release];
+    [_mediaCenterRefreshButton release];
+    [_mediaCenterLoadingSpinner release];
+    [_mediaCenterPreviewOverlayView release];
+    [_mediaCenterPreviewImageView release];
+    [_mediaCenterPreviewTitleField release];
+    [_mediaCenterPreviewCloseButton release];
     [_mediaCenterItems release];
+    [_mediaCenterPaginationAnchorsByFilter release];
+    [_mediaCenterExhaustedFilterIdentifiers release];
+    [_mediaCenterSeenKeys release];
     [_pinnedMessagePanelView release];
     [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];
@@ -3553,6 +3714,11 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_typingIndicatorField release];
     [_selectedChatAvatarView release];
     [_selectedChatProfileButton release];
+    [_closedChatPlaceholderView release];
+    [_closedChatTitleField release];
+    [_closedChatHintField release];
+    [_closedChatSuggestionViews release];
+    [_closedChatSuggestionItems release];
     [_chatScrollSurfaceView release];
     [_chatScrollView release];
     [_chatTableView release];
@@ -3707,6 +3873,8 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_appearanceWindow release];
     [_activeSessionsWindow release];
     [_activeSessionsTextView release];
+    [_activeSessionsTableView release];
+    [_activeSessionsSelectableSessions release];
     [_activeSessionsStatusField release];
     [_activeSessionsRefreshButton release];
     [_activeSessionsTerminatePopup release];
@@ -3791,6 +3959,7 @@ static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramens
     [_typingIndicatorText release];
     [_pendingNotificationChatID release];
     [_pendingNotificationThreadID release];
+    [_suppressedForumTopicAutoOpenChatID release];
     [super dealloc];
 }
 

@@ -267,9 +267,10 @@
 
 - (void)updateMessageJumpToNewestButtonVisibility {
     BOOL ready = ([self.currentAuthState isEqualToString:@"ready"] &&
-                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
+                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
+                  self.selectedChatID != nil);
     [self.messageJumpToNewestButton setHidden:!ready];
-    [self.messageJumpToNewestButton setEnabled:(ready && [self shouldShowMessageJumpToNewestButton])];
+    [self.messageJumpToNewestButton setEnabled:ready];
 }
 
 - (void)jumpToNewestMessages:(id)sender {
@@ -1475,13 +1476,14 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *probeError = nil;
         NSError *authorizationError = nil;
-        NSError *parametersError = nil;
         NSError *encryptionKeyError = nil;
         NSError *finalAuthorizationError = nil;
         NSError *postLoginProbeError = nil;
         NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
         NSString *parametersSummary = nil;
+        BOOL parametersAttempted = NO;
+        BOOL parametersMissingConfiguration = NO;
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
@@ -1491,11 +1493,11 @@
                 authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
-                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
+                parametersAttempted = YES;
+                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
+                parametersMissingConfiguration = ([parametersSummary length] == 0);
             }
-            NSInteger parametersErrorCode = [parametersError code];
-            BOOL missingInternalConfiguration = parametersError &&
-                (parametersErrorCode == 12 || parametersErrorCode == 13 || parametersErrorCode == 14);
+            BOOL missingInternalConfiguration = parametersMissingConfiguration;
             if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
                 finalAuthorizationState = @"waitApiCredentials";
             }
@@ -1546,8 +1548,8 @@
                 }
                 if (parametersSummary) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummary]];
-                } else if (parametersError) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", [parametersError localizedDescription]]];
+                } else if (parametersAttempted) {
+                    [self appendDetail:@"TDLib parameters: could not set local parameters; current auth state requires API credentials or local configuration."];
                 }
                 if (encryptionKeySummary) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummary]];
