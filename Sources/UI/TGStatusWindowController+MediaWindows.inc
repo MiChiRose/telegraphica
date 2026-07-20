@@ -457,9 +457,19 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
                                   self.selectedMessageThreadID ? [self.selectedMessageThreadID description] : @"none"]];
     [self ensureMediaCenterWindow];
     [self layoutMediaCenterWindowSubviews];
+    [NSApp activateIgnoringOtherApps:YES];
+    if ([self.mediaCenterWindow isMiniaturized]) {
+        [self.mediaCenterWindow deminiaturize:self];
+    }
     [self.mediaCenterWindow center];
-    [self.mediaCenterWindow makeKeyAndOrderFront:nil];
+    [self.mediaCenterWindow makeKeyAndOrderFront:self];
+    [self.mediaCenterWindow orderFrontRegardless];
     [self.mediaCenterWindow makeFirstResponder:self.mediaCenterSearchField];
+    [self.mediaCenterWindow displayIfNeeded];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: window ordered visible=%@ key=%@ frame=%@.",
+                                  [self.mediaCenterWindow isVisible] ? @"yes" : @"no",
+                                  [self.mediaCenterWindow isKeyWindow] ? @"yes" : @"no",
+                                  NSStringFromRect([self.mediaCenterWindow frame])]];
     [self reloadMediaCenter:nil];
 }
 
