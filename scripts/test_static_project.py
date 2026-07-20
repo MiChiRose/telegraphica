@@ -111,6 +111,47 @@ def check_test_structure(errors):
         errors.append("Telegraphica.xcscheme: TestAction is missing")
 
 
+def check_media_center_pagination(errors):
+    rel = os.path.join("Sources", "UI", "TGStatusWindowController+MediaWindows.inc")
+    path = os.path.join(ROOT, rel)
+    text = read_text(path)
+
+    page_limit = re.search(r"TGMediaCenterPageLimit\s*=\s*(\d+)", text)
+    if not page_limit:
+        errors.append("%s: media center page limit constant is missing" % rel)
+    elif int(page_limit.group(1)) != 30:
+        errors.append("%s: media center page limit should stay at 30 for reliable TDLib paging" % rel)
+
+    required_fragments = [
+        "mediaCenterScrollViewBoundsDidChange:",
+        "loadMoreMediaCenterIfNeeded",
+        "documentHeight - visibleBottom <= 120.0",
+        "loadMediaCenterPageAppending:YES sender:nil",
+        "self.mediaCenterLoadingMore",
+        "self.mediaCenterPaginationAnchorsByFilter",
+        "self.mediaCenterExhaustedFilterIdentifiers",
+        "fromMessageID:fromMessageID",
+        "limit:TGMediaCenterPageLimit",
+        "TGMediaCenterOldestMessageIDFromItems(results)",
+        "rebuildMediaCenterRowsPreservingScroll:append",
+    ]
+    for fragment in required_fragments:
+        if fragment not in text:
+            errors.append("%s: media center pagination contract is missing `%s`" % (rel, fragment))
+
+    if "TGLoc(@\"media.center.titleCard\")" in text or "TGLoc(@\"media.center.hint\")" in text:
+        errors.append("%s: removed media center info card should not be rendered again" % rel)
+
+    localization_rel = os.path.join("Sources", "UI", "TGLocalization.m")
+    localization_text = read_text(os.path.join(ROOT, localization_rel))
+    if "Scroll down to load more." not in localization_text:
+        errors.append("%s: English media center status should tell users about scroll pagination" % localization_rel)
+    if "Прокрутите вниз, чтобы загрузить ещё." not in localization_text:
+        errors.append("%s: Russian media center status should tell users about scroll pagination" % localization_rel)
+    if "Пракруціце ўніз, каб загрузіць яшчэ." not in localization_text:
+        errors.append("%s: Belarusian media center status should tell users about scroll pagination" % localization_rel)
+
+
 def check_no_local_runtime_data(errors):
     forbidden_names = [
         "tdlib-config.plist",
@@ -142,6 +183,7 @@ def main():
     check_localization(errors)
     check_project_membership(errors)
     check_test_structure(errors)
+    check_media_center_pagination(errors)
     check_no_local_runtime_data(errors)
     if errors:
         print("Static project tests failed:")
