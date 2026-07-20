@@ -143,6 +143,52 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 @end
 
+@interface TGStickerSetRailScrollView : NSScrollView
+@end
+
+@implementation TGStickerSetRailScrollView
+
+- (void)scrollWheel:(NSEvent *)event {
+    NSClipView *clipView = [self contentView];
+    NSView *documentView = [self documentView];
+    if (!clipView || !documentView) {
+        [super scrollWheel:event];
+        return;
+    }
+
+    NSRect visibleBounds = [clipView bounds];
+    NSRect documentFrame = [documentView frame];
+    CGFloat maxX = NSWidth(documentFrame) - NSWidth(visibleBounds);
+    if (maxX <= 0.0) {
+        return;
+    }
+
+    CGFloat deltaX = [event scrollingDeltaX];
+    CGFloat deltaY = [event scrollingDeltaY];
+    if (![event hasPreciseScrollingDeltas]) {
+        deltaX *= 10.0;
+        deltaY *= 10.0;
+    }
+
+    CGFloat delta = (fabs(deltaX) >= fabs(deltaY)) ? deltaX : deltaY;
+    if (fabs(delta) < 0.01) {
+        return;
+    }
+
+    NSPoint origin = visibleBounds.origin;
+    origin.x += delta;
+    if (origin.x < 0.0) {
+        origin.x = 0.0;
+    } else if (origin.x > maxX) {
+        origin.x = maxX;
+    }
+
+    [clipView scrollToPoint:origin];
+    [self reflectScrolledClipView:clipView];
+}
+
+@end
+
 @interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;

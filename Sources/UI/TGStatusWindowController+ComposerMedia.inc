@@ -1109,7 +1109,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [railPanel setAutoresizingMask:NSViewWidthSizable];
     [contentView addSubview:railPanel];
 
-    NSScrollView *setScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20, 360, 520, 50)] autorelease];
+    NSScrollView *setScrollView = [[[TGStickerSetRailScrollView alloc] initWithFrame:NSMakeRect(20, 360, 520, 50)] autorelease];
     [setScrollView setBorderType:NSNoBorder];
     [setScrollView setDrawsBackground:NO];
     [setScrollView setHasVerticalScroller:NO];
