@@ -239,6 +239,12 @@
 }
 
 - (BOOL)shouldShowMessageJumpToNewestButton {
+    if (self.messageItemsRepresentFocusedContext &&
+        [self.currentAuthState isEqualToString:@"ready"] &&
+        self.selectedChatID &&
+        ![self.messageScrollView isHidden]) {
+        return YES;
+    }
     if ([self.messageItems count] <= 20 || !self.messageScrollView || [self.messageScrollView isHidden]) {
         return NO;
     }
@@ -261,14 +267,26 @@
 
 - (void)updateMessageJumpToNewestButtonVisibility {
     BOOL ready = ([self.currentAuthState isEqualToString:@"ready"] &&
-                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats]);
+                  [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
+                  self.selectedChatID != nil);
     [self.messageJumpToNewestButton setHidden:!ready];
-    [self.messageJumpToNewestButton setEnabled:(ready && [self shouldShowMessageJumpToNewestButton])];
+    [self.messageJumpToNewestButton setEnabled:ready];
 }
 
 - (void)jumpToNewestMessages:(id)sender {
     (void)sender;
     self.forceMessageScrollToNewest = YES;
+    if (self.messageItemsRepresentFocusedContext && self.selectedChatID) {
+        NSNumber *chatID = [self.selectedChatID retain];
+        self.messageItemsRepresentFocusedContext = NO;
+        self.olderMessagesExhausted = NO;
+        self.messageLoadingIndicatorVisible = YES;
+        [self.messageLoadingSpinner startAnimation:self];
+        [self updateVisibleSection];
+        [self reloadMessagesForChatID:chatID interactive:NO];
+        [chatID release];
+        return;
+    }
     [self scrollMessagesToNewestIfAvailable];
     [self performSelector:@selector(scrollMessagesToNewestIfAvailable) withObject:nil afterDelay:0.0];
     [self updateMessageJumpToNewestButtonVisibility];
@@ -1101,7 +1119,7 @@
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
     NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
-    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0);
+    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0 || self.forceMessageScrollToNewest);
     NSUInteger messageLoadingGeneration = 0;
     if (shouldShowMessageLoading) {
         messageLoadingGeneration = self.messageLoadingGeneration + 1;
@@ -1144,6 +1162,10 @@
                 }
             } else if (itemsCopy) {
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
+                if (self.forceMessageScrollToNewest) {
+                    preserveOlder = NO;
+                }
+                self.messageItemsRepresentFocusedContext = NO;
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
                 [self scheduleMessageItemsReadForChatID:chatIDCopy items:itemsCopy];
                 [self setOfflineModeActive:NO reason:nil];
@@ -1403,6 +1425,12 @@
             if (!mountainLionSafeLoginMode && selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsPinnedMessageRefresh = YES;
             }
+        } else if ([kind isEqualToString:@"poll_update"]) {
+            if (selectedChatID && [self.messageItems count] > 0) {
+                needsMessageRefresh = YES;
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Polls: live update received%@; refreshing selected messages.",
+                                              [summary objectForKey:@"poll_id"] ? [NSString stringWithFormat:@" poll=%@", [summary objectForKey:@"poll_id"]] : @""]];
+            }
         } else if ([kind isEqualToString:@"account_unread"]) {
             id unreadCount = [summary objectForKey:@"count"];
             if ([unreadCount respondsToSelector:@selector(unsignedIntegerValue)]) {
@@ -1455,6 +1483,9 @@
     if (self.controlsBusy) {
         return;
     }
+    if (!self.client) {
+        self.client = [[[TGTDLibClient alloc] init] autorelease];
+    }
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Connecting..."];
     [self appendDetail:@"Connecting to Telegram core..."];
@@ -1462,9 +1493,16 @@
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSString *probeSummary = [client tdlibProbeSummaryWithError:NULL];
+        NSError *probeError = nil;
+        NSError *authorizationError = nil;
+        NSError *encryptionKeyError = nil;
+        NSError *finalAuthorizationError = nil;
+        NSError *postLoginProbeError = nil;
+        NSString *probeSummary = [client tdlibProbeSummaryWithError:&probeError];
         NSString *authorizationState = nil;
         NSString *parametersSummary = nil;
+        BOOL parametersAttempted = NO;
+        BOOL parametersMissingConfiguration = NO;
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
@@ -1473,33 +1511,42 @@
         if (probeSummary) {
             proxySummary = [client configureNetworkProxyIfNeededWithTimeout:5.0 error:NULL];
             networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:2.0 error:NULL];
-            authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:NULL];
+            authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
-                authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:NULL];
+                authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
+                parametersAttempted = YES;
                 parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
+                parametersMissingConfiguration = ([parametersSummary length] == 0);
+            }
+            BOOL missingInternalConfiguration = parametersMissingConfiguration;
+            if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
+                finalAuthorizationState = @"waitApiCredentials";
             }
             if ([authorizationState isEqualToString:@"waitEncryptionKey"] || [parametersSummary length] > 0) {
-                encryptionKeySummary = [client checkDatabaseEncryptionKeyWithTimeout:4.0 error:NULL];
+                encryptionKeySummary = [client checkDatabaseEncryptionKeyWithTimeout:4.0 error:&encryptionKeyError];
             }
             if (![finalAuthorizationState isEqualToString:@"waitApiCredentials"]) {
-                finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:NULL];
+                finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&finalAuthorizationError];
             }
             if ([finalAuthorizationState isEqualToString:@"ready"]) {
                 if (TGMountainLionSafeLoginModeEnabled()) {
                     postLoginProbeSummary = @"Mountain Lion safe login mode: skipped automatic getChats post-login probe.";
                 } else {
-                    postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:NULL];
+                    postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
                     if (!postLoginProbeSummary) {
-                        finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:NULL];
+                        finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
                     }
                 }
             }
             if (![finalAuthorizationState length]) {
-                NSString *fallbackAuthorizationState = [client authorizationStateSummaryWithTimeout:4.0 error:NULL];
+                NSError *fallbackAuthorizationError = nil;
+                NSString *fallbackAuthorizationState = [client authorizationStateSummaryWithTimeout:4.0 error:&fallbackAuthorizationError];
                 if ([fallbackAuthorizationState length] > 0) {
                     finalAuthorizationState = fallbackAuthorizationState;
+                } else if (!finalAuthorizationError && fallbackAuthorizationError) {
+                    finalAuthorizationError = fallbackAuthorizationError;
                 }
             }
             if (![finalAuthorizationState length] && [authorizationState length] > 0) {
@@ -1573,6 +1620,8 @@
                 }
                 if (parametersSummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummaryForUI]];
+                } else if (parametersAttempted) {
+                    [self appendDetail:@"TDLib parameters: could not set local parameters; current auth state requires API credentials or local configuration."];
                 }
                 if (encryptionKeySummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummaryForUI]];

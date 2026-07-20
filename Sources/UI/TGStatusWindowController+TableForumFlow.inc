@@ -1,4 +1,7 @@
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    if (tableView == self.activeSessionsTableView) {
+        return (NSInteger)[self.activeSessionsSelectableSessions count];
+    }
     if (tableView == self.searchResultsTableView) {
         return (NSInteger)[self.searchResultItems count];
     }
@@ -25,6 +28,9 @@
 }
 
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
+    if (tableView == self.activeSessionsTableView) {
+        return 58.0;
+    }
     if (tableView == self.searchResultsTableView) {
         return 44.0;
     }
@@ -145,6 +151,19 @@
         [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
         return;
     }
+    if (tableView == self.activeSessionsTableView) {
+        BOOL selected = [tableView isRowSelected:row];
+        [textCell setFont:[NSFont systemFontOfSize:12.0]];
+        [textCell setTextColor:(selected ? TGClassicSelectedRowTextColor() : TGClassicInkColor())];
+        [textCell setDrawsBackground:selected];
+        if (selected) {
+            [textCell setBackgroundColor:TGClassicSelectedRowColor()];
+        }
+        [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
+        [textCell setWraps:YES];
+        [textCell setAlignment:NSLeftTextAlignment];
+        return;
+    }
     if (tableView == self.chatTableView && [identifier isEqual:@"chat"] && [cell isKindOfClass:[TGChatListCell class]]) {
         TGChatItem *chatItem = nil;
         if (row >= 0 && (NSUInteger)row < [self.chatItems count]) {
@@ -212,6 +231,17 @@
 }
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    if (tableView == self.activeSessionsTableView) {
+        if (row < 0 || (NSUInteger)row >= [self.activeSessionsSelectableSessions count]) {
+            return @"";
+        }
+        id candidate = [self.activeSessionsSelectableSessions objectAtIndex:(NSUInteger)row];
+        if (![candidate isKindOfClass:[NSDictionary class]]) {
+            return @"";
+        }
+        NSDictionary *session = (NSDictionary *)candidate;
+        return TGActiveSessionTableTitle(session, TGLoc(@"settings.sessions.unknownDevice"), TGLanguageCode());
+    }
     if (tableView == self.searchResultsTableView) {
         if (row < 0 || (NSUInteger)row >= [self.searchResultItems count]) {
             return @"";
@@ -281,6 +311,17 @@
     if ([notification object] == self.searchResultsTableView) {
         return;
     }
+    if ([notification object] == self.activeSessionsTableView) {
+        NSInteger row = [self.activeSessionsTableView selectedRow];
+        if (row >= 0 && (NSUInteger)row < [self.activeSessionsSelectableSessions count]) {
+            [self.activeSessionsTerminatePopup selectItemAtIndex:(row + 1)];
+            [self.activeSessionsTerminateButton setEnabled:YES];
+        } else {
+            [self.activeSessionsTerminatePopup selectItemAtIndex:0];
+            [self.activeSessionsTerminateButton setEnabled:NO];
+        }
+        return;
+    }
     if ([notification object] != self.chatTableView) {
         return;
     }
@@ -347,13 +388,23 @@
     BOOL sameTopicKind = ((!previousTopicKind && !newTopicKind) ||
                           (previousTopicKind && newTopicKind && [previousTopicKind isEqualToString:newTopicKind]));
     BOOL selectionChanged = !(sameChat && sameThread && sameTopicKind);
+    if (selectionChanged) {
+        self.chatNavigationClosed = NO;
+        if (![self isForumTopicAutoOpenSuppressedForChatID:newChatID]) {
+            self.suppressedForumTopicAutoOpenChatID = nil;
+        }
+    }
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"Selected chat";
     self.selectedChatTypeSummary = [item typeSummary];
     self.selectedChatAvatarLocalPath = [item avatarLocalPath];
     self.selectedChatLastReadOutboxMessageID = [item lastReadOutboxMessageID];
     [self updateOutgoingReadStateForVisibleMessages];
     [self refreshSelectedChatHeaderDisplay];
-    BOOL shouldOpenTopicList = (!selectedForumTopic && !self.showingForumTopicList && [[item typeSummary] isEqualToString:@"Supergroup"]);
+    BOOL shouldOpenTopicList = (!selectedForumTopic &&
+                                !self.showingForumTopicList &&
+                                !self.chatNavigationClosed &&
+                                ![self isForumTopicAutoOpenSuppressedForChatID:newChatID] &&
+                                [[item typeSummary] isEqualToString:@"Supergroup"]);
     if (selectionChanged) {
         [self clearTypingIndicator];
         self.searchGeneration++;
@@ -429,6 +480,9 @@
     if ([chatID respondsToSelector:@selector(longLongValue)]) {
         selectedChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
     }
+    self.chatNavigationClosed = NO;
+    self.suppressedForumTopicAutoOpenChatID = nil;
+    self.forumTopicNavigationGeneration = self.forumTopicNavigationGeneration + 1;
     [self removeForumTopicRowsPreservingChatID:selectedChatID];
     [self loadForumTopicsForChatItem:item];
     [item release];
@@ -484,6 +538,17 @@
             self.selectedChatLastReadOutboxMessageID = [(TGChatItem *)selectedItem lastReadOutboxMessageID];
             [self updateOutgoingReadStateForVisibleMessages];
         }
+        return;
+    }
+
+    if (self.chatNavigationClosed) {
+        self.suppressChatSelectionHandling = YES;
+        [self.chatTableView deselectAll:nil];
+        self.suppressChatSelectionHandling = NO;
+        [self rebuildClosedChatSuggestions];
+        [self updateAuthControlsForState:self.currentAuthState];
+        [self updateVisibleSection];
+        [self layoutContentView];
         return;
     }
 
@@ -591,6 +656,8 @@
     self.topicParentTitle = [chatItem title];
     self.topicParentAvatarLocalPath = [chatItem avatarLocalPath];
     self.showingForumTopicList = YES;
+    self.chatNavigationClosed = NO;
+    self.suppressedForumTopicAutoOpenChatID = nil;
     [self.loadChatsButton setToolTip:@"Refresh topics"];
     self.chatsExhausted = YES;
     self.autoChatListLoadArmed = NO;
@@ -664,6 +731,10 @@
     }
 
     NSNumber *parentChatID = [self.topicParentChatID retain];
+    if ([parentChatID respondsToSelector:@selector(longLongValue)]) {
+        self.suppressedForumTopicAutoOpenChatID = [NSNumber numberWithLongLong:[parentChatID longLongValue]];
+    }
+    self.forumTopicNavigationGeneration = self.forumTopicNavigationGeneration + 1;
     self.showingForumTopicList = NO;
     self.topicParentChatID = nil;
     self.topicParentTitle = nil;
@@ -803,6 +874,7 @@
     self.forumTopicRefreshInFlight = YES;
     NSUInteger topicLoadingGeneration = self.messageLoadingGeneration + 1;
     self.messageLoadingGeneration = topicLoadingGeneration;
+    NSUInteger forumNavigationGeneration = self.forumTopicNavigationGeneration;
     self.messageLoadingIndicatorVisible = YES;
     [self.messageLoadingSpinner startAnimation:self];
     [self updateVisibleSection];
@@ -819,7 +891,13 @@
 
         dispatch_async(dispatch_get_main_queue(), ^{
             self.forumTopicRefreshInFlight = NO;
-            BOOL selectionStillCurrent = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] && self.selectedMessageThreadID == nil);
+            BOOL topicAutoOpenSuppressed = ([self isForumTopicAutoOpenSuppressedForChatID:chatIDCopy] ||
+                                            self.forumTopicNavigationGeneration != forumNavigationGeneration ||
+                                            self.chatNavigationClosed);
+            BOOL selectionStillCurrent = (!topicAutoOpenSuppressed &&
+                                          self.selectedChatID &&
+                                          [self.selectedChatID longLongValue] == [chatIDCopy longLongValue] &&
+                                          self.selectedMessageThreadID == nil);
             if (selectionStillCurrent && [topics count] > 0) {
                 [self showForumTopicListForChatItem:chatItemCopy topics:topics];
                 [self appendDetail:[NSString stringWithFormat:@"Forum topics: found %lu topics in %@", (unsigned long)[topics count], parentTitle ? parentTitle : @"selected chat"]];

@@ -7,6 +7,7 @@
 @property (nonatomic, retain) NSNumber *date;
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL sending;
+@property (nonatomic, assign) BOOL failedToSend;
 @property (nonatomic, assign) BOOL outgoingRead;
 @property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, copy) NSString *preview;
@@ -39,6 +40,24 @@
 @property (nonatomic, copy) NSString *editableText;
 @property (nonatomic, assign) BOOL canGetMessageThread;
 @property (nonatomic, retain) NSNumber *messageThreadReplyCount;
+@property (nonatomic, retain) NSNumber *retryMessageThreadID;
+@property (nonatomic, copy) NSString *retryMessageTopicKind;
+@property (nonatomic, copy) NSString *retryText;
+@property (nonatomic, retain) NSNumber *retryReplyToMessageID;
+@property (nonatomic, retain) NSNumber *retrySentPartCount;
+@property (nonatomic, retain) NSNumber *retryTotalPartCount;
+@property (nonatomic, copy) NSString *sendFailureSummary;
+@property (nonatomic, copy) NSString *pollQuestion;
+@property (nonatomic, copy) NSArray *pollOptions;
+@property (nonatomic, retain) NSNumber *pollTotalVoterCount;
+@property (nonatomic, retain) NSNumber *pollID;
+@property (nonatomic, assign, getter=isPollClosed) BOOL pollClosed;
+@property (nonatomic, assign, getter=isPollAnonymous) BOOL pollAnonymous;
+@property (nonatomic, assign, getter=isPollMultipleChoice) BOOL pollMultipleChoice;
+@property (nonatomic, assign, getter=isPollQuiz) BOOL pollQuiz;
+@property (nonatomic, copy) NSArray *pendingPollOptionIndexes;
+@property (nonatomic, copy) NSString *pollVoteState;
+@property (nonatomic, copy) NSString *pollVoteMessage;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -52,6 +71,7 @@
 - (BOOL)isPlayableMediaMessage;
 - (BOOL)isVoiceNoteMessage;
 - (BOOL)isVideoNoteMessage;
+- (BOOL)isPollMessage;
 - (BOOL)isMediaAlbumMessage;
 - (NSArray *)visualMediaItems;
 - (void)addVisualMediaFromMessageItem:(TGMessageItem *)item;
