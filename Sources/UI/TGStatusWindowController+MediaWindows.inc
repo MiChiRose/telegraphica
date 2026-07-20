@@ -194,14 +194,14 @@ static BOOL TGMediaCenterSelectionUsesGroups(NSInteger index) {
 
 static CGFloat TGMediaCenterTabWidthForIndex(NSUInteger index) {
     switch (index) {
-        case 0: return 76.0;
-        case 1: return 80.0;
-        case 2: return 82.0;
-        case 3: return 82.0;
-        case 4: return 84.0;
-        case 5: return 62.0;
-        case 6: return 78.0;
-        case 7: return 84.0;
+        case 0: return 80.0;
+        case 1: return 84.0;
+        case 2: return 86.0;
+        case 3: return 86.0;
+        case 4: return 88.0;
+        case 5: return 66.0;
+        case 6: return 88.0;
+        case 7: return 94.0;
         default: return 76.0;
     }
 }
@@ -312,13 +312,18 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
     [window setTitle:@"Chat info"];
-    [window setMinSize:NSMakeSize(560.0, 460.0)];
+    [window setMinSize:NSMakeSize(740.0, 520.0)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
 
     TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
+
+    TGGroupedCardView *contentCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(28.0, 18.0, NSWidth(frame) - 56.0, NSHeight(frame) - 48.0)] autorelease];
+    [contentCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:contentCard];
+    self.mediaCenterContentCardView = contentCard;
 
     CGFloat avatarSize = 92.0;
     TGProfileAvatarView *avatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(floor((NSWidth(frame) - avatarSize) / 2.0),
@@ -373,7 +378,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [infoText setAutoresizingMask:NSViewWidthSizable];
     [infoCard addSubview:infoText];
 
-    NSSegmentedControl *tabControl = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(66.0, 382.0, NSWidth(frame) - 132.0, 28.0)] autorelease];
+    CGFloat initialTabWidth = TGMediaCenterTabsWidth(8);
+    NSSegmentedControl *tabControl = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(floor((NSWidth(frame) - initialTabWidth) / 2.0), 382.0, initialTabWidth, 28.0)] autorelease];
     NSArray *tabTitles = [NSArray arrayWithObjects:
                           TGLoc(@"media.center.tab.media"),
                           TGLoc(@"media.center.tab.files"),
@@ -457,8 +463,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     CGFloat height = NSHeight(bounds);
     NSUInteger segmentCount = [self.mediaCenterTabControl segmentCount];
     CGFloat tabWidth = TGMediaCenterTabsWidth(segmentCount);
-    if (tabWidth > width - 72.0) {
-        tabWidth = width - 72.0;
+    [self.mediaCenterContentCardView setFrame:NSMakeRect(28.0, 18.0, width - 56.0, height - 48.0)];
+    if (tabWidth > width - 64.0) {
+        tabWidth = width - 64.0;
     }
     [self.mediaCenterTabControl setFrame:NSMakeRect(floor((width - tabWidth) / 2.0), height - 298.0, tabWidth, 28.0)];
     [self.mediaCenterStatusField setFrame:NSMakeRect(52.0, height - 334.0, width - 136.0, 18.0)];

@@ -1042,16 +1042,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 520, 18)
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 274, 18)
                                                text:TGLoc(@"stickers.recent")
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 428, 66, 30)] autorelease];
-    [recentButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.recent.short")] autorelease]];
-    [recentButton setTitle:TGLoc(@"stickers.recent.short")];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(308, 458, 104, 30)] autorelease];
+    [recentButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.recent.tab")] autorelease]];
+    [recentButton setTitle:TGLoc(@"stickers.recent.tab")];
     [recentButton setImage:TGTemplateIconAssetImage(@"history", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
     [recentButton setImagePosition:NSImageLeft];
     [recentButton setBordered:NO];
@@ -1062,9 +1062,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
 
-    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(94, 428, 66, 30)] autorelease];
-    [favoriteButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.favorites.short")] autorelease]];
-    [favoriteButton setTitle:TGLoc(@"stickers.favorites.short")];
+    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(424, 458, 104, 30)] autorelease];
+    [favoriteButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.favorites.tab")] autorelease]];
+    [favoriteButton setTitle:TGLoc(@"stickers.favorites.tab")];
     [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
     [favoriteButton setImagePosition:NSImageLeft];
     [favoriteButton setBordered:NO];
@@ -1075,10 +1075,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
-    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(176, 429, 208, 28)] autorelease];
+    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(20, 428, 410, 28)] autorelease];
     [contentView addSubview:stickerSearchBackground];
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(186, 434, 188, 18)] autorelease];
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(30, 434, 390, 18)] autorelease];
     [self applyComposerTextFieldStyle:searchField];
     if ([[searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
         [[searchField cell] setSearchButtonCell:nil];
@@ -1093,7 +1093,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:searchField];
     self.stickerPickerSearchField = searchField;
 
-    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(394, 428, 42, 30)] autorelease];
+    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(448, 427, 44, 30)] autorelease];
     [removeSetButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:@""] autorelease]];
     [removeSetButton setTitle:@""];
     [removeSetButton setImage:TGTemplateIconAssetImage(@"folder-remove", NSMakeSize(17.0, 17.0), TGClassicHeaderTextColor(0.96), 1.0)];
