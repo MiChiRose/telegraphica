@@ -1159,6 +1159,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     if ([identifier isEqualToString:TGThemeCategoryIdentifierExperimental]) {
         return TGLoc(@"settings.theme.category.experimental");
     }
+    if ([identifier isEqualToString:TGThemeCategoryIdentifierVisualWorlds]) {
+        return TGLoc(@"settings.theme.category.visualWorlds");
+    }
     return TGLoc(@"settings.theme.category.light");
 }
 

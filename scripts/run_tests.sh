@@ -84,6 +84,7 @@ fi
     Sources/UI/TGLocalization.m \
     Sources/UI/TGMessageLayoutSupport.m \
     Sources/UI/TGTheme.m \
+    Sources/UI/TGVisualWorldThemeSpec.m \
     -framework Cocoa \
     -o "$BUILD_DIR/core_logic_probe"
 

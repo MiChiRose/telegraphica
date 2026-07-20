@@ -70,6 +70,7 @@ def check_localization(errors):
         "drawer.all",
         "pinned.title",
         "settings.theme.category.experimental",
+        "settings.theme.category.visualWorlds",
         "settings.messages.blocks",
         "message.retrySend",
         "search.chats.title",
