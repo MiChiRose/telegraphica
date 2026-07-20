@@ -1222,6 +1222,13 @@
         self.mediaCenterStatusField = nil;
         self.mediaCenterScrollView = nil;
         self.mediaCenterResultsView = nil;
+        self.mediaCenterRefreshButton = nil;
+        self.mediaCenterLoadingSpinner = nil;
+        self.mediaCenterLoading = NO;
+        self.mediaCenterPreviewOverlayView = nil;
+        self.mediaCenterPreviewImageView = nil;
+        self.mediaCenterPreviewTitleField = nil;
+        self.mediaCenterPreviewCloseButton = nil;
         [self.mediaCenterItems removeAllObjects];
         self.mediaCenterWindow = nil;
     }
