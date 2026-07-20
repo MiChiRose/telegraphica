@@ -455,21 +455,38 @@ static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessa
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: opening for chat=%lld thread=%@.",
                                   [self.selectedChatID longLongValue],
                                   self.selectedMessageThreadID ? [self.selectedMessageThreadID description] : @"none"]];
-    [self ensureMediaCenterWindow];
-    [self layoutMediaCenterWindowSubviews];
-    [NSApp activateIgnoringOtherApps:YES];
-    if ([self.mediaCenterWindow isMiniaturized]) {
-        [self.mediaCenterWindow deminiaturize:self];
+    @try {
+        [[TGLogger sharedLogger] log:@"Media Center: ensuring window."];
+        [self ensureMediaCenterWindow];
+        if (!self.mediaCenterWindow) {
+            [[TGLogger sharedLogger] log:@"Media Center: failed to create window."];
+            NSBeep();
+            return;
+        }
+        [[TGLogger sharedLogger] log:@"Media Center: laying out window."];
+        [self layoutMediaCenterWindowSubviews];
+        if ([self.mediaCenterWindow isMiniaturized]) {
+            [[TGLogger sharedLogger] log:@"Media Center: deminiaturizing window."];
+            [self.mediaCenterWindow deminiaturize:self];
+        }
+        [[TGLogger sharedLogger] log:@"Media Center: ordering window front."];
+        [self.mediaCenterWindow center];
+        [self.mediaCenterWindow makeKeyAndOrderFront:self];
+        [self.mediaCenterWindow orderFrontRegardless];
+        [self.mediaCenterWindow makeFirstResponder:self.mediaCenterSearchField];
+        [self.mediaCenterWindow displayIfNeeded];
+        [NSApp activateIgnoringOtherApps:YES];
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: window ordered visible=%@ key=%@ frame=%@.",
+                                      [self.mediaCenterWindow isVisible] ? @"yes" : @"no",
+                                      [self.mediaCenterWindow isKeyWindow] ? @"yes" : @"no",
+                                      NSStringFromRect([self.mediaCenterWindow frame])]];
+    } @catch (NSException *exception) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: open failed with exception %@: %@.",
+                                      [exception name],
+                                      [exception reason]]];
+        NSBeep();
+        return;
     }
-    [self.mediaCenterWindow center];
-    [self.mediaCenterWindow makeKeyAndOrderFront:self];
-    [self.mediaCenterWindow orderFrontRegardless];
-    [self.mediaCenterWindow makeFirstResponder:self.mediaCenterSearchField];
-    [self.mediaCenterWindow displayIfNeeded];
-    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: window ordered visible=%@ key=%@ frame=%@.",
-                                  [self.mediaCenterWindow isVisible] ? @"yes" : @"no",
-                                  [self.mediaCenterWindow isKeyWindow] ? @"yes" : @"no",
-                                  NSStringFromRect([self.mediaCenterWindow frame])]];
     [self reloadMediaCenter:nil];
 }
 
