@@ -398,6 +398,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [terminateButton setTarget:self];
         [terminateButton setAction:@selector(terminateSelectedActiveSession:)];
         [self applyDestructiveSettingsButtonStyle:terminateButton];
+        [terminateButton setImage:TGTemplateIconAssetImage(@"running",
+                                                           NSMakeSize(16.0, 16.0),
+                                                           [NSColor colorWithCalibratedRed:0.920 green:0.140 blue:0.140 alpha:1.0],
+                                                           1.0)];
         [terminateButton setEnabled:NO];
         [terminateButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
         [contentView addSubview:terminateButton];
@@ -670,7 +674,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 
         NSButton *channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 82, 340, 24)] autorelease];
         [channelButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.channel") attributes:linkAttributes] autorelease]];
-        [channelButton setImage:TGTemplateIconAssetImage(@"discover-compass", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
+        [channelButton setImage:TGTemplateIconAssetImage(@"telegram", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
         [channelButton setImagePosition:NSImageLeft];
         [channelButton setBordered:NO];
         [channelButton setButtonType:NSMomentaryPushInButton];

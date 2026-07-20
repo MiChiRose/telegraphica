@@ -68,27 +68,10 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 5.0, 12.0, 4.0, 4.0, flipped)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 11.0, 7.0, 4.0, 4.0, flipped)] fill];
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
-    } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"] || [title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
-        NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
-        NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
-        NSBezierPath *folderPath = [NSBezierPath bezierPath];
-        [folderPath appendBezierPathWithRoundedRect:folderBody xRadius:2.0 yRadius:2.0];
-        [folderPath appendBezierPathWithRoundedRect:folderTab xRadius:1.5 yRadius:1.5];
-        [folderPath fill];
-
-        NSColor *detailColor = TGClassicWindowBottomColor();
-        [detailColor set];
-        if ([title isEqualToString:@"Private"]) {
-            [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 8.0, 4.0, 4.0, flipped)] fill];
-            TGStrokeLine(TGIconPoint(iconRect, 6.0, 6.0, flipped), TGIconPoint(iconRect, 12.0, 6.0, flipped), 1.1);
-        } else if ([title isEqualToString:@"Groups"]) {
-            [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 4.0, 8.0, 3.4, 3.4, flipped)] fill];
-            [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 10.6, 8.0, 3.4, 3.4, flipped)] fill];
-            TGStrokeLine(TGIconPoint(iconRect, 5.0, 6.0, flipped), TGIconPoint(iconRect, 13.0, 6.0, flipped), 1.0);
-        } else {
-            TGStrokeLine(TGIconPoint(iconRect, 5.0, 9.5, flipped), TGIconPoint(iconRect, 13.0, 9.5, flipped), 1.0);
-            TGStrokeLine(TGIconPoint(iconRect, 5.0, 7.0, flipped), TGIconPoint(iconRect, 13.0, 7.0, flipped), 1.0);
-        }
+    } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"]) {
+        TGDrawTemplateIconAsset(@"folder-share", iconRect, color, 1.0, flipped);
+    } else if ([title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
+        TGDrawTemplateIconAsset(@"folder", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Logs"]) {
         NSRect pageRect = TGIconRect(iconRect, 3.0, 2.0, 12.0, 14.0, flipped);
         [[NSBezierPath bezierPathWithRoundedRect:pageRect xRadius:2.0 yRadius:2.0] stroke];
@@ -107,12 +90,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                       NSMidY(circleRect) - (size.height / 2.0) - 0.5)
            withAttributes:attributes];
     } else {
-        NSRect folderBody = TGIconRect(iconRect, 2.0, 4.0, 14.0, 10.0, flipped);
-        NSRect folderTab = TGIconRect(iconRect, 3.0, 12.0, 6.0, 3.0, flipped);
-        NSBezierPath *folderPath = [NSBezierPath bezierPath];
-        [folderPath appendBezierPathWithRoundedRect:folderBody xRadius:2.0 yRadius:2.0];
-        [folderPath appendBezierPathWithRoundedRect:folderTab xRadius:1.5 yRadius:1.5];
-        [folderPath fill];
+        TGDrawTemplateIconAsset(@"folder", iconRect, color, 1.0, flipped);
     }
 }
 

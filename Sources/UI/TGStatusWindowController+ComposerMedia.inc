@@ -1062,7 +1062,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
     NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(94, 428, 66, 30)] autorelease];
     [favoriteButton setTitle:TGLoc(@"stickers.favorites.short")];
-    [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [favoriteButton setImage:TGTemplateIconAssetImage(@"star", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
     [favoriteButton setImagePosition:NSImageLeft];
     [favoriteButton setTarget:self];
     [favoriteButton setAction:@selector(selectFavoriteStickerPickerTab:)];
