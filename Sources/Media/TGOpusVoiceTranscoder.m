@@ -1,4 +1,5 @@
 #import "TGOpusVoiceTranscoder.h"
+#import "TGMediaSecurityLimits.h"
 #import "../Services/TGLogger.h"
 
 static NSString *TGOpusTranscoderErrorDomain = @"TelegraphicaOpusTranscoder";
@@ -74,6 +75,17 @@ NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mim
         return nil;
     }
 
+    NSDictionary *sourceAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL];
+    unsigned long long sourceSize = [[sourceAttributes objectForKey:NSFileSize] respondsToSelector:@selector(unsignedLongLongValue)]
+        ? [[sourceAttributes objectForKey:NSFileSize] unsignedLongLongValue]
+        : 0;
+    if (sourceSize == 0 || sourceSize > TGMediaMaximumOpusInputBytes) {
+        if (error) {
+            *error = TGOpusTranscoderError(7, @"Voice source exceeds the safe decode size limit.");
+        }
+        return nil;
+    }
+
     NSString *helperPath = TGOpusDecoderHelperPath();
     if ([helperPath length] == 0 || ![[NSFileManager defaultManager] isExecutableFileAtPath:helperPath]) {
         if (error) {
@@ -98,40 +110,85 @@ NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mim
     NSDictionary *outputAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:outputPath error:NULL];
     id outputSize = [outputAttributes objectForKey:NSFileSize];
     if ([outputSize respondsToSelector:@selector(unsignedLongLongValue)] && [outputSize unsignedLongLongValue] > 44) {
-        return outputPath;
+        if ([outputSize unsignedLongLongValue] <= TGMediaMaximumDecodedVoiceBytes) {
+            return outputPath;
+        }
+        [[NSFileManager defaultManager] removeItemAtPath:outputPath error:NULL];
     }
 
-    NSString *temporaryOutputPath = [outputPath stringByAppendingString:@".tmp"];
+    NSString *uniqueSuffix = [[NSProcessInfo processInfo] globallyUniqueString];
+    NSString *temporaryOutputPath = [outputPath stringByAppendingFormat:@".%@.tmp", uniqueSuffix];
     [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
 
-    NSPipe *errorPipe = [NSPipe pipe];
+    NSString *errorLogPath = [temporaryOutputPath stringByAppendingString:@".stderr"];
+    [[NSFileManager defaultManager] removeItemAtPath:errorLogPath error:NULL];
+    [[NSFileManager defaultManager] createFileAtPath:errorLogPath contents:nil attributes:nil];
+    NSFileHandle *errorHandle = [NSFileHandle fileHandleForWritingAtPath:errorLogPath];
     NSTask *task = [[[NSTask alloc] init] autorelease];
     [task setLaunchPath:helperPath];
     [task setArguments:[NSArray arrayWithObjects:path, temporaryOutputPath, nil]];
-    [task setStandardError:errorPipe];
-    [task setStandardOutput:[NSPipe pipe]];
+    [task setStandardError:errorHandle ? errorHandle : [NSFileHandle fileHandleWithNullDevice]];
+    [task setStandardOutput:[NSFileHandle fileHandleWithNullDevice]];
 
+    BOOL timedOut = NO;
+    BOOL outputLimitExceeded = NO;
     @try {
         [task launch];
-        [task waitUntilExit];
+        NSDate *startedAt = [NSDate date];
+        while ([task isRunning]) {
+            [NSThread sleepForTimeInterval:0.05];
+            NSDictionary *temporaryAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:temporaryOutputPath error:NULL];
+            id temporarySize = [temporaryAttributes objectForKey:NSFileSize];
+            if ([temporarySize respondsToSelector:@selector(unsignedLongLongValue)] &&
+                [temporarySize unsignedLongLongValue] > TGMediaMaximumDecodedVoiceBytes) {
+                outputLimitExceeded = YES;
+                [task terminate];
+            } else if (-[startedAt timeIntervalSinceNow] > TGMediaMaximumVoiceTranscodeSeconds) {
+                timedOut = YES;
+                [task terminate];
+            }
+        }
     } @catch (NSException *exception) {
+        [errorHandle closeFile];
         if (error) {
             *error = TGOpusTranscoderError(4, [NSString stringWithFormat:@"Could not start Opus decoder: %@", [exception reason]]);
+        }
+        [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
+        [[NSFileManager defaultManager] removeItemAtPath:errorLogPath error:NULL];
+        return nil;
+    }
+
+    [errorHandle closeFile];
+    NSData *stderrData = [NSData dataWithContentsOfFile:errorLogPath];
+    if ([stderrData length] > 16 * 1024) {
+        stderrData = [stderrData subdataWithRange:NSMakeRange(0, 16 * 1024)];
+    }
+    NSString *stderrText = [[[NSString alloc] initWithData:stderrData encoding:NSUTF8StringEncoding] autorelease];
+    [[NSFileManager defaultManager] removeItemAtPath:errorLogPath error:NULL];
+    if (timedOut || outputLimitExceeded || [task terminationStatus] != 0) {
+        NSString *limitMessage = timedOut
+            ? @"Opus decoder exceeded the safe time limit"
+            : (outputLimitExceeded ? @"Opus decoder exceeded the safe output size limit" : nil);
+        NSString *message = [NSString stringWithFormat:@"Opus decoder failed with status %d%@%@",
+                             [task terminationStatus],
+                             [limitMessage length] > 0 || [stderrText length] > 0 ? @": " : @"",
+                             [limitMessage length] > 0 ? limitMessage : ([stderrText length] > 0 ? stderrText : @"")];
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: %@", message]];
+        if (error) {
+            *error = TGOpusTranscoderError(5, message);
         }
         [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
         return nil;
     }
 
-    NSData *stderrData = [[errorPipe fileHandleForReading] readDataToEndOfFile];
-    NSString *stderrText = [[[NSString alloc] initWithData:stderrData encoding:NSUTF8StringEncoding] autorelease];
-    if ([task terminationStatus] != 0) {
-        NSString *message = [NSString stringWithFormat:@"Opus decoder failed with status %d%@%@",
-                             [task terminationStatus],
-                             [stderrText length] > 0 ? @": " : @"",
-                             [stderrText length] > 0 ? stderrText : @""];
-        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: %@", message]];
+    NSDictionary *decodedAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:temporaryOutputPath error:NULL];
+    id decodedSizeObject = [decodedAttributes objectForKey:NSFileSize];
+    unsigned long long decodedSize = [decodedSizeObject respondsToSelector:@selector(unsignedLongLongValue)]
+        ? [decodedSizeObject unsignedLongLongValue]
+        : 0;
+    if (decodedSize <= 44 || decodedSize > TGMediaMaximumDecodedVoiceBytes) {
         if (error) {
-            *error = TGOpusTranscoderError(5, message);
+            *error = TGOpusTranscoderError(8, @"Decoded voice output is empty or exceeds the safe size limit.");
         }
         [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
         return nil;

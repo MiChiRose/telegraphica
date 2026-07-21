@@ -39,6 +39,7 @@ trap cleanup EXIT
 echo "== Telegraphica static compatibility =="
 "$PYTHON_BIN" scripts/check_legacy_compat.py
 "$PYTHON_BIN" scripts/test_static_project.py
+"$PYTHON_BIN" scripts/test_security_hardening.py
 
 echo "== Shell syntax =="
 bash -n build_legacy.sh

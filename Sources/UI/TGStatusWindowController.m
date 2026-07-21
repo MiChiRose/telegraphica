@@ -595,6 +595,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
 @property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
+@property (nonatomic, assign) NSUInteger mediaPlaybackPreparationGeneration;
 @property (nonatomic, retain) NSNumber *typingChatID;
 @property (nonatomic, copy) NSString *typingIndicatorText;
 @property (nonatomic, retain) NSTimer *typingClearTimer;
@@ -1028,6 +1029,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
 @synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
 @synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
+@synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);

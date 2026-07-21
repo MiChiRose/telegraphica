@@ -1547,33 +1547,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     return NO;
 }
 
-- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly mimeType:(NSString *)mimeType {
-    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        [self appendDetail:@"Playable media file is not available yet."];
-        return NO;
-    }
-    NSString *playablePath = path;
-    NSError *transcodeError = nil;
-    if (TGVoicePathLooksLikeOggOpus(path, mimeType, audioOnly)) {
-        [self.statusField setStringValue:@"Preparing voice..."];
-        playablePath = TGPlayableVoicePathByTranscodingIfNeeded(path, mimeType, audioOnly, &transcodeError);
-        if ([playablePath length] == 0) {
-            NSString *message = [transcodeError localizedDescription];
-            if ([message length] == 0) {
-                message = @"This voice message uses Ogg/Opus and could not be decoded.";
-            }
-            [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
-            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: Opus transcode failed file=%@ mime=%@ reason=%@",
-                                          [path lastPathComponent],
-                                          [mimeType length] > 0 ? mimeType : @"unknown",
-                                          message]];
-            return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
-        }
-    } else if (TGMediaPlaybackPathLooksUnsupportedOnMavericks(path, audioOnly) ||
-               TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
-        return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
-    }
-
+- (BOOL)openPreparedPlayableMediaAtPath:(NSString *)playablePath title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {
     [self ensureMediaPlaybackWindow];
     [self resetMediaPlaybackState];
     [self layoutMediaPlaybackWindowForAudioOnly:audioOnly title:title];
@@ -1606,6 +1580,79 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         [self startMediaPlaybackTimer];
     }
     return YES;
+}
+
+- (void)prepareOpusVoicePlaybackInBackground:(NSDictionary *)request {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    NSString *path = [request objectForKey:@"path"];
+    NSString *mimeType = [request objectForKey:@"mimeType"];
+    NSError *transcodeError = nil;
+    NSString *playablePath = TGPlayableVoicePathByTranscodingIfNeeded(path, mimeType, YES, &transcodeError);
+    NSMutableDictionary *result = [NSMutableDictionary dictionaryWithDictionary:request];
+    if ([playablePath length] > 0) {
+        [result setObject:playablePath forKey:@"playablePath"];
+    }
+    NSString *message = [transcodeError localizedDescription];
+    if ([message length] > 0) {
+        [result setObject:message forKey:@"error"];
+    }
+    [self performSelectorOnMainThread:@selector(finishOpusVoicePlayback:)
+                           withObject:result
+                        waitUntilDone:NO];
+    [pool drain];
+}
+
+- (void)finishOpusVoicePlayback:(NSDictionary *)result {
+    NSUInteger generation = [[result objectForKey:@"generation"] unsignedIntegerValue];
+    if (generation != self.mediaPlaybackPreparationGeneration) {
+        return;
+    }
+    NSString *playablePath = [result objectForKey:@"playablePath"];
+    NSString *path = [result objectForKey:@"path"];
+    NSString *mimeType = [result objectForKey:@"mimeType"];
+    if ([playablePath length] == 0) {
+        NSString *message = [result objectForKey:@"error"];
+        if ([message length] == 0) {
+            message = @"This voice message uses Ogg/Opus and could not be decoded.";
+        }
+        [self appendDetail:[NSString stringWithFormat:@"Media playback: %@", message]];
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Playback: Opus transcode failed file=%@ mime=%@ reason=%@",
+                                      [path lastPathComponent],
+                                      [mimeType length] > 0 ? mimeType : @"unknown",
+                                      message]];
+        [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
+        return;
+    }
+    [self openPreparedPlayableMediaAtPath:playablePath
+                                    title:[result objectForKey:@"title"]
+                                 duration:[result objectForKey:@"duration"]
+                                audioOnly:YES];
+}
+
+- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly mimeType:(NSString *)mimeType {
+    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self appendDetail:@"Playable media file is not available yet."];
+        return NO;
+    }
+    if (TGVoicePathLooksLikeOggOpus(path, mimeType, audioOnly)) {
+        self.mediaPlaybackPreparationGeneration++;
+        [self.statusField setStringValue:@"Preparing voice..."];
+        NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 path, @"path",
+                                 title ? title : @"Voice message", @"title",
+                                 duration ? duration : [NSNumber numberWithDouble:0.0], @"duration",
+                                 mimeType ? mimeType : @"", @"mimeType",
+                                 [NSNumber numberWithUnsignedInteger:self.mediaPlaybackPreparationGeneration], @"generation",
+                                 nil];
+        [self performSelectorInBackground:@selector(prepareOpusVoicePlaybackInBackground:)
+                               withObject:request];
+        return YES;
+    }
+    if (TGMediaPlaybackPathLooksUnsupportedOnMavericks(path, audioOnly) ||
+        TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
+        return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
+    }
+    return [self openPreparedPlayableMediaAtPath:path title:title duration:duration audioOnly:audioOnly];
 }
 
 - (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {

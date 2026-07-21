@@ -54,6 +54,7 @@
 // the parse.
 
 #include <array>
+#include <cmath>
 #include <queue>
 #include <unordered_set>
 
@@ -77,6 +78,8 @@ RAPIDJSON_DIAG_OFF(effc++)
 #endif
 
 using namespace rapidjson;
+
+static const float TGMaximumRepeaterCopies = 256.0f;
 
 using namespace rlottie::internal;
 
@@ -1652,7 +1655,13 @@ model::Repeater *LottieParserImpl::parseReapeaterObject()
             } else {
                 maxCopy = obj->mCopies.value();
             }
-            obj->mMaxCopies = maxCopy;
+            if (!std::isfinite(maxCopy) || maxCopy < 0.0f ||
+                maxCopy > TGMaximumRepeaterCopies) {
+                obj->mMaxCopies = 0.0f;
+                obj->setHidden(true);
+            } else {
+                obj->mMaxCopies = maxCopy;
+            }
         } else if (0 == strcmp(key, "o")) {
             parseProperty(obj->mOffset);
         } else if (0 == strcmp(key, "tr")) {

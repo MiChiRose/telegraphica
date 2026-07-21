@@ -3,6 +3,7 @@
 @interface TGWebMAnimationView : NSView {
 @private
     NSOperationQueue *_decodeQueue;
+    NSOperation *_decodeOperation;
     NSArray *_frames;
     NSTimer *_frameTimer;
     NSDate *_playbackStartDate;
@@ -13,11 +14,13 @@
     BOOL _decodePending;
     BOOL _playbackActive;
     BOOL _animationValid;
+    volatile BOOL _decodeCancelled;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame webmPath:(NSString *)path;
 - (BOOL)isAnimationValid;
 - (void)setPlaybackActive:(BOOL)active;
+- (void)invalidate;
 - (NSUInteger)renderedFrameCount;
 - (NSUInteger)lastAppliedFrame;
 - (unsigned long long)currentFrameChecksum;

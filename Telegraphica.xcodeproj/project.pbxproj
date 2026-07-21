@@ -20,6 +20,7 @@
 		111111111111111111111109 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111231 /* Security.framework */; };
 		111111111111111111111110 /* TelegraphicaAppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111223 /* TelegraphicaAppIcon.icns */; };
 		111111111111111111111113 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111232 /* AVFoundation.framework */; };
+		111111111111111111111157 /* ImageIO.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111316 /* ImageIO.framework */; };
 		111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111224 /* TelegraphicaNotificationIcon.png */; };
 		111111111111111111111115 /* TGActiveSessionsPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111217 /* TGActiveSessionsPresentation.m */; };
 		111111111111111111111116 /* TGLocalization.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111219 /* TGLocalization.m */; };
@@ -155,6 +156,7 @@
 		111111111111111111111287 /* TGSearchResultItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSearchResultItem.m; sourceTree = "<group>"; };
 		111111111111111111111288 /* TGOpusVoiceTranscoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGOpusVoiceTranscoder.h; sourceTree = "<group>"; };
 		111111111111111111111289 /* TGOpusVoiceTranscoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGOpusVoiceTranscoder.m; sourceTree = "<group>"; };
+		111111111111111111111317 /* TGMediaSecurityLimits.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaSecurityLimits.h; sourceTree = "<group>"; };
 		111111111111111111111290 /* TGTDLibBundledCredentials.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTDLibBundledCredentials.h; sourceTree = "<group>"; };
 		111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = TGTDLibBundledCredentialsGenerated.m; path = build-legacy/Generated/TGTDLibBundledCredentialsGenerated.m; sourceTree = SOURCE_ROOT; };
 		111111111111111111111292 /* TGMessageViewersWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageViewersWindowController.h; sourceTree = "<group>"; };
@@ -168,6 +170,7 @@
 		111111111111111111111230 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		111111111111111111111316 /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -179,6 +182,7 @@
 				111111111111111111111108 /* Cocoa.framework in Frameworks */,
 				111111111111111111111109 /* Security.framework in Frameworks */,
 				111111111111111111111113 /* AVFoundation.framework in Frameworks */,
+				111111111111111111111157 /* ImageIO.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,6 +220,7 @@
 				111111111111111111111230 /* Cocoa.framework */,
 				111111111111111111111231 /* Security.framework */,
 				111111111111111111111232 /* AVFoundation.framework */,
+				111111111111111111111316 /* ImageIO.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -338,6 +343,7 @@
 				111111111111111111111285 /* TGFileTransferState.m */,
 				111111111111111111111288 /* TGOpusVoiceTranscoder.h */,
 				111111111111111111111289 /* TGOpusVoiceTranscoder.m */,
+				111111111111111111111317 /* TGMediaSecurityLimits.h */,
 				111111111111111111111225 /* TGWebPDecoder.h */,
 				111111111111111111111226 /* TGWebPDecoder.m */,
 				111111111111111111111227 /* TGMediaImageLoader.h */,
