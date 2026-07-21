@@ -4248,6 +4248,21 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([animationObject isKindOfClass:[NSDictionary class]]) {
             container = (NSDictionary *)animationObject;
         }
+    } else if ([type isEqualToString:@"messageVoiceNote"]) {
+        id voiceObject = [content objectForKey:@"voice_note"];
+        if ([voiceObject isKindOfClass:[NSDictionary class]]) {
+            container = (NSDictionary *)voiceObject;
+        }
+    } else if ([type isEqualToString:@"messageAudio"]) {
+        id audioObject = [content objectForKey:@"audio"];
+        if ([audioObject isKindOfClass:[NSDictionary class]]) {
+            container = (NSDictionary *)audioObject;
+        }
+    } else if ([type isEqualToString:@"messageVideoNote"]) {
+        id videoNoteObject = [content objectForKey:@"video_note"];
+        if ([videoNoteObject isKindOfClass:[NSDictionary class]]) {
+            container = (NSDictionary *)videoNoteObject;
+        }
     }
 
     if (![container isKindOfClass:[NSDictionary class]]) {
@@ -4302,7 +4317,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                [contentType isEqualToString:@"messageVideoNote"] ||
                [contentType isEqualToString:@"messageAnimation"]) {
         type = TGResourceAutoDownloadVideo;
-    } else if ([contentType isEqualToString:@"messageDocument"]) {
+    } else if ([contentType isEqualToString:@"messageDocument"] ||
+               [contentType isEqualToString:@"messageVoiceNote"] ||
+               [contentType isEqualToString:@"messageAudio"]) {
         type = TGResourceAutoDownloadDocument;
     } else {
         policyApplies = NO;

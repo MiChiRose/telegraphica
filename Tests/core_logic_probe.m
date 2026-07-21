@@ -2,6 +2,7 @@
 #import "TGChatDisplayPreferences.h"
 #import "TGLocalization.h"
 #import "TGMediaItemSupport.h"
+#import "TGMediaSecurityLimits.h"
 #import "TGMessageItem.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGMessagePollSupport.h"
@@ -242,6 +243,23 @@ static void TGTestMediaSupport(void) {
     [[NSFileManager defaultManager] removeItemAtPath:tgsPath error:nil];
 }
 
+static void TGTestMediaSecurityLimits(void) {
+    TGAssertTrue(TGMediaDimensionsFitDecodedBudget(512, 512, 4, TGMediaMaximumDecodedBytes),
+                 @"ordinary media dimensions should fit the decode budget");
+    TGAssertTrue(!TGMediaDimensionsFitDecodedBudget(0, 512, 4, TGMediaMaximumDecodedBytes),
+                 @"zero-width media should fail closed");
+    TGAssertTrue(!TGMediaDimensionsFitDecodedBudget(TGMediaMaximumDecodedSide + 1, 512, 4, TGMediaMaximumDecodedBytes),
+                 @"oversized media dimensions should fail closed");
+    TGAssertTrue(!TGMediaDimensionsFitDecodedBudget(4096, 4096, 16, TGMediaMaximumDecodedBytes),
+                 @"media exceeding the decoded-byte budget should fail closed");
+    TGAssertTrue(TGMediaMaximumAnimatedFrameCount > 0 && TGMediaMaximumAnimatedFrameCount <= 180,
+                 @"animated media should keep a bounded frame budget");
+    TGAssertTrue(TGMediaMaximumCompressedWebMFrameBytes <= 8ULL * 1024ULL * 1024ULL,
+                 @"compressed WebM blocks should keep a bounded allocation budget");
+    TGAssertTrue(TGMediaMaximumTGSRepeaterCopies <= 256,
+                 @"TGS repeaters should keep a bounded copy budget");
+}
+
 static void TGTestMessageItemsAndLayout(void) {
     TGClearProbeDefaults();
     TGMessageItem *empty = [[[TGMessageItem alloc] initWithChatID:nil messageID:nil date:nil outgoing:NO preview:nil] autorelease];
@@ -412,6 +430,7 @@ int main(int argc, const char **argv) {
     TGTestChatDisplayPreferences();
     TGTestResourcePolicy();
     TGTestMediaSupport();
+    TGTestMediaSecurityLimits();
     TGTestMessageItemsAndLayout();
     TGTestLocalization();
     TGClearProbeDefaults();
