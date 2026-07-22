@@ -3,6 +3,7 @@
 #import "TGLocalization.h"
 #import "TGMediaItemSupport.h"
 #import "TGMediaSecurityLimits.h"
+#import "TGOpusVoiceTranscoder.h"
 #import "TGMessageItem.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGMessagePollSupport.h"
@@ -194,6 +195,16 @@ static void TGTestResourcePolicy(void) {
     TGAssertTrue(!TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo), @"economy mode should disable video auto-download");
     TGAssertTrue(TGResourcePolicyMaximumActiveAnimations() == 1, @"economy mode should lower active animations");
 
+    TGResourcePolicySetEconomyModeEnabled(NO);
+    TGResourcePolicySetMaxAutoDownloadBytes(20LL * 1024LL * 1024LL);
+    TGAssertTrue(TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 1024), @"known media with a declared safe size should auto-download");
+    TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 0), @"missing media size should fail closed");
+    TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(nil, 1024), @"missing message type should fail closed");
+    TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 21LL * 1024LL * 1024LL), @"oversized media should not auto-download");
+    TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageUnknown", 1024), @"unknown message content should fail closed");
+    TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVideo, NO);
+    TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageVideo", 1024), @"disabled media category should not auto-download");
+
     TGResourcePolicySetMaxAutoDownloadBytes(-1);
     TGAssertTrue(TGResourcePolicyMaxAutoDownloadBytes() > 0, @"invalid auto-download size should fall back to a positive value");
     TGResourcePolicySetMaximumActiveAnimations(0);
@@ -258,6 +269,20 @@ static void TGTestMediaSecurityLimits(void) {
                  @"compressed WebM blocks should keep a bounded allocation budget");
     TGAssertTrue(TGMediaMaximumTGSRepeaterCopies <= 256,
                  @"TGS repeaters should keep a bounded copy budget");
+
+    TGOpusVoiceTranscodeCancellationToken *token = [[[TGOpusVoiceTranscodeCancellationToken alloc] init] autorelease];
+    TGAssertTrue(![token isCancelled], @"new voice preparation token should be active");
+    [token cancel];
+    TGAssertTrue([token isCancelled], @"voice preparation token should retain cancellation state");
+    NSError *cancelError = nil;
+    NSString *cancelledPath = TGPlayableVoicePathByTranscodingIfNeededWithCancellation(@"/tmp/missing.opus",
+                                                                                       @"audio/opus",
+                                                                                       YES,
+                                                                                       token,
+                                                                                       &cancelError);
+    TGAssertTrue(cancelledPath == nil && [cancelError code] == 9, @"cancelled voice preparation should stop before decoder work");
+    NSOperationQueue *voiceQueue = TGCreateSerialVoiceTranscodeQueue();
+    TGAssertTrue([voiceQueue maxConcurrentOperationCount] == 1, @"voice preparation queue should serialize decoder jobs");
 }
 
 static void TGTestMessageItemsAndLayout(void) {

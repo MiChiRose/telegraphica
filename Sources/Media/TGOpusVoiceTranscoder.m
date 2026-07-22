@@ -4,6 +4,43 @@
 
 static NSString *TGOpusTranscoderErrorDomain = @"TelegraphicaOpusTranscoder";
 
+@implementation TGOpusVoiceTranscodeCancellationToken
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _lock = [[NSLock alloc] init];
+        _cancelled = NO;
+    }
+    return self;
+}
+
+- (void)cancel {
+    [_lock lock];
+    _cancelled = YES;
+    [_lock unlock];
+}
+
+- (BOOL)isCancelled {
+    [_lock lock];
+    BOOL cancelled = _cancelled;
+    [_lock unlock];
+    return cancelled;
+}
+
+- (void)dealloc {
+    [_lock release];
+    [super dealloc];
+}
+
+@end
+
+NSOperationQueue *TGCreateSerialVoiceTranscodeQueue(void) {
+    NSOperationQueue *queue = [[[NSOperationQueue alloc] init] autorelease];
+    [queue setMaxConcurrentOperationCount:1];
+    return queue;
+}
+
 BOOL TGVoicePathLooksLikeOggOpus(NSString *path, NSString *mimeType, BOOL audioOnly) {
     if (!audioOnly) {
         return NO;
@@ -65,6 +102,20 @@ static NSError *TGOpusTranscoderError(NSInteger code, NSString *message) {
 }
 
 NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mimeType, BOOL audioOnly, NSError **error) {
+    return TGPlayableVoicePathByTranscodingIfNeededWithCancellation(path, mimeType, audioOnly, nil, error);
+}
+
+NSString *TGPlayableVoicePathByTranscodingIfNeededWithCancellation(NSString *path,
+                                                                   NSString *mimeType,
+                                                                   BOOL audioOnly,
+                                                                   TGOpusVoiceTranscodeCancellationToken *cancellationToken,
+                                                                   NSError **error) {
+    if ([cancellationToken isCancelled]) {
+        if (error) {
+            *error = TGOpusTranscoderError(9, @"Voice preparation was cancelled.");
+        }
+        return nil;
+    }
     if (!TGVoicePathLooksLikeOggOpus(path, mimeType, audioOnly)) {
         return path;
     }
@@ -130,6 +181,7 @@ NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mim
     [task setStandardError:errorHandle ? errorHandle : [NSFileHandle fileHandleWithNullDevice]];
     [task setStandardOutput:[NSFileHandle fileHandleWithNullDevice]];
 
+    BOOL cancelled = NO;
     BOOL timedOut = NO;
     BOOL outputLimitExceeded = NO;
     @try {
@@ -137,6 +189,11 @@ NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mim
         NSDate *startedAt = [NSDate date];
         while ([task isRunning]) {
             [NSThread sleepForTimeInterval:0.05];
+            if ([cancellationToken isCancelled]) {
+                cancelled = YES;
+                [task terminate];
+                continue;
+            }
             NSDictionary *temporaryAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:temporaryOutputPath error:NULL];
             id temporarySize = [temporaryAttributes objectForKey:NSFileSize];
             if ([temporarySize respondsToSelector:@selector(unsignedLongLongValue)] &&
@@ -165,6 +222,13 @@ NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mim
     }
     NSString *stderrText = [[[NSString alloc] initWithData:stderrData encoding:NSUTF8StringEncoding] autorelease];
     [[NSFileManager defaultManager] removeItemAtPath:errorLogPath error:NULL];
+    if (cancelled || [cancellationToken isCancelled]) {
+        if (error) {
+            *error = TGOpusTranscoderError(9, @"Voice preparation was cancelled.");
+        }
+        [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
+        return nil;
+    }
     if (timedOut || outputLimitExceeded || [task terminationStatus] != 0) {
         NSString *limitMessage = timedOut
             ? @"Opus decoder exceeded the safe time limit"
@@ -189,6 +253,13 @@ NSString *TGPlayableVoicePathByTranscodingIfNeeded(NSString *path, NSString *mim
     if (decodedSize <= 44 || decodedSize > TGMediaMaximumDecodedVoiceBytes) {
         if (error) {
             *error = TGOpusTranscoderError(8, @"Decoded voice output is empty or exceeds the safe size limit.");
+        }
+        [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
+        return nil;
+    }
+    if ([cancellationToken isCancelled]) {
+        if (error) {
+            *error = TGOpusTranscoderError(9, @"Voice preparation was cancelled.");
         }
         [[NSFileManager defaultManager] removeItemAtPath:temporaryOutputPath error:NULL];
         return nil;

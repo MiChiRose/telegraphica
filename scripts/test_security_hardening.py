@@ -51,8 +51,13 @@ def main():
         'objectForKey:@"audio"',
         'isEqualToString:@"messageVideoNote"',
         'objectForKey:@"video_note"',
-        "type = TGResourceAutoDownloadDocument",
-        "type = TGResourceAutoDownloadVideo",
+        "TGResourcePolicyAllowsAutoDownloadForMessageContent",
+    ])
+    require(errors, "Sources/Services/TGResourcePolicy.m", [
+        "TGResourcePolicyAutoDownloadTypeForMessageContent",
+        "declaredBytes <= 0",
+        "return NO;",
+        "declaredBytes <= maximumBytes",
     ])
 
     require(errors, "Sources/Media/TGWebPDecoder.m", [
@@ -96,6 +101,9 @@ def main():
         "TGMediaMaximumOpusInputBytes",
         "TGMediaMaximumDecodedVoiceBytes",
         "TGMediaMaximumVoiceTranscodeSeconds",
+        "TGOpusVoiceTranscodeCancellationToken",
+        "setMaxConcurrentOperationCount:1",
+        "[cancellationToken isCancelled]",
         "setStandardError:errorHandle",
     ])
     require(errors, "Tools/tgopusdec.c", [
@@ -105,7 +113,9 @@ def main():
     ])
     media_windows = require(errors, "Sources/UI/TGStatusWindowController+MediaWindows.inc", [
         "prepareOpusVoicePlaybackInBackground:",
-        "performSelectorInBackground:@selector(prepareOpusVoicePlaybackInBackground:)",
+        "cancelMediaPlaybackPreparation",
+        "NSInvocationOperation",
+        "addOperation:operation",
         "finishOpusVoicePlayback:",
     ])
     if "TGPlayableVoicePathByTranscodingIfNeeded" in method_body(
@@ -119,6 +129,7 @@ def main():
         "performSelectorInBackground:@selector(fetchNotificationChatInfoInBackground:)",
         "fetch_pending",
         "fetch_complete",
+        "fetch_retry_after",
     ])
     notification_lookup = method_body(
         notifications,
@@ -159,7 +170,7 @@ def main():
         for error in errors:
             print(" - " + error)
         return 1
-    print("Security hardening tests passed: 11 audited media and UI boundaries remain guarded.")
+    print("Security hardening contract checks passed; behavioral policy and queue checks run in the core logic probe.")
     return 0
 
 

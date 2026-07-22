@@ -1582,12 +1582,31 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     return YES;
 }
 
+- (NSOperationQueue *)ensureMediaPlaybackPreparationQueue {
+    if (!self.mediaPlaybackPreparationQueue) {
+        self.mediaPlaybackPreparationQueue = TGCreateSerialVoiceTranscodeQueue();
+    }
+    return self.mediaPlaybackPreparationQueue;
+}
+
+- (void)cancelMediaPlaybackPreparation {
+    self.mediaPlaybackPreparationGeneration = self.mediaPlaybackPreparationGeneration + 1;
+    [self.mediaPlaybackPreparationCancellationToken cancel];
+    self.mediaPlaybackPreparationCancellationToken = nil;
+    [self.mediaPlaybackPreparationQueue cancelAllOperations];
+}
+
 - (void)prepareOpusVoicePlaybackInBackground:(NSDictionary *)request {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSString *path = [request objectForKey:@"path"];
     NSString *mimeType = [request objectForKey:@"mimeType"];
     NSError *transcodeError = nil;
-    NSString *playablePath = TGPlayableVoicePathByTranscodingIfNeeded(path, mimeType, YES, &transcodeError);
+    TGOpusVoiceTranscodeCancellationToken *cancellationToken = [request objectForKey:@"cancellationToken"];
+    NSString *playablePath = TGPlayableVoicePathByTranscodingIfNeededWithCancellation(path,
+                                                                                       mimeType,
+                                                                                       YES,
+                                                                                       cancellationToken,
+                                                                                       &transcodeError);
     NSMutableDictionary *result = [NSMutableDictionary dictionaryWithDictionary:request];
     if ([playablePath length] > 0) {
         [result setObject:playablePath forKey:@"playablePath"];
@@ -1604,8 +1623,12 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
 - (void)finishOpusVoicePlayback:(NSDictionary *)result {
     NSUInteger generation = [[result objectForKey:@"generation"] unsignedIntegerValue];
-    if (generation != self.mediaPlaybackPreparationGeneration) {
+    TGOpusVoiceTranscodeCancellationToken *cancellationToken = [result objectForKey:@"cancellationToken"];
+    if (generation != self.mediaPlaybackPreparationGeneration || [cancellationToken isCancelled]) {
         return;
+    }
+    if (cancellationToken == self.mediaPlaybackPreparationCancellationToken) {
+        self.mediaPlaybackPreparationCancellationToken = nil;
     }
     NSString *playablePath = [result objectForKey:@"playablePath"];
     NSString *path = [result objectForKey:@"path"];
@@ -1635,7 +1658,9 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         return NO;
     }
     if (TGVoicePathLooksLikeOggOpus(path, mimeType, audioOnly)) {
-        self.mediaPlaybackPreparationGeneration++;
+        [self cancelMediaPlaybackPreparation];
+        TGOpusVoiceTranscodeCancellationToken *cancellationToken = [[[TGOpusVoiceTranscodeCancellationToken alloc] init] autorelease];
+        self.mediaPlaybackPreparationCancellationToken = cancellationToken;
         [self.statusField setStringValue:@"Preparing voice..."];
         NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
                                  path, @"path",
@@ -1643,11 +1668,15 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
                                  duration ? duration : [NSNumber numberWithDouble:0.0], @"duration",
                                  mimeType ? mimeType : @"", @"mimeType",
                                  [NSNumber numberWithUnsignedInteger:self.mediaPlaybackPreparationGeneration], @"generation",
+                                 cancellationToken, @"cancellationToken",
                                  nil];
-        [self performSelectorInBackground:@selector(prepareOpusVoicePlaybackInBackground:)
-                               withObject:request];
+        NSInvocationOperation *operation = [[[NSInvocationOperation alloc] initWithTarget:self
+                                                                                  selector:@selector(prepareOpusVoicePlaybackInBackground:)
+                                                                                    object:request] autorelease];
+        [[self ensureMediaPlaybackPreparationQueue] addOperation:operation];
         return YES;
     }
+    [self cancelMediaPlaybackPreparation];
     if (TGMediaPlaybackPathLooksUnsupportedOnMavericks(path, audioOnly) ||
         TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
         return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
