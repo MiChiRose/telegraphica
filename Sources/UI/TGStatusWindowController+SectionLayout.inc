@@ -1202,6 +1202,7 @@
         [closingWindow release];
     }
     if ([notification object] == self.mediaPlaybackWindow) {
+        [self cancelMediaPlaybackPreparation];
         [self resetMediaPlaybackState];
         [self.mediaPlaybackWindow setDelegate:nil];
         self.mediaPlaybackContainerView = nil;

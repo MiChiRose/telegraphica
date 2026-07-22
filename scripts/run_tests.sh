@@ -80,6 +80,8 @@ fi
     Sources/Core/TGMessagePollSupport.m \
     Sources/Core/TGOutgoingMessageTextChunker.m \
     Sources/Media/TGMediaItemSupport.m \
+    Sources/Media/TGOpusVoiceTranscoder.m \
+    Sources/Services/TGLogger.m \
     Sources/Services/TGResourcePolicy.m \
     Sources/UI/TGChatDisplayPreferences.m \
     Sources/UI/TGLocalization.m \
