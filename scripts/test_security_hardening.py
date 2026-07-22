@@ -52,7 +52,16 @@ def main():
         'isEqualToString:@"messageVideoNote"',
         'objectForKey:@"video_note"',
         "TGResourcePolicyAllowsAutoDownloadForMessageContent",
+        'objectForKey:@"expected_size"',
+        "canKeepVisualFallback",
     ])
+    tdlib_client = read_text("Sources/Core/TGTDLibClient.m")
+    photo_message_parser = method_body(
+        tdlib_client,
+        "- (NSArray *)messagePreviewItemsFromMessages:",
+        "- (NSArray *)messagePreviewItemsByGroupingMediaAlbums:")
+    if 'isEqualToString:@"messagePhoto"] && !hasDisplayablePhotoInfo' in photo_message_parser:
+        errors.append("Sources/Core/TGTDLibClient.m: photo messages awaiting download must not be discarded")
     require(errors, "Sources/Services/TGResourcePolicy.m", [
         "TGResourcePolicyAutoDownloadTypeForMessageContent",
         "declaredBytes <= 0",

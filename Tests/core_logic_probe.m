@@ -333,6 +333,22 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue([photoA isMediaAlbumMessage], @"merged visual media should become an album");
     TGAssertTrue([[photoA visualMediaItems] count] == 2, @"album should keep both media items");
 
+    TGMessageItem *pendingPhoto = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
+                                                                messageID:[NSNumber numberWithInt:6]
+                                                                     date:nil
+                                                                 outgoing:YES
+                                                                  preview:@"Image"] autorelease];
+    [pendingPhoto setContentType:@"messagePhoto"];
+    [pendingPhoto setMediaItems:[NSArray arrayWithObject:
+                                 [NSDictionary dictionaryWithObjectsAndKeys:
+                                  [NSNumber numberWithInt:42], @"file_id",
+                                  [NSNumber numberWithInt:1280], @"width",
+                                  [NSNumber numberWithInt:720], @"height",
+                                  @"Photo", @"placeholder",
+                                  nil]]];
+    TGAssertTrue([pendingPhoto isVisualMediaMessage], @"a photo awaiting download must remain a visual message");
+    TGAssertTrue([[pendingPhoto visualMediaItems] count] == 1, @"a photo awaiting download must keep its placeholder metadata");
+
     NSDictionary *pollContent = [NSDictionary dictionaryWithObjectsAndKeys:
                                  @"messagePoll", @"@type",
                                  [NSDictionary dictionaryWithObjectsAndKeys:

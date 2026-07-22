@@ -3604,6 +3604,21 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return (NSString *)path;
 }
 
+- (NSNumber *)declaredSizeFromFileObject:(id)fileObject {
+    if (![fileObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id sizeObject = [(NSDictionary *)fileObject objectForKey:@"size"];
+    if (![sizeObject respondsToSelector:@selector(longLongValue)] || [sizeObject longLongValue] <= 0) {
+        sizeObject = [(NSDictionary *)fileObject objectForKey:@"expected_size"];
+    }
+    if (![sizeObject respondsToSelector:@selector(longLongValue)] || [sizeObject longLongValue] <= 0) {
+        return nil;
+    }
+    return [NSNumber numberWithLongLong:[sizeObject longLongValue]];
+}
+
 - (void)addMiniThumbnailFromContainerObject:(NSDictionary *)containerObject toMediaInfo:(NSMutableDictionary *)info {
     if (![containerObject isKindOfClass:[NSDictionary class]] || ![info isKindOfClass:[NSMutableDictionary class]]) {
         return;
@@ -3781,6 +3796,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (height) {
         [info setObject:height forKey:@"height"];
     }
+    NSNumber *fileSize = [self declaredSizeFromFileObject:fileObject];
+    if (fileSize) {
+        [info setObject:fileSize forKey:@"file_size"];
+    }
     return ([info count] > 0) ? info : nil;
 }
 
@@ -3858,6 +3877,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSNumber *fullHeight = [fullHeightObject respondsToSelector:@selector(integerValue)] ? [NSNumber numberWithInteger:[fullHeightObject integerValue]] : nil;
     id fullFileObject = [largestSize objectForKey:@"photo"];
     NSNumber *fullFileID = [self fileIDFromFileObject:fullFileObject];
+    NSNumber *fullFileSize = [self declaredSizeFromFileObject:fullFileObject];
     NSString *fullLocalPath = [self completedLocalPathFromFileObject:fullFileObject];
     if (fullFileID) {
         [info setObject:fullFileID forKey:@"full_file_id"];
@@ -3867,6 +3887,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([[info objectForKey:@"local_path"] length] == 0) {
             [info setObject:fullLocalPath forKey:@"local_path"];
         }
+    }
+    if (fullFileSize) {
+        [info setObject:fullFileSize forKey:@"full_file_size"];
     }
     if (fullWidth) {
         [info setObject:fullWidth forKey:@"full_width"];
@@ -3977,10 +4000,13 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![photo isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
-    return [self photoInfoFromPhotoSizes:[(NSDictionary *)photo objectForKey:@"sizes"]
-                         downloadMissing:downloadMissing
-                                 timeout:timeout
-                      didRequestDownload:didRequestDownload];
+    NSDictionary *photoInfo = [self photoInfoFromPhotoSizes:[(NSDictionary *)photo objectForKey:@"sizes"]
+                                             downloadMissing:downloadMissing
+                                                     timeout:timeout
+                                          didRequestDownload:didRequestDownload];
+    NSMutableDictionary *info = photoInfo ? [NSMutableDictionary dictionaryWithDictionary:photoInfo] : [NSMutableDictionary dictionary];
+    [self addMiniThumbnailFromContainerObject:(NSDictionary *)photo toMediaInfo:info];
+    return ([info count] > 0) ? info : nil;
 }
 
 - (NSDictionary *)visualMediaInfoFromContainerObject:(id)containerObject
@@ -5104,11 +5130,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             [item setDownloadFileSize:[NSNumber numberWithLongLong:[fileSize longLongValue]]];
         }
         BOOL hasDisplayablePhotoInfo = ([[photoInfo objectForKey:@"local_path"] length] > 0);
-        if ([contentType isEqualToString:@"messagePhoto"] && !hasDisplayablePhotoInfo && ([preview isEqualToString:@"Image"] || [preview isEqualToString:@"[Photo]"])) {
-            continue;
-        }
-        BOOL canKeepStickerFallback = ([contentType isEqualToString:@"messageSticker"] && [photoInfo count] > 0);
-        if ([photoInfo count] > 0 && (hasDisplayablePhotoInfo || canKeepStickerFallback) && [item isVisualMediaMessage]) {
+        BOOL canKeepVisualFallback = (([contentType isEqualToString:@"messagePhoto"] ||
+                                       [contentType isEqualToString:@"messageSticker"]) &&
+                                      [photoInfo count] > 0);
+        if ([photoInfo count] > 0 && (hasDisplayablePhotoInfo || canKeepVisualFallback)) {
             NSMutableDictionary *mediaInfo = [NSMutableDictionary dictionaryWithDictionary:photoInfo];
             if ([contentType length] > 0) {
                 [mediaInfo setObject:contentType forKey:@"content_type"];
