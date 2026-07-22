@@ -53,6 +53,11 @@
     if ([[cached objectForKey:@"fetch_pending"] boolValue] || [[cached objectForKey:@"fetch_complete"] boolValue]) {
         return;
     }
+    id retryAfterObject = [cached objectForKey:@"fetch_retry_after"];
+    if ([retryAfterObject respondsToSelector:@selector(doubleValue)] &&
+        [retryAfterObject doubleValue] > [[NSDate date] timeIntervalSince1970]) {
+        return;
+    }
     NSMutableDictionary *pending = [NSMutableDictionary dictionary];
     if ([cached isKindOfClass:[NSDictionary class]]) {
         [pending addEntriesFromDictionary:cached];
@@ -79,7 +84,7 @@
                                                   error:&chatInfoError];
     }
     NSMutableDictionary *result = [NSMutableDictionary dictionaryWithDictionary:request];
-    if ([fetchedInfo isKindOfClass:[NSDictionary class]]) {
+    if ([fetchedInfo isKindOfClass:[NSDictionary class]] && [fetchedInfo count] > 0) {
         [result setObject:fetchedInfo forKey:@"info"];
     }
     NSString *errorMessage = [chatInfoError localizedDescription];
@@ -103,15 +108,20 @@
         [merged addEntriesFromDictionary:cached];
     }
     [merged removeObjectForKey:@"fetch_pending"];
-    [merged setObject:[NSNumber numberWithBool:YES] forKey:@"fetch_complete"];
     NSDictionary *fetchedInfo = [result objectForKey:@"info"];
     if ([fetchedInfo isKindOfClass:[NSDictionary class]]) {
+        [merged setObject:[NSNumber numberWithBool:YES] forKey:@"fetch_complete"];
+        [merged removeObjectForKey:@"fetch_retry_after"];
         for (NSString *key in [NSArray arrayWithObjects:@"title", @"avatar_local_path", @"notifications_muted", nil]) {
             id value = [fetchedInfo objectForKey:key];
             if (value) {
                 [merged setObject:value forKey:key];
             }
         }
+    } else {
+        [merged removeObjectForKey:@"fetch_complete"];
+        [merged setObject:[NSNumber numberWithDouble:[[NSDate date] timeIntervalSince1970] + 5.0]
+                   forKey:@"fetch_retry_after"];
     }
     [self.notificationChatInfoByChatID setObject:merged forKey:cacheKey];
     NSString *errorMessage = [result objectForKey:@"error"];
@@ -163,7 +173,7 @@
     if ([info count] > 0) {
         NSMutableDictionary *storedInfo = [NSMutableDictionary dictionaryWithDictionary:info];
         NSDictionary *latestCachedInfo = [self.notificationChatInfoByChatID objectForKey:cacheKey];
-        for (NSString *stateKey in [NSArray arrayWithObjects:@"fetch_pending", @"fetch_complete", nil]) {
+        for (NSString *stateKey in [NSArray arrayWithObjects:@"fetch_pending", @"fetch_complete", @"fetch_retry_after", nil]) {
             id stateValue = [latestCachedInfo objectForKey:stateKey];
             if (stateValue) {
                 [storedInfo setObject:stateValue forKey:stateKey];
