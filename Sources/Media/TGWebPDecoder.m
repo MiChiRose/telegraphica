@@ -1,4 +1,5 @@
 #import "TGWebPDecoder.h"
+#import "TGMediaSecurityLimits.h"
 #import "webp/decode.h"
 #include <string.h>
 
@@ -22,8 +23,10 @@ NSImage *TGWebPImageFromData(NSData *data) {
     if (!WebPGetInfo(bytes, length, &width, &height) || width <= 0 || height <= 0) {
         return nil;
     }
-    if ((NSUInteger)width > NSUIntegerMax / 4 ||
-        (NSUInteger)height > NSUIntegerMax / ((NSUInteger)width * 4)) {
+    if (!TGMediaDimensionsFitDecodedBudget((NSUInteger)width,
+                                           (NSUInteger)height,
+                                           4,
+                                           TGMediaMaximumDecodedBytes)) {
         return nil;
     }
 

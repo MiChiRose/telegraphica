@@ -6,6 +6,8 @@
 
 #include <opus/opusfile.h>
 
+#define TG_MAX_DECODED_WAV_BYTES (512ULL * 1024ULL * 1024ULL)
+
 static void write_u16_le(FILE *file, uint16_t value) {
     unsigned char bytes[2];
     bytes[0] = (unsigned char)(value & 0xff);
@@ -92,6 +94,17 @@ int main(int argc, char **argv) {
             remove(output_path);
             return 68;
         }
+        const uint64_t bytes_per_frame = (uint64_t)channels * (bits_per_sample / 8);
+        const uint64_t maximum_pcm_bytes = TG_MAX_DECODED_WAV_BYTES - 44;
+        const uint64_t maximum_frames = maximum_pcm_bytes / bytes_per_frame;
+        if (total_frames > maximum_frames ||
+            (uint64_t)frames > maximum_frames - total_frames) {
+            fprintf(stderr, "decoded file exceeds the safe wav size limit\n");
+            fclose(output);
+            op_free(opus_file);
+            remove(output_path);
+            return 70;
+        }
         size_t sample_count = (size_t)frames * channels;
         if (fwrite(pcm, sizeof(opus_int16), sample_count, output) != sample_count) {
             fprintf(stderr, "could not write pcm data\n");
@@ -101,13 +114,6 @@ int main(int argc, char **argv) {
             return 69;
         }
         total_frames += (uint64_t)frames;
-        if (total_frames > (uint64_t)0xffffffff / 4) {
-            fprintf(stderr, "decoded file is too large for wav helper\n");
-            fclose(output);
-            op_free(opus_file);
-            remove(output_path);
-            return 70;
-        }
     }
 
     uint32_t data_bytes = (uint32_t)(total_frames * channels * (bits_per_sample / 8));

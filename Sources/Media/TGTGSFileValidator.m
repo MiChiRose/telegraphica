@@ -1,4 +1,5 @@
 #import "TGTGSFileValidator.h"
+#import "TGMediaSecurityLimits.h"
 #import <zlib.h>
 #include <math.h>
 #include <string.h>
@@ -8,6 +9,7 @@ static const NSUInteger TGTGSMaximumInflatedBytes = 1024 * 1024;
 static const NSUInteger TGTGSMaximumFrameCount = 360;
 static const CGFloat TGTGSMaximumFrameRate = 60.0;
 static const CGFloat TGTGSMaximumDuration = 6.1;
+static const NSUInteger TGTGSMaximumJSONTraversalDepth = 64;
 
 static NSData *TGTGSInflatedData(NSData *compressedData) {
     if (![compressedData isKindOfClass:[NSData class]] ||
@@ -71,6 +73,71 @@ static BOOL TGTGSHasExternalImageAssets(NSDictionary *root) {
     return NO;
 }
 
+static BOOL TGTGSRepeaterCopiesObjectIsSafeAtDepth(id value, NSUInteger depth) {
+    if (depth > TGTGSMaximumJSONTraversalDepth) {
+        return NO;
+    }
+    if ([value respondsToSelector:@selector(doubleValue)] && ![value isKindOfClass:[NSString class]]) {
+        double copies = [value doubleValue];
+        return isfinite(copies) && copies >= 0.0 && copies <= (double)TGMediaMaximumTGSRepeaterCopies;
+    }
+    if ([value isKindOfClass:[NSArray class]]) {
+        for (id child in (NSArray *)value) {
+            if (!TGTGSRepeaterCopiesObjectIsSafeAtDepth(child, depth + 1)) {
+                return NO;
+            }
+        }
+        return YES;
+    }
+    if ([value isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dictionary = (NSDictionary *)value;
+        for (NSString *key in [NSArray arrayWithObjects:@"k", @"s", @"e", nil]) {
+            id child = [dictionary objectForKey:key];
+            if (child && !TGTGSRepeaterCopiesObjectIsSafeAtDepth(child, depth + 1)) {
+                return NO;
+            }
+        }
+        return YES;
+    }
+    return NO;
+}
+
+static BOOL TGTGSRepeatersAreSafeAtDepth(id value, NSUInteger depth) {
+    if (depth > TGTGSMaximumJSONTraversalDepth) {
+        return NO;
+    }
+    if ([value isKindOfClass:[NSArray class]]) {
+        for (id child in (NSArray *)value) {
+            if (!TGTGSRepeatersAreSafeAtDepth(child, depth + 1)) {
+                return NO;
+            }
+        }
+        return YES;
+    }
+    if (![value isKindOfClass:[NSDictionary class]]) {
+        return YES;
+    }
+
+    NSDictionary *dictionary = (NSDictionary *)value;
+    id type = [dictionary objectForKey:@"ty"];
+    if ([type isKindOfClass:[NSString class]] && [(NSString *)type isEqualToString:@"rp"]) {
+        id copies = [dictionary objectForKey:@"c"];
+        if (!copies || !TGTGSRepeaterCopiesObjectIsSafeAtDepth(copies, depth + 1)) {
+            return NO;
+        }
+    }
+    for (id child in [dictionary allValues]) {
+        if (!TGTGSRepeatersAreSafeAtDepth(child, depth + 1)) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
+static BOOL TGTGSRepeatersAreSafe(id value) {
+    return TGTGSRepeatersAreSafeAtDepth(value, 0);
+}
+
 NSData *TGTGSValidatedJSONDataAtPath(NSString *path,
                                      NSUInteger *frameCountOut,
                                      CGFloat *frameRateOut) {
@@ -113,7 +180,8 @@ NSData *TGTGSValidatedJSONDataAtPath(NSString *path,
         frameRate <= 0.0 || frameRate > TGTGSMaximumFrameRate ||
         frameCount <= 0.0 || frameCount > (double)TGTGSMaximumFrameCount ||
         duration <= 0.0 || duration > TGTGSMaximumDuration ||
-        TGTGSHasExternalImageAssets(root)) {
+        TGTGSHasExternalImageAssets(root) ||
+        !TGTGSRepeatersAreSafe(root)) {
         return nil;
     }
 

@@ -42,6 +42,10 @@
 
 #include "vp9/decoder/vp9_decodeframe.h"
 #include "vp9/decoder/vp9_detokenize.h"
+
+#define TG_VP9_MAX_DECODE_DIMENSION 4096
+#define TG_VP9_MAX_DECODE_PIXELS \
+  (TG_VP9_MAX_DECODE_DIMENSION * TG_VP9_MAX_DECODE_DIMENSION)
 #include "vp9/decoder/vp9_decodemv.h"
 #include "vp9/decoder/vp9_decoder.h"
 #include "vp9/decoder/vp9_dsubexp.h"
@@ -1464,6 +1468,13 @@ static void setup_render_size(VP9_COMMON *cm, struct vpx_read_bit_buffer *rb) {
   cm->render_height = cm->height;
   if (vpx_rb_read_bit(rb))
     vp9_read_frame_size(rb, &cm->render_width, &cm->render_height);
+  if (cm->render_width <= 0 || cm->render_height <= 0 ||
+      cm->render_width > TG_VP9_MAX_DECODE_DIMENSION ||
+      cm->render_height > TG_VP9_MAX_DECODE_DIMENSION ||
+      cm->render_width > TG_VP9_MAX_DECODE_PIXELS / cm->render_height) {
+    vpx_internal_error(&cm->error, VPX_CODEC_CORRUPT_FRAME,
+                       "Render dimensions exceed Telegraphica's safe limit");
+  }
 }
 
 static void resize_mv_buffer(VP9_COMMON *cm) {
@@ -1476,6 +1487,13 @@ static void resize_mv_buffer(VP9_COMMON *cm) {
 }
 
 static void resize_context_buffers(VP9_COMMON *cm, int width, int height) {
+  if (width <= 0 || height <= 0 ||
+      width > TG_VP9_MAX_DECODE_DIMENSION ||
+      height > TG_VP9_MAX_DECODE_DIMENSION ||
+      width > TG_VP9_MAX_DECODE_PIXELS / height) {
+    vpx_internal_error(&cm->error, VPX_CODEC_CORRUPT_FRAME,
+                       "Coded dimensions exceed Telegraphica's safe limit");
+  }
 #if CONFIG_SIZE_LIMIT
   if (width > DECODE_WIDTH_LIMIT || height > DECODE_HEIGHT_LIMIT)
     vpx_internal_error(&cm->error, VPX_CODEC_CORRUPT_FRAME,
@@ -2735,6 +2753,10 @@ static size_t read_uncompressed_header(VP9Decoder *pbi,
         const int ref = vpx_rb_read_literal(rb, REF_FRAMES_LOG2);
         const int idx = cm->ref_frame_map[ref];
         RefBuffer *const ref_frame = &cm->frame_refs[i];
+        if (idx < 0 || idx >= FRAME_BUFFERS) {
+          vpx_internal_error(&cm->error, VPX_CODEC_CORRUPT_FRAME,
+                             "Invalid VP9 reference frame index");
+        }
         ref_frame->idx = idx;
         ref_frame->buf = &frame_bufs[idx].buf;
         cm->ref_frame_sign_bias[LAST_FRAME + i] = vpx_rb_read_bit(rb);

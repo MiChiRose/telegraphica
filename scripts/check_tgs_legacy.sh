@@ -11,6 +11,8 @@ RLOTTIE_LIBRARY="$BUILD_DIR/librlottie.a"
 VPX_LIBRARY="$VPX_BUILD_DIR/libvpxwebmdecoder.a"
 FIXTURE_JSON="$ROOT_DIR/Tests/Fixtures/tgs-animation.json"
 FIXTURE_TGS="$BUILD_DIR/tgs-animation.tgs"
+UNSAFE_REPEATER_JSON="$ROOT_DIR/Tests/Fixtures/tgs-repeater-bomb.json"
+UNSAFE_REPEATER_TGS="$BUILD_DIR/tgs-repeater-bomb.tgs"
 CLANG="$(xcrun --sdk "$SDK_NAME" --find clang)"
 SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path)}"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
@@ -25,8 +27,13 @@ if [ ! -f "$FIXTURE_JSON" ]; then
     echo "TGS fixture is missing: $FIXTURE_JSON"
     exit 1
 fi
+if [ ! -f "$UNSAFE_REPEATER_JSON" ]; then
+    echo "Unsafe TGS repeater fixture is missing: $UNSAFE_REPEATER_JSON"
+    exit 1
+fi
 
 gzip -c "$FIXTURE_JSON" > "$FIXTURE_TGS"
+gzip -c "$UNSAFE_REPEATER_JSON" > "$UNSAFE_REPEATER_TGS"
 
 "$CLANG" \
     -arch "$ARCH" \
@@ -64,4 +71,4 @@ gzip -c "$FIXTURE_JSON" > "$FIXTURE_TGS"
     -framework CoreMedia \
     -o "$BUILD_DIR/tgs_view_probe"
 
-"$BUILD_DIR/tgs_view_probe" "$FIXTURE_TGS" "$FIXTURE_JSON"
+"$BUILD_DIR/tgs_view_probe" "$FIXTURE_TGS" "$FIXTURE_JSON" "$UNSAFE_REPEATER_TGS"

@@ -13,6 +13,7 @@
 //          Jyrki Alakuijala (jyrki@google.com)
 
 #include <assert.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,7 @@
 #include "src/webp/types.h"
 
 #define NUM_ARGB_CACHE_ROWS          16
+#define TG_MAX_HUFFMAN_TREE_GROUPS   1000
 
 static const int kCodeLengthLiterals = 16;
 static const int kCodeLengthRepeatCode = 16;
@@ -437,6 +439,12 @@ static int ReadHuffmanCodes(VP8LDecoder* const dec, int xsize, int ysize,
 
   if (br->eos) goto Error;
 
+  if (num_htree_groups <= 0 ||
+      num_htree_groups > TG_MAX_HUFFMAN_TREE_GROUPS) {
+    VP8LSetError(dec, VP8_STATUS_BITSTREAM_ERROR);
+    goto Error;
+  }
+
   if (!ReadHuffmanCodesHelper(color_cache_bits, num_htree_groups,
                               num_htree_groups_max, mapping, dec,
                               huffman_tables, &htree_groups)) {
@@ -471,7 +479,11 @@ int ReadHuffmanCodesHelper(int color_cache_bits, int num_htree_groups,
   int* code_lengths = NULL;
 
   if ((mapping == NULL && num_htree_groups != num_htree_groups_max) ||
-      num_htree_groups > num_htree_groups_max) {
+      num_htree_groups > num_htree_groups_max ||
+      num_htree_groups <= 0 ||
+      num_htree_groups > TG_MAX_HUFFMAN_TREE_GROUPS ||
+      table_size > INT_MAX / num_htree_groups) {
+    VP8LSetError(dec, VP8_STATUS_BITSTREAM_ERROR);
     goto Error;
   }
 
