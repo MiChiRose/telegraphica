@@ -106,6 +106,41 @@ BOOL TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadType type)
     return TGResourceBoolForKey(TGResourcePolicyAutoPhotoKey, YES);
 }
 
+BOOL TGResourcePolicyAutoDownloadTypeForMessageContent(NSString *contentType, TGResourceAutoDownloadType *type) {
+    if (![contentType isKindOfClass:[NSString class]] || [contentType length] == 0 || !type) {
+        return NO;
+    }
+    if ([contentType isEqualToString:@"messagePhoto"] || [contentType isEqualToString:@"messageSticker"]) {
+        *type = TGResourceAutoDownloadPhoto;
+        return YES;
+    }
+    if ([contentType isEqualToString:@"messageVideo"] ||
+        [contentType isEqualToString:@"messageVideoNote"] ||
+        [contentType isEqualToString:@"messageAnimation"]) {
+        *type = TGResourceAutoDownloadVideo;
+        return YES;
+    }
+    if ([contentType isEqualToString:@"messageDocument"] ||
+        [contentType isEqualToString:@"messageVoiceNote"] ||
+        [contentType isEqualToString:@"messageAudio"]) {
+        *type = TGResourceAutoDownloadDocument;
+        return YES;
+    }
+    return NO;
+}
+
+BOOL TGResourcePolicyAllowsAutoDownloadForMessageContent(NSString *contentType, long long declaredBytes) {
+    TGResourceAutoDownloadType type = TGResourceAutoDownloadPhoto;
+    if (!TGResourcePolicyAutoDownloadTypeForMessageContent(contentType, &type) || declaredBytes <= 0) {
+        return NO;
+    }
+    if (!TGResourcePolicyAutoDownloadEnabledForType(type)) {
+        return NO;
+    }
+    long long maximumBytes = TGResourcePolicyMaxAutoDownloadBytes();
+    return maximumBytes > 0 && declaredBytes <= maximumBytes;
+}
+
 void TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadType type, BOOL enabled) {
     TGResourcePolicyApplyDefaultsIfNeeded();
     NSString *key = TGResourcePolicyAutoPhotoKey;

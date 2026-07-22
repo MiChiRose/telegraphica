@@ -9,7 +9,7 @@ int main(int argc, const char **argv) {
     NSMutableArray *firstChecksums = [NSMutableArray array];
     NSMutableArray *firstFrameCounts = [NSMutableArray array];
     BOOL valid = YES;
-    if (argc != 3) return 2;
+    if (argc != 4) return 2;
 
     NSUInteger index = 0;
     for (index = 0; index < 5; index++) {
@@ -22,6 +22,9 @@ int main(int argc, const char **argv) {
     TGTGSAnimationView *rawJSONView = [[[TGTGSAnimationView alloc] initWithFrame:NSMakeRect(0, 0, 128, 128)
                                                                         tgsPath:[NSString stringWithUTF8String:argv[2]]] autorelease];
     valid = (valid && ![rawJSONView isAnimationValid]);
+    TGTGSAnimationView *unsafeRepeaterView = [[[TGTGSAnimationView alloc] initWithFrame:NSMakeRect(0, 0, 128, 128)
+                                                                              tgsPath:[NSString stringWithUTF8String:argv[3]]] autorelease];
+    valid = (valid && ![unsafeRepeaterView isAnimationValid]);
     [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.25]];
     for (TGTGSAnimationView *view in views) {
         valid = (valid && [view renderedFrameCount] >= 2);
@@ -87,6 +90,6 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "TGS AppKit view probe failed.\n");
         return 3;
     }
-    printf("TGS AppKit view probe passed: pixels changed; removed view stopped; detached overlay reattached; pending views released; raw JSON rejected.\n");
+    printf("TGS AppKit view probe passed: pixels changed; removed view stopped; detached overlay reattached; pending views released; raw JSON and unsafe repeater rejected.\n");
     return 0;
 }

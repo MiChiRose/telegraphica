@@ -606,6 +606,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
 @property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
+@property (nonatomic, assign) NSUInteger mediaPlaybackPreparationGeneration;
+@property (nonatomic, retain) NSOperationQueue *mediaPlaybackPreparationQueue;
+@property (nonatomic, retain) TGOpusVoiceTranscodeCancellationToken *mediaPlaybackPreparationCancellationToken;
 @property (nonatomic, retain) NSNumber *typingChatID;
 @property (nonatomic, copy) NSString *typingIndicatorText;
 @property (nonatomic, retain) NSTimer *typingClearTimer;
@@ -1039,6 +1042,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
 @synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
 @synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
+@synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
+@synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
+@synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -3880,6 +3886,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaPreviewWindow setDelegate:nil];
     [_mediaPreviewWindow close];
     [_mediaPlaybackWindow setDelegate:nil];
+    [_mediaPlaybackPreparationCancellationToken cancel];
+    [_mediaPlaybackPreparationQueue cancelAllOperations];
     [_mediaPlaybackPlayer pause];
     [_mediaPlaybackTimer invalidate];
     [_mediaPlaybackLayer removeFromSuperlayer];
@@ -3923,6 +3931,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackLayer release];
     [_mediaPlaybackTimer release];
+    [_mediaPlaybackPreparationQueue release];
+    [_mediaPlaybackPreparationCancellationToken release];
     [_messageViewersWindowController release];
     [_photoSendPreviewWindow release];
     [_photoSendPreviewImageView release];
