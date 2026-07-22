@@ -11,6 +11,9 @@
     <img src="https://img.shields.io/badge/status-open%20beta-brightgreen" alt="open beta status" />
     <img src="https://img.shields.io/badge/no-Electron-success" alt="no Electron" />
   </p>
+  <p>
+    📣 <a href="https://t.me/macos_telegraphica"><b>Follow development news and release announcements on Telegram</b></a>
+  </p>
 </div>
 
 Telegraphica is a small native Cocoa/AppKit Telegram client available for
