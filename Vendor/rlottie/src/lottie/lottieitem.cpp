@@ -29,6 +29,8 @@
 #include "vpainter.h"
 #include "vraster.h"
 
+static const int TGMaximumRepeaterCopies = 256;
+
 /* Lottie Layer Rules
  * 1. time stretch is pre calculated and applied to all the properties of the
  * lottilayer model and all its children
@@ -1497,7 +1499,14 @@ renderer::Repeater::Repeater(model::Repeater *data, VArenaAlloc *allocator)
 {
     assert(mRepeaterData->content());
 
-    mCopies = mRepeaterData->maxCopies();
+    float maximumCopies = mRepeaterData->maxCopies();
+    if (!std::isfinite(maximumCopies) || maximumCopies <= 0.0f) {
+        mCopies = 0;
+    } else if (maximumCopies >= static_cast<float>(TGMaximumRepeaterCopies)) {
+        mCopies = TGMaximumRepeaterCopies;
+    } else {
+        mCopies = static_cast<int>(std::ceil(maximumCopies));
+    }
 
     for (int i = 0; i < mCopies; i++) {
         auto content = allocator->make<renderer::Group>(
@@ -1513,7 +1522,10 @@ void renderer::Repeater::update(int frameNo, const VMatrix &parentMatrix,
     DirtyFlag newFlag = flag;
 
     float copies = mRepeaterData->copies(frameNo);
-    int   visibleCopies = int(copies);
+    int visibleCopies = 0;
+    if (std::isfinite(copies) && copies > 0.0f) {
+        visibleCopies = copies >= static_cast<float>(mCopies) ? mCopies : int(copies);
+    }
 
     if (visibleCopies == 0) {
         mHidden = true;

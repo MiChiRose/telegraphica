@@ -13,6 +13,8 @@ void TGResourcePolicySetEconomyModeEnabled(BOOL enabled);
 
 BOOL TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadType type);
 void TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadType type, BOOL enabled);
+BOOL TGResourcePolicyAutoDownloadTypeForMessageContent(NSString *contentType, TGResourceAutoDownloadType *type);
+BOOL TGResourcePolicyAllowsAutoDownloadForMessageContent(NSString *contentType, long long declaredBytes);
 
 long long TGResourcePolicyMaxAutoDownloadBytes(void);
 void TGResourcePolicySetMaxAutoDownloadBytes(long long bytes);
