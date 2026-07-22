@@ -7,6 +7,7 @@
     NSImage *_renderedImage;
     NSBitmapImageRep *_bitmapRepresentation;
     NSOperationQueue *_renderQueue;
+    NSOperation *_renderOperation;
     NSTimer *_frameTimer;
     NSDate *_playbackStartDate;
     NSUInteger _lastScheduledFrame;
@@ -18,11 +19,13 @@
     NSUInteger _lastAppliedFrame;
     BOOL _renderPending;
     BOOL _playbackActive;
+    volatile BOOL _invalidated;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame tgsPath:(NSString *)path;
 - (BOOL)isAnimationValid;
 - (void)setPlaybackActive:(BOOL)active;
+- (void)invalidate;
 - (NSUInteger)renderedFrameCount;
 - (NSUInteger)lastAppliedFrame;
 - (unsigned long long)currentFrameChecksum;

@@ -1,7 +1,9 @@
 #import "TGInlineMediaPlaybackCoordinator.h"
 #import "TGTGSAnimationView.h"
 #import "TGWebMAnimationView.h"
+#import "TGMediaSecurityLimits.h"
 #import <AVFoundation/AVFoundation.h>
+#import <ImageIO/ImageIO.h>
 
 NSString * const TGInlineMediaIdentifierKey = @"identifier";
 NSString * const TGInlineMediaPathKey = @"path";
@@ -37,6 +39,7 @@ static void TGInlineMediaPlaybackPostDiagnostic(NSString *message) {
 @property (nonatomic, assign) BOOL playbackActive;
 - (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath mediaKind:(NSString *)mediaKind;
 - (void)setPlaybackActive:(BOOL)active;
+- (void)invalidate;
 - (NSString *)diagnosticSummary;
 - (NSRect)contentFrame;
 @end
@@ -65,6 +68,44 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     }
     NSString *signature = [[[NSString alloc] initWithData:prefix encoding:NSASCIIStringEncoding] autorelease];
     return [signature isEqualToString:@"GIF87a"] || [signature isEqualToString:@"GIF89a"];
+}
+
+static BOOL TGInlineMediaGIFIsWithinBudget(NSString *path) {
+    NSURL *url = [NSURL fileURLWithPath:path];
+    CGImageSourceRef source = CGImageSourceCreateWithURL((CFURLRef)url, NULL);
+    if (!source) {
+        return NO;
+    }
+    size_t frameCount = CGImageSourceGetCount(source);
+    if (frameCount == 0 || frameCount > TGMediaMaximumAnimatedFrameCount) {
+        CFRelease(source);
+        return NO;
+    }
+
+    unsigned long long totalBytes = 0;
+    size_t index = 0;
+    for (index = 0; index < frameCount; index++) {
+        CFDictionaryRef properties = CGImageSourceCopyPropertiesAtIndex(source, index, NULL);
+        NSNumber *widthNumber = properties ? [(NSDictionary *)properties objectForKey:(NSString *)kCGImagePropertyPixelWidth] : nil;
+        NSNumber *heightNumber = properties ? [(NSDictionary *)properties objectForKey:(NSString *)kCGImagePropertyPixelHeight] : nil;
+        NSUInteger width = [widthNumber respondsToSelector:@selector(unsignedIntegerValue)] ? [widthNumber unsignedIntegerValue] : 0;
+        NSUInteger height = [heightNumber respondsToSelector:@selector(unsignedIntegerValue)] ? [heightNumber unsignedIntegerValue] : 0;
+        if (properties) {
+            CFRelease(properties);
+        }
+        if (!TGMediaDimensionsFitDecodedBudget(width, height, 4, TGMediaMaximumDecodedBytes)) {
+            CFRelease(source);
+            return NO;
+        }
+        unsigned long long frameBytes = (unsigned long long)width * (unsigned long long)height * 4ULL;
+        if (frameBytes > TGMediaMaximumDecodedBytes - totalBytes) {
+            CFRelease(source);
+            return NO;
+        }
+        totalBytes += frameBytes;
+    }
+    CFRelease(source);
+    return YES;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame mediaPath:(NSString *)mediaPath mediaKind:(NSString *)mediaKind {
@@ -99,6 +140,10 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
         self.webmView = webmView;
         TGInlineMediaPlaybackPostDiagnostic([NSString stringWithFormat:@"Media Playback: WebM renderer created file=%@", [mediaPath lastPathComponent]]);
     } else if ([mediaKind isEqualToString:TGInlineMediaKindGIF] || TGInlineMediaPathContainsGIF(mediaPath)) {
+        if (!TGInlineMediaGIFIsWithinBudget(mediaPath)) {
+            self.failureReason = @"GIF exceeds the safe animation budget.";
+            return self;
+        }
         NSImage *image = [[[NSImage alloc] initWithContentsOfFile:mediaPath] autorelease];
         if (image) {
             NSImageView *imageView = [[[NSImageView alloc] initWithFrame:[self bounds]] autorelease];
@@ -224,8 +269,15 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
     }
 }
 
-- (void)dealloc {
+- (void)invalidate {
+    [self setPlaybackActive:NO];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.tgsView invalidate];
+    [self.webmView invalidate];
+}
+
+- (void)dealloc {
+    [self invalidate];
     [_player pause];
     [_player release];
     [_playerLayer removeFromSuperlayer];
@@ -371,7 +423,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 
         TGInlineMediaPlaybackView *view = [self.viewsByIdentifier objectForKey:identifier];
         if (view && (![[view mediaPath] isEqualToString:path] || ![[view mediaKind] isEqualToString:kind])) {
-            [view setPlaybackActive:NO];
+            [view invalidate];
             [view removeFromSuperview];
             [self.viewsByIdentifier removeObjectForKey:identifier];
             view = nil;
@@ -405,7 +457,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
             continue;
         }
         TGInlineMediaPlaybackView *view = [self.viewsByIdentifier objectForKey:identifier];
-        [view setPlaybackActive:NO];
+        [view invalidate];
         [view removeFromSuperview];
         [self.viewsByIdentifier removeObjectForKey:identifier];
     }
@@ -422,7 +474,7 @@ static BOOL TGInlineMediaPathContainsGIF(NSString *path) {
 - (void)removeAllPlayback {
     NSArray *views = [[self.viewsByIdentifier allValues] copy];
     for (TGInlineMediaPlaybackView *view in views) {
-        [view setPlaybackActive:NO];
+        [view invalidate];
         [view removeFromSuperview];
     }
     [views release];

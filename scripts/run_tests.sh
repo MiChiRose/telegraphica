@@ -39,6 +39,7 @@ trap cleanup EXIT
 echo "== Telegraphica static compatibility =="
 "$PYTHON_BIN" scripts/check_legacy_compat.py
 "$PYTHON_BIN" scripts/test_static_project.py
+"$PYTHON_BIN" scripts/test_security_hardening.py
 
 echo "== Shell syntax =="
 bash -n build_legacy.sh
@@ -79,6 +80,8 @@ fi
     Sources/Core/TGMessagePollSupport.m \
     Sources/Core/TGOutgoingMessageTextChunker.m \
     Sources/Media/TGMediaItemSupport.m \
+    Sources/Media/TGOpusVoiceTranscoder.m \
+    Sources/Services/TGLogger.m \
     Sources/Services/TGResourcePolicy.m \
     Sources/UI/TGChatDisplayPreferences.m \
     Sources/UI/TGLocalization.m \

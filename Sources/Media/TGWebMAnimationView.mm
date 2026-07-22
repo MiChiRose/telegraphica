@@ -1,8 +1,10 @@
 #import "TGWebMAnimationView.h"
+#import "TGMediaSecurityLimits.h"
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
+#include <cstdlib>
+#include <climits>
 #include "mkvparser/mkvparser.h"
 #include "mkvparser/mkvreader.h"
 #include "vpx/vp8dx.h"
@@ -105,8 +107,8 @@ static NSImage *TGWebMCreateImageFromI420(vpx_image_t *image, NSUInteger targetW
     return decodedImage;
 }
 
-static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
-    if ([path length] == 0) {
+static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize, volatile BOOL *cancelled) {
+    if ([path length] == 0 || (cancelled && *cancelled)) {
         return nil;
     }
 
@@ -184,23 +186,38 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
     NSMutableArray *frames = [NSMutableArray array];
     unsigned long long lastChecksum = 0;
     const mkvparser::Cluster *cluster = segment->GetFirst();
-    while (cluster && !cluster->EOS() && [frames count] < TGWebMMaximumFrameCount) {
+    while (cluster && !cluster->EOS() && [frames count] < TGWebMMaximumFrameCount && !(cancelled && *cancelled)) {
         const mkvparser::BlockEntry *entry = NULL;
         if (cluster->GetFirst(entry) < 0) {
             break;
         }
-        while (entry && !entry->EOS() && [frames count] < TGWebMMaximumFrameCount) {
+        while (entry && !entry->EOS() && [frames count] < TGWebMMaximumFrameCount && !(cancelled && *cancelled)) {
             const mkvparser::Block *block = entry->GetBlock();
             if (block && block->GetTrackNumber() == videoTrack->GetNumber()) {
                 int frameIndex = 0;
-                for (frameIndex = 0; frameIndex < block->GetFrameCount() && [frames count] < TGWebMMaximumFrameCount; frameIndex++) {
+                for (frameIndex = 0; frameIndex < block->GetFrameCount() && [frames count] < TGWebMMaximumFrameCount && !(cancelled && *cancelled); frameIndex++) {
                     const mkvparser::Block::Frame &frame = block->GetFrame(frameIndex);
-                    std::vector<unsigned char> frameData((size_t)frame.len);
-                    if (frame.Read(&reader, &frameData[0]) == 0 &&
-                        vpx_codec_decode(&codec, &frameData[0], (unsigned int)frameData.size(), NULL, 0) == VPX_CODEC_OK) {
+                    if (frame.len <= 0 ||
+                        (unsigned long long)frame.len > TGMediaMaximumCompressedWebMFrameBytes ||
+                        (unsigned long long)frame.len > (unsigned long long)UINT_MAX) {
+                        continue;
+                    }
+                    unsigned char *frameData = (unsigned char *)malloc((size_t)frame.len);
+                    if (!frameData) {
+                        continue;
+                    }
+                    if (frame.Read(&reader, frameData) == 0 &&
+                        !(cancelled && *cancelled) &&
+                        vpx_codec_decode(&codec, frameData, (unsigned int)frame.len, NULL, 0) == VPX_CODEC_OK) {
                         vpx_codec_iter_t iterator = NULL;
                         vpx_image_t *decoded = NULL;
-                        while ((decoded = vpx_codec_get_frame(&codec, &iterator)) != NULL && [frames count] < TGWebMMaximumFrameCount) {
+                        while ((decoded = vpx_codec_get_frame(&codec, &iterator)) != NULL &&
+                               [frames count] < TGWebMMaximumFrameCount &&
+                               !(cancelled && *cancelled)) {
+                            if (decoded->d_w == 0 || decoded->d_h == 0 ||
+                                decoded->d_w > TGWebMMaximumSourceSide || decoded->d_h > TGWebMMaximumSourceSide) {
+                                continue;
+                            }
                             unsigned long long checksum = 0;
                             NSImage *decodedImage = TGWebMCreateImageFromI420(decoded, targetWidth, targetHeight, &checksum);
                             if (decodedImage) {
@@ -209,6 +226,7 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
                             }
                         }
                     }
+                    free(frameData);
                 }
             }
             const mkvparser::BlockEntry *nextEntry = NULL;
@@ -224,7 +242,7 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
     delete segment;
     reader.Close();
 
-    if ([frames count] == 0) {
+    if ((cancelled && *cancelled) || [frames count] == 0) {
         return nil;
     }
     return [NSDictionary dictionaryWithObjectsAndKeys:
@@ -235,7 +253,7 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
 }
 
 @interface TGWebMAnimationView ()
-- (void)decodeInBackground:(NSString *)path;
+- (void)decodeInBackground:(NSDictionary *)request;
 - (void)applyDecodedFrames:(NSDictionary *)payload;
 - (void)advanceFrame:(NSTimer *)timer;
 - (void)startFrameTimer;
@@ -257,10 +275,14 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
     _frameRate = TGWebMDefaultFrameRate;
     _decodeQueue = [TGWebMSharedDecodeQueue() retain];
     _decodePending = YES;
-    NSInvocationOperation *operation = [[[NSInvocationOperation alloc] initWithTarget:self
-                                                                              selector:@selector(decodeInBackground:)
-                                                                                object:[[path copy] autorelease]] autorelease];
-    [_decodeQueue addOperation:operation];
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             path ? path : @"", @"path",
+                             [NSValue valueWithSize:[self bounds].size], @"viewSize",
+                             nil];
+    _decodeOperation = [[NSInvocationOperation alloc] initWithTarget:self
+                                                            selector:@selector(decodeInBackground:)
+                                                              object:request];
+    [_decodeQueue addOperation:_decodeOperation];
     return self;
 }
 
@@ -268,17 +290,26 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
     return _animationValid;
 }
 
-- (void)decodeInBackground:(NSString *)path {
+- (void)decodeInBackground:(NSDictionary *)request {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    NSDictionary *payload = TGWebMDecodeFramesAtPath(path, [self bounds].size);
-    [self performSelectorOnMainThread:@selector(applyDecodedFrames:)
-                           withObject:payload
-                        waitUntilDone:NO];
+    NSString *path = [request objectForKey:@"path"];
+    NSSize viewSize = [[request objectForKey:@"viewSize"] sizeValue];
+    NSDictionary *payload = TGWebMDecodeFramesAtPath(path, viewSize, &_decodeCancelled);
+    if (!_decodeCancelled && ![_decodeOperation isCancelled]) {
+        [self performSelectorOnMainThread:@selector(applyDecodedFrames:)
+                               withObject:payload
+                            waitUntilDone:NO];
+    }
     [pool drain];
 }
 
 - (void)applyDecodedFrames:(NSDictionary *)payload {
+    [_decodeOperation release];
+    _decodeOperation = nil;
     _decodePending = NO;
+    if (_decodeCancelled) {
+        return;
+    }
     NSArray *decodedFrames = [payload objectForKey:@"frames"];
     if ([decodedFrames count] == 0) {
         _animationValid = NO;
@@ -299,12 +330,30 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
 }
 
 - (void)setPlaybackActive:(BOOL)active {
+    if (_decodeCancelled) {
+        return;
+    }
     _playbackActive = active;
     if (active) {
         [self startFrameTimer];
     } else {
         [self stopFrameTimer];
     }
+}
+
+- (void)invalidate {
+    _decodeCancelled = YES;
+    [_decodeOperation cancel];
+    [_decodeOperation release];
+    _decodeOperation = nil;
+    [self stopFrameTimer];
+}
+
+- (void)viewWillMoveToSuperview:(NSView *)newSuperview {
+    if (!newSuperview) {
+        [self invalidate];
+    }
+    [super viewWillMoveToSuperview:newSuperview];
 }
 
 - (void)startFrameTimer {
@@ -384,7 +433,7 @@ static NSDictionary *TGWebMDecodeFramesAtPath(NSString *path, NSSize viewSize) {
 }
 
 - (void)dealloc {
-    [self stopFrameTimer];
+    [self invalidate];
     [_frames release];
     [_decodeQueue release];
     [super dealloc];

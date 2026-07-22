@@ -169,19 +169,23 @@ static NSColor *TGTGSStickerBackgroundColor(void) {
 }
 
 - (void)scheduleRenderFrame:(NSUInteger)frameIndex {
-    if (![self isAnimationValid] || _renderPending || frameIndex == _lastScheduledFrame) {
+    if (_invalidated || ![self isAnimationValid] || _renderPending || frameIndex == _lastScheduledFrame) {
         return;
     }
     _renderPending = YES;
     _lastScheduledFrame = frameIndex;
-    NSInvocationOperation *operation = [[[NSInvocationOperation alloc] initWithTarget:self
-                                                                              selector:@selector(renderFrameInBackground:)
-                                                                                object:[NSNumber numberWithUnsignedInteger:frameIndex]] autorelease];
-    [_renderQueue addOperation:operation];
+    _renderOperation = [[NSInvocationOperation alloc] initWithTarget:self
+                                                            selector:@selector(renderFrameInBackground:)
+                                                              object:[NSNumber numberWithUnsignedInteger:frameIndex]];
+    [_renderQueue addOperation:_renderOperation];
 }
 
 - (void)renderFrameInBackground:(NSNumber *)frameNumber {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    if (_invalidated || [_renderOperation isCancelled]) {
+        [pool drain];
+        return;
+    }
     NSUInteger frameIndex = [frameNumber unsignedIntegerValue];
     NSUInteger expectedLength = _pixelWidth * _pixelHeight * 4;
     NSMutableData *renderedPixels = [[NSMutableData alloc] initWithLength:expectedLength];
@@ -195,6 +199,12 @@ static NSColor *TGTGSStickerBackgroundColor(void) {
                             _pixelHeight,
                             _pixelWidth * 4);
     [renderLock unlock];
+    if (_invalidated || [_renderOperation isCancelled]) {
+        [pixels release];
+        [renderedPixels release];
+        [pool drain];
+        return;
+    }
     TGTGSConvertBGRAPremultipliedToRGBA((const unsigned char *)[renderedPixels bytes],
                                         (unsigned char *)[pixels mutableBytes],
                                         _pixelWidth * _pixelHeight);
@@ -212,6 +222,12 @@ static NSColor *TGTGSStickerBackgroundColor(void) {
 }
 
 - (void)applyRenderedFrame:(NSDictionary *)payload {
+    [_renderOperation release];
+    _renderOperation = nil;
+    if (_invalidated) {
+        _renderPending = NO;
+        return;
+    }
     NSData *pixels = [payload objectForKey:@"pixels"];
     NSUInteger expectedLength = _pixelWidth * _pixelHeight * 4;
     if ([self isAnimationValid] && [pixels length] == expectedLength) {
@@ -305,6 +321,9 @@ static NSColor *TGTGSStickerBackgroundColor(void) {
 }
 
 - (void)setPlaybackActive:(BOOL)active {
+    if (_invalidated) {
+        return;
+    }
     _playbackActive = active;
     if (active) {
         [self startFrameTimer];
@@ -313,9 +332,18 @@ static NSColor *TGTGSStickerBackgroundColor(void) {
     }
 }
 
+- (void)invalidate {
+    _invalidated = YES;
+    [_renderOperation cancel];
+    [_renderOperation release];
+    _renderOperation = nil;
+    _renderPending = NO;
+    [self stopFrameTimer];
+}
+
 - (void)viewWillMoveToSuperview:(NSView *)newSuperview {
     if (!newSuperview) {
-        [self setPlaybackActive:NO];
+        [self invalidate];
     }
     [super viewWillMoveToSuperview:newSuperview];
 }
@@ -326,7 +354,7 @@ static NSColor *TGTGSStickerBackgroundColor(void) {
 }
 
 - (void)dealloc {
-    [self stopFrameTimer];
+    [self invalidate];
     [_renderQueue release];
     _renderQueue = nil;
     if (_animation) {
