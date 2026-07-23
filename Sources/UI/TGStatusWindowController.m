@@ -27,6 +27,8 @@
 #import "../Media/TGMediaItemSupport.h"
 #import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
+#import "../Core/TGDemoContent.h"
+#import "../Core/TGDemoSession.h"
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGMessagePollSupport.h"
 #import "../Core/TGOutgoingMessageTextChunker.h"
@@ -546,6 +548,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @property (nonatomic, retain) NSButton *logsCheckButton;
 @property (nonatomic, retain) NSPopUpButton *appearanceThemePopUpButton;
 @property (nonatomic, retain) TGTDLibClient *client;
+@property (nonatomic, retain) TGDemoSession *demoSession;
+@property (nonatomic, assign) BOOL demoMode;
 @property (nonatomic, copy) NSString *currentAuthState;
 @property (nonatomic, copy) NSString *activeSection;
 @property (nonatomic, retain) NSTimer *liveUpdateTimer;
@@ -605,6 +609,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
 @property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
 @property (nonatomic, retain) NSMutableDictionary *localMuteUnreadCountsByChatID;
+- (void)loadDemoContent;
+- (void)loadDemoMessagesForChatID:(NSNumber *)chatID;
+- (void)reloadDemoChatsPreservingSelection:(BOOL)preserveSelection;
 - (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item;
 - (void)clearReplyTarget;
 - (void)clearReplyTargetIfSelectionDiffersFromChatID:(NSNumber *)chatID
@@ -975,6 +982,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @synthesize logsCheckButton = _logsCheckButton;
 @synthesize appearanceThemePopUpButton = _appearanceThemePopUpButton;
 @synthesize client = _client;
+@synthesize demoSession = _demoSession;
+@synthesize demoMode = _demoMode;
 @synthesize currentAuthState = _currentAuthState;
 @synthesize activeSection = _activeSection;
 @synthesize liveUpdateTimer = _liveUpdateTimer;
@@ -1036,6 +1045,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
 
 - (instancetype)init {
+    return [self initWithDemoMode:NO];
+}
+
+- (instancetype)initWithDemoMode:(BOOL)demoMode {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
@@ -1049,8 +1062,15 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     if (self) {
         [[self window] setDelegate:self];
         TGResourcePolicyApplyDefaultsIfNeeded();
-        self.client = [[[TGTDLibClient alloc] init] autorelease];
-        TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
+        self.demoMode = demoMode;
+        if (self.demoMode) {
+            self.demoSession = [[[TGDemoSession alloc] init] autorelease];
+        } else {
+            self.client = [[[TGTDLibClient alloc] init] autorelease];
+        }
+        TGSetActiveThemeIdentifier(self.demoMode
+                                   ? TGThemeIdentifierVKBlue
+                                   : [[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         self.searchResultItems = [NSMutableArray array];
@@ -1103,11 +1123,125 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
         [self refreshUpdateAvailabilityBadge];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
-        [self startLiveUpdateTimerIfNeeded];
-        [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
-        [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
+        if (self.demoMode) {
+            [self loadDemoContent];
+        } else {
+            [self startLiveUpdateTimerIfNeeded];
+            [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
+        }
     }
     return self;
+}
+
+- (void)loadDemoContent {
+    NSDictionary *profile = [self.demoSession profileSummary];
+    [[self window] setTitle:@"Telegraphica Offline Demo"];
+    [[self window] setContentSize:NSMakeSize(1100.0, 720.0)];
+    [[self window] center];
+    self.currentAuthState = @"ready";
+    self.activeSection = TGSectionChats;
+    self.profileUserID = [profile objectForKey:@"user_id"];
+    self.profileDisplayName = [profile objectForKey:@"display_name"];
+    self.profileFirstName = [profile objectForKey:@"first_name"];
+    self.profileLastName = [profile objectForKey:@"last_name"];
+    self.profileUsername = [profile objectForKey:@"username"];
+    self.profilePhoneNumber = [profile objectForKey:@"phone_number"];
+    self.profileBio = [profile objectForKey:@"bio"];
+    self.profileAvatarLocalPath = nil;
+    self.profileSummaryLoaded = YES;
+    self.pendingLiveChatRefresh = NO;
+    self.pendingLiveMessageRefresh = NO;
+    self.chatFilterInfos = [TGDemoContent chatFolderItems];
+    self.selectedChatFilterID = nil;
+    [self rebuildDrawerFolderButtons];
+    [self.chatItems removeAllObjects];
+    [self.chatItems addObjectsFromArray:[self.demoSession chatItemsForFolderID:nil]];
+    [self.statusField setStringValue:@"Offline demo - no Telegram connection"];
+    [self refreshProfileDisplay];
+    [self updateVisibleSection];
+    [self layoutContentView];
+    [self.chatTableView reloadData];
+
+    if ([self.chatItems count] > 0) {
+        NSIndexSet *selection = [NSIndexSet indexSetWithIndex:0];
+        [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
+        [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                         object:self.chatTableView]];
+    }
+
+    [[self.sendTextField cell] setPlaceholderString:@"Write a local demo message"];
+    [self.sendTextField setEnabled:YES];
+    [self.attachPhotoButton setEnabled:YES];
+    [self.stickerButton setEnabled:YES];
+    [self.stickerButton setToolTip:@"Send a local demo sticker"];
+    [self.voiceRecordButton setEnabled:YES];
+    [self.voiceRecordButton setToolTip:@"Record a local demo voice message"];
+    [self.sendMessageButton setEnabled:NO];
+    [self.loadChatsButton setEnabled:NO];
+    [self.loadMessagesButton setEnabled:NO];
+    [self.chatSearchButton setEnabled:YES];
+    [self.conversationSearchButton setEnabled:YES];
+    [self.selectedChatProfileButton setEnabled:NO];
+    [self.drawerButton setEnabled:YES];
+    [self.mediaCenterButton setEnabled:NO];
+    [self.profileRefreshButton setEnabled:NO];
+    [self.settingsActiveSessionsButton setEnabled:NO];
+    [self.themeCategoryPopUpButton setEnabled:YES];
+    [self.themePopUpButton setEnabled:YES];
+    [self.settingsMessagesAsBlocksButton setEnabled:NO];
+    [self.settingsChatTextSizeSlider setEnabled:NO];
+    [self.settingsStorageUsageButton setEnabled:NO];
+    [self.settingsDeleteLocalDataButton setEnabled:NO];
+    [self.settingsCheckUpdatesButton setEnabled:NO];
+    [self.logoutButton setEnabled:NO];
+    [self updateSendControls];
+    [self updateVisibleSection];
+    [self layoutContentView];
+}
+
+- (void)reloadDemoChatsPreservingSelection:(BOOL)preserveSelection {
+    NSNumber *previousChatID = preserveSelection ? [self.selectedChatID retain] : nil;
+    NSArray *filteredItems = [self.demoSession chatItemsForFolderID:self.selectedChatFilterID];
+    [self.chatItems removeAllObjects];
+    [self.chatItems addObjectsFromArray:filteredItems];
+    [self.chatTableView reloadData];
+
+    NSInteger selectedRow = -1;
+    NSUInteger index = 0;
+    if (previousChatID) {
+        for (index = 0; index < [self.chatItems count]; index++) {
+            TGChatItem *item = [self.chatItems objectAtIndex:index];
+            if ([[item chatID] respondsToSelector:@selector(longLongValue)] &&
+                [[item chatID] longLongValue] == [previousChatID longLongValue]) {
+                selectedRow = (NSInteger)index;
+                break;
+            }
+        }
+    }
+    if (selectedRow < 0 && [self.chatItems count] > 0) {
+        selectedRow = 0;
+    }
+
+    if (selectedRow >= 0) {
+        [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)selectedRow]
+                       byExtendingSelection:NO];
+    } else {
+        [self.chatTableView deselectAll:nil];
+    }
+    [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                     object:self.chatTableView]];
+    [previousChatID release];
+}
+
+- (void)loadDemoMessagesForChatID:(NSNumber *)chatID {
+    [self.messageItems removeAllObjects];
+    [self.messageItems addObjectsFromArray:[self.demoSession messagesForChatID:chatID]];
+    [self.messageTableView reloadData];
+    NSInteger lastRow = (NSInteger)[self.messageItems count] - 1;
+    if (lastRow >= 0) {
+        [self.messageTableView scrollRowToVisible:lastRow];
+    }
 }
 
 - (void)handleInlineMediaPlaybackDiagnostic:(NSNotification *)notification {
@@ -2201,6 +2335,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     TGChatListCell *chatCell = [[[TGChatListCell alloc] initTextCell:@""] autorelease];
     [chatCell setEditable:NO];
     [chatCell setSelectable:NO];
+    [chatCell setLeadingEdgeExpansion:(self.demoMode ? 16.0 : 0.0)];
     [chatColumn setDataCell:chatCell];
     [chatColumn setWidth:470.0];
     [self.chatTableView addTableColumn:chatColumn];
@@ -2319,6 +2454,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     TGMessageBubbleCell *bubbleCell = [[[TGMessageBubbleCell alloc] initTextCell:@""] autorelease];
     [bubbleCell setEditable:NO];
     [bubbleCell setSelectable:NO];
+    [bubbleCell setLeadingEdgeExpansion:(self.demoMode ? 16.0 : 0.0)];
     [bubbleColumn setDataCell:bubbleCell];
     [bubbleColumn setWidth:500.0];
     [self.messageTableView addTableColumn:bubbleColumn];
@@ -3235,7 +3371,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 - (void)updateDrawerFolderButtonStates {
     NSUInteger index = 0;
-    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL drawerHidden = (!self.demoMode && TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO));
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
@@ -3313,6 +3449,11 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Drawer: skipped folder refresh because auth state is %@.",
                                       self.currentAuthState ? self.currentAuthState : @"unknown"]];
+        return;
+    }
+    if (self.demoMode) {
+        self.chatFilterInfos = [TGDemoContent chatFolderItems];
+        [self rebuildDrawerFolderButtons];
         return;
     }
     if (self.chatFilterRefreshInFlight) {
@@ -3402,7 +3543,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 - (void)updateNavigationButtonsForSection:(NSString *)section enabled:(BOOL)enabled {
     NSInteger selectedTag = [self navigationTagForSectionIdentifier:section];
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
-    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL drawerHidden = (!self.demoMode && TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO));
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
         NSButton *button = [self.navigationButtons objectAtIndex:index];
@@ -3458,6 +3599,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     if (sameFilter) {
         return;
     }
+    if (self.demoMode) {
+        [self reloadDemoChatsPreservingSelection:YES];
+        return;
+    }
 
     [self clearForumTopicListState];
     self.chatsExhausted = NO;
@@ -3472,7 +3617,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 - (void)toggleDrawer:(id)sender {
     (void)sender;
-    if (TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO)) {
+    if (!self.demoMode && TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO)) {
         self.drawerOpen = NO;
         return;
     }
@@ -3839,6 +3984,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [_topicParentAvatarLocalPath release];
     [_selectedChatFilterID release];
     [_client release];
+    [_demoSession release];
     [_currentAuthState release];
     [_activeSection release];
     [_liveUpdateTimer release];

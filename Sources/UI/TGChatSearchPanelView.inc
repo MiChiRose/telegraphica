@@ -83,8 +83,8 @@
 
         _searchField = [[NSSearchField alloc] initWithFrame:NSZeroRect];
         [_searchField setDelegate:self];
-        [_searchField setTarget:self];
-        [_searchField setAction:@selector(commitSearch:)];
+        [_searchField setTarget:nil];
+        [_searchField setAction:NULL];
         [_searchField setBezeled:NO];
         [_searchField setBordered:NO];
         [_searchField setDrawsBackground:NO];
@@ -277,17 +277,11 @@
 }
 
 - (void)setResults:(NSArray *)results {
-    if (_results == results) {
-        return;
-    }
+    NSArray *snapshot = results ? [results copy] : [[NSArray alloc] init];
     [_results release];
-    _results = [results retain];
+    _results = snapshot;
     [_tableView reloadData];
-    if ([_results count] > 0) {
-        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
-    } else {
-        [_tableView deselectAll:self];
-    }
+    [_tableView deselectAll:self];
 }
 
 - (TGSearchResultItem *)selectedResult {
@@ -339,9 +333,6 @@
 
 - (void)commitSearch:(id)sender {
     (void)sender;
-    if (![self selectedResult] && [_results count] > 0) {
-        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
-    }
     if ([self selectedResult]) {
         [self sendAction:_commitAction];
     }

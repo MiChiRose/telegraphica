@@ -64,7 +64,7 @@
         self.activeSection = TGSectionChats;
     }
     BOOL showLogin = !ready;
-    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL drawerHidden = (!self.demoMode && TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO));
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
     [self showView:self.topPanelView visible:(ready && !drawerHidden && self.drawerOpen)];
@@ -332,7 +332,7 @@
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
     CGFloat margin = 10.0;
-    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL drawerHidden = (!self.demoMode && TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO));
     BOOL drawerVisible = (!drawerHidden && self.drawerOpen);
     BOOL drawerConsumesLayout = drawerVisible;
     CGFloat railGutter = (!drawerHidden && self.drawerOpen) ? 10.0 : 0.0;
@@ -551,7 +551,8 @@
     [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, chatHeaderTitleWidth, 20.0)];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
-    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat chatListTopPadding = self.demoMode ? 2.0 : 7.0;
+    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - chatListTopPadding;
     CGFloat chatListHeight = chatListTop - chatListBottom;
     if (chatListHeight < 128.0) {
         chatListHeight = 128.0;
@@ -566,11 +567,20 @@
     NSTableColumn *chatColumn = [self.chatTableView tableColumnWithIdentifier:@"chat"];
     if (chatColumn) {
         [self.chatScrollView tile];
-        CGFloat chatWidth = NSWidth([[self.chatScrollView contentView] bounds]);
+        NSClipView *chatClipView = [self.chatScrollView contentView];
+        CGFloat chatWidth = NSWidth([chatClipView bounds]);
         if (chatWidth < 132.0) {
             chatWidth = 132.0;
         }
         [chatColumn setWidth:chatWidth];
+        NSRect chatTableFrame = [self.chatTableView frame];
+        chatTableFrame.origin.x = 0.0;
+        chatTableFrame.size.width = chatWidth;
+        [self.chatTableView setFrame:chatTableFrame];
+        NSPoint chatScrollPoint = [chatClipView bounds].origin;
+        chatScrollPoint.x = 0.0;
+        [chatClipView scrollToPoint:chatScrollPoint];
+        [self.chatScrollView reflectScrolledClipView:chatClipView];
     }
 
     CGFloat conversationRefreshX = conversationX + conversationWidth - 12.0 - headerButtonSize;
@@ -716,11 +726,20 @@
     NSTableColumn *bubbleColumn = [self.messageTableView tableColumnWithIdentifier:@"bubble"];
     if (bubbleColumn) {
         [self.messageScrollView tile];
-        CGFloat bubbleWidth = NSWidth([[self.messageScrollView contentView] bounds]);
+        NSClipView *messageClipView = [self.messageScrollView contentView];
+        CGFloat bubbleWidth = NSWidth([messageClipView bounds]);
         if (bubbleWidth < 260.0) {
             bubbleWidth = 260.0;
         }
         [bubbleColumn setWidth:bubbleWidth];
+        NSRect messageTableFrame = [self.messageTableView frame];
+        messageTableFrame.origin.x = 0.0;
+        messageTableFrame.size.width = bubbleWidth;
+        [self.messageTableView setFrame:messageTableFrame];
+        NSPoint messageScrollPoint = [messageClipView bounds].origin;
+        messageScrollPoint.x = 0.0;
+        [messageClipView scrollToPoint:messageScrollPoint];
+        [self.messageScrollView reflectScrolledClipView:messageClipView];
     }
 
     CGFloat sendButtonWidth = 38.0;

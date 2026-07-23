@@ -2,6 +2,7 @@
 
 @interface TGStatusWindowController : NSWindowController
 
+- (instancetype)initWithDemoMode:(BOOL)demoMode;
 - (void)prepareForApplicationTermination;
 
 @end

@@ -262,6 +262,32 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         [self layoutContentView];
         return;
     }
+    if (self.demoMode) {
+        NSArray *messageItems = [self.demoSession searchMessagesForChatID:self.selectedChatID query:query];
+        self.searchLoading = NO;
+        self.searchEndReached = YES;
+        self.globalSearchOffset = nil;
+        [self.searchResultItems removeAllObjects];
+        NSUInteger index = 0;
+        for (index = 0; index < [messageItems count]; index++) {
+            TGSearchResultItem *result = [self searchResultForMessageItem:[messageItems objectAtIndex:index]
+                                                                chatTitle:self.selectedChatTitle];
+            if (result) {
+                [self.searchResultItems addObject:result];
+            }
+        }
+        [self.searchResultsTableView reloadData];
+        [self.searchResultsTableView deselectAll:self];
+        if ([self.searchResultItems count] == 0) {
+            [self setSearchStatusText:@"Ничего не найдено"];
+        } else {
+            [self setSearchStatusText:[NSString stringWithFormat:@"Найдено: %lu",
+                                      (unsigned long)[self.searchResultItems count]]];
+        }
+        [self updateVisibleSection];
+        [self layoutContentView];
+        return;
+    }
     BOOL global = (!self.searchInlineCurrentChatOnly && ([self.searchScopePopUpButton indexOfSelectedItem] == 1 || self.selectedChatID == nil));
     NSString *filter = TGSearchFilterIdentifierForIndex([self.searchFilterPopUpButton indexOfSelectedItem]);
     NSNumber *chatID = [self.selectedChatID retain];
@@ -466,6 +492,24 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
             [self.chatTableView scrollRowToVisible:index];
         }
+        return;
+    }
+    if (self.demoMode) {
+        NSNumber *messageID = [[result messageID] retain];
+        [self closeSearchPanel:self];
+        NSUInteger index = [self indexOfMessageID:messageID inMessageItems:self.messageItems];
+        if (index != NSNotFound) {
+            [self.messageTableView scrollRowToVisible:(NSInteger)index];
+            [self.messageTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
+            self.highlightedSearchMessageID = messageID;
+            [self.searchHighlightTimer invalidate];
+            self.searchHighlightTimer = [NSTimer scheduledTimerWithTimeInterval:2.0
+                                                                         target:self
+                                                                       selector:@selector(clearSearchHighlightTimerFired:)
+                                                                       userInfo:nil
+                                                                        repeats:NO];
+        }
+        [messageID release];
         return;
     }
     NSNumber *chatID = [result.chatID retain];

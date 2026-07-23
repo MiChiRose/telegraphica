@@ -449,6 +449,42 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
+@implementation TGUtilityButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.48;
+    NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:6.0 yRadius:6.0];
+    TGThemeDrawEnamelButtonInPath(buttonPath,
+                                 buttonRect,
+                                 highlighted,
+                                 NO,
+                                 enabled,
+                                 [controlView isFlipped]);
+    [TGClassicTableGridColor() set];
+    [buttonPath setLineWidth:1.0];
+    [buttonPath stroke];
+
+    NSString *title = [self title] ? [self title] : @"";
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                ([self font] ? [self font] : [NSFont systemFontOfSize:12.0]), NSFontAttributeName,
+                                TGClassicHeaderTextColor(alpha), NSForegroundColorAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSSize titleSize = [title sizeWithAttributes:attributes];
+    NSRect titleRect = NSMakeRect(NSMinX(buttonRect) + 5.0,
+                                  NSMidY(buttonRect) - ceil(titleSize.height / 2.0),
+                                  MAX(0.0, NSWidth(buttonRect) - 10.0),
+                                  ceil(titleSize.height) + 2.0);
+    [title drawInRect:titleRect withAttributes:attributes];
+}
+
+@end
+
 @implementation TGSettingsListButtonCell
 
 - (NSColor *)accentColorForTitle:(NSString *)title alpha:(CGFloat)alpha {

@@ -63,6 +63,10 @@
 		111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111299 /* TGChatDisplayPreferences.m */; };
 		111111111111111111111154 /* TGLocalDataReset.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111311 /* TGLocalDataReset.m */; };
 		111111111111111111111155 /* TGMessagePollSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111313 /* TGMessagePollSupport.m */; };
+		111111111111111111111158 /* TGDemoContent.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111318 /* TGDemoContent.m */; };
+		111111111111111111111159 /* TGDemoSession.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111321 /* TGDemoSession.m */; };
+		111111111111111111111160 /* demo-lake-macbook.png in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111322 /* demo-lake-macbook.png */; };
+		111111111111111111111161 /* Stickers in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111323 /* Stickers */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -86,6 +90,12 @@
 		111111111111111111111215 /* TGMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageItem.m; sourceTree = "<group>"; };
 		111111111111111111111312 /* TGMessagePollSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessagePollSupport.h; sourceTree = "<group>"; };
 		111111111111111111111313 /* TGMessagePollSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessagePollSupport.m; sourceTree = "<group>"; };
+		111111111111111111111319 /* TGDemoContent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDemoContent.h; sourceTree = "<group>"; };
+		111111111111111111111318 /* TGDemoContent.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDemoContent.m; sourceTree = "<group>"; };
+		111111111111111111111320 /* TGDemoSession.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDemoSession.h; sourceTree = "<group>"; };
+		111111111111111111111321 /* TGDemoSession.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDemoSession.m; sourceTree = "<group>"; };
+		111111111111111111111322 /* demo-lake-macbook.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Demo/demo-lake-macbook.png; sourceTree = "<group>"; };
+		111111111111111111111323 /* Stickers */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Demo/Stickers; sourceTree = "<group>"; };
 		111111111111111111111216 /* TGActiveSessionsPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGActiveSessionsPresentation.h; sourceTree = "<group>"; };
 		111111111111111111111217 /* TGActiveSessionsPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGActiveSessionsPresentation.m; sourceTree = "<group>"; };
 		111111111111111111111218 /* TGLocalization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocalization.h; sourceTree = "<group>"; };
@@ -244,6 +254,10 @@
 				111111111111111111111213 /* TGChatItem.m */,
 				111111111111111111111214 /* TGMessageItem.h */,
 				111111111111111111111215 /* TGMessageItem.m */,
+				111111111111111111111319 /* TGDemoContent.h */,
+				111111111111111111111318 /* TGDemoContent.m */,
+				111111111111111111111320 /* TGDemoSession.h */,
+				111111111111111111111321 /* TGDemoSession.m */,
 				111111111111111111111312 /* TGMessagePollSupport.h */,
 				111111111111111111111313 /* TGMessagePollSupport.m */,
 				111111111111111111111294 /* TGOutgoingMessageTextChunker.h */,
@@ -360,6 +374,8 @@
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
 				111111111111111111111277 /* Icons */,
 				111111111111111111111229 /* ThirdPartyNotices.txt */,
+				111111111111111111111322 /* demo-lake-macbook.png */,
+				111111111111111111111323 /* Stickers */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -421,6 +437,8 @@
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
 				111111111111111111111141 /* Icons in Resources */,
 				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
+				111111111111111111111160 /* demo-lake-macbook.png in Resources */,
+				111111111111111111111161 /* Stickers in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -478,6 +496,8 @@
 				111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */,
 				111111111111111111111154 /* TGLocalDataReset.m in Sources */,
 				111111111111111111111155 /* TGMessagePollSupport.m in Sources */,
+				111111111111111111111158 /* TGDemoContent.m in Sources */,
+				111111111111111111111159 /* TGDemoSession.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

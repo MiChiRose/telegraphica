@@ -56,12 +56,20 @@
 }
 
 - (void)applyUtilityButtonStyle:(NSButton *)button {
+    id target = [button target];
+    SEL action = [button action];
+    NSString *title = [[button title] copy];
+    TGUtilityButtonCell *cell = [[[TGUtilityButtonCell alloc] initTextCell:title] autorelease];
+    [button setCell:cell];
+    [button setTitle:title];
+    [button setTarget:target];
+    [button setAction:action];
     [button setButtonType:NSMomentaryPushInButton];
-    [button setBezelStyle:NSRoundedBezelStyle];
-    [button setBordered:YES];
+    [button setBordered:NO];
     [button setImagePosition:NSNoImage];
     [button setFocusRingType:NSFocusRingTypeExterior];
     [button setFont:[NSFont systemFontOfSize:12.0]];
+    [title release];
 }
 
 - (void)applySettingsListButtonStyle:(NSButton *)button {

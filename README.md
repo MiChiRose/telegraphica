@@ -143,6 +143,27 @@ warn on first launch.
    **Open**.
 4. Sign in with your phone number, Telegram code, and 2FA password if needed.
 
+## Offline Demo
+
+Telegraphica can also be packaged as a completely offline demo for people who
+want to explore the interface without entering a phone number or creating a
+Telegram session. The demo uses fictional local chats and never creates a
+TDLib client. Text messages and file attachments are simulated in memory and
+disappear when the app quits.
+
+The demo bundle has its own bundle identifier and does not include
+`libtdjson.dylib` or Telegram runtime credentials. It can therefore be installed
+next to the regular app without sharing its login state.
+
+After building the regular app, create the demo archive with:
+
+```sh
+./scripts/package_offline_demo.sh
+```
+
+The resulting archive is written to `dist/` and supports the same OS X 10.9+
+Intel systems as the regular build.
+
 ---
 
 ## Legacy Build Guide

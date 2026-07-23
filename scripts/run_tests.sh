@@ -93,4 +93,17 @@ fi
 
 HOME="$TEST_HOME" "$BUILD_DIR/core_logic_probe"
 
+echo "== Offline demo content probe =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/demo_content_probe.m \
+    Sources/Core/TGChatItem.m \
+    Sources/Core/TGDemoContent.m \
+    Sources/Core/TGDemoSession.m \
+    Sources/Core/TGMessageItem.m \
+    -framework Cocoa \
+    -o "$BUILD_DIR/demo_content_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/demo_content_probe"
+
 echo "Telegraphica tests passed."

@@ -93,7 +93,17 @@
     if ([query length] == 0) {
         [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? TGLoc(@"search.chats.loadingRecent") : TGLoc(@"search.chats.recent"))];
     } else {
-        [panelView setStatusText:([self.chatSearchWindowResults count] == 0 ? TGLoc(@"search.chats.searching") : [NSString stringWithFormat:TGLoc(@"search.chats.loadedSearching"), (unsigned long)[self.chatSearchWindowResults count]])];
+        if (self.demoMode) {
+            [panelView setStatusText:([self.chatSearchWindowResults count] == 0
+                                      ? TGLoc(@"search.chats.empty")
+                                      : [NSString stringWithFormat:TGLoc(@"search.chats.found"),
+                                         (unsigned long)[self.chatSearchWindowResults count]])];
+        } else {
+            [panelView setStatusText:([self.chatSearchWindowResults count] == 0
+                                      ? TGLoc(@"search.chats.searching")
+                                      : [NSString stringWithFormat:TGLoc(@"search.chats.loadedSearching"),
+                                         (unsigned long)[self.chatSearchWindowResults count]])];
+        }
     }
     [panelView setResults:self.chatSearchWindowResults];
     [panelView layoutPanelSubviews];
@@ -102,6 +112,10 @@
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Search: chat search query length=%lu results=%lu.",
                                   (unsigned long)[query length],
                                   (unsigned long)[self.chatSearchWindowResults count]]];
+
+    if (self.demoMode) {
+        return;
+    }
 
     if ([query length] == 0) {
         if ([self.chatSearchWindowResults count] == 0) {
@@ -269,9 +283,6 @@
 - (void)chatSearchWindowResultActivated:(id)sender {
     TGChatSearchPanelView *panelView = [sender isKindOfClass:[TGChatSearchPanelView class]] ? (TGChatSearchPanelView *)sender : [self chatSearchPanelView];
     TGSearchResultItem *result = [panelView selectedResult];
-    if (!result && [self.chatSearchWindowResults count] > 0) {
-        result = [self.chatSearchWindowResults objectAtIndex:0];
-    }
     if (![result isKindOfClass:[TGSearchResultItem class]]) {
         return;
     }

@@ -10,7 +10,11 @@
     if (columnIndex == NSNotFound) {
         return NSZeroRect;
     }
-    return [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
+    NSRect cellFrame = [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
+    if (self.demoMode) {
+        cellFrame.origin.x -= 16.0;
+    }
+    return cellFrame;
 }
 
 - (NSArray *)mediaLayoutEntriesForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame {
@@ -488,6 +492,10 @@
                                  inCellFrame:cellFrame
                                      atPoint:tablePoint];
     if (!url) {
+        return;
+    }
+    if (self.demoMode) {
+        [self.statusField setStringValue:@"External links are disabled in the offline demo"];
         return;
     }
     if ([[NSWorkspace sharedWorkspace] openURL:url]) {

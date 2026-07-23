@@ -969,6 +969,38 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     });
 }
 
+- (void)submitDemoAttachmentDescriptors:(NSArray *)descriptors
+                                 caption:(NSString *)caption
+                                  chatID:(NSNumber *)chatID {
+    NSArray *safeDescriptors = [descriptors isKindOfClass:[NSArray class]] ? descriptors : [NSArray array];
+    NSUInteger index = 0;
+    NSUInteger addedCount = 0;
+    for (index = 0; index < [safeDescriptors count]; index++) {
+        id candidate = [safeDescriptors objectAtIndex:index];
+        if (![candidate isKindOfClass:[TGAttachmentDescriptor class]]) {
+            continue;
+        }
+        TGAttachmentDescriptor *descriptor = (TGAttachmentDescriptor *)candidate;
+        NSString *itemCaption = (addedCount == 0) ? caption : @"";
+        TGMessageItem *item = [self.demoSession appendDocumentMessageWithFileName:[descriptor fileName]
+                                                                         fileSize:[descriptor fileSize]
+                                                                        typeLabel:[descriptor typeLabel]
+                                                                          caption:itemCaption
+                                                                           chatID:chatID];
+        if (item) {
+            [self.messageItems addObject:item];
+            addedCount++;
+        }
+    }
+    if (addedCount > 0) {
+        [self.messageTableView reloadData];
+        [self scrollMessagesToNewestIfAvailable];
+        [self.statusField setStringValue:(addedCount > 1 ? @"Demo files added locally" : @"Demo file added locally")];
+    }
+    [self cancelPendingPhotoSend:nil];
+    [self updateSendControls];
+}
+
 - (void)sendPendingPhotoPreview:(id)sender {
     (void)sender;
     NSString *path = [self.pendingPhotoSendPath copy];
@@ -979,6 +1011,22 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     TGAttachmentDescriptor *descriptor = [self.pendingAttachmentDescriptor retain];
     NSArray *descriptors = [self.pendingAttachmentDescriptors retain];
     NSArray *queueItems = [self.pendingAttachmentQueueItems retain];
+    if (self.demoMode) {
+        NSArray *demoDescriptors = descriptors;
+        if ([demoDescriptors count] == 0 && [descriptor isKindOfClass:[TGAttachmentDescriptor class]]) {
+            demoDescriptors = [NSArray arrayWithObject:descriptor];
+        }
+        [self submitDemoAttachmentDescriptors:demoDescriptors caption:caption chatID:chatID];
+        [path release];
+        [caption release];
+        [chatID release];
+        [threadID release];
+        [topicKind release];
+        [descriptor release];
+        [descriptors release];
+        [queueItems release];
+        return;
+    }
     BOOL retryingFailedDescriptors = NO;
     if (TGAttachmentQueueFailedCount(queueItems) > 0) {
         NSArray *failedDescriptors = TGAttachmentDescriptorsFromQueueItems(queueItems, YES);
@@ -1527,6 +1575,12 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (void)reloadStickerPickerSetsIfNeeded {
+    if (self.demoMode) {
+        self.stickerPickerStickerSets = [NSArray array];
+        self.stickerPickerSelectedSetID = nil;
+        [self rebuildStickerPickerSetRail];
+        return;
+    }
     if ([self.stickerPickerStickerSets count] > 0) {
         [self rebuildStickerPickerSetRail];
         [self scrollStickerPickerSetRailToTop];
@@ -1689,6 +1743,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (void)reloadStickerPickerItems {
+    if (self.demoMode) {
+        self.stickerPickerSelectedSetID = nil;
+        self.stickerPickerItems = [TGDemoContent stickerItems];
+        [self.stickerPickerStatusField setStringValue:@"Telegraphica demo stickers"];
+        [self rebuildStickerPickerGrid];
+        [self scrollStickerPickerGridToTop];
+        return;
+    }
     [self.stickerPickerStatusField setStringValue:@"Loading stickers..."];
     self.stickerPickerSelectedSetID = nil;
     TGTDLibClient *client = [self.client retain];
@@ -1728,6 +1790,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (void)reloadFavoriteStickerPickerItems {
+    if (self.demoMode) {
+        [self reloadStickerPickerItems];
+        return;
+    }
     [self.stickerPickerStatusField setStringValue:@"Loading favorite stickers..."];
     self.stickerPickerSelectedSetID = nil;
     TGTDLibClient *client = [self.client retain];
@@ -1756,6 +1822,32 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (void)reloadStickerPickerItemsForEmoji:(NSString *)emoji {
+    if (self.demoMode) {
+        NSString *query = [emoji stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSArray *allItems = [TGDemoContent stickerItems];
+        if ([query length] == 0) {
+            self.stickerPickerItems = allItems;
+        } else {
+            NSMutableArray *matches = [NSMutableArray array];
+            NSUInteger index = 0;
+            for (index = 0; index < [allItems count]; index++) {
+                NSDictionary *item = [allItems objectAtIndex:index];
+                NSString *name = [item objectForKey:@"demo_name"];
+                NSString *itemEmoji = [item objectForKey:@"emoji"];
+                if ([name rangeOfString:query options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                    [itemEmoji rangeOfString:query options:NSCaseInsensitiveSearch].location != NSNotFound) {
+                    [matches addObject:item];
+                }
+            }
+            self.stickerPickerItems = matches;
+        }
+        [self.stickerPickerStatusField setStringValue:([self.stickerPickerItems count] > 0
+                                                        ? @"Telegraphica demo stickers"
+                                                        : @"No demo stickers found")];
+        [self rebuildStickerPickerGrid];
+        [self scrollStickerPickerGridToTop];
+        return;
+    }
     NSString *query = [emoji copy];
     [self.stickerPickerStatusField setStringValue:[NSString stringWithFormat:@"Searching %@...", query]];
     self.stickerPickerItems = [NSArray array];
@@ -1788,6 +1880,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (void)reloadStickerPickerItemsForSet:(NSDictionary *)setInfo {
+    if (self.demoMode) {
+        [self reloadStickerPickerItems];
+        return;
+    }
     NSNumber *setID = [setInfo objectForKey:@"id"];
     if (![setID respondsToSelector:@selector(longLongValue)] || [setID longLongValue] == 0LL) {
         [self reloadStickerPickerItems];
@@ -1867,6 +1963,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [self.stickerPickerWindow setTitle:TGLoc(@"stickers")];
     [self.stickerPickerWindow center];
     [self.stickerPickerWindow makeKeyAndOrderFront:nil];
+    if (self.demoMode) {
+        [self reloadStickerPickerItems];
+        return;
+    }
     [self reloadStickerPickerSetsIfNeeded];
     if (self.stickerPickerSelectedSetID && [self.stickerPickerItems count] == 0) {
         NSString *selectedID = [self.stickerPickerSelectedSetID stringValue];
@@ -1894,6 +1994,25 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
     NSDictionary *sticker = (NSDictionary *)represented;
+    if (self.demoMode) {
+        TGMessageItem *item = [self.demoSession appendStickerMessageWithLocalPath:TGMediaItemLocalPath(sticker)
+                                                                            emoji:[sticker objectForKey:@"emoji"]
+                                                                            width:[sticker objectForKey:@"width"]
+                                                                           height:[sticker objectForKey:@"height"]
+                                                                           chatID:self.selectedChatID];
+        if (item) {
+            [self.messageItems addObject:item];
+            [self.messageTableView reloadData];
+            [self scrollMessagesToNewestIfAvailable];
+            [self.statusField setStringValue:@"Demo sticker added locally"];
+        }
+        [self.stickerPickerWindow orderOut:nil];
+        [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+        [self scheduleInlineMediaPlaybackRefresh];
+        [self updateSendControls];
+        [self requestComposerRefocus];
+        return;
+    }
     NSNumber *fileID = TGMediaItemFullFileID(sticker);
     if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
         fileID = [sticker objectForKey:@"file_id"];
@@ -2100,7 +2219,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [stopButton setTitle:@"Stop"];
     [stopButton setTarget:self];
     [stopButton setAction:@selector(toggleVoiceRecording:)];
-    [self applySkeuomorphicButtonStyle:stopButton isPrimary:YES];
+    [self applyUtilityButtonStyle:stopButton];
     [stopButton setHidden:YES];
     [contentView addSubview:stopButton];
     self.voicePreviewStopButton = stopButton;
@@ -2135,7 +2254,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [sendButton setTitle:TGLoc(@"send")];
     [sendButton setTarget:self];
     [sendButton setAction:@selector(sendVoicePreview:)];
-    [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
+    [self applyUtilityButtonStyle:sendButton];
     [contentView addSubview:sendButton];
     self.voicePreviewSendButton = sendButton;
 
@@ -2334,6 +2453,35 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSNumber *chatID = [self.selectedChatID retain];
     NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
     NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    if (self.demoMode) {
+        TGMessageItem *item = [self.demoSession appendVoiceMessageWithLocalPath:path
+                                                                      duration:duration
+                                                                        chatID:chatID];
+        [self invalidateVoicePreviewTimer];
+        [self.voicePreviewPlayer stop];
+        if (item) {
+            [self.messageItems addObject:item];
+            [self.messageTableView reloadData];
+            [self scrollMessagesToNewestIfAvailable];
+            [self.statusField setStringValue:@"Demo voice message added locally"];
+        }
+        [self.voicePreviewWindow orderOut:nil];
+        [self.voicePreviewSendButton setTitle:TGLoc(@"send")];
+        [self.voicePreviewSendButton setEnabled:YES];
+        [self.voicePreviewErrorField setStringValue:@""];
+        [self.voicePreviewErrorField setHidden:YES];
+        self.voiceRecordingPath = nil;
+        self.voiceRecordingStartDate = nil;
+        self.voicePreviewPlayer = nil;
+        [self updateVoicePreviewTimelineWithCurrentTime:0.0 duration:0.0];
+        [self updateSendControls];
+        [self requestComposerRefocus];
+        [path release];
+        [chatID release];
+        [messageThreadID release];
+        [messageTopicKind release];
+        return;
+    }
     [self.voicePreviewSendButton setTitle:TGLoc(@"sending")];
     [self.voicePreviewSendButton setEnabled:NO];
     [self.voicePreviewErrorField setStringValue:@""];
@@ -2586,11 +2734,13 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                  keyEquivalent:@""] autorelease];
     [attachItem setTarget:self];
     [menu addItem:attachItem];
-    NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"poll.create.menu")
-                                                      action:@selector(createPollFromComposerMenu:)
-                                               keyEquivalent:@""] autorelease];
-    [pollItem setTarget:self];
-    [menu addItem:pollItem];
+    if (!self.demoMode) {
+        NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"poll.create.menu")
+                                                          action:@selector(createPollFromComposerMenu:)
+                                                   keyEquivalent:@""] autorelease];
+        [pollItem setTarget:self];
+        [menu addItem:pollItem];
+    }
     [menu popUpMenuPositioningItem:nil
                         atLocation:NSMakePoint(0.0, NSHeight([self.attachPhotoButton bounds]) + 2.0)
                             inView:self.attachPhotoButton];
@@ -2609,6 +2759,22 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     if ([trimmedText length] == 0) {
         [self appendDetail:@"Message text is empty."];
         [self updateSendControls];
+        return;
+    }
+    if (self.demoMode) {
+        TGMessageItem *item = [self.demoSession appendTextMessage:trimmedText
+                                                           chatID:self.selectedChatID
+                                                     replyMessage:self.replyTargetMessageItem];
+        if (item) {
+            [self.messageItems addObject:item];
+            [self.messageTableView reloadData];
+            [self scrollMessagesToNewestIfAvailable];
+            [self setComposerTextWithoutSavingDraft:nil];
+            [self clearReplyTarget];
+            [self.statusField setStringValue:@"Demo message added locally"];
+        }
+        [self updateSendControls];
+        [self requestComposerRefocus];
         return;
     }
     NSNumber *chatID = [self.selectedChatID retain];

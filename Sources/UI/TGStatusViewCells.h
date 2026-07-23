@@ -5,8 +5,10 @@
 
 @interface TGChatListCell : NSTextFieldCell {
     TGChatItem *_chatItem;
+    CGFloat _leadingEdgeExpansion;
 }
 @property (nonatomic, retain) TGChatItem *chatItem;
+@property (nonatomic, assign) CGFloat leadingEdgeExpansion;
 @end
 
 @interface TGPanelView : NSView
@@ -55,7 +57,9 @@
 @interface TGMessageBubbleCell : NSTextFieldCell {
     TGMessageItem *_messageItem;
     BOOL _showSenderDetails;
+    CGFloat _leadingEdgeExpansion;
 }
 @property (nonatomic, retain) TGMessageItem *messageItem;
 @property (nonatomic, assign) BOOL showSenderDetails;
+@property (nonatomic, assign) CGFloat leadingEdgeExpansion;
 @end

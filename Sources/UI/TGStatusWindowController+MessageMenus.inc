@@ -467,6 +467,28 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
 
 - (void)menuNeedsUpdate:(NSMenu *)menu {
     if (menu == self.chatContextMenu) {
+        if (self.demoMode) {
+            [menu removeAllItems];
+            NSInteger row = -1;
+            TGChatItem *item = [self chatItemAtCurrentEventWithRow:&row];
+            if (!item) {
+                return;
+            }
+            NSMenuItem *titleItem = [[[NSMenuItem alloc] initWithTitle:([[item title] length] > 0 ? [item title] : @"Demo chat")
+                                                                  action:nil
+                                                           keyEquivalent:@""] autorelease];
+            [titleItem setEnabled:NO];
+            [menu addItem:titleItem];
+            [menu addItem:[NSMenuItem separatorItem]];
+            NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:@"Delete demo chat"
+                                                                 action:@selector(deleteDemoChatFromMenu:)
+                                                          keyEquivalent:@""] autorelease];
+            [deleteItem setRepresentedObject:item];
+            [deleteItem setTarget:self];
+            [deleteItem setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(16.0, 16.0), [NSColor redColor], 0.90)];
+            [menu addItem:deleteItem];
+            return;
+        }
         [self populateChatContextMenu:menu];
         return;
     }
@@ -483,6 +505,31 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         return;
     }
     if (![self messageItem:item atRow:row containsTablePoint:tablePoint]) {
+        return;
+    }
+    if (self.demoMode) {
+        NSString *copyableText = ([[item editableText] length] > 0) ? [item editableText] : TGDisplayTextForMessageItem(item);
+        if ([copyableText length] > 0) {
+            NSMenuItem *copyTextItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.copyText")
+                                                                   action:@selector(copyMessageTextFromMenu:)
+                                                            keyEquivalent:@""] autorelease];
+            [copyTextItem setRepresentedObject:item];
+            [copyTextItem setTarget:self];
+            [menu addItem:copyTextItem];
+        }
+        NSMenuItem *replyItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reply")
+                                                            action:@selector(replyToMessageFromMenu:)
+                                                     keyEquivalent:@""] autorelease];
+        [replyItem setRepresentedObject:item];
+        [replyItem setTarget:self];
+        [menu addItem:replyItem];
+        NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.delete")
+                                                             action:@selector(deleteMessageFromMenu:)
+                                                      keyEquivalent:@""] autorelease];
+        [deleteItem setRepresentedObject:item];
+        [deleteItem setTarget:self];
+        [deleteItem setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(16.0, 16.0), [NSColor redColor], 0.90)];
+        [menu addItem:deleteItem];
         return;
     }
     if ([item failedToSend]) {
@@ -881,6 +928,25 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [self appendDetail:@"Message deletion is available only after sign-in is ready."];
         return;
     }
+    if (self.demoMode) {
+        if (![TGMessageActionDialogs confirmPlainDeleteMessage]) {
+            return;
+        }
+        NSNumber *chatID = [[item chatID] retain];
+        NSArray *messageIDs = [[self messageIDsForMessageActionItem:item] retain];
+        NSUInteger removedCount = [self.demoSession deleteMessageIDs:messageIDs chatID:chatID];
+        NSUInteger index = 0;
+        for (index = 0; index < [messageIDs count]; index++) {
+            [self removeDisplayedMessageWithID:[messageIDs objectAtIndex:index] chatID:chatID];
+        }
+        [self.messageTableView reloadData];
+        [self scheduleInlineMediaPlaybackRefresh];
+        [self.statusField setStringValue:(removedCount > 0 ? @"Demo message deleted locally" : @"Demo message was already removed")];
+        [self requestComposerRefocus];
+        [chatID release];
+        [messageIDs release];
+        return;
+    }
 
     BOOL hasKnownDeleteOptions = ([item capabilitiesKnown] && ([item canBeDeletedOnlyForSelf] || [item canBeDeletedForAllUsers]));
     BOOL canDeleteOnlyForSelf = (hasKnownDeleteOptions ? [item canBeDeletedOnlyForSelf] : YES);
@@ -951,6 +1017,31 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         });
         [pool drain];
     });
+}
+
+- (void)deleteDemoChatFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (!self.demoMode ||
+        ![item isKindOfClass:[TGChatItem class]] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+
+    NSInteger result = NSRunAlertPanel(@"Delete demo chat?",
+                                       @"This removes \"%@\" only from the offline demo until the app restarts.",
+                                       @"Delete",
+                                       @"Cancel",
+                                       nil,
+                                       [[item title] length] > 0 ? [item title] : @"Demo chat");
+    if (result != NSAlertDefaultReturn) {
+        return;
+    }
+
+    NSNumber *chatID = [item chatID];
+    if ([self.demoSession deleteChatID:chatID]) {
+        [self reloadDemoChatsPreservingSelection:YES];
+        [self.statusField setStringValue:@"Demo chat deleted locally"];
+    }
 }
 
 - (void)downloadMessageAttachmentFromMenu:(id)sender {

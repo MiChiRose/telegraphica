@@ -1,4 +1,5 @@
 #import "AppDelegate.h"
+#import "Core/TGDemoContent.h"
 #import "Services/TGLogger.h"
 #import "UI/TGStatusWindowController.h"
 #include <stdlib.h>
@@ -14,7 +15,8 @@
     [[TGLogger sharedLogger] startDiagnosticSession];
     [[TGLogger sharedLogger] log:@"Telegraphica launched."];
 
-    self.statusWindowController = [[[TGStatusWindowController alloc] init] autorelease];
+    BOOL demoMode = [TGDemoContent isEnabledFromEnvironment];
+    self.statusWindowController = [[[TGStatusWindowController alloc] initWithDemoMode:demoMode] autorelease];
     [self.statusWindowController showWindow:self];
 
     if (getenv("TELEGRAPHICA_SMOKE_LAUNCH")) {

@@ -591,7 +591,9 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
         NSString *version = [info objectForKey:@"CFBundleShortVersionString"];
         NSString *build = [info objectForKey:@"CFBundleVersion"];
-        NSString *versionText = [NSString stringWithFormat:TGLoc(@"about.version"), version ? version : @"0.1.0", build ? build : @"0.1.0"];
+        NSString *versionText = self.demoMode
+            ? @"Demo"
+            : [NSString stringWithFormat:TGLoc(@"about.version"), version ? version : @"0.1.0", build ? build : @"0.1.0"];
         NSTextField *versionField = [self labelWithFrame:NSMakeRect(70, 212, 340, 22)
                                                     text:versionText
                                                     font:[NSFont systemFontOfSize:12.0]];
@@ -622,7 +624,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [authorButton setTarget:self];
         [authorButton setAction:@selector(openAuthorPage:)];
         [authorButton setToolTip:TGAuthorURLString];
-        [[authorButton cell] setAlignment:NSCenterTextAlignment];
+        [[authorButton cell] setAlignment:NSLeftTextAlignment];
         [contentView addSubview:authorButton];
 
         NSButton *projectButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 112, 340, 24)] autorelease];
@@ -634,7 +636,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [projectButton setTarget:self];
         [projectButton setAction:@selector(openProjectPage:)];
         [projectButton setToolTip:TGProjectURLString];
-        [[projectButton cell] setAlignment:NSCenterTextAlignment];
+        [[projectButton cell] setAlignment:NSLeftTextAlignment];
         [contentView addSubview:projectButton];
 
         NSButton *channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 82, 340, 24)] autorelease];
@@ -646,7 +648,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [channelButton setTarget:self];
         [channelButton setAction:@selector(openChannelPage:)];
         [channelButton setToolTip:TGChannelURLString];
-        [[channelButton cell] setAlignment:NSCenterTextAlignment];
+        [[channelButton cell] setAlignment:NSLeftTextAlignment];
         [contentView addSubview:channelButton];
 
         NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(180, 18, 120, 30)];
@@ -662,16 +664,28 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 
 - (void)openProjectPage:(id)sender {
     (void)sender;
+    if (self.demoMode) {
+        [self.statusField setStringValue:@"External links are disabled in the offline demo"];
+        return;
+    }
     [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGProjectURLString]];
 }
 
 - (void)openAuthorPage:(id)sender {
     (void)sender;
+    if (self.demoMode) {
+        [self.statusField setStringValue:@"External links are disabled in the offline demo"];
+        return;
+    }
     [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGAuthorURLString]];
 }
 
 - (void)openChannelPage:(id)sender {
     (void)sender;
+    if (self.demoMode) {
+        [self.statusField setStringValue:@"External links are disabled in the offline demo"];
+        return;
+    }
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
     [alert setMessageText:TGLoc(@"about.channel.open.title")];
     [alert setInformativeText:TGLoc(@"about.channel.open.message")];
@@ -694,6 +708,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 }
 
 - (void)openTelegraphicaChannelInApp {
+    if (self.demoMode) {
+        [self.statusField setStringValue:@"Telegram lookup is disabled in the offline demo"];
+        return;
+    }
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:TGChannelURLString]];
         return;
@@ -753,8 +771,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         themeIdentifier = TGThemeIdentifierVKBlue;
     }
     TGSetActiveThemeIdentifier(themeIdentifier);
-    [[NSUserDefaults standardUserDefaults] setObject:themeIdentifier forKey:TGThemeDefaultsKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    if (!self.demoMode) {
+        [[NSUserDefaults standardUserDefaults] setObject:themeIdentifier forKey:TGThemeDefaultsKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
     [self selectThemePopUpItemForIdentifier:themeIdentifier];
     [self refreshThemeAppearance];
     [self appendDetail:[NSString stringWithFormat:@"Theme changed: %@", TGThemeDisplayNameForIdentifier(themeIdentifier)]];

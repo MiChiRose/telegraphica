@@ -400,6 +400,25 @@
     self.selectedChatLastReadOutboxMessageID = [item lastReadOutboxMessageID];
     [self updateOutgoingReadStateForVisibleMessages];
     [self refreshSelectedChatHeaderDisplay];
+    if (self.demoMode) {
+        [self clearTypingIndicator];
+        self.pinnedMessageItems = [NSArray array];
+        self.pinnedMessageItem = nil;
+        self.pinnedMessageCarouselIndex = 0;
+        [self loadDemoMessagesForChatID:newChatID];
+        [self.sendTextField setEnabled:YES];
+        [self.attachPhotoButton setEnabled:YES];
+        [self.stickerButton setEnabled:YES];
+        [self.voiceRecordButton setEnabled:YES];
+        [self updateSendControls];
+        [self updateVisibleSection];
+        [self layoutContentView];
+        [previousChatID release];
+        [previousThreadID release];
+        [previousTopicKind release];
+        [item release];
+        return;
+    }
     BOOL shouldOpenTopicList = (!selectedForumTopic &&
                                 !self.showingForumTopicList &&
                                 !self.chatNavigationClosed &&

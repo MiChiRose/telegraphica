@@ -762,6 +762,12 @@
 }
 
 - (void)checkForUpdatesManual:(BOOL)manual {
+    if (self.demoMode) {
+        if (manual) {
+            [self.statusField setStringValue:@"Update checks are disabled in the offline demo"];
+        }
+        return;
+    }
     if (!manual) {
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         NSTimeInterval last = [[NSUserDefaults standardUserDefaults] doubleForKey:TGLastUpdateCheckDefaultsKey];

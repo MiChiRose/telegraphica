@@ -15,11 +15,13 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 @implementation TGChatListCell
 
 @synthesize chatItem = _chatItem;
+@synthesize leadingEdgeExpansion = _leadingEdgeExpansion;
 
 - (id)copyWithZone:(NSZone *)zone {
     TGChatListCell *cell = [super copyWithZone:zone];
     cell->_chatItem = nil;
     [cell setChatItem:self.chatItem];
+    [cell setLeadingEdgeExpansion:self.leadingEdgeExpansion];
     return cell;
 }
 
@@ -45,6 +47,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [super drawWithFrame:cellFrame inView:controlView];
         return;
     }
+    cellFrame.origin.x -= self.leadingEdgeExpansion;
 
     BOOL selected = [self isHighlighted];
     if (selected) {
@@ -347,12 +350,14 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 
 @synthesize messageItem = _messageItem;
 @synthesize showSenderDetails = _showSenderDetails;
+@synthesize leadingEdgeExpansion = _leadingEdgeExpansion;
 
 - (id)copyWithZone:(NSZone *)zone {
     TGMessageBubbleCell *cell = [super copyWithZone:zone];
     cell->_messageItem = nil;
     [cell setMessageItem:self.messageItem];
     [cell setShowSenderDetails:self.showSenderDetails];
+    [cell setLeadingEdgeExpansion:self.leadingEdgeExpansion];
     return cell;
 }
 
@@ -378,6 +383,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [super drawWithFrame:cellFrame inView:controlView];
         return;
     }
+    cellFrame.origin.x -= self.leadingEdgeExpansion;
 
     if (TGChatMessagesAsBlocksEnabled()) {
         [self drawListMessageItem:item withFrame:cellFrame inView:controlView];
