@@ -70,6 +70,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
     } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"]) {
         TGDrawTemplateIconAsset(@"folder-share", iconRect, color, 1.0, flipped);
+    } else if ([title isEqualToString:@"Workshop"] || [title isEqualToString:@"Мастерская"] || [title isEqualToString:@"Майстэрня"]) {
+        NSRect boxRect = TGIconRect(iconRect, 2.0, 7.0, 14.0, 9.0, flipped);
+        NSBezierPath *boxPath = [NSBezierPath bezierPathWithRoundedRect:boxRect xRadius:2.0 yRadius:2.0];
+        [boxPath setLineWidth:1.5];
+        [boxPath stroke];
+        NSRect handleRect = TGIconRect(iconRect, 6.0, 3.0, 6.0, 6.0, flipped);
+        NSBezierPath *handlePath = [NSBezierPath bezierPathWithRoundedRect:handleRect xRadius:2.0 yRadius:2.0];
+        [handlePath setLineWidth:1.5];
+        [handlePath stroke];
+        TGStrokeLine(TGIconPoint(iconRect, 2.5, 11.0, flipped),
+                     TGIconPoint(iconRect, 15.5, 11.0, flipped),
+                     1.4);
+        NSRect latchRect = TGIconRect(iconRect, 8.0, 9.5, 2.0, 3.0, flipped);
+        [[NSBezierPath bezierPathWithRoundedRect:latchRect xRadius:0.7 yRadius:0.7] fill];
     } else if ([title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
         TGDrawTemplateIconAsset(@"folder", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Logs"]) {
