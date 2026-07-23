@@ -18,17 +18,17 @@
 
 ## A Personal Project That Became Public
 
-Telegraphica was originally created for personal use. A friend indirectly
-inspired the project: while chatting with him through Telegram Web on an old
-MacBook running OS X 10.9 Mavericks, the author noticed that the machine became
-hot, started throttling, and slowed down under the browser workload. Building a
+I originally created Telegraphica for my own use. A friend indirectly inspired
+me to start the project: while chatting with him through Telegram Web on my old
+MacBook running OS X 10.9 Mavericks, I noticed that the machine became hot,
+started throttling, and slowed down under the browser workload. Building a
 small native client seemed like a practical way to take that pressure off the
 system.
 
-Once the first working version proved that the idea was possible, the author
-showed it to several people. Their surprise, enthusiasm, and support turned a
-private experiment into a public project. Telegraphica was released so that
-other owners of older Macs could use it too.
+Once the first working version proved that the idea was possible, I showed it
+to several people. Their surprise, enthusiasm, and support encouraged me to
+turn a private experiment into a public project. I decided to release
+Telegraphica so that other owners of older Macs could use it too.
 
 Anyone who wants to try Telegraphica on a supported legacy system is welcome to
 do so. Detailed installation instructions are included below.
@@ -37,7 +37,7 @@ Telegraphica is a small native Cocoa/AppKit Telegram client for **OS X 10.8
 through macOS 10.13** on Intel `x86_64`. It is intended for every Intel-based
 Mac, including MacBook models, that can run one of those operating systems.
 Newer Intel Macs and Apple Silicon Macs may also run the app, but those
-configurations are unofficial and the author cannot guarantee current or future
+configurations are unofficial and I cannot guarantee current or future
 compatibility.
 
 It is not a Telegram clone, not an official Telegram app, and not a branded
@@ -70,10 +70,10 @@ that general-purpose Rosetta support for Intel apps remains available through
 macOS 27 and ends after that release, with only a limited legacy-game exception.
 See [Apple's Intel-app compatibility guidance](https://support.apple.com/102527).
 
-Most development and hands-on testing happens on **OS X 10.9 Mavericks**. The
-practical reason is that it provides the project's main legacy toolchain and
-hardware baseline. The less serious reason is that the author likes
-skeuomorphic systems and would like to make them great again.
+I do most of the development and hands-on testing on **OS X 10.9 Mavericks**.
+It gives me the project's main legacy toolchain and hardware baseline. The less
+serious reason is that I like skeuomorphic systems and would like to make them
+great again.
 
 ---
 
