@@ -1,11 +1,11 @@
-# Telegraphica ✦ Legacy Telegram for Mavericks
+# Telegraphica ✦ Legacy Telegram for Intel Macs
 
 <div align="center">
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
-  <p><b>An experimental, unofficial Telegram client for macOS 10.9 and newer.</b></p>
+  <p><b>An experimental, unofficial Telegram client for OS X 10.8 through macOS 10.13 on Intel Macs.</b></p>
   <p>
     <img src="https://img.shields.io/badge/version-v0.5.1-blue" alt="version v0.5.1" />
-    <img src="https://img.shields.io/badge/macOS-10.9%2B-black" alt="macOS 10.9 and newer" />
+    <img src="https://img.shields.io/badge/macOS-10.8--10.13-black" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
     <img src="https://img.shields.io/badge/status-open%20beta-brightgreen" alt="open beta status" />
@@ -16,19 +16,64 @@
   </p>
 </div>
 
-Telegraphica is a small native Cocoa/AppKit Telegram client available for
-**macOS 10.9 and newer**. It is built primarily for people who still use Intel
-Macs on **macOS 10.9-10.13** and do not want to give up working hardware just
-because modern clients moved on.
+## A Personal Project That Became Public
+
+I originally created Telegraphica for my own use. A friend indirectly inspired
+me to start the project: while chatting with him through Telegram Web on my old
+MacBook running OS X 10.9 Mavericks, I noticed that the machine became hot,
+started throttling, and slowed down under the browser workload. Building a
+small native client seemed like a practical way to take that pressure off the
+system.
+
+Once the first working version proved that the idea was possible, I showed it
+to several people. Their surprise, enthusiasm, and support encouraged me to
+turn a private experiment into a public project. I decided to release
+Telegraphica so that other owners of older Macs could use it too.
+
+Anyone who wants to try Telegraphica on a supported legacy system is welcome to
+do so. Detailed installation instructions are included below.
+
+Telegraphica is a small native Cocoa/AppKit Telegram client for **OS X 10.8
+through macOS 10.13** on Intel `x86_64`. It is intended for every Intel-based
+Mac, including MacBook models, that can run one of those operating systems.
+Newer Intel Macs and Apple Silicon Macs may also run the app, but those
+configurations are unofficial and I cannot guarantee current or future
+compatibility.
 
 It is not a Telegram clone, not an official Telegram app, and not a branded
 Telegram distribution. It is an independent legacy-Mac experiment that talks to
 Telegram through **TDLib's JSON API** and keeps the UI native, small, and
-Mavericks-friendly.
+legacy-Mac-friendly.
 
 > Telegraphica is not affiliated with Telegram. This repository does not include
 > Telegram logos, official artwork, user credentials, TDLib databases, sessions,
 > or account data.
+
+---
+
+## Compatibility
+
+Telegraphica has two release lanes: a dedicated Mountain Lion build for 10.8
+and the standard build for 10.9-10.13. Both are Intel-only.
+
+| macOS version | Telegraphica support began | Architecture | Status |
+| --- | --- | --- | --- |
+| OS X 10.8 Mountain Lion | `v0.4.5-ml` | Intel `x86_64` | Supported through the separate `-ml` release |
+| OS X 10.9 Mavericks | First public mainline release | Intel `x86_64` | Primary supported platform |
+| OS X 10.10-10.13 | First public mainline release | Intel `x86_64` | Supported by the standard release |
+| macOS 10.14-10.15 | No formal support milestone | Intel `x86_64` | Unofficial, best effort, not part of regular HITL testing |
+| macOS 11-27 / Apple Silicon era | No formal support milestone | Intel `x86_64`; Rosetta 2 where available | Unofficial and untested; no native `arm64` build |
+| macOS 28 and newer | No formal support milestone | No supported architecture | General-purpose Rosetta support for ordinary Intel apps is expected to be unavailable |
+
+The exact operating systems available still depend on the Mac model. Apple says
+that general-purpose Rosetta support for Intel apps remains available through
+macOS 27 and ends after that release, with only a limited legacy-game exception.
+See [Apple's Intel-app compatibility guidance](https://support.apple.com/102527).
+
+I do most of the development and hands-on testing on **OS X 10.9 Mavericks**.
+It gives me the project's main legacy toolchain and hardware baseline. The less
+serious reason is that I like skeuomorphic systems and would like to make them
+great again.
 
 ---
 
@@ -37,14 +82,20 @@ Mavericks-friendly.
 Telegraphica exists for one very specific reason: keeping an old Mac useful for
 real messaging again.
 
-Modern Telegram Desktop builds no longer target OS X Mavericks, and web clients
-can be heavy or brittle on vintage browsers. Telegraphica takes the opposite
-route: a native Objective-C/AppKit shell, old-Xcode-safe code, TDLib underneath,
-and a UI shaped around the constraints of a 2013-era Mac.
+The current official Telegram Desktop client no longer supports these legacy
+macOS releases. Telegram's web version remains an option, but keeping a modern
+browser and a full web client open can place sustained CPU and memory pressure
+on older hardware. That can contribute to heat, throttling, and visible system
+slowdowns.
+
+Telegraphica takes the opposite route: a native Objective-C/AppKit shell,
+old-Xcode-safe code, TDLib underneath, and no embedded browser engine. The goal
+is lower overhead so the system can "breathe easier" and leave more of its
+limited resources available for other useful work.
 
 In plain language, the goal is:
 
-- 🧭 open Telegram on OS X 10.9.5;
+- 🧭 open Telegram on an Intel Mac running OS X 10.8 through macOS 10.13;
 - 🔐 pass modern Telegram authorization through TDLib;
 - 💬 read chats, topics, messages, media previews, and unread state;
 - 📤 send text, photos, reactions, and voice messages;
@@ -101,7 +152,8 @@ voice messages, and keep the app updated from GitHub Releases.
   `Contents/Frameworks/libtdjson.dylib`.
 - DMGs without bundled TDLib are development images, not out-of-the-box
   installers.
-- Release confidence still comes from OS X 10.9.5 / Xcode 6.2 HITL testing.
+- Mainline release confidence comes from OS X 10.9.5 / Xcode 6.2 HITL testing;
+  Mountain Lion uses its own Xcode 5.1.1-compatible release lane.
 - The project is moving fast, so UI details and release packaging may change.
 
 ---
@@ -116,7 +168,10 @@ Compiled beta builds live in:
 
 1. Open the latest release page.
 2. Click **Assets** if the download list is collapsed.
-3. Download **`Telegraphica-v0.5.1-macos10.9-x86_64.dmg`**.
+3. Download the DMG for your system:
+   - **OS X 10.8:** `Telegraphica-v0.5.1-macos10.8-x86_64.dmg` from the
+     corresponding `-ml` release;
+   - **OS X 10.9-10.13:** `Telegraphica-v0.5.1-macos10.9-x86_64.dmg`.
 4. Open the downloaded DMG.
 5. Drag **Telegraphica.app** into **Applications**.
 6. Launch Telegraphica and sign in with your Telegram phone number.
@@ -128,7 +183,8 @@ If you are not sure which file to download, choose the file ending in
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.5.1-macos10.9-x86_64.dmg` | Installation | Download this one if you just want to install the app. |
+| `Telegraphica-v0.5.1-macos10.8-x86_64.dmg` | OS X 10.8 installation | Use the separate `v0.5.1-ml` release for Mountain Lion. |
+| `Telegraphica-v0.5.1-macos10.9-x86_64.dmg` | OS X 10.9-10.13 installation | Standard supported release. |
 | `Telegraphica-v0.5.1-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
 | `.sha256` files | Checksum verification | You do not need these files to install Telegraphica. |
 
@@ -151,7 +207,7 @@ Telegraphica is intentionally built around a conservative Objective-C lane:
 
 | Item | Target |
 | --- | --- |
-| OS | macOS 10.9 and newer, with primary support focused on macOS 10.9-10.13 |
+| OS | OS X 10.8 through macOS 10.13; 10.8 uses the separate Mountain Lion lane |
 | CPU | Intel `x86_64` |
 | UI | Cocoa / AppKit |
 | Language | Objective-C, non-ARC |
@@ -303,11 +359,14 @@ PRODUCT.md                     Product and design direction
 
 ## Compatibility & Security
 
-**Supported target:** macOS 10.9 and newer on Intel `x86_64`.
+**Supported target:** OS X 10.8 through macOS 10.13 on Intel `x86_64`.
 
-Primary compatibility work is focused on macOS 10.9-10.13. Newer macOS versions
-may work, but the old Intel Mac lane remains the main target for testing and
-release confidence.
+The mainline build targets 10.9-10.13. OS X 10.8 uses the separate
+`mountain-lion/*` source and `-ml` release lane. Newer Intel and Apple Silicon
+systems may work, including through Rosetta 2, but they are unofficial, are not
+regular release gates, and have no native `arm64` binary. General-purpose
+Rosetta support for ordinary Intel apps is available through macOS 27; continued
+operation after that version is not expected or guaranteed.
 
 **Security posture:**
 
