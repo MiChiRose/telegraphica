@@ -17,10 +17,11 @@
 </div>
 
 Telegraphica is a small native Cocoa/AppKit Telegram client for **OS X 10.8
-through macOS 10.13** on Intel `x86_64`. It is designed primarily for Intel
-MacBooks and other Macs from roughly **2008-2012**, with the exact macOS range
-depending on the model. Newer macOS versions may still run the app, but they are
-outside the officially tested legacy range.
+through macOS 10.13** on Intel `x86_64`. It is intended for every Intel-based
+Mac, including MacBook models, that can run one of those operating systems.
+Newer Intel Macs and Apple Silicon Macs may also run the app, but those
+configurations are unofficial and the author cannot guarantee current or future
+compatibility.
 
 It is not a Telegram clone, not an official Telegram app, and not a branded
 Telegram distribution. It is an independent legacy-Mac experiment that talks to
@@ -44,11 +45,18 @@ and the standard build for 10.9-10.13. Both are Intel-only.
 | OS X 10.9 Mavericks | First public mainline release | Intel `x86_64` | Primary supported platform |
 | OS X 10.10-10.13 | First public mainline release | Intel `x86_64` | Supported by the standard release |
 | macOS 10.14-10.15 | No formal support milestone | Intel `x86_64` | Unofficial, best effort, not part of regular HITL testing |
-| macOS 11 and newer / Apple Silicon era | No formal support milestone | Intel `x86_64`; Rosetta 2 where available | Unofficial and untested; no native `arm64` build |
+| macOS 11-27 / Apple Silicon era | No formal support milestone | Intel `x86_64`; Rosetta 2 where available | Unofficial and untested; no native `arm64` build |
+| macOS 28 and newer | No formal support milestone | No supported architecture | General-purpose Rosetta support for ordinary Intel apps is expected to be unavailable |
 
-The project does not claim that every 2008-2012 Mac can run every listed macOS
-version. Apple model support and the operating system already installed on the
-machine still determine what can be used.
+The exact operating systems available still depend on the Mac model. Apple says
+that general-purpose Rosetta support for Intel apps remains available through
+macOS 27 and ends after that release, with only a limited legacy-game exception.
+See [Apple's Intel-app compatibility guidance](https://support.apple.com/102527).
+
+Most development and hands-on testing happens on **OS X 10.9 Mavericks**. The
+practical reason is that it provides the project's main legacy toolchain and
+hardware baseline. The less serious reason is that the author likes
+skeuomorphic systems and would like to make them great again.
 
 ---
 
@@ -57,10 +65,16 @@ machine still determine what can be used.
 Telegraphica exists for one very specific reason: keeping an old Mac useful for
 real messaging again.
 
-Modern Telegram Desktop builds no longer target these legacy macOS releases,
-and web clients can be heavy or brittle on vintage browsers. Telegraphica takes
-the opposite route: a native Objective-C/AppKit shell, old-Xcode-safe code,
-TDLib underneath, and a UI shaped around older Intel Macs.
+The current official Telegram Desktop client no longer supports these legacy
+macOS releases. Telegram's web version remains an option, but keeping a modern
+browser and a full web client open can place sustained CPU and memory pressure
+on older hardware. That can contribute to heat, throttling, and visible system
+slowdowns.
+
+Telegraphica takes the opposite route: a native Objective-C/AppKit shell,
+old-Xcode-safe code, TDLib underneath, and no embedded browser engine. The goal
+is lower overhead so the system can "breathe easier" and leave more of its
+limited resources available for other useful work.
 
 In plain language, the goal is:
 
@@ -331,10 +345,11 @@ PRODUCT.md                     Product and design direction
 **Supported target:** OS X 10.8 through macOS 10.13 on Intel `x86_64`.
 
 The mainline build targets 10.9-10.13. OS X 10.8 uses the separate
-`mountain-lion/*` source and `-ml` release lane. macOS 10.14 and newer may work,
-including through Rosetta 2 on some Apple Silicon systems, but those
-configurations are unofficial, are not regular release gates, and have no
-native `arm64` binary.
+`mountain-lion/*` source and `-ml` release lane. Newer Intel and Apple Silicon
+systems may work, including through Rosetta 2, but they are unofficial, are not
+regular release gates, and have no native `arm64` binary. General-purpose
+Rosetta support for ordinary Intel apps is available through macOS 27; continued
+operation after that version is not expected or guaranteed.
 
 **Security posture:**
 
