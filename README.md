@@ -16,6 +16,23 @@
   </p>
 </div>
 
+## A Personal Project That Became Public
+
+Telegraphica was originally created for personal use. A friend indirectly
+inspired the project: while chatting with him through Telegram Web on an old
+MacBook running OS X 10.9 Mavericks, the author noticed that the machine became
+hot, started throttling, and slowed down under the browser workload. Building a
+small native client seemed like a practical way to take that pressure off the
+system.
+
+Once the first working version proved that the idea was possible, the author
+showed it to several people. Their surprise, enthusiasm, and support turned a
+private experiment into a public project. Telegraphica was released so that
+other owners of older Macs could use it too.
+
+Anyone who wants to try Telegraphica on a supported legacy system is welcome to
+do so. Detailed installation instructions are included below.
+
 Telegraphica is a small native Cocoa/AppKit Telegram client for **OS X 10.8
 through macOS 10.13** on Intel `x86_64`. It is intended for every Intel-based
 Mac, including MacBook models, that can run one of those operating systems.
