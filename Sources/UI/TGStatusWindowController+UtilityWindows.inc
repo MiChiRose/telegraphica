@@ -600,7 +600,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [contentView addSubview:versionField];
 
         NSString *copyrightText = [NSString stringWithFormat:@"Copyright %@. %@", TGCurrentYearString(), TGLoc(@"about.rights")];
-        NSTextField *copyrightField = [self labelWithFrame:NSMakeRect(60, 178, 360, 22)
+        NSTextField *copyrightField = [self labelWithFrame:NSMakeRect(60, 184, 360, 22)
                                                       text:copyrightText
                                                       font:[NSFont systemFontOfSize:12.0]];
         [copyrightField setAlignment:NSCenterTextAlignment];
@@ -608,12 +608,20 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [self applyMutedLabelStyle:copyrightField];
         [contentView addSubview:copyrightField];
 
+        NSTextField *compatibilityField = [self labelWithFrame:NSMakeRect(55, 145, 370, 38)
+                                                          text:TGLoc(@"about.compatibility")
+                                                          font:[NSFont systemFontOfSize:11.0]];
+        [compatibilityField setAlignment:NSCenterTextAlignment];
+        [[compatibilityField cell] setLineBreakMode:NSLineBreakByWordWrapping];
+        [self applyMutedLabelStyle:compatibilityField];
+        [contentView addSubview:compatibilityField];
+
         NSDictionary *linkAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                         [NSFont systemFontOfSize:12.0], NSFontAttributeName,
                                         TGClassicLinkColor(), NSForegroundColorAttributeName,
                                         [NSNumber numberWithInteger:NSUnderlineStyleSingle], NSUnderlineStyleAttributeName,
                                         nil];
-        NSButton *authorButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 142, 340, 24)] autorelease];
+        NSButton *authorButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 116, 340, 24)] autorelease];
         [authorButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.author") attributes:linkAttributes] autorelease]];
         [authorButton setImage:TGTemplateIconAssetImage(@"instagram", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
         [authorButton setImagePosition:NSImageLeft];
@@ -625,7 +633,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [[authorButton cell] setAlignment:NSCenterTextAlignment];
         [contentView addSubview:authorButton];
 
-        NSButton *projectButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 112, 340, 24)] autorelease];
+        NSButton *projectButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 88, 340, 24)] autorelease];
         [projectButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.project") attributes:linkAttributes] autorelease]];
         [projectButton setImage:TGTemplateIconAssetImage(@"github", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
         [projectButton setImagePosition:NSImageLeft];
@@ -637,7 +645,7 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [[projectButton cell] setAlignment:NSCenterTextAlignment];
         [contentView addSubview:projectButton];
 
-        NSButton *channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 82, 340, 24)] autorelease];
+        NSButton *channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(70, 60, 340, 24)] autorelease];
         [channelButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"about.channel") attributes:linkAttributes] autorelease]];
         [channelButton setImage:TGTemplateIconAssetImage(@"telegram", NSMakeSize(16.0, 16.0), TGClassicLinkColor(), 1.0)];
         [channelButton setImagePosition:NSImageLeft];
