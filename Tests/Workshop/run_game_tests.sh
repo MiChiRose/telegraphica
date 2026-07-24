@@ -19,7 +19,6 @@ clang \
   "$ROOT/WorkshopModules/Solitaire/TGSolitaireEngine.m" \
   "$ROOT/WorkshopModules/PacMan/TGPacManEngine.m" \
   "$ROOT/WorkshopModules/Fifteen/TGFifteenEngine.m" \
-  "$ROOT/WorkshopModules/TankPatrol/TGTankPatrolEngine.m" \
   -o "$BUILD_DIR/TGWorkshopGameTests"
 
 "$BUILD_DIR/TGWorkshopGameTests"

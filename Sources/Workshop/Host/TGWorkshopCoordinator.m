@@ -17,6 +17,23 @@ static NSString * const TGWorkshopModeAvailable = @"available";
 static NSString * const TGWorkshopModeInstalled = @"installed";
 static NSString * const TGWorkshopModeUpdates = @"updates";
 
+static NSString *TGWorkshopInstalledCategory(NSString *identifier, NSDictionary *record) {
+    NSString *category = [record objectForKey:@"category"];
+    if (![category isKindOfClass:[NSString class]] || [category length] == 0) {
+        NSDictionary *manifest = [record objectForKey:@"manifest"];
+        category = [manifest isKindOfClass:[NSDictionary class]]
+            ? [manifest objectForKey:@"category"]
+            : nil;
+    }
+    if ([identifier hasSuffix:@".diagnosticcenter"] ||
+        [identifier hasSuffix:@".mediaworkbench"]) {
+        return TGWorkshopModuleCategoryUtilities;
+    }
+    return ([category isKindOfClass:[NSString class]] && [category length] > 0)
+        ? category
+        : TGWorkshopModuleCategoryGames;
+}
+
 static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identifier,
                                                                  NSDictionary *record) {
     if ([identifier length] == 0 || ![record isKindOfClass:[NSDictionary class]]) return nil;
@@ -36,9 +53,7 @@ static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identi
                                 @"0.5.1", @"minimum_app_version",
                                 @"10.9", @"minimum_os_version",
                                 [NSArray arrayWithObject:@"x86_64"], @"architectures",
-                                ([[record objectForKey:@"category"] isKindOfClass:[NSString class]]
-                                 ? [record objectForKey:@"category"]
-                                 : TGWorkshopModuleCategoryGames), @"category",
+                                TGWorkshopInstalledCategory(identifier, record), @"category",
                                 @1, @"archive_size",
                                 @1, @"unpacked_size",
                                 @1, @"entry_count",

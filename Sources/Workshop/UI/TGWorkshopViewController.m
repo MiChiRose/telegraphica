@@ -15,6 +15,15 @@ static NSString * const TGWorkshopViewModeInstalled = @"installed";
 static NSString * const TGWorkshopViewModeUpdates = @"updates";
 static NSString * const TGWorkshopCategoryAll = @"all";
 
+static NSString *TGWorkshopNormalizedCategory(NSString *category) {
+    if ([category isEqualToString:@"modules"] ||
+        [category isEqualToString:@"helpers"] ||
+        [category isEqualToString:@"utilities"]) {
+        return @"utilities";
+    }
+    return [category length] > 0 ? category : @"games";
+}
+
 @interface TGWorkshopContentDocumentView : NSView
 @end
 
@@ -289,8 +298,9 @@ static NSImage *TGWorkshopBackImage(void) {
 - (NSString *)localizedCategoryTitle:(NSString *)category {
     if ([category isEqualToString:TGWorkshopCategoryAll]) return TGLoc(@"workshop.allPlugins");
     if ([category isEqualToString:@"games"]) return TGLoc(@"workshop.games");
-    if ([category isEqualToString:@"modules"]) return TGLoc(@"workshop.modules");
-    if ([category isEqualToString:@"helpers"]) return TGLoc(@"workshop.helpers");
+    if ([TGWorkshopNormalizedCategory(category) isEqualToString:@"utilities"]) {
+        return TGLoc(@"workshop.utilities");
+    }
     return [[category stringByReplacingOccurrencesOfString:@"-" withString:@" "] capitalizedString];
 }
 
@@ -298,10 +308,18 @@ static NSImage *TGWorkshopBackImage(void) {
     NSMutableSet *categories = [NSMutableSet set];
     TGWorkshopCatalogEntry *entry = nil;
     for (entry in [[_coordinator catalog] entries]) {
-        if ([[entry category] length] > 0) [categories addObject:[entry category]];
+        [categories addObject:TGWorkshopNormalizedCategory([entry category])];
     }
-    for (entry in [_coordinator entriesForMode:_selectedMode]) {
-        if ([[entry category] length] > 0) [categories addObject:[entry category]];
+    NSArray *modes = [NSArray arrayWithObjects:
+                      TGWorkshopViewModeAvailable,
+                      TGWorkshopViewModeInstalled,
+                      TGWorkshopViewModeUpdates,
+                      nil];
+    NSString *mode = nil;
+    for (mode in modes) {
+        for (entry in [_coordinator entriesForMode:mode]) {
+            [categories addObject:TGWorkshopNormalizedCategory([entry category])];
+        }
     }
     return [[categories allObjects] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
 }
@@ -365,7 +383,9 @@ static NSImage *TGWorkshopBackImage(void) {
     NSMutableArray *filtered = [NSMutableArray array];
     TGWorkshopCatalogEntry *entry = nil;
     for (entry in entries) {
-        if ([[entry category] isEqualToString:_selectedCategory]) [filtered addObject:entry];
+        if ([TGWorkshopNormalizedCategory([entry category]) isEqualToString:_selectedCategory]) {
+            [filtered addObject:entry];
+        }
     }
     return filtered;
 }

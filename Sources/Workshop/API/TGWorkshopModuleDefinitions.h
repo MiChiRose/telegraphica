@@ -5,6 +5,7 @@
 #define TGWorkshopModuleCategoryGames @"games"
 #define TGWorkshopModuleCategoryModules @"modules"
 #define TGWorkshopModuleCategoryHelpers @"helpers"
+#define TGWorkshopModuleCategoryUtilities @"utilities"
 
 #define TGWorkshopPermissionModuleData @"module-data"
 #define TGWorkshopPermissionHostNotifications @"host-notifications"

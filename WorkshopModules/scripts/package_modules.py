@@ -68,22 +68,13 @@ MODULES = {
         "ru_description": "Компактная игра в пятнашки с сохранением прогресса и без фонового таймера.",
         "category": "games",
     },
-    "TankPatrol": {
-        "id": "com.michirose.telegraphica.workshop.tankpatrol",
-        "name": "Tank Patrol",
-        "ru_name": "Танковый патруль",
-        "en_description": "An original lightweight top-down tank defense inspired by cartridge-era games.",
-        "ru_description": "Оригинальная лёгкая танковая оборона с видом сверху в духе картриджных игр.",
-        "category": "games",
-        "permissions": ["module-data", "host-notifications"],
-    },
     "DiagnosticCenter": {
         "id": "com.michirose.telegraphica.workshop.diagnosticcenter",
         "name": "Diagnostic Center",
         "ru_name": "Центр диагностики",
         "en_description": "Check Telegram core connectivity, cache usage and application state.",
         "ru_description": "Проверка соединения с Telegram Core, кэша и состояния приложения.",
-        "category": "helpers",
+        "category": "utilities",
         "permissions": ["module-data", "host-diagnostics"],
     },
     "MediaWorkbench": {
@@ -92,7 +83,7 @@ MODULES = {
         "ru_name": "Медиацентр",
         "en_description": "Compress, resize and convert images locally without uploading them.",
         "ru_description": "Локальное сжатие, изменение размера и конвертация изображений.",
-        "category": "modules",
+        "category": "utilities",
         "permissions": ["user-selected-files"],
     },
 }

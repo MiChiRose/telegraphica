@@ -3,6 +3,7 @@
 <plist version="1.0"><dict>
 <key>api_version</key><integer>1</integer>
 <key>architectures</key><array><string>x86_64</string></array>
+<key>category</key><string>utilities</string>
 <key>identifier</key><string>com.michirose.telegraphica.workshop.diagnosticcenter</string>
 <key>minimum_app_version</key><string>0.5.1</string>
 <key>minimum_os_version</key><string>10.9</string>

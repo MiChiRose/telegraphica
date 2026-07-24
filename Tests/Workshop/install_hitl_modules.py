@@ -16,9 +16,12 @@ MODULES = (
     ("Solitaire", "com.michirose.telegraphica.workshop.solitaire"),
     ("PacMan", "com.michirose.telegraphica.workshop.pacman"),
     ("Fifteen", "com.michirose.telegraphica.workshop.fifteen"),
-    ("TankPatrol", "com.michirose.telegraphica.workshop.tankpatrol"),
     ("DiagnosticCenter", "com.michirose.telegraphica.workshop.diagnosticcenter"),
     ("MediaWorkbench", "com.michirose.telegraphica.workshop.mediaworkbench"),
+)
+
+RETIRED_MODULES = (
+    "com.michirose.telegraphica.workshop.tankpatrol",
 )
 
 
@@ -95,6 +98,7 @@ def main():
         records[identifier] = {
             "active_version": version,
             "previous_version": previous_version,
+            "category": manifest.get("category", "games"),
             "disabled": False,
             "pending_removal": False,
             "remove_data": False,
@@ -102,6 +106,13 @@ def main():
             "manifest": manifest,
         }
         print("Installed HITL module: {0} {1}".format(identifier, version))
+
+    for identifier in RETIRED_MODULES:
+        records.pop(identifier, None)
+        retired_path = os.path.join(modules_dir, identifier)
+        if os.path.isdir(retired_path):
+            shutil.rmtree(retired_path)
+        print("Removed retired HITL module: " + identifier)
 
     write_plist({"schema_version": 1, "modules": records}, registry_path)
     print("Workshop HITL registry: " + registry_path)
