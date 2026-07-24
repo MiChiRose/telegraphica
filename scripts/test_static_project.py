@@ -237,6 +237,17 @@ def check_unified_legacy_contract(errors):
     if "TGTDLibPruneMountainLionBackups(backupRoot, 3)" not in tdlib_text:
         errors.append("Sources/Core/TGTDLibClient.m: Mountain Lion cache backups must stay bounded")
 
+    startup_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    startup_text = read_text(os.path.join(ROOT, startup_rel))
+    for fragment in [
+        "error:&parametersError",
+        "parametersErrorCode >= 12",
+        "parametersErrorCode <= 14",
+    ]:
+        if fragment not in startup_text:
+            errors.append("%s: TDLib startup must distinguish missing configuration from transient failures `%s`" %
+                          (startup_rel, fragment))
+
     build_rel = "build_legacy.sh"
     build_text = read_text(os.path.join(ROOT, build_rel))
     for fragment in [
