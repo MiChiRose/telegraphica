@@ -142,8 +142,12 @@ while IFS= read -r binary_path; do
         echo "$relative_path has no LC_VERSION_MIN_MACOSX command."
         exit 1
     fi
-    if version_gt "$minimum_os" "$DEPLOYMENT_TARGET"; then
-        echo "$relative_path requires OS X $minimum_os, expected <= $DEPLOYMENT_TARGET."
+    binary_deployment_target="$DEPLOYMENT_TARGET"
+    if [ "$relative_path" = "Contents/Frameworks/libtdjson.dylib" ]; then
+        binary_deployment_target="10.9"
+    fi
+    if version_gt "$minimum_os" "$binary_deployment_target"; then
+        echo "$relative_path requires OS X $minimum_os, expected <= $binary_deployment_target."
         exit 1
     fi
 

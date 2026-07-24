@@ -1399,16 +1399,28 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (NSArray *)candidateLibraryPaths {
     NSMutableArray *paths = [NSMutableArray array];
-    NSString *environmentPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"TELEGRAPHICA_TDJSON_PATH"];
+    NSDictionary *environment = [[NSProcessInfo processInfo] environment];
+    BOOL mountainLion = TGSystemIsMountainLion();
+    NSString *environmentPath = nil;
+    if (mountainLion) {
+        environmentPath = [environment objectForKey:@"TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH"];
+    }
+    if ([environmentPath length] == 0) {
+        environmentPath = [environment objectForKey:@"TELEGRAPHICA_TDJSON_PATH"];
+    }
     if ([environmentPath length] > 0) {
         [paths addObject:environmentPath];
     }
 
-    NSString *frameworksPath = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"Contents/Frameworks/libtdjson.dylib"];
+    NSString *libraryName = mountainLion ? @"libtdjson-mountain-lion.dylib" : @"libtdjson.dylib";
+    NSString *frameworksPath = [[[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"Contents/Frameworks"]
+                                stringByAppendingPathComponent:libraryName];
     [paths addObject:frameworksPath];
-    [paths addObject:@"/usr/local/lib/libtdjson.dylib"];
-    [paths addObject:@"/opt/homebrew/lib/libtdjson.dylib"];
-    [paths addObject:@"libtdjson.dylib"];
+    if (!mountainLion) {
+        [paths addObject:@"/usr/local/lib/libtdjson.dylib"];
+        [paths addObject:@"/opt/homebrew/lib/libtdjson.dylib"];
+        [paths addObject:@"libtdjson.dylib"];
+    }
     return paths;
 }
 

@@ -237,6 +237,16 @@ def check_unified_legacy_contract(errors):
     tdlib_text = read_text(os.path.join(ROOT, "Sources", "Core", "TGTDLibClient.m"))
     if "TGTDLibPruneMountainLionBackups(backupRoot, 3)" not in tdlib_text:
         errors.append("Sources/Core/TGTDLibClient.m: Mountain Lion cache backups must stay bounded")
+    for fragment in [
+        'TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH',
+        'mountainLion ? @"libtdjson-mountain-lion.dylib" : @"libtdjson.dylib"',
+        "if (!mountainLion)",
+    ]:
+        if fragment not in tdlib_text:
+            errors.append("Sources/Core/TGTDLibClient.m: dual TDLib runtime selection is missing `%s`" %
+                          fragment)
+    if "TGTDLibStartupRecovery" in tdlib_text:
+        errors.append("Sources/Core/TGTDLibClient.m: TDLib cache migration recovery must not return")
 
     startup_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
     startup_text = read_text(os.path.join(ROOT, startup_rel))
@@ -256,6 +266,8 @@ def check_unified_legacy_contract(errors):
         "check_release_bundle_legacy.sh",
         "Xcode 5.1.1.app",
         "TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH",
+        "TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH",
+        "libtdjson-mountain-lion.dylib",
         "Preserved the existing generated Telegram connection provider.",
     ]:
         if fragment not in build_text:
@@ -266,6 +278,14 @@ def check_unified_legacy_contract(errors):
     package_text = read_text(os.path.join(ROOT, package_rel))
     if "macos10.8-10.13" not in package_text:
         errors.append("%s: unified release artifact compatibility tag is missing" % package_rel)
+    for fragment in ["--mountain-lion-tdjson", "libtdjson-mountain-lion.dylib"]:
+        if fragment not in package_text:
+            errors.append("%s: dual TDLib release contract is missing `%s`" %
+                          (package_rel, fragment))
+
+    recovery_rel = os.path.join("Sources", "Services", "TGTDLibStartupRecovery.m")
+    if os.path.exists(os.path.join(ROOT, recovery_rel)):
+        errors.append("%s: destructive TDLib cache recovery helper must not return" % recovery_rel)
 
     for rel in [
         os.path.join("Sources", "UI", "TGUpdateSupport.h"),
