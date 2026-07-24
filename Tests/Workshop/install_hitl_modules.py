@@ -15,6 +15,7 @@ MODULES = (
     ("Checkers", "com.michirose.telegraphica.workshop.checkers"),
     ("Solitaire", "com.michirose.telegraphica.workshop.solitaire"),
     ("PacMan", "com.michirose.telegraphica.workshop.pacman"),
+    ("Fifteen", "com.michirose.telegraphica.workshop.fifteen"),
 )
 
 
