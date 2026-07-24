@@ -1503,7 +1503,6 @@
         NSString *parametersSummary = nil;
         BOOL parametersAttempted = NO;
         BOOL parametersMissingConfiguration = NO;
-        NSError *parametersError = nil;
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
@@ -1518,12 +1517,10 @@
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
                 parametersAttempted = YES;
-                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
-                NSInteger parametersErrorCode = [parametersError code];
+                BOOL parametersConfigurationAvailable = [client hasUsableTDLibConfiguration];
+                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
                 parametersMissingConfiguration = ([parametersSummary length] == 0 &&
-                                                  [[parametersError domain] isEqualToString:@"TelegraphicaTDLibError"] &&
-                                                  parametersErrorCode >= 12 &&
-                                                  parametersErrorCode <= 14);
+                                                  !parametersConfigurationAvailable);
             }
             BOOL missingInternalConfiguration = parametersMissingConfiguration;
             if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
@@ -1568,9 +1565,6 @@
         if (parametersSummary) {
             [uiState setObject:parametersSummary forKey:@"parametersSummary"];
         }
-        if (parametersError) {
-            [uiState setObject:[parametersError localizedDescription] forKey:@"parametersErrorDescription"];
-        }
         if (encryptionKeySummary) {
             [uiState setObject:encryptionKeySummary forKey:@"encryptionKeySummary"];
         }
@@ -1598,7 +1592,6 @@
             NSString *probeSummaryForUI = [uiState objectForKey:@"probeSummary"];
             NSString *authorizationStateForUI = [uiState objectForKey:@"authorizationState"];
             NSString *parametersSummaryForUI = [uiState objectForKey:@"parametersSummary"];
-            NSString *parametersErrorDescriptionForUI = [uiState objectForKey:@"parametersErrorDescription"];
             NSString *encryptionKeySummaryForUI = [uiState objectForKey:@"encryptionKeySummary"];
             NSString *finalAuthorizationStateForUI = [uiState objectForKey:@"finalAuthorizationState"];
             NSString *postLoginProbeSummaryForUI = [uiState objectForKey:@"postLoginProbeSummary"];
@@ -1630,10 +1623,7 @@
                 if (parametersSummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummaryForUI]];
                 } else if (parametersAttempted) {
-                    NSString *parametersFailure = ([parametersErrorDescriptionForUI length] > 0)
-                        ? parametersErrorDescriptionForUI
-                        : @"request did not complete";
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersFailure]];
+                    [self appendDetail:@"TDLib parameters: request did not complete; authorization state will be checked again."];
                 }
                 if (encryptionKeySummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummaryForUI]];

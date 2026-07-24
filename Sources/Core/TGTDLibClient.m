@@ -1749,6 +1749,11 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (BOOL)hasUsableTDLibConfiguration {
+    NSDictionary *configuration = [self localTDLibConfigurationWithError:NULL];
+    return [self configurationContainsValidAPICredentials:configuration];
+}
+
 - (NSString *)stringValueForKey:(NSString *)key inConfiguration:(NSDictionary *)configuration required:(BOOL)required error:(NSError **)error {
     id value = [configuration objectForKey:key];
     if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
