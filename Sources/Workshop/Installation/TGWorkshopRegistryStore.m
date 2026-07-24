@@ -1,6 +1,9 @@
 #import "TGWorkshopRegistryStore.h"
 #import "../API/TGWorkshopModuleDefinitions.h"
 #import "../Host/TGWorkshopPaths.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 static NSError *TGWorkshopRegistryError(NSInteger code, NSString *message) {
     return [NSError errorWithDomain:TGWorkshopErrorDomain
@@ -57,14 +60,35 @@ static NSError *TGWorkshopRegistryError(NSInteger code, NSString *message) {
         if (error) *error = TGWorkshopRegistryError(401, @"Could not write Workshop module registry.");
         return NO;
     }
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    if ([fileManager fileExistsAtPath:_registryPath] && ![fileManager removeItemAtPath:_registryPath error:error]) {
-        [fileManager removeItemAtPath:temporaryPath error:NULL];
+    [[NSFileManager defaultManager] setAttributes:
+     [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedLong:0600]
+                                 forKey:NSFilePosixPermissions]
+                                            ofItemAtPath:temporaryPath
+                                                   error:NULL];
+    int temporaryFile = open([temporaryPath fileSystemRepresentation], O_RDONLY);
+    if (temporaryFile < 0 || fsync(temporaryFile) != 0) {
+        if (temporaryFile >= 0) close(temporaryFile);
+        [[NSFileManager defaultManager] removeItemAtPath:temporaryPath error:NULL];
+        if (error) {
+            *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:nil];
+        }
         return NO;
     }
-    if (![fileManager moveItemAtPath:temporaryPath toPath:_registryPath error:error]) {
+    close(temporaryFile);
+
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (rename([temporaryPath fileSystemRepresentation], [_registryPath fileSystemRepresentation]) != 0) {
+        NSInteger renameError = errno;
         [fileManager removeItemAtPath:temporaryPath error:NULL];
+        if (error) {
+            *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:renameError userInfo:nil];
+        }
         return NO;
+    }
+    int directoryFile = open([directory fileSystemRepresentation], O_RDONLY);
+    if (directoryFile >= 0) {
+        fsync(directoryFile);
+        close(directoryFile);
     }
     return YES;
 }

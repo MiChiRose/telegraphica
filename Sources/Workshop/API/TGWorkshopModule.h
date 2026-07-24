@@ -6,7 +6,9 @@
 
 - (id)initWithHostContext:(id<TGWorkshopHostContext>)context;
 - (NSString *)moduleIdentifier;
+- (NSString *)moduleDisplayName;
 - (NSString *)moduleVersion;
+- (NSString *)minimumHostVersion;
 - (NSUInteger)moduleAPIVersion;
 - (NSViewController *)mainViewController;
 - (BOOL)startWithError:(NSError **)error;

@@ -13,6 +13,25 @@ static NSError *TGWorkshopLoaderError(NSInteger code, NSString *message) {
 
 @implementation TGWorkshopModuleLoader
 
+- (void)quarantineFailedVersion:(NSString *)version identifier:(NSString *)identifier {
+    NSDictionary *record = [_registryStore recordForModuleIdentifier:identifier];
+    if (!record) return;
+    NSMutableDictionary *updated = [NSMutableDictionary dictionaryWithDictionary:record];
+    NSString *previousVersion = [record objectForKey:@"previous_version"];
+    if ([previousVersion length] > 0 && ![previousVersion isEqualToString:version]) {
+        [updated setObject:previousVersion forKey:@"active_version"];
+        [updated setObject:[NSNumber numberWithBool:NO] forKey:@"disabled"];
+    } else {
+        [updated setObject:[NSNumber numberWithBool:YES] forKey:@"disabled"];
+    }
+    if ([version length] > 0) {
+        [updated setObject:version forKey:@"failed_version"];
+    }
+    [updated removeObjectForKey:@"launching_version"];
+    [_registryStore setRecord:updated forModuleIdentifier:identifier];
+    [_registryStore save:NULL];
+}
+
 - (id)initWithRegistryStore:(TGWorkshopRegistryStore *)registryStore
                  hostDelegate:(id<TGWorkshopHostContextDelegate>)hostDelegate {
     self = [super init];
@@ -66,14 +85,19 @@ static NSError *TGWorkshopLoaderError(NSInteger code, NSString *message) {
     NSString *version = [record objectForKey:@"active_version"];
     NSString *bundlePath = [self bundlePathForIdentifier:identifier record:record];
     NSBundle *bundle = [NSBundle bundleWithPath:bundlePath];
-    if (!bundle || ![self setLaunchingVersion:version identifier:identifier error:error]) {
-        if (error && !*error) *error = TGWorkshopLoaderError(381, @"Workshop module bundle could not be opened.");
+    if (!bundle) {
+        [self quarantineFailedVersion:version identifier:identifier];
+        if (error) *error = TGWorkshopLoaderError(381, @"Workshop module bundle could not be opened.");
+        return nil;
+    }
+    if (![self setLaunchingVersion:version identifier:identifier error:error]) {
+        if (error && !*error) *error = TGWorkshopLoaderError(381, @"Workshop module launch state could not be saved.");
         return nil;
     }
 
     NSError *loadError = nil;
     if (![bundle loadAndReturnError:&loadError]) {
-        [self setLaunchingVersion:nil identifier:identifier error:NULL];
+        [self quarantineFailedVersion:version identifier:identifier];
         if (error) *error = loadError ? loadError : TGWorkshopLoaderError(382, @"Workshop module executable could not be loaded.");
         return nil;
     }
@@ -107,7 +131,11 @@ static NSError *TGWorkshopLoaderError(NSInteger code, NSString *message) {
                                             [exception reason] ? [exception reason] : [exception name]]);
         }
     }
-    [self setLaunchingVersion:nil identifier:identifier error:NULL];
+    if (module) {
+        [self setLaunchingVersion:nil identifier:identifier error:NULL];
+    } else {
+        [self quarantineFailedVersion:version identifier:identifier];
+    }
     return module;
 }
 

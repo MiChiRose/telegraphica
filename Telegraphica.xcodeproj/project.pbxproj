@@ -84,6 +84,9 @@
 		220000000000000000000013 /* TGWorkshopViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000013 /* TGWorkshopViewController.m */; };
 		220000000000000000000014 /* unzip.c in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000014 /* unzip.c */; };
 		220000000000000000000015 /* ioapi.c in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000015 /* ioapi.c */; };
+		220000000000000000000016 /* WorkshopCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000016 /* WorkshopCatalog.json */; };
+		220000000000000000000017 /* WorkshopCatalogPublicKey.der in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000017 /* WorkshopCatalogPublicKey.der */; };
+		220000000000000000000018 /* WorkshopPackagePublicKey.der in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000018 /* WorkshopPackagePublicKey.der */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -214,6 +217,9 @@
 		221000000000000000000013 /* TGWorkshopViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopViewController.m; sourceTree = "<group>"; };
 		221000000000000000000014 /* unzip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unzip.c; sourceTree = "<group>"; };
 		221000000000000000000015 /* ioapi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ioapi.c; sourceTree = "<group>"; };
+		221000000000000000000016 /* WorkshopCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = WorkshopCatalog.json; sourceTree = "<group>"; };
+		221000000000000000000017 /* WorkshopCatalogPublicKey.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = WorkshopCatalogPublicKey.der; sourceTree = "<group>"; };
+		221000000000000000000018 /* WorkshopPackagePublicKey.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = WorkshopPackagePublicKey.der; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -404,6 +410,9 @@
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
 				111111111111111111111277 /* Icons */,
 				111111111111111111111229 /* ThirdPartyNotices.txt */,
+				221000000000000000000016 /* WorkshopCatalog.json */,
+				221000000000000000000017 /* WorkshopCatalogPublicKey.der */,
+				221000000000000000000018 /* WorkshopPackagePublicKey.der */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -501,6 +510,9 @@
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
 				111111111111111111111141 /* Icons in Resources */,
 				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
+				220000000000000000000016 /* WorkshopCatalog.json in Resources */,
+				220000000000000000000017 /* WorkshopCatalogPublicKey.der in Resources */,
+				220000000000000000000018 /* WorkshopPackagePublicKey.der in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -57,5 +57,10 @@ third_party/td/
 third_party/tdlib-build/
 libtdjson.dylib
 
+# Workshop build products and private signing material
+build-workshop/
+WorkshopModules/.keys/
+WorkshopModules/packages/
+
 # macOS
 .DS_Store
