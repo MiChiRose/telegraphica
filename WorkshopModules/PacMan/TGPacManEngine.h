@@ -34,6 +34,7 @@ typedef enum {
 - (void)newGame;
 - (BOOL)isWallAtIndex:(NSUInteger)index;
 - (BOOL)hasPelletAtIndex:(NSUInteger)index;
+- (BOOL)canStepInDirection:(TGPacManDirection)direction;
 - (BOOL)stepInDirection:(TGPacManDirection)direction;
 - (NSDictionary *)dictionaryRepresentation;
 - (BOOL)restoreFromDictionary:(NSDictionary *)dictionary;

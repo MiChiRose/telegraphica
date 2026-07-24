@@ -16,6 +16,7 @@
     NSButton *_pauseButton;
     NSTimer *_timer;
     TGPacManDirection _direction;
+    TGPacManDirection _queuedDirection;
     BOOL _paused;
 }
 

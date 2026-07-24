@@ -85,6 +85,12 @@ static NSUInteger const TGPacManGhostStartIndex = (8 * 19) + 9;
     return [_pellets containsIndex:index];
 }
 
+- (BOOL)canStepInDirection:(TGPacManDirection)direction {
+    if (_finished || direction == TGPacManDirectionNone) return NO;
+    NSUInteger destination = [self neighborFromIndex:_pacmanIndex direction:direction];
+    return destination != NSNotFound && ![self isWallAtIndex:destination];
+}
+
 - (NSUInteger)neighborFromIndex:(NSUInteger)index direction:(TGPacManDirection)direction {
     NSInteger row = (NSInteger)(index / TGPacManWidth);
     NSInteger column = (NSInteger)(index % TGPacManWidth);
@@ -137,9 +143,8 @@ static NSUInteger const TGPacManGhostStartIndex = (8 * 19) + 9;
 }
 
 - (BOOL)stepInDirection:(TGPacManDirection)direction {
-    if (_finished || direction == TGPacManDirectionNone) return NO;
+    if (![self canStepInDirection:direction]) return NO;
     NSUInteger destination = [self neighborFromIndex:_pacmanIndex direction:direction];
-    if (destination == NSNotFound || [self isWallAtIndex:destination]) return NO;
     _pacmanIndex = destination;
     if ([_pellets containsIndex:_pacmanIndex]) {
         [_pellets removeIndex:_pacmanIndex];

@@ -160,13 +160,13 @@ static NSImage *TGWorkshopBackImage(void) {
     for (index = 0; index < [_modeButtons count]; index++) {
         NSButton *button = [_modeButtons objectAtIndex:index];
         [button setFrame:NSMakeRect(20 + index * (buttonWidth + gap),
-                                    height - 84,
+                                    height - 96,
                                     buttonWidth,
                                     38)];
     }
-    [_categoryField setFrame:NSMakeRect(24, height - 112, 280, 20)];
-    [_statusField setFrame:NSMakeRect(310, height - 112, MAX(120.0, width - 334.0), 20)];
-    [_scrollView setFrame:NSMakeRect(18, 18, width - 36, MAX(120.0, height - 142.0))];
+    [_categoryField setFrame:NSMakeRect(24, height - 124, 280, 20)];
+    [_statusField setFrame:NSMakeRect(310, height - 124, MAX(120.0, width - 334.0), 20)];
+    [_scrollView setFrame:NSMakeRect(18, 18, width - 36, MAX(120.0, height - 154.0))];
     [_moduleContainerView setFrame:NSMakeRect(12, 12, width - 24, height - 56)];
     if (_activeModuleViewController) {
         [[_activeModuleViewController view] setFrame:[_moduleContainerView bounds]];
@@ -203,7 +203,11 @@ static NSImage *TGWorkshopBackImage(void) {
         NSButton *button = [_modeButtons objectAtIndex:index];
         [button setTitle:[titles objectAtIndex:index]];
         [button setToolTip:[titles objectAtIndex:index]];
-        NSArray *icons = [NSArray arrayWithObjects:@"appstore", @"bookmark-plus", @"apple-store", nil];
+        NSArray *icons = [NSArray arrayWithObjects:
+                          @"workshop-available",
+                          @"workshop-installed",
+                          @"workshop-updates",
+                          nil];
         [button setImage:TGTemplateIconAssetImage([icons objectAtIndex:index],
                                                   NSMakeSize(16.0, 16.0),
                                                   TGClassicHeaderTextColor(1.0),

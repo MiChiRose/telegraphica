@@ -340,6 +340,9 @@ static void TGTestPacMan(void) {
     TGAssert([engine width] == 19 && [engine height] == 15,
              @"Pac-Man builds the expected compact maze.");
     NSUInteger pellets = [engine pelletCount];
+    TGAssert([engine canStepInDirection:TGPacManDirectionLeft] &&
+             ![engine canStepInDirection:TGPacManDirectionDown],
+             @"Pac-Man exposes valid turns for buffered movement.");
     TGAssert([engine stepInDirection:TGPacManDirectionLeft] &&
              [engine pelletCount] + 1 == pellets &&
              [engine score] == 10,

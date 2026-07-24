@@ -119,16 +119,37 @@
 
 - (void)directionChanged:(id)sender {
     if (![sender isKindOfClass:[TGPacManBoardView class]]) return;
-    _direction = [(TGPacManBoardView *)sender pendingDirection];
+    _queuedDirection = [(TGPacManBoardView *)sender pendingDirection];
     _paused = NO;
-    [_engine stepInDirection:_direction];
+    if (![_boardView isAnimatingMovement]) {
+        [self timerFired:nil];
+    }
     [self refreshFromEngine];
 }
 
 - (void)timerFired:(NSTimer *)timer {
     (void)timer;
-    if (_paused || _direction == TGPacManDirectionNone || [_engine isFinished]) return;
-    [_engine stepInDirection:_direction];
+    if (_paused || [_engine isFinished]) return;
+    if ([_boardView isAnimatingMovement]) {
+        [_boardView advanceMovementAnimation];
+        return;
+    }
+    if (_queuedDirection != TGPacManDirectionNone &&
+        [_engine canStepInDirection:_queuedDirection]) {
+        _direction = _queuedDirection;
+        _queuedDirection = TGPacManDirectionNone;
+    }
+    if (_direction == TGPacManDirectionNone ||
+        ![_engine canStepInDirection:_direction]) {
+        return;
+    }
+    NSUInteger previousPacman = [_engine pacmanIndex];
+    NSUInteger previousGhost = [_engine ghostIndex];
+    if ([_engine stepInDirection:_direction]) {
+        [_boardView beginMovementFromPacmanIndex:previousPacman
+                                     ghostIndex:previousGhost
+                                      direction:_direction];
+    }
     [self refreshFromEngine];
 }
 
@@ -136,7 +157,10 @@
     (void)sender;
     [_engine newGame];
     _direction = TGPacManDirectionNone;
+    _queuedDirection = TGPacManDirectionNone;
     _paused = NO;
+    [_boardView setFacingDirection:TGPacManDirectionRight];
+    [_boardView resetMovementAnimation];
     [self refreshFromEngine];
     if ([[_boardView window] firstResponder] != _boardView) {
         [[_boardView window] makeFirstResponder:_boardView];
@@ -151,7 +175,7 @@
 
 - (void)startAnimation {
     if (_timer) return;
-    _timer = [[NSTimer scheduledTimerWithTimeInterval:0.16
+    _timer = [[NSTimer scheduledTimerWithTimeInterval:0.04
                                                target:self
                                              selector:@selector(timerFired:)
                                              userInfo:nil

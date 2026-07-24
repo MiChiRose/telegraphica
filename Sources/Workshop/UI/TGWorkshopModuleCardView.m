@@ -48,6 +48,23 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     return nil;
 }
 
+static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
+    if (!source) return nil;
+    NSSize size = [source size];
+    NSImage *result = [[[NSImage alloc] initWithSize:size] autorelease];
+    [result lockFocus];
+    NSAffineTransform *transform = [NSAffineTransform transform];
+    [transform translateXBy:0.0 yBy:size.height];
+    [transform scaleXBy:1.0 yBy:-1.0];
+    [transform concat];
+    [source drawInRect:NSMakeRect(0.0, 0.0, size.width, size.height)
+              fromRect:NSZeroRect
+             operation:NSCompositeSourceOver
+              fraction:1.0];
+    [result unlockFocus];
+    return result;
+}
+
 @implementation TGWorkshopModuleCardView
 
 @synthesize delegate = _delegate;
@@ -117,6 +134,9 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
                                              TGWorkshopCreamColor(),
                                              1.0);
     if (icon) {
+        if ([iconName isEqualToString:@"solitaire"]) {
+            icon = TGWorkshopVerticallyFlippedImage(icon);
+        }
         NSRect iconRect = NSMakeRect(NSMidX(rect) - 20.0, NSMidY(rect) - 20.0, 40.0, 40.0);
         if ([iconName isEqualToString:@"minesweeper"]) {
             NSInteger offsetX;

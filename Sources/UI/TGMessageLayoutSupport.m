@@ -13,7 +13,7 @@
 static CGFloat const TGMessageBubbleMaximumWidth = 500.0;
 static CGFloat const TGMessagePhotoMaximumSide = 320.0;
 static CGFloat const TGOutgoingStatusCheckSide = 10.0;
-static CGFloat const TGOutgoingStatusCheckOverlap = 3.0;
+static CGFloat const TGOutgoingStatusCheckOverlap = 4.0;
 static CGFloat const TGOutgoingStatusCheckInlineFontSize = 12.0;
 
 NSString *TGInitialsForTitle(NSString *title) {
