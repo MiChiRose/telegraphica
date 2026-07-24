@@ -10,7 +10,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (NSString *)tdlibProbeSummaryWithError:(NSError **)error;
 - (NSString *)authorizationStateSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)setLocalTDLibParametersWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (BOOL)hasUsableTDLibConfiguration;
+- (BOOL)hasPotentialTDLibConfigurationSource;
 - (NSString *)localTDLibConfigurationPathWithError:(NSError **)error;
 - (NSString *)checkDatabaseEncryptionKeyWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;

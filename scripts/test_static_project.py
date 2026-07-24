@@ -241,7 +241,7 @@ def check_unified_legacy_contract(errors):
     startup_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
     startup_text = read_text(os.path.join(ROOT, startup_rel))
     for fragment in [
-        "hasUsableTDLibConfiguration",
+        "hasPotentialTDLibConfigurationSource",
         "!parametersConfigurationAvailable",
         "authorization state will be checked again",
     ]:

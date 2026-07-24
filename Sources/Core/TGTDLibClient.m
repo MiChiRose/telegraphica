@@ -1749,9 +1749,23 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
-- (BOOL)hasUsableTDLibConfiguration {
-    NSDictionary *configuration = [self localTDLibConfigurationWithError:NULL];
-    return [self configurationContainsValidAPICredentials:configuration];
+- (BOOL)hasPotentialTDLibConfigurationSource {
+    NSString *configPath = [self localTDLibConfigurationPathWithError:NULL];
+    NSDictionary *localConfiguration = [self tdLibConfigurationAtPath:configPath label:@"Local" error:NULL];
+    if ([self configurationContainsValidAPICredentials:localConfiguration]) {
+        return YES;
+    }
+
+    NSDictionary *bundledConfiguration = TGTDLibRuntimeBundledConfiguration();
+    if ([self configurationContainsValidAPICredentials:bundledConfiguration]) {
+        return YES;
+    }
+
+    NSString *remoteURLString = [self remoteTDLibConfigurationURLString];
+    NSURL *remoteURL = [NSURL URLWithString:remoteURLString];
+    return [remoteURLString length] > 0 &&
+           remoteURL &&
+           [[[remoteURL scheme] lowercaseString] isEqualToString:@"https"];
 }
 
 - (NSString *)stringValueForKey:(NSString *)key inConfiguration:(NSDictionary *)configuration required:(BOOL)required error:(NSError **)error {

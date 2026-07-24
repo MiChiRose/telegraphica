@@ -1517,7 +1517,7 @@
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
                 parametersAttempted = YES;
-                BOOL parametersConfigurationAvailable = [client hasUsableTDLibConfiguration];
+                BOOL parametersConfigurationAvailable = [client hasPotentialTDLibConfigurationSource];
                 parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
                 parametersMissingConfiguration = ([parametersSummary length] == 0 &&
                                                   !parametersConfigurationAvailable);
