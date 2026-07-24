@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.8 through macOS 10.13 on Intel Macs.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.5.1-blue" alt="version v0.5.1" />
+    <img src="https://img.shields.io/badge/version-v0.5.2-blue" alt="version v0.5.2" />
     <img src="https://img.shields.io/badge/macOS-10.8--10.13-black" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -59,7 +59,7 @@ runtime, while Mavericks and newer systems retain the normal feature path.
 
 | macOS version | Telegraphica support began | Architecture | Status |
 | --- | --- | --- | --- |
-| OS X 10.8 Mountain Lion | Unified legacy release | Intel `x86_64` | Supported with Mountain Lion-safe TDLib storage and reduced background work |
+| OS X 10.8 Mountain Lion | v0.5.2 unified legacy release | Intel `x86_64` | Supported with Mountain Lion-safe TDLib storage and reduced background work |
 | OS X 10.9 Mavericks | First public mainline release | Intel `x86_64` | Primary development and HITL platform |
 | OS X 10.10-10.13 | First public mainline release | Intel `x86_64` | Supported by the same unified build |
 | macOS 10.14-10.15 | No formal support milestone | Intel `x86_64` | Unofficial, best effort, not part of regular HITL testing |
@@ -105,7 +105,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Open Beta: `v0.5.1`
+## Current Open Beta: `v0.5.2`
 
 This open beta is ready for broader legacy-Mac testing. Telegraphica is still
 young software, but the everyday loop is now useful enough for real feedback:
@@ -141,6 +141,8 @@ voice messages, and keep the app updated from GitHub Releases.
   support on Mavericks.
 - 🔍 Chat search/navigation with a native search field.
 - 🧽 Storage usage view with cache cleanup.
+- 🧩 Optional Workshop modules that can be installed without increasing the
+  base application download.
 - 🧹 Build/release hygiene scripts for the old-Mac workflow.
 
 ### ⚠️ Known Beta Gaps

@@ -162,7 +162,10 @@ ditto -c -k --norsrc --keepParent "$APP_PATH" "$APP_ZIP"
 
 for artifact in "$DMG_FINAL" "$APP_ZIP"; do
     rm -f "$artifact.sha256"
-    shasum -a 256 "$artifact" > "$artifact.sha256"
+    (
+        cd "$(dirname "$artifact")"
+        shasum -a 256 "$(basename "$artifact")"
+    ) > "$artifact.sha256"
 done
 
 echo
