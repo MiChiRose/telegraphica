@@ -7,6 +7,7 @@
     TGMinesweeperEngine *_engine;
     id<TGWorkshopHostContext> _hostContext;
     NSMutableArray *_cellButtons;
+    NSTextField *_titleField;
     NSTextField *_statusField;
     NSTextField *_mineField;
     NSTextField *_timerField;

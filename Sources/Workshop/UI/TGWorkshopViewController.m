@@ -75,6 +75,7 @@ static NSImage *TGWorkshopBackImage(void) {
         _selectedMode = [TGWorkshopViewModeAvailable copy];
         _progressByIdentifier = [[NSMutableDictionary alloc] init];
         _errorsByIdentifier = [[NSMutableDictionary alloc] init];
+        _installStartDatesByIdentifier = [[NSMutableDictionary alloc] init];
     }
     return self;
 }
@@ -202,6 +203,12 @@ static NSImage *TGWorkshopBackImage(void) {
         NSButton *button = [_modeButtons objectAtIndex:index];
         [button setTitle:[titles objectAtIndex:index]];
         [button setToolTip:[titles objectAtIndex:index]];
+        NSArray *icons = [NSArray arrayWithObjects:@"appstore", @"bookmark-plus", @"apple-store", nil];
+        [button setImage:TGTemplateIconAssetImage([icons objectAtIndex:index],
+                                                  NSMakeSize(16.0, 16.0),
+                                                  TGClassicHeaderTextColor(1.0),
+                                                  1.0)];
+        [button setImagePosition:NSImageLeft];
     }
     [_categoryField setStringValue:TGLoc(@"workshop.games")];
     [_backButton setToolTip:TGLoc(@"back")];
@@ -291,6 +298,53 @@ static NSImage *TGWorkshopBackImage(void) {
     [self refreshTheme];
 }
 
+- (TGWorkshopModuleCardView *)cardViewForModuleIdentifier:(NSString *)identifier {
+    if ([identifier length] == 0) return nil;
+    for (NSView *view in [_contentView subviews]) {
+        if ([view isKindOfClass:[TGWorkshopModuleCardView class]]) {
+            TGWorkshopModuleCardView *card = (TGWorkshopModuleCardView *)view;
+            if ([[[card entry] moduleIdentifier] isEqualToString:identifier]) {
+                return card;
+            }
+        }
+    }
+    return nil;
+}
+
+- (void)finishInstalledCardForIdentifier:(NSString *)identifier {
+    TGWorkshopModuleCardView *card = [self cardViewForModuleIdentifier:identifier];
+    if (!card) {
+        [self rebuildCards];
+        return;
+    }
+
+    CGFloat shift = NSHeight([card frame]) + 10.0;
+    CGFloat removedY = NSMinY([card frame]);
+    [NSAnimationContext beginGrouping];
+    [[NSAnimationContext currentContext] setDuration:0.38];
+    [[card animator] setAlphaValue:0.0];
+    for (NSView *view in [_contentView subviews]) {
+        if (view != card &&
+            [view isKindOfClass:[TGWorkshopModuleCardView class]] &&
+            NSMinY([view frame]) > removedY) {
+            NSRect frame = [view frame];
+            frame.origin.y -= shift;
+            [[view animator] setFrame:frame];
+        }
+    }
+    [NSAnimationContext endGrouping];
+    [self performSelector:@selector(rebuildCardsAfterAnimation:)
+               withObject:nil
+               afterDelay:0.42];
+    [_installStartDatesByIdentifier removeObjectForKey:identifier];
+    [_progressByIdentifier removeObjectForKey:identifier];
+}
+
+- (void)rebuildCardsAfterAnimation:(id)unused {
+    (void)unused;
+    [self rebuildCards];
+}
+
 - (void)backAction:(id)sender {
     (void)sender;
     if (_activeModuleViewController) {
@@ -342,6 +396,7 @@ static NSImage *TGWorkshopBackImage(void) {
         action == TGWorkshopModuleCardActionRetry) {
         [_errorsByIdentifier removeObjectForKey:identifier];
         [_progressByIdentifier setObject:[NSNumber numberWithDouble:0.0] forKey:identifier];
+        [_installStartDatesByIdentifier setObject:[NSDate date] forKey:identifier];
         [_coordinator installOrUpdateEntry:entry];
     } else if (action == TGWorkshopModuleCardActionOpen) {
         [_coordinator openEntry:entry];
@@ -358,7 +413,23 @@ static NSImage *TGWorkshopBackImage(void) {
     if (identifier) {
         [_progressByIdentifier setObject:[NSNumber numberWithDouble:progress] forKey:identifier];
     }
-    [self rebuildCards];
+    TGWorkshopModuleCardView *card = [self cardViewForModuleIdentifier:identifier];
+    if (card) {
+        [card updateProgress:progress];
+    } else {
+        [self rebuildCards];
+    }
+}
+
+- (void)workshopCoordinatorDidCompleteInstallationForModuleIdentifier:(NSString *)identifier {
+    TGWorkshopModuleCardView *card = [self cardViewForModuleIdentifier:identifier];
+    [card showInstallSuccess];
+    NSDate *startedAt = [_installStartDatesByIdentifier objectForKey:identifier];
+    NSTimeInterval elapsed = startedAt ? -[startedAt timeIntervalSinceNow] : 0.0;
+    NSTimeInterval delay = MAX(0.9, 2.0 - elapsed);
+    [self performSelector:@selector(finishInstalledCardForIdentifier:)
+               withObject:identifier
+               afterDelay:delay];
 }
 
 - (void)workshopCoordinatorDidFailWithError:(NSError *)error moduleIdentifier:(NSString *)identifier {
@@ -394,6 +465,7 @@ static NSImage *TGWorkshopBackImage(void) {
 }
 
 - (void)dealloc {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
     [_coordinator setDelegate:nil];
     [_coordinator closeActiveModule];
     [_coordinator release];
@@ -409,6 +481,7 @@ static NSImage *TGWorkshopBackImage(void) {
     [_selectedMode release];
     [_progressByIdentifier release];
     [_errorsByIdentifier release];
+    [_installStartDatesByIdentifier release];
     [super dealloc];
 }
 

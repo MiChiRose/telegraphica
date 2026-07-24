@@ -4,6 +4,7 @@
 #import "../../WorkshopModules/Minesweeper/TGMinesweeperEngine.h"
 #import "../../WorkshopModules/Checkers/TGCheckersEngine.h"
 #import "../../WorkshopModules/Solitaire/TGSolitaireEngine.h"
+#import "../../WorkshopModules/PacMan/TGPacManEngine.h"
 
 static NSUInteger TGTestsRun = 0;
 static NSUInteger TGTestsFailed = 0;
@@ -334,12 +335,34 @@ static void TGTestSaveStore(void) {
              @"Game save store clears only its module directory.");
 }
 
+static void TGTestPacMan(void) {
+    TGPacManEngine *engine = [[[TGPacManEngine alloc] init] autorelease];
+    TGAssert([engine width] == 19 && [engine height] == 15,
+             @"Pac-Man builds the expected compact maze.");
+    NSUInteger pellets = [engine pelletCount];
+    TGAssert([engine stepInDirection:TGPacManDirectionLeft] &&
+             [engine pelletCount] + 1 == pellets &&
+             [engine score] == 10,
+             @"Pac-Man moves through the maze and consumes a pellet.");
+    TGAssert(![engine stepInDirection:TGPacManDirectionDown],
+             @"Pac-Man refuses to cross a wall.");
+    NSDictionary *saved = [engine dictionaryRepresentation];
+    TGPacManEngine *restored = [[[TGPacManEngine alloc] init] autorelease];
+    TGAssert([restored restoreFromDictionary:saved] &&
+             [restored pacmanIndex] == [engine pacmanIndex] &&
+             [restored pelletCount] == [engine pelletCount],
+             @"Pac-Man restores saved progress.");
+    TGAssert(![restored restoreFromDictionary:[NSDictionary dictionary]],
+             @"Pac-Man rejects malformed saves.");
+}
+
 int main(void) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     TGTestTicTacToe();
     TGTestMinesweeper();
     TGTestCheckers();
     TGTestSolitaire();
+    TGTestPacMan();
     TGTestSaveStore();
     printf("Workshop game tests: %lu assertions, %lu failures\n",
            (unsigned long)TGTestsRun, (unsigned long)TGTestsFailed);

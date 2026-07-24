@@ -12,9 +12,9 @@
 
 static CGFloat const TGMessageBubbleMaximumWidth = 500.0;
 static CGFloat const TGMessagePhotoMaximumSide = 320.0;
-static CGFloat const TGOutgoingStatusDotSide = 6.0;
-static CGFloat const TGOutgoingStatusDotGap = 3.0;
-static CGFloat const TGOutgoingStatusDotInlineFontSize = 12.0;
+static CGFloat const TGOutgoingStatusCheckSide = 10.0;
+static CGFloat const TGOutgoingStatusCheckOverlap = 3.0;
+static CGFloat const TGOutgoingStatusCheckInlineFontSize = 12.0;
 
 NSString *TGInitialsForTitle(NSString *title) {
     if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
@@ -1125,7 +1125,7 @@ CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
     if ([item isKindOfClass:[TGMessageItem class]] && [item failedToSend]) {
         return 12.0;
     }
-    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? ((TGOutgoingStatusDotSide * 2.0) + TGOutgoingStatusDotGap) : 0.0;
+    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? ((TGOutgoingStatusCheckSide * 2.0) - TGOutgoingStatusCheckOverlap) : 0.0;
 }
 
 CGFloat TGComposerMinimumInputHeight(void) {
@@ -1148,16 +1148,10 @@ NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item) {
         return @"!";
     }
 
-    BOOL delivered = ![item sending];
-    BOOL read = delivered && [item outgoingRead];
-    unichar chars[2];
-    chars[0] = delivered ? 0x25CF : 0x25CB;
-    chars[1] = read ? 0x25CF : 0x25CB;
-    return [NSString stringWithCharacters:chars length:2];
+    return @"✓✓";
 }
 
 void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL flipped) {
-    (void)flipped;
     if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing] || NSIsEmptyRect(timeRect)) {
         return;
     }
@@ -1172,26 +1166,18 @@ void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL 
         return;
     }
 
-    CGFloat dotSide = TGOutgoingStatusDotSide;
-    CGFloat dotGap = TGOutgoingStatusDotGap;
-    CGFloat dotX = NSMaxX(timeRect) + 4.0;
-    CGFloat dotY = NSMinY(timeRect) + floor((NSHeight(timeRect) - dotSide) / 2.0) + 1.0;
-    NSColor *strokeColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.72];
-    NSColor *fillColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.86];
-    BOOL delivered = ![item sending];
-    BOOL read = delivered && [item outgoingRead];
+    CGFloat checkSide = TGOutgoingStatusCheckSide;
+    CGFloat checkStep = checkSide - TGOutgoingStatusCheckOverlap;
+    CGFloat checkX = NSMaxX(timeRect) + 4.0;
+    CGFloat checkY = NSMinY(timeRect) + floor((NSHeight(timeRect) - checkSide) / 2.0) + 1.0;
+    BOOL read = ![item sending] && [item outgoingRead];
+    CGFloat alpha = [item sending] ? 0.42 : (read ? 0.90 : 0.62);
+    NSColor *checkColor = [NSColor colorWithCalibratedWhite:(read ? 0.36 : 0.60) alpha:alpha];
 
     NSUInteger index = 0;
     for (index = 0; index < 2; index++) {
-        NSRect dotRect = NSMakeRect(dotX + ((dotSide + dotGap) * (CGFloat)index), dotY, dotSide, dotSide);
-        NSBezierPath *dotPath = [NSBezierPath bezierPathWithOvalInRect:dotRect];
-        if ((index == 0 && delivered) || (index == 1 && read)) {
-            [fillColor set];
-            [dotPath fill];
-        }
-        [strokeColor set];
-        [dotPath setLineWidth:0.8];
-        [dotPath stroke];
+        NSRect checkRect = NSMakeRect(checkX + (checkStep * (CGFloat)index), checkY, checkSide, checkSide);
+        TGDrawTemplateIconAsset(@"done-mini", checkRect, checkColor, 1.0, flipped);
     }
 }
 
@@ -1333,7 +1319,10 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:TGOutgoingStatusDotInlineFontSize] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:TGOutgoingStatusCheckInlineFontSize] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:([item outgoingRead] ? 0.36 : 0.60)
+                                                                      alpha:([item outgoingRead] ? 0.90 : 0.62)]
+                                     forKey:NSForegroundColorAttributeName];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@" %@", statusDots]
                                                                                         attributes:statusAttributes] autorelease];
                 [composedText appendAttributedString:statusSuffixText];
@@ -1404,8 +1393,10 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
             if ([statusDots length] > 0) {
                 NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:TGOutgoingStatusDotInlineFontSize] forKey:NSFontAttributeName];
-                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
+                [statusAttributes setObject:[NSFont boldSystemFontOfSize:TGOutgoingStatusCheckInlineFontSize] forKey:NSFontAttributeName];
+                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:([item outgoingRead] ? 0.36 : 0.60)
+                                                                      alpha:([item outgoingRead] ? 0.90 : 0.62)]
+                                     forKey:NSForegroundColorAttributeName];
                 NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
                 NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
                 [composedMessageText appendAttributedString:statusSuffixText];

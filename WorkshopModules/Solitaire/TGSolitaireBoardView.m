@@ -24,6 +24,11 @@ static const CGFloat TGSolitaireFaceUpOffset = 27.0;
         _engine = [engine retain];
         _themeColors = [colors copy];
         _dragSource = TGSolitaireSourceNone;
+        NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+        NSString *cardBackPath = [bundle pathForResource:@"card-back" ofType:@"png"];
+        if ([cardBackPath length] > 0) {
+            _cardBackImage = [[NSImage alloc] initWithContentsOfFile:cardBackPath];
+        }
         [self setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
     }
     return self;
@@ -92,16 +97,28 @@ static const CGFloat TGSolitaireFaceUpOffset = 27.0;
     [shadow set];
     NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:6 yRadius:6];
     if (!faceUp) {
-        [[NSColor colorWithCalibratedRed:0.18 green:0.39 blue:0.62 alpha:1.0] setFill];
+        [[NSColor colorWithCalibratedRed:0.48 green:0.05 blue:0.10 alpha:1.0] setFill];
         [path fill];
-        [[NSColor colorWithCalibratedRed:0.77 green:0.88 blue:0.96 alpha:1.0] setStroke];
+        [[NSColor colorWithCalibratedRed:0.95 green:0.78 blue:0.34 alpha:1.0] setStroke];
         [path setLineWidth:2.0];
         [path stroke];
-        NSRect inner = NSInsetRect(rect, 7, 7);
-        NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:inner xRadius:4 yRadius:4];
-        [[NSColor colorWithCalibratedWhite:1 alpha:0.22] setStroke];
-        [innerPath setLineWidth:1.0];
-        [innerPath stroke];
+        if (_cardBackImage) {
+            [NSGraphicsContext saveGraphicsState];
+            [path addClip];
+            [_cardBackImage drawInRect:NSInsetRect(rect, 3.0, 3.0)
+                              fromRect:NSZeroRect
+                             operation:NSCompositeSourceOver
+                              fraction:1.0
+                        respectFlipped:NO
+                                 hints:nil];
+            [NSGraphicsContext restoreGraphicsState];
+        } else {
+            NSRect inner = NSInsetRect(rect, 7, 7);
+            NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:inner xRadius:4 yRadius:4];
+            [[NSColor colorWithCalibratedWhite:1 alpha:0.22] setStroke];
+            [innerPath setLineWidth:1.0];
+            [innerPath stroke];
+        }
     } else {
         [[NSColor colorWithCalibratedWhite:0.98 alpha:1.0] setFill];
         [path fill];
@@ -301,6 +318,7 @@ static const CGFloat TGSolitaireFaceUpOffset = 27.0;
 }
 
 - (void)dealloc {
+    [_cardBackImage release];
     [_engine release];
     [_themeColors release];
     [super dealloc];

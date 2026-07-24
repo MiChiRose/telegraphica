@@ -11,6 +11,7 @@
     NSInteger _dragCardIndex;
     NSPoint _dragPoint;
     BOOL _dragging;
+    NSImage *_cardBackImage;
 }
 
 - (id)initWithFrame:(NSRect)frame engine:(TGSolitaireEngine *)engine themeColors:(NSDictionary *)colors;

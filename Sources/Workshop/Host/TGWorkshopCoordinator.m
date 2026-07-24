@@ -16,6 +16,39 @@ static NSString * const TGWorkshopModeAvailable = @"available";
 static NSString * const TGWorkshopModeInstalled = @"installed";
 static NSString * const TGWorkshopModeUpdates = @"updates";
 
+static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identifier,
+                                                                 NSDictionary *record) {
+    if ([identifier length] == 0 || ![record isKindOfClass:[NSDictionary class]]) return nil;
+    NSString *version = [record objectForKey:@"active_version"];
+    if ([version length] == 0) return nil;
+    NSString *name = [identifier hasSuffix:@".pacman"] ? @"Pac-Man" : [identifier lastPathComponent];
+    NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:
+                                identifier, @"id",
+                                name, @"name",
+                                [NSDictionary dictionaryWithObjectsAndKeys:name, @"en", name, @"ru", nil], @"localized_name",
+                                [NSDictionary dictionaryWithObjectsAndKeys:@"Installed Workshop module.", @"en",
+                                 @"Установленный модуль Мастерской.", @"ru", nil], @"description",
+                                version, @"version",
+                                @1, @"api_version",
+                                @"0.5.1", @"minimum_app_version",
+                                @"10.9", @"minimum_os_version",
+                                [NSArray arrayWithObject:@"x86_64"], @"architectures",
+                                @"games", @"category",
+                                @1, @"archive_size",
+                                @1, @"unpacked_size",
+                                @1, @"entry_count",
+                                @"0000000000000000000000000000000000000000000000000000000000000000", @"sha256",
+                                [NSDictionary dictionaryWithObjectsAndKeys:@"local-installed", @"key_id",
+                                 @"rsa-pkcs1-sha256", @"algorithm", @"local", @"value", nil], @"signature",
+                                @"https://localhost/installed-workshop-module.zip", @"download_url",
+                                @"https://localhost/installed-workshop-module.png", @"icon_url",
+                                [NSDictionary dictionaryWithObjectsAndKeys:@"Installed locally.", @"en",
+                                 @"Установлено локально.", @"ru", nil], @"changelog",
+                                [NSArray arrayWithObjects:@"module-data", @"host-notifications", nil], @"permissions",
+                                nil];
+    return [[[TGWorkshopCatalogEntry alloc] initWithDictionary:dictionary error:NULL] autorelease];
+}
+
 @implementation TGWorkshopCoordinator
 
 @synthesize delegate = _delegate;
@@ -84,8 +117,10 @@ static NSString * const TGWorkshopModeUpdates = @"updates";
 
 - (NSArray *)entriesForMode:(NSString *)mode {
     NSMutableArray *result = [NSMutableArray array];
+    NSMutableSet *catalogIdentifiers = [NSMutableSet set];
     TGWorkshopCatalogEntry *entry = nil;
     for (entry in [_catalog entries]) {
+        [catalogIdentifiers addObject:[entry moduleIdentifier]];
         NSDictionary *record = [_registryStore recordForModuleIdentifier:[entry moduleIdentifier]];
         NSString *installedVersion = [record objectForKey:@"active_version"];
         BOOL installed = ([installedVersion length] > 0 && ![[record objectForKey:@"pending_removal"] boolValue]);
@@ -94,6 +129,18 @@ static NSString * const TGWorkshopModeUpdates = @"updates";
             ([mode isEqualToString:TGWorkshopModeInstalled] && installed) ||
             ([mode isEqualToString:TGWorkshopModeUpdates] && update)) {
             [result addObject:entry];
+        }
+    }
+    if ([mode isEqualToString:TGWorkshopModeInstalled]) {
+        NSString *identifier = nil;
+        for (identifier in [_registryStore installedModuleIdentifiers]) {
+            if ([catalogIdentifiers containsObject:identifier]) continue;
+            NSDictionary *record = [_registryStore recordForModuleIdentifier:identifier];
+            BOOL installed = [[[record objectForKey:@"active_version"] description] length] > 0 &&
+                             ![[record objectForKey:@"pending_removal"] boolValue];
+            if (!installed) continue;
+            TGWorkshopCatalogEntry *fallbackEntry = TGWorkshopInstalledFallbackEntry(identifier, record);
+            if (fallbackEntry) [result addObject:fallbackEntry];
         }
     }
     return result;
@@ -124,8 +171,11 @@ static NSString * const TGWorkshopModeUpdates = @"updates";
         [blockSelf->_busyModuleIdentifiers removeObject:identifier];
         if (!installed) {
             [blockSelf->_delegate workshopCoordinatorDidFailWithError:installError moduleIdentifier:identifier];
+            [blockSelf->_delegate workshopCoordinatorDidReload];
+        } else {
+            [blockSelf->_delegate workshopCoordinatorDidUpdateProgress:1.0 moduleIdentifier:identifier];
+            [blockSelf->_delegate workshopCoordinatorDidCompleteInstallationForModuleIdentifier:identifier];
         }
-        [blockSelf->_delegate workshopCoordinatorDidReload];
     }];
 }
 

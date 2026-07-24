@@ -27,11 +27,13 @@ typedef enum {
     NSTextField *_detailsField;
     NSTextField *_statusField;
     NSProgressIndicator *_progressIndicator;
+    NSImageView *_successImageView;
     NSButton *_primaryButton;
     NSButton *_removeButton;
     BOOL _busy;
     double _progress;
     NSString *_errorMessage;
+    BOOL _showingSuccess;
 }
 
 @property(nonatomic, assign) id<TGWorkshopModuleCardViewDelegate> delegate;
@@ -43,5 +45,7 @@ typedef enum {
                         errorMessage:(NSString *)errorMessage;
 - (void)refreshTheme;
 - (void)refreshLocalization;
+- (void)updateProgress:(double)progress;
+- (void)showInstallSuccess;
 
 @end

@@ -2,6 +2,26 @@
 #import "TGCheckersBoardView.h"
 #import "../Common/TGGameUI.h"
 
+@class TGCheckersViewController;
+
+@interface TGCheckersRootView : TGWorkshopGameSurfaceView {
+    TGCheckersViewController *_layoutOwner;
+}
+@property(nonatomic, assign) TGCheckersViewController *layoutOwner;
+@end
+
+@interface TGCheckersViewController ()
+- (void)layoutGame;
+@end
+
+@implementation TGCheckersRootView
+@synthesize layoutOwner = _layoutOwner;
+- (void)setFrameSize:(NSSize)newSize {
+    [super setFrameSize:newSize];
+    [_layoutOwner layoutGame];
+}
+@end
+
 @implementation TGCheckersViewController
 
 - (id)initWithEngine:(TGCheckersEngine *)engine hostContext:(id<TGWorkshopHostContext>)context {
@@ -14,43 +34,68 @@
 }
 
 - (void)loadView {
-    TGWorkshopGameSurfaceView *root = [[[TGWorkshopGameSurfaceView alloc] initWithFrame:NSMakeRect(0, 0, 720, 620)] autorelease];
+    TGCheckersRootView *root = [[[TGCheckersRootView alloc] initWithFrame:NSMakeRect(0, 0, 720, 620)] autorelease];
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root setLayoutOwner:self];
     [self setView:root];
 
-    _statusField = [TGGameLabel(NSMakeRect(24, 574, 300, 24), 15.0, YES, _hostContext) retain];
-    [_statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    _statusField = [TGGameLabel(NSZeroRect, 15.0, YES, _hostContext) retain];
+    [_statusField setAlignment:NSCenterTextAlignment];
     [root addSubview:_statusField];
 
-    _scoreField = [TGGameLabel(NSMakeRect(24, 550, 300, 20), 11.0, NO, _hostContext) retain];
-    [_scoreField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    _scoreField = [TGGameLabel(NSZeroRect, 11.0, NO, _hostContext) retain];
+    [_scoreField setAlignment:NSCenterTextAlignment];
     [root addSubview:_scoreField];
 
-    _modeButton = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(416, 570, 144, 28) pullsDown:NO];
+    _modeButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
     [_modeButton addItemsWithTitles:
      [NSArray arrayWithObjects:
       [_hostContext localizedStringForKey:@"game.computer" fallback:@"Computer"],
       [_hostContext localizedStringForKey:@"game.twoPlayers" fallback:@"Two players"], nil]];
     [_modeButton setTarget:self];
     [_modeButton setAction:@selector(modeChanged:)];
-    [_modeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:_modeButton];
 
-    _restartButton = [TGGameThemedButton(NSMakeRect(570, 568, 126, 32),
+    _restartButton = [TGGameThemedButton(NSZeroRect,
                                         [_hostContext localizedStringForKey:@"checkers.new_game" fallback:@"New game"],
                                         @"refresh",
                                         _hostContext) retain];
     [_restartButton setTarget:self];
     [_restartButton setAction:@selector(restart:)];
-    [_restartButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:_restartButton];
 
-    _boardView = [[TGCheckersBoardView alloc] initWithFrame:NSMakeRect(20, 20, 680, 520)
+    _boardView = [[TGCheckersBoardView alloc] initWithFrame:NSZeroRect
                                                      engine:_engine
                                                 themeColors:[_hostContext themeColors]];
     [_boardView setTarget:self action:@selector(boardMoved:)];
     [root addSubview:_boardView];
+    [self layoutGame];
     [self refreshFromEngine];
+}
+
+- (void)layoutGame {
+    if (!_boardView) return;
+    NSRect bounds = [[self view] bounds];
+    CGFloat width = NSWidth(bounds);
+    CGFloat height = NSHeight(bounds);
+    CGFloat contentWidth = MIN(660.0, MAX(320.0, width - 28.0));
+    CGFloat contentX = floor((width - contentWidth) / 2.0);
+    [_statusField setFrame:NSMakeRect(contentX, height - 34.0, contentWidth, 22.0)];
+    [_scoreField setFrame:NSMakeRect(contentX, height - 54.0, contentWidth, 18.0)];
+
+    CGFloat controlsWidth = MIN(304.0, contentWidth);
+    CGFloat controlsX = floor((width - controlsWidth) / 2.0);
+    [_modeButton setFrame:NSMakeRect(controlsX, 16.0, 148.0, 28.0)];
+    [_restartButton setFrame:NSMakeRect(controlsX + 156.0, 14.0, 148.0, 32.0)];
+
+    CGFloat boardAreaBottom = 56.0;
+    CGFloat boardAreaTop = height - 64.0;
+    CGFloat boardSide = floor(MIN(width - 30.0, boardAreaTop - boardAreaBottom));
+    boardSide = MIN(boardSide, 544.0);
+    boardSide = MAX(260.0, boardSide);
+    CGFloat boardX = floor((width - boardSide) / 2.0);
+    CGFloat boardY = floor(boardAreaBottom + (boardAreaTop - boardAreaBottom - boardSide) / 2.0);
+    [_boardView setFrame:NSMakeRect(boardX, boardY, boardSide, boardSide)];
 }
 
 - (void)refreshFromEngine {

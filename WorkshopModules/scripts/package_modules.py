@@ -47,6 +47,13 @@ MODULES = {
         "en_description": "Classic draw-one Klondike with undo and saved progress.",
         "ru_description": "Классическая «Косынка» по одной карте с отменой хода и сохранением.",
     },
+    "PacMan": {
+        "id": "com.michirose.telegraphica.workshop.pacman",
+        "name": "Pac-Man",
+        "ru_name": "Pac-Man",
+        "en_description": "A lightweight native maze chase for classic Macs.",
+        "ru_description": "Лёгкая нативная погоня по лабиринту для старых Mac.",
+    },
 }
 
 

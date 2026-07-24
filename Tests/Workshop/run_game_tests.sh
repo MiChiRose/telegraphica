@@ -17,6 +17,7 @@ clang \
   "$ROOT/WorkshopModules/Minesweeper/TGMinesweeperEngine.m" \
   "$ROOT/WorkshopModules/Checkers/TGCheckersEngine.m" \
   "$ROOT/WorkshopModules/Solitaire/TGSolitaireEngine.m" \
+  "$ROOT/WorkshopModules/PacMan/TGPacManEngine.m" \
   -o "$BUILD_DIR/TGWorkshopGameTests"
 
 "$BUILD_DIR/TGWorkshopGameTests"

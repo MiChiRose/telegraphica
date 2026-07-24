@@ -7,6 +7,7 @@
     TGTicTacToeEngine *_engine;
     id<TGWorkshopHostContext> _hostContext;
     NSArray *_boardButtons;
+    NSTextField *_titleField;
     NSTextField *_statusField;
     NSTextField *_scoreField;
     NSPopUpButton *_modeButton;

@@ -53,6 +53,9 @@ build_module() {
     chmod 755 "$executable"
     cp "$module_dir/Info.plist" "$bundle_dir/Contents/Info.plist"
     cp "$module_dir/WorkshopModule.plist" "$resources_dir/WorkshopModule.plist"
+    if [ -d "$module_dir/Resources" ]; then
+        cp -R "$module_dir/Resources/." "$resources_dir/"
+    fi
 
     if [ ! -x "$executable" ]; then
         echo "Missing bundle executable for $module_name" >&2
@@ -69,5 +72,6 @@ build_module "TicTacToe" "TGTicTacToeModule"
 build_module "Minesweeper" "TGMinesweeperModule"
 build_module "Checkers" "TGCheckersModule"
 build_module "Solitaire" "TGSolitaireModule"
+build_module "PacMan" "TGPacManModule"
 
 echo "Workshop modules are ready in $PRODUCT_ROOT"

@@ -1,6 +1,26 @@
 #import "TGTicTacToeViewController.h"
 #import "../Common/TGGameUI.h"
 
+@class TGTicTacToeViewController;
+
+@interface TGTicTacToeRootView : TGWorkshopGameSurfaceView {
+    TGTicTacToeViewController *_layoutOwner;
+}
+@property(nonatomic, assign) TGTicTacToeViewController *layoutOwner;
+@end
+
+@interface TGTicTacToeViewController ()
+- (void)layoutGame;
+@end
+
+@implementation TGTicTacToeRootView
+@synthesize layoutOwner = _layoutOwner;
+- (void)setFrameSize:(NSSize)newSize {
+    [super setFrameSize:newSize];
+    [_layoutOwner layoutGame];
+}
+@end
+
 @interface TGTicTacToeSquareCell : NSButtonCell
 @end
 
@@ -52,21 +72,22 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
 }
 
 - (void)loadView {
-    TGWorkshopGameSurfaceView *root = [[[TGWorkshopGameSurfaceView alloc] initWithFrame:NSMakeRect(0, 0, 700, 520)] autorelease];
+    TGTicTacToeRootView *root = [[[TGTicTacToeRootView alloc] initWithFrame:NSMakeRect(0, 0, 700, 520)] autorelease];
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root setLayoutOwner:self];
     [self setView:root];
 
-    NSTextField *title = TGTicTacToeLabel(NSMakeRect(190, 20, 320, 30),
-                                          [_hostContext interfaceFontOfSize:20.0 bold:YES]);
-    [title setStringValue:[_hostContext localizedStringForKey:@"tictactoe.title" fallback:@"Tic-Tac-Toe"]];
-    [title setTextColor:TGWorkshopCreamColor()];
-    [root addSubview:title];
+    _titleField = [TGTicTacToeLabel(NSZeroRect,
+                                    [_hostContext interfaceFontOfSize:20.0 bold:YES]) retain];
+    [_titleField setStringValue:[_hostContext localizedStringForKey:@"tictactoe.title" fallback:@"Tic-Tac-Toe"]];
+    [_titleField setTextColor:TGWorkshopCreamColor()];
+    [root addSubview:_titleField];
 
-    _statusField = [TGTicTacToeLabel(NSMakeRect(170, 55, 360, 22),
+    _statusField = [TGTicTacToeLabel(NSZeroRect,
                                      [_hostContext interfaceFontOfSize:13.0 bold:YES]) retain];
     [_statusField setTextColor:TGWorkshopGoldColor()];
     [root addSubview:_statusField];
-    _scoreField = [TGTicTacToeLabel(NSMakeRect(170, 82, 360, 20),
+    _scoreField = [TGTicTacToeLabel(NSZeroRect,
                                     [_hostContext interfaceFontOfSize:11.0 bold:NO]) retain];
     [_scoreField setTextColor:TGWorkshopMutedCreamColor()];
     [root addSubview:_scoreField];
@@ -74,12 +95,7 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     NSMutableArray *buttons = [NSMutableArray array];
     NSUInteger index = 0;
     for (index = 0; index < 9; index++) {
-        NSUInteger row = index / 3;
-        NSUInteger column = index % 3;
-        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(226 + column * 83,
-                                                                       120 + row * 88,
-                                                                       80,
-                                                                       80)] autorelease];
+        NSButton *button = [[[NSButton alloc] initWithFrame:NSZeroRect] autorelease];
         TGTicTacToeSquareCell *cell = [[[TGTicTacToeSquareCell alloc] initTextCell:@""] autorelease];
         [cell setButtonType:NSMomentaryPushInButton];
         [button setCell:cell];
@@ -89,20 +105,19 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
         [button setFont:[_hostContext interfaceFontOfSize:30.0 bold:YES]];
         [button setTarget:self];
         [button setAction:@selector(squarePressed:)];
-        [button setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin)];
         [root addSubview:button];
         [buttons addObject:button];
     }
     _boardButtons = [buttons copy];
 
-    _modeButton = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(145, 405, 170, 26) pullsDown:NO];
+    _modeButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
     [_modeButton addItemWithTitle:[_hostContext localizedStringForKey:@"game.twoPlayers" fallback:@"Two players"]];
     [_modeButton addItemWithTitle:[_hostContext localizedStringForKey:@"game.computer" fallback:@"Computer"]];
     [_modeButton setTarget:self];
     [_modeButton setAction:@selector(settingsChanged:)];
     [root addSubview:_modeButton];
 
-    _difficultyButton = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(325, 405, 150, 26) pullsDown:NO];
+    _difficultyButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
     [_difficultyButton addItemWithTitle:[_hostContext localizedStringForKey:@"game.easy" fallback:@"Easy"]];
     [_difficultyButton addItemWithTitle:[_hostContext localizedStringForKey:@"game.medium" fallback:@"Medium"]];
     [_difficultyButton addItemWithTitle:[_hostContext localizedStringForKey:@"game.hard" fallback:@"Hard"]];
@@ -110,7 +125,7 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     [_difficultyButton setAction:@selector(settingsChanged:)];
     [root addSubview:_difficultyButton];
 
-    _newRoundButton = [TGGameThemedButton(NSMakeRect(485, 403, 120, 30),
+    _newRoundButton = [TGGameThemedButton(NSZeroRect,
                                            [_hostContext localizedStringForKey:@"game.newRound" fallback:@"New round"],
                                            @"refresh",
                                            _hostContext) retain];
@@ -118,7 +133,52 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     [_newRoundButton setAction:@selector(newRound:)];
     [root addSubview:_newRoundButton];
 
+    [self layoutGame];
     [self refreshFromEngine];
+}
+
+- (void)layoutGame {
+    if (!_titleField || [_boardButtons count] != 9) return;
+    NSRect bounds = [[self view] bounds];
+    CGFloat width = NSWidth(bounds);
+    CGFloat height = NSHeight(bounds);
+    CGFloat contentWidth = MIN(620.0, MAX(320.0, width - 28.0));
+    CGFloat contentX = floor((width - contentWidth) / 2.0);
+
+    [_titleField setFrame:NSMakeRect(contentX, height - 42.0, contentWidth, 28.0)];
+    [_statusField setFrame:NSMakeRect(contentX, height - 66.0, contentWidth, 20.0)];
+    [_scoreField setFrame:NSMakeRect(contentX, height - 87.0, contentWidth, 18.0)];
+
+    CGFloat controlsWidth = MIN(456.0, contentWidth);
+    CGFloat controlsX = floor((width - controlsWidth) / 2.0);
+    CGFloat modeWidth = MIN(170.0, floor(controlsWidth * 0.37));
+    CGFloat difficultyWidth = MIN(150.0, floor(controlsWidth * 0.32));
+    CGFloat buttonWidth = controlsWidth - modeWidth - difficultyWidth - 16.0;
+    [_modeButton setFrame:NSMakeRect(controlsX, 18.0, modeWidth, 28.0)];
+    [_difficultyButton setFrame:NSMakeRect(controlsX + modeWidth + 8.0, 18.0,
+                                           difficultyWidth, 28.0)];
+    [_newRoundButton setFrame:NSMakeRect(controlsX + modeWidth + difficultyWidth + 16.0,
+                                         16.0, buttonWidth, 32.0)];
+
+    CGFloat boardTop = height - 100.0;
+    CGFloat boardBottom = 62.0;
+    CGFloat availableBoardHeight = MAX(180.0, boardTop - boardBottom);
+    CGFloat cellSide = floor(MIN(82.0, (availableBoardHeight - 4.0) / 3.0));
+    cellSide = MAX(54.0, cellSide);
+    CGFloat cellGap = 2.0;
+    CGFloat boardSide = cellSide * 3.0 + cellGap * 2.0;
+    CGFloat boardX = floor((width - boardSide) / 2.0);
+    CGFloat boardY = floor(boardBottom + (availableBoardHeight - boardSide) / 2.0);
+    NSUInteger index = 0;
+    for (index = 0; index < 9; index++) {
+        NSUInteger row = index / 3;
+        NSUInteger column = index % 3;
+        NSButton *button = [_boardButtons objectAtIndex:index];
+        [button setFrame:NSMakeRect(boardX + column * (cellSide + cellGap),
+                                    boardY + (2 - row) * (cellSide + cellGap),
+                                    cellSide,
+                                    cellSide)];
+    }
 }
 
 - (void)refreshFromEngine {
@@ -193,6 +253,7 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     [_engine release];
     [_hostContext release];
     [_boardButtons release];
+    [_titleField release];
     [_statusField release];
     [_scoreField release];
     [_modeButton release];

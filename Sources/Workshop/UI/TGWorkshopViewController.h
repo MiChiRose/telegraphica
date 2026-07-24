@@ -28,6 +28,7 @@
     NSString *_selectedMode;
     NSMutableDictionary *_progressByIdentifier;
     NSMutableDictionary *_errorsByIdentifier;
+    NSMutableDictionary *_installStartDatesByIdentifier;
     BOOL _started;
 }
 

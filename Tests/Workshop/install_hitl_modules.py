@@ -14,6 +14,7 @@ MODULES = (
     ("Minesweeper", "com.michirose.telegraphica.workshop.minesweeper"),
     ("Checkers", "com.michirose.telegraphica.workshop.checkers"),
     ("Solitaire", "com.michirose.telegraphica.workshop.solitaire"),
+    ("PacMan", "com.michirose.telegraphica.workshop.pacman"),
 )
 
 

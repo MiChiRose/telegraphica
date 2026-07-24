@@ -9,6 +9,7 @@
 @protocol TGWorkshopCoordinatorDelegate <NSObject>
 - (void)workshopCoordinatorDidReload;
 - (void)workshopCoordinatorDidUpdateProgress:(double)progress moduleIdentifier:(NSString *)identifier;
+- (void)workshopCoordinatorDidCompleteInstallationForModuleIdentifier:(NSString *)identifier;
 - (void)workshopCoordinatorDidFailWithError:(NSError *)error moduleIdentifier:(NSString *)identifier;
 - (void)workshopCoordinatorDidOpenModuleViewController:(NSViewController *)viewController
                                       moduleIdentifier:(NSString *)identifier;

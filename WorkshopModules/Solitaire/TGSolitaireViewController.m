@@ -2,6 +2,26 @@
 #import "TGSolitaireBoardView.h"
 #import "../Common/TGGameUI.h"
 
+@class TGSolitaireViewController;
+
+@interface TGSolitaireRootView : TGWorkshopGameSurfaceView {
+    TGSolitaireViewController *_layoutOwner;
+}
+@property(nonatomic, assign) TGSolitaireViewController *layoutOwner;
+@end
+
+@interface TGSolitaireViewController ()
+- (void)layoutGame;
+@end
+
+@implementation TGSolitaireRootView
+@synthesize layoutOwner = _layoutOwner;
+- (void)setFrameSize:(NSSize)newSize {
+    [super setFrameSize:newSize];
+    [_layoutOwner layoutGame];
+}
+@end
+
 @implementation TGSolitaireViewController
 
 - (id)initWithEngine:(TGSolitaireEngine *)engine hostContext:(id<TGWorkshopHostContext>)context {
@@ -14,53 +34,70 @@
 }
 
 - (void)loadView {
-    TGWorkshopGameSurfaceView *root = [[[TGWorkshopGameSurfaceView alloc] initWithFrame:NSMakeRect(0, 0, 760, 620)] autorelease];
+    TGSolitaireRootView *root = [[[TGSolitaireRootView alloc] initWithFrame:NSMakeRect(0, 0, 760, 620)] autorelease];
     [root setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+    [root setLayoutOwner:self];
     [self setView:root];
 
-    _boardView = [[TGSolitaireBoardView alloc] initWithFrame:NSMakeRect(18, 62, 724, 540)
+    _boardView = [[TGSolitaireBoardView alloc] initWithFrame:NSZeroRect
                                                       engine:_engine themeColors:[_hostContext themeColors]];
-    [_boardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [_boardView setTarget:self action:@selector(boardChanged:)];
     [root addSubview:_boardView];
 
-    _rulesButton = [TGGameThemedButton(NSMakeRect(16, 16, 38, 30),
+    _rulesButton = [TGGameThemedButton(NSZeroRect,
                                       @"",
                                       @"info",
                                       _hostContext) retain];
     [_rulesButton setToolTip:[_hostContext localizedStringForKey:@"game.rules" fallback:@"Rules"]];
     [_rulesButton setTarget:self];
     [_rulesButton setAction:@selector(showRules:)];
-    [_rulesButton setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
     [root addSubview:_rulesButton];
 
-    _statusField = [TGGameLabel(NSMakeRect(64, 19, 176, 22), 12.0, YES, _hostContext) retain];
-    [_statusField setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
+    _statusField = [TGGameLabel(NSZeroRect, 12.0, YES, _hostContext) retain];
+    [_statusField setAlignment:NSCenterTextAlignment];
     [root addSubview:_statusField];
 
-    _statisticsField = [TGGameLabel(NSMakeRect(244, 19, 196, 22), 11.0, NO, _hostContext) retain];
+    _statisticsField = [TGGameLabel(NSZeroRect, 11.0, NO, _hostContext) retain];
     [_statisticsField setAlignment:NSCenterTextAlignment];
-    [_statisticsField setAutoresizingMask:NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin];
     [root addSubview:_statisticsField];
 
-    _undoButton = [TGGameThemedButton(NSMakeRect(470, 14, 116, 32),
+    _undoButton = [TGGameThemedButton(NSZeroRect,
                                      [_hostContext localizedStringForKey:@"game.undo" fallback:@"Undo"],
                                      @"restore",
                                      _hostContext) retain];
     [_undoButton setTarget:self];
     [_undoButton setAction:@selector(undo:)];
-    [_undoButton setAutoresizingMask:NSViewMinXMargin | NSViewMaxYMargin];
     [root addSubview:_undoButton];
 
-    _newDealButton = [TGGameThemedButton(NSMakeRect(594, 14, 150, 32),
+    _newDealButton = [TGGameThemedButton(NSZeroRect,
                                         [_hostContext localizedStringForKey:@"solitaire.new_deal" fallback:@"New deal"],
                                         @"refresh",
                                         _hostContext) retain];
     [_newDealButton setTarget:self];
     [_newDealButton setAction:@selector(newDeal:)];
-    [_newDealButton setAutoresizingMask:NSViewMinXMargin | NSViewMaxYMargin];
     [root addSubview:_newDealButton];
+    [self layoutGame];
     [self refreshFromEngine];
+}
+
+- (void)layoutGame {
+    if (!_boardView) return;
+    NSRect bounds = [[self view] bounds];
+    CGFloat width = NSWidth(bounds);
+    CGFloat height = NSHeight(bounds);
+    [_boardView setFrame:NSMakeRect(14.0, 58.0,
+                                    MAX(420.0, width - 28.0),
+                                    MAX(300.0, height - 72.0))];
+
+    CGFloat controlsWidth = MIN(680.0, MAX(520.0, width - 28.0));
+    CGFloat controlsX = floor((width - controlsWidth) / 2.0);
+    [_rulesButton setFrame:NSMakeRect(controlsX, 14.0, 38.0, 32.0)];
+    [_statusField setFrame:NSMakeRect(controlsX + 46.0, 19.0, 150.0, 20.0)];
+    [_statisticsField setFrame:NSMakeRect(controlsX + 202.0, 19.0, 172.0, 20.0)];
+    [_undoButton setFrame:NSMakeRect(NSMaxX(NSMakeRect(controlsX, 0.0, controlsWidth, 0.0)) - 274.0,
+                                     14.0, 118.0, 32.0)];
+    [_newDealButton setFrame:NSMakeRect(NSMaxX(NSMakeRect(controlsX, 0.0, controlsWidth, 0.0)) - 148.0,
+                                        14.0, 148.0, 32.0)];
 }
 
 - (void)refreshFromEngine {
