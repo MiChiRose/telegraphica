@@ -33,6 +33,30 @@ version_gt() {
     '
 }
 
+binary_architectures() {
+    local binary_path="$1"
+    local architectures=""
+    local lipo_info=""
+
+    architectures="$(lipo -archs "$binary_path" 2>/dev/null || true)"
+    if [ -n "$architectures" ]; then
+        echo "$architectures"
+        return 0
+    fi
+
+    # Xcode 5.1.1's lipo does not support -archs. Its -info output is either:
+    # "... is architecture: x86_64" or "... are: i386 x86_64".
+    lipo_info="$(lipo -info "$binary_path" 2>/dev/null || true)"
+    case "$lipo_info" in
+        *" is architecture: "*)
+            echo "${lipo_info##* is architecture: }"
+            ;;
+        *" are: "*)
+            echo "${lipo_info##* are: }"
+            ;;
+    esac
+}
+
 resolve_bundle_dependency() {
     local binary_path="$1"
     local dependency="$2"
@@ -90,7 +114,7 @@ printf "sha256\tarchitecture\tminimum_os\tinstall_name\tbundle_path\n" > "$MANIF
 
 while IFS= read -r binary_path; do
     relative_path="${binary_path#"$APP_PATH"/}"
-    architectures="$(lipo -archs "$binary_path" 2>/dev/null || true)"
+    architectures="$(binary_architectures "$binary_path")"
     if ! echo "$architectures" | tr ' ' '\n' | grep -qx "$ARCH"; then
         echo "$relative_path does not contain $ARCH."
         exit 1
