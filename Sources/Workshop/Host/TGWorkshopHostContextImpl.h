@@ -4,6 +4,7 @@
 @protocol TGWorkshopHostContextDelegate <NSObject>
 - (void)workshopHostContextRequestedClose;
 - (void)workshopHostContextRequestedNotificationWithTitle:(NSString *)title message:(NSString *)message;
+- (NSDictionary *)workshopHostContextDiagnosticSnapshot;
 @end
 
 @interface TGWorkshopHostContextImpl : NSObject <TGWorkshopHostContext> {

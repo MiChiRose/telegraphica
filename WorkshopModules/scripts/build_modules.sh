@@ -75,5 +75,7 @@ build_module "Solitaire" "TGSolitaireModule"
 build_module "PacMan" "TGPacManModule"
 build_module "Fifteen" "TGFifteenModule"
 build_module "TankPatrol" "TGTankPatrolModule"
+build_module "DiagnosticCenter" "TGDiagnosticCenterModule"
+build_module "MediaWorkbench" "TGMediaWorkbenchModule"
 
 echo "Workshop modules are ready in $PRODUCT_ROOT"

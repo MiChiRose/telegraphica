@@ -8,6 +8,8 @@
 
 #define TGWorkshopPermissionModuleData @"module-data"
 #define TGWorkshopPermissionHostNotifications @"host-notifications"
+#define TGWorkshopPermissionHostDiagnostics @"host-diagnostics"
+#define TGWorkshopPermissionUserSelectedFiles @"user-selected-files"
 
 #define TGWorkshopModuleManifestFileName @"WorkshopModule.plist"
 #define TGWorkshopInstalledRegistryFileName @"InstalledModules.plist"

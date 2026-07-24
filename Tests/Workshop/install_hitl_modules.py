@@ -17,6 +17,8 @@ MODULES = (
     ("PacMan", "com.michirose.telegraphica.workshop.pacman"),
     ("Fifteen", "com.michirose.telegraphica.workshop.fifteen"),
     ("TankPatrol", "com.michirose.telegraphica.workshop.tankpatrol"),
+    ("DiagnosticCenter", "com.michirose.telegraphica.workshop.diagnosticcenter"),
+    ("MediaWorkbench", "com.michirose.telegraphica.workshop.mediaworkbench"),
 )
 
 

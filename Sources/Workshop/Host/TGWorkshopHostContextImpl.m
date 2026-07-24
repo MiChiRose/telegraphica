@@ -53,6 +53,14 @@
     return path ? [NSURL fileURLWithPath:path isDirectory:YES] : nil;
 }
 
+- (NSDictionary *)diagnosticSnapshot {
+    if ([_delegate respondsToSelector:@selector(workshopHostContextDiagnosticSnapshot)]) {
+        NSDictionary *snapshot = [_delegate workshopHostContextDiagnosticSnapshot];
+        return [snapshot isKindOfClass:[NSDictionary class]] ? snapshot : [NSDictionary dictionary];
+    }
+    return [NSDictionary dictionary];
+}
+
 - (void)showNotificationWithTitle:(NSString *)title message:(NSString *)message {
     if ([_delegate respondsToSelector:@selector(workshopHostContextRequestedNotificationWithTitle:message:)]) {
         [_delegate workshopHostContextRequestedNotificationWithTitle:title message:message];

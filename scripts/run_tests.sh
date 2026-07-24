@@ -61,6 +61,9 @@ Tests/Workshop/run_game_tests.sh
 echo "== Workshop installer state =="
 Tests/Workshop/run_installer_state_tests.sh
 
+echo "== Media Workbench =="
+Tests/Workshop/run_media_workbench_tests.sh
+
 echo "== Media preview gate =="
 scripts/check_media_item_support.sh "$ARCH" "$BUILD_DIR/media-item-support" "$SDK_NAME"
 

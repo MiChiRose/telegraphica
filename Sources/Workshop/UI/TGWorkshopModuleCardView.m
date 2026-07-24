@@ -57,6 +57,8 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     if ([identifier hasSuffix:@".pacman"] || [identifier hasSuffix:@".mazechase"]) return @"pac-man";
     if ([identifier hasSuffix:@".fifteen"]) return @"tictactoe";
     if ([identifier hasSuffix:@".tankpatrol"]) return @"game-controller";
+    if ([identifier hasSuffix:@".diagnosticcenter"]) return @"info";
+    if ([identifier hasSuffix:@".mediaworkbench"]) return @"image";
     return nil;
 }
 

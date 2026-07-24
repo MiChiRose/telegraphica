@@ -23,6 +23,8 @@ static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identi
     NSString *version = [record objectForKey:@"active_version"];
     if ([version length] == 0) return nil;
     NSString *name = [identifier hasSuffix:@".pacman"] ? @"Pac-Man" : [identifier lastPathComponent];
+    if ([identifier hasSuffix:@".diagnosticcenter"]) name = @"Diagnostic Center";
+    if ([identifier hasSuffix:@".mediaworkbench"]) name = @"Media Center";
     NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:
                                 identifier, @"id",
                                 name, @"name",

@@ -3474,6 +3474,46 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [[NSUserNotificationCenter defaultUserNotificationCenter] deliverNotification:notification];
 }
 
+- (NSDictionary *)workshopHostContextDiagnosticSnapshot {
+    NSBundle *bundle = [NSBundle mainBundle];
+    NSString *version = [[bundle infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *build = [[bundle infoDictionary] objectForKey:@"CFBundleVersion"];
+    NSString *osVersion = [[NSProcessInfo processInfo] operatingSystemVersionString];
+    NSString *authState = self.currentAuthState;
+    NSString *receiverStatus = [self.client receiverStatusSummary];
+    NSString *libraryPath = [self.client loadedLibraryPath];
+    NSError *storageError = nil;
+    NSDictionary *storage = nil;
+    if ([authState isEqualToString:@"ready"]) {
+        storage = [self.client storageUsageSummaryWithTimeout:2.0 error:&storageError];
+    }
+
+    NSMutableDictionary *snapshot = [NSMutableDictionary dictionary];
+    [snapshot setObject:([version length] > 0 ? version : @"unknown") forKey:@"app_version"];
+    [snapshot setObject:([build length] > 0 ? build : @"unknown") forKey:@"app_build"];
+    [snapshot setObject:([osVersion length] > 0 ? osVersion : @"unknown") forKey:@"os_version"];
+#if defined(__x86_64__)
+    [snapshot setObject:@"x86_64" forKey:@"architecture"];
+#elif defined(__arm64__)
+    [snapshot setObject:@"arm64" forKey:@"architecture"];
+#else
+    [snapshot setObject:@"unknown" forKey:@"architecture"];
+#endif
+    [snapshot setObject:([authState length] > 0 ? authState : @"unknown") forKey:@"authorization_state"];
+    [snapshot setObject:[NSNumber numberWithBool:([libraryPath length] > 0)] forKey:@"tdlib_loaded"];
+    [snapshot setObject:([receiverStatus length] > 0 ? receiverStatus : @"unavailable") forKey:@"receiver_status"];
+    [snapshot setObject:([self.activeSection length] > 0 ? self.activeSection : @"unknown") forKey:@"active_section"];
+    [snapshot setObject:[NSNumber numberWithBool:self.controlsBusy] forKey:@"controls_busy"];
+    if (storage) {
+        [snapshot setObject:storage forKey:@"storage"];
+    }
+    if (storageError) {
+        NSString *message = [storageError localizedDescription];
+        if ([message length] > 0) [snapshot setObject:message forKey:@"storage_error"];
+    }
+    return snapshot;
+}
+
 - (void)workshopHostContextRequestedClose {
     [self.workshopViewController requestCloseActiveModuleOrWorkshop];
 }

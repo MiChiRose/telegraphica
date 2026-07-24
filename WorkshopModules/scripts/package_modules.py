@@ -75,6 +75,25 @@ MODULES = {
         "en_description": "An original lightweight top-down tank defense inspired by cartridge-era games.",
         "ru_description": "Оригинальная лёгкая танковая оборона с видом сверху в духе картриджных игр.",
         "category": "games",
+        "permissions": ["module-data", "host-notifications"],
+    },
+    "DiagnosticCenter": {
+        "id": "com.michirose.telegraphica.workshop.diagnosticcenter",
+        "name": "Diagnostic Center",
+        "ru_name": "Центр диагностики",
+        "en_description": "Check Telegram core connectivity, cache usage and application state.",
+        "ru_description": "Проверка соединения с Telegram Core, кэша и состояния приложения.",
+        "category": "helpers",
+        "permissions": ["module-data", "host-diagnostics"],
+    },
+    "MediaWorkbench": {
+        "id": "com.michirose.telegraphica.workshop.mediaworkbench",
+        "name": "Media Center",
+        "ru_name": "Медиацентр",
+        "en_description": "Compress, resize and convert images locally without uploading them.",
+        "ru_description": "Локальное сжатие, изменение размера и конвертация изображений.",
+        "category": "modules",
+        "permissions": ["user-selected-files"],
     },
 }
 
@@ -166,7 +185,7 @@ def main() -> None:
                 "en": "Initial Workshop release.",
                 "ru": "Первый выпуск модуля для Мастерской.",
             },
-            "permissions": ["module-data", "host-notifications"],
+            "permissions": metadata.get("permissions", ["module-data", "host-notifications"]),
         })
 
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
