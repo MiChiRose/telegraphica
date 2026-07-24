@@ -35,6 +35,8 @@
 #import "../Services/TGLocalDataReset.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
+#import "../Workshop/Host/TGWorkshopCoordinator.h"
+#import "../Workshop/UI/TGWorkshopViewController.h"
 #import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
 #include <math.h>
@@ -51,6 +53,7 @@ static NSString * const TGSectionProfile = @"profile";
 static NSString * const TGSectionSettings = @"settings";
 static NSString * const TGSectionAbout = @"about";
 static NSString * const TGSectionLogs = @"logs";
+static NSString * const TGSectionWorkshop = @"workshop";
 
 static NSString * const TGNotificationsEnabledDefaultsKey = @"TelegraphicaNotificationsEnabled";
 static NSString * const TGNotificationSoundEnabledDefaultsKey = @"TelegraphicaNotificationSoundEnabled";
@@ -189,7 +192,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) NSView *conversationPanelView;
@@ -202,6 +205,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @property (nonatomic, retain) NSScrollView *settingsScrollView;
 @property (nonatomic, retain) NSView *settingsContentView;
 @property (nonatomic, retain) NSView *aboutPanelView;
+@property (nonatomic, retain) TGWorkshopCoordinator *workshopCoordinator;
+@property (nonatomic, retain) TGWorkshopViewController *workshopViewController;
+@property (nonatomic, retain) NSButton *workshopDrawerButton;
+@property (nonatomic, copy) NSString *workshopReturnSection;
 @property (nonatomic, retain) TGGroupedCardView *bottomNavigationView;
 @property (nonatomic, retain) NSArray *navigationButtons;
 @property (nonatomic, retain) NSProgressIndicator *markAllChatsReadSpinner;
@@ -618,6 +625,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 - (void)togglePollOptionForMessageItem:(TGMessageItem *)item optionIndex:(NSUInteger)optionIndex;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
+- (void)openWorkshopFromDrawer:(id)sender;
 @end
 
 #include "TGChatSearchPanelView.inc"
@@ -636,6 +644,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 @synthesize settingsScrollView = _settingsScrollView;
 @synthesize settingsContentView = _settingsContentView;
 @synthesize aboutPanelView = _aboutPanelView;
+@synthesize workshopCoordinator = _workshopCoordinator;
+@synthesize workshopViewController = _workshopViewController;
+@synthesize workshopDrawerButton = _workshopDrawerButton;
+@synthesize workshopReturnSection = _workshopReturnSection;
 @synthesize bottomNavigationView = _bottomNavigationView;
 @synthesize navigationButtons = _navigationButtons;
 @synthesize markAllChatsReadSpinner = _markAllChatsReadSpinner;
@@ -1431,6 +1443,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 }
 
 - (void)refreshLocalizedText {
+    [self.workshopDrawerButton setTitle:TGLoc(@"workshop.title")];
+    [self.workshopDrawerButton setToolTip:TGLoc(@"workshop.openTooltip")];
+    [self.workshopDrawerButton setNeedsDisplay:YES];
+    [self.workshopViewController refreshLocalization];
     [self.chatsLabel setStringValue:TGLoc(@"chats")];
     [self.profileTitleField setStringValue:TGLoc(@"profile.title")];
     [self.profileAboutSectionField setStringValue:TGLoc(@"profile.about")];
@@ -1644,6 +1660,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [self.settingsResourceCardView setNeedsDisplay:YES];
     [self.settingsHelpCardView setNeedsDisplay:YES];
     [self.bottomNavigationView setNeedsDisplay:YES];
+    [self.workshopDrawerButton setNeedsDisplay:YES];
+    [self.workshopViewController refreshTheme];
     if ([self.messageScrollSurfaceView isKindOfClass:[TGScrollSurfaceView class]]) {
         [(TGScrollSurfaceView *)self.messageScrollSurfaceView setDrawsInterior:!TGThemeIsSkeuomorphicBlue()];
     }
@@ -1745,6 +1763,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 }
 
 - (void)handleTypingUpdateSummary:(NSDictionary *)summary {
+    if ([self.activeSection isEqualToString:TGSectionWorkshop]) {
+        return;
+    }
     if (![summary isKindOfClass:[NSDictionary class]]) {
         return;
     }
@@ -1846,6 +1867,19 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [self.drawerButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
     [contentView addSubview:self.drawerButton];
 
+    self.workshopDrawerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 570, 92, 46)] autorelease];
+    TGNavigationButtonCell *workshopCell = [[[TGNavigationButtonCell alloc] initTextCell:TGLoc(@"workshop.title")] autorelease];
+    [workshopCell setButtonType:NSToggleButton];
+    [self.workshopDrawerButton setCell:workshopCell];
+    [self.workshopDrawerButton setTitle:TGLoc(@"workshop.title")];
+    [self.workshopDrawerButton setButtonType:NSToggleButton];
+    [self.workshopDrawerButton setBordered:NO];
+    [self.workshopDrawerButton setToolTip:TGLoc(@"workshop.openTooltip")];
+    [self.workshopDrawerButton setTarget:self];
+    [self.workshopDrawerButton setAction:@selector(openWorkshopFromDrawer:)];
+    [self.workshopDrawerButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+    [contentView addSubview:self.workshopDrawerButton];
+
     self.sidebarPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 286, 480)] autorelease];
     [self.sidebarPanelView setAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
     [contentView addSubview:self.sidebarPanelView];
@@ -1895,6 +1929,13 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     self.aboutPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 948, 480)] autorelease];
     [self.aboutPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.aboutPanelView];
+
+    self.workshopCoordinator = [[[TGWorkshopCoordinator alloc] initWithHostDelegate:self] autorelease];
+    self.workshopViewController = [[[TGWorkshopViewController alloc] initWithCoordinator:self.workshopCoordinator] autorelease];
+    [self.workshopViewController setDelegate:self];
+    [[self.workshopViewController view] setFrame:NSMakeRect(16, 16, 948, 596)];
+    [[self.workshopViewController view] setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:[self.workshopViewController view]];
 
     self.bottomNavigationView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(126, 18, 276, 54)] autorelease];
     [self.bottomNavigationView setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
@@ -3218,6 +3259,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 }
 
 - (NSInteger)navigationTagForSectionIdentifier:(NSString *)section {
+    if ([section isEqualToString:TGSectionWorkshop]) {
+        return -1;
+    }
     if ([section isEqualToString:TGSectionProfile]) {
         return 1;
     }
@@ -3387,10 +3431,100 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     });
 }
 
+- (void)openWorkshopFromDrawer:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    if (![self.activeSection isEqualToString:TGSectionWorkshop]) {
+        self.workshopReturnSection = self.activeSection ? self.activeSection : TGSectionChats;
+    }
+    self.activeSection = TGSectionWorkshop;
+    self.drawerOpen = NO;
+    [self clearTypingIndicator];
+    [self.workshopViewController startIfNeeded];
+    [self updateVisibleSection];
+    [self layoutContentView];
+}
+
+- (void)workshopViewControllerDidRequestClose:(TGWorkshopViewController *)viewController {
+    (void)viewController;
+    NSString *returnSection = self.workshopReturnSection;
+    if ([returnSection length] == 0 || [returnSection isEqualToString:TGSectionWorkshop]) {
+        returnSection = TGSectionChats;
+    }
+    self.activeSection = returnSection;
+    self.workshopReturnSection = nil;
+    [self updateVisibleSection];
+    [self layoutContentView];
+}
+
+- (void)workshopViewController:(TGWorkshopViewController *)viewController
+       didChangeActiveModule:(BOOL)active {
+    (void)viewController;
+    (void)active;
+    [self updateVisibleSection];
+    [self layoutContentView];
+}
+
+- (void)workshopHostContextRequestedNotificationWithTitle:(NSString *)title message:(NSString *)message {
+    NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
+    [notification setTitle:([title length] > 0 ? title : TGLoc(@"workshop.title"))];
+    [notification setInformativeText:(message ? message : @"")];
+    [[NSUserNotificationCenter defaultUserNotificationCenter] deliverNotification:notification];
+}
+
+- (NSDictionary *)workshopHostContextDiagnosticSnapshot {
+    NSBundle *bundle = [NSBundle mainBundle];
+    NSString *version = [[bundle infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+    NSString *build = [[bundle infoDictionary] objectForKey:@"CFBundleVersion"];
+    NSString *osVersion = [[NSProcessInfo processInfo] operatingSystemVersionString];
+    NSString *authState = self.currentAuthState;
+    NSString *receiverStatus = [self.client receiverStatusSummary];
+    NSString *libraryPath = [self.client loadedLibraryPath];
+    NSError *storageError = nil;
+    NSDictionary *storage = nil;
+    if ([authState isEqualToString:@"ready"]) {
+        storage = [self.client storageUsageSummaryWithTimeout:2.0 error:&storageError];
+    }
+
+    NSMutableDictionary *snapshot = [NSMutableDictionary dictionary];
+    [snapshot setObject:([version length] > 0 ? version : @"unknown") forKey:@"app_version"];
+    [snapshot setObject:([build length] > 0 ? build : @"unknown") forKey:@"app_build"];
+    [snapshot setObject:([osVersion length] > 0 ? osVersion : @"unknown") forKey:@"os_version"];
+#if defined(__x86_64__)
+    [snapshot setObject:@"x86_64" forKey:@"architecture"];
+#elif defined(__arm64__)
+    [snapshot setObject:@"arm64" forKey:@"architecture"];
+#else
+    [snapshot setObject:@"unknown" forKey:@"architecture"];
+#endif
+    [snapshot setObject:([authState length] > 0 ? authState : @"unknown") forKey:@"authorization_state"];
+    [snapshot setObject:[NSNumber numberWithBool:([libraryPath length] > 0)] forKey:@"tdlib_loaded"];
+    [snapshot setObject:([receiverStatus length] > 0 ? receiverStatus : @"unavailable") forKey:@"receiver_status"];
+    [snapshot setObject:([self.activeSection length] > 0 ? self.activeSection : @"unknown") forKey:@"active_section"];
+    [snapshot setObject:[NSNumber numberWithBool:self.controlsBusy] forKey:@"controls_busy"];
+    if (storage) {
+        [snapshot setObject:storage forKey:@"storage"];
+    }
+    if (storageError) {
+        NSString *message = [storageError localizedDescription];
+        if ([message length] > 0) [snapshot setObject:message forKey:@"storage_error"];
+    }
+    return snapshot;
+}
+
+- (void)workshopHostContextRequestedClose {
+    [self.workshopViewController requestCloseActiveModuleOrWorkshop];
+}
+
 - (void)openProfileFromDrawer:(id)sender {
     (void)sender;
     if (![self.currentAuthState isEqualToString:@"ready"]) {
         return;
+    }
+    if ([self.activeSection isEqualToString:TGSectionWorkshop]) {
+        [self.workshopCoordinator closeActiveModule];
     }
     self.activeSection = TGSectionProfile;
     [self updateVisibleSection];
@@ -3415,16 +3549,23 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
         [button setEnabled:(enabled && ready)];
         [button setHidden:(!ready || drawerHidden || !self.drawerOpen)];
     }
+    [self.workshopDrawerButton setEnabled:(enabled && ready)];
+    [self.workshopDrawerButton setHidden:(!ready || drawerHidden || !self.drawerOpen)];
+    [self.workshopDrawerButton setState:[section isEqualToString:TGSectionWorkshop] ? NSOnState : NSOffState];
     [self updateDrawerFolderButtonStates];
 }
 
 - (void)navigationChanged:(id)sender {
+    BOOL leavingWorkshop = [self.activeSection isEqualToString:TGSectionWorkshop];
     if ([sender respondsToSelector:@selector(tag)]) {
         NSInteger navigationTag = [sender tag];
         if (![self.currentAuthState isEqualToString:@"ready"]) {
             navigationTag = 0;
         }
         self.activeSection = [self sectionIdentifierForNavigationTag:navigationTag];
+    }
+    if (leavingWorkshop && ![self.activeSection isEqualToString:TGSectionWorkshop]) {
+        [self.workshopCoordinator closeActiveModule];
     }
     [self updateVisibleSection];
     if ([self.activeSection isEqualToString:TGSectionProfile] &&
@@ -3438,6 +3579,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     if (![self.currentAuthState isEqualToString:@"ready"] || ![sender respondsToSelector:@selector(tag)]) {
         [self updateDrawerFolderButtonStates];
         return;
+    }
+    if ([self.activeSection isEqualToString:TGSectionWorkshop]) {
+        [self.workshopCoordinator closeActiveModule];
+        self.activeSection = TGSectionChats;
     }
 
     NSInteger tag = [sender tag];
@@ -3601,6 +3746,11 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [_settingsScrollView release];
     [_settingsContentView release];
     [_aboutPanelView release];
+    [_workshopViewController setDelegate:nil];
+    [_workshopViewController release];
+    [_workshopCoordinator release];
+    [_workshopDrawerButton release];
+    [_workshopReturnSection release];
     [_bottomNavigationView release];
     [_navigationButtons release];
     [_markAllChatsReadSpinner release];

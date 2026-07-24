@@ -152,6 +152,54 @@ def check_media_center_pagination(errors):
         errors.append("%s: Belarusian media center status should tell users about scroll pagination" % localization_rel)
 
 
+def check_workshop_download_proxy(errors):
+    rel = os.path.join(
+        "Sources", "Workshop", "Installation", "TGWorkshopPackageDownloader.m"
+    )
+    text = read_text(os.path.join(ROOT, rel))
+    required_fragments = [
+        "TGWorkshopResolvedPackageURL",
+        'isEqualToString:@"github.com"',
+        "/MiChiRose/telegraphica/releases/download/workshop-modules-v1/",
+        "telegraphica-tdlib-config.telegraphica.workers.dev/v1/workshop/package?asset=",
+        "[self URLIsAllowed:downloadURL]",
+        "requestWithURL:downloadURL",
+    ]
+    for fragment in required_fragments:
+        if fragment not in text:
+            errors.append("%s: Workshop compatibility proxy contract is missing `%s`" %
+                          (rel, fragment))
+
+
+def check_workshop_installed_presentation(errors):
+    coordinator_rel = os.path.join(
+        "Sources", "Workshop", "Host", "TGWorkshopCoordinator.m"
+    )
+    coordinator_text = read_text(os.path.join(ROOT, coordinator_rel))
+    required_fragments = [
+        "TGWorkshopInstalledLocalizedNames",
+        '[identifier hasSuffix:@".fifteen"]',
+        'russian = @"Пятнашки"',
+        '[identifier componentsSeparatedByString:@"."]',
+    ]
+    for fragment in required_fragments:
+        if fragment not in coordinator_text:
+            errors.append("%s: installed-module presentation is missing `%s`" %
+                          (coordinator_rel, fragment))
+    if "[identifier lastPathComponent]" in coordinator_text:
+        errors.append("%s: dotted module identifiers must not be shown via lastPathComponent" %
+                      coordinator_rel)
+
+    notice_rel = os.path.join(
+        "Sources", "Workshop", "UI", "TGWorkshopHeaderNoticeView.m"
+    )
+    notice_text = read_text(os.path.join(ROOT, notice_rel))
+    for fragment in ["showMessage:", "hideAnimated", "setAlphaValue:"]:
+        if fragment not in notice_text:
+            errors.append("%s: refresh notice animation is missing `%s`" %
+                          (notice_rel, fragment))
+
+
 def check_no_local_runtime_data(errors):
     forbidden_names = [
         "tdlib-config.plist",
@@ -184,6 +232,8 @@ def main():
     check_project_membership(errors)
     check_test_structure(errors)
     check_media_center_pagination(errors)
+    check_workshop_download_proxy(errors)
+    check_workshop_installed_presentation(errors)
     check_no_local_runtime_data(errors)
     if errors:
         print("Static project tests failed:")

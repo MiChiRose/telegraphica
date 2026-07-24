@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>identifier</key><string>com.michirose.telegraphica.workshop.checkers</string>
+<key>version</key><string>1.0.0</string>
+<key>api_version</key><integer>1</integer>
+<key>minimum_app_version</key><string>0.5.1</string>
+<key>minimum_os_version</key><string>10.9</string>
+<key>architectures</key><array><string>x86_64</string></array>
+<key>principal_class</key><string>TGCheckersModule</string>
+<key>permissions</key><array><string>module-data</string><string>host-notifications</string></array>
+</dict></plist>
