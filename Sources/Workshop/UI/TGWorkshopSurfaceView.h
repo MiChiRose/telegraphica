@@ -1,5 +1,7 @@
 #import <Cocoa/Cocoa.h>
 
+#pragma GCC visibility push(default)
+
 NSColor *TGWorkshopFeltBaseColor(void);
 NSColor *TGWorkshopFeltPatternColor(void);
 NSColor *TGWorkshopWoodPatternColor(void);
@@ -9,8 +11,12 @@ NSColor *TGWorkshopMutedCreamColor(void);
 NSColor *TGWorkshopBurgundyColor(void);
 NSColor *TGWorkshopDeepGreenColor(void);
 
+__attribute__((visibility("default")))
 @interface TGWorkshopSurfaceView : NSView
 @end
 
+__attribute__((visibility("default")))
 @interface TGWorkshopGameSurfaceView : NSView
 @end
+
+#pragma GCC visibility pop
