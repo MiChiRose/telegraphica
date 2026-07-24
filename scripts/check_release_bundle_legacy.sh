@@ -100,9 +100,12 @@ MACHO_LIST="$WORK_DIR/macho-files.txt"
 MANIFEST_PATH="${TELEGRAPHICA_BUNDLE_MANIFEST_PATH:-$APP_PATH/Contents/Resources/TelegraphicaLegacyBinaryManifest.tsv}"
 : > "$MACHO_LIST"
 find "$APP_PATH/Contents" -type f -print | while IFS= read -r candidate; do
-    if file "$candidate" 2>/dev/null | grep -q "Mach-O"; then
-        echo "$candidate"
-    fi
+    file_description="$(file "$candidate" 2>/dev/null || true)"
+    case "$file_description" in
+        *Mach-O*)
+            echo "$candidate"
+            ;;
+    esac
 done > "$MACHO_LIST"
 
 if [ ! -s "$MACHO_LIST" ]; then
@@ -115,17 +118,26 @@ printf "sha256\tarchitecture\tminimum_os\tinstall_name\tbundle_path\n" > "$MANIF
 while IFS= read -r binary_path; do
     relative_path="${binary_path#"$APP_PATH"/}"
     architectures="$(binary_architectures "$binary_path")"
-    if ! echo "$architectures" | tr ' ' '\n' | grep -qx "$ARCH"; then
-        echo "$relative_path does not contain $ARCH."
-        exit 1
-    fi
+    case " $architectures " in
+        *" $ARCH "*)
+            ;;
+        *)
+            echo "$relative_path does not contain $ARCH."
+            exit 1
+            ;;
+    esac
 
     load_commands="$(otool -arch "$ARCH" -l "$binary_path" 2>/dev/null || true)"
-    if echo "$load_commands" | grep -q "LC_BUILD_VERSION"; then
-        echo "$relative_path uses LC_BUILD_VERSION and is not a legacy release binary."
-        exit 1
-    fi
-    minimum_os="$(echo "$load_commands" | awk '/LC_VERSION_MIN_MACOSX/{found=1} found && /version /{print $2; exit}')"
+    case "$load_commands" in
+        *LC_BUILD_VERSION*)
+            echo "$relative_path uses LC_BUILD_VERSION and is not a legacy release binary."
+            exit 1
+            ;;
+    esac
+    minimum_os="$(printf "%s\n" "$load_commands" | awk '
+        /LC_VERSION_MIN_MACOSX/ { found = 1 }
+        found && /version / && !printed { print $2; printed = 1 }
+    ')"
     if [ -z "$minimum_os" ]; then
         echo "$relative_path has no LC_VERSION_MIN_MACOSX command."
         exit 1
@@ -135,15 +147,20 @@ while IFS= read -r binary_path; do
         exit 1
     fi
 
-    if echo "$load_commands" | grep -E -q "__LLVM|__llvm|__llvm_prf"; then
-        echo "$relative_path contains profiling/LLVM sections."
-        exit 1
-    fi
+    case "$load_commands" in
+        *__LLVM*|*__llvm*|*__llvm_prf*)
+            echo "$relative_path contains profiling/LLVM sections."
+            exit 1
+            ;;
+    esac
 
     install_name="$(otool -arch "$ARCH" -D "$binary_path" 2>/dev/null | awk 'NR == 2 {print $1}')"
     linked_libraries="$(otool -arch "$ARCH" -L "$binary_path" 2>/dev/null | awk 'NR > 1 {print $1}')"
     while IFS= read -r dependency; do
         [ -z "$dependency" ] && continue
+        if [ -n "$install_name" ] && [ "$dependency" = "$install_name" ]; then
+            continue
+        fi
         case "$dependency" in
             /usr/lib/*|/System/Library/*)
                 ;;
