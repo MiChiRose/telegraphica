@@ -238,12 +238,26 @@ PY
 }
 
 BUNDLED_TDLIB_CONFIG_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}"
+BUNDLED_TDLIB_CREDENTIALS_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH:-}"
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && ! valid_tdlib_config "$BUNDLED_TDLIB_CONFIG_SOURCE"; then
     echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH is missing or does not contain valid api_id and api_hash."
     exit 1
 fi
+if [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    if [ ! -f "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ] ||
+       ! grep -q "TGTDLibRuntimeBundledConfigurationIsAvailable" "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ||
+       ! grep -q "TGTDLibRuntimeBundledConfiguration" "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ||
+       ! grep -q "return YES;" "$BUNDLED_TDLIB_CREDENTIALS_SOURCE"; then
+        echo "TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH is not a valid generated credentials provider."
+        exit 1
+    fi
+fi
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    echo "Use either TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH or TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH, not both."
+    exit 1
+fi
 
-if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && [ -z "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
     for CONFIG_CANDIDATE in \
         "$HOME/Library/Application Support/Telegraphica/tdlib-config.plist" \
         "$BUILD_ROOT/Release/$APP_NAME/Contents/Resources/TelegraphicaTDLibDefaults.plist" \
@@ -259,12 +273,16 @@ fi
 
 TDJSON_STAGED_PATH=""
 BUNDLED_TDLIB_CONFIG_TEMP=""
+BUNDLED_TDLIB_CREDENTIALS_TEMP=""
 cleanup_legacy_build_inputs() {
     if [ -n "$TDJSON_STAGED_PATH" ]; then
         rm -f "$TDJSON_STAGED_PATH"
     fi
     if [ -n "$BUNDLED_TDLIB_CONFIG_TEMP" ]; then
         rm -f "$BUNDLED_TDLIB_CONFIG_TEMP"
+    fi
+    if [ -n "$BUNDLED_TDLIB_CREDENTIALS_TEMP" ]; then
+        rm -f "$BUNDLED_TDLIB_CREDENTIALS_TEMP"
     fi
 }
 trap cleanup_legacy_build_inputs EXIT
@@ -275,6 +293,12 @@ if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     chmod 0600 "$BUNDLED_TDLIB_CONFIG_TEMP"
     BUNDLED_TDLIB_CONFIG_SOURCE="$BUNDLED_TDLIB_CONFIG_TEMP"
     echo "Preserved the existing internal Telegram connection configuration."
+elif [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    BUNDLED_TDLIB_CREDENTIALS_TEMP="$(mktemp /tmp/telegraphica-tdlib-credentials.XXXXXX)"
+    ditto "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" "$BUNDLED_TDLIB_CREDENTIALS_TEMP"
+    chmod 0600 "$BUNDLED_TDLIB_CREDENTIALS_TEMP"
+    BUNDLED_TDLIB_CREDENTIALS_SOURCE="$BUNDLED_TDLIB_CREDENTIALS_TEMP"
+    echo "Preserved the existing generated Telegram connection provider."
 else
     echo "Warning: no internal Telegram connection configuration was found."
     echo "This development build will not be able to start a new Telegram sign-in."
@@ -296,7 +320,13 @@ rm -rf "$BUILD_ROOT" "$APP_NAME"
 
 GENERATED_DIR="$BUILD_ROOT/Generated"
 GENERATED_TDLIB_CREDENTIALS_SOURCE="$GENERATED_DIR/TGTDLibBundledCredentialsGenerated.m"
-generate_tdlib_runtime_credentials_source "$BUNDLED_TDLIB_CONFIG_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+if [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    mkdir -p "$GENERATED_DIR"
+    ditto "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+    chmod 0600 "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+else
+    generate_tdlib_runtime_credentials_source "$BUNDLED_TDLIB_CONFIG_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+fi
 
 WEBP_BUILD_DIR="$BUILD_ROOT/Vendor/libwebp"
 scripts/build_webp_legacy.sh "$ARCH" "$WEBP_BUILD_DIR"
@@ -463,7 +493,7 @@ fi
 
 RESOURCES_DIR="$APP_NAME/Contents/Resources"
 rm -f "$RESOURCES_DIR/TelegraphicaTDLibDefaults.plist"
-if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] || [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
     RUNTIME_CONFIG_MARKER="$RESOURCES_DIR/TelegraphicaTDLibRuntimeDefaults.plist"
     mkdir -p "$RESOURCES_DIR"
     rm -f "$RUNTIME_CONFIG_MARKER"

@@ -243,6 +243,8 @@ def check_unified_legacy_contract(errors):
         "MACOSX_DEPLOYMENT_TARGET:-10.8",
         "check_release_bundle_legacy.sh",
         "Xcode 5.1.1.app",
+        "TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH",
+        "Preserved the existing generated Telegram connection provider.",
     ]:
         if fragment not in build_text:
             errors.append("%s: unified legacy build contract is missing `%s`" %
