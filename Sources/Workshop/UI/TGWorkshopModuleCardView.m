@@ -154,10 +154,12 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     [background setLineWidth:1.0];
     [background stroke];
     NSString *iconName = TGWorkshopIconNameForModuleIdentifier([_entry moduleIdentifier]);
-    NSImage *icon = TGWorkshopUprightTemplateIcon(iconName,
-                                                  NSMakeSize(40.0, 40.0),
-                                                  TGWorkshopCreamColor(),
-                                                  1.0);
+    // Card icons are drawn directly in this non-flipped view. Button images use
+    // the Mavericks AppKit compensation helper, but applying it here flips twice.
+    NSImage *icon = TGTemplateIconAssetImage(iconName,
+                                             NSMakeSize(40.0, 40.0),
+                                             TGWorkshopCreamColor(),
+                                             1.0);
     if (icon) {
         NSRect iconRect = NSMakeRect(NSMidX(rect) - 20.0, NSMidY(rect) - 20.0, 40.0, 40.0);
         if ([iconName isEqualToString:@"minesweeper"]) {
