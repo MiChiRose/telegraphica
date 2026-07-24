@@ -1,4 +1,5 @@
 #import "TGMinesweeperViewController.h"
+#import "../Common/TGGameUI.h"
 
 @protocol TGMinesweeperCellButtonDelegate <NSObject>
 - (void)mineCellButtonRightClicked:(NSButton *)button;
@@ -6,6 +7,52 @@
 
 @interface TGMinesweeperCellButton : NSButton
 @property(nonatomic, assign) id<TGMinesweeperCellButtonDelegate> rightClickDelegate;
+@end
+
+@interface TGMinesweeperCell : NSButtonCell
+@end
+
+@implementation TGMinesweeperCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL open = ([self state] == NSOnState);
+    BOOL pressed = [self isHighlighted];
+    NSRect rect = NSInsetRect(cellFrame, 0.5, 0.5);
+    if (open) {
+        [[NSColor colorWithCalibratedWhite:0.79 alpha:1.0] setFill];
+        NSRectFill(rect);
+        [[NSColor colorWithCalibratedWhite:0.48 alpha:1.0] setStroke];
+        NSFrameRect(rect);
+    } else {
+        NSColor *top = pressed ? [NSColor colorWithCalibratedWhite:0.62 alpha:1.0]
+                               : [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
+        NSColor *bottom = pressed ? [NSColor colorWithCalibratedWhite:0.82 alpha:1.0]
+                                  : [NSColor colorWithCalibratedWhite:0.62 alpha:1.0];
+        NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:top endingColor:bottom] autorelease];
+        [gradient drawInRect:rect angle:90.0];
+        [[NSColor colorWithCalibratedWhite:0.36 alpha:1.0] setStroke];
+        NSFrameRect(rect);
+        [[NSColor colorWithCalibratedWhite:1.0 alpha:0.88] setFill];
+        NSRectFill(NSMakeRect(NSMinX(rect) + 1.0, NSMaxY(rect) - 2.0, NSWidth(rect) - 2.0, 1.0));
+    }
+
+    NSString *title = [self title] ? [self title] : @"";
+    if ([title length] == 0) return;
+    NSColor *color = [NSColor colorWithCalibratedWhite:0.08 alpha:1.0];
+    if ([title isEqualToString:@"1"]) color = [NSColor colorWithCalibratedRed:0.08 green:0.20 blue:0.74 alpha:1.0];
+    if ([title isEqualToString:@"2"]) color = [NSColor colorWithCalibratedRed:0.04 green:0.46 blue:0.12 alpha:1.0];
+    if ([title isEqualToString:@"3"]) color = [NSColor colorWithCalibratedRed:0.72 green:0.08 blue:0.08 alpha:1.0];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [self font], NSFontAttributeName,
+                                color, NSForegroundColorAttributeName,
+                                nil];
+    NSSize size = [title sizeWithAttributes:attributes];
+    [title drawAtPoint:NSMakePoint(NSMidX(rect) - size.width / 2.0,
+                                   NSMidY(rect) - size.height / 2.0)
+        withAttributes:attributes];
+}
+
 @end
 
 @implementation TGMinesweeperCellButton
@@ -27,6 +74,7 @@ static NSTextField *TGMinesweeperLabel(NSRect frame, NSFont *font) {
     [field setDrawsBackground:NO];
     [field setFont:font];
     [field setAlignment:NSCenterTextAlignment];
+    [field setTextColor:TGWorkshopCreamColor()];
     return field;
 }
 
@@ -43,7 +91,7 @@ static NSTextField *TGMinesweeperLabel(NSRect frame, NSFont *font) {
 }
 
 - (void)loadView {
-    NSView *root = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 700, 520)] autorelease];
+    TGWorkshopGameSurfaceView *root = [[[TGWorkshopGameSurfaceView alloc] initWithFrame:NSMakeRect(0, 0, 700, 520)] autorelease];
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [self setView:root];
 
@@ -53,12 +101,15 @@ static NSTextField *TGMinesweeperLabel(NSRect frame, NSFont *font) {
     [root addSubview:title];
     _statusField = [TGMinesweeperLabel(NSMakeRect(235, 446, 230, 20),
                                        [_hostContext interfaceFontOfSize:12.0 bold:YES]) retain];
+    [_statusField setTextColor:TGWorkshopGoldColor()];
     [root addSubview:_statusField];
     _mineField = [TGMinesweeperLabel(NSMakeRect(72, 446, 150, 20),
                                      [_hostContext interfaceFontOfSize:11.0 bold:NO]) retain];
+    [_mineField setTextColor:TGWorkshopMutedCreamColor()];
     [root addSubview:_mineField];
     _timerField = [TGMinesweeperLabel(NSMakeRect(478, 446, 150, 20),
                                       [_hostContext interfaceFontOfSize:11.0 bold:NO]) retain];
+    [_timerField setTextColor:TGWorkshopMutedCreamColor()];
     [root addSubview:_timerField];
 
     _difficultyButton = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(170, 18, 180, 28) pullsDown:NO];
@@ -69,8 +120,10 @@ static NSTextField *TGMinesweeperLabel(NSRect frame, NSFont *font) {
     [_difficultyButton setAction:@selector(difficultyChanged:)];
     [root addSubview:_difficultyButton];
 
-    _restartButton = [[NSButton alloc] initWithFrame:NSMakeRect(360, 16, 150, 30)];
-    [_restartButton setTitle:[_hostContext localizedStringForKey:@"game.restart" fallback:@"Restart"]];
+    _restartButton = [TGGameThemedButton(NSMakeRect(360, 16, 150, 30),
+                                         [_hostContext localizedStringForKey:@"game.restart" fallback:@"Restart"],
+                                         @"refresh",
+                                         _hostContext) retain];
     [_restartButton setTarget:self];
     [_restartButton setAction:@selector(restart:)];
     [root addSubview:_restartButton];
@@ -101,6 +154,9 @@ static NSTextField *TGMinesweeperLabel(NSRect frame, NSFont *font) {
                                                                       originY + row * side,
                                                                       side,
                                                                       side)] autorelease];
+        TGMinesweeperCell *cell = [[[TGMinesweeperCell alloc] initTextCell:@""] autorelease];
+        [cell setButtonType:NSMomentaryPushInButton];
+        [button setCell:cell];
         [button setTag:(NSInteger)index];
         [button setButtonType:NSMomentaryPushInButton];
         [button setBezelStyle:NSShadowlessSquareBezelStyle];

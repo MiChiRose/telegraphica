@@ -1,22 +1,32 @@
 #import "TGTicTacToeViewController.h"
+#import "../Common/TGGameUI.h"
 
-@interface TGTicTacToeBoardView : NSView {
-@private
-    NSDictionary *_colors;
-}
-@property(nonatomic, retain) NSDictionary *colors;
+@interface TGTicTacToeSquareCell : NSButtonCell
 @end
 
-@implementation TGTicTacToeBoardView
-@synthesize colors = _colors;
-- (BOOL)isFlipped { return YES; }
-- (void)drawRect:(NSRect)dirtyRect {
-    (void)dirtyRect;
-    NSColor *background = [_colors objectForKey:@"background"];
-    [(background ? background : [NSColor colorWithCalibratedWhite:0.94 alpha:1.0]) set];
-    NSRectFill([self bounds]);
+@implementation TGTicTacToeSquareCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    NSRect rect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
+    NSColor *top = [self isHighlighted]
+        ? [NSColor colorWithCalibratedRed:0.36 green:0.065 blue:0.13 alpha:1.0]
+        : [NSColor colorWithCalibratedRed:0.54 green:0.075 blue:0.18 alpha:1.0];
+    NSGradient *gradient = [[[NSGradient alloc]
+                             initWithStartingColor:top
+                             endingColor:TGWorkshopBurgundyColor()] autorelease];
+    [gradient drawInBezierPath:path angle:90.0];
+    [TGWorkshopGoldColor() setStroke];
+    [path setLineWidth:1.0];
+    [path stroke];
+    NSAttributedString *title = [self attributedTitle];
+    if ([[title string] length] == 0) return;
+    NSSize size = [title size];
+    [title drawAtPoint:NSMakePoint(NSMidX(rect) - size.width / 2.0,
+                                   NSMidY(rect) - size.height / 2.0)];
 }
-- (void)dealloc { [_colors release]; [super dealloc]; }
+
 @end
 
 static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
@@ -42,22 +52,23 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
 }
 
 - (void)loadView {
-    TGTicTacToeBoardView *root = [[[TGTicTacToeBoardView alloc] initWithFrame:NSMakeRect(0, 0, 700, 520)] autorelease];
+    TGWorkshopGameSurfaceView *root = [[[TGWorkshopGameSurfaceView alloc] initWithFrame:NSMakeRect(0, 0, 700, 520)] autorelease];
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [root setColors:[_hostContext themeColors]];
     [self setView:root];
 
     NSTextField *title = TGTicTacToeLabel(NSMakeRect(190, 20, 320, 30),
                                           [_hostContext interfaceFontOfSize:20.0 bold:YES]);
     [title setStringValue:[_hostContext localizedStringForKey:@"tictactoe.title" fallback:@"Tic-Tac-Toe"]];
-    [title setTextColor:[[_hostContext themeColors] objectForKey:@"text"]];
+    [title setTextColor:TGWorkshopCreamColor()];
     [root addSubview:title];
 
     _statusField = [TGTicTacToeLabel(NSMakeRect(170, 55, 360, 22),
                                      [_hostContext interfaceFontOfSize:13.0 bold:YES]) retain];
+    [_statusField setTextColor:TGWorkshopGoldColor()];
     [root addSubview:_statusField];
     _scoreField = [TGTicTacToeLabel(NSMakeRect(170, 82, 360, 20),
                                     [_hostContext interfaceFontOfSize:11.0 bold:NO]) retain];
+    [_scoreField setTextColor:TGWorkshopMutedCreamColor()];
     [root addSubview:_scoreField];
 
     NSMutableArray *buttons = [NSMutableArray array];
@@ -65,16 +76,20 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     for (index = 0; index < 9; index++) {
         NSUInteger row = index / 3;
         NSUInteger column = index % 3;
-        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(220 + column * 88,
+        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(222 + column * 88,
                                                                        120 + row * 88,
                                                                        80,
                                                                        80)] autorelease];
+        TGTicTacToeSquareCell *cell = [[[TGTicTacToeSquareCell alloc] initTextCell:@""] autorelease];
+        [cell setButtonType:NSMomentaryPushInButton];
+        [button setCell:cell];
         [button setTag:(NSInteger)index];
         [button setButtonType:NSMomentaryPushInButton];
         [button setBezelStyle:NSShadowlessSquareBezelStyle];
         [button setFont:[_hostContext interfaceFontOfSize:30.0 bold:YES]];
         [button setTarget:self];
         [button setAction:@selector(squarePressed:)];
+        [button setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin)];
         [root addSubview:button];
         [buttons addObject:button];
     }
@@ -95,8 +110,10 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     [_difficultyButton setAction:@selector(settingsChanged:)];
     [root addSubview:_difficultyButton];
 
-    _newRoundButton = [[NSButton alloc] initWithFrame:NSMakeRect(485, 403, 120, 30)];
-    [_newRoundButton setTitle:[_hostContext localizedStringForKey:@"game.newRound" fallback:@"New round"]];
+    _newRoundButton = [TGGameThemedButton(NSMakeRect(485, 403, 120, 30),
+                                           [_hostContext localizedStringForKey:@"game.newRound" fallback:@"New round"],
+                                           @"refresh",
+                                           _hostContext) retain];
     [_newRoundButton setTarget:self];
     [_newRoundButton setAction:@selector(newRound:)];
     [root addSubview:_newRoundButton];
@@ -104,24 +121,8 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     [self refreshFromEngine];
 }
 
-- (void)layoutBoard {
-    CGFloat width = NSWidth([[self view] bounds]);
-    CGFloat boardWidth = 256.0;
-    CGFloat originX = floor((width - boardWidth) / 2.0);
-    NSUInteger index = 0;
-    for (index = 0; index < [_boardButtons count]; index++) {
-        NSUInteger row = index / 3;
-        NSUInteger column = index % 3;
-        [[_boardButtons objectAtIndex:index] setFrame:NSMakeRect(originX + column * 88.0,
-                                                                 120.0 + row * 88.0,
-                                                                 80.0,
-                                                                 80.0)];
-    }
-}
-
 - (void)refreshFromEngine {
     if (!_statusField) return;
-    [self layoutBoard];
     [_modeButton selectItemAtIndex:[_engine mode]];
     [_difficultyButton selectItemAtIndex:[_engine difficulty]];
     [_difficultyButton setEnabled:([_engine mode] == TGTicTacToeModeComputer)];
@@ -133,8 +134,9 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
         [button setTitle:title];
         [button setEnabled:([[_engine winner] length] == 0 && [[board objectAtIndex:index] length] == 0)];
         if ([title length] > 0) {
-            NSColor *markColor = [[_hostContext themeColors] objectForKey:
-                                  ([[_engine winningIndexes] containsIndex:index] ? @"accent" : @"text")];
+            NSColor *markColor = [[_engine winningIndexes] containsIndex:index]
+                ? TGWorkshopGoldColor()
+                : TGWorkshopCreamColor();
             NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                         [_hostContext interfaceFontOfSize:30.0 bold:YES], NSFontAttributeName,
                                         markColor ? markColor : [NSColor controlTextColor], NSForegroundColorAttributeName,
@@ -160,9 +162,8 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
                                  (unsigned long)[_engine oWins],
                                  [_hostContext localizedStringForKey:@"game.draws" fallback:@"Draws"],
                                  (unsigned long)[_engine draws]]];
-    NSColor *text = [[_hostContext themeColors] objectForKey:@"text"];
-    [_statusField setTextColor:text ? text : [NSColor textColor]];
-    [_scoreField setTextColor:text ? text : [NSColor secondarySelectedControlColor]];
+    [_statusField setTextColor:TGWorkshopCreamColor()];
+    [_scoreField setTextColor:TGWorkshopMutedCreamColor()];
 }
 
 - (void)squarePressed:(id)sender {

@@ -1,4 +1,5 @@
 #import "TGSolitaireBoardView.h"
+#import "../../Sources/Workshop/UI/TGWorkshopSurfaceView.h"
 
 static const CGFloat TGSolitaireCardWidth = 72.0;
 static const CGFloat TGSolitaireCardHeight = 102.0;
@@ -128,9 +129,7 @@ static const CGFloat TGSolitaireFaceUpOffset = 27.0;
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    NSColor *background = [_themeColors objectForKey:@"accent"];
-    if (!background) background = [NSColor colorWithCalibratedRed:0.12 green:0.42 blue:0.28 alpha:1.0];
-    [background setFill];
+    [TGWorkshopFeltPatternColor() setFill];
     NSRectFill([self bounds]);
 
     NSRect stockRect = [self topRectAtColumn:0];

@@ -1,8 +1,10 @@
 #import "TGWorkshopViewController.h"
 #import "TGWorkshopButtonCell.h"
+#import "TGWorkshopSurfaceView.h"
 #import "../Catalog/TGWorkshopCatalog.h"
 #import "../Catalog/TGWorkshopCatalogEntry.h"
 #import "../../UI/TGLocalization.h"
+#import "../../UI/TGIconAssets.h"
 #import "../../UI/TGStatusButtonCells.h"
 #import "../../UI/TGStatusViewCells.h"
 #import "../../UI/TGTheme.h"
@@ -40,6 +42,26 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
     return button;
 }
 
+static NSImage *TGWorkshopBackImage(void) {
+    NSImage *source = TGTemplateIconAssetImage(@"route-arrow",
+                                               NSMakeSize(18.0, 18.0),
+                                               TGClassicHeaderTextColor(1.0),
+                                               1.0);
+    if (!source) return nil;
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(18.0, 18.0)] autorelease];
+    [image lockFocus];
+    NSAffineTransform *transform = [NSAffineTransform transform];
+    [transform translateXBy:18.0 yBy:0.0];
+    [transform scaleXBy:-1.0 yBy:1.0];
+    [transform concat];
+    [source drawInRect:NSMakeRect(0.0, 0.0, 18.0, 18.0)
+              fromRect:NSZeroRect
+             operation:NSCompositeSourceOver
+              fraction:1.0];
+    [image unlockFocus];
+    return image;
+}
+
 @implementation TGWorkshopViewController
 
 @synthesize delegate = _delegate;
@@ -58,11 +80,13 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 }
 
 - (void)loadView {
-    TGPanelView *rootView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(0, 0, 720, 560)] autorelease];
+    TGWorkshopSurfaceView *rootView = [[[TGWorkshopSurfaceView alloc] initWithFrame:NSMakeRect(0, 0, 720, 560)] autorelease];
     [rootView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [self setView:rootView];
 
-    _backButton = [TGWorkshopViewButton(NSMakeRect(12, 8, 66, 30), @"‹", 0) retain];
+    _backButton = [TGWorkshopViewButton(NSMakeRect(12, 8, 42, 30), @"", 0) retain];
+    [_backButton setImage:TGWorkshopBackImage()];
+    [_backButton setImagePosition:NSImageOnly];
     [_backButton setAutoresizingMask:NSViewMinYMargin];
     [[_backButton cell] setButtonType:NSMomentaryPushInButton];
     [_backButton setTarget:self];
@@ -71,7 +95,7 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 
     _titleField = [TGWorkshopViewLabel(NSMakeRect(88, 10, 350, 24), [NSFont boldSystemFontOfSize:14.0]) retain];
     [_titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-    [_titleField setTextColor:TGClassicHeaderTextColor(1.0)];
+    [_titleField setTextColor:TGWorkshopCreamColor()];
     [rootView addSubview:_titleField];
 
     NSArray *modeIdentifiers = [NSArray arrayWithObjects:
@@ -125,8 +149,8 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
     NSRect bounds = [[self view] bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    [_backButton setFrame:NSMakeRect(12, height - 36, 66, 28)];
-    [_titleField setFrame:NSMakeRect(88, height - 33, width - 104, 22)];
+    [_backButton setFrame:NSMakeRect(12, height - 38, 42, 30)];
+    [_titleField setFrame:NSMakeRect(64, height - 34, width - 80, 22)];
     NSUInteger index = 0;
     CGFloat tabsWidth = MIN(470.0, width - 40.0);
     CGFloat gap = 8.0;
@@ -175,9 +199,9 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 
 - (void)refreshTheme {
     if (!_titleField) return;
-    [_titleField setTextColor:TGClassicHeaderTextColor(1.0)];
-    [_categoryField setTextColor:TGClassicInkColor()];
-    [_statusField setTextColor:TGClassicMutedInkColor()];
+    [_titleField setTextColor:TGWorkshopCreamColor()];
+    [_categoryField setTextColor:TGWorkshopCreamColor()];
+    [_statusField setTextColor:TGWorkshopMutedCreamColor()];
     [[self view] setNeedsDisplay:YES];
     NSUInteger index = 0;
     for (index = 0; index < [_modeButtons count]; index++) {
@@ -242,7 +266,7 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
     if ([entries count] == 0) {
         NSTextField *empty = TGWorkshopViewLabel(NSMakeRect(18, 26, width - 36.0, 44), [NSFont systemFontOfSize:12.0]);
         [empty setAlignment:NSCenterTextAlignment];
-        [empty setTextColor:TGClassicMutedInkColor()];
+        [empty setTextColor:TGWorkshopMutedCreamColor()];
         [empty setStringValue:([_coordinator catalog] ? TGLoc(@"workshop.empty") : TGLoc(@"workshop.catalogUnavailable"))];
         [[empty cell] setLineBreakMode:NSLineBreakByWordWrapping];
         [_contentView addSubview:empty];

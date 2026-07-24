@@ -11,6 +11,24 @@ static NSError *TGWorkshopDownloadError(NSInteger code, NSString *message) {
                            userInfo:[NSDictionary dictionaryWithObject:message forKey:NSLocalizedDescriptionKey]];
 }
 
+static NSURL *TGWorkshopResolvedPackageURL(NSURL *catalogURL) {
+    NSString *host = [[catalogURL host] lowercaseString];
+    NSString *path = [catalogURL path];
+    NSString *prefix = @"/MiChiRose/telegraphica/releases/download/workshop-modules-v1/";
+    if (![host isEqualToString:@"github.com"] || ![path hasPrefix:prefix]) {
+        return catalogURL;
+    }
+    NSString *asset = [path substringFromIndex:[prefix length]];
+    if ([asset length] == 0 || [asset rangeOfString:@"/"].location != NSNotFound) {
+        return catalogURL;
+    }
+    NSString *escapedAsset = [asset stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    NSString *workerURL = [NSString stringWithFormat:
+                           @"https://telegraphica-tdlib-config.telegraphica.workers.dev/v1/workshop/package?asset=%@",
+                           escapedAsset];
+    return [NSURL URLWithString:workerURL];
+}
+
 @implementation TGWorkshopPackageDownloader
 
 - (BOOL)URLIsAllowed:(NSURL *)URL {
@@ -22,7 +40,8 @@ static NSError *TGWorkshopDownloadError(NSInteger code, NSString *message) {
                     progress:(TGWorkshopDownloadProgress)progress
                   completion:(TGWorkshopDownloadCompletion)completion {
     [self cancel];
-    if (!entry || ![self URLIsAllowed:[entry downloadURL]] || !TGWorkshopEnsureBaseDirectories(NULL)) {
+    NSURL *downloadURL = entry ? TGWorkshopResolvedPackageURL([entry downloadURL]) : nil;
+    if (!entry || ![self URLIsAllowed:downloadURL] || !TGWorkshopEnsureBaseDirectories(NULL)) {
         if (completion) completion(nil, TGWorkshopDownloadError(370, @"Workshop module download URL is not trusted."));
         return;
     }
@@ -37,7 +56,7 @@ static NSError *TGWorkshopDownloadError(NSInteger code, NSString *message) {
     _outputStream = [[NSOutputStream outputStreamToFileAtPath:_partialPath append:NO] retain];
     [_outputStream open];
 
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[entry downloadURL]
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:downloadURL
                                                            cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                                        timeoutInterval:60.0];
     [request setValue:TGUpdateCheckUserAgentString() forHTTPHeaderField:@"User-Agent"];

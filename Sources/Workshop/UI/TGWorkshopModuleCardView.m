@@ -1,9 +1,9 @@
 #import "TGWorkshopModuleCardView.h"
 #import "TGWorkshopButtonCell.h"
+#import "TGWorkshopSurfaceView.h"
 #import "../Catalog/TGWorkshopCatalogEntry.h"
 #import "../../UI/TGLocalization.h"
 #import "../../UI/TGStatusButtonCells.h"
-#import "../../UI/TGTheme.h"
 #import "../../UI/TGStatusSupport.h"
 #include <math.h>
 
@@ -88,75 +88,33 @@ static NSButton *TGWorkshopCardButton(NSRect frame, NSString *title) {
 }
 
 - (void)drawModuleIconInRect:(NSRect)rect {
-    NSString *identifier = [_entry moduleIdentifier];
-    NSColor *accent = TGClassicSelectedRowColor();
-    NSColor *ink = TGClassicSelectedRowTextColor();
+    NSString *name = [_entry localizedNameForLanguageCode:TGLanguageCode()];
+    NSString *initial = [name length] > 0 ? [name substringToIndex:1] : @"";
     NSBezierPath *background = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:9.0 yRadius:9.0];
-    [accent set];
+    [TGWorkshopBurgundyColor() set];
     [background fill];
-    [TGClassicPanelStrokeColor() set];
+    [TGWorkshopGoldColor() setStroke];
     [background setLineWidth:1.0];
     [background stroke];
-
-    [ink set];
-    if ([identifier rangeOfString:@"mine" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-        NSBezierPath *mine = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(rect, 13.0, 13.0)];
-        [mine fill];
-        NSInteger ray = 0;
-        for (ray = 0; ray < 8; ray++) {
-            CGFloat angle = ((CGFloat)ray / 8.0) * (CGFloat)M_PI * 2.0;
-            NSPoint center = NSMakePoint(NSMidX(rect), NSMidY(rect));
-            NSPoint inner = NSMakePoint(center.x + cos(angle) * 16.0, center.y + sin(angle) * 16.0);
-            NSPoint outer = NSMakePoint(center.x + cos(angle) * 23.0, center.y + sin(angle) * 23.0);
-            NSBezierPath *line = [NSBezierPath bezierPath];
-            [line setLineWidth:3.0];
-            [line moveToPoint:inner];
-            [line lineToPoint:outer];
-            [line stroke];
-        }
-    } else if ([identifier rangeOfString:@"solitaire" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-        NSRect backRect = NSMakeRect(NSMinX(rect) + 13.0, NSMinY(rect) + 10.0, 28.0, 38.0);
-        NSRect frontRect = NSMakeRect(NSMinX(rect) + 23.0, NSMinY(rect) + 16.0, 28.0, 38.0);
-        [[NSBezierPath bezierPathWithRoundedRect:backRect xRadius:3.0 yRadius:3.0] stroke];
-        [[NSBezierPath bezierPathWithRoundedRect:frontRect xRadius:3.0 yRadius:3.0] fill];
-    } else if ([identifier rangeOfString:@"check" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-        NSInteger row = 0;
-        NSInteger column = 0;
-        CGFloat side = 9.0;
-        for (row = 0; row < 4; row++) {
-            for (column = 0; column < 4; column++) {
-                if (((row + column) % 2) == 0) {
-                    NSRect square = NSMakeRect(NSMinX(rect) + 14.0 + column * side,
-                                               NSMinY(rect) + 14.0 + row * side,
-                                               side,
-                                               side);
-                    NSRectFill(square);
-                }
-            }
-        }
-    } else {
-        NSRect board = NSMakeRect(NSMinX(rect) + 13.0, NSMinY(rect) + 13.0, 38.0, 38.0);
-        [[NSBezierPath bezierPathWithRoundedRect:board xRadius:3.0 yRadius:3.0] stroke];
-        NSBezierPath *lines = [NSBezierPath bezierPath];
-        [lines setLineWidth:2.0];
-        [lines moveToPoint:NSMakePoint(NSMinX(board) + 12.7, NSMinY(board))];
-        [lines lineToPoint:NSMakePoint(NSMinX(board) + 12.7, NSMaxY(board))];
-        [lines moveToPoint:NSMakePoint(NSMinX(board) + 25.3, NSMinY(board))];
-        [lines lineToPoint:NSMakePoint(NSMinX(board) + 25.3, NSMaxY(board))];
-        [lines moveToPoint:NSMakePoint(NSMinX(board), NSMinY(board) + 12.7)];
-        [lines lineToPoint:NSMakePoint(NSMaxX(board), NSMinY(board) + 12.7)];
-        [lines moveToPoint:NSMakePoint(NSMinX(board), NSMinY(board) + 25.3)];
-        [lines lineToPoint:NSMakePoint(NSMaxX(board), NSMinY(board) + 25.3)];
-        [lines stroke];
-    }
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:25.0], NSFontAttributeName,
+                                TGWorkshopCreamColor(), NSForegroundColorAttributeName,
+                                nil];
+    NSSize size = [initial sizeWithAttributes:attributes];
+    [initial drawAtPoint:NSMakePoint(NSMidX(rect) - size.width / 2.0,
+                                     NSMidY(rect) - size.height / 2.0)
+          withAttributes:attributes];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect cardRect = NSInsetRect([self bounds], 0.5, 0.5);
     NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect xRadius:8.0 yRadius:8.0];
-    TGThemeDrawGroupedCardInPath(cardPath, cardRect, [self isFlipped]);
-    [TGClassicPanelStrokeColor() set];
+    NSGradient *gradient = [[[NSGradient alloc]
+                             initWithStartingColor:[NSColor colorWithCalibratedRed:0.035 green:0.27 blue:0.18 alpha:0.98]
+                             endingColor:TGWorkshopDeepGreenColor()] autorelease];
+    [gradient drawInBezierPath:cardPath angle:90.0];
+    [[TGWorkshopGoldColor() colorWithAlphaComponent:0.75] setStroke];
     [cardPath setLineWidth:1.0];
     [cardPath stroke];
     [self drawModuleIconInRect:NSMakeRect(10, NSHeight([self bounds]) - 68, 54, 54)];
@@ -184,12 +142,12 @@ static NSButton *TGWorkshopCardButton(NSRect frame, NSString *title) {
 }
 
 - (void)refreshTheme {
-    [_nameField setTextColor:TGClassicCardInkColor()];
-    [_descriptionField setTextColor:TGClassicCardMutedInkColor()];
-    [_detailsField setTextColor:TGClassicCardMutedInkColor()];
+    [_nameField setTextColor:TGWorkshopCreamColor()];
+    [_descriptionField setTextColor:TGWorkshopMutedCreamColor()];
+    [_detailsField setTextColor:TGWorkshopMutedCreamColor()];
     [_statusField setTextColor:([_errorMessage length] > 0
                                 ? [NSColor colorWithCalibratedRed:0.78 green:0.16 blue:0.13 alpha:1.0]
-                                : TGClassicCardMutedInkColor())];
+                                : TGWorkshopMutedCreamColor())];
     [self setNeedsDisplay:YES];
     [_primaryButton setNeedsDisplay:YES];
     [_removeButton setNeedsDisplay:YES];

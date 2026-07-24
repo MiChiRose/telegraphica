@@ -12,6 +12,7 @@
     NSTextField *_statisticsField;
     NSButton *_newDealButton;
     NSButton *_undoButton;
+    NSButton *_rulesButton;
 }
 - (id)initWithEngine:(TGSolitaireEngine *)engine hostContext:(id<TGWorkshopHostContext>)context;
 - (void)refreshFromEngine;

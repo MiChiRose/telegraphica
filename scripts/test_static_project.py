@@ -152,6 +152,25 @@ def check_media_center_pagination(errors):
         errors.append("%s: Belarusian media center status should tell users about scroll pagination" % localization_rel)
 
 
+def check_workshop_download_proxy(errors):
+    rel = os.path.join(
+        "Sources", "Workshop", "Installation", "TGWorkshopPackageDownloader.m"
+    )
+    text = read_text(os.path.join(ROOT, rel))
+    required_fragments = [
+        "TGWorkshopResolvedPackageURL",
+        'isEqualToString:@"github.com"',
+        "/MiChiRose/telegraphica/releases/download/workshop-modules-v1/",
+        "telegraphica-tdlib-config.telegraphica.workers.dev/v1/workshop/package?asset=",
+        "[self URLIsAllowed:downloadURL]",
+        "requestWithURL:downloadURL",
+    ]
+    for fragment in required_fragments:
+        if fragment not in text:
+            errors.append("%s: Workshop compatibility proxy contract is missing `%s`" %
+                          (rel, fragment))
+
+
 def check_no_local_runtime_data(errors):
     forbidden_names = [
         "tdlib-config.plist",
@@ -184,6 +203,7 @@ def main():
     check_project_membership(errors)
     check_test_structure(errors)
     check_media_center_pagination(errors)
+    check_workshop_download_proxy(errors)
     check_no_local_runtime_data(errors)
     if errors:
         print("Static project tests failed:")
