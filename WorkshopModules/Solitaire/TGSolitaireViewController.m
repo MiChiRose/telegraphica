@@ -58,7 +58,7 @@
 }
 
 - (void)refreshFromEngine {
-    if (![self isViewLoaded]) return;
+    if (!_statusField) return;
     [_statusField setStringValue:[_engine isWon]
                                  ? [_hostContext localizedStringForKey:@"game.won" fallback:@"You won"]
                                  : [_hostContext localizedStringForKey:@"solitaire.hint" fallback:@"Drag cards or double-click to move home"]];

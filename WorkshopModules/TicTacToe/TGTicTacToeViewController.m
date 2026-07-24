@@ -120,7 +120,7 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
 }
 
 - (void)refreshFromEngine {
-    if (![self isViewLoaded]) return;
+    if (!_statusField) return;
     [self layoutBoard];
     [_modeButton selectItemAtIndex:[_engine mode]];
     [_difficultyButton selectItemAtIndex:[_engine difficulty]];

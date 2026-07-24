@@ -155,7 +155,7 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 }
 
 - (void)refreshLocalization {
-    if (![self isViewLoaded]) return;
+    if (!_titleField) return;
     [_titleField setStringValue:TGLoc(@"workshop.title")];
     NSArray *titles = [NSArray arrayWithObjects:
                        TGLoc(@"workshop.available"),
@@ -174,7 +174,7 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 }
 
 - (void)refreshTheme {
-    if (![self isViewLoaded]) return;
+    if (!_titleField) return;
     [_titleField setTextColor:TGClassicHeaderTextColor(1.0)];
     [_categoryField setTextColor:TGClassicInkColor()];
     [_statusField setTextColor:TGClassicMutedInkColor()];
@@ -211,7 +211,7 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 }
 
 - (void)rebuildCards {
-    if (![self isViewLoaded]) return;
+    if (!_contentView) return;
     NSArray *existing = [[_contentView subviews] copy];
     for (NSView *view in existing) {
         [view removeFromSuperview];

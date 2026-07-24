@@ -121,7 +121,7 @@ static NSTextField *TGMinesweeperLabel(NSRect frame, NSFont *font) {
 }
 
 - (void)refreshFromEngine {
-    if (![self isViewLoaded]) return;
+    if (!_statusField) return;
     if ([_cellButtons count] != [_engine width] * [_engine height]) [self rebuildGrid];
     [_difficultyButton selectItemAtIndex:[_engine difficulty]];
     NSUInteger index = 0;

@@ -105,7 +105,7 @@ static const CGFloat TGCheckersBoardSize = 480.0;
 }
 
 - (void)refreshFromEngine {
-    if (![self isViewLoaded]) return;
+    if (!_statusField) return;
     NSInteger row;
     NSInteger column;
     for (row = 0; row < 8; row++) {
