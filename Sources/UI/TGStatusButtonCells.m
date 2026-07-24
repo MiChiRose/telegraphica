@@ -70,6 +70,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
     } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"]) {
         TGDrawTemplateIconAsset(@"folder-share", iconRect, color, 1.0, flipped);
+    } else if ([title isEqualToString:@"Workshop"] || [title isEqualToString:@"Мастерская"] || [title isEqualToString:@"Майстэрня"]) {
+        TGDrawTemplateIconAsset(@"workshop", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {
         TGDrawTemplateIconAsset(@"folder", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Logs"]) {

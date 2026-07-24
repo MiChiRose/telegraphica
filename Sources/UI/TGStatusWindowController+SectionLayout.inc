@@ -93,7 +93,10 @@
     }
 
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
-    [self showView:self.drawerButton visible:(ready && !drawerHidden)];
+    BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
+                                 [self.workshopViewController hasActiveModule]);
+    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive)];
+    [self showView:self.workshopDrawerButton visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
     [self showView:self.chatsLabel visible:showChats];
@@ -266,6 +269,9 @@
     [self showView:self.settingsLogsButton visible:showSettings];
     [self showView:self.settingsAboutButton visible:showSettings];
 
+    BOOL showWorkshop = (ready && [section isEqualToString:TGSectionWorkshop]);
+    [self showView:[self.workshopViewController view] visible:showWorkshop];
+
     [self showView:self.aboutPanelView visible:NO];
     [self showView:self.aboutCardView visible:NO];
     [self showView:self.aboutIconView visible:NO];
@@ -383,6 +389,10 @@
     [self.profilePanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    [[self.workshopViewController view] setFrame:NSMakeRect(mainX,
+                                                            mainY + 72.0,
+                                                            mainWidth,
+                                                            MAX(220.0, mainHeight - 72.0))];
     if (drawerVisible) {
         [contentView addSubview:self.topPanelView positioned:NSWindowAbove relativeTo:nil];
     }
@@ -391,7 +401,11 @@
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
     }
-    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, railTop - 124.0, accountBadgeWidth, 60.0)];
+    [self.workshopDrawerButton setFrame:NSMakeRect(railX + 8.0,
+                                                   railTop - 112.0,
+                                                   railWidth - 16.0,
+                                                   46.0)];
+    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, railTop - 176.0, accountBadgeWidth, 54.0)];
     if (drawerVisible) {
         [contentView addSubview:self.accountBadgeView positioned:NSWindowAbove relativeTo:nil];
     }
@@ -404,7 +418,21 @@
 
     CGFloat drawerFolderButtonHeight = 46.0;
     CGFloat drawerFolderButtonGap = 8.0;
-    CGFloat drawerFolderButtonY = railTop - 196.0;
+    CGFloat drawerFolderButtonY = railTop - 238.0;
+    CGFloat drawerFolderAvailableHeight = drawerFolderButtonY - railY - 8.0;
+    if ([self.drawerFolderButtons count] > 0) {
+        CGFloat requiredHeight = ([self.drawerFolderButtons count] * drawerFolderButtonHeight) +
+                                 (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap);
+        if (requiredHeight > drawerFolderAvailableHeight) {
+            drawerFolderButtonGap = 4.0;
+            drawerFolderButtonHeight = floor((drawerFolderAvailableHeight -
+                                              (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap)) /
+                                             [self.drawerFolderButtons count]);
+            if (drawerFolderButtonHeight < 32.0) {
+                drawerFolderButtonHeight = 32.0;
+            }
+        }
+    }
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.drawerFolderButtons count]; navigationIndex++) {
         NSButton *folderButton = [self.drawerFolderButtons objectAtIndex:navigationIndex];
@@ -418,6 +446,7 @@
         [contentView addSubview:self.titleField positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.statusField positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
+        [contentView addSubview:self.workshopDrawerButton positioned:NSWindowAbove relativeTo:nil];
     }
 
     CGFloat bottomNavigationHeight = 62.0;

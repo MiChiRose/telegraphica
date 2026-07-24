@@ -12,9 +12,9 @@
 
 static CGFloat const TGMessageBubbleMaximumWidth = 500.0;
 static CGFloat const TGMessagePhotoMaximumSide = 320.0;
-static CGFloat const TGOutgoingStatusDotSide = 6.0;
-static CGFloat const TGOutgoingStatusDotGap = 3.0;
-static CGFloat const TGOutgoingStatusDotInlineFontSize = 12.0;
+static CGFloat const TGOutgoingStatusCheckSide = 10.0;
+static CGFloat const TGOutgoingStatusCheckOverlap = 4.0;
+static CGFloat const TGOutgoingStatusCheckInlineFontSize = 12.0;
 
 NSString *TGInitialsForTitle(NSString *title) {
     if (![title isKindOfClass:[NSString class]] || [title length] == 0) {
@@ -447,6 +447,102 @@ static NSString *TGMediaFallbackIconNameForPlaceholder(NSString *placeholder) {
     return nil;
 }
 
+static NSString *TGStickerFallbackEmojiForMediaItem(NSDictionary *mediaItem) {
+    id emoji = [mediaItem objectForKey:@"emoji"];
+    if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0) {
+        return (NSString *)emoji;
+    }
+
+    NSString *placeholder = TGMediaItemPlaceholder(mediaItem);
+    if ([placeholder length] > 0 && ![placeholder isEqualToString:@"Sticker"]) {
+        return placeholder;
+    }
+    return @"☺";
+}
+
+static NSString *TGStickerFallbackCaptionForMediaItem(NSDictionary *mediaItem) {
+    id label = [mediaItem objectForKey:@"label"];
+    if ([label isKindOfClass:[NSString class]] && [(NSString *)label length] > 0) {
+        NSString *stickerPrefix = @"[Sticker] ";
+        if ([(NSString *)label hasPrefix:stickerPrefix] && [(NSString *)label length] > [stickerPrefix length]) {
+            return [(NSString *)label substringFromIndex:[stickerPrefix length]];
+        }
+        return (NSString *)label;
+    }
+
+    NSString *placeholder = TGMediaItemPlaceholder(mediaItem);
+    if ([placeholder length] > 0 && ![placeholder isEqualToString:@"Sticker"]) {
+        return placeholder;
+    }
+    return @"Sticker";
+}
+
+static NSString *TGStickerFallbackFormatBadgeForMediaItem(NSDictionary *mediaItem) {
+    NSString *format = TGMediaItemStickerFormat(mediaItem);
+    if ([format isEqualToString:@"stickerFormatTgs"]) {
+        return @"TGS";
+    }
+    if ([format isEqualToString:@"stickerFormatWebm"]) {
+        return @"WEBM";
+    }
+    if ([format isEqualToString:@"stickerFormatWebp"]) {
+        return @"WEBP";
+    }
+    return @"STICKER";
+}
+
+static void TGDrawStickerFallbackInRect(NSDictionary *mediaItem, NSRect rect, BOOL flipped) {
+    NSBezierPath *backgroundPath = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:11.0 yRadius:11.0];
+    [[NSColor colorWithCalibratedWhite:0.985 alpha:0.96] set];
+    [backgroundPath fill];
+
+    NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(rect, 7.0, 7.0) xRadius:9.0 yRadius:9.0];
+    [[NSColor colorWithCalibratedWhite:0.93 alpha:0.72] set];
+    [innerPath fill];
+
+    NSString *emoji = TGStickerFallbackEmojiForMediaItem(mediaItem);
+    NSString *caption = TGStickerFallbackCaptionForMediaItem(mediaItem);
+    NSFont *emojiFont = [NSFont fontWithName:@"Apple Color Emoji" size:38.0];
+    if (!emojiFont) {
+        emojiFont = [NSFont systemFontOfSize:38.0];
+    }
+    NSMutableParagraphStyle *centeredParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [centeredParagraph setAlignment:NSCenterTextAlignment];
+    [centeredParagraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSDictionary *emojiAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     emojiFont, NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     centeredParagraph, NSParagraphStyleAttributeName,
+                                     nil];
+    NSSize emojiSize = [emoji sizeWithAttributes:emojiAttributes];
+    CGFloat emojiY = NSMidY(rect) - floor(emojiSize.height / 2.0) - 8.0;
+    NSRect emojiRect = NSMakeRect(NSMinX(rect) + 8.0,
+                                  emojiY,
+                                  NSWidth(rect) - 16.0,
+                                  emojiSize.height + 4.0);
+    [emoji drawInRect:emojiRect withAttributes:emojiAttributes];
+
+    if ([caption length] > 0 && ![caption isEqualToString:emoji]) {
+        NSDictionary *captionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                           TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                           centeredParagraph, NSParagraphStyleAttributeName,
+                                           nil];
+        NSSize captionSize = [caption sizeWithAttributes:captionAttributes];
+        CGFloat captionY = NSMaxY(emojiRect) + 2.0;
+        if (!flipped) {
+            captionY = NSMinY(emojiRect) - captionSize.height - 3.0;
+        }
+        NSRect captionRect = NSMakeRect(NSMinX(rect) + 8.0,
+                                        captionY,
+                                        NSWidth(rect) - 16.0,
+                                        captionSize.height + 3.0);
+        [caption drawInRect:captionRect withAttributes:captionAttributes];
+    }
+
+    TGDrawMediaKindBadge(TGStickerFallbackFormatBadgeForMediaItem(mediaItem), rect, flipped);
+}
+
 NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth) {
     BOOL sticker = TGMediaItemIsSticker(mediaItem);
     CGFloat maximumSide = sticker ? 128.0 : TGMessagePhotoMaximumSide;
@@ -659,6 +755,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         }
     }
 
+    BOOL sticker = TGMediaItemIsSticker(mediaItem);
     if (image) {
         [NSGraphicsContext saveGraphicsState];
         [mediaPath addClip];
@@ -668,6 +765,8 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
             TGDrawImageInRect(image, rect, flipped);
         }
         [NSGraphicsContext restoreGraphicsState];
+    } else if (sticker) {
+        TGDrawStickerFallbackInRect(mediaItem, rect, flipped);
     } else {
         [[NSColor colorWithCalibratedWhite:0.96 alpha:0.92] set];
         [mediaPath fill];
@@ -713,7 +812,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         } else if (TGMediaItemIsVideo(mediaItem)) {
             TGDrawMediaKindBadge(@"VIDEO", rect, flipped);
         }
-        if (TGMediaItemIsPlayable(mediaItem)) {
+        if (TGMediaItemIsPlayable(mediaItem) && !sticker) {
             TGDrawMediaPlayBadge(rect, flipped);
         }
     }
@@ -1125,7 +1224,7 @@ CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item) {
     if ([item isKindOfClass:[TGMessageItem class]] && [item failedToSend]) {
         return 12.0;
     }
-    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? ((TGOutgoingStatusDotSide * 2.0) + TGOutgoingStatusDotGap) : 0.0;
+    return ([item isKindOfClass:[TGMessageItem class]] && [item outgoing]) ? ((TGOutgoingStatusCheckSide * 2.0) - TGOutgoingStatusCheckOverlap) : 0.0;
 }
 
 CGFloat TGComposerMinimumInputHeight(void) {
@@ -1140,24 +1239,83 @@ CGFloat TGComposerLineHeight(void) {
     return 16.0;
 }
 
-NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item) {
-    if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing]) {
-        return @"";
+static NSColor *TGOutgoingStatusCheckColorForIndex(TGMessageItem *item, NSUInteger index) {
+    BOOL delivered = ![item sending];
+    BOOL active = ((index == 0 && delivered) ||
+                   (index == 1 && delivered && [item outgoingRead]));
+    if (active) {
+        return [NSColor colorWithCalibratedWhite:0.38 alpha:0.94];
     }
-    if ([item failedToSend]) {
-        return @"!";
+    return [NSColor colorWithCalibratedWhite:0.72 alpha:0.72];
+}
+
+static NSImage *TGOutgoingStatusPairImageForItem(TGMessageItem *item) {
+    NSString *state = [item sending] ? @"sending" : ([item outgoingRead] ? @"read" : @"sent");
+    NSString *cacheKey = [NSString stringWithFormat:@"%@|%@", TGCurrentThemeIdentifier(), state];
+    static NSMutableDictionary *cache = nil;
+    if (!cache) {
+        cache = [[NSMutableDictionary alloc] init];
+    }
+    NSImage *cached = [cache objectForKey:cacheKey];
+    if (cached) {
+        return cached;
     }
 
-    BOOL delivered = ![item sending];
-    BOOL read = delivered && [item outgoingRead];
-    unichar chars[2];
-    chars[0] = delivered ? 0x25CF : 0x25CB;
-    chars[1] = read ? 0x25CF : 0x25CB;
-    return [NSString stringWithCharacters:chars length:2];
+    CGFloat checkStep = TGOutgoingStatusCheckSide - TGOutgoingStatusCheckOverlap;
+    NSSize pairSize = NSMakeSize((TGOutgoingStatusCheckSide * 2.0) - TGOutgoingStatusCheckOverlap,
+                                 TGOutgoingStatusCheckSide);
+    NSImage *pair = [[[NSImage alloc] initWithSize:pairSize] autorelease];
+    [pair lockFocus];
+    NSUInteger index = 0;
+    for (index = 0; index < 2; index++) {
+        NSImage *check = TGTemplateIconAssetImage(@"done-mini",
+                                                  NSMakeSize(TGOutgoingStatusCheckSide, TGOutgoingStatusCheckSide),
+                                                  TGOutgoingStatusCheckColorForIndex(item, index),
+                                                  1.0);
+        if (!check) {
+            continue;
+        }
+        NSRect checkRect = NSMakeRect(checkStep * (CGFloat)index,
+                                      0.0,
+                                      TGOutgoingStatusCheckSide,
+                                      TGOutgoingStatusCheckSide);
+        [check drawInRect:checkRect
+                 fromRect:NSZeroRect
+                operation:NSCompositeSourceOver
+                 fraction:1.0
+           respectFlipped:NO
+                    hints:nil];
+    }
+    [pair unlockFocus];
+    [cache setObject:pair forKey:cacheKey];
+    return pair;
+}
+
+NSAttributedString *TGOutgoingStatusInlineAttributedStringForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing]) {
+        return nil;
+    }
+    if ([item failedToSend]) {
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont boldSystemFontOfSize:TGOutgoingStatusCheckInlineFontSize], NSFontAttributeName,
+                                    [NSColor colorWithCalibratedRed:0.74 green:0.14 blue:0.12 alpha:0.95], NSForegroundColorAttributeName,
+                                    nil];
+        return [[[NSAttributedString alloc] initWithString:@" !" attributes:attributes] autorelease];
+    }
+
+    NSImage *pair = TGOutgoingStatusPairImageForItem(item);
+    if (!pair) {
+        return nil;
+    }
+    NSTextAttachmentCell *cell = [[[NSTextAttachmentCell alloc] initImageCell:pair] autorelease];
+    NSTextAttachment *attachment = [[[NSTextAttachment alloc] init] autorelease];
+    [attachment setAttachmentCell:cell];
+    NSMutableAttributedString *result = [[[NSMutableAttributedString alloc] initWithString:@" "] autorelease];
+    [result appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+    return result;
 }
 
 void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL flipped) {
-    (void)flipped;
     if (![item isKindOfClass:[TGMessageItem class]] || ![item outgoing] || NSIsEmptyRect(timeRect)) {
         return;
     }
@@ -1172,26 +1330,18 @@ void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL 
         return;
     }
 
-    CGFloat dotSide = TGOutgoingStatusDotSide;
-    CGFloat dotGap = TGOutgoingStatusDotGap;
-    CGFloat dotX = NSMaxX(timeRect) + 4.0;
-    CGFloat dotY = NSMinY(timeRect) + floor((NSHeight(timeRect) - dotSide) / 2.0) + 1.0;
-    NSColor *strokeColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.72];
-    NSColor *fillColor = [NSColor colorWithCalibratedWhite:0.470 alpha:0.86];
-    BOOL delivered = ![item sending];
-    BOOL read = delivered && [item outgoingRead];
-
+    CGFloat checkSide = TGOutgoingStatusCheckSide;
+    CGFloat checkStep = checkSide - TGOutgoingStatusCheckOverlap;
+    CGFloat checkX = NSMaxX(timeRect) + 4.0;
+    CGFloat checkY = NSMinY(timeRect) + floor((NSHeight(timeRect) - checkSide) / 2.0) + 1.0;
     NSUInteger index = 0;
     for (index = 0; index < 2; index++) {
-        NSRect dotRect = NSMakeRect(dotX + ((dotSide + dotGap) * (CGFloat)index), dotY, dotSide, dotSide);
-        NSBezierPath *dotPath = [NSBezierPath bezierPathWithOvalInRect:dotRect];
-        if ((index == 0 && delivered) || (index == 1 && read)) {
-            [fillColor set];
-            [dotPath fill];
-        }
-        [strokeColor set];
-        [dotPath setLineWidth:0.8];
-        [dotPath stroke];
+        NSRect checkRect = NSMakeRect(checkX + (checkStep * (CGFloat)index), checkY, checkSide, checkSide);
+        TGDrawTemplateIconAsset(@"done-mini",
+                                checkRect,
+                                TGOutgoingStatusCheckColorForIndex(item, index),
+                                1.0,
+                                flipped);
     }
 }
 
@@ -1330,13 +1480,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
                                                                                   attributes:timeAttributes] autorelease];
             [composedText appendAttributedString:timeSuffixText];
-            NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
-            if ([statusDots length] > 0) {
-                NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:TGOutgoingStatusDotInlineFontSize] forKey:NSFontAttributeName];
-                NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@" %@", statusDots]
-                                                                                        attributes:statusAttributes] autorelease];
-                [composedText appendAttributedString:statusSuffixText];
+            NSAttributedString *statusSuffix = TGOutgoingStatusInlineAttributedStringForItem(item);
+            if ([statusSuffix length] > 0) {
+                [composedText appendAttributedString:statusSuffix];
             }
         }
         NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 12000.0)
@@ -1401,14 +1547,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
-            NSString *statusDots = TGOutgoingStatusDotsInlineTextForItem(item);
-            if ([statusDots length] > 0) {
-                NSMutableDictionary *statusAttributes = [NSMutableDictionary dictionaryWithDictionary:timeAttributes];
-                [statusAttributes setObject:[NSFont boldSystemFontOfSize:TGOutgoingStatusDotInlineFontSize] forKey:NSFontAttributeName];
-                [statusAttributes setObject:[NSColor colorWithCalibratedWhite:0.470 alpha:0.78] forKey:NSForegroundColorAttributeName];
-                NSString *statusSuffix = [NSString stringWithFormat:@" %@", statusDots];
-                NSAttributedString *statusSuffixText = [[[NSAttributedString alloc] initWithString:statusSuffix attributes:statusAttributes] autorelease];
-                [composedMessageText appendAttributedString:statusSuffixText];
+            NSAttributedString *statusSuffix = TGOutgoingStatusInlineAttributedStringForItem(item);
+            if ([statusSuffix length] > 0) {
+                [composedMessageText appendAttributedString:statusSuffix];
             }
         }
     }

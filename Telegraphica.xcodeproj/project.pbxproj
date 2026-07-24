@@ -63,6 +63,33 @@
 		111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111299 /* TGChatDisplayPreferences.m */; };
 		111111111111111111111154 /* TGLocalDataReset.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111311 /* TGLocalDataReset.m */; };
 		111111111111111111111155 /* TGMessagePollSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111313 /* TGMessagePollSupport.m */; };
+		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
+		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
+		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
+		220000000000000000000004 /* TGWorkshopCatalogParser.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000004 /* TGWorkshopCatalogParser.m */; };
+		220000000000000000000005 /* TGWorkshopConfiguration.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000005 /* TGWorkshopConfiguration.m */; };
+		220000000000000000000006 /* TGWorkshopCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000006 /* TGWorkshopCoordinator.m */; };
+		220000000000000000000007 /* TGWorkshopHostContextImpl.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000007 /* TGWorkshopHostContextImpl.m */; };
+		220000000000000000000008 /* TGWorkshopModuleLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000008 /* TGWorkshopModuleLoader.m */; };
+		220000000000000000000009 /* TGWorkshopPaths.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000009 /* TGWorkshopPaths.m */; };
+		22000000000000000000000A /* TGWorkshopCompatibility.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000000A /* TGWorkshopCompatibility.m */; };
+		22000000000000000000000B /* TGWorkshopInstaller.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000000B /* TGWorkshopInstaller.m */; };
+		22000000000000000000000C /* TGWorkshopPackageDownloader.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000000C /* TGWorkshopPackageDownloader.m */; };
+		22000000000000000000000D /* TGWorkshopRegistryStore.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000000D /* TGWorkshopRegistryStore.m */; };
+		22000000000000000000000E /* TGWorkshopArchiveExtractor.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000000E /* TGWorkshopArchiveExtractor.m */; };
+		22000000000000000000000F /* TGWorkshopBundleValidator.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000000F /* TGWorkshopBundleValidator.m */; };
+		220000000000000000000010 /* TGWorkshopIntegrity.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000010 /* TGWorkshopIntegrity.m */; };
+		220000000000000000000011 /* TGWorkshopButtonCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000011 /* TGWorkshopButtonCell.m */; settings = {COMPILER_FLAGS = "-fvisibility=default"; }; };
+		220000000000000000000012 /* TGWorkshopModuleCardView.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000012 /* TGWorkshopModuleCardView.m */; };
+		220000000000000000000013 /* TGWorkshopViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000013 /* TGWorkshopViewController.m */; };
+		220000000000000000000014 /* unzip.c in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000014 /* unzip.c */; };
+		220000000000000000000015 /* ioapi.c in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000015 /* ioapi.c */; };
+		220000000000000000000016 /* WorkshopCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000016 /* WorkshopCatalog.json */; };
+		220000000000000000000017 /* WorkshopCatalogPublicKey.der in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000017 /* WorkshopCatalogPublicKey.der */; };
+		220000000000000000000018 /* WorkshopPackagePublicKey.der in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000018 /* WorkshopPackagePublicKey.der */; };
+		220000000000000000000019 /* TGWorkshopSurfaceView.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000019 /* TGWorkshopSurfaceView.m */; settings = {COMPILER_FLAGS = "-fvisibility=default"; }; };
+		22000000000000000000001A /* TGWorkshopRemovalConfirmationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */; };
+		22000000000000000000001B /* TGWorkshopHeaderNoticeView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -172,6 +199,33 @@
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		111111111111111111111316 /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
+		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
+		221000000000000000000003 /* TGWorkshopCatalogEntry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogEntry.m; sourceTree = "<group>"; };
+		221000000000000000000004 /* TGWorkshopCatalogParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogParser.m; sourceTree = "<group>"; };
+		221000000000000000000005 /* TGWorkshopConfiguration.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopConfiguration.m; sourceTree = "<group>"; };
+		221000000000000000000006 /* TGWorkshopCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Host/TGWorkshopCoordinator.m; sourceTree = "<group>"; };
+		221000000000000000000007 /* TGWorkshopHostContextImpl.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Host/TGWorkshopHostContextImpl.m; sourceTree = "<group>"; };
+		221000000000000000000008 /* TGWorkshopModuleLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Host/TGWorkshopModuleLoader.m; sourceTree = "<group>"; };
+		221000000000000000000009 /* TGWorkshopPaths.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Host/TGWorkshopPaths.m; sourceTree = "<group>"; };
+		22100000000000000000000A /* TGWorkshopCompatibility.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Installation/TGWorkshopCompatibility.m; sourceTree = "<group>"; };
+		22100000000000000000000B /* TGWorkshopInstaller.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Installation/TGWorkshopInstaller.m; sourceTree = "<group>"; };
+		22100000000000000000000C /* TGWorkshopPackageDownloader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Installation/TGWorkshopPackageDownloader.m; sourceTree = "<group>"; };
+		22100000000000000000000D /* TGWorkshopRegistryStore.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Installation/TGWorkshopRegistryStore.m; sourceTree = "<group>"; };
+		22100000000000000000000E /* TGWorkshopArchiveExtractor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Security/TGWorkshopArchiveExtractor.m; sourceTree = "<group>"; };
+		22100000000000000000000F /* TGWorkshopBundleValidator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Security/TGWorkshopBundleValidator.m; sourceTree = "<group>"; };
+		221000000000000000000010 /* TGWorkshopIntegrity.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Security/TGWorkshopIntegrity.m; sourceTree = "<group>"; };
+		221000000000000000000011 /* TGWorkshopButtonCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopButtonCell.m; sourceTree = "<group>"; };
+		221000000000000000000012 /* TGWorkshopModuleCardView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopModuleCardView.m; sourceTree = "<group>"; };
+		221000000000000000000013 /* TGWorkshopViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopViewController.m; sourceTree = "<group>"; };
+		221000000000000000000014 /* unzip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = unzip.c; sourceTree = "<group>"; };
+		221000000000000000000015 /* ioapi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ioapi.c; sourceTree = "<group>"; };
+		221000000000000000000016 /* WorkshopCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = WorkshopCatalog.json; sourceTree = "<group>"; };
+		221000000000000000000017 /* WorkshopCatalogPublicKey.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = WorkshopCatalogPublicKey.der; sourceTree = "<group>"; };
+		221000000000000000000018 /* WorkshopPackagePublicKey.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = WorkshopPackagePublicKey.der; sourceTree = "<group>"; };
+		221000000000000000000019 /* TGWorkshopSurfaceView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopSurfaceView.m; sourceTree = "<group>"; };
+		22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopRemovalConfirmationView.m; sourceTree = "<group>"; };
+		22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopHeaderNoticeView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,6 +247,7 @@
 			isa = PBXGroup;
 			children = (
 				111111111111111111111401 /* Sources */,
+				222000000000000000000002 /* Vendor */,
 				111111111111111111111402 /* Frameworks */,
 				111111111111111111111403 /* Products */,
 			);
@@ -209,6 +264,7 @@
 				111111111111111111111405 /* Services */,
 				111111111111111111111406 /* UI */,
 				111111111111111111111408 /* Media */,
+				222000000000000000000001 /* Workshop */,
 				111111111111111111111407 /* Resources */,
 			);
 			path = Sources;
@@ -360,9 +416,51 @@
 				111111111111111111111224 /* TelegraphicaNotificationIcon.png */,
 				111111111111111111111277 /* Icons */,
 				111111111111111111111229 /* ThirdPartyNotices.txt */,
+				221000000000000000000016 /* WorkshopCatalog.json */,
+				221000000000000000000017 /* WorkshopCatalogPublicKey.der */,
+				221000000000000000000018 /* WorkshopPackagePublicKey.der */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
+		};
+		222000000000000000000001 /* Workshop */ = {
+			isa = PBXGroup;
+			children = (
+				221000000000000000000001 /* TGWorkshopCatalog.m */,
+				221000000000000000000002 /* TGWorkshopCatalogClient.m */,
+				221000000000000000000003 /* TGWorkshopCatalogEntry.m */,
+				221000000000000000000004 /* TGWorkshopCatalogParser.m */,
+				221000000000000000000005 /* TGWorkshopConfiguration.m */,
+				221000000000000000000006 /* TGWorkshopCoordinator.m */,
+				221000000000000000000007 /* TGWorkshopHostContextImpl.m */,
+				221000000000000000000008 /* TGWorkshopModuleLoader.m */,
+				221000000000000000000009 /* TGWorkshopPaths.m */,
+				22100000000000000000000A /* TGWorkshopCompatibility.m */,
+				22100000000000000000000B /* TGWorkshopInstaller.m */,
+				22100000000000000000000C /* TGWorkshopPackageDownloader.m */,
+				22100000000000000000000D /* TGWorkshopRegistryStore.m */,
+				22100000000000000000000E /* TGWorkshopArchiveExtractor.m */,
+				22100000000000000000000F /* TGWorkshopBundleValidator.m */,
+				221000000000000000000010 /* TGWorkshopIntegrity.m */,
+				221000000000000000000011 /* TGWorkshopButtonCell.m */,
+				221000000000000000000012 /* TGWorkshopModuleCardView.m */,
+				221000000000000000000013 /* TGWorkshopViewController.m */,
+				221000000000000000000019 /* TGWorkshopSurfaceView.m */,
+				22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */,
+				22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */,
+			);
+			path = Workshop;
+			sourceTree = "<group>";
+		};
+		222000000000000000000002 /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				221000000000000000000014 /* unzip.c */,
+				221000000000000000000015 /* ioapi.c */,
+			);
+			name = minizip;
+			path = Vendor/minizip;
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
@@ -421,6 +519,9 @@
 				111111111111111111111114 /* TelegraphicaNotificationIcon.png in Resources */,
 				111111111111111111111141 /* Icons in Resources */,
 				111111111111111111111119 /* ThirdPartyNotices.txt in Resources */,
+				220000000000000000000016 /* WorkshopCatalog.json in Resources */,
+				220000000000000000000017 /* WorkshopCatalogPublicKey.der in Resources */,
+				220000000000000000000018 /* WorkshopPackagePublicKey.der in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -478,6 +579,30 @@
 				111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */,
 				111111111111111111111154 /* TGLocalDataReset.m in Sources */,
 				111111111111111111111155 /* TGMessagePollSupport.m in Sources */,
+				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
+				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
+				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,
+				220000000000000000000004 /* TGWorkshopCatalogParser.m in Sources */,
+				220000000000000000000005 /* TGWorkshopConfiguration.m in Sources */,
+				220000000000000000000006 /* TGWorkshopCoordinator.m in Sources */,
+				220000000000000000000007 /* TGWorkshopHostContextImpl.m in Sources */,
+				220000000000000000000008 /* TGWorkshopModuleLoader.m in Sources */,
+				220000000000000000000009 /* TGWorkshopPaths.m in Sources */,
+				22000000000000000000000A /* TGWorkshopCompatibility.m in Sources */,
+				22000000000000000000000B /* TGWorkshopInstaller.m in Sources */,
+				22000000000000000000000C /* TGWorkshopPackageDownloader.m in Sources */,
+				22000000000000000000000D /* TGWorkshopRegistryStore.m in Sources */,
+				22000000000000000000000E /* TGWorkshopArchiveExtractor.m in Sources */,
+				22000000000000000000000F /* TGWorkshopBundleValidator.m in Sources */,
+				220000000000000000000010 /* TGWorkshopIntegrity.m in Sources */,
+				220000000000000000000011 /* TGWorkshopButtonCell.m in Sources */,
+				220000000000000000000012 /* TGWorkshopModuleCardView.m in Sources */,
+				220000000000000000000013 /* TGWorkshopViewController.m in Sources */,
+				220000000000000000000014 /* unzip.c in Sources */,
+				220000000000000000000015 /* ioapi.c in Sources */,
+				220000000000000000000019 /* TGWorkshopSurfaceView.m in Sources */,
+				22000000000000000000001A /* TGWorkshopRemovalConfirmationView.m in Sources */,
+				22000000000000000000001B /* TGWorkshopHeaderNoticeView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -533,7 +658,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;
@@ -571,7 +696,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;
@@ -584,6 +709,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lz",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.michirose.Telegraphica;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
@@ -596,6 +725,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lz",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.michirose.Telegraphica;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;

@@ -8,13 +8,27 @@ TARGET="Telegraphica"
 SCHEME="${TELEGRAPHICA_SCHEME:-$TARGET}"
 APP_NAME="Telegraphica.app"
 EXECUTABLE_NAME="Telegraphica"
-DEPLOYMENT_TARGET="10.9"
+DEPLOYMENT_TARGET="${TELEGRAPHICA_DEPLOYMENT_TARGET:-${MACOSX_DEPLOYMENT_TARGET:-10.8}}"
 ARCH="x86_64"
 BUILD_ROOT="build-legacy"
 DERIVED_DATA_PATH="$BUILD_ROOT/DerivedData"
 DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
 
-if [ -z "${DEVELOPER_DIR:-}" ] && [ -d "/Applications/Xcode_6.2.app/Contents/Developer" ]; then
+export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
+export LC_ALL=C
+export LANG=C
+
+if [ -z "${DEVELOPER_DIR:-}" ] && [ "$DEPLOYMENT_TARGET" = "10.8" ] && [ -d "/Applications/Xcode 5.1.1.app/Contents/Developer" ]; then
+    XCODE5_DEVELOPER_DIR="/Applications/Xcode 5.1.1.app/Contents/Developer"
+    XCODE5_LINK="${TMPDIR:-/tmp}/telegraphica-xcode-5.1.1-developer"
+    if [ -L "$XCODE5_LINK" ] && [ "$(readlink "$XCODE5_LINK")" != "$XCODE5_DEVELOPER_DIR" ]; then
+        rm -f "$XCODE5_LINK"
+    fi
+    if [ ! -e "$XCODE5_LINK" ]; then
+        ln -s "$XCODE5_DEVELOPER_DIR" "$XCODE5_LINK"
+    fi
+    export DEVELOPER_DIR="$XCODE5_LINK"
+elif [ -z "${DEVELOPER_DIR:-}" ] && [ -d "/Applications/Xcode_6.2.app/Contents/Developer" ]; then
     export DEVELOPER_DIR="/Applications/Xcode_6.2.app/Contents/Developer"
 fi
 
@@ -55,11 +69,34 @@ else
     echo "Skipping legacy compatibility script: python/python3 was not found."
 fi
 
-SDK_NAME="macosx"
-if "$XCODEBUILD" -showsdks 2>/dev/null | grep -q "macosx10\.9"; then
-    SDK_NAME="macosx10.9"
+SDK_NAME="${TELEGRAPHICA_SDK_NAME:-macosx}"
+if [ -z "${TELEGRAPHICA_SDK_NAME:-}" ]; then
+    for SDK_CANDIDATE in macosx10.9 macosx10.8; do
+        if "$XCODEBUILD" -showsdks 2>/dev/null | grep -q "$SDK_CANDIDATE"; then
+            SDK_NAME="$SDK_CANDIDATE"
+            break
+        fi
+    done
 fi
-SDK_ARGS=(-sdk "$SDK_NAME")
+
+SDK_BUILD_ROOT="${SDKROOT:-}"
+if [ -z "$SDK_BUILD_ROOT" ]; then
+    SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path 2>/dev/null || true)"
+    if [ -n "$SDK_PATH" ]; then
+        SDK_LINK="${TMPDIR:-/tmp}/telegraphica-macosx-sdk"
+        if [ -L "$SDK_LINK" ] && [ "$(readlink "$SDK_LINK")" != "$SDK_PATH" ]; then
+            rm -f "$SDK_LINK"
+        fi
+        if [ ! -e "$SDK_LINK" ]; then
+            ln -s "$SDK_PATH" "$SDK_LINK"
+        fi
+        SDK_BUILD_ROOT="$SDK_LINK"
+        export SDKROOT="$SDK_BUILD_ROOT"
+    else
+        SDK_BUILD_ROOT="$SDK_NAME"
+    fi
+fi
+SDK_ARGS=(-sdk "$SDK_BUILD_ROOT")
 
 scripts/check_media_item_support.sh "$ARCH" "$BUILD_ROOT/Tests/media-item-support" "$SDK_NAME"
 
@@ -201,12 +238,26 @@ PY
 }
 
 BUNDLED_TDLIB_CONFIG_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH:-}"
+BUNDLED_TDLIB_CREDENTIALS_SOURCE="${TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH:-}"
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && ! valid_tdlib_config "$BUNDLED_TDLIB_CONFIG_SOURCE"; then
     echo "TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH is missing or does not contain valid api_id and api_hash."
     exit 1
 fi
+if [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    if [ ! -f "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ] ||
+       ! grep -q "TGTDLibRuntimeBundledConfigurationIsAvailable" "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ||
+       ! grep -q "TGTDLibRuntimeBundledConfiguration" "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ||
+       ! grep -q "return YES;" "$BUNDLED_TDLIB_CREDENTIALS_SOURCE"; then
+        echo "TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH is not a valid generated credentials provider."
+        exit 1
+    fi
+fi
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    echo "Use either TELEGRAPHICA_BUNDLED_TDLIB_CONFIG_PATH or TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH, not both."
+    exit 1
+fi
 
-if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && [ -z "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
     for CONFIG_CANDIDATE in \
         "$HOME/Library/Application Support/Telegraphica/tdlib-config.plist" \
         "$BUILD_ROOT/Release/$APP_NAME/Contents/Resources/TelegraphicaTDLibDefaults.plist" \
@@ -222,12 +273,16 @@ fi
 
 TDJSON_STAGED_PATH=""
 BUNDLED_TDLIB_CONFIG_TEMP=""
+BUNDLED_TDLIB_CREDENTIALS_TEMP=""
 cleanup_legacy_build_inputs() {
     if [ -n "$TDJSON_STAGED_PATH" ]; then
         rm -f "$TDJSON_STAGED_PATH"
     fi
     if [ -n "$BUNDLED_TDLIB_CONFIG_TEMP" ]; then
         rm -f "$BUNDLED_TDLIB_CONFIG_TEMP"
+    fi
+    if [ -n "$BUNDLED_TDLIB_CREDENTIALS_TEMP" ]; then
+        rm -f "$BUNDLED_TDLIB_CREDENTIALS_TEMP"
     fi
 }
 trap cleanup_legacy_build_inputs EXIT
@@ -238,6 +293,12 @@ if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
     chmod 0600 "$BUNDLED_TDLIB_CONFIG_TEMP"
     BUNDLED_TDLIB_CONFIG_SOURCE="$BUNDLED_TDLIB_CONFIG_TEMP"
     echo "Preserved the existing internal Telegram connection configuration."
+elif [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    BUNDLED_TDLIB_CREDENTIALS_TEMP="$(mktemp /tmp/telegraphica-tdlib-credentials.XXXXXX)"
+    ditto "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" "$BUNDLED_TDLIB_CREDENTIALS_TEMP"
+    chmod 0600 "$BUNDLED_TDLIB_CREDENTIALS_TEMP"
+    BUNDLED_TDLIB_CREDENTIALS_SOURCE="$BUNDLED_TDLIB_CREDENTIALS_TEMP"
+    echo "Preserved the existing generated Telegram connection provider."
 else
     echo "Warning: no internal Telegram connection configuration was found."
     echo "This development build will not be able to start a new Telegram sign-in."
@@ -259,7 +320,13 @@ rm -rf "$BUILD_ROOT" "$APP_NAME"
 
 GENERATED_DIR="$BUILD_ROOT/Generated"
 GENERATED_TDLIB_CREDENTIALS_SOURCE="$GENERATED_DIR/TGTDLibBundledCredentialsGenerated.m"
-generate_tdlib_runtime_credentials_source "$BUNDLED_TDLIB_CONFIG_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+if [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
+    mkdir -p "$GENERATED_DIR"
+    ditto "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+    chmod 0600 "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+else
+    generate_tdlib_runtime_credentials_source "$BUNDLED_TDLIB_CONFIG_SOURCE" "$GENERATED_TDLIB_CREDENTIALS_SOURCE"
+fi
 
 WEBP_BUILD_DIR="$BUILD_ROOT/Vendor/libwebp"
 scripts/build_webp_legacy.sh "$ARCH" "$WEBP_BUILD_DIR"
@@ -297,7 +364,7 @@ fi
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
     "VALID_ARCHS=$ARCH"
-    "SDKROOT=$SDK_NAME"
+    "SDKROOT=$SDK_BUILD_ROOT"
     "ONLY_ACTIVE_ARCH=NO"
     "MACOSX_DEPLOYMENT_TARGET=$DEPLOYMENT_TARGET"
     "CLANG_ENABLE_OBJC_ARC=NO"
@@ -426,7 +493,7 @@ fi
 
 RESOURCES_DIR="$APP_NAME/Contents/Resources"
 rm -f "$RESOURCES_DIR/TelegraphicaTDLibDefaults.plist"
-if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ]; then
+if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] || [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
     RUNTIME_CONFIG_MARKER="$RESOURCES_DIR/TelegraphicaTDLibRuntimeDefaults.plist"
     mkdir -p "$RESOURCES_DIR"
     rm -f "$RUNTIME_CONFIG_MARKER"
@@ -453,6 +520,8 @@ mkdir -p "$HELPERS_DIR"
 ditto "$OPUS_HELPER_PATH" "$HELPERS_DIR/tgopusdec"
 chmod 0755 "$HELPERS_DIR/tgopusdec"
 echo "Bundled Opus decoder helper: $HELPERS_DIR/tgopusdec"
+
+scripts/check_release_bundle_legacy.sh "$APP_NAME" "$DEPLOYMENT_TARGET"
 
 xattr -cr "$APP_NAME" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then

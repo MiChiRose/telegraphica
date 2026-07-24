@@ -15,6 +15,7 @@ else
 fi
 
 ARCH="${TELEGRAPHICA_TEST_ARCH:-x86_64}"
+DEPLOYMENT_TARGET="${TELEGRAPHICA_TEST_DEPLOYMENT_TARGET:-10.8}"
 SDK_NAME="${TELEGRAPHICA_TEST_SDK:-macosx}"
 if xcodebuild -showsdks 2>/dev/null | grep -q "macosx10\.9"; then
     SDK_NAME="${TELEGRAPHICA_TEST_SDK:-macosx10.9}"
@@ -55,13 +56,22 @@ fi
 echo "== Mock TDLib event reducer =="
 "$PYTHON_BIN" Tests/mock_tdlib_event_probe.py
 
+echo "== Workshop game logic =="
+Tests/Workshop/run_game_tests.sh
+
+echo "== Workshop installer state =="
+Tests/Workshop/run_installer_state_tests.sh
+
+echo "== Media Workbench =="
+Tests/Workshop/run_media_workbench_tests.sh
+
 echo "== Media preview gate =="
 scripts/check_media_item_support.sh "$ARCH" "$BUILD_DIR/media-item-support" "$SDK_NAME"
 
 echo "== Core logic probe =="
 COMPILE_FLAGS=(
     -arch "$ARCH"
-    -mmacosx-version-min=10.9
+    "-mmacosx-version-min=$DEPLOYMENT_TARGET"
     -fblocks
     -fno-objc-arc
     -I"$ROOT_DIR/Sources/Core"

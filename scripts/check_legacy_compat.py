@@ -6,6 +6,7 @@ import re
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+DEPLOYMENT_TARGET = os.environ.get("TELEGRAPHICA_DEPLOYMENT_TARGET") or os.environ.get("MACOSX_DEPLOYMENT_TARGET") or "10.8"
 
 SOURCE_EXTENSIONS = (".h", ".m", ".mm", ".c", ".cpp", ".hpp", ".plist", ".pbxproj", ".sh")
 
@@ -22,6 +23,16 @@ FORBIDDEN_TEXT = [
     ("NSLayoutAnchor", "Use frame/autoresizing or old NSLayoutConstraint APIs."),
     ("activateConstraints:", "Use addConstraints: for Xcode 6.2 compatibility."),
     ("NSStackView", "Use Mavericks-safe manual AppKit layout."),
+    ("base64EncodedStringWithOptions:", "Use NSData base64Encoding for the OS X 10.8 Mountain Lion lane."),
+    ("base64EncodedDataWithOptions:", "Use NSData base64Encoding for the OS X 10.8 Mountain Lion lane."),
+    ("initWithBase64EncodedString:", "Use NSData initWithBase64Encoding: for the OS X 10.8 Mountain Lion lane."),
+    ("initWithBase64EncodedData:", "Use NSData initWithBase64Encoding: for the OS X 10.8 Mountain Lion lane."),
+    ("dataWithBase64EncodedString:", "Use NSData initWithBase64Encoding: for the OS X 10.8 Mountain Lion lane."),
+    ("NSDataBase64EncodingOptions", "Use the pre-10.9 NSData base64Encoding APIs for the Mountain Lion lane."),
+    ("NSDataBase64DecodingOptions", "Use the pre-10.9 NSData initWithBase64Encoding: APIs for the Mountain Lion lane."),
+    ("colorWithWhite:", "Use colorWithCalibratedWhite:alpha: or colorWithDeviceWhite:alpha: for OS X 10.8."),
+    ("colorWithRed:", "Use colorWithCalibratedRed:green:blue:alpha: or colorWithDeviceRed:green:blue:alpha: for OS X 10.8."),
+    ("colorWithHue:", "Use colorWithCalibratedHue:saturation:brightness:alpha: or colorWithDeviceHue:saturation:brightness:alpha: for OS X 10.8."),
     ("NSLog(", "Use TGLogger redaction instead of direct NSLog."),
 ]
 
@@ -87,8 +98,9 @@ def check_plist(errors):
         fail(errors, "Sources/Info.plist", "Missing Info.plist.")
         return
     text = read_text(plist)
-    if "<key>LSMinimumSystemVersion</key>" not in text or "<string>10.9</string>" not in text:
-        fail(errors, "Sources/Info.plist", "LSMinimumSystemVersion must be 10.9.")
+    expected = "<string>%s</string>" % DEPLOYMENT_TARGET
+    if "<key>LSMinimumSystemVersion</key>" not in text or expected not in text:
+        fail(errors, "Sources/Info.plist", "LSMinimumSystemVersion must be %s." % DEPLOYMENT_TARGET)
 
 
 def check_project(errors):
@@ -97,8 +109,9 @@ def check_project(errors):
         fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "Missing Xcode project.")
         return
     text = read_text(project)
-    if "MACOSX_DEPLOYMENT_TARGET = 10.9;" not in text:
-        fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "MACOSX_DEPLOYMENT_TARGET must be 10.9.")
+    expected = "MACOSX_DEPLOYMENT_TARGET = %s;" % DEPLOYMENT_TARGET
+    if expected not in text:
+        fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "MACOSX_DEPLOYMENT_TARGET must be %s." % DEPLOYMENT_TARGET)
     if "CLANG_ENABLE_OBJC_ARC = NO;" not in text:
         fail(errors, "Telegraphica.xcodeproj/project.pbxproj", "ARC must stay disabled until the legacy build lane proves otherwise.")
     if "x86_64" not in text:

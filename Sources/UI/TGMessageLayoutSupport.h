@@ -56,7 +56,7 @@ CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item);
 CGFloat TGComposerMinimumInputHeight(void);
 CGFloat TGComposerMaximumInputHeight(void);
 CGFloat TGComposerLineHeight(void);
-NSString *TGOutgoingStatusDotsInlineTextForItem(TGMessageItem *item);
+NSAttributedString *TGOutgoingStatusInlineAttributedStringForItem(TGMessageItem *item);
 void TGDrawOutgoingStatusDotsForItem(TGMessageItem *item, NSRect timeRect, BOOL flipped);
 CGFloat TGMessageMediaFooterHeightForItem(TGMessageItem *item);
 NSSize TGListMessageMediaDisplaySizeForItem(TGMessageItem *item, CGFloat availableWidth);

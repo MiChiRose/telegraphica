@@ -146,7 +146,7 @@ NSString *TGUpdateCheckUserAgentString(void) {
     if ([version length] == 0) {
         version = @"unknown";
     }
-    return [NSString stringWithFormat:@"Telegraphica/%@ (Mac OS X; Mavericks-compatible)", version];
+    return [NSString stringWithFormat:@"Telegraphica/%@ (Mac OS X; 10.8-10.13-unified; x86_64)", version];
 }
 
 NSString *TGUpdateDownloadURLStringFromInfo(NSDictionary *info) {

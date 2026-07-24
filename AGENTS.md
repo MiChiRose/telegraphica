@@ -34,11 +34,11 @@ These project rules apply to Codex work in this repository.
 
 ## Project Constraints
 
-- Target OS: OS X 10.9.5 Mavericks.
+- Target OS: one application and release artifact for OS X 10.8 through macOS 10.13.
 - Target architecture: Intel x86_64.
-- Target toolchain: Xcode 6.2-compatible where possible.
+- Target toolchain: Xcode 5.1.1-compatible for the shared 10.8 deployment target, while preserving Xcode 6.2 compatibility.
 - Use Objective-C, Cocoa, and AppKit.
-- Do not use Swift, SwiftUI, official Telegram branding/logo/assets, or macOS 10.10+ APIs without a Mavericks-safe fallback.
+- Do not use Swift, SwiftUI, official Telegram branding/logo/assets, or OS X 10.9+ APIs without a Mountain Lion-safe fallback.
 - When adding UI or feature code, prefer focused component/helper files over growing large controllers such as `TGStatusWindowController.m`; keep new modules cohesive and import them from the owning controller.
 - Do not let one file become a broad mixed-responsibility dump. If a feature adds a meaningful amount of UI, media, data-flow, presentation, or TDLib orchestration code, split that area into a small focused file during the same task.
 - For refactors of oversized files, prefer substantial cohesive moves of complete method groups or helper responsibilities over tiny cosmetic reductions. Verify with local checks and, when relevant, the remote Mavericks HITL build flow.

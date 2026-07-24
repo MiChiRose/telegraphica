@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ARCH="${WEBP_TEST_ARCH:-$(uname -m)}"
 BUILD_DIR="${TMPDIR:-/tmp}/telegraphica-webp-check"
 CC_BIN="$(xcrun -f clang 2>/dev/null || command -v clang || command -v cc || true)"
-SDK_PATH="$(xcrun --show-sdk-path 2>/dev/null || true)"
+SDK_PATH="${SDKROOT:-$(xcrun --show-sdk-path 2>/dev/null || true)}"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 
 if [ -z "$CC_BIN" ]; then
     echo "clang or cc is required for the WebP decoder check."
@@ -18,7 +19,7 @@ mkdir -p "$BUILD_DIR"
 
 COMPILE_FLAGS=(
     -arch "$ARCH"
-    -mmacosx-version-min=10.9
+    -mmacosx-version-min="$DEPLOYMENT_TARGET"
     -I"$ROOT_DIR/Vendor/libwebp/src"
 )
 if [ -n "$SDK_PATH" ]; then
