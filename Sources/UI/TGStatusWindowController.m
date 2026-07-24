@@ -35,6 +35,7 @@
 #import "../Services/TGLocalDataReset.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
+#import "../Services/TGSystemCompatibility.h"
 #import "../Workshop/Host/TGWorkshopCoordinator.h"
 #import "../Workshop/UI/TGWorkshopViewController.h"
 #import <AVFoundation/AVFoundation.h>
@@ -63,12 +64,20 @@ static NSString * const TGNotificationsWhenActiveDefaultsKey = @"TelegraphicaNot
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
+static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvailableUpdateVersion";
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
+
+static BOOL TGMountainLionSafeLoginModeEnabled(void) {
+    if (!TGSystemIsMountainLion()) {
+        return NO;
+    }
+    return ![[NSUserDefaults standardUserDefaults] boolForKey:TGMountainLionSafeLoginModeDisabledDefaultsKey];
+}
 
 @interface TGPointingHandButton : NSButton
 @end
@@ -1115,6 +1124,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
         [self refreshUpdateAvailabilityBadge];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling will drain updates without automatic chat refresh."];
+        }
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
         [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
@@ -3211,6 +3223,10 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     NSString *version = [info objectForKey:@"CFBundleShortVersionString"];
     NSString *build = [info objectForKey:@"CFBundleVersion"];
     NSString *versionText = [NSString stringWithFormat:@"Version %@ (%@)", version ? version : @"0.1.0", build ? build : @"0.1.0"];
+    NSString *compatibilitySummary = [info objectForKey:@"TelegraphicaCompatibilitySummary"];
+    if ([compatibilitySummary length] > 0) {
+        versionText = [versionText stringByAppendingFormat:@" — %@", compatibilitySummary];
+    }
     self.aboutVersionField = [self labelWithFrame:NSMakeRect(240, 324, 500, 22)
                                              text:versionText
                                              font:[NSFont systemFontOfSize:12.0]];
@@ -3528,7 +3544,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     }
     self.activeSection = TGSectionProfile;
     [self updateVisibleSection];
-    if (!self.profileSummaryLoaded && !self.profileSummaryLoading && !self.controlsBusy) {
+    if (!self.profileSummaryLoaded && !self.profileSummaryLoading && !self.controlsBusy &&
+        !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 }
@@ -3570,7 +3587,8 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [self updateVisibleSection];
     if ([self.activeSection isEqualToString:TGSectionProfile] &&
         !self.profileSummaryLoaded && !self.profileSummaryLoading &&
-        [self.currentAuthState isEqualToString:@"ready"] && !self.controlsBusy) {
+        [self.currentAuthState isEqualToString:@"ready"] && !self.controlsBusy &&
+        !TGMountainLionSafeLoginModeEnabled()) {
         [self reloadProfileSummaryIfReady];
     }
 }

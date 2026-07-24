@@ -868,6 +868,11 @@
 }
 
 - (void)reloadProfileSummaryIfReady {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        [self appendDetail:@"Mountain Lion safe login mode: profile loading is paused for this build."];
+        return;
+    }
+
     if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy || self.profileSummaryLoading) {
         return;
     }
@@ -967,6 +972,9 @@
     if (interactive) {
         [self setControlsBusy:YES];
         [self.statusField setStringValue:@"Loading chats..."];
+        if (TGMountainLionSafeLoginModeEnabled()) {
+            [self appendDetail:@"Mountain Lion safe login mode: loading chats with TDLib message database disabled."];
+        }
         [self appendDetail:activeFilterID ? @"Loading folder chat previews from TDLib..." : @"Loading main chat previews from TDLib..."];
     } else {
         self.backgroundChatRefreshInFlight = YES;
@@ -1051,8 +1059,10 @@
                     if (self.chatsExhausted) {
                         [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
                     }
-                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
+                } else if (TGMountainLionSafeLoginModeEnabled()) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu chat previews after Mountain Lion safe login.", (unsigned long)[itemsCopy count]]];
                 }
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib chat previews loaded: %lu", (unsigned long)[itemsCopy count]]];
             } else {
                 BOOL looksOffline = TGStatusErrorLooksOffline(chatErrorMessage);
                 if (interactive) {
@@ -1318,6 +1328,12 @@
 }
 
 - (void)handlePendingLiveRefreshesIfPossible {
+    if (TGMountainLionSafeLoginModeEnabled()) {
+        self.pendingLiveChatRefresh = NO;
+        self.pendingLiveMessageRefresh = NO;
+        return;
+    }
+
     if (self.controlsBusy || ![self.currentAuthState isEqualToString:@"ready"]) {
         return;
     }
@@ -1354,6 +1370,7 @@
     BOOL needsMessageRefresh = NO;
     BOOL needsChatFilterRefresh = NO;
     BOOL needsPinnedMessageRefresh = NO;
+    BOOL mountainLionSafeLoginMode = TGMountainLionSafeLoginModeEnabled();
 
     NSUInteger index = 0;
     for (index = 0; index < [updates count]; index++) {
@@ -1372,9 +1389,11 @@
         }
 
         if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"] || [kind isEqualToString:@"message_update"]) {
-            needsChatRefresh = YES;
-            self.chatsExhausted = NO;
-            [self.client invalidateMainChatListExhaustion];
+            if (!mountainLionSafeLoginMode) {
+                needsChatRefresh = YES;
+                self.chatsExhausted = NO;
+                [self.client invalidateMainChatListExhaustion];
+            }
             if ([kind isEqualToString:@"new_message"]) {
                 id direction = [summary objectForKey:@"direction"];
                 id incomingChatID = [summary objectForKey:@"chat_id"];
@@ -1394,7 +1413,7 @@
                 [chatID respondsToSelector:@selector(longLongValue)]) {
                 [self removeDisplayedMessageWithID:oldMessageID chatID:chatID];
             }
-            if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
+            if (!mountainLionSafeLoginMode && selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsMessageRefresh = YES;
             }
         } else if ([kind isEqualToString:@"chat_action"]) {
@@ -1403,7 +1422,7 @@
             [self handleComposerDraftUpdateSummary:summary];
         } else if ([kind isEqualToString:@"pinned_message_update"]) {
             id chatID = [summary objectForKey:@"chat_id"];
-            if (selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
+            if (!mountainLionSafeLoginMode && selectedChatID && [chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] == [selectedChatID longLongValue]) {
                 needsPinnedMessageRefresh = YES;
             }
         } else if ([kind isEqualToString:@"poll_update"]) {
@@ -1487,15 +1506,21 @@
         NSString *encryptionKeySummary = nil;
         NSString *finalAuthorizationState = nil;
         NSString *postLoginProbeSummary = nil;
+        NSString *proxySummary = nil;
+        NSString *networkDiagnosticsSummary = nil;
         if (probeSummary) {
+            proxySummary = [client configureNetworkProxyIfNeededWithTimeout:5.0 error:NULL];
+            networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:2.0 error:NULL];
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
                 authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
             }
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
                 parametersAttempted = YES;
+                BOOL parametersConfigurationAvailable = [client hasPotentialTDLibConfigurationSource];
                 parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
-                parametersMissingConfiguration = ([parametersSummary length] == 0);
+                parametersMissingConfiguration = ([parametersSummary length] == 0 &&
+                                                  !parametersConfigurationAvailable);
             }
             BOOL missingInternalConfiguration = parametersMissingConfiguration;
             if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
@@ -1508,9 +1533,13 @@
                 finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&finalAuthorizationError];
             }
             if ([finalAuthorizationState isEqualToString:@"ready"]) {
-                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
-                if (!postLoginProbeSummary) {
-                    finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
+                if (TGMountainLionSafeLoginModeEnabled()) {
+                    postLoginProbeSummary = @"Mountain Lion safe login mode: skipped automatic getChats post-login probe.";
+                } else {
+                    postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
+                    if (!postLoginProbeSummary) {
+                        finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&finalAuthorizationError];
+                    }
                 }
             }
             if (![finalAuthorizationState length]) {
@@ -1526,71 +1555,109 @@
                 finalAuthorizationState = authorizationState;
             }
         }
+        NSMutableDictionary *uiState = [[NSMutableDictionary alloc] init];
+        if (probeSummary) {
+            [uiState setObject:probeSummary forKey:@"probeSummary"];
+        }
+        if (authorizationState) {
+            [uiState setObject:authorizationState forKey:@"authorizationState"];
+        }
+        if (parametersSummary) {
+            [uiState setObject:parametersSummary forKey:@"parametersSummary"];
+        }
+        if (encryptionKeySummary) {
+            [uiState setObject:encryptionKeySummary forKey:@"encryptionKeySummary"];
+        }
+        if (finalAuthorizationState) {
+            [uiState setObject:finalAuthorizationState forKey:@"finalAuthorizationState"];
+        }
+        if (postLoginProbeSummary) {
+            [uiState setObject:postLoginProbeSummary forKey:@"postLoginProbeSummary"];
+        }
+        if (proxySummary) {
+            [uiState setObject:proxySummary forKey:@"proxySummary"];
+        }
+        if (networkDiagnosticsSummary) {
+            [uiState setObject:networkDiagnosticsSummary forKey:@"networkDiagnosticsSummary"];
+        }
         NSString *loadedPath = [client loadedLibraryPath];
-        NSString *receiverSummary = [[client receiverStatusSummary] copy];
-
+        if (loadedPath) {
+            [uiState setObject:loadedPath forKey:@"loadedPath"];
+        }
+        NSString *receiverSummary = [client receiverStatusSummary];
+        if (receiverSummary) {
+            [uiState setObject:receiverSummary forKey:@"receiverSummary"];
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
+            NSString *probeSummaryForUI = [uiState objectForKey:@"probeSummary"];
+            NSString *authorizationStateForUI = [uiState objectForKey:@"authorizationState"];
+            NSString *parametersSummaryForUI = [uiState objectForKey:@"parametersSummary"];
+            NSString *encryptionKeySummaryForUI = [uiState objectForKey:@"encryptionKeySummary"];
+            NSString *finalAuthorizationStateForUI = [uiState objectForKey:@"finalAuthorizationState"];
+            NSString *postLoginProbeSummaryForUI = [uiState objectForKey:@"postLoginProbeSummary"];
+            NSString *proxySummaryForUI = [uiState objectForKey:@"proxySummary"];
+            NSString *networkDiagnosticsSummaryForUI = [uiState objectForKey:@"networkDiagnosticsSummary"];
+            NSString *loadedPathForUI = [uiState objectForKey:@"loadedPath"];
+            NSString *receiverSummaryForUI = [uiState objectForKey:@"receiverSummary"];
             if (self.client != client) {
                 return;
             }
-            if (probeSummary) {
-                [self.statusField setStringValue:[finalAuthorizationState isEqualToString:@"ready"] ? @"Connected" : @"Login required"];
-                [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPath ? loadedPath : @"unknown path"]];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummary]];
-                if (receiverSummary) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib receiver: %@", receiverSummary]];
+            if (probeSummaryForUI) {
+                [self.statusField setStringValue:[finalAuthorizationStateForUI isEqualToString:@"ready"] ? @"Connected" : @"Login required"];
+                [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPathForUI ? loadedPathForUI : @"unknown path"]];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummaryForUI]];
+                if (receiverSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib receiver: %@", receiverSummaryForUI]];
                 }
-                if (authorizationState) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", authorizationState]];
+                if (proxySummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib proxy: %@", proxySummaryForUI]];
+                }
+                if (networkDiagnosticsSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", networkDiagnosticsSummaryForUI]];
+                }
+                if (authorizationStateForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", authorizationStateForUI]];
                 } else {
-                    NSString *message = [authorizationError localizedDescription] ? [authorizationError localizedDescription] : @"Authorization state probe did not return a result.";
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib auth state: %@", message]];
+                    [self appendDetail:@"TDLib auth state: Authorization state probe did not return a result."];
                 }
-                if (parametersSummary) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummary]];
+                if (parametersSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummaryForUI]];
                 } else if (parametersAttempted) {
-                    [self appendDetail:@"TDLib parameters: could not set local parameters; current auth state requires API credentials or local configuration."];
+                    [self appendDetail:@"TDLib parameters: request did not complete; authorization state will be checked again."];
                 }
-                if (encryptionKeySummary) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummary]];
-                } else if (encryptionKeyError) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", [encryptionKeyError localizedDescription]]];
+                if (encryptionKeySummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummaryForUI]];
                 }
-                if (finalAuthorizationState) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationState]];
-                } else if (finalAuthorizationError) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", [finalAuthorizationError localizedDescription]]];
+                if (finalAuthorizationStateForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationStateForUI]];
                 }
-                if (postLoginProbeSummary) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummary]];
-                } else if (postLoginProbeError) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", [postLoginProbeError localizedDescription]]];
+                if (postLoginProbeSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummaryForUI]];
                 }
-                [self updateAuthControlsForState:finalAuthorizationState];
-                if ([finalAuthorizationState isEqualToString:@"waitApiCredentials"]) {
+                [self updateAuthControlsForState:finalAuthorizationStateForUI];
+                if ([finalAuthorizationStateForUI isEqualToString:@"waitApiCredentials"]) {
                     [self setLoginErrorWithLocalizationKey:@"login.config.missing"];
                     [self updateVisibleSection];
                 }
-                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummary]];
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe succeeded: %@", probeSummaryForUI]];
                 [self setControlsBusy:NO];
-                if ([self isTerminalAuthorizationState:finalAuthorizationState]) {
-                    [self recoverTDLibClientAfterAuthorizationState:finalAuthorizationState expectedClient:client];
+                if ([self isTerminalAuthorizationState:finalAuthorizationStateForUI]) {
+                    [self recoverTDLibClientAfterAuthorizationState:finalAuthorizationStateForUI expectedClient:client];
                 } else {
                     self.authClientRecoveryAttemptCount = 0;
                 }
             } else {
-                NSString *message = [probeError localizedDescription] ? [probeError localizedDescription] : @"Unknown TDLib error.";
                 [self setControlsBusy:NO];
                 [self.statusField setStringValue:@"Connection unavailable"];
                 [self setLoginErrorWithLocalizationKey:@"login.connection.unavailable"];
                 [self updateVisibleSection];
-                [self appendDetail:message];
-                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib probe failed: %@", message]];
+                [self appendDetail:@"Unknown TDLib error."];
+                [[TGLogger sharedLogger] log:@"TDLib probe failed: unknown TDLib error."];
             }
         });
 
         [client release];
-        [receiverSummary release];
+        [uiState release];
         [pool drain];
     });
 }
@@ -1651,60 +1718,122 @@
         NSError *authError = nil;
         NSError *stateError = nil;
         NSError *postLoginProbeError = nil;
+        NSError *networkDiagnosticsError = nil;
         NSString *authSummary = nil;
         NSString *postLoginProbeSummary = nil;
+        NSString *networkDiagnosticsSummary = nil;
         if ([state isEqualToString:@"waitPhoneNumber"]) {
-            authSummary = [client submitAuthenticationPhoneNumber:input timeout:8.0 error:&authError];
+            authSummary = [client submitAuthenticationPhoneNumber:input timeout:30.0 error:&authError];
         } else if ([state isEqualToString:@"waitCode"]) {
-            authSummary = [client submitAuthenticationCode:input timeout:8.0 error:&authError];
+            authSummary = [client submitAuthenticationCode:input timeout:15.0 error:&authError];
         } else if ([state isEqualToString:@"waitPassword"]) {
-            authSummary = [client submitAuthenticationPassword:input timeout:8.0 error:&authError];
+            authSummary = [client submitAuthenticationPassword:input timeout:15.0 error:&authError];
+        }
+        BOOL authNetworkTimeout = [client isAuthorizationNetworkTimeoutError:authError];
+        if (!authSummary && authNetworkTimeout) {
+            networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:3.0 error:&networkDiagnosticsError];
         }
         NSString *finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:2.0 error:&stateError];
         if ([finalAuthorizationState isEqualToString:@"ready"]) {
-            postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
-            if (!postLoginProbeSummary) {
-                finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&stateError];
+            if (TGMountainLionSafeLoginModeEnabled()) {
+                postLoginProbeSummary = @"Mountain Lion safe login mode: skipped automatic getChats post-login probe.";
+            } else {
+                postLoginProbeSummary = [client postLoginProbeSummaryWithTimeout:6.0 error:&postLoginProbeError];
+                if (!postLoginProbeSummary) {
+                    finalAuthorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&stateError];
+                }
+            }
+        }
+
+        NSMutableDictionary *uiState = [[NSMutableDictionary alloc] init];
+        [uiState setObject:state forKey:@"inputState"];
+        [uiState setObject:[NSNumber numberWithBool:authNetworkTimeout] forKey:@"authNetworkTimeout"];
+        if (authSummary) {
+            [uiState setObject:authSummary forKey:@"authSummary"];
+        } else if (authError) {
+            NSString *authErrorMessage = [authError localizedDescription];
+            if ([authErrorMessage length] > 0) {
+                [uiState setObject:authErrorMessage forKey:@"authErrorMessage"];
+            }
+        }
+        if (finalAuthorizationState) {
+            [uiState setObject:finalAuthorizationState forKey:@"finalAuthorizationState"];
+        } else if (stateError) {
+            NSString *stateErrorMessage = [stateError localizedDescription];
+            if ([stateErrorMessage length] > 0) {
+                [uiState setObject:stateErrorMessage forKey:@"stateErrorMessage"];
+            }
+        }
+        if (postLoginProbeSummary) {
+            [uiState setObject:postLoginProbeSummary forKey:@"postLoginProbeSummary"];
+        } else if (postLoginProbeError) {
+            NSString *postLoginProbeErrorMessage = [postLoginProbeError localizedDescription];
+            if ([postLoginProbeErrorMessage length] > 0) {
+                [uiState setObject:postLoginProbeErrorMessage forKey:@"postLoginProbeErrorMessage"];
+            }
+        }
+        if (networkDiagnosticsSummary) {
+            [uiState setObject:networkDiagnosticsSummary forKey:@"networkDiagnosticsSummary"];
+        } else if (networkDiagnosticsError) {
+            NSString *networkDiagnosticsErrorMessage = [networkDiagnosticsError localizedDescription];
+            if ([networkDiagnosticsErrorMessage length] > 0) {
+                [uiState setObject:networkDiagnosticsErrorMessage forKey:@"networkDiagnosticsErrorMessage"];
             }
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            NSString *stateForUI = [uiState objectForKey:@"inputState"];
+            NSString *authSummaryForUI = [uiState objectForKey:@"authSummary"];
+            NSString *authErrorMessageForUI = [uiState objectForKey:@"authErrorMessage"];
+            NSString *finalAuthorizationStateForUI = [uiState objectForKey:@"finalAuthorizationState"];
+            NSString *stateErrorMessageForUI = [uiState objectForKey:@"stateErrorMessage"];
+            NSString *postLoginProbeSummaryForUI = [uiState objectForKey:@"postLoginProbeSummary"];
+            NSString *postLoginProbeErrorMessageForUI = [uiState objectForKey:@"postLoginProbeErrorMessage"];
+            NSString *networkDiagnosticsSummaryForUI = [uiState objectForKey:@"networkDiagnosticsSummary"];
+            NSString *networkDiagnosticsErrorMessageForUI = [uiState objectForKey:@"networkDiagnosticsErrorMessage"];
+            BOOL authNetworkTimeoutForUI = [[uiState objectForKey:@"authNetworkTimeout"] boolValue];
+
             self.authSubmissionInFlight = NO;
-            if (!authSummary && [state isEqualToString:@"waitCode"]) {
+            if (!authSummaryForUI && [stateForUI isEqualToString:@"waitCode"]) {
                 [self.authTextField setStringValue:@""];
-            } else if (!authSummary && [state isEqualToString:@"waitPassword"]) {
+            } else if (!authSummaryForUI && [stateForUI isEqualToString:@"waitPassword"]) {
                 [self.authSecureField setStringValue:@""];
             }
-            if (authSummary) {
+            if (authSummaryForUI) {
                 [self.statusField setStringValue:@"Sign-in step submitted"];
                 [self setLoginErrorMessage:nil];
-                [self appendDetail:[NSString stringWithFormat:@"TDLib auth submit: %@", authSummary]];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib auth submit: %@", authSummaryForUI]];
             } else {
-                NSString *message = [authError localizedDescription] ? [authError localizedDescription] : @"Authentication submit did not return a result.";
-                [self.statusField setStringValue:@"Sign-in needs attention"];
+                NSString *message = [authErrorMessageForUI length] > 0 ? authErrorMessageForUI : @"Authentication submit did not return a result.";
+                [self.statusField setStringValue:(authNetworkTimeoutForUI ? @"Telegram connection timed out" : @"Sign-in needs attention")];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib auth submit: %@", message]];
+                if (networkDiagnosticsSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", networkDiagnosticsSummaryForUI]];
+                } else if (networkDiagnosticsErrorMessageForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib network: %@", networkDiagnosticsErrorMessageForUI]];
+                }
             }
-            if (finalAuthorizationState) {
-                [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationState]];
-                if (postLoginProbeSummary) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummary]];
-                } else if (postLoginProbeError) {
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", [postLoginProbeError localizedDescription]]];
+            if (finalAuthorizationStateForUI) {
+                [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", finalAuthorizationStateForUI]];
+                if (postLoginProbeSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummaryForUI]];
+                } else if (postLoginProbeErrorMessageForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeErrorMessageForUI]];
                 }
-                [self updateAuthControlsForState:finalAuthorizationState];
-                if (!authSummary) {
-                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:finalAuthorizationState]];
+                [self updateAuthControlsForState:finalAuthorizationStateForUI];
+                if (!authSummaryForUI) {
+                    [self setLoginErrorWithLocalizationKey:(authNetworkTimeoutForUI ? @"login.connection.unavailable" : [self loginErrorLocalizationKeyForAuthState:finalAuthorizationStateForUI])];
                 }
-            } else if (stateError) {
-                [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", [stateError localizedDescription]]];
-                [self updateAuthControlsForState:state];
-                if (!authSummary) {
-                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:state]];
+            } else if (stateErrorMessageForUI) {
+                [self appendDetail:[NSString stringWithFormat:@"TDLib current auth state: %@", stateErrorMessageForUI]];
+                [self updateAuthControlsForState:stateForUI];
+                if (!authSummaryForUI) {
+                    [self setLoginErrorWithLocalizationKey:(authNetworkTimeoutForUI ? @"login.connection.unavailable" : [self loginErrorLocalizationKeyForAuthState:stateForUI])];
                 }
             } else {
-                [self updateAuthControlsForState:state];
-                if (!authSummary) {
-                    [self setLoginErrorWithLocalizationKey:[self loginErrorLocalizationKeyForAuthState:state]];
+                [self updateAuthControlsForState:stateForUI];
+                if (!authSummaryForUI) {
+                    [self setLoginErrorWithLocalizationKey:(authNetworkTimeoutForUI ? @"login.connection.unavailable" : [self loginErrorLocalizationKeyForAuthState:stateForUI])];
                 }
             }
             [self updateVisibleSection];
@@ -1714,6 +1843,7 @@
         [client release];
         [input release];
         [state release];
+        [uiState release];
         [pool drain];
     });
 }

@@ -10,6 +10,7 @@ SOURCE_DIR="$ROOT_DIR/Vendor/rlottie"
 OBJECT_DIR="$BUILD_DIR/Objects"
 CONFIG_DIR="$BUILD_DIR/Generated"
 OUTPUT_LIBRARY="$BUILD_DIR/librlottie.a"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 
 if [ ! -d "$SOURCE_DIR/src" ] || [ ! -f "$SOURCE_DIR/inc/rlottie_capi.h" ]; then
     echo "Vendored rlottie sources are missing: $SOURCE_DIR"
@@ -38,12 +39,12 @@ mkdir -p "$OBJECT_DIR" "$CONFIG_DIR"
 printf '%s\n' '/* Telegraphica legacy rlottie configuration. */' > "$CONFIG_DIR/config.h"
 
 CLANGXX="$(xcrun --sdk "$SDK_NAME" --find clang++)"
-SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path)"
+SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path)}"
 
 COMMON_FLAGS=(
     -arch "$ARCH"
     -isysroot "$SDK_PATH"
-    -mmacosx-version-min=10.9
+    -mmacosx-version-min="$DEPLOYMENT_TARGET"
     -std=c++11
     -stdlib=libc++
     -Os

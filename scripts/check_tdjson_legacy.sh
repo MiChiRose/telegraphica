@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
-DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.9}"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 TDJSON_PATH="${1:-${TELEGRAPHICA_TDJSON_PATH:-}}"
 REQUIRE_PORTABLE_DEPS="${TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON:-0}"
 
@@ -97,7 +97,7 @@ MIN_MACHO="$(echo "$OTOOL_LOAD_COMMANDS" | awk '/LC_VERSION_MIN_MACOSX/{found=1}
 if [ -z "$MIN_MACHO" ]; then
     if echo "$OTOOL_LOAD_COMMANDS" | grep -q "LC_BUILD_VERSION"; then
         echo "libtdjson.dylib uses LC_BUILD_VERSION instead of LC_VERSION_MIN_MACOSX."
-        echo "Build it on the legacy lane or with an SDK/toolchain that emits a 10.9-safe load command."
+        echo "Build it on the legacy lane or with an SDK/toolchain that emits a $DEPLOYMENT_TARGET-safe load command."
         exit 1
     fi
     echo "Could not find LC_VERSION_MIN_MACOSX in libtdjson.dylib."
@@ -145,7 +145,7 @@ if [ -z "$OTOOL_LINKED_LIBS" ]; then
 fi
 echo "$OTOOL_LINKED_LIBS"
 
-NON_SYSTEM_DEPS="$(echo "$OTOOL_LINKED_LIBS" | awk 'NR > 2 {print $1}' | grep -E -v '^(/usr/lib/|/System/Library/|@loader_path/|@executable_path/)' || true)"
+NON_SYSTEM_DEPS="$(echo "$OTOOL_LINKED_LIBS" | awk 'NR > 1 {print $1}' | grep -E -v '^(/usr/lib/|/System/Library/|@loader_path/|@executable_path/|@rpath/)' || true)"
 if [ -n "$NON_SYSTEM_DEPS" ]; then
     echo
     echo "libtdjson.dylib has non-system dependencies:"
