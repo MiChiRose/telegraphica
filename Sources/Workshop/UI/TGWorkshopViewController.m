@@ -45,10 +45,10 @@ static NSButton *TGWorkshopViewButton(NSRect frame, NSString *title, NSInteger t
 }
 
 static NSImage *TGWorkshopBackImage(void) {
-    NSImage *source = TGTemplateIconAssetImage(@"route-arrow",
-                                               NSMakeSize(18.0, 18.0),
-                                               TGClassicHeaderTextColor(1.0),
-                                               1.0);
+    NSImage *source = TGWorkshopUprightTemplateIcon(@"route-arrow",
+                                                    NSMakeSize(18.0, 18.0),
+                                                    TGClassicHeaderTextColor(1.0),
+                                                    1.0);
     if (!source) return nil;
     NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(18.0, 18.0)] autorelease];
     [image lockFocus];
@@ -57,26 +57,6 @@ static NSImage *TGWorkshopBackImage(void) {
     [transform scaleXBy:-1.0 yBy:1.0];
     [transform concat];
     [source drawInRect:NSMakeRect(0.0, 0.0, 18.0, 18.0)
-              fromRect:NSZeroRect
-             operation:NSCompositeSourceOver
-              fraction:1.0];
-    [image unlockFocus];
-    return image;
-}
-
-static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
-    NSImage *source = TGTemplateIconAssetImage(name,
-                                               NSMakeSize(16.0, 16.0),
-                                               TGClassicHeaderTextColor(1.0),
-                                               1.0);
-    if (!source) return nil;
-    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(16.0, 16.0)] autorelease];
-    [image lockFocus];
-    NSAffineTransform *transform = [NSAffineTransform transform];
-    [transform translateXBy:0.0 yBy:16.0];
-    [transform scaleXBy:1.0 yBy:-1.0];
-    [transform concat];
-    [source drawInRect:NSMakeRect(0.0, 0.0, 16.0, 16.0)
               fromRect:NSZeroRect
              operation:NSCompositeSourceOver
               fraction:1.0];
@@ -148,7 +128,10 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     _modeButtons = [modeButtons copy];
 
     _refreshButton = [TGWorkshopViewButton(NSMakeRect(490, 56, 38, 38), @"", 0) retain];
-    [_refreshButton setImage:TGWorkshopOriginalOrientationIconImage(@"refresh")];
+    [_refreshButton setImage:TGWorkshopUprightTemplateIcon(@"refresh",
+                                                           NSMakeSize(16.0, 16.0),
+                                                           TGClassicHeaderTextColor(1.0),
+                                                           1.0)];
     [_refreshButton setImagePosition:NSImageOnly];
     [[_refreshButton cell] setButtonType:NSMomentaryPushInButton];
     [_refreshButton setTarget:self];
@@ -209,18 +192,18 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     for (index = 0; index < [_modeButtons count]; index++) {
         NSButton *button = [_modeButtons objectAtIndex:index];
         [button setFrame:NSMakeRect(20 + index * (buttonWidth + gap),
-                                    height - 96,
+                                    height - 106,
                                     buttonWidth,
                                     38)];
     }
     [_refreshButton setFrame:NSMakeRect(20 + tabsWidth + refreshGap,
-                                       height - 96,
+                                       height - 106,
                                        refreshSize,
                                        refreshSize)];
-    [_categoryField setFrame:NSMakeRect(24, height - 124, 150, 20)];
-    [_categoryPopup setFrame:NSMakeRect(82, height - 128, 190, 26)];
-    [_statusField setFrame:NSMakeRect(310, height - 124, MAX(120.0, width - 334.0), 20)];
-    [_scrollView setFrame:NSMakeRect(18, 18, width - 36, MAX(120.0, height - 154.0))];
+    [_categoryField setFrame:NSMakeRect(24, height - 134, 150, 20)];
+    [_categoryPopup setFrame:NSMakeRect(82, height - 138, 190, 26)];
+    [_statusField setFrame:NSMakeRect(310, height - 134, MAX(120.0, width - 334.0), 20)];
+    [_scrollView setFrame:NSMakeRect(18, 18, width - 36, MAX(120.0, height - 164.0))];
     [_moduleContainerView setFrame:NSMakeRect(12, 12, width - 24, height - 56)];
     if (_activeModuleViewController) {
         [[_activeModuleViewController view] setFrame:[_moduleContainerView bounds]];
@@ -262,7 +245,10 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
                           @"workshop-installed",
                           @"workshop-updates",
                           nil];
-        [button setImage:TGWorkshopOriginalOrientationIconImage([icons objectAtIndex:index])];
+        [button setImage:TGWorkshopUprightTemplateIcon([icons objectAtIndex:index],
+                                                        NSMakeSize(16.0, 16.0),
+                                                        TGClassicHeaderTextColor(1.0),
+                                                        1.0)];
         [button setImagePosition:NSImageLeft];
     }
     [self rebuildCategoryFilter];

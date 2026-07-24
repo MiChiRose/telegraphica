@@ -1763,6 +1763,9 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
 }
 
 - (void)handleTypingUpdateSummary:(NSDictionary *)summary {
+    if ([self.activeSection isEqualToString:TGSectionWorkshop]) {
+        return;
+    }
     if (![summary isKindOfClass:[NSDictionary class]]) {
         return;
     }
@@ -3438,6 +3441,7 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     }
     self.activeSection = TGSectionWorkshop;
     self.drawerOpen = NO;
+    [self clearTypingIndicator];
     [self.workshopViewController startIfNeeded];
     [self updateVisibleSection];
     [self layoutContentView];

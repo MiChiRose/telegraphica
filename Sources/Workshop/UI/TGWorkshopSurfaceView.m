@@ -1,4 +1,5 @@
 #import "TGWorkshopSurfaceView.h"
+#import "../../UI/TGIconAssets.h"
 
 static NSImage *TGWorkshopFeltTile(void) {
     static NSImage *tile = nil;
@@ -89,6 +90,26 @@ NSColor *TGWorkshopBurgundyColor(void) {
 
 NSColor *TGWorkshopDeepGreenColor(void) {
     return [NSColor colorWithCalibratedRed:0.025 green:0.20 blue:0.13 alpha:1.0];
+}
+
+NSImage *TGWorkshopUprightTemplateIcon(NSString *name,
+                                       NSSize size,
+                                       NSColor *color,
+                                       CGFloat alpha) {
+    NSImage *source = TGTemplateIconAssetImage(name, size, color, alpha);
+    if (!source) return nil;
+    NSImage *image = [[[NSImage alloc] initWithSize:size] autorelease];
+    [image lockFocus];
+    NSAffineTransform *transform = [NSAffineTransform transform];
+    [transform translateXBy:0.0 yBy:size.height];
+    [transform scaleXBy:1.0 yBy:-1.0];
+    [transform concat];
+    [source drawInRect:NSMakeRect(0.0, 0.0, size.width, size.height)
+              fromRect:NSZeroRect
+             operation:NSCompositeSourceOver
+              fraction:1.0];
+    [image unlockFocus];
+    return image;
 }
 
 static void TGWorkshopDrawTableSurface(NSRect bounds, BOOL woodenHeader) {

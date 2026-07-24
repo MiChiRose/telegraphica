@@ -10,4 +10,8 @@ __attribute__((visibility("default")))
 @interface TGWorkshopSegmentButtonCell : TGWorkshopButtonCell
 @end
 
+__attribute__((visibility("default")))
+@interface TGWorkshopDestructiveButtonCell : TGWorkshopButtonCell
+@end
+
 #pragma GCC visibility pop

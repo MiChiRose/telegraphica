@@ -1,21 +1,21 @@
 #import <Cocoa/Cocoa.h>
 #import "../../Sources/Workshop/API/TGWorkshopHostContext.h"
 
-@class TGFifteenEngine;
+@class TGTankPatrolEngine;
+@class TGTankPatrolBoardView;
 
-@interface TGFifteenViewController : NSViewController {
+@interface TGTankPatrolViewController : NSViewController {
 @private
-    TGFifteenEngine *_engine;
+    TGTankPatrolEngine *_engine;
     id<TGWorkshopHostContext> _hostContext;
+    TGTankPatrolBoardView *_boardView;
     NSTextField *_titleField;
     NSTextField *_statusField;
     NSTextField *_scoreField;
-    NSView *_guideView;
-    NSArray *_tileButtons;
     NSButton *_newGameButton;
 }
 
-- (id)initWithEngine:(TGFifteenEngine *)engine
+- (id)initWithEngine:(TGTankPatrolEngine *)engine
          hostContext:(id<TGWorkshopHostContext>)hostContext;
 - (void)refreshFromEngine;
 

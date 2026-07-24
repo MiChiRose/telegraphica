@@ -25,6 +25,49 @@
 @interface TGFifteenTileCell : NSButtonCell
 @end
 
+@interface TGFifteenGuideView : NSView
+@end
+
+@implementation TGFifteenGuideView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    CGFloat gap = 5.0;
+    CGFloat cellSize = floor((MIN(NSWidth(bounds), NSHeight(bounds)) - gap * 3.0) / 4.0);
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:15.0], NSFontAttributeName,
+                                [NSColor colorWithCalibratedRed:0.92 green:0.79 blue:0.37 alpha:0.38],
+                                NSForegroundColorAttributeName,
+                                nil];
+    NSUInteger index = 0;
+    for (index = 0; index < 16; index++) {
+        NSUInteger row = index / 4;
+        NSUInteger column = index % 4;
+        NSRect cellRect = NSMakeRect(column * (cellSize + gap),
+                                     (3 - row) * (cellSize + gap),
+                                     cellSize,
+                                     cellSize);
+        NSBezierPath *cell = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(cellRect, 1.5, 1.5)
+                                                             xRadius:8.0
+                                                             yRadius:8.0];
+        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.13] setFill];
+        [cell fill];
+        [[TGWorkshopGoldColor() colorWithAlphaComponent:0.36] setStroke];
+        [cell setLineWidth:1.0];
+        [cell stroke];
+        NSString *goal = index < 15
+            ? [NSString stringWithFormat:@"%lu", (unsigned long)(index + 1)]
+            : @"";
+        NSSize size = [goal sizeWithAttributes:attributes];
+        [goal drawAtPoint:NSMakePoint(NSMidX(cellRect) - size.width / 2.0,
+                                      NSMidY(cellRect) - size.height / 2.0)
+           withAttributes:attributes];
+    }
+}
+
+@end
+
 @implementation TGFifteenTileCell
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
     (void)controlView;
@@ -97,6 +140,9 @@ static NSTextField *TGFifteenLabel(NSFont *font) {
     [_scoreField setTextColor:TGWorkshopMutedCreamColor()];
     [root addSubview:_scoreField];
 
+    _guideView = [[TGFifteenGuideView alloc] initWithFrame:NSZeroRect];
+    [root addSubview:_guideView];
+
     NSMutableArray *buttons = [NSMutableArray arrayWithCapacity:16];
     NSUInteger index = 0;
     for (index = 0; index < 16; index++) {
@@ -140,6 +186,7 @@ static NSTextField *TGFifteenLabel(NSFont *font) {
     [_titleField setFrame:NSMakeRect(18.0, height - 42.0, width - 36.0, 28.0)];
     [_statusField setFrame:NSMakeRect(18.0, height - 66.0, width - 36.0, 20.0)];
     [_scoreField setFrame:NSMakeRect(18.0, height - 87.0, width - 36.0, 18.0)];
+    [_guideView setFrame:NSMakeRect(boardX, boardY, boardSize, boardSize)];
 
     NSUInteger index = 0;
     for (index = 0; index < 16; index++) {
@@ -194,6 +241,7 @@ static NSTextField *TGFifteenLabel(NSFont *font) {
     [_titleField release];
     [_statusField release];
     [_scoreField release];
+    [_guideView release];
     [_tileButtons release];
     [_newGameButton release];
     [super dealloc];

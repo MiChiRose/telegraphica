@@ -10,6 +10,10 @@ NSColor *TGWorkshopCreamColor(void);
 NSColor *TGWorkshopMutedCreamColor(void);
 NSColor *TGWorkshopBurgundyColor(void);
 NSColor *TGWorkshopDeepGreenColor(void);
+NSImage *TGWorkshopUprightTemplateIcon(NSString *name,
+                                       NSSize size,
+                                       NSColor *color,
+                                       CGFloat alpha);
 
 __attribute__((visibility("default")))
 @interface TGWorkshopSurfaceView : NSView

@@ -100,3 +100,39 @@ static void TGWorkshopDrawCenteredTitle(NSButtonCell *cell,
 }
 
 @end
+
+@implementation TGWorkshopDestructiveButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    (void)controlView;
+    BOOL enabled = [self isEnabled];
+    BOOL pressed = [self isHighlighted];
+    NSRect rect = NSInsetRect(cellFrame, 1.0, 1.0);
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:6.0 yRadius:6.0];
+    NSColor *top = pressed
+        ? [NSColor colorWithCalibratedRed:0.54 green:0.08 blue:0.10 alpha:1.0]
+        : [NSColor colorWithCalibratedRed:0.86 green:0.20 blue:0.20 alpha:1.0];
+    NSColor *bottom = pressed
+        ? [NSColor colorWithCalibratedRed:0.68 green:0.12 blue:0.13 alpha:1.0]
+        : [NSColor colorWithCalibratedRed:0.62 green:0.08 blue:0.10 alpha:1.0];
+    if (!enabled) {
+        top = [NSColor colorWithCalibratedRed:0.42 green:0.27 blue:0.25 alpha:1.0];
+        bottom = [NSColor colorWithCalibratedRed:0.30 green:0.20 blue:0.19 alpha:1.0];
+    }
+    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:top endingColor:bottom] autorelease];
+    [gradient drawInBezierPath:path angle:90.0];
+    [[NSColor colorWithCalibratedRed:0.31 green:0.035 blue:0.045 alpha:0.98] setStroke];
+    [path setLineWidth:1.0];
+    [path stroke];
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.20] setStroke];
+    NSBezierPath *highlight = [NSBezierPath bezierPath];
+    [highlight moveToPoint:NSMakePoint(NSMinX(rect) + 6.0, NSMaxY(rect) - 2.0)];
+    [highlight lineToPoint:NSMakePoint(NSMaxX(rect) - 6.0, NSMaxY(rect) - 2.0)];
+    [highlight stroke];
+    TGWorkshopDrawCenteredTitle(self,
+                                rect,
+                                [NSColor colorWithCalibratedWhite:1.0 alpha:(enabled ? 1.0 : 0.58)],
+                                YES);
+}
+
+@end

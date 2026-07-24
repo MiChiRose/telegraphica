@@ -68,6 +68,14 @@ MODULES = {
         "ru_description": "Компактная игра в пятнашки с сохранением прогресса и без фонового таймера.",
         "category": "games",
     },
+    "TankPatrol": {
+        "id": "com.michirose.telegraphica.workshop.tankpatrol",
+        "name": "Tank Patrol",
+        "ru_name": "Танковый патруль",
+        "en_description": "An original lightweight top-down tank defense inspired by cartridge-era games.",
+        "ru_description": "Оригинальная лёгкая танковая оборона с видом сверху в духе картриджных игр.",
+        "category": "games",
+    },
 }
 
 

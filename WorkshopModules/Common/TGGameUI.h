@@ -16,7 +16,10 @@ static NSButton *TGGameThemedButton(NSRect frame,
     [button setBordered:NO];
     if ([iconName length] > 0) {
         NSColor *iconColor = [NSColor colorWithCalibratedRed:0.08 green:0.11 blue:0.075 alpha:1.0];
-        [button setImage:TGTemplateIconAssetImage(iconName, NSMakeSize(16.0, 16.0), iconColor, 1.0)];
+        [button setImage:TGWorkshopUprightTemplateIcon(iconName,
+                                                       NSMakeSize(16.0, 16.0),
+                                                       iconColor,
+                                                       1.0)];
         [button setImagePosition:([title length] > 0 ? NSImageLeft : NSImageOnly)];
     }
     return button;

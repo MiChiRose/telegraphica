@@ -39,6 +39,16 @@ static NSButton *TGWorkshopCardButton(NSRect frame, NSString *title) {
     return button;
 }
 
+static NSButton *TGWorkshopDestructiveCardButton(NSRect frame) {
+    NSButton *button = [[[NSButton alloc] initWithFrame:frame] autorelease];
+    TGWorkshopDestructiveButtonCell *cell =
+        [[[TGWorkshopDestructiveButtonCell alloc] initTextCell:@""] autorelease];
+    [cell setButtonType:NSMomentaryPushInButton];
+    [button setCell:cell];
+    [button setBordered:NO];
+    return button;
+}
+
 static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     if ([identifier hasSuffix:@".solitaire"]) return @"solitaire";
     if ([identifier hasSuffix:@".checkers"]) return @"checkers";
@@ -46,24 +56,8 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     if ([identifier hasSuffix:@".tictactoe"]) return @"tictactoe";
     if ([identifier hasSuffix:@".pacman"] || [identifier hasSuffix:@".mazechase"]) return @"pac-man";
     if ([identifier hasSuffix:@".fifteen"]) return @"tictactoe";
+    if ([identifier hasSuffix:@".tankpatrol"]) return @"game-controller";
     return nil;
-}
-
-static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
-    if (!source) return nil;
-    NSSize size = [source size];
-    NSImage *result = [[[NSImage alloc] initWithSize:size] autorelease];
-    [result lockFocus];
-    NSAffineTransform *transform = [NSAffineTransform transform];
-    [transform translateXBy:0.0 yBy:size.height];
-    [transform scaleXBy:1.0 yBy:-1.0];
-    [transform concat];
-    [source drawInRect:NSMakeRect(0.0, 0.0, size.width, size.height)
-              fromRect:NSZeroRect
-             operation:NSCompositeSourceOver
-              fraction:1.0];
-    [result unlockFocus];
-    return result;
 }
 
 @interface TGWorkshopModuleCardView ()
@@ -111,7 +105,7 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
         [_primaryButton setAction:@selector(primaryAction:)];
         [self addSubview:_primaryButton];
 
-        _removeButton = [TGWorkshopCardButton(NSZeroRect, @"") retain];
+        _removeButton = [TGWorkshopDestructiveCardButton(NSZeroRect) retain];
         [_removeButton setAutoresizingMask:NSViewMinXMargin];
         [_removeButton setTarget:self];
         [_removeButton setAction:@selector(removeAction:)];
@@ -159,14 +153,11 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
     [background setLineWidth:1.0];
     [background stroke];
     NSString *iconName = TGWorkshopIconNameForModuleIdentifier([_entry moduleIdentifier]);
-    NSImage *icon = TGTemplateIconAssetImage(iconName,
-                                             NSMakeSize(40.0, 40.0),
-                                             TGWorkshopCreamColor(),
-                                             1.0);
+    NSImage *icon = TGWorkshopUprightTemplateIcon(iconName,
+                                                  NSMakeSize(40.0, 40.0),
+                                                  TGWorkshopCreamColor(),
+                                                  1.0);
     if (icon) {
-        if ([iconName isEqualToString:@"solitaire"]) {
-            icon = TGWorkshopVerticallyFlippedImage(icon);
-        }
         NSRect iconRect = NSMakeRect(NSMidX(rect) - 20.0, NSMidY(rect) - 20.0, 40.0, 40.0);
         if ([iconName isEqualToString:@"minesweeper"]) {
             NSInteger offsetX;
@@ -244,10 +235,10 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
     [_statusField setTextColor:([_errorMessage length] > 0
                                 ? [NSColor colorWithCalibratedRed:0.78 green:0.16 blue:0.13 alpha:1.0]
                                 : TGWorkshopMutedCreamColor())];
-    [_successImageView setImage:TGTemplateIconAssetImage(@"done-mini",
-                                                         NSMakeSize(18.0, 18.0),
-                                                         TGWorkshopGoldColor(),
-                                                         1.0)];
+    [_successImageView setImage:TGWorkshopUprightTemplateIcon(@"done-mini",
+                                                              NSMakeSize(18.0, 18.0),
+                                                              TGWorkshopGoldColor(),
+                                                              1.0)];
     [self setNeedsDisplay:YES];
     [_primaryButton setNeedsDisplay:YES];
     [_removeButton setNeedsDisplay:YES];
@@ -302,10 +293,10 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
     [_primaryButton setToolTip:primaryTitle];
     [_primaryButton setEnabled:(!_busy && !_showingSuccess)];
     [_removeButton setTitle:@""];
-    [_removeButton setImage:TGTemplateIconAssetImage(@"trash",
-                                                     NSMakeSize(17.0, 17.0),
-                                                     TGWorkshopBurgundyColor(),
-                                                     1.0)];
+    [_removeButton setImage:TGWorkshopUprightTemplateIcon(@"trash",
+                                                          NSMakeSize(17.0, 17.0),
+                                                          [NSColor whiteColor],
+                                                          1.0)];
     [_removeButton setImagePosition:NSImageOnly];
     [_removeButton setToolTip:TGLoc(@"workshop.remove")];
     [_removeButton setHidden:(!installed || _showingSuccess)];

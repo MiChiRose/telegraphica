@@ -6,6 +6,7 @@
 #import "../../WorkshopModules/Solitaire/TGSolitaireEngine.h"
 #import "../../WorkshopModules/PacMan/TGPacManEngine.h"
 #import "../../WorkshopModules/Fifteen/TGFifteenEngine.h"
+#import "../../WorkshopModules/TankPatrol/TGTankPatrolEngine.h"
 
 static NSUInteger TGTestsRun = 0;
 static NSUInteger TGTestsFailed = 0;
@@ -396,6 +397,33 @@ static void TGTestFifteen(void) {
              @"Fifteen rejects malformed duplicate-tile saves.");
 }
 
+static void TGTestTankPatrol(void) {
+    TGTankPatrolEngine *engine = [[[TGTankPatrolEngine alloc] init] autorelease];
+    TGAssert([engine boardSize] == 13 &&
+             [engine terrainAtX:6 y:12] == 3 &&
+             [[engine enemies] count] == 5,
+             @"Tank Patrol creates a compact battlefield, base, and enemy wave.");
+    NSInteger originalY = [engine playerY];
+    TGAssert([engine movePlayerInDirection:TGTankDirectionUp] &&
+             [engine playerY] == originalY - 1 &&
+             [engine turns] == 1,
+             @"Tank Patrol moves the player and advances a turn.");
+
+    NSDictionary *saved = [engine saveState];
+    TGTankPatrolEngine *restored = [[[TGTankPatrolEngine alloc] init] autorelease];
+    TGAssert([restored restoreState:saved] &&
+             [restored playerX] == [engine playerX] &&
+             [[restored enemies] count] == [[engine enemies] count],
+             @"Tank Patrol restores mutable enemy state and player progress.");
+    TGAssert(![restored restoreState:[NSDictionary dictionary]],
+             @"Tank Patrol rejects malformed saves.");
+
+    NSUInteger turns = [restored turns];
+    [restored fire];
+    TGAssert([restored turns] == turns + 1,
+             @"Tank Patrol accepts a shot and advances a turn.");
+}
+
 int main(void) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     TGTestTicTacToe();
@@ -404,6 +432,7 @@ int main(void) {
     TGTestSolitaire();
     TGTestPacMan();
     TGTestFifteen();
+    TGTestTankPatrol();
     TGTestSaveStore();
     printf("Workshop game tests: %lu assertions, %lu failures\n",
            (unsigned long)TGTestsRun, (unsigned long)TGTestsFailed);

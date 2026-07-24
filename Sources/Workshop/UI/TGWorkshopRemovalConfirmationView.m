@@ -23,6 +23,17 @@ static NSButton *TGWorkshopRemovalButton(NSRect frame, NSString *title) {
     return button;
 }
 
+static NSButton *TGWorkshopRemovalDestructiveButton(NSRect frame, NSString *title) {
+    NSButton *button = [[[NSButton alloc] initWithFrame:frame] autorelease];
+    TGWorkshopDestructiveButtonCell *cell =
+        [[[TGWorkshopDestructiveButtonCell alloc] initTextCell:title] autorelease];
+    [cell setButtonType:NSMomentaryPushInButton];
+    [button setCell:cell];
+    [button setTitle:title];
+    [button setBordered:NO];
+    return button;
+}
+
 @interface TGWorkshopRemovalConfirmationView ()
 - (NSRect)panelRect;
 - (void)layoutConfirmation;
@@ -59,17 +70,17 @@ static NSButton *TGWorkshopRemovalButton(NSRect frame, NSString *title) {
         [[_messageField cell] setWraps:YES];
         [self addSubview:_messageField];
 
-        _keepDataButton = [TGWorkshopRemovalButton(NSZeroRect, keepDataTitle) retain];
-        [_keepDataButton setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(15.0, 15.0),
-                                                           TGWorkshopBurgundyColor(), 0.88)];
+        _keepDataButton = [TGWorkshopRemovalDestructiveButton(NSZeroRect, keepDataTitle) retain];
+        [_keepDataButton setImage:TGWorkshopUprightTemplateIcon(@"trash", NSMakeSize(15.0, 15.0),
+                                                                [NSColor whiteColor], 0.88)];
         [_keepDataButton setImagePosition:NSImageLeft];
         [_keepDataButton setTarget:self];
         [_keepDataButton setAction:@selector(keepDataAction:)];
         [self addSubview:_keepDataButton];
 
-        _removeDataButton = [TGWorkshopRemovalButton(NSZeroRect, removeDataTitle) retain];
-        [_removeDataButton setImage:TGTemplateIconAssetImage(@"trash", NSMakeSize(15.0, 15.0),
-                                                             TGWorkshopBurgundyColor(), 1.0)];
+        _removeDataButton = [TGWorkshopRemovalDestructiveButton(NSZeroRect, removeDataTitle) retain];
+        [_removeDataButton setImage:TGWorkshopUprightTemplateIcon(@"trash", NSMakeSize(15.0, 15.0),
+                                                                  [NSColor whiteColor], 1.0)];
         [_removeDataButton setImagePosition:NSImageLeft];
         [_removeDataButton setTarget:self];
         [_removeDataButton setAction:@selector(removeDataAction:)];
@@ -96,7 +107,7 @@ static NSButton *TGWorkshopRemovalButton(NSRect frame, NSString *title) {
 
 - (NSRect)panelRect {
     CGFloat width = MIN(610.0, MAX(440.0, NSWidth([self bounds]) - 48.0));
-    CGFloat height = 206.0;
+    CGFloat height = 238.0;
     return NSMakeRect(floor((NSWidth([self bounds]) - width) / 2.0),
                       floor((NSHeight([self bounds]) - height) / 2.0),
                       width,
@@ -108,27 +119,27 @@ static NSButton *TGWorkshopRemovalButton(NSRect frame, NSString *title) {
     NSRect panel = [self panelRect];
     CGFloat inset = 24.0;
     [_titleField setFrame:NSMakeRect(NSMinX(panel) + inset,
-                                     NSMaxY(panel) - 46.0,
+                                     NSMaxY(panel) - 43.0,
                                      NSWidth(panel) - inset * 2.0,
                                      24.0)];
     [_messageField setFrame:NSMakeRect(NSMinX(panel) + inset,
-                                       NSMaxY(panel) - 111.0,
+                                       NSMaxY(panel) - 99.0,
                                        NSWidth(panel) - inset * 2.0,
-                                       55.0)];
+                                       46.0)];
     CGFloat gap = 10.0;
-    CGFloat buttonWidth = floor((NSWidth(panel) - inset * 2.0 - gap * 2.0) / 3.0);
-    CGFloat buttonY = NSMinY(panel) + 23.0;
+    CGFloat buttonWidth = floor((NSWidth(panel) - inset * 2.0 - gap) / 2.0);
+    CGFloat buttonY = NSMinY(panel) + 70.0;
     [_keepDataButton setFrame:NSMakeRect(NSMinX(panel) + inset,
                                          buttonY, buttonWidth, 38.0)];
     [_removeDataButton setFrame:NSMakeRect(NSMinX(panel) + inset + buttonWidth + gap,
                                            buttonY, buttonWidth, 38.0)];
-    [_cancelButton setFrame:NSMakeRect(NSMinX(panel) + inset + (buttonWidth + gap) * 2.0,
-                                       buttonY, buttonWidth, 38.0)];
+    [_cancelButton setFrame:NSMakeRect(NSMidX(panel) - 75.0,
+                                       NSMinY(panel) + 20.0, 150.0, 36.0)];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    [[NSColor colorWithCalibratedWhite:0.0 alpha:0.56] setFill];
+    [[NSColor colorWithCalibratedRed:0.015 green:0.075 blue:0.055 alpha:0.34] setFill];
     NSRectFill([self bounds]);
 
     NSRect panelRect = [self panelRect];
