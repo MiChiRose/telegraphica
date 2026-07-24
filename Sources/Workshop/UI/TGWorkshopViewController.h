@@ -3,6 +3,8 @@
 #import "TGWorkshopModuleCardView.h"
 
 @class TGWorkshopViewController;
+@class TGWorkshopCatalogEntry;
+@class TGWorkshopRemovalConfirmationView;
 
 @protocol TGWorkshopViewControllerDelegate <NSObject>
 - (void)workshopViewControllerDidRequestClose:(TGWorkshopViewController *)viewController;
@@ -19,6 +21,7 @@
     NSButton *_backButton;
     NSTextField *_titleField;
     NSTextField *_categoryField;
+    NSPopUpButton *_categoryPopup;
     NSTextField *_statusField;
     NSArray *_modeButtons;
     NSButton *_refreshButton;
@@ -27,11 +30,14 @@
     NSView *_moduleContainerView;
     NSViewController *_activeModuleViewController;
     NSString *_selectedMode;
+    NSString *_selectedCategory;
     NSMutableDictionary *_progressByIdentifier;
     NSMutableDictionary *_errorsByIdentifier;
     NSMutableDictionary *_installStartDatesByIdentifier;
     BOOL _started;
     BOOL _catalogRefreshing;
+    TGWorkshopRemovalConfirmationView *_removalConfirmationView;
+    TGWorkshopCatalogEntry *_pendingRemovalEntry;
 }
 
 @property(nonatomic, assign) id<TGWorkshopViewControllerDelegate> delegate;

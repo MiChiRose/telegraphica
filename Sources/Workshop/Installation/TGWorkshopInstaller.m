@@ -126,6 +126,7 @@ static NSError *TGWorkshopInstallerError(NSInteger code, NSString *message) {
                                    [NSNumber numberWithBool:NO], @"pending_removal",
                                    [NSNumber numberWithBool:NO], @"remove_data",
                                    [NSDate date], @"installed_at",
+                                   [entry category], @"category",
                                    manifest ? manifest : [NSDictionary dictionary], @"manifest",
                                    nil];
         [_registryStore setRecord:newRecord forModuleIdentifier:[entry moduleIdentifier]];

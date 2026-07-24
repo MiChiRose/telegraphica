@@ -3,6 +3,8 @@
 #define TGWorkshopModuleAPIVersion 1
 #define TGWorkshopCatalogSchemaVersion 1
 #define TGWorkshopModuleCategoryGames @"games"
+#define TGWorkshopModuleCategoryModules @"modules"
+#define TGWorkshopModuleCategoryHelpers @"helpers"
 
 #define TGWorkshopPermissionModuleData @"module-data"
 #define TGWorkshopPermissionHostNotifications @"host-notifications"

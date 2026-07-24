@@ -23,6 +23,17 @@ static NSArray *TGWorkshopStringArrayValue(id value) {
     return value;
 }
 
+static BOOL TGWorkshopCategoryIsValid(NSString *category) {
+    if (![category isKindOfClass:[NSString class]] ||
+        [category length] == 0 ||
+        [category length] > 32) {
+        return NO;
+    }
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:
+                               @"abcdefghijklmnopqrstuvwxyz0123456789-"];
+    return ([category rangeOfCharacterFromSet:[allowed invertedSet]].location == NSNotFound);
+}
+
 static NSError *TGWorkshopCatalogEntryError(NSString *message) {
     return [NSError errorWithDomain:TGWorkshopErrorDomain
                                code:200
@@ -92,7 +103,7 @@ static NSError *TGWorkshopCatalogEntryError(NSString *message) {
                  [_minimumApplicationVersion length] > 0 &&
                  [_minimumOSVersion length] > 0 &&
                  [_architectures count] > 0 &&
-                 [_category isEqualToString:TGWorkshopModuleCategoryGames] &&
+                 TGWorkshopCategoryIsValid(_category) &&
                  _archiveSize > 0 &&
                  _unpackedSize > 0 &&
                  _entryCount > 0 &&

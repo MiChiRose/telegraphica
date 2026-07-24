@@ -1,5 +1,6 @@
 #import "TGWorkshopCoordinator.h"
 #import "TGWorkshopModuleLoader.h"
+#import "../API/TGWorkshopModuleDefinitions.h"
 #import "../Catalog/TGWorkshopCatalog.h"
 #import "../Catalog/TGWorkshopCatalogEntry.h"
 #import "../Catalog/TGWorkshopCatalogParser.h"
@@ -33,7 +34,9 @@ static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identi
                                 @"0.5.1", @"minimum_app_version",
                                 @"10.9", @"minimum_os_version",
                                 [NSArray arrayWithObject:@"x86_64"], @"architectures",
-                                @"games", @"category",
+                                ([[record objectForKey:@"category"] isKindOfClass:[NSString class]]
+                                 ? [record objectForKey:@"category"]
+                                 : TGWorkshopModuleCategoryGames), @"category",
                                 @1, @"archive_size",
                                 @1, @"unpacked_size",
                                 @1, @"entry_count",

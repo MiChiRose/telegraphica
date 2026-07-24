@@ -5,6 +5,7 @@
 #import "../../WorkshopModules/Checkers/TGCheckersEngine.h"
 #import "../../WorkshopModules/Solitaire/TGSolitaireEngine.h"
 #import "../../WorkshopModules/PacMan/TGPacManEngine.h"
+#import "../../WorkshopModules/Fifteen/TGFifteenEngine.h"
 
 static NSUInteger TGTestsRun = 0;
 static NSUInteger TGTestsFailed = 0;
@@ -359,6 +360,42 @@ static void TGTestPacMan(void) {
              @"Pac-Man rejects malformed saves.");
 }
 
+static void TGTestFifteen(void) {
+    TGFifteenEngine *engine = [[[TGFifteenEngine alloc] init] autorelease];
+    TGAssert([[engine tiles] count] == 16 && [engine blankIndex] != NSNotFound,
+             @"Fifteen creates a complete solvable board.");
+
+    NSArray *nearWin = [NSArray arrayWithObjects:
+                        @1, @2, @3, @4,
+                        @5, @6, @7, @8,
+                        @9, @10, @11, @12,
+                        @13, @14, @0, @15, nil];
+    NSDictionary *state = [NSDictionary dictionaryWithObjectsAndKeys:
+                           @1, @"schema",
+                           nearWin, @"tiles",
+                           @4, @"moves",
+                           @2, @"gamesStarted",
+                           @0, @"gamesWon",
+                           @NO, @"finished",
+                           nil];
+    TGAssert([engine restoreFromDictionary:state] &&
+             [engine canMoveTileAtIndex:15] &&
+             [engine moveTileAtIndex:15],
+             @"Fifteen accepts a legal finishing move.");
+    TGAssert([engine isFinished] && [engine gamesWon] == 1 && [engine moves] == 5,
+             @"Fifteen records a solved game and series statistics.");
+
+    NSArray *duplicate = [NSArray arrayWithObjects:
+                          @1, @1, @3, @4,
+                          @5, @6, @7, @8,
+                          @9, @10, @11, @12,
+                          @13, @14, @15, @0, nil];
+    NSDictionary *invalid = [NSDictionary dictionaryWithObjectsAndKeys:
+                             duplicate, @"tiles", @NO, @"finished", nil];
+    TGAssert(![engine restoreFromDictionary:invalid],
+             @"Fifteen rejects malformed duplicate-tile saves.");
+}
+
 int main(void) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     TGTestTicTacToe();
@@ -366,6 +403,7 @@ int main(void) {
     TGTestCheckers();
     TGTestSolitaire();
     TGTestPacMan();
+    TGTestFifteen();
     TGTestSaveStore();
     printf("Workshop game tests: %lu assertions, %lu failures\n",
            (unsigned long)TGTestsRun, (unsigned long)TGTestsFailed);

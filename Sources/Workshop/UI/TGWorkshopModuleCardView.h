@@ -47,5 +47,6 @@ typedef enum {
 - (void)refreshLocalization;
 - (void)updateProgress:(double)progress;
 - (void)showInstallSuccess;
+- (void)beginRemovalAnimation;
 
 @end

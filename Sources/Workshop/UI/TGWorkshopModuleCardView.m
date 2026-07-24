@@ -45,6 +45,7 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     if ([identifier hasSuffix:@".minesweeper"]) return @"minesweeper";
     if ([identifier hasSuffix:@".tictactoe"]) return @"tictactoe";
     if ([identifier hasSuffix:@".pacman"] || [identifier hasSuffix:@".mazechase"]) return @"pac-man";
+    if ([identifier hasSuffix:@".fifteen"]) return @"tictactoe";
     return nil;
 }
 
@@ -64,6 +65,10 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
     [result unlockFocus];
     return result;
 }
+
+@interface TGWorkshopModuleCardView ()
+- (void)layoutCardControls;
+@end
 
 @implementation TGWorkshopModuleCardView
 
@@ -100,19 +105,44 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
         [_successImageView setHidden:YES];
         [self addSubview:_successImageView];
 
-        _primaryButton = [TGWorkshopCardButton(NSMakeRect(510, 56, 112, 42), @"") retain];
+        _primaryButton = [TGWorkshopCardButton(NSZeroRect, @"") retain];
         [_primaryButton setAutoresizingMask:NSViewMinXMargin];
         [_primaryButton setTarget:self];
         [_primaryButton setAction:@selector(primaryAction:)];
         [self addSubview:_primaryButton];
 
-        _removeButton = [TGWorkshopCardButton(NSMakeRect(510, 12, 112, 36), @"") retain];
+        _removeButton = [TGWorkshopCardButton(NSZeroRect, @"") retain];
         [_removeButton setAutoresizingMask:NSViewMinXMargin];
         [_removeButton setTarget:self];
         [_removeButton setAction:@selector(removeAction:)];
         [self addSubview:_removeButton];
+        [self layoutCardControls];
     }
     return self;
+}
+
+- (void)setFrameSize:(NSSize)newSize {
+    [super setFrameSize:newSize];
+    [self layoutCardControls];
+}
+
+- (void)layoutCardControls {
+    if (!_primaryButton) return;
+    CGFloat width = NSWidth([self bounds]);
+    CGFloat actionWidth = MIN(210.0, MAX(170.0, width * 0.31));
+    CGFloat actionX = width - actionWidth - 10.0;
+    [_primaryButton setFrame:NSMakeRect(actionX, 47.0, actionWidth, 57.0)];
+    [_removeButton setFrame:NSMakeRect(width - 46.0, 8.0, 36.0, 32.0)];
+    CGFloat textWidth = MAX(160.0, actionX - 80.0);
+    [_nameField setFrame:NSMakeRect(70.0, 82.0, textWidth, 20.0)];
+    [_descriptionField setFrame:NSMakeRect(70.0, 50.0, textWidth, 32.0)];
+    [_detailsField setFrame:NSMakeRect(70.0, 28.0, textWidth, 17.0)];
+    [_progressIndicator setFrame:NSMakeRect(70.0, 7.0, MAX(120.0, textWidth - 24.0), 12.0)];
+    CGFloat statusX = _showingSuccess ? 94.0 : 70.0;
+    [_statusField setFrame:NSMakeRect(statusX,
+                                      8.0,
+                                      MAX(100.0, actionX - statusX - 10.0),
+                                      17.0)];
 }
 
 - (BOOL)isFlipped {
@@ -271,19 +301,28 @@ static NSImage *TGWorkshopVerticallyFlippedImage(NSImage *source) {
     [_primaryButton setTitle:primaryTitle];
     [_primaryButton setToolTip:primaryTitle];
     [_primaryButton setEnabled:(!_busy && !_showingSuccess)];
-    [_removeButton setTitle:TGLoc(@"workshop.remove")];
+    [_removeButton setTitle:@""];
+    [_removeButton setImage:TGTemplateIconAssetImage(@"trash",
+                                                     NSMakeSize(17.0, 17.0),
+                                                     TGWorkshopBurgundyColor(),
+                                                     1.0)];
+    [_removeButton setImagePosition:NSImageOnly];
     [_removeButton setToolTip:TGLoc(@"workshop.remove")];
     [_removeButton setHidden:(!installed || _showingSuccess)];
     [_removeButton setEnabled:(!_busy && !_showingSuccess)];
     [_progressIndicator setHidden:(!_busy || _showingSuccess)];
     [_statusField setHidden:(_busy && !_showingSuccess)];
     [_successImageView setHidden:!_showingSuccess];
-    [_statusField setFrame:NSMakeRect(_showingSuccess ? 94.0 : 70.0, 8.0,
-                                      _showingSuccess ? 406.0 : 430.0, 17.0)];
     if (_busy) {
         [_progressIndicator setDoubleValue:MAX(0.0, MIN(1.0, _progress))];
     }
+    [self layoutCardControls];
     [self refreshTheme];
+}
+
+- (void)beginRemovalAnimation {
+    [_primaryButton setEnabled:NO];
+    [_removeButton setEnabled:NO];
 }
 
 - (void)updateProgress:(double)progress {

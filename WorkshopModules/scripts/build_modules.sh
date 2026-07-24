@@ -73,5 +73,6 @@ build_module "Minesweeper" "TGMinesweeperModule"
 build_module "Checkers" "TGCheckersModule"
 build_module "Solitaire" "TGSolitaireModule"
 build_module "PacMan" "TGPacManModule"
+build_module "Fifteen" "TGFifteenModule"
 
 echo "Workshop modules are ready in $PRODUCT_ROOT"

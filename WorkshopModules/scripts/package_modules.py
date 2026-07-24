@@ -26,6 +26,7 @@ MODULES = {
         "ru_name": "Крестики-нолики",
         "en_description": "A quick local match or a game against the computer.",
         "ru_description": "Быстрая локальная партия или игра против компьютера.",
+        "category": "games",
     },
     "Minesweeper": {
         "id": "com.michirose.telegraphica.workshop.minesweeper",
@@ -33,6 +34,7 @@ MODULES = {
         "ru_name": "Сапёр",
         "en_description": "Clear a classic minefield with three difficulty levels.",
         "ru_description": "Классическое минное поле с тремя уровнями сложности.",
+        "category": "games",
     },
     "Checkers": {
         "id": "com.michirose.telegraphica.workshop.checkers",
@@ -40,6 +42,7 @@ MODULES = {
         "ru_name": "Шашки",
         "en_description": "Play locally or against a lightweight computer opponent.",
         "ru_description": "Локальная игра или партия против лёгкого компьютерного соперника.",
+        "category": "games",
     },
     "Solitaire": {
         "id": "com.michirose.telegraphica.workshop.solitaire",
@@ -47,6 +50,7 @@ MODULES = {
         "ru_name": "Пасьянс",
         "en_description": "Classic draw-one Klondike with undo and saved progress.",
         "ru_description": "Классическая «Косынка» по одной карте с отменой хода и сохранением.",
+        "category": "games",
     },
     "PacMan": {
         "id": "com.michirose.telegraphica.workshop.pacman",
@@ -54,6 +58,15 @@ MODULES = {
         "ru_name": "Pac-Man",
         "en_description": "A lightweight native maze chase for classic Macs.",
         "ru_description": "Лёгкая нативная погоня по лабиринту для старых Mac.",
+        "category": "games",
+    },
+    "Fifteen": {
+        "id": "com.michirose.telegraphica.workshop.fifteen",
+        "name": "Fifteen",
+        "ru_name": "Пятнашки",
+        "en_description": "A compact sliding puzzle with saved progress and no background timer.",
+        "ru_description": "Компактная игра в пятнашки с сохранением прогресса и без фонового таймера.",
+        "category": "games",
     },
 }
 
@@ -129,7 +142,7 @@ def main() -> None:
             "minimum_app_version": "0.5.1",
             "minimum_os_version": "10.9",
             "architectures": ["x86_64"],
-            "category": "games",
+            "category": metadata["category"],
             "archive_size": len(package_bytes),
             "unpacked_size": unpacked_size,
             "entry_count": entry_count,
