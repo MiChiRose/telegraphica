@@ -42,6 +42,14 @@ void TGDrawTemplateIconAsset(NSString *name, NSRect rect, NSColor *color, CGFloa
     (void)flipped;
 }
 
+NSImage *TGTemplateIconAssetImage(NSString *name, NSSize size, NSColor *color, CGFloat alpha) {
+    (void)name;
+    (void)size;
+    (void)color;
+    (void)alpha;
+    return nil;
+}
+
 static int TGProbeFailures = 0;
 
 static void TGAssertTrue(BOOL condition, NSString *message) {

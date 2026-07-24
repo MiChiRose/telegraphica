@@ -62,6 +62,26 @@ static NSImage *TGWorkshopBackImage(void) {
     return image;
 }
 
+static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
+    NSImage *source = TGTemplateIconAssetImage(name,
+                                               NSMakeSize(16.0, 16.0),
+                                               TGClassicHeaderTextColor(1.0),
+                                               1.0);
+    if (!source) return nil;
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(16.0, 16.0)] autorelease];
+    [image lockFocus];
+    NSAffineTransform *transform = [NSAffineTransform transform];
+    [transform translateXBy:0.0 yBy:16.0];
+    [transform scaleXBy:1.0 yBy:-1.0];
+    [transform concat];
+    [source drawInRect:NSMakeRect(0.0, 0.0, 16.0, 16.0)
+              fromRect:NSZeroRect
+             operation:NSCompositeSourceOver
+              fraction:1.0];
+    [image unlockFocus];
+    return image;
+}
+
 @implementation TGWorkshopViewController
 
 @synthesize delegate = _delegate;
@@ -208,10 +228,7 @@ static NSImage *TGWorkshopBackImage(void) {
                           @"workshop-installed",
                           @"workshop-updates",
                           nil];
-        [button setImage:TGTemplateIconAssetImage([icons objectAtIndex:index],
-                                                  NSMakeSize(16.0, 16.0),
-                                                  TGClassicHeaderTextColor(1.0),
-                                                  1.0)];
+        [button setImage:TGWorkshopOriginalOrientationIconImage([icons objectAtIndex:index])];
         [button setImagePosition:NSImageLeft];
     }
     [_categoryField setStringValue:TGLoc(@"workshop.games")];
