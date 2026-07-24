@@ -104,12 +104,20 @@ static NSString *TGWorkshopHexDigest(const unsigned char *digest, NSUInteger len
         unsigned char digest[CC_SHA256_DIGEST_LENGTH];
         CC_SHA256_Final(digest, &context);
 
+        static const unsigned char SHA256DigestInfoPrefix[] = {
+            0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
+            0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20
+        };
+        NSMutableData *digestInfo = [NSMutableData dataWithBytes:SHA256DigestInfoPrefix
+                                                          length:sizeof(SHA256DigestInfoPrefix)];
+        [digestInfo appendBytes:digest length:CC_SHA256_DIGEST_LENGTH];
+
         TGWorkshopSecKeyRawVerifyFunction rawVerify = (TGWorkshopSecKeyRawVerifyFunction)dlsym(RTLD_DEFAULT, "SecKeyRawVerify");
         if (rawVerify) {
             OSStatus status = rawVerify(publicKey,
-                                        (uint32_t)kSecPaddingPKCS1SHA256,
-                                        digest,
-                                        CC_SHA256_DIGEST_LENGTH,
+                                        (uint32_t)kSecPaddingPKCS1,
+                                        [digestInfo bytes],
+                                        [digestInfo length],
                                         [signature bytes],
                                         [signature length]);
             verified = (status == errSecSuccess);
