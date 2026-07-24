@@ -2,6 +2,7 @@
 #import "TGWorkshopButtonCell.h"
 #import "TGWorkshopSurfaceView.h"
 #import "TGWorkshopRemovalConfirmationView.h"
+#import "TGWorkshopHeaderNoticeView.h"
 #import "../Catalog/TGWorkshopCatalog.h"
 #import "../Catalog/TGWorkshopCatalogEntry.h"
 #import "../../UI/TGLocalization.h"
@@ -181,6 +182,10 @@ static NSImage *TGWorkshopBackImage(void) {
     [_moduleContainerView setHidden:YES];
     [rootView addSubview:_moduleContainerView];
 
+    _headerNoticeView = [[TGWorkshopHeaderNoticeView alloc] initWithFrame:NSMakeRect(360, 518, 330, 30)];
+    [_headerNoticeView setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [rootView addSubview:_headerNoticeView];
+
     [self refreshLocalization];
     [self refreshTheme];
     [self layoutWorkshopView];
@@ -214,6 +219,10 @@ static NSImage *TGWorkshopBackImage(void) {
     [_statusField setFrame:NSMakeRect(310, height - 134, MAX(120.0, width - 334.0), 20)];
     [_scrollView setFrame:NSMakeRect(18, 18, width - 36, MAX(120.0, height - 164.0))];
     [_moduleContainerView setFrame:NSMakeRect(12, 12, width - 24, height - 56)];
+    [_headerNoticeView setFrame:NSMakeRect(MAX(190.0, width - 350.0),
+                                           height - 40.0,
+                                           MIN(330.0, width - 210.0),
+                                           30.0)];
     if (_activeModuleViewController) {
         [[_activeModuleViewController view] setFrame:[_moduleContainerView bounds]];
     }
@@ -393,9 +402,11 @@ static NSImage *TGWorkshopBackImage(void) {
 - (void)refreshCatalogAction:(id)sender {
     (void)sender;
     if (_catalogRefreshing) return;
+    _availableCountBeforeRefresh = [[_coordinator entriesForMode:TGWorkshopViewModeAvailable] count];
     _catalogRefreshing = YES;
     [_refreshButton setEnabled:NO];
-    [_statusField setStringValue:TGLoc(@"workshop.refreshing")];
+    [_statusField setStringValue:@""];
+    [_headerNoticeView showMessage:TGLoc(@"workshop.refreshing") duration:20.0];
     [_coordinator refreshCatalog];
 }
 
@@ -620,10 +631,26 @@ static NSImage *TGWorkshopBackImage(void) {
 }
 
 - (void)workshopCoordinatorDidReload {
+    BOOL completedManualRefresh = _catalogRefreshing;
     _catalogRefreshing = NO;
     [_refreshButton setEnabled:YES];
     [self rebuildCategoryFilter];
     [self rebuildCards];
+    if (completedManualRefresh) {
+        NSUInteger availableCount = [[_coordinator entriesForMode:TGWorkshopViewModeAvailable] count];
+        NSUInteger updatesCount = [[_coordinator entriesForMode:TGWorkshopViewModeUpdates] count];
+        NSString *message = nil;
+        if (updatesCount > 0) {
+            message = [NSString stringWithFormat:TGLoc(@"workshop.updatesFound"),
+                       (unsigned long)updatesCount];
+        } else if (availableCount > _availableCountBeforeRefresh) {
+            message = [NSString stringWithFormat:TGLoc(@"workshop.newModulesFound"),
+                       (unsigned long)(availableCount - _availableCountBeforeRefresh)];
+        } else {
+            message = TGLoc(@"workshop.noNewUpdates");
+        }
+        [_headerNoticeView showMessage:message duration:2.8];
+    }
 }
 
 - (void)workshopCoordinatorDidUpdateProgress:(double)progress moduleIdentifier:(NSString *)identifier {
@@ -655,8 +682,12 @@ static NSImage *TGWorkshopBackImage(void) {
     if (identifier) {
         [_errorsByIdentifier setObject:message forKey:identifier];
     } else {
+        BOOL failedManualRefresh = _catalogRefreshing;
         _catalogRefreshing = NO;
         [_refreshButton setEnabled:YES];
+        if (failedManualRefresh) {
+            [_headerNoticeView showMessage:TGLoc(@"workshop.refreshFailed") duration:3.2];
+        }
     }
     [self rebuildCards];
     if (!identifier) {
@@ -702,6 +733,7 @@ static NSImage *TGWorkshopBackImage(void) {
     [_scrollView release];
     [_contentView release];
     [_moduleContainerView release];
+    [_headerNoticeView release];
     [_activeModuleViewController release];
     [_selectedMode release];
     [_selectedCategory release];

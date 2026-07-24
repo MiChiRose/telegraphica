@@ -34,18 +34,67 @@ static NSString *TGWorkshopInstalledCategory(NSString *identifier, NSDictionary 
         : TGWorkshopModuleCategoryGames;
 }
 
+static NSDictionary *TGWorkshopInstalledLocalizedNames(NSString *identifier) {
+    NSString *english = nil;
+    NSString *russian = nil;
+    NSString *belarusian = nil;
+    if ([identifier hasSuffix:@".tictactoe"]) {
+        english = @"Tic-Tac-Toe";
+        russian = @"Крестики-нолики";
+        belarusian = @"Крыжыкі-нулікі";
+    } else if ([identifier hasSuffix:@".minesweeper"]) {
+        english = @"Minesweeper";
+        russian = @"Сапёр";
+        belarusian = @"Сапёр";
+    } else if ([identifier hasSuffix:@".checkers"]) {
+        english = @"Checkers";
+        russian = @"Шашки";
+        belarusian = @"Шашкі";
+    } else if ([identifier hasSuffix:@".solitaire"]) {
+        english = @"Solitaire";
+        russian = @"Пасьянс";
+        belarusian = @"Пасьянс";
+    } else if ([identifier hasSuffix:@".pacman"]) {
+        english = @"Pac-Man";
+        russian = @"Pac-Man";
+        belarusian = @"Pac-Man";
+    } else if ([identifier hasSuffix:@".fifteen"]) {
+        english = @"Fifteen";
+        russian = @"Пятнашки";
+        belarusian = @"Пятнашкі";
+    } else if ([identifier hasSuffix:@".diagnosticcenter"]) {
+        english = @"Diagnostic Center";
+        russian = @"Центр диагностики";
+        belarusian = @"Цэнтр дыягностыкі";
+    } else if ([identifier hasSuffix:@".mediaworkbench"]) {
+        english = @"Media Center";
+        russian = @"Медиацентр";
+        belarusian = @"Медыяцэнтр";
+    } else {
+        NSArray *components = [identifier componentsSeparatedByString:@"."];
+        NSString *fallback = [components count] > 0 ? [components lastObject] : identifier;
+        english = [fallback length] > 0 ? [fallback capitalizedString] : @"Workshop Module";
+        russian = english;
+        belarusian = english;
+    }
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            english, @"en",
+            russian, @"ru",
+            belarusian, @"be",
+            nil];
+}
+
 static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identifier,
                                                                  NSDictionary *record) {
     if ([identifier length] == 0 || ![record isKindOfClass:[NSDictionary class]]) return nil;
     NSString *version = [record objectForKey:@"active_version"];
     if ([version length] == 0) return nil;
-    NSString *name = [identifier hasSuffix:@".pacman"] ? @"Pac-Man" : [identifier lastPathComponent];
-    if ([identifier hasSuffix:@".diagnosticcenter"]) name = @"Diagnostic Center";
-    if ([identifier hasSuffix:@".mediaworkbench"]) name = @"Media Center";
+    NSDictionary *localizedNames = TGWorkshopInstalledLocalizedNames(identifier);
+    NSString *name = [localizedNames objectForKey:@"en"];
     NSDictionary *dictionary = [NSDictionary dictionaryWithObjectsAndKeys:
                                 identifier, @"id",
                                 name, @"name",
-                                [NSDictionary dictionaryWithObjectsAndKeys:name, @"en", name, @"ru", nil], @"localized_name",
+                                localizedNames, @"localized_name",
                                 [NSDictionary dictionaryWithObjectsAndKeys:@"Installed Workshop module.", @"en",
                                  @"Установленный модуль Мастерской.", @"ru", nil], @"description",
                                 version, @"version",

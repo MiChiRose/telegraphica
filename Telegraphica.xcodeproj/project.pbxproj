@@ -89,6 +89,7 @@
 		220000000000000000000018 /* WorkshopPackagePublicKey.der in Resources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000018 /* WorkshopPackagePublicKey.der */; };
 		220000000000000000000019 /* TGWorkshopSurfaceView.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000019 /* TGWorkshopSurfaceView.m */; settings = {COMPILER_FLAGS = "-fvisibility=default"; }; };
 		22000000000000000000001A /* TGWorkshopRemovalConfirmationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */; };
+		22000000000000000000001B /* TGWorkshopHeaderNoticeView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -224,6 +225,7 @@
 		221000000000000000000018 /* WorkshopPackagePublicKey.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = WorkshopPackagePublicKey.der; sourceTree = "<group>"; };
 		221000000000000000000019 /* TGWorkshopSurfaceView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopSurfaceView.m; sourceTree = "<group>"; };
 		22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopRemovalConfirmationView.m; sourceTree = "<group>"; };
+		22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopHeaderNoticeView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -445,6 +447,7 @@
 				221000000000000000000013 /* TGWorkshopViewController.m */,
 				221000000000000000000019 /* TGWorkshopSurfaceView.m */,
 				22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */,
+				22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */,
 			);
 			path = Workshop;
 			sourceTree = "<group>";
@@ -599,6 +602,7 @@
 				220000000000000000000015 /* ioapi.c in Sources */,
 				220000000000000000000019 /* TGWorkshopSurfaceView.m in Sources */,
 				22000000000000000000001A /* TGWorkshopRemovalConfirmationView.m in Sources */,
+				22000000000000000000001B /* TGWorkshopHeaderNoticeView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

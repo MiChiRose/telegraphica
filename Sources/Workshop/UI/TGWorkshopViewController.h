@@ -5,6 +5,7 @@
 @class TGWorkshopViewController;
 @class TGWorkshopCatalogEntry;
 @class TGWorkshopRemovalConfirmationView;
+@class TGWorkshopHeaderNoticeView;
 
 @protocol TGWorkshopViewControllerDelegate <NSObject>
 - (void)workshopViewControllerDidRequestClose:(TGWorkshopViewController *)viewController;
@@ -28,6 +29,7 @@
     NSScrollView *_scrollView;
     NSView *_contentView;
     NSView *_moduleContainerView;
+    TGWorkshopHeaderNoticeView *_headerNoticeView;
     NSViewController *_activeModuleViewController;
     NSString *_selectedMode;
     NSString *_selectedCategory;
@@ -36,6 +38,7 @@
     NSMutableDictionary *_installStartDatesByIdentifier;
     BOOL _started;
     BOOL _catalogRefreshing;
+    NSUInteger _availableCountBeforeRefresh;
     TGWorkshopRemovalConfirmationView *_removalConfirmationView;
     TGWorkshopCatalogEntry *_pendingRemovalEntry;
 }
