@@ -84,13 +84,14 @@ static NSImage *TGWorkshopBackImage(void) {
     [rootView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [self setView:rootView];
 
-    _backButton = [TGWorkshopViewButton(NSMakeRect(12, 8, 42, 30), @"", 0) retain];
+    _backButton = [TGWorkshopViewButton(NSMakeRect(12, 8, 30, 30), @"", 0) retain];
     [_backButton setImage:TGWorkshopBackImage()];
     [_backButton setImagePosition:NSImageOnly];
     [_backButton setAutoresizingMask:NSViewMinYMargin];
     [[_backButton cell] setButtonType:NSMomentaryPushInButton];
     [_backButton setTarget:self];
     [_backButton setAction:@selector(backAction:)];
+    [_backButton setHidden:YES];
     [rootView addSubview:_backButton];
 
     _titleField = [TGWorkshopViewLabel(NSMakeRect(88, 10, 350, 24), [NSFont boldSystemFontOfSize:14.0]) retain];
@@ -149,7 +150,7 @@ static NSImage *TGWorkshopBackImage(void) {
     NSRect bounds = [[self view] bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    [_backButton setFrame:NSMakeRect(12, height - 38, 42, 30)];
+    [_backButton setFrame:NSMakeRect(12, height - 38, 30, 30)];
     [_titleField setFrame:NSMakeRect(64, height - 34, width - 80, 22)];
     NSUInteger index = 0;
     CGFloat tabsWidth = MIN(470.0, width - 40.0);
@@ -176,6 +177,16 @@ static NSImage *TGWorkshopBackImage(void) {
     _started = YES;
     [_coordinator start];
     [self rebuildCards];
+}
+
+- (BOOL)hasActiveModule {
+    return (_activeModuleViewController != nil);
+}
+
+- (void)notifyActiveModuleChanged {
+    if ([_delegate respondsToSelector:@selector(workshopViewController:didChangeActiveModule:)]) {
+        [_delegate workshopViewController:self didChangeActiveModule:[self hasActiveModule]];
+    }
 }
 
 - (void)refreshLocalization {
@@ -288,11 +299,13 @@ static NSImage *TGWorkshopBackImage(void) {
         [_activeModuleViewController release];
         _activeModuleViewController = nil;
         [_moduleContainerView setHidden:YES];
+        [_backButton setHidden:YES];
         [_scrollView setHidden:NO];
         [_categoryField setHidden:NO];
         [_statusField setHidden:NO];
         for (NSButton *button in _modeButtons) [button setHidden:NO];
         [self rebuildCards];
+        [self notifyActiveModuleChanged];
         return;
     }
     if ([_delegate respondsToSelector:@selector(workshopViewControllerDidRequestClose:)]) {
@@ -372,10 +385,12 @@ static NSImage *TGWorkshopBackImage(void) {
     [moduleView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [_moduleContainerView addSubview:moduleView];
     [_moduleContainerView setHidden:NO];
+    [_backButton setHidden:NO];
     [_scrollView setHidden:YES];
     [_categoryField setHidden:YES];
     [_statusField setHidden:YES];
     for (NSButton *button in _modeButtons) [button setHidden:YES];
+    [self notifyActiveModuleChanged];
 }
 
 - (void)dealloc {

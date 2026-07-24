@@ -76,7 +76,7 @@ static NSTextField *TGTicTacToeLabel(NSRect frame, NSFont *font) {
     for (index = 0; index < 9; index++) {
         NSUInteger row = index / 3;
         NSUInteger column = index % 3;
-        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(222 + column * 88,
+        NSButton *button = [[[NSButton alloc] initWithFrame:NSMakeRect(226 + column * 83,
                                                                        120 + row * 88,
                                                                        80,
                                                                        80)] autorelease];

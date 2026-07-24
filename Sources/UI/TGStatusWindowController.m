@@ -3455,6 +3455,14 @@ static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
     [self layoutContentView];
 }
 
+- (void)workshopViewController:(TGWorkshopViewController *)viewController
+       didChangeActiveModule:(BOOL)active {
+    (void)viewController;
+    (void)active;
+    [self updateVisibleSection];
+    [self layoutContentView];
+}
+
 - (void)workshopHostContextRequestedNotificationWithTitle:(NSString *)title message:(NSString *)message {
     NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
     [notification setTitle:([title length] > 0 ? title : TGLoc(@"workshop.title"))];

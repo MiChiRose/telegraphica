@@ -26,7 +26,7 @@ static NSImage *TGWorkshopFeltTile(void) {
 static NSImage *TGWorkshopWoodTile(void) {
     static NSImage *tile = nil;
     if (tile) return tile;
-    tile = [[NSImage alloc] initWithSize:NSMakeSize(96.0, 42.0)];
+    tile = [[NSImage alloc] initWithSize:NSMakeSize(256.0, 64.0)];
     [tile lockFocus];
     NSGradient *wood = [[[NSGradient alloc]
                          initWithColorsAndLocations:
@@ -34,23 +34,23 @@ static NSImage *TGWorkshopWoodTile(void) {
                          [NSColor colorWithCalibratedRed:0.68 green:0.36 blue:0.17 alpha:1.0], 0.44,
                          [NSColor colorWithCalibratedRed:0.39 green:0.17 blue:0.075 alpha:1.0], 1.0,
                          nil] autorelease];
-    [wood drawInRect:NSMakeRect(0.0, 0.0, 96.0, 42.0) angle:90.0];
+    [wood drawInRect:NSMakeRect(0.0, 0.0, 256.0, 64.0) angle:90.0];
     NSUInteger index = 0;
-    for (index = 0; index < 14; index++) {
-        CGFloat y = 2.0 + (CGFloat)((index * 11) % 38);
-        CGFloat wave = (CGFloat)((index * 7) % 12);
+    for (index = 0; index < 11; index++) {
+        CGFloat y = 3.0 + (CGFloat)((index * 17) % 58);
+        CGFloat wave = 3.0 + (CGFloat)((index * 11) % 13);
         NSBezierPath *grain = [NSBezierPath bezierPath];
-        [grain setLineWidth:(index % 4 == 0) ? 1.1 : 0.6];
+        [grain setLineWidth:(index % 4 == 0) ? 1.0 : 0.55];
         [[NSColor colorWithCalibratedRed:0.19 green:0.07 blue:0.025
-                                    alpha:(index % 3 == 0 ? 0.22 : 0.12)] setStroke];
-        [grain moveToPoint:NSMakePoint(-4.0, y)];
-        [grain curveToPoint:NSMakePoint(100.0, y + 1.0)
-              controlPoint1:NSMakePoint(28.0, y + wave * 0.16)
-              controlPoint2:NSMakePoint(64.0, y - wave * 0.13)];
+                                    alpha:(index % 3 == 0 ? 0.18 : 0.09)] setStroke];
+        [grain moveToPoint:NSMakePoint(-8.0, y)];
+        [grain curveToPoint:NSMakePoint(264.0, y + 0.8)
+              controlPoint1:NSMakePoint(72.0, y + wave)
+              controlPoint2:NSMakePoint(178.0, y - wave * 0.72)];
         [grain stroke];
     }
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.16] setFill];
-    NSRectFill(NSMakeRect(0.0, 40.0, 96.0, 1.0));
+    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.12] setFill];
+    NSRectFill(NSMakeRect(0.0, 62.0, 256.0, 1.0));
     [tile unlockFocus];
     return tile;
 }
@@ -133,7 +133,9 @@ static void TGWorkshopDrawTableSurface(NSRect bounds, BOOL woodenHeader) {
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    TGWorkshopDrawTableSurface([self bounds], NO);
+    NSRect bounds = [self bounds];
+    [TGWorkshopFeltPatternColor() setFill];
+    NSRectFill(bounds);
 }
 
 @end

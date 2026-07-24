@@ -156,7 +156,8 @@ static NSString * const TGWorkshopModeUpdates = @"updates";
         [self closeActiveModule];
     }
     NSError *error = nil;
-    if (![_installer markModuleForRemoval:identifier removeData:removeData error:&error]) {
+    if (![_installer markModuleForRemoval:identifier removeData:removeData error:&error] ||
+        ![_installer processPendingRemovals:&error]) {
         [_delegate workshopCoordinatorDidFailWithError:error moduleIdentifier:identifier];
     }
     [_delegate workshopCoordinatorDidReload];

@@ -6,6 +6,9 @@
 
 @protocol TGWorkshopViewControllerDelegate <NSObject>
 - (void)workshopViewControllerDidRequestClose:(TGWorkshopViewController *)viewController;
+@optional
+- (void)workshopViewController:(TGWorkshopViewController *)viewController
+       didChangeActiveModule:(BOOL)active;
 @end
 
 @interface TGWorkshopViewController : NSViewController
@@ -33,6 +36,7 @@
 
 - (id)initWithCoordinator:(TGWorkshopCoordinator *)coordinator;
 - (void)startIfNeeded;
+- (BOOL)hasActiveModule;
 - (void)requestCloseActiveModuleOrWorkshop;
 - (void)refreshLocalization;
 - (void)refreshTheme;

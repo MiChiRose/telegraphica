@@ -65,6 +65,11 @@ static NSError *TGWorkshopInstallerError(NSInteger code, NSString *message) {
                catalogEntry:(TGWorkshopCatalogEntry *)entry
          applicationVersion:(NSString *)applicationVersion
                       error:(NSError **)error {
+    NSDictionary *existingRecord = [_registryStore recordForModuleIdentifier:[entry moduleIdentifier]];
+    if ([[existingRecord objectForKey:@"pending_removal"] boolValue] &&
+        ![self processPendingRemovals:error]) {
+        return NO;
+    }
     if (![TGWorkshopCompatibility catalogEntryIsCompatible:entry
                                         applicationVersion:applicationVersion
                                              systemVersion:[TGWorkshopCompatibility currentSystemVersion]

@@ -93,7 +93,9 @@
     }
 
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
-    [self showView:self.drawerButton visible:(ready && !drawerHidden)];
+    BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
+                                 [self.workshopViewController hasActiveModule]);
+    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive)];
     [self showView:self.workshopDrawerButton visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
