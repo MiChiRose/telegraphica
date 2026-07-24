@@ -200,6 +200,72 @@ def check_workshop_installed_presentation(errors):
                           (notice_rel, fragment))
 
 
+def check_unified_legacy_contract(errors):
+    info_rel = os.path.join("Sources", "Info.plist")
+    info_text = read_text(os.path.join(ROOT, info_rel))
+    if "<key>LSMinimumSystemVersion</key>\n\t<string>10.8</string>" not in info_text:
+        errors.append("%s: unified app must keep LSMinimumSystemVersion at 10.8" % info_rel)
+    if "OS X 10.8–macOS 10.13" not in info_text:
+        errors.append("%s: unified compatibility summary is missing" % info_rel)
+
+    compatibility_rel = os.path.join("Sources", "Services", "TGSystemCompatibility.h")
+    compatibility_text = read_text(os.path.join(ROOT, compatibility_rel))
+    for fragment in ["NSAppKitVersionNumber < 1265.0", "TGSystemIsMountainLion"]:
+        if fragment not in compatibility_text:
+            errors.append("%s: runtime Mountain Lion detection is missing `%s`" %
+                          (compatibility_rel, fragment))
+    if "LSMinimumSystemVersion" in compatibility_text:
+        errors.append("%s: runtime detection must not inspect the deployment-target plist key" %
+                      compatibility_rel)
+
+    base64_rel = os.path.join("Sources", "Services", "TGBase64Compatibility.h")
+    base64_text = read_text(os.path.join(ROOT, base64_rel))
+    for fragment in ["TGBase64EncodedString", "TGDataFromBase64String",
+                     "base64Encoding", "initWithBase64Encoding:"]:
+        if fragment not in base64_text:
+            errors.append("%s: shared Mountain Lion Base64 helper is missing `%s`" %
+                          (base64_rel, fragment))
+
+    for rel in [
+        os.path.join("Sources", "Core", "TGTDLibClient.m"),
+        os.path.join("Sources", "UI", "TGStatusWindowController.m"),
+    ]:
+        text = read_text(os.path.join(ROOT, rel))
+        if "TGSystemIsMountainLion()" not in text:
+            errors.append("%s: shared runtime compatibility helper is not used" % rel)
+    tdlib_text = read_text(os.path.join(ROOT, "Sources", "Core", "TGTDLibClient.m"))
+    if "TGTDLibPruneMountainLionBackups(backupRoot, 3)" not in tdlib_text:
+        errors.append("Sources/Core/TGTDLibClient.m: Mountain Lion cache backups must stay bounded")
+
+    build_rel = "build_legacy.sh"
+    build_text = read_text(os.path.join(ROOT, build_rel))
+    for fragment in [
+        "MACOSX_DEPLOYMENT_TARGET:-10.8",
+        "check_release_bundle_legacy.sh",
+        "Xcode 5.1.1.app",
+    ]:
+        if fragment not in build_text:
+            errors.append("%s: unified legacy build contract is missing `%s`" %
+                          (build_rel, fragment))
+
+    package_rel = os.path.join("scripts", "package_legacy_release_artifacts.sh")
+    package_text = read_text(os.path.join(ROOT, package_rel))
+    if "macos10.8-10.13" not in package_text:
+        errors.append("%s: unified release artifact compatibility tag is missing" % package_rel)
+
+    for rel in [
+        os.path.join("Sources", "UI", "TGUpdateSupport.h"),
+        os.path.join("Sources", "UI", "TGUpdateSupport.m"),
+        os.path.join("Sources", "UI", "TGStatusWindowController.m"),
+        os.path.join("Sources", "UI", "TGStatusWindowController+Notifications.inc"),
+    ]:
+        if "TGCurrentApplicationVersionIsMountainLionBuild" in read_text(os.path.join(ROOT, rel)):
+            errors.append("%s: unified updater must not disable itself through the old -ml release suffix" % rel)
+
+    if os.path.exists(os.path.join(ROOT, "build_mountain_lion.sh")):
+        errors.append("build_mountain_lion.sh: separate Mountain Lion build wrapper must not return")
+
+
 def check_no_local_runtime_data(errors):
     forbidden_names = [
         "tdlib-config.plist",
@@ -234,6 +300,7 @@ def main():
     check_media_center_pagination(errors)
     check_workshop_download_proxy(errors)
     check_workshop_installed_presentation(errors)
+    check_unified_legacy_contract(errors)
     check_no_local_runtime_data(errors)
     if errors:
         print("Static project tests failed:")

@@ -15,17 +15,24 @@ VENDOR_DIR="$ROOT_DIR/Vendor"
 PREFIX="$ROOT_DIR/$BUILD_DIR/prefix"
 HELPER_DIR="$ROOT_DIR/$BUILD_DIR/bin"
 LOG_DIR="$ROOT_DIR/$BUILD_DIR/logs"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 
-SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path 2>/dev/null || true)"
+SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path 2>/dev/null || true)}"
 if [ -z "$SDK_PATH" ]; then
     echo "Could not resolve SDK path for $SDK_NAME"
     exit 1
 fi
 
+SDK_LINK="$ROOT_DIR/$BUILD_DIR/Toolchain/MacOSX.sdk"
+rm -f "$SDK_LINK"
+mkdir -p "$(dirname "$SDK_LINK")"
+ln -s "$SDK_PATH" "$SDK_LINK"
+SDK_PATH="$SDK_LINK"
+
 mkdir -p "$PREFIX" "$HELPER_DIR" "$LOG_DIR"
 
-COMMON_CFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=10.9 -O2"
-COMMON_LDFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=10.9"
+COMMON_CFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=$DEPLOYMENT_TARGET -O2"
+COMMON_LDFLAGS="-arch $ARCH -isysroot $SDK_PATH -mmacosx-version-min=$DEPLOYMENT_TARGET"
 HOST="$ARCH-apple-darwin"
 
 build_configure_project() {
@@ -37,6 +44,7 @@ build_configure_project() {
     mkdir -p "$build_path"
     (
         cd "$build_path"
+        MAKE=/usr/bin/make \
         CFLAGS="$COMMON_CFLAGS" \
         LDFLAGS="$COMMON_LDFLAGS" \
         PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
@@ -48,8 +56,8 @@ build_configure_project() {
             --disable-shared \
             --enable-static \
             "$@" > "$LOG_DIR/$build_subdir-configure.log" 2>&1
-        make -j2 > "$LOG_DIR/$build_subdir-make.log" 2>&1
-        make install > "$LOG_DIR/$build_subdir-install.log" 2>&1
+        MAKE=/usr/bin/make /usr/bin/make -j2 MAKE=/usr/bin/make > "$LOG_DIR/$build_subdir-make.log" 2>&1
+        MAKE=/usr/bin/make /usr/bin/make install MAKE=/usr/bin/make > "$LOG_DIR/$build_subdir-install.log" 2>&1
     )
 }
 

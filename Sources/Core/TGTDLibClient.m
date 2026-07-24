@@ -3,9 +3,11 @@
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
 #import "TGMessagePollSupport.h"
+#import "../Services/TGBase64Compatibility.h"
 #import "../Services/TGKeychainHelper.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
+#import "../Services/TGSystemCompatibility.h"
 #import <dlfcn.h>
 #import <Security/Security.h>
 #import <stdlib.h>
@@ -20,9 +22,23 @@ static NSString * const TGTDLibErrorDomain = @"TelegraphicaTDLibError";
 static NSString * const TGTDLibTDLibCodeErrorKey = @"TelegraphicaTDLibCode";
 static NSString * const TGTDLibTDLibMessageErrorKey = @"TelegraphicaTDLibMessage";
 static NSString * const TGTDLibTDLibResponseErrorKey = @"TelegraphicaTDLibResponse";
+static NSString * const TGTDLibAuthorizationNetworkTimeoutErrorKey = @"TelegraphicaAuthorizationNetworkTimeout";
 static NSString * const TGTDLibDatabaseEncryptionKeyAccount = @"tdlib_database_encryption_key";
 static NSString * const TGTDLibRemoteConfigurationURLInfoKey = @"TelegraphicaRemoteTDLibConfigURL";
 static NSString * const TGTDLibRemoteConfigurationURLEnvironmentKey = @"TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL";
+static NSString * const TGTDLibProxyServerEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_SERVER";
+static NSString * const TGTDLibProxyPortEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_PORT";
+static NSString * const TGTDLibProxyTypeEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_TYPE";
+static NSString * const TGTDLibProxyUsernameEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_USERNAME";
+static NSString * const TGTDLibProxyPasswordEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_PASSWORD";
+static NSString * const TGTDLibProxySecretEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_SECRET";
+static NSString * const TGTDLibProxyHTTPOnlyEnvironmentKey = @"TELEGRAPHICA_TDLIB_PROXY_HTTP_ONLY";
+static NSString * const TGTDLibMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
+static NSString * const TGTDLibDefaultDatabaseDirectoryName = @"tdlib";
+static NSString * const TGTDLibMountainLionDatabaseDirectoryName = @"tdlib-mountain-lion";
+static NSString * const TGTDLibDefaultFilesDirectoryName = @"tdlib-files";
+static NSString * const TGTDLibMountainLionFilesDirectoryName = @"tdlib-files-mountain-lion";
+static NSString * const TGTDLibMountainLionBinlogMarkerName = @"telegraphica-ml-binlog-only-store";
 static NSTimeInterval const TGTDLibRemoteConfigurationTimeout = 8.0;
 static NSUInteger const TGTDLibMaxPendingResponses = 64;
 static NSUInteger const TGTDLibMaxPendingUpdateSummaries = 200;
@@ -73,6 +89,35 @@ static BOOL TGTDLibCanGetMessageThreadFromObject(NSDictionary *object) {
         }
     }
     return NO;
+}
+
+static BOOL TGTDLibMountainLionSafeLoginModeEnabled(void) {
+    if (!TGSystemIsMountainLion()) {
+        return NO;
+    }
+    return ![[NSUserDefaults standardUserDefaults] boolForKey:TGTDLibMountainLionSafeLoginModeDisabledDefaultsKey];
+}
+
+static void TGTDLibPruneMountainLionBackups(NSString *backupRoot, NSUInteger maximumCount) {
+    if ([backupRoot length] == 0 || maximumCount == 0) {
+        return;
+    }
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSArray *names = [fileManager contentsOfDirectoryAtPath:backupRoot error:NULL];
+    NSMutableArray *backupNames = [NSMutableArray array];
+    NSString *name = nil;
+    for (name in names) {
+        if ([name hasPrefix:@"tdlib-mountain-lion-"] &&
+            ![name hasPrefix:@"tdlib-mountain-lion-staging-"]) {
+            [backupNames addObject:name];
+        }
+    }
+    [backupNames sortUsingSelector:@selector(compare:)];
+    while ([backupNames count] > maximumCount) {
+        NSString *oldestName = [backupNames objectAtIndex:0];
+        [fileManager removeItemAtPath:[backupRoot stringByAppendingPathComponent:oldestName] error:NULL];
+        [backupNames removeObjectAtIndex:0];
+    }
 }
 
 static NSComparisonResult TGTDLibCompareChatItemsByPinnedOrder(id leftObject, id rightObject, void *context) {
@@ -198,6 +243,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_senderSummaryCache;
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSString *_latestAuthorizationStateSummary;
+    NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
     NSThread *_receiverThread;
@@ -207,6 +253,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL _mainChatListExhausted;
     BOOL _chatFilterInfosKnown;
     BOOL _chatFilterFallbackProbeFinished;
+    BOOL _networkProxyBootstrapAttempted;
     NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
@@ -226,6 +273,17 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)chatListIDKeyForType:(NSString *)chatListType;
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSDictionary *)networkProxyConfigurationWithError:(NSError **)error;
+- (NSDictionary *)networkProxyConfigurationFromEnvironmentWithError:(NSError **)error;
+- (NSDictionary *)networkProxyConfigurationFromLocalConfigurationWithError:(NSError **)error;
+- (NSDictionary *)networkProxyConfigurationFromDictionary:(NSDictionary *)dictionary label:(NSString *)label error:(NSError **)error;
+- (NSDictionary *)networkProxyObjectFromConfiguration:(NSDictionary *)configuration error:(NSError **)error;
+- (NSString *)networkProxySummaryFromConfiguration:(NSDictionary *)configuration;
+- (NSString *)trimmedStringValue:(id)value;
+- (NSNumber *)integerValueFromObject:(id)value minimum:(NSInteger)minimum maximum:(NSInteger)maximum;
+- (BOOL)boolValueFromObject:(id)value defaultValue:(BOOL)defaultValue;
+- (NSString *)optionSummaryForName:(NSString *)name timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (id)valueFromTDLibOptionResponse:(NSDictionary *)response;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
 - (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
@@ -234,7 +292,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)uniqueExtraWithPrefix:(NSString *)prefix;
 - (NSArray *)chatFilterChatIDsForFilterID:(NSNumber *)filterID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error;
 - (NSError *)errorWithTDLibErrorResponse:(NSDictionary *)response code:(NSInteger)code;
+- (NSError *)errorWithDescription:(NSString *)description code:(NSInteger)code userInfo:(NSDictionary *)extraInfo;
 - (NSInteger)tdlibErrorCodeFromError:(NSError *)error;
+- (BOOL)isRequestTimeoutError:(NSError *)error;
 - (BOOL)isTDLibLoadChatsExhaustedError:(NSError *)error;
 - (void)setMainChatListExhausted:(BOOL)exhausted;
 - (NSDictionary *)mediaFileObjectFromContainerObject:(NSDictionary *)containerObject;
@@ -406,6 +466,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     _chatFilterInfos = nil;
     _chatFilterInfosKnown = NO;
     _chatFilterFallbackProbeFinished = NO;
+    [_networkProxyBootstrapSummary release];
+    _networkProxyBootstrapSummary = nil;
+    _networkProxyBootstrapAttempted = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
     _mainChatListExhausted = NO;
@@ -434,6 +497,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_chatFilterInfos release];
     [_senderSummaryCache release];
     [_syntheticMediaAlbumIDByMessageKey release];
+    [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
     [_receiverThread release];
@@ -1349,8 +1413,22 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSError *)errorWithDescription:(NSString *)description code:(NSInteger)code {
-    NSDictionary *info = [NSDictionary dictionaryWithObject:(description ? description : @"Unknown TDLib error")
-                                                     forKey:NSLocalizedDescriptionKey];
+    return [self errorWithDescription:description code:code userInfo:nil];
+}
+
+- (NSError *)errorWithDescription:(NSString *)description code:(NSInteger)code userInfo:(NSDictionary *)extraInfo {
+    NSMutableDictionary *info = [NSMutableDictionary dictionaryWithObject:(description ? description : @"Unknown TDLib error")
+                                                                  forKey:NSLocalizedDescriptionKey];
+    if ([extraInfo isKindOfClass:[NSDictionary class]]) {
+        NSEnumerator *keyEnumerator = [extraInfo keyEnumerator];
+        id key = nil;
+        while ((key = [keyEnumerator nextObject])) {
+            id value = [extraInfo objectForKey:key];
+            if (key && value) {
+                [info setObject:value forKey:key];
+            }
+        }
+    }
     return [NSError errorWithDomain:TGTDLibErrorDomain code:code userInfo:info];
 }
 
@@ -1379,6 +1457,25 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return [value integerValue];
     }
     return 0;
+}
+
+- (BOOL)isRequestTimeoutError:(NSError *)error {
+    if (!error) {
+        return NO;
+    }
+    NSString *message = [[error localizedDescription] lowercaseString];
+    return ([message rangeOfString:@"timed out"].location != NSNotFound ||
+            [message rangeOfString:@"timeout"].location != NSNotFound ||
+            [message rangeOfString:@"did not return"].location != NSNotFound ||
+            [message rangeOfString:@"did not acknowledge"].location != NSNotFound);
+}
+
+- (BOOL)isAuthorizationNetworkTimeoutError:(NSError *)error {
+    if (!error) {
+        return NO;
+    }
+    id marker = [[error userInfo] objectForKey:TGTDLibAuthorizationNetworkTimeoutErrorKey];
+    return ([marker respondsToSelector:@selector(boolValue)] && [marker boolValue]);
 }
 
 - (BOOL)isTDLibLoadChatsExhaustedError:(NSError *)error {
@@ -1691,6 +1788,248 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [NSNumber numberWithBool:defaultValue];
 }
 
+- (NSString *)trimmedStringValue:(id)value {
+    if (![value isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    NSString *trimmed = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return ([trimmed length] > 0) ? trimmed : nil;
+}
+
+- (NSNumber *)integerValueFromObject:(id)value minimum:(NSInteger)minimum maximum:(NSInteger)maximum {
+    NSInteger integerValue = 0;
+    if ([value isKindOfClass:[NSNumber class]] && !TGTDLibObjectIsBoolean(value)) {
+        integerValue = [(NSNumber *)value integerValue];
+    } else if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
+        integerValue = [(NSString *)value integerValue];
+    } else {
+        return nil;
+    }
+
+    if (integerValue < minimum || integerValue > maximum) {
+        return nil;
+    }
+    return [NSNumber numberWithInteger:integerValue];
+}
+
+- (BOOL)boolValueFromObject:(id)value defaultValue:(BOOL)defaultValue {
+    if ([value respondsToSelector:@selector(boolValue)]) {
+        return [value boolValue];
+    }
+    if ([value isKindOfClass:[NSString class]]) {
+        NSString *lowercase = [[(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
+        if ([lowercase isEqualToString:@"true"] || [lowercase isEqualToString:@"yes"] || [lowercase isEqualToString:@"1"] || [lowercase isEqualToString:@"on"]) {
+            return YES;
+        }
+        if ([lowercase isEqualToString:@"false"] || [lowercase isEqualToString:@"no"] || [lowercase isEqualToString:@"0"] || [lowercase isEqualToString:@"off"]) {
+            return NO;
+        }
+    }
+    return defaultValue;
+}
+
+- (NSDictionary *)networkProxyConfigurationWithError:(NSError **)error {
+    NSDictionary *environmentConfiguration = [self networkProxyConfigurationFromEnvironmentWithError:error];
+    if (environmentConfiguration) {
+        return environmentConfiguration;
+    }
+    if (error && *error) {
+        return nil;
+    }
+
+    return [self networkProxyConfigurationFromLocalConfigurationWithError:error];
+}
+
+- (NSDictionary *)networkProxyConfigurationFromEnvironmentWithError:(NSError **)error {
+    NSDictionary *environment = [[NSProcessInfo processInfo] environment];
+    NSString *server = [self trimmedStringValue:[environment objectForKey:TGTDLibProxyServerEnvironmentKey]];
+    if ([server length] == 0) {
+        return nil;
+    }
+
+    NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
+    [dictionary setObject:server forKey:@"server"];
+    id port = [environment objectForKey:TGTDLibProxyPortEnvironmentKey];
+    if (port) {
+        [dictionary setObject:port forKey:@"port"];
+    }
+    id type = [environment objectForKey:TGTDLibProxyTypeEnvironmentKey];
+    if (type) {
+        [dictionary setObject:type forKey:@"type"];
+    }
+    id username = [environment objectForKey:TGTDLibProxyUsernameEnvironmentKey];
+    if (username) {
+        [dictionary setObject:username forKey:@"username"];
+    }
+    id password = [environment objectForKey:TGTDLibProxyPasswordEnvironmentKey];
+    if (password) {
+        [dictionary setObject:password forKey:@"password"];
+    }
+    id secret = [environment objectForKey:TGTDLibProxySecretEnvironmentKey];
+    if (secret) {
+        [dictionary setObject:secret forKey:@"secret"];
+    }
+    id httpOnly = [environment objectForKey:TGTDLibProxyHTTPOnlyEnvironmentKey];
+    if (httpOnly) {
+        [dictionary setObject:httpOnly forKey:@"http_only"];
+    }
+    return [self networkProxyConfigurationFromDictionary:dictionary label:@"environment" error:error];
+}
+
+- (NSDictionary *)networkProxyConfigurationFromLocalConfigurationWithError:(NSError **)error {
+    NSString *configPath = [self localTDLibConfigurationPathWithError:NULL];
+    if ([configPath length] == 0) {
+        return nil;
+    }
+    NSDictionary *configuration = [self tdLibConfigurationAtPath:configPath label:@"Local" error:NULL];
+    if (![configuration isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    id proxyDictionary = [configuration objectForKey:@"proxy"];
+    if ([proxyDictionary isKindOfClass:[NSDictionary class]]) {
+        return [self networkProxyConfigurationFromDictionary:(NSDictionary *)proxyDictionary label:@"local tdlib-config proxy" error:error];
+    }
+
+    if ([configuration objectForKey:@"proxy_server"] || [configuration objectForKey:@"proxy_port"] || [configuration objectForKey:@"proxy_type"]) {
+        NSMutableDictionary *topLevelProxy = [NSMutableDictionary dictionary];
+        NSArray *keys = [NSArray arrayWithObjects:@"proxy_server", @"proxy_port", @"proxy_type", @"proxy_username", @"proxy_password", @"proxy_secret", @"proxy_http_only", nil];
+        NSUInteger index = 0;
+        for (index = 0; index < [keys count]; index++) {
+            NSString *key = [keys objectAtIndex:index];
+            id value = [configuration objectForKey:key];
+            if (value) {
+                NSString *shortKey = [key substringFromIndex:[@"proxy_" length]];
+                [topLevelProxy setObject:value forKey:shortKey];
+            }
+        }
+        return [self networkProxyConfigurationFromDictionary:topLevelProxy label:@"local tdlib-config proxy" error:error];
+    }
+
+    return nil;
+}
+
+- (NSDictionary *)networkProxyConfigurationFromDictionary:(NSDictionary *)dictionary label:(NSString *)label error:(NSError **)error {
+    if (![dictionary isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    if (![self boolValueFromObject:[dictionary objectForKey:@"enabled"] defaultValue:YES]) {
+        return nil;
+    }
+
+    NSString *server = [self trimmedStringValue:[dictionary objectForKey:@"server"]];
+    if ([server length] == 0) {
+        server = [self trimmedStringValue:[dictionary objectForKey:@"host"]];
+    }
+    NSNumber *port = [self integerValueFromObject:[dictionary objectForKey:@"port"] minimum:1 maximum:65535];
+    NSString *type = [[self trimmedStringValue:[dictionary objectForKey:@"type"]] lowercaseString];
+    if ([type length] == 0) {
+        type = @"socks5";
+    }
+
+    if ([server length] == 0 || !port) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib proxy config needs a server and a port between 1 and 65535." code:120];
+        }
+        return nil;
+    }
+    if (![type isEqualToString:@"socks5"] && ![type isEqualToString:@"http"] && ![type isEqualToString:@"mtproto"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib proxy config type must be socks5, http, or mtproto." code:120];
+        }
+        return nil;
+    }
+
+    NSString *username = [self trimmedStringValue:[dictionary objectForKey:@"username"]];
+    NSString *password = [self trimmedStringValue:[dictionary objectForKey:@"password"]];
+    NSString *secret = [self trimmedStringValue:[dictionary objectForKey:@"secret"]];
+    BOOL httpOnly = [self boolValueFromObject:[dictionary objectForKey:@"http_only"] defaultValue:NO];
+
+    NSMutableDictionary *configuration = [NSMutableDictionary dictionary];
+    [configuration setObject:server forKey:@"server"];
+    [configuration setObject:port forKey:@"port"];
+    [configuration setObject:type forKey:@"type"];
+    [configuration setObject:(label ? label : @"local config") forKey:@"source"];
+    [configuration setObject:[NSNumber numberWithBool:httpOnly] forKey:@"http_only"];
+    if ([username length] > 0) {
+        [configuration setObject:username forKey:@"username"];
+    }
+    if ([password length] > 0) {
+        [configuration setObject:password forKey:@"password"];
+    }
+    if ([secret length] > 0) {
+        [configuration setObject:secret forKey:@"secret"];
+    }
+    return configuration;
+}
+
+- (NSDictionary *)networkProxyObjectFromConfiguration:(NSDictionary *)configuration error:(NSError **)error {
+    NSString *type = [configuration objectForKey:@"type"];
+    NSString *server = [configuration objectForKey:@"server"];
+    NSNumber *port = [configuration objectForKey:@"port"];
+    NSString *username = [configuration objectForKey:@"username"];
+    NSString *password = [configuration objectForKey:@"password"];
+    if (![username isKindOfClass:[NSString class]]) {
+        username = @"";
+    }
+    if (![password isKindOfClass:[NSString class]]) {
+        password = @"";
+    }
+
+    NSMutableDictionary *typeObject = [NSMutableDictionary dictionary];
+    if ([type isEqualToString:@"socks5"]) {
+        [typeObject setObject:@"proxyTypeSocks5" forKey:@"@type"];
+        [typeObject setObject:username forKey:@"username"];
+        [typeObject setObject:password forKey:@"password"];
+    } else if ([type isEqualToString:@"http"]) {
+        [typeObject setObject:@"proxyTypeHttp" forKey:@"@type"];
+        [typeObject setObject:username forKey:@"username"];
+        [typeObject setObject:password forKey:@"password"];
+        [typeObject setObject:[configuration objectForKey:@"http_only"] ? [configuration objectForKey:@"http_only"] : [NSNumber numberWithBool:NO] forKey:@"http_only"];
+    } else if ([type isEqualToString:@"mtproto"]) {
+        NSString *secret = [configuration objectForKey:@"secret"];
+        if (![secret isKindOfClass:[NSString class]] || [secret length] == 0) {
+            if (error) {
+                *error = [self errorWithDescription:@"MTProto proxy config needs a hexadecimal secret." code:120];
+            }
+            return nil;
+        }
+        NSCharacterSet *nonHexadecimalCharacters = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
+        if ([secret rangeOfCharacterFromSet:nonHexadecimalCharacters].location != NSNotFound) {
+            if (error) {
+                *error = [self errorWithDescription:@"MTProto proxy secret must be hexadecimal." code:120];
+            }
+            return nil;
+        }
+        [typeObject setObject:@"proxyTypeMtproto" forKey:@"@type"];
+        [typeObject setObject:secret forKey:@"secret"];
+    } else {
+        if (error) {
+            *error = [self errorWithDescription:@"Unsupported TDLib proxy type." code:120];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *proxy = [NSMutableDictionary dictionary];
+    [proxy setObject:@"proxy" forKey:@"@type"];
+    [proxy setObject:server forKey:@"server"];
+    [proxy setObject:port forKey:@"port"];
+    [proxy setObject:typeObject forKey:@"type"];
+    return proxy;
+}
+
+- (NSString *)networkProxySummaryFromConfiguration:(NSDictionary *)configuration {
+    NSString *type = [configuration objectForKey:@"type"];
+    NSString *server = [configuration objectForKey:@"server"];
+    NSNumber *port = [configuration objectForKey:@"port"];
+    NSString *source = [configuration objectForKey:@"source"];
+    return [NSString stringWithFormat:@"%@ proxy %@:%@ (%@)",
+            [type length] > 0 ? type : @"tdlib",
+            [server length] > 0 ? server : @"unknown",
+            port ? [port stringValue] : @"?",
+            [source length] > 0 ? source : @"local"];
+}
+
 - (NSString *)defaultSystemLanguageCode {
     NSArray *languages = [NSLocale preferredLanguages];
     if ([languages count] > 0 && [[languages objectAtIndex:0] length] > 0) {
@@ -1730,6 +2069,75 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:error];
 }
 
+- (BOOL)prepareMountainLionBinlogStoreAtPath:(NSString *)targetPath sourcePath:(NSString *)sourcePath error:(NSError **)error {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *sourceBinlog = [sourcePath stringByAppendingPathComponent:@"td.binlog"];
+    NSString *targetBinlog = [targetPath stringByAppendingPathComponent:@"td.binlog"];
+    NSString *targetMarker = [targetPath stringByAppendingPathComponent:TGTDLibMountainLionBinlogMarkerName];
+    if ([fileManager fileExistsAtPath:targetMarker] && [fileManager fileExistsAtPath:targetBinlog]) {
+        NSArray *cacheFileNames = [NSArray arrayWithObjects:@"db.sqlite", @"db.sqlite-shm", @"db.sqlite-wal", nil];
+        BOOL removedCache = NO;
+        for (NSString *cacheFileName in cacheFileNames) {
+            NSString *cachePath = [targetPath stringByAppendingPathComponent:cacheFileName];
+            if ([fileManager fileExistsAtPath:cachePath]) {
+                if (![fileManager removeItemAtPath:cachePath error:error]) {
+                    return NO;
+                }
+                removedCache = YES;
+            }
+        }
+        if (removedCache) {
+            [[TGLogger sharedLogger] log:@"Mountain Lion TDLib store: removed SQLite chat cache before starting legacy TDLib."];
+        }
+        return YES;
+    }
+
+    if (![fileManager fileExistsAtPath:sourceBinlog]) {
+        if (![self ensureDirectoryAtPath:targetPath error:error]) {
+            return NO;
+        }
+        NSString *marker = @"Telegraphica Mountain Lion TDLib store keeps only td.binlog and removes SQLite chat cache before TDLib startup.";
+        return [marker writeToFile:targetMarker atomically:YES encoding:NSUTF8StringEncoding error:error];
+    }
+
+    NSString *backupRoot = [[targetPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"tdlib-mountain-lion-backups"];
+    if (![self ensureDirectoryAtPath:backupRoot error:error]) {
+        return NO;
+    }
+
+    NSString *stagingName = [NSString stringWithFormat:@"tdlib-mountain-lion-staging-%llu", (unsigned long long)[[NSDate date] timeIntervalSince1970]];
+    NSString *stagingPath = [backupRoot stringByAppendingPathComponent:stagingName];
+    if (![self ensureDirectoryAtPath:stagingPath error:error]) {
+        return NO;
+    }
+    if (![fileManager copyItemAtPath:sourceBinlog toPath:[stagingPath stringByAppendingPathComponent:@"td.binlog"] error:error]) {
+        [fileManager removeItemAtPath:stagingPath error:NULL];
+        return NO;
+    }
+    NSString *marker = @"Telegraphica Mountain Lion TDLib store keeps only td.binlog and removes SQLite chat cache before TDLib startup.";
+    if (![marker writeToFile:[stagingPath stringByAppendingPathComponent:TGTDLibMountainLionBinlogMarkerName] atomically:YES encoding:NSUTF8StringEncoding error:error]) {
+        [fileManager removeItemAtPath:stagingPath error:NULL];
+        return NO;
+    }
+
+    if ([fileManager fileExistsAtPath:targetPath]) {
+        NSString *backupName = [NSString stringWithFormat:@"tdlib-mountain-lion-%llu", (unsigned long long)[[NSDate date] timeIntervalSince1970]];
+        NSString *backupPath = [backupRoot stringByAppendingPathComponent:backupName];
+        if (![fileManager moveItemAtPath:targetPath toPath:backupPath error:error]) {
+            [fileManager removeItemAtPath:stagingPath error:NULL];
+            return NO;
+        }
+    }
+
+    if (![fileManager moveItemAtPath:stagingPath toPath:targetPath error:error]) {
+        return NO;
+    }
+
+    TGTDLibPruneMountainLionBackups(backupRoot, 3);
+    [[TGLogger sharedLogger] log:@"Mountain Lion TDLib store: prepared binlog-only store to avoid legacy chat cache crashes."];
+    return YES;
+}
+
 - (NSDictionary *)localTDLibParametersWithError:(NSError **)error {
     NSDictionary *configuration = [self localTDLibConfigurationWithError:error];
     if (!configuration) {
@@ -1748,8 +2156,17 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSString *databasePath = [supportPath stringByAppendingPathComponent:@"tdlib"];
-    NSString *filesPath = [cachePath stringByAppendingPathComponent:@"tdlib-files"];
+    BOOL mountainLionSafeLoginMode = TGTDLibMountainLionSafeLoginModeEnabled();
+    NSString *databaseDirectoryName = mountainLionSafeLoginMode ? TGTDLibMountainLionDatabaseDirectoryName : TGTDLibDefaultDatabaseDirectoryName;
+    NSString *filesDirectoryName = mountainLionSafeLoginMode ? TGTDLibMountainLionFilesDirectoryName : TGTDLibDefaultFilesDirectoryName;
+    NSString *databasePath = [supportPath stringByAppendingPathComponent:databaseDirectoryName];
+    NSString *filesPath = [cachePath stringByAppendingPathComponent:filesDirectoryName];
+    if (mountainLionSafeLoginMode) {
+        NSString *sourceDatabasePath = [supportPath stringByAppendingPathComponent:TGTDLibDefaultDatabaseDirectoryName];
+        if (![self prepareMountainLionBinlogStoreAtPath:databasePath sourcePath:sourceDatabasePath error:error]) {
+            return nil;
+        }
+    }
     if (![self ensureDirectoryAtPath:databasePath error:error] || ![self ensureDirectoryAtPath:filesPath error:error]) {
         return nil;
     }
@@ -1780,7 +2197,12 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [parameters setObject:filesPath forKey:@"files_directory"];
     [parameters setObject:[self boolValueForKey:@"use_file_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_file_database"];
     [parameters setObject:[self boolValueForKey:@"use_chat_info_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_chat_info_database"];
-    [parameters setObject:[self boolValueForKey:@"use_message_database" inConfiguration:configuration defaultValue:YES] forKey:@"use_message_database"];
+    [parameters setObject:[self boolValueForKey:@"use_message_database" inConfiguration:configuration defaultValue:!mountainLionSafeLoginMode] forKey:@"use_message_database"];
+    if (mountainLionSafeLoginMode) {
+        [parameters setObject:[NSNumber numberWithBool:NO] forKey:@"use_chat_info_database"];
+        [parameters setObject:[NSNumber numberWithBool:NO] forKey:@"use_message_database"];
+        [[TGLogger sharedLogger] log:@"Mountain Lion TDLib parameters: chat info and message databases disabled for legacy TDLib stability."];
+    }
     [parameters setObject:[self boolValueForKey:@"use_secret_chats" inConfiguration:configuration defaultValue:NO] forKey:@"use_secret_chats"];
     [parameters setObject:apiID forKey:@"api_id"];
     [parameters setObject:apiHash forKey:@"api_hash"];
@@ -1864,7 +2286,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSString *encryptionKey = [encryptionKeyData base64EncodedStringWithOptions:0];
+    NSString *encryptionKey = TGBase64EncodedString(encryptionKeyData);
     if ([encryptionKey length] == 0) {
         if (error) {
             *error = [self errorWithDescription:@"Could not encode TDLib database encryption key." code:20];
@@ -2064,6 +2486,144 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSString *)configureNetworkProxyIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    [_responseCondition lock];
+    if (_networkProxyBootstrapAttempted) {
+        NSString *summary = [_networkProxyBootstrapSummary copy];
+        [_responseCondition unlock];
+        return [summary autorelease];
+    }
+    _networkProxyBootstrapAttempted = YES;
+    [_responseCondition unlock];
+
+    NSError *configurationError = nil;
+    NSDictionary *configuration = [self networkProxyConfigurationWithError:&configurationError];
+    if (!configuration) {
+        if (configurationError && error) {
+            *error = configurationError;
+        }
+        return nil;
+    }
+
+    NSDictionary *proxy = [self networkProxyObjectFromConfiguration:configuration error:error];
+    if (!proxy) {
+        return nil;
+    }
+    if (![self ensureClientWithError:error]) {
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"addProxy" forKey:@"@type"];
+    [request setObject:[proxy objectForKey:@"server"] forKey:@"server"];
+    [request setObject:[proxy objectForKey:@"port"] forKey:@"port"];
+    [request setObject:[NSNumber numberWithBool:YES] forKey:@"enable"];
+    [request setObject:[proxy objectForKey:@"type"] forKey:@"type"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-proxy-add"
+                                                            timeout:timeout
+                                                          errorCode:121
+                                                              error:error];
+    if (!response) {
+        return nil;
+    }
+
+    NSString *summary = [NSString stringWithFormat:@"enabled %@", [self networkProxySummaryFromConfiguration:configuration]];
+    [_responseCondition lock];
+    [_networkProxyBootstrapSummary release];
+    _networkProxyBootstrapSummary = [summary copy];
+    [_responseCondition unlock];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib network proxy bootstrap: %@", summary]];
+    return summary;
+}
+
+- (id)valueFromTDLibOptionResponse:(NSDictionary *)response {
+    if (![response isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSString *type = [response objectForKey:@"@type"];
+    if (![type isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    if ([type isEqualToString:@"optionValueBoolean"]) {
+        id value = [response objectForKey:@"value"];
+        return [NSNumber numberWithBool:[self boolValueFromObject:value defaultValue:NO]];
+    }
+    if ([type isEqualToString:@"optionValueInteger"]) {
+        id value = [response objectForKey:@"value"];
+        if ([value respondsToSelector:@selector(longLongValue)]) {
+            return [NSNumber numberWithLongLong:[value longLongValue]];
+        }
+        return nil;
+    }
+    if ([type isEqualToString:@"optionValueString"]) {
+        id value = [response objectForKey:@"value"];
+        return [value isKindOfClass:[NSString class]] ? value : @"";
+    }
+    if ([type isEqualToString:@"optionValueEmpty"]) {
+        return @"empty";
+    }
+    return type;
+}
+
+- (NSString *)optionSummaryForName:(NSString *)name timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getOption" forKey:@"@type"];
+    [request setObject:name forKey:@"name"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-option"
+                                                            timeout:timeout
+                                                          errorCode:122
+                                                              error:error];
+    id value = [self valueFromTDLibOptionResponse:response];
+    if (!value) {
+        return nil;
+    }
+    if ([value isKindOfClass:[NSNumber class]] && TGTDLibObjectIsBoolean(value)) {
+        return [NSString stringWithFormat:@"%@=%@", name, [value boolValue] ? @"true" : @"false"];
+    }
+    return [NSString stringWithFormat:@"%@=%@", name, value];
+}
+
+- (NSString *)networkDiagnosticsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self ensureClientWithError:error]) {
+        return nil;
+    }
+    if (timeout <= 0.0) {
+        timeout = 1.0;
+    }
+
+    NSMutableArray *parts = [NSMutableArray array];
+    NSError *blockingError = nil;
+    NSString *blockingSummary = [self optionSummaryForName:@"expect_blocking" timeout:timeout error:&blockingError];
+    if ([blockingSummary length] > 0) {
+        [parts addObject:blockingSummary];
+    } else if (blockingError) {
+        [parts addObject:[NSString stringWithFormat:@"expect_blocking unavailable: %@", [blockingError localizedDescription]]];
+    }
+
+    NSError *proxyError = nil;
+    NSString *proxySummary = [self optionSummaryForName:@"enabled_proxy_id" timeout:timeout error:&proxyError];
+    if ([proxySummary length] > 0) {
+        [parts addObject:proxySummary];
+    } else if (proxyError) {
+        [parts addObject:[NSString stringWithFormat:@"enabled_proxy_id unavailable: %@", [proxyError localizedDescription]]];
+    }
+
+    [_responseCondition lock];
+    NSString *bootstrapSummary = [_networkProxyBootstrapSummary copy];
+    [_responseCondition unlock];
+    if ([bootstrapSummary length] > 0) {
+        [parts addObject:[NSString stringWithFormat:@"configured %@", bootstrapSummary]];
+    }
+    [bootstrapSummary release];
+
+    if ([parts count] == 0) {
+        return @"TDLib network diagnostics unavailable.";
+    }
+    return [parts componentsJoinedByString:@"; "];
+}
+
 - (NSDictionary *)currentTDLibParametersRequestWithParameters:(NSDictionary *)parameters error:(NSError **)error {
     NSString *encryptionKey = [self databaseEncryptionKeyStringWithError:error];
     if ([encryptionKey length] == 0) {
@@ -2100,6 +2660,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSError *responseError = nil;
     NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:(NSString *)extraObject timeout:timeout errorCode:16 error:&responseError];
     if (!response) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib parameters %@ request did not return before timeout.", schemaName]];
         if (error) {
             NSString *message = responseError ? [responseError localizedDescription] : [NSString stringWithFormat:@"TDLib did not acknowledge %@ local parameters before the probe timed out.", schemaName];
             *error = [self errorWithDescription:message code:16];
@@ -2111,6 +2672,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL receivedOK = ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]);
     NSString *summary = [self summaryForAuthorizationStateObject:response];
     if ([summary hasPrefix:@"error"]) {
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib parameters %@ rejected: %@", schemaName, summary]];
         if (error) {
             NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, summary];
             *error = [self errorWithDescription:message code:16];
@@ -2124,6 +2686,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *nextSummary = [self waitForAuthorizationStateDifferentFromState:@"waitTdlibParameters" afterGeneration:generation timeout:timeout];
     if ([nextSummary length] > 0) {
         if ([nextSummary hasPrefix:@"error"]) {
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib parameters %@ rejected after wait: %@", schemaName, nextSummary]];
             if (error) {
                 NSString *message = [NSString stringWithFormat:@"TDLib rejected %@ local parameters: %@", schemaName, nextSummary];
                 *error = [self errorWithDescription:message code:16];
@@ -2139,6 +2702,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     if (error) {
         NSString *message = [NSString stringWithFormat:@"TDLib did not acknowledge %@ local parameters before the probe timed out.", schemaName];
+        [[TGLogger sharedLogger] log:message];
         *error = [self errorWithDescription:message code:17];
     }
     return nil;
@@ -2337,6 +2901,8 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    [self configureNetworkProxyIfNeededWithTimeout:(timeout < 5.0 ? timeout : 5.0) error:NULL];
+
     NSString *authorizationState = [self authorizationStateSummaryWithTimeout:timeout error:error];
     if ([authorizationState isEqualToString:@"closed"]) {
         [self destroyTDLibClient];
@@ -2377,8 +2943,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     if (error) {
-        NSString *message = [NSString stringWithFormat:@"TDLib did not acknowledge %@ before the probe timed out.", actionName];
-        *error = [self errorWithDescription:message code:errorCode];
+        NSString *message = [NSString stringWithFormat:@"Telegram did not answer while submitting %@. This usually means the network is blocked, very slow, or a proxy/VPN is required; the %@ was not rejected by Telegram.", actionName, actionName];
+        NSDictionary *info = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:TGTDLibAuthorizationNetworkTimeoutErrorKey];
+        *error = [self errorWithDescription:message code:errorCode userInfo:info];
     }
     return nil;
 }
@@ -2397,9 +2964,15 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSDictionary *response = [self sendTDLibRequest:request waitingForExtra:(NSString *)extraObject timeout:timeout errorCode:errorCode error:&responseError];
     if (!response) {
         if (error) {
-            NSString *summary = responseError ? [responseError localizedDescription] : @"TDLib returned no authorization response.";
-            NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
-            *error = [self errorWithDescription:message code:errorCode];
+            if ([self isRequestTimeoutError:responseError]) {
+                NSString *message = [NSString stringWithFormat:@"Telegram did not answer while submitting %@. This usually means the network is blocked, very slow, or a proxy/VPN is required; the %@ was not rejected by Telegram.", actionName, actionName];
+                NSDictionary *info = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:TGTDLibAuthorizationNetworkTimeoutErrorKey];
+                *error = [self errorWithDescription:message code:errorCode userInfo:info];
+            } else {
+                NSString *summary = responseError ? [responseError localizedDescription] : @"TDLib returned no authorization response.";
+                NSString *message = [self authorizationErrorDescriptionForSummary:summary actionName:actionName];
+                *error = [self errorWithDescription:message code:errorCode];
+            }
         }
         return nil;
     }
@@ -3631,7 +4204,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
     id dataObject = [(NSDictionary *)miniThumbnailObject objectForKey:@"data"];
     if ([dataObject isKindOfClass:[NSString class]] && [(NSString *)dataObject length] > 0) {
-        NSData *data = [[[NSData alloc] initWithBase64EncodedString:(NSString *)dataObject options:0] autorelease];
+        NSData *data = TGDataFromBase64String((NSString *)dataObject);
         if ([data length] > 0) {
             [info setObject:data forKey:@"minithumbnail_data"];
         }

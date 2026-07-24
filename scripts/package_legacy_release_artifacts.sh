@@ -7,7 +7,8 @@ DIST_DIR="${TELEGRAPHICA_DIST_DIR:-$PWD/dist}"
 APP_PATH="build-legacy/Release/Telegraphica.app"
 APP_NAME="Telegraphica.app"
 ARCH="x86_64"
-DEPLOYMENT_TARGET="10.9"
+DEPLOYMENT_TARGET="${TELEGRAPHICA_DEPLOYMENT_TARGET:-${MACOSX_DEPLOYMENT_TARGET:-10.8}}"
+COMPATIBILITY_TAG="${TELEGRAPHICA_COMPATIBILITY_TAG:-macos10.8-10.13}"
 
 usage() {
     cat <<USAGE
@@ -16,8 +17,8 @@ Usage: $0 [--tdjson /path/to/libtdjson.dylib]
 Builds Telegraphica with bundled TDLib on the legacy Mac, then creates release
 artifacts in dist/:
 
-  - Telegraphica-v<VERSION>-macos10.9-x86_64.dmg
-  - Telegraphica-v<VERSION>-macos10.9-x86_64.app.zip
+  - Telegraphica-v<VERSION>-${COMPATIBILITY_TAG}-x86_64.dmg
+  - Telegraphica-v<VERSION>-${COMPATIBILITY_TAG}-x86_64.app.zip
   - matching .sha256 files
 
 The script refuses to package a public installer unless libtdjson.dylib is
@@ -55,15 +56,16 @@ find_tdjson() {
         "$PWD/build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib" \
         "$PWD/build-tdlib-legacy/stage/Frameworks/libtdjson.dylib" \
         "$HOME/Desktop/Telegraphica-current/build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib" \
-        "$HOME/Desktop/Telegraphica-current/build-tdlib-legacy/stage/Frameworks/libtdjson.dylib"
+        "$HOME/Desktop/Telegraphica-current/build-tdlib-legacy/stage/Frameworks/libtdjson.dylib" \
+        "$HOME/Desktop/Telegraphica-10.8-current/build-tdlib-master-legacy/stage/Frameworks/libtdjson.dylib" \
+        "$HOME/Desktop/Telegraphica-10.8-current/build-tdlib-legacy/stage/Frameworks/libtdjson.dylib"
     do
-        if [ -f "$candidate" ]; then
+        if [ -f "$candidate" ] &&
+            TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$candidate" >/dev/null 2>&1; then
             echo "$candidate"
             return 0
         fi
     done
-
-    find "$HOME/Desktop" -path "*/stage/Frameworks/libtdjson.dylib" -print 2>/dev/null | head -n 1
 }
 
 if [ -z "$TDJSON_PATH" ]; then
@@ -113,6 +115,8 @@ if [ ! -f "$BUNDLED_TDJSON" ]; then
 fi
 
 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON"
+TELEGRAPHICA_BUNDLE_MANIFEST_PATH="$BUILD_DIST_DIR/TelegraphicaLegacyBinaryManifest.tsv" \
+scripts/check_release_bundle_legacy.sh "$APP_PATH" "$DEPLOYMENT_TARGET"
 
 BUNDLED_CONFIG="$APP_PATH/Contents/Resources/TelegraphicaTDLibDefaults.plist"
 RUNTIME_CONFIG_MARKER="$APP_PATH/Contents/Resources/TelegraphicaTDLibRuntimeDefaults.plist"
@@ -143,8 +147,8 @@ mkdir -p "$DIST_DIR"
 scripts/package_release_installer.sh "$APP_PATH"
 
 DMG_SRC="$DIST_DIR/Telegraphica-v${APP_VERSION}-installer.dmg"
-DMG_FINAL="$DIST_DIR/Telegraphica-v${APP_VERSION}-macos${DEPLOYMENT_TARGET}-${ARCH}.dmg"
-APP_ZIP="$DIST_DIR/Telegraphica-v${APP_VERSION}-macos${DEPLOYMENT_TARGET}-${ARCH}.app.zip"
+DMG_FINAL="$DIST_DIR/Telegraphica-v${APP_VERSION}-${COMPATIBILITY_TAG}-${ARCH}.dmg"
+APP_ZIP="$DIST_DIR/Telegraphica-v${APP_VERSION}-${COMPATIBILITY_TAG}-${ARCH}.app.zip"
 
 if [ ! -f "$DMG_SRC" ]; then
     echo "Expected DMG was not created:"

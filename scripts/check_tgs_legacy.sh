@@ -14,7 +14,8 @@ FIXTURE_TGS="$BUILD_DIR/tgs-animation.tgs"
 UNSAFE_REPEATER_JSON="$ROOT_DIR/Tests/Fixtures/tgs-repeater-bomb.json"
 UNSAFE_REPEATER_TGS="$BUILD_DIR/tgs-repeater-bomb.tgs"
 CLANG="$(xcrun --sdk "$SDK_NAME" --find clang)"
-SDK_PATH="$(xcrun --sdk "$SDK_NAME" --show-sdk-path)"
+SDK_PATH="${SDKROOT:-$(xcrun --sdk "$SDK_NAME" --show-sdk-path)}"
+DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-10.8}"
 
 if [ ! -f "$RLOTTIE_LIBRARY" ]; then
     "$ROOT_DIR/scripts/build_rlottie_legacy.sh" "$ARCH" "$BUILD_DIR" "$SDK_NAME"
@@ -37,7 +38,7 @@ gzip -c "$UNSAFE_REPEATER_JSON" > "$UNSAFE_REPEATER_TGS"
 "$CLANG" \
     -arch "$ARCH" \
     -isysroot "$SDK_PATH" \
-    -mmacosx-version-min=10.9 \
+    -mmacosx-version-min="$DEPLOYMENT_TARGET" \
     -I"$ROOT_DIR/Vendor/rlottie/inc" \
     "$ROOT_DIR/Tests/tgs_renderer_probe.c" \
     "$RLOTTIE_LIBRARY" \
@@ -49,7 +50,7 @@ gzip -c "$UNSAFE_REPEATER_JSON" > "$UNSAFE_REPEATER_TGS"
 "$CLANG" \
     -arch "$ARCH" \
     -isysroot "$SDK_PATH" \
-    -mmacosx-version-min=10.9 \
+    -mmacosx-version-min="$DEPLOYMENT_TARGET" \
     -fno-objc-arc \
     -I"$ROOT_DIR/Sources/Media" \
     -I"$ROOT_DIR/Vendor/rlottie/inc" \

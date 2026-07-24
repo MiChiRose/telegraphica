@@ -447,6 +447,102 @@ static NSString *TGMediaFallbackIconNameForPlaceholder(NSString *placeholder) {
     return nil;
 }
 
+static NSString *TGStickerFallbackEmojiForMediaItem(NSDictionary *mediaItem) {
+    id emoji = [mediaItem objectForKey:@"emoji"];
+    if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0) {
+        return (NSString *)emoji;
+    }
+
+    NSString *placeholder = TGMediaItemPlaceholder(mediaItem);
+    if ([placeholder length] > 0 && ![placeholder isEqualToString:@"Sticker"]) {
+        return placeholder;
+    }
+    return @"☺";
+}
+
+static NSString *TGStickerFallbackCaptionForMediaItem(NSDictionary *mediaItem) {
+    id label = [mediaItem objectForKey:@"label"];
+    if ([label isKindOfClass:[NSString class]] && [(NSString *)label length] > 0) {
+        NSString *stickerPrefix = @"[Sticker] ";
+        if ([(NSString *)label hasPrefix:stickerPrefix] && [(NSString *)label length] > [stickerPrefix length]) {
+            return [(NSString *)label substringFromIndex:[stickerPrefix length]];
+        }
+        return (NSString *)label;
+    }
+
+    NSString *placeholder = TGMediaItemPlaceholder(mediaItem);
+    if ([placeholder length] > 0 && ![placeholder isEqualToString:@"Sticker"]) {
+        return placeholder;
+    }
+    return @"Sticker";
+}
+
+static NSString *TGStickerFallbackFormatBadgeForMediaItem(NSDictionary *mediaItem) {
+    NSString *format = TGMediaItemStickerFormat(mediaItem);
+    if ([format isEqualToString:@"stickerFormatTgs"]) {
+        return @"TGS";
+    }
+    if ([format isEqualToString:@"stickerFormatWebm"]) {
+        return @"WEBM";
+    }
+    if ([format isEqualToString:@"stickerFormatWebp"]) {
+        return @"WEBP";
+    }
+    return @"STICKER";
+}
+
+static void TGDrawStickerFallbackInRect(NSDictionary *mediaItem, NSRect rect, BOOL flipped) {
+    NSBezierPath *backgroundPath = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:11.0 yRadius:11.0];
+    [[NSColor colorWithCalibratedWhite:0.985 alpha:0.96] set];
+    [backgroundPath fill];
+
+    NSBezierPath *innerPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(rect, 7.0, 7.0) xRadius:9.0 yRadius:9.0];
+    [[NSColor colorWithCalibratedWhite:0.93 alpha:0.72] set];
+    [innerPath fill];
+
+    NSString *emoji = TGStickerFallbackEmojiForMediaItem(mediaItem);
+    NSString *caption = TGStickerFallbackCaptionForMediaItem(mediaItem);
+    NSFont *emojiFont = [NSFont fontWithName:@"Apple Color Emoji" size:38.0];
+    if (!emojiFont) {
+        emojiFont = [NSFont systemFontOfSize:38.0];
+    }
+    NSMutableParagraphStyle *centeredParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [centeredParagraph setAlignment:NSCenterTextAlignment];
+    [centeredParagraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSDictionary *emojiAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     emojiFont, NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     centeredParagraph, NSParagraphStyleAttributeName,
+                                     nil];
+    NSSize emojiSize = [emoji sizeWithAttributes:emojiAttributes];
+    CGFloat emojiY = NSMidY(rect) - floor(emojiSize.height / 2.0) - 8.0;
+    NSRect emojiRect = NSMakeRect(NSMinX(rect) + 8.0,
+                                  emojiY,
+                                  NSWidth(rect) - 16.0,
+                                  emojiSize.height + 4.0);
+    [emoji drawInRect:emojiRect withAttributes:emojiAttributes];
+
+    if ([caption length] > 0 && ![caption isEqualToString:emoji]) {
+        NSDictionary *captionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           [NSFont boldSystemFontOfSize:11.0], NSFontAttributeName,
+                                           TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                           centeredParagraph, NSParagraphStyleAttributeName,
+                                           nil];
+        NSSize captionSize = [caption sizeWithAttributes:captionAttributes];
+        CGFloat captionY = NSMaxY(emojiRect) + 2.0;
+        if (!flipped) {
+            captionY = NSMinY(emojiRect) - captionSize.height - 3.0;
+        }
+        NSRect captionRect = NSMakeRect(NSMinX(rect) + 8.0,
+                                        captionY,
+                                        NSWidth(rect) - 16.0,
+                                        captionSize.height + 3.0);
+        [caption drawInRect:captionRect withAttributes:captionAttributes];
+    }
+
+    TGDrawMediaKindBadge(TGStickerFallbackFormatBadgeForMediaItem(mediaItem), rect, flipped);
+}
+
 NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth) {
     BOOL sticker = TGMediaItemIsSticker(mediaItem);
     CGFloat maximumSide = sticker ? 128.0 : TGMessagePhotoMaximumSide;
@@ -659,6 +755,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         }
     }
 
+    BOOL sticker = TGMediaItemIsSticker(mediaItem);
     if (image) {
         [NSGraphicsContext saveGraphicsState];
         [mediaPath addClip];
@@ -668,6 +765,8 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
             TGDrawImageInRect(image, rect, flipped);
         }
         [NSGraphicsContext restoreGraphicsState];
+    } else if (sticker) {
+        TGDrawStickerFallbackInRect(mediaItem, rect, flipped);
     } else {
         [[NSColor colorWithCalibratedWhite:0.96 alpha:0.92] set];
         [mediaPath fill];
@@ -713,7 +812,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         } else if (TGMediaItemIsVideo(mediaItem)) {
             TGDrawMediaKindBadge(@"VIDEO", rect, flipped);
         }
-        if (TGMediaItemIsPlayable(mediaItem)) {
+        if (TGMediaItemIsPlayable(mediaItem) && !sticker) {
             TGDrawMediaPlayBadge(rect, flipped);
         }
     }

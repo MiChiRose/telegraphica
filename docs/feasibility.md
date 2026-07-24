@@ -122,13 +122,13 @@ row-height assumptions.
 
 Use the `syncrosa-objc` project as an engineering style reference:
 
-- `build_legacy.sh` structure: strict shell, Xcode 6.2 preference, `10.9`
+- `build_legacy.sh` structure: strict shell, Xcode 5.1.1/6.2 selection, `10.8`
   deployment target, x86_64, isolated DerivedData, `PlistBuddy`, `otool`,
   `lipo`/`file`, coverage-section checks, ad-hoc signing, zip packaging.
 - Info.plist discipline: explicit version fields, bundle id, and
   `LSMinimumSystemVersion`.
 - Project settings: `objectVersion = 46`, `compatibilityVersion = "Xcode 3.2"`,
-  `MACOSX_DEPLOYMENT_TARGET = 10.9`, `SDKROOT = macosx`, coverage off.
+  `MACOSX_DEPLOYMENT_TARGET = 10.8`, `SDKROOT = macosx`, coverage off.
 - Keychain helper pattern: `kSecClassGenericPassword`, service/account split,
   save/read/delete.
 - Logger pattern: bounded in-memory log, opt-in diagnostics, synchronized file
@@ -158,9 +158,10 @@ Do not copy:
   incompatible load commands or libc++/libSystem requirements.
 - OpenSSL built by modern Homebrew may not target Mavericks. Build OpenSSL/zlib
   for x86_64 and inspect load commands.
-- TDLib transitive dependencies may use APIs unavailable on OS X 10.9.
-- Modern Xcode may reject `MACOSX_DEPLOYMENT_TARGET=10.9` or emit
-  `LC_BUILD_VERSION`; final validation must use Mavericks/Xcode 6.2.
+- TDLib transitive dependencies may use APIs unavailable on OS X 10.8.
+- Modern Xcode may reject `MACOSX_DEPLOYMENT_TARGET=10.8` or emit
+  `LC_BUILD_VERSION`; final validation must use Xcode 5.1.1 and the unchanged
+  artifact must also pass on Mavericks.
 - Old TDLib may compile but fail against current Telegram API expectations.
 - Static linking may ease deployment but can increase binary size and licensing
   review surface; dynamic linking simplifies spike iteration.

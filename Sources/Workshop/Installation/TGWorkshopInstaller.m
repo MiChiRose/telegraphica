@@ -7,6 +7,7 @@
 #import "../Security/TGWorkshopIntegrity.h"
 #import "../Host/TGWorkshopPaths.h"
 #import "../API/TGWorkshopModuleDefinitions.h"
+#import "../../Services/TGBase64Compatibility.h"
 
 static NSError *TGWorkshopInstallerError(NSInteger code, NSString *message) {
     return [NSError errorWithDomain:TGWorkshopErrorDomain
@@ -45,7 +46,7 @@ static NSError *TGWorkshopInstallerError(NSInteger code, NSString *message) {
     NSString *algorithm = [[signatureInfo objectForKey:@"algorithm"] isKindOfClass:[NSString class]] ? [signatureInfo objectForKey:@"algorithm"] : nil;
     NSString *signatureBase64 = [[signatureInfo objectForKey:@"value"] isKindOfClass:[NSString class]] ? [signatureInfo objectForKey:@"value"] : nil;
     NSString *certificatePath = [_packageCertificatePathsByKeyIdentifier objectForKey:keyIdentifier];
-    NSData *signature = [[[NSData alloc] initWithBase64EncodedString:signatureBase64 options:0] autorelease];
+    NSData *signature = TGDataFromBase64String(signatureBase64);
     NSString *signedDescription = [NSString stringWithFormat:@"%@\n%@\n%@",
                                    [entry moduleIdentifier], [entry version], [entry SHA256]];
     NSData *signedData = [signedDescription dataUsingEncoding:NSUTF8StringEncoding];

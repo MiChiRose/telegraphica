@@ -53,14 +53,15 @@ legacy-Mac-friendly.
 
 ## Compatibility
 
-Telegraphica has two release lanes: a dedicated Mountain Lion build for 10.8
-and the standard build for 10.9-10.13. Both are Intel-only.
+Telegraphica uses one Intel `x86_64` application and one release lane for OS X
+10.8 through macOS 10.13. The app selects its Mountain Lion fallbacks at
+runtime, while Mavericks and newer systems retain the normal feature path.
 
 | macOS version | Telegraphica support began | Architecture | Status |
 | --- | --- | --- | --- |
-| OS X 10.8 Mountain Lion | `v0.4.5-ml` | Intel `x86_64` | Supported through the separate `-ml` release |
-| OS X 10.9 Mavericks | First public mainline release | Intel `x86_64` | Primary supported platform |
-| OS X 10.10-10.13 | First public mainline release | Intel `x86_64` | Supported by the standard release |
+| OS X 10.8 Mountain Lion | Unified legacy release | Intel `x86_64` | Supported with Mountain Lion-safe TDLib storage and reduced background work |
+| OS X 10.9 Mavericks | First public mainline release | Intel `x86_64` | Primary development and HITL platform |
+| OS X 10.10-10.13 | First public mainline release | Intel `x86_64` | Supported by the same unified build |
 | macOS 10.14-10.15 | No formal support milestone | Intel `x86_64` | Unofficial, best effort, not part of regular HITL testing |
 | macOS 11-27 / Apple Silicon era | No formal support milestone | Intel `x86_64`; Rosetta 2 where available | Unofficial and untested; no native `arm64` build |
 | macOS 28 and newer | No formal support milestone | No supported architecture | General-purpose Rosetta support for ordinary Intel apps is expected to be unavailable |
@@ -152,8 +153,8 @@ voice messages, and keep the app updated from GitHub Releases.
   `Contents/Frameworks/libtdjson.dylib`.
 - DMGs without bundled TDLib are development images, not out-of-the-box
   installers.
-- Mainline release confidence comes from OS X 10.9.5 / Xcode 6.2 HITL testing;
-  Mountain Lion uses its own Xcode 5.1.1-compatible release lane.
+- Release confidence requires the same unchanged app bundle to pass on Mountain
+  Lion and Mavericks; broader 10.10-10.13 reports remain welcome.
 - The project is moving fast, so UI details and release packaging may change.
 
 ---
@@ -168,10 +169,8 @@ Compiled beta builds live in:
 
 1. Open the latest release page.
 2. Click **Assets** if the download list is collapsed.
-3. Download the DMG for your system:
-   - **OS X 10.8:** `Telegraphica-v0.5.1-macos10.8-x86_64.dmg` from the
-     corresponding `-ml` release;
-   - **OS X 10.9-10.13:** `Telegraphica-v0.5.1-macos10.9-x86_64.dmg`.
+3. Download the unified Intel DMG:
+   `Telegraphica-v<VERSION>-macos10.8-10.13-x86_64.dmg`.
 4. Open the downloaded DMG.
 5. Drag **Telegraphica.app** into **Applications**.
 6. Launch Telegraphica and sign in with your Telegram phone number.
@@ -183,9 +182,8 @@ If you are not sure which file to download, choose the file ending in
 
 | Asset | Best For | Notes |
 | --- | --- | --- |
-| `Telegraphica-v0.5.1-macos10.8-x86_64.dmg` | OS X 10.8 installation | Use the separate `v0.5.1-ml` release for Mountain Lion. |
-| `Telegraphica-v0.5.1-macos10.9-x86_64.dmg` | OS X 10.9-10.13 installation | Standard supported release. |
-| `Telegraphica-v0.5.1-macos10.9-x86_64.app.zip` | Manual app bundle transfer | Use this only if the DMG is inconvenient. |
+| `Telegraphica-v<VERSION>-macos10.8-10.13-x86_64.dmg` | OS X 10.8-10.13 installation | One Intel installer for the complete supported range. |
+| `Telegraphica-v<VERSION>-macos10.8-10.13-x86_64.app.zip` | Manual app bundle transfer | The same app bundle as the DMG. |
 | `.sha256` files | Checksum verification | You do not need these files to install Telegraphica. |
 
 ### First Launch
@@ -207,12 +205,12 @@ Telegraphica is intentionally built around a conservative Objective-C lane:
 
 | Item | Target |
 | --- | --- |
-| OS | OS X 10.8 through macOS 10.13; 10.8 uses the separate Mountain Lion lane |
+| OS | OS X 10.8 through macOS 10.13 in one app bundle |
 | CPU | Intel `x86_64` |
 | UI | Cocoa / AppKit |
 | Language | Objective-C, non-ARC |
 | Telegram core | TDLib JSON API (`tdjson`) |
-| Preferred legacy toolchain | Xcode 6.2 |
+| Preferred legacy toolchain | Xcode 5.1.1 for the 10.8 minimum; Xcode 6.2-compatible source |
 
 Build the app:
 
@@ -248,9 +246,12 @@ That command rebuilds Telegraphica, bundles TDLib, creates an HFS+ DMG, creates
 an app zip, and writes SHA256 files into `dist/`. These are the artifacts that
 should be uploaded to GitHub for an out-of-the-box Mavericks beta.
 
-The build script targets `MACOSX_DEPLOYMENT_TARGET=10.9`, builds `x86_64`,
+The build script targets `MACOSX_DEPLOYMENT_TARGET=10.8`, builds `x86_64`,
 stamps `LSMinimumSystemVersion`, checks the resulting binary with `file`,
-`lipo`, and `otool`, then writes release artifacts into `dist/`.
+`lipo`, and `otool`, then writes the unified release artifacts into `dist/`.
+Mountain Lion compatibility is selected from the running AppKit version rather
+than from the deployment target, so the same bundle keeps its full Mavericks
+and newer behavior.
 
 ---
 
@@ -327,7 +328,7 @@ Sources/Resources/             App icons, localizations, bundled resources
 readme-assets/                 README artwork
 docs/                          Feasibility, security, Mavericks, release notes
 scripts/                       Build, TDLib, validation, release helpers
-build_legacy.sh                Main Mavericks/x86_64 build lane
+build_legacy.sh                Unified OS X 10.8-10.13 / x86_64 build lane
 PRODUCT.md                     Product and design direction
 ```
 
@@ -336,7 +337,8 @@ PRODUCT.md                     Product and design direction
 ## Engineering Notes
 
 - 🧱 **Native first:** no Electron, no web wrapper, no SwiftUI requirement.
-- 🕰 **Old-Xcode-safe:** avoids modern AppKit APIs that would break Xcode 6.2.
+- 🕰 **Old-Xcode-safe:** avoids modern AppKit APIs that would break Xcode 5.1.1
+  or Mountain Lion.
 - 🔌 **Dynamic TDLib boundary:** the app can launch without vendoring TDLib.
 - 🔐 **Local data discipline:** credentials and sessions stay outside git.
 - 🧪 **HITL-driven:** Mavericks/Xcode 6.2 testing remains the source of truth.
@@ -361,12 +363,12 @@ PRODUCT.md                     Product and design direction
 
 **Supported target:** OS X 10.8 through macOS 10.13 on Intel `x86_64`.
 
-The mainline build targets 10.9-10.13. OS X 10.8 uses the separate
-`mountain-lion/*` source and `-ml` release lane. Newer Intel and Apple Silicon
-systems may work, including through Rosetta 2, but they are unofficial, are not
-regular release gates, and have no native `arm64` binary. General-purpose
-Rosetta support for ordinary Intel apps is available through macOS 27; continued
-operation after that version is not expected or guaranteed.
+The mainline build targets OS X 10.8-10.13 as one `x86_64` application. Newer
+Intel and Apple Silicon systems may work, including through Rosetta 2, but they
+are unofficial, are not regular release gates, and have no native `arm64`
+binary. General-purpose Rosetta support for ordinary Intel apps is available
+through macOS 27; continued operation after that version is not expected or
+guaranteed.
 
 **Security posture:**
 

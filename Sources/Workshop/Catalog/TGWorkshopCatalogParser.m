@@ -2,6 +2,7 @@
 #import "TGWorkshopCatalog.h"
 #import "../Security/TGWorkshopIntegrity.h"
 #import "../API/TGWorkshopModuleDefinitions.h"
+#import "../../Services/TGBase64Compatibility.h"
 
 static NSError *TGWorkshopCatalogParserError(NSInteger code, NSString *message) {
     return [NSError errorWithDomain:TGWorkshopErrorDomain
@@ -40,7 +41,7 @@ static NSError *TGWorkshopCatalogParserError(NSInteger code, NSString *message) 
     }
 
     NSString *payloadBase64 = [[envelope objectForKey:@"payload"] isKindOfClass:[NSString class]] ? [envelope objectForKey:@"payload"] : nil;
-    NSData *payloadData = [[[NSData alloc] initWithBase64EncodedString:payloadBase64 options:0] autorelease];
+    NSData *payloadData = TGDataFromBase64String(payloadBase64);
     if ([payloadData length] == 0) {
         if (error) *error = TGWorkshopCatalogParserError(223, @"Workshop catalog payload is missing.");
         return nil;
@@ -52,7 +53,7 @@ static NSError *TGWorkshopCatalogParserError(NSInteger code, NSString *message) 
         NSString *algorithm = [[envelope objectForKey:@"algorithm"] isKindOfClass:[NSString class]] ? [envelope objectForKey:@"algorithm"] : nil;
         NSString *signatureBase64 = [[envelope objectForKey:@"catalog_signature"] isKindOfClass:[NSString class]] ? [envelope objectForKey:@"catalog_signature"] : nil;
         NSString *certificatePath = [_certificatePathsByKeyIdentifier objectForKey:keyIdentifier];
-        NSData *signature = [[[NSData alloc] initWithBase64EncodedString:signatureBase64 options:0] autorelease];
+        NSData *signature = TGDataFromBase64String(signatureBase64);
         if (![algorithm isEqualToString:@"rsa-pkcs1-sha256"] || [certificatePath length] == 0 || [signature length] == 0) {
             if (error) *error = TGWorkshopCatalogParserError(224, @"Workshop catalog signing key is unknown.");
             return nil;
