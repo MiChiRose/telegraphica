@@ -137,6 +137,15 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     }
     _modeButtons = [modeButtons copy];
 
+    _refreshButton = [TGWorkshopViewButton(NSMakeRect(490, 56, 38, 38), @"", 0) retain];
+    [_refreshButton setImage:TGWorkshopOriginalOrientationIconImage(@"refresh")];
+    [_refreshButton setImagePosition:NSImageOnly];
+    [[_refreshButton cell] setButtonType:NSMomentaryPushInButton];
+    [_refreshButton setTarget:self];
+    [_refreshButton setAction:@selector(refreshCatalogAction:)];
+    [_refreshButton setAutoresizingMask:NSViewMinYMargin];
+    [rootView addSubview:_refreshButton];
+
     _categoryField = [TGWorkshopViewLabel(NSMakeRect(24, 104, 300, 20), [NSFont boldSystemFontOfSize:12.0]) retain];
     [_categoryField setAutoresizingMask:NSViewMinYMargin];
     [rootView addSubview:_categoryField];
@@ -174,7 +183,9 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     [_backButton setFrame:NSMakeRect(12, height - 38, 30, 30)];
     [_titleField setFrame:NSMakeRect(64, height - 34, width - 80, 22)];
     NSUInteger index = 0;
-    CGFloat tabsWidth = MIN(470.0, width - 40.0);
+    CGFloat refreshSize = 38.0;
+    CGFloat refreshGap = 8.0;
+    CGFloat tabsWidth = MIN(470.0, width - 40.0 - refreshSize - refreshGap);
     CGFloat gap = 8.0;
     CGFloat buttonWidth = floor((tabsWidth - gap * 2.0) / 3.0);
     for (index = 0; index < [_modeButtons count]; index++) {
@@ -184,6 +195,10 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
                                     buttonWidth,
                                     38)];
     }
+    [_refreshButton setFrame:NSMakeRect(20 + tabsWidth + refreshGap,
+                                       height - 96,
+                                       refreshSize,
+                                       refreshSize)];
     [_categoryField setFrame:NSMakeRect(24, height - 124, 280, 20)];
     [_statusField setFrame:NSMakeRect(310, height - 124, MAX(120.0, width - 334.0), 20)];
     [_scrollView setFrame:NSMakeRect(18, 18, width - 36, MAX(120.0, height - 154.0))];
@@ -233,6 +248,7 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     }
     [_categoryField setStringValue:TGLoc(@"workshop.games")];
     [_backButton setToolTip:TGLoc(@"back")];
+    [_refreshButton setToolTip:TGLoc(@"workshop.refreshCatalog")];
     [self rebuildCards];
 }
 
@@ -246,6 +262,7 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     for (index = 0; index < [_modeButtons count]; index++) {
         [[_modeButtons objectAtIndex:index] setNeedsDisplay:YES];
     }
+    [_refreshButton setNeedsDisplay:YES];
     for (NSView *subview in [_contentView subviews]) {
         if ([subview isKindOfClass:[TGWorkshopModuleCardView class]]) {
             [(TGWorkshopModuleCardView *)subview refreshTheme];
@@ -263,6 +280,15 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     [self rebuildCards];
 }
 
+- (void)refreshCatalogAction:(id)sender {
+    (void)sender;
+    if (_catalogRefreshing) return;
+    _catalogRefreshing = YES;
+    [_refreshButton setEnabled:NO];
+    [_statusField setStringValue:TGLoc(@"workshop.refreshing")];
+    [_coordinator refreshCatalog];
+}
+
 - (void)updateModeButtonStates {
     NSInteger selected = 0;
     if ([_selectedMode isEqualToString:TGWorkshopViewModeInstalled]) selected = 1;
@@ -271,6 +297,7 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     for (index = 0; index < [_modeButtons count]; index++) {
         [[_modeButtons objectAtIndex:index] setState:((NSInteger)index == selected) ? NSOnState : NSOffState];
     }
+    [_refreshButton setHidden:[_selectedMode isEqualToString:TGWorkshopViewModeInstalled]];
 }
 
 - (void)rebuildCards {
@@ -379,6 +406,7 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
         [_categoryField setHidden:NO];
         [_statusField setHidden:NO];
         for (NSButton *button in _modeButtons) [button setHidden:NO];
+        [_refreshButton setHidden:[_selectedMode isEqualToString:TGWorkshopViewModeInstalled]];
         [self rebuildCards];
         [self notifyActiveModuleChanged];
         return;
@@ -427,6 +455,8 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
 }
 
 - (void)workshopCoordinatorDidReload {
+    _catalogRefreshing = NO;
+    [_refreshButton setEnabled:YES];
     [self rebuildCards];
 }
 
@@ -459,9 +489,13 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     if (identifier) {
         [_errorsByIdentifier setObject:message forKey:identifier];
     } else {
-        [_statusField setStringValue:message];
+        _catalogRefreshing = NO;
+        [_refreshButton setEnabled:YES];
     }
     [self rebuildCards];
+    if (!identifier) {
+        [_statusField setStringValue:message];
+    }
 }
 
 - (void)workshopCoordinatorDidOpenModuleViewController:(NSViewController *)viewController
@@ -482,6 +516,7 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     [_categoryField setHidden:YES];
     [_statusField setHidden:YES];
     for (NSButton *button in _modeButtons) [button setHidden:YES];
+    [_refreshButton setHidden:YES];
     [self notifyActiveModuleChanged];
 }
 
@@ -495,6 +530,7 @@ static NSImage *TGWorkshopOriginalOrientationIconImage(NSString *name) {
     [_categoryField release];
     [_statusField release];
     [_modeButtons release];
+    [_refreshButton release];
     [_scrollView release];
     [_contentView release];
     [_moduleContainerView release];

@@ -21,6 +21,7 @@
     NSTextField *_categoryField;
     NSTextField *_statusField;
     NSArray *_modeButtons;
+    NSButton *_refreshButton;
     NSScrollView *_scrollView;
     NSView *_contentView;
     NSView *_moduleContainerView;
@@ -30,6 +31,7 @@
     NSMutableDictionary *_errorsByIdentifier;
     NSMutableDictionary *_installStartDatesByIdentifier;
     BOOL _started;
+    BOOL _catalogRefreshing;
 }
 
 @property(nonatomic, assign) id<TGWorkshopViewControllerDelegate> delegate;

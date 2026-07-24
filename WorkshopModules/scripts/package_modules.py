@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import pathlib
+import plistlib
 import shutil
 import subprocess
 import tempfile
@@ -100,20 +101,30 @@ def main() -> None:
         bundle = args.products / f"{module_name}.bundle"
         if not bundle.is_dir():
             raise SystemExit(f"Missing built bundle: {bundle}")
-        package_name = f"{metadata['id']}-1.0.0.zip"
+        manifest_path = bundle / "Contents" / "Resources" / "WorkshopModule.plist"
+        if not manifest_path.is_file():
+            raise SystemExit(f"Missing Workshop manifest: {manifest_path}")
+        with manifest_path.open("rb") as manifest_file:
+            manifest = plistlib.load(manifest_file)
+        module_identifier = str(manifest.get("identifier", "")).strip()
+        module_version = str(manifest.get("version", "")).strip()
+        if module_identifier != metadata["id"] or not module_version:
+            raise SystemExit(f"Invalid Workshop manifest identity: {manifest_path}")
+
+        package_name = f"{module_identifier}-{module_version}.zip"
         package_path = args.output / package_name
-        deterministic_zip(bundle, package_path, f"{metadata['id']}.bundle")
+        deterministic_zip(bundle, package_path, f"{module_identifier}.bundle")
         package_bytes = package_path.read_bytes()
         digest = hashlib.sha256(package_bytes).hexdigest()
         unpacked_size, entry_count = unpacked_metrics(bundle)
-        signed_description = f"{metadata['id']}\n1.0.0\n{digest}".encode("utf-8")
+        signed_description = f"{module_identifier}\n{module_version}\n{digest}".encode("utf-8")
         package_signature = sign(args.private_key, PACKAGE_DOMAIN, signed_description)
         entries.append({
-            "id": metadata["id"],
+            "id": module_identifier,
             "name": metadata["name"],
             "localized_name": {"en": metadata["name"], "ru": metadata["ru_name"]},
             "description": {"en": metadata["en_description"], "ru": metadata["ru_description"]},
-            "version": "1.0.0",
+            "version": module_version,
             "api_version": 1,
             "minimum_app_version": "0.5.1",
             "minimum_os_version": "10.9",
