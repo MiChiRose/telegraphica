@@ -23,6 +23,7 @@
 - (void)focusBoard;
 - (void)newGame:(id)sender;
 - (void)playerDidAct;
+- (void)simulationTick:(NSTimer *)timer;
 @end
 
 @implementation TGTankPatrolRootView
@@ -35,51 +36,50 @@
 
 static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
                            NSColor *bodyColor, NSColor *detailColor) {
-    NSRect inset = NSInsetRect(rect, NSWidth(rect) * 0.16, NSHeight(rect) * 0.16);
-    NSBezierPath *body = [NSBezierPath bezierPathWithRoundedRect:inset
-                                                        xRadius:2.0
-                                                        yRadius:2.0];
+    CGFloat pixel = MAX(1.0, floor(NSWidth(rect) / 12.0));
+    NSRect inset = NSInsetRect(rect, pixel * 2.0, pixel * 2.0);
+    NSBezierPath *body = [NSBezierPath bezierPathWithRect:inset];
     [bodyColor setFill];
     [body fill];
 
-    NSRect leftTrack = NSMakeRect(NSMinX(rect) + NSWidth(rect) * 0.08,
-                                  NSMinY(rect) + NSHeight(rect) * 0.17,
-                                  NSWidth(rect) * 0.16,
-                                  NSHeight(rect) * 0.66);
-    NSRect rightTrack = NSMakeRect(NSMaxX(rect) - NSWidth(rect) * 0.24,
-                                   NSMinY(rect) + NSHeight(rect) * 0.17,
-                                   NSWidth(rect) * 0.16,
-                                   NSHeight(rect) * 0.66);
+    NSRect leftTrack = NSMakeRect(NSMinX(rect) + pixel,
+                                  NSMinY(rect) + pixel * 2.0,
+                                  pixel * 2.0,
+                                  NSHeight(rect) - pixel * 4.0);
+    NSRect rightTrack = NSMakeRect(NSMaxX(rect) - pixel * 3.0,
+                                   NSMinY(rect) + pixel * 2.0,
+                                   pixel * 2.0,
+                                   NSHeight(rect) - pixel * 4.0);
     [detailColor setFill];
     NSRectFill(leftTrack);
     NSRectFill(rightTrack);
 
     NSPoint center = NSMakePoint(NSMidX(rect), NSMidY(rect));
-    CGFloat turret = NSWidth(rect) * 0.24;
-    NSBezierPath *turretPath = [NSBezierPath bezierPathWithOvalInRect:
+    CGFloat turret = pixel * 4.0;
+    NSBezierPath *turretPath = [NSBezierPath bezierPathWithRect:
                                 NSMakeRect(center.x - turret / 2.0,
                                            center.y - turret / 2.0,
                                            turret, turret)];
     [detailColor setFill];
     [turretPath fill];
 
-    CGFloat barrelWidth = MAX(2.0, floor(NSWidth(rect) * 0.08));
+    CGFloat barrelWidth = pixel * 2.0;
     NSRect barrel = NSZeroRect;
     if (direction == TGTankDirectionUp) {
         barrel = NSMakeRect(center.x - barrelWidth / 2.0,
-                            center.y, barrelWidth, NSHeight(rect) * 0.42);
+                            center.y, barrelWidth, pixel * 5.0);
     } else if (direction == TGTankDirectionDown) {
         barrel = NSMakeRect(center.x - barrelWidth / 2.0,
-                            NSMinY(rect) + NSHeight(rect) * 0.08,
-                            barrelWidth, NSHeight(rect) * 0.42);
+                            NSMinY(rect) + pixel,
+                            barrelWidth, pixel * 5.0);
     } else if (direction == TGTankDirectionLeft) {
-        barrel = NSMakeRect(NSMinX(rect) + NSWidth(rect) * 0.08,
+        barrel = NSMakeRect(NSMinX(rect) + pixel,
                             center.y - barrelWidth / 2.0,
-                            NSWidth(rect) * 0.42, barrelWidth);
+                            pixel * 5.0, barrelWidth);
     } else {
         barrel = NSMakeRect(center.x,
                             center.y - barrelWidth / 2.0,
-                            NSWidth(rect) * 0.42, barrelWidth);
+                            pixel * 5.0, barrelWidth);
     }
     NSRectFill(barrel);
 }
@@ -130,9 +130,22 @@ static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
     CGFloat boardWidth = cell * size;
     CGFloat originX = floor((NSWidth(bounds) - boardWidth) / 2.0);
     CGFloat originY = floor((NSHeight(bounds) - boardWidth) / 2.0);
-
     NSInteger y;
     NSInteger x;
+
+    [[NSColor colorWithCalibratedWhite:0.16 alpha:0.28] setStroke];
+    NSBezierPath *grid = [NSBezierPath bezierPath];
+    [grid setLineWidth:0.5];
+    for (x = 0; x <= (NSInteger)size; x++) {
+        [grid moveToPoint:NSMakePoint(originX + x * cell, originY)];
+        [grid lineToPoint:NSMakePoint(originX + x * cell, originY + boardWidth)];
+    }
+    for (y = 0; y <= (NSInteger)size; y++) {
+        [grid moveToPoint:NSMakePoint(originX, originY + y * cell)];
+        [grid lineToPoint:NSMakePoint(originX + boardWidth, originY + y * cell)];
+    }
+    [grid stroke];
+
     for (y = 0; y < (NSInteger)size; y++) {
         for (x = 0; x < (NSInteger)size; x++) {
             NSRect tile = NSMakeRect(originX + x * cell, originY + y * cell, cell, cell);
@@ -140,10 +153,11 @@ static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
             if (terrain == 1) {
                 [self drawBrickInRect:tile];
             } else if (terrain == 2) {
-                [[NSColor colorWithCalibratedWhite:0.68 alpha:1.0] setFill];
+                [[NSColor colorWithCalibratedWhite:0.70 alpha:1.0] setFill];
                 NSRectFill(NSInsetRect(tile, 1.0, 1.0));
-                [[NSColor colorWithCalibratedWhite:0.90 alpha:0.72] setStroke];
-                NSFrameRect(NSInsetRect(tile, 2.0, 2.0));
+                [[NSColor colorWithCalibratedWhite:0.96 alpha:0.76] setFill];
+                NSRectFill(NSMakeRect(NSMinX(tile) + 2.0, NSMinY(tile) + 2.0,
+                                      NSWidth(tile) - 4.0, 2.0));
             } else if (terrain == 3) {
                 [[NSColor colorWithCalibratedRed:0.82 green:0.71 blue:0.22 alpha:1.0] setFill];
                 NSBezierPath *base = [NSBezierPath bezierPath];
@@ -175,7 +189,39 @@ static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
                                    cell, cell);
     TGTankDrawTank(playerTile, [_engine playerDirection],
                    [NSColor colorWithCalibratedRed:0.92 green:0.76 blue:0.24 alpha:1.0],
-                   [NSColor colorWithCalibratedRed:0.25 green:0.18 blue:0.06 alpha:1.0]);
+                   [NSColor colorWithCalibratedRed:0.98 green:0.94 blue:0.72 alpha:1.0]);
+
+    for (NSDictionary *bullet in [_engine bullets]) {
+        NSInteger bulletX = [[bullet objectForKey:@"x"] integerValue];
+        NSInteger bulletY = [[bullet objectForKey:@"y"] integerValue];
+        if (bulletX < 0 || bulletY < 0 ||
+            bulletX >= (NSInteger)size || bulletY >= (NSInteger)size) continue;
+        NSRect tile = NSMakeRect(originX + bulletX * cell, originY + bulletY * cell, cell, cell);
+        CGFloat bulletSize = MAX(4.0, floor(cell * 0.22));
+        NSRect bulletRect = NSMakeRect(NSMidX(tile) - bulletSize / 2.0,
+                                       NSMidY(tile) - bulletSize / 2.0,
+                                       bulletSize, bulletSize);
+        NSColor *bulletColor = [[bullet objectForKey:@"enemy"] boolValue]
+            ? [NSColor colorWithCalibratedRed:1.0 green:0.28 blue:0.12 alpha:1.0]
+            : [NSColor colorWithCalibratedRed:1.0 green:0.95 blue:0.52 alpha:1.0];
+        [bulletColor setFill];
+        NSRectFill(bulletRect);
+    }
+
+    for (y = 0; y < (NSInteger)size; y++) {
+        for (x = 0; x < (NSInteger)size; x++) {
+            if ([_engine terrainAtX:x y:y] != 4) continue;
+            NSRect tile = NSMakeRect(originX + x * cell, originY + y * cell, cell, cell);
+            [[NSColor colorWithCalibratedRed:0.25 green:0.70 blue:0.13 alpha:0.86] setFill];
+            CGFloat leaf = MAX(2.0, floor(cell / 4.0));
+            NSInteger leafIndex = 0;
+            for (leafIndex = 0; leafIndex < 8; leafIndex++) {
+                CGFloat leafX = NSMinX(tile) + (leafIndex % 3) * leaf * 1.25;
+                CGFloat leafY = NSMinY(tile) + (leafIndex / 3) * leaf * 1.15;
+                NSRectFill(NSMakeRect(leafX, leafY, leaf, leaf));
+            }
+        }
+    }
 
     [[NSColor colorWithCalibratedRed:0.88 green:0.74 blue:0.25 alpha:0.70] setStroke];
     NSBezierPath *border = [NSBezierPath bezierPathWithRect:
@@ -268,6 +314,11 @@ static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
     [root addSubview:_newGameButton];
     [self layoutGame];
     [self refreshFromEngine];
+    _gameTimer = [[NSTimer scheduledTimerWithTimeInterval:0.12
+                                                    target:self
+                                                  selector:@selector(simulationTick:)
+                                                  userInfo:nil
+                                                   repeats:YES] retain];
     [self performSelector:@selector(focusBoard) withObject:nil afterDelay:0.0];
 }
 
@@ -316,6 +367,19 @@ static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
     [self refreshFromEngine];
 }
 
+- (void)simulationTick:(NSTimer *)timer {
+    (void)timer;
+    if (![[self view] window] || [[self view] isHidden]) return;
+    [_engine advanceSimulation];
+    [self refreshFromEngine];
+}
+
+- (void)stopSimulation {
+    [_gameTimer invalidate];
+    [_gameTimer release];
+    _gameTimer = nil;
+}
+
 - (void)newGame:(id)sender {
     (void)sender;
     [_engine newGame];
@@ -324,6 +388,7 @@ static void TGTankDrawTank(NSRect rect, TGTankDirection direction,
 }
 
 - (void)dealloc {
+    [self stopSimulation];
     [_engine release];
     [_hostContext release];
     [_boardView release];

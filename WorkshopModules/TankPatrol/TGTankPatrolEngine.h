@@ -11,6 +11,7 @@ typedef enum {
 @private
     NSMutableArray *_terrain;
     NSMutableArray *_enemies;
+    NSMutableArray *_bullets;
     NSInteger _playerX;
     NSInteger _playerY;
     TGTankDirection _playerDirection;
@@ -18,6 +19,7 @@ typedef enum {
     NSUInteger _score;
     NSUInteger _wins;
     NSUInteger _turns;
+    NSUInteger _simulationTicks;
     BOOL _finished;
     BOOL _won;
 }
@@ -29,6 +31,7 @@ typedef enum {
 - (NSInteger)playerY;
 - (TGTankDirection)playerDirection;
 - (NSArray *)enemies;
+- (NSArray *)bullets;
 - (NSUInteger)lives;
 - (NSUInteger)score;
 - (NSUInteger)wins;
@@ -37,6 +40,7 @@ typedef enum {
 - (BOOL)didWin;
 - (BOOL)movePlayerInDirection:(TGTankDirection)direction;
 - (BOOL)fire;
+- (void)advanceSimulation;
 - (NSDictionary *)saveState;
 - (BOOL)restoreState:(NSDictionary *)state;
 

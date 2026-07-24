@@ -25,6 +25,11 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
 - (void)buildTerrain;
 - (BOOL)enemyOccupiesX:(NSInteger)x y:(NSInteger)y ignoringIndex:(NSInteger)ignoredIndex;
 - (void)advanceEnemies;
+- (void)advanceBullets;
+- (void)spawnBulletFromX:(NSInteger)x
+                       y:(NSInteger)y
+               direction:(TGTankDirection)direction
+                   enemy:(BOOL)enemy;
 - (void)damagePlayer;
 - (void)evaluateOutcome;
 @end
@@ -36,6 +41,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     if (self) {
         _terrain = [[NSMutableArray alloc] initWithCapacity:TGTankBoardSize * TGTankBoardSize];
         _enemies = [[NSMutableArray alloc] init];
+        _bullets = [[NSMutableArray alloc] init];
         [self newGame];
     }
     return self;
@@ -50,6 +56,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
 - (NSInteger)playerY { return _playerY; }
 - (TGTankDirection)playerDirection { return _playerDirection; }
 - (NSArray *)enemies { return _enemies; }
+- (NSArray *)bullets { return _bullets; }
 - (NSUInteger)lives { return _lives; }
 - (NSUInteger)score { return _score; }
 - (NSUInteger)wins { return _wins; }
@@ -76,6 +83,23 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
         [_terrain replaceObjectAtIndex:TGTankIndex(walls[index][0], walls[index][1])
                             withObject:[NSNumber numberWithInteger:1]];
     }
+    NSInteger steel[][2] = {
+        {6, 4}, {1, 5}, {11, 5}, {4, 8}, {8, 8}
+    };
+    count = sizeof(steel) / sizeof(steel[0]);
+    for (index = 0; index < count; index++) {
+        [_terrain replaceObjectAtIndex:TGTankIndex(steel[index][0], steel[index][1])
+                            withObject:[NSNumber numberWithInteger:2]];
+    }
+    NSInteger brush[][2] = {
+        {5, 1}, {7, 1}, {6, 2}, {1, 4}, {11, 4},
+        {3, 6}, {9, 6}, {5, 9}, {6, 9}, {7, 9}
+    };
+    count = sizeof(brush) / sizeof(brush[0]);
+    for (index = 0; index < count; index++) {
+        [_terrain replaceObjectAtIndex:TGTankIndex(brush[index][0], brush[index][1])
+                            withObject:[NSNumber numberWithInteger:4]];
+    }
     [_terrain replaceObjectAtIndex:TGTankIndex(6, 12)
                         withObject:[NSNumber numberWithInteger:3]];
 }
@@ -83,6 +107,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
 - (void)newGame {
     [self buildTerrain];
     [_enemies removeAllObjects];
+    [_bullets removeAllObjects];
     NSArray *starts = [NSArray arrayWithObjects:
                        [NSArray arrayWithObjects:@1, @0, nil],
                        [NSArray arrayWithObjects:@6, @0, nil],
@@ -104,6 +129,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     _lives = 3;
     _score = 0;
     _turns = 0;
+    _simulationTicks = 0;
     _finished = NO;
     _won = NO;
 }
@@ -151,27 +177,25 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     for (NSMutableDictionary *enemy in _enemies) {
         NSInteger x = [[enemy objectForKey:@"x"] integerValue];
         NSInteger y = [[enemy objectForKey:@"y"] integerValue];
+        TGTankDirection direction =
+            (TGTankDirection)[[enemy objectForKey:@"direction"] integerValue];
+        if (((_simulationTicks + (NSUInteger)index * 3) % 7) == 0) {
+            if (labs(6 - x) > labs(12 - y)) {
+                direction = (6 > x) ? TGTankDirectionRight : TGTankDirectionLeft;
+            } else {
+                direction = (12 > y) ? TGTankDirectionDown : TGTankDirectionUp;
+            }
+        } else if (((_simulationTicks + (NSUInteger)index) % 11) == 0) {
+            direction = (TGTankDirection)arc4random_uniform(4);
+        }
         NSInteger dx = 0;
         NSInteger dy = 0;
-        if (labs(6 - x) > labs(12 - y)) {
-            dx = (6 > x) ? 1 : -1;
-        } else {
-            dy = (12 > y) ? 1 : -1;
-        }
+        TGTankDelta(direction, &dx, &dy);
         NSInteger nx = x + dx;
         NSInteger ny = y + dy;
-        TGTankDirection direction = dy > 0 ? TGTankDirectionDown :
-                                     dy < 0 ? TGTankDirectionUp :
-                                     dx > 0 ? TGTankDirectionRight : TGTankDirectionLeft;
         [enemy setObject:[NSNumber numberWithInteger:direction] forKey:@"direction"];
         NSInteger terrain = [self terrainAtX:nx y:ny];
-        if (terrain == 1) {
-            [_terrain replaceObjectAtIndex:TGTankIndex(nx, ny)
-                                withObject:[NSNumber numberWithInteger:0]];
-        } else if (terrain == 3) {
-            [_terrain replaceObjectAtIndex:TGTankIndex(nx, ny)
-                                withObject:[NSNumber numberWithInteger:0]];
-        } else if (terrain == 0 &&
+        if ((terrain == 0 || terrain == 4) &&
                    ![self enemyOccupiesX:nx y:ny ignoringIndex:index]) {
             if (nx == _playerX && ny == _playerY) {
                 [self damagePlayer];
@@ -179,11 +203,94 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
                 [enemy setObject:[NSNumber numberWithInteger:nx] forKey:@"x"];
                 [enemy setObject:[NSNumber numberWithInteger:ny] forKey:@"y"];
             }
+        } else if (((_simulationTicks + (NSUInteger)index) % 5) == 0) {
+            [enemy setObject:[NSNumber numberWithInteger:arc4random_uniform(4)]
+                      forKey:@"direction"];
+        }
+        if (((_simulationTicks + (NSUInteger)index * 2) % 4) == 0) {
+            [self spawnBulletFromX:[[enemy objectForKey:@"x"] integerValue]
+                                 y:[[enemy objectForKey:@"y"] integerValue]
+                         direction:(TGTankDirection)[[enemy objectForKey:@"direction"] integerValue]
+                             enemy:YES];
         }
         index++;
         if (_finished) break;
     }
     [self evaluateOutcome];
+}
+
+- (void)spawnBulletFromX:(NSInteger)x
+                       y:(NSInteger)y
+               direction:(TGTankDirection)direction
+                   enemy:(BOOL)enemy {
+    NSInteger dx = 0;
+    NSInteger dy = 0;
+    TGTankDelta(direction, &dx, &dy);
+    [_bullets addObject:[NSMutableDictionary dictionaryWithObjectsAndKeys:
+                         [NSNumber numberWithInteger:x + dx], @"x",
+                         [NSNumber numberWithInteger:y + dy], @"y",
+                         [NSNumber numberWithInteger:direction], @"direction",
+                         [NSNumber numberWithBool:enemy], @"enemy",
+                         nil]];
+}
+
+- (void)advanceBullets {
+    if (_finished || [_bullets count] == 0) return;
+    NSArray *current = [[_bullets copy] autorelease];
+    NSMutableArray *survivors = [NSMutableArray arrayWithCapacity:[current count]];
+    for (NSDictionary *bullet in current) {
+        NSInteger x = [[bullet objectForKey:@"x"] integerValue];
+        NSInteger y = [[bullet objectForKey:@"y"] integerValue];
+        TGTankDirection direction =
+            (TGTankDirection)[[bullet objectForKey:@"direction"] integerValue];
+        BOOL enemyBullet = [[bullet objectForKey:@"enemy"] boolValue];
+        if (!TGTankPointInside(x, y)) continue;
+
+        NSInteger terrain = [self terrainAtX:x y:y];
+        if (terrain == 1) {
+            [_terrain replaceObjectAtIndex:TGTankIndex(x, y)
+                                withObject:[NSNumber numberWithInteger:0]];
+            continue;
+        }
+        if (terrain == 2) continue;
+        if (terrain == 3) {
+            if (enemyBullet) {
+                [_terrain replaceObjectAtIndex:TGTankIndex(x, y)
+                                    withObject:[NSNumber numberWithInteger:0]];
+            }
+            continue;
+        }
+
+        if (enemyBullet) {
+            if (x == _playerX && y == _playerY) {
+                [self damagePlayer];
+                continue;
+            }
+        } else {
+            NSUInteger enemyIndex = 0;
+            BOOL hitEnemy = NO;
+            for (NSDictionary *enemy in [[_enemies copy] autorelease]) {
+                if ([[enemy objectForKey:@"x"] integerValue] == x &&
+                    [[enemy objectForKey:@"y"] integerValue] == y) {
+                    [_enemies removeObjectAtIndex:enemyIndex];
+                    _score += 100;
+                    hitEnemy = YES;
+                    break;
+                }
+                enemyIndex++;
+            }
+            if (hitEnemy) continue;
+        }
+
+        NSInteger dx = 0;
+        NSInteger dy = 0;
+        TGTankDelta(direction, &dx, &dy);
+        NSMutableDictionary *advanced = [NSMutableDictionary dictionaryWithDictionary:bullet];
+        [advanced setObject:[NSNumber numberWithInteger:x + dx] forKey:@"x"];
+        [advanced setObject:[NSNumber numberWithInteger:y + dy] forKey:@"y"];
+        [survivors addObject:advanced];
+    }
+    [_bullets setArray:survivors];
 }
 
 - (BOOL)movePlayerInDirection:(TGTankDirection)direction {
@@ -195,60 +302,40 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     NSInteger nx = _playerX + dx;
     NSInteger ny = _playerY + dy;
     BOOL moved = NO;
+    NSInteger terrain = [self terrainAtX:nx y:ny];
     if (TGTankPointInside(nx, ny) &&
-        [self terrainAtX:nx y:ny] == 0 &&
+        (terrain == 0 || terrain == 4) &&
         ![self enemyOccupiesX:nx y:ny ignoringIndex:-1]) {
         _playerX = nx;
         _playerY = ny;
         moved = YES;
     }
     _turns++;
-    [self advanceEnemies];
     return moved;
 }
 
 - (BOOL)fire {
     if (_finished) return NO;
-    NSInteger dx = 0;
-    NSInteger dy = 0;
-    TGTankDelta(_playerDirection, &dx, &dy);
-    NSInteger x = _playerX + dx;
-    NSInteger y = _playerY + dy;
-    BOOL hit = NO;
-    while (TGTankPointInside(x, y)) {
-        NSInteger terrain = [self terrainAtX:x y:y];
-        if (terrain == 1) {
-            [_terrain replaceObjectAtIndex:TGTankIndex(x, y)
-                                withObject:[NSNumber numberWithInteger:0]];
-            hit = YES;
-            break;
-        }
-        if (terrain == 2 || terrain == 3) break;
-        NSUInteger index = 0;
-        for (NSDictionary *enemy in [[_enemies copy] autorelease]) {
-            if ([[enemy objectForKey:@"x"] integerValue] == x &&
-                [[enemy objectForKey:@"y"] integerValue] == y) {
-                [_enemies removeObjectAtIndex:index];
-                _score += 100;
-                hit = YES;
-                break;
-            }
-            index++;
-        }
-        if (hit) break;
-        x += dx;
-        y += dy;
-    }
+    [self spawnBulletFromX:_playerX y:_playerY direction:_playerDirection enemy:NO];
     _turns++;
+    return YES;
+}
+
+- (void)advanceSimulation {
+    if (_finished) return;
+    _simulationTicks++;
+    [self advanceBullets];
+    if (!_finished && (_simulationTicks % 3) == 0) {
+        [self advanceEnemies];
+    }
     [self evaluateOutcome];
-    if (!_finished) [self advanceEnemies];
-    return hit;
 }
 
 - (NSDictionary *)saveState {
     return [NSDictionary dictionaryWithObjectsAndKeys:
             _terrain, @"terrain",
             _enemies, @"enemies",
+            _bullets, @"bullets",
             [NSNumber numberWithInteger:_playerX], @"player_x",
             [NSNumber numberWithInteger:_playerY], @"player_y",
             [NSNumber numberWithInteger:_playerDirection], @"player_direction",
@@ -256,6 +343,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
             [NSNumber numberWithUnsignedInteger:_score], @"score",
             [NSNumber numberWithUnsignedInteger:_wins], @"wins",
             [NSNumber numberWithUnsignedInteger:_turns], @"turns",
+            [NSNumber numberWithUnsignedInteger:_simulationTicks], @"simulation_ticks",
             [NSNumber numberWithBool:_finished], @"finished",
             [NSNumber numberWithBool:_won], @"won",
             nil];
@@ -265,10 +353,14 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     if (![state isKindOfClass:[NSDictionary class]]) return NO;
     NSArray *terrain = [state objectForKey:@"terrain"];
     NSArray *enemies = [state objectForKey:@"enemies"];
+    NSArray *bullets = [state objectForKey:@"bullets"];
     if (![terrain isKindOfClass:[NSArray class]] ||
         [terrain count] != TGTankBoardSize * TGTankBoardSize ||
         ![enemies isKindOfClass:[NSArray class]] ||
         [enemies count] > 12) {
+        return NO;
+    }
+    if (bullets && (![bullets isKindOfClass:[NSArray class]] || [bullets count] > 64)) {
         return NO;
     }
     NSInteger playerX = [[state objectForKey:@"player_x"] integerValue];
@@ -280,7 +372,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     }
     for (id value in terrain) {
         NSInteger tile = [value integerValue];
-        if (![value respondsToSelector:@selector(integerValue)] || tile < 0 || tile > 3) return NO;
+        if (![value respondsToSelector:@selector(integerValue)] || tile < 0 || tile > 4) return NO;
     }
     for (id value in enemies) {
         if (![value isKindOfClass:[NSDictionary class]]) return NO;
@@ -293,6 +385,15 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     for (NSDictionary *enemy in enemies) {
         [_enemies addObject:[NSMutableDictionary dictionaryWithDictionary:enemy]];
     }
+    [_bullets removeAllObjects];
+    for (NSDictionary *bullet in bullets) {
+        if (![bullet isKindOfClass:[NSDictionary class]]) return NO;
+        NSInteger x = [[bullet objectForKey:@"x"] integerValue];
+        NSInteger y = [[bullet objectForKey:@"y"] integerValue];
+        if (x < -1 || y < -1 ||
+            x > (NSInteger)TGTankBoardSize || y > (NSInteger)TGTankBoardSize) return NO;
+        [_bullets addObject:[NSMutableDictionary dictionaryWithDictionary:bullet]];
+    }
     _playerX = playerX;
     _playerY = playerY;
     _playerDirection = (TGTankDirection)direction;
@@ -300,6 +401,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
     _score = [[state objectForKey:@"score"] unsignedIntegerValue];
     _wins = [[state objectForKey:@"wins"] unsignedIntegerValue];
     _turns = [[state objectForKey:@"turns"] unsignedIntegerValue];
+    _simulationTicks = [[state objectForKey:@"simulation_ticks"] unsignedIntegerValue];
     _finished = [[state objectForKey:@"finished"] boolValue];
     _won = [[state objectForKey:@"won"] boolValue];
     return _lives <= 3;
@@ -308,6 +410,7 @@ static void TGTankDelta(TGTankDirection direction, NSInteger *dx, NSInteger *dy)
 - (void)dealloc {
     [_terrain release];
     [_enemies release];
+    [_bullets release];
     [super dealloc];
 }
 

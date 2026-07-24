@@ -46,6 +46,7 @@ static NSString * const TGTankPatrolModuleIdentifier =
 }
 
 - (void)stop {
+    [_viewController stopSimulation];
 }
 
 - (BOOL)saveStateWithError:(NSError **)error {

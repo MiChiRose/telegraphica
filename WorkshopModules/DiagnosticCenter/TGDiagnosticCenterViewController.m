@@ -136,6 +136,7 @@ static NSTextField *TGDiagnosticLabel(NSFont *font, NSColor *color, NSTextAlignm
     [root addSubview:_spinner];
 
     [self layoutDiagnostics];
+    [self refreshDiagnostics];
 }
 
 - (void)layoutDiagnostics {
@@ -170,7 +171,7 @@ static NSTextField *TGDiagnosticLabel(NSFont *font, NSColor *color, NSTextAlignm
 }
 
 - (void)refreshDiagnostics {
-    if (_refreshing || ![self isViewLoaded]) return;
+    if (_refreshing || !_refreshButton) return;
     _refreshing = YES;
     [_refreshButton setEnabled:NO];
     [_spinner startAnimation:nil];

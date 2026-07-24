@@ -29,7 +29,6 @@ static NSString * const TGDiagnosticCenterModuleIdentifier =
 }
 - (BOOL)startWithError:(NSError **)error {
     (void)error;
-    [_viewController refreshDiagnostics];
     return YES;
 }
 - (void)stop {}

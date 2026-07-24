@@ -404,10 +404,19 @@ static void TGTestTankPatrol(void) {
              [[engine enemies] count] == 5,
              @"Tank Patrol creates a compact battlefield, base, and enemy wave.");
     NSInteger originalY = [engine playerY];
+    NSDictionary *firstEnemyBeforeMove = [[[engine enemies] objectAtIndex:0] copy];
     TGAssert([engine movePlayerInDirection:TGTankDirectionUp] &&
              [engine playerY] == originalY - 1 &&
              [engine turns] == 1,
-             @"Tank Patrol moves the player and advances a turn.");
+             @"Tank Patrol moves the player and records a player action.");
+    TGAssert([firstEnemyBeforeMove isEqualToDictionary:[[engine enemies] objectAtIndex:0]],
+             @"Tank Patrol does not tie enemy movement to player input.");
+    NSUInteger tick = 0;
+    for (tick = 0; tick < 6; tick++) [engine advanceSimulation];
+    TGAssert([[engine bullets] count] > 0 ||
+             ![[[engine enemies] objectAtIndex:0] isEqualToDictionary:firstEnemyBeforeMove],
+             @"Tank Patrol advances enemy movement and fire on its own simulation clock.");
+    [firstEnemyBeforeMove release];
 
     NSDictionary *saved = [engine saveState];
     TGTankPatrolEngine *restored = [[[TGTankPatrolEngine alloc] init] autorelease];

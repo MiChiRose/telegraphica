@@ -13,10 +13,12 @@
     NSTextField *_statusField;
     NSTextField *_scoreField;
     NSButton *_newGameButton;
+    NSTimer *_gameTimer;
 }
 
 - (id)initWithEngine:(TGTankPatrolEngine *)engine
          hostContext:(id<TGWorkshopHostContext>)hostContext;
 - (void)refreshFromEngine;
+- (void)stopSimulation;
 
 @end
