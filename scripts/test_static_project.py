@@ -147,9 +147,9 @@ def check_media_center_pagination(errors):
     localization_text = read_text(os.path.join(ROOT, localization_rel))
     if "Scroll down to load more." not in localization_text:
         errors.append("%s: English media center status should tell users about scroll pagination" % localization_rel)
-    if "Прокрутите вниз, чтобы загрузить ещё." not in localization_text:
+    if u"Прокрутите вниз, чтобы загрузить ещё." not in localization_text:
         errors.append("%s: Russian media center status should tell users about scroll pagination" % localization_rel)
-    if "Пракруціце ўніз, каб загрузіць яшчэ." not in localization_text:
+    if u"Пракруціце ўніз, каб загрузіць яшчэ." not in localization_text:
         errors.append("%s: Belarusian media center status should tell users about scroll pagination" % localization_rel)
 
 
@@ -180,7 +180,7 @@ def check_workshop_installed_presentation(errors):
     required_fragments = [
         "TGWorkshopInstalledLocalizedNames",
         '[identifier hasSuffix:@".fifteen"]',
-        'russian = @"Пятнашки"',
+        u'russian = @"Пятнашки"',
         '[identifier componentsSeparatedByString:@"."]',
     ]
     for fragment in required_fragments:
@@ -206,7 +206,7 @@ def check_unified_legacy_contract(errors):
     info_text = read_text(os.path.join(ROOT, info_rel))
     if "<key>LSMinimumSystemVersion</key>\n\t<string>10.8</string>" not in info_text:
         errors.append("%s: unified app must keep LSMinimumSystemVersion at 10.8" % info_rel)
-    if "OS X 10.8–macOS 10.13" not in info_text:
+    if u"OS X 10.8–macOS 10.13" not in info_text:
         errors.append("%s: unified compatibility summary is missing" % info_rel)
 
     compatibility_rel = os.path.join("Sources", "Services", "TGSystemCompatibility.h")
