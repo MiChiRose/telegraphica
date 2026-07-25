@@ -2668,6 +2668,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [[self.sendTextField cell] setUsesSingleLineMode:NO];
     [[self.sendTextField cell] setWraps:YES];
     [[self.sendTextField cell] setScrollable:NO];
+    [[self.sendTextField cell] setAllowsEditingTextAttributes:YES];
     [[self.sendTextField cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [[self.sendTextField cell] setPlaceholderString:@"Message"];
     [self.sendTextField setDelegate:(id)self];

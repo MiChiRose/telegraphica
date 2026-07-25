@@ -225,6 +225,13 @@
     if (![self.currentAuthState isEqualToString:@"ready"] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         return;
     }
+    if ([text hasPrefix:@"\u2063"]) {
+        /* Formatted drafts stay local so Markdown control markers never leak into Telegram draft text. */
+        [self.composerDraftSyncTimer invalidate];
+        self.composerDraftSyncTimer = nil;
+        self.composerDraftSyncGeneration++;
+        return;
+    }
 
     self.composerDraftSyncChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
     self.composerDraftSyncThreadID = ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) ? [NSNumber numberWithLongLong:[messageThreadID longLongValue]] : nil;

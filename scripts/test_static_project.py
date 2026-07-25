@@ -358,6 +358,28 @@ def check_conversation_creation_contract(errors):
                           (lifecycle_rel, fragment))
 
 
+def check_composer_formatting_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in ["parseTextEntities", "textParseModeMarkdown",
+                     "telegraphica-parse-composer-formatting", u'@"\\u2063"']:
+        if fragment not in client_text:
+            errors.append("%s: rich composer parsing is missing `%s`" %
+                          (client_rel, fragment))
+
+    composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
+    composer_text = read_text(os.path.join(ROOT, composer_rel))
+    for fragment in ["applyComposerFormatting:", 'TGLoc(@"composer.format.spoiler")',
+                     'TGLoc(@"composer.format.code")']:
+        if fragment not in composer_text:
+            errors.append("%s: composer formatting UI is missing `%s`" %
+                          (composer_rel, fragment))
+
+    draft_rel = os.path.join("Sources", "UI", "TGStatusWindowController+AuthComposerState.inc")
+    if u'[text hasPrefix:@"\\u2063"]' not in read_text(os.path.join(ROOT, draft_rel)):
+        errors.append("%s: formatting control markers must not sync into Telegram drafts" % draft_rel)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -371,6 +393,7 @@ def main():
     check_unified_legacy_contract(errors)
     check_no_local_runtime_data(errors)
     check_conversation_creation_contract(errors)
+    check_composer_formatting_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:
