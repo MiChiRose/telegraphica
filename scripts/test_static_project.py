@@ -324,6 +324,40 @@ def check_no_local_runtime_data(errors):
                 errors.append("%s: tests/scripts must not contain Telegram API credentials" % rel)
 
 
+def check_conversation_creation_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        'createNewBasicGroupChat',
+        'createNewSecretChat',
+        'createNewSupergroupChat',
+        'createdBasicGroupChat',
+        'message_auto_delete_time',
+        'telegraphica-create-basic-group-legacy',
+        'telegraphica-create-supergroup-legacy',
+        'isTDLibSchemaCompatibilityError',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: conversation creation compatibility is missing `%s`" %
+                          (client_rel, fragment))
+
+    prompt_rel = os.path.join("Sources", "UI", "TGConversationCreationPrompt.m")
+    prompt_text = read_text(os.path.join(ROOT, prompt_rel))
+    for fragment in ["runGroupPromptWithMemberCount:", "runChannelPromptWithTitle:",
+                     "[safeTitle length] > 128", "[safeDescription length] > 255"]:
+        if fragment not in prompt_text:
+            errors.append("%s: focused creation prompt is missing `%s`" %
+                          (prompt_rel, fragment))
+
+    lifecycle_rel = os.path.join("Sources", "UI", "TGChatLifecycleWindowController.m")
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    for fragment in ["setAllowsMultipleSelection:YES", "createGroup:",
+                     "createSecretChat:", "createChannel:"]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: conversation creation UI is missing `%s`" %
+                          (lifecycle_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -336,6 +370,7 @@ def main():
     check_workshop_installed_presentation(errors)
     check_unified_legacy_contract(errors)
     check_no_local_runtime_data(errors)
+    check_conversation_creation_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:
