@@ -104,6 +104,7 @@
     [self showView:self.loadChatsButton visible:showChats];
     [self showView:self.loadMoreChatsButton visible:NO];
     [self showView:self.chatSearchButton visible:showChats];
+    [self showView:self.composeChatButton visible:showChats];
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
@@ -572,7 +573,8 @@
     [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.chatSearchButton setFrame:NSMakeRect(mainX + sidebarWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
-    CGFloat chatHeaderTitleMaxX = NSMinX([self.chatSearchButton frame]) - 8.0;
+    [self.composeChatButton setFrame:NSMakeRect(mainX + sidebarWidth - 24.0 - (headerButtonSize * 3.0), headerButtonY, headerButtonSize, headerButtonSize)];
+    CGFloat chatHeaderTitleMaxX = NSMinX([self.composeChatButton frame]) - 8.0;
     CGFloat chatHeaderTitleWidth = chatHeaderTitleMaxX - chatHeaderTitleX;
     if (chatHeaderTitleWidth < 42.0) {
         chatHeaderTitleWidth = 42.0;

@@ -463,6 +463,21 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [muteRoot setImage:TGTemplateIconAssetImage(@"sound-off", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
     [muteRoot setSubmenu:muteMenu];
     [menu addItem:muteRoot];
+
+    NSString *typeSummary = [item typeSummary];
+    BOOL canLeave = (![item isForumTopic] &&
+                     ([typeSummary isEqualToString:@"Group"] ||
+                      [typeSummary isEqualToString:@"Supergroup"] ||
+                      [typeSummary isEqualToString:@"Channel"]));
+    if (canLeave) {
+        [menu addItem:[NSMenuItem separatorItem]];
+        NSMenuItem *leaveItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.leave")
+                                                            action:@selector(leaveChatFromMenu:)
+                                                     keyEquivalent:@""] autorelease];
+        [leaveItem setRepresentedObject:item];
+        [leaveItem setTarget:self];
+        [menu addItem:leaveItem];
+    }
 }
 
 - (void)menuNeedsUpdate:(NSMenu *)menu {
