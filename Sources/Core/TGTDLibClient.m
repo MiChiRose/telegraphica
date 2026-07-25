@@ -3659,6 +3659,169 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [NSNumber numberWithLongLong:[chatID longLongValue]];
 }
 
+- (NSNumber *)createdChatIDFromResponse:(NSDictionary *)response {
+    if (!response) {
+        return nil;
+    }
+    NSString *responseType = [response objectForKey:@"@type"];
+    id chatID = [responseType isEqualToString:@"createdBasicGroupChat"]
+        ? [response objectForKey:@"chat_id"]
+        : [response objectForKey:@"id"];
+    if (([responseType isEqualToString:@"chat"] || [responseType isEqualToString:@"createdBasicGroupChat"]) &&
+        [chatID respondsToSelector:@selector(longLongValue)] &&
+        [chatID longLongValue] != 0LL) {
+        return [NSNumber numberWithLongLong:[chatID longLongValue]];
+    }
+    return nil;
+}
+
+- (BOOL)isTDLibSchemaCompatibilityError:(NSError *)error {
+    NSString *message = [[error localizedDescription] lowercaseString];
+    return ([message rangeOfString:@"unknown field"].location != NSNotFound ||
+            [message rangeOfString:@"unexpected field"].location != NSNotFound ||
+            [message rangeOfString:@"field \"message_auto_delete_time\""].location != NSNotFound ||
+            [message rangeOfString:@"field \"is_forum\""].location != NSNotFound);
+}
+
+- (NSNumber *)basicGroupChatIDWithUserIDs:(NSArray *)userIDs title:(NSString *)title timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *safeTitle = [title isKindOfClass:[NSString class]]
+        ? [title stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+        : @"";
+    if ([safeTitle length] == 0 || [safeTitle length] > 128 || ![userIDs isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"A valid group title and members are required." code:215];
+        }
+        return nil;
+    }
+    NSMutableArray *safeUserIDs = [NSMutableArray array];
+    id userID = nil;
+    for (userID in userIDs) {
+        if ([userID respondsToSelector:@selector(longLongValue)] && [userID longLongValue] != 0LL) {
+            [safeUserIDs addObject:[NSNumber numberWithLongLong:[userID longLongValue]]];
+        }
+    }
+    if ([safeUserIDs count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Select at least one contact for the group." code:216];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"createNewBasicGroupChat" forKey:@"@type"];
+    [request setObject:safeUserIDs forKey:@"user_ids"];
+    [request setObject:safeTitle forKey:@"title"];
+    [request setObject:[NSNumber numberWithInt:0] forKey:@"message_auto_delete_time"];
+    NSError *currentError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-create-basic-group"
+                                                           timeout:timeout
+                                                         errorCode:217
+                                                             error:&currentError];
+    NSNumber *chatID = [self createdChatIDFromResponse:response];
+    if (chatID) {
+        return chatID;
+    }
+    if (response || ![self isTDLibSchemaCompatibilityError:currentError]) {
+        if (error) {
+            *error = currentError ? currentError :
+                [self errorWithDescription:@"TDLib returned an unexpected group chat response." code:219];
+        }
+        return nil;
+    }
+
+    [request removeObjectForKey:@"message_auto_delete_time"];
+    NSError *legacyError = nil;
+    response = [self sendTDLibRequestAndWaitForExtra:request
+                                        extraPrefix:@"telegraphica-create-basic-group-legacy"
+                                            timeout:timeout
+                                          errorCode:218
+                                              error:&legacyError];
+    chatID = [self createdChatIDFromResponse:response];
+    if (!chatID && error) {
+        *error = legacyError ? legacyError :
+            (currentError ? currentError : [self errorWithDescription:@"TDLib returned an unexpected group chat response." code:219]);
+    }
+    return chatID;
+}
+
+- (NSNumber *)secretChatIDForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![userID respondsToSelector:@selector(longLongValue)] || [userID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"Select a contact for the secret chat." code:220];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"createNewSecretChat" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"user_id"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-create-secret-chat"
+                                                           timeout:timeout
+                                                         errorCode:221
+                                                             error:error];
+    NSNumber *chatID = [self createdChatIDFromResponse:response];
+    if (!chatID && error && response) {
+        *error = [self errorWithDescription:@"TDLib returned an unexpected secret chat response." code:222];
+    }
+    return chatID;
+}
+
+- (NSNumber *)supergroupChatIDWithTitle:(NSString *)title description:(NSString *)description channel:(BOOL)channel timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *safeTitle = [title isKindOfClass:[NSString class]]
+        ? [title stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+        : @"";
+    NSString *safeDescription = [description isKindOfClass:[NSString class]]
+        ? [description stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+        : @"";
+    if ([safeTitle length] == 0 || [safeTitle length] > 128 || [safeDescription length] > 255) {
+        if (error) {
+            *error = [self errorWithDescription:@"A valid chat title and description are required." code:223];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"createNewSupergroupChat" forKey:@"@type"];
+    [request setObject:safeTitle forKey:@"title"];
+    [request setObject:[NSNumber numberWithBool:NO] forKey:@"is_forum"];
+    [request setObject:[NSNumber numberWithBool:channel] forKey:@"is_channel"];
+    [request setObject:safeDescription forKey:@"description"];
+    [request setObject:[NSNumber numberWithInt:0] forKey:@"message_auto_delete_time"];
+    [request setObject:[NSNumber numberWithBool:NO] forKey:@"for_import"];
+    NSError *currentError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-create-supergroup"
+                                                           timeout:timeout
+                                                         errorCode:224
+                                                             error:&currentError];
+    NSNumber *chatID = [self createdChatIDFromResponse:response];
+    if (chatID) {
+        return chatID;
+    }
+    if (response || ![self isTDLibSchemaCompatibilityError:currentError]) {
+        if (error) {
+            *error = currentError ? currentError :
+                [self errorWithDescription:@"TDLib returned an unexpected channel response." code:226];
+        }
+        return nil;
+    }
+
+    [request removeObjectForKey:@"is_forum"];
+    [request removeObjectForKey:@"message_auto_delete_time"];
+    NSError *legacyError = nil;
+    response = [self sendTDLibRequestAndWaitForExtra:request
+                                        extraPrefix:@"telegraphica-create-supergroup-legacy"
+                                            timeout:timeout
+                                          errorCode:225
+                                              error:&legacyError];
+    chatID = [self createdChatIDFromResponse:response];
+    if (!chatID && error) {
+        *error = legacyError ? legacyError :
+            (currentError ? currentError : [self errorWithDescription:@"TDLib returned an unexpected channel response." code:226]);
+    }
+    return chatID;
+}
+
 - (NSString *)normalizedChatInviteLink:(NSString *)inviteLink {
     NSString *trimmed = [inviteLink isKindOfClass:[NSString class]]
         ? [inviteLink stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]

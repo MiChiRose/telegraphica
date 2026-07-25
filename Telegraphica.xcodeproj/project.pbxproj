@@ -64,6 +64,7 @@
 		111111111111111111111154 /* TGLocalDataReset.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111311 /* TGLocalDataReset.m */; };
 		111111111111111111111155 /* TGMessagePollSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111313 /* TGMessagePollSupport.m */; };
 		111111111111111111111158 /* TGChatLifecycleWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111320 /* TGChatLifecycleWindowController.m */; };
+		111111111111111111111159 /* TGConversationCreationPrompt.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111322 /* TGConversationCreationPrompt.m */; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -201,6 +202,8 @@
 		111111111111111111111316 /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
 		111111111111111111111319 /* TGChatLifecycleWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatLifecycleWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111320 /* TGChatLifecycleWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatLifecycleWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111321 /* TGConversationCreationPrompt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGConversationCreationPrompt.h; sourceTree = "<group>"; };
+		111111111111111111111322 /* TGConversationCreationPrompt.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGConversationCreationPrompt.m; sourceTree = "<group>"; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -353,6 +356,8 @@
 				111111111111111111111293 /* TGMessageViewersWindowController.m */,
 				111111111111111111111319 /* TGChatLifecycleWindowController.h */,
 				111111111111111111111320 /* TGChatLifecycleWindowController.m */,
+				111111111111111111111321 /* TGConversationCreationPrompt.h */,
+				111111111111111111111322 /* TGConversationCreationPrompt.m */,
 				111111111111111111111298 /* TGChatDisplayPreferences.h */,
 				111111111111111111111299 /* TGChatDisplayPreferences.m */,
 				111111111111111111111247 /* TGMessageLayoutSupport.h */,
@@ -585,6 +590,7 @@
 				111111111111111111111154 /* TGLocalDataReset.m in Sources */,
 				111111111111111111111155 /* TGMessagePollSupport.m in Sources */,
 				111111111111111111111158 /* TGChatLifecycleWindowController.m in Sources */,
+				111111111111111111111159 /* TGConversationCreationPrompt.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,
