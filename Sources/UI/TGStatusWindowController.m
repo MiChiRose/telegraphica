@@ -1,6 +1,7 @@
 #import "TGStatusWindowController.h"
 #import "TGActiveSessionsPresentation.h"
 #import "TGChatDisplayPreferences.h"
+#import "TGChatLifecycleWindowController.h"
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
@@ -201,7 +202,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) NSView *conversationPanelView;
@@ -238,6 +239,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGGroupedCardView *settingsFilesCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsHelpCardView;
 @property (nonatomic, retain) TGStorageUsageWindowController *storageUsageWindowController;
+@property (nonatomic, retain) TGChatLifecycleWindowController *chatLifecycleWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
@@ -253,6 +255,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *loadMessagesButton;
 @property (nonatomic, retain) NSButton *loadOlderMessagesButton;
 @property (nonatomic, retain) NSButton *chatSearchButton;
+@property (nonatomic, retain) NSButton *composeChatButton;
 @property (nonatomic, retain) NSButton *conversationSearchButton;
 @property (nonatomic, retain) NSButton *mediaCenterButton;
 @property (nonatomic, retain) TGGroupedCardView *searchPanelView;
@@ -692,6 +695,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize loadMessagesButton = _loadMessagesButton;
 @synthesize loadOlderMessagesButton = _loadOlderMessagesButton;
 @synthesize chatSearchButton = _chatSearchButton;
+@synthesize composeChatButton = _composeChatButton;
 @synthesize conversationSearchButton = _conversationSearchButton;
 @synthesize mediaCenterButton = _mediaCenterButton;
 @synthesize searchPanelView = _searchPanelView;
@@ -990,6 +994,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messageContextMenu = _messageContextMenu;
 @synthesize chatContextMenu = _chatContextMenu;
 @synthesize chatsNavigationContextMenu = _chatsNavigationContextMenu;
+@synthesize chatLifecycleWindowController = _chatLifecycleWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -1528,9 +1533,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self selectLanguagePopUpItemForCode:TGLanguageCode()];
     [self updateSavedMessagesPresentationForChatItems];
     [self refreshLoginLanguageButtons];
-    if ([[self.chatsNavigationContextMenu itemArray] count] > 0) {
-        [[[self.chatsNavigationContextMenu itemArray] objectAtIndex:0] setTitle:TGLoc(@"chat.readAll")];
+    NSArray *chatMenuItems = [self.chatsNavigationContextMenu itemArray];
+    if ([chatMenuItems count] >= 4) {
+        [[chatMenuItems objectAtIndex:0] setTitle:TGLoc(@"contacts.newChat")];
+        [[chatMenuItems objectAtIndex:1] setTitle:TGLoc(@"contacts.joinByLink")];
+        [[chatMenuItems objectAtIndex:3] setTitle:TGLoc(@"chat.readAll")];
     }
+    [self.composeChatButton setToolTip:TGLoc(@"contacts.newChat")];
 
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
@@ -1987,6 +1996,18 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [navigationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         if (navigationTags[navigationIndex] == 0) {
             NSMenu *readAllMenu = [[[NSMenu alloc] initWithTitle:@"Chats"] autorelease];
+            NSMenuItem *newChatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"contacts.newChat")
+                                                                  action:@selector(openNewChatWindow:)
+                                                           keyEquivalent:@"n"] autorelease];
+            [newChatItem setKeyEquivalentModifierMask:NSCommandKeyMask];
+            [newChatItem setTarget:self];
+            [readAllMenu addItem:newChatItem];
+            NSMenuItem *joinItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"contacts.joinByLink")
+                                                               action:@selector(openJoinChatWindow:)
+                                                        keyEquivalent:@""] autorelease];
+            [joinItem setTarget:self];
+            [readAllMenu addItem:joinItem];
+            [readAllMenu addItem:[NSMenuItem separatorItem]];
             NSMenuItem *readAllItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.readAll")
                                                                    action:@selector(markAllChatsReadFromMenu:)
                                                             keyEquivalent:@""] autorelease];
@@ -2190,6 +2211,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self applyHeaderIconButtonStyle:self.chatSearchButton];
     [self.chatSearchButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.chatSearchButton];
+
+    self.composeChatButton = [[[NSButton alloc] initWithFrame:NSMakeRect(152, 332, 32, 32)] autorelease];
+    [self.composeChatButton setTitle:@"+"];
+    [self.composeChatButton setToolTip:TGLoc(@"contacts.newChat")];
+    [self.composeChatButton setTarget:self];
+    [self.composeChatButton setAction:@selector(openNewChatWindow:)];
+    [self.composeChatButton setEnabled:NO];
+    [self applyHeaderIconButtonStyle:self.composeChatButton];
+    [self.composeChatButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.composeChatButton];
 
     self.mediaCenterButton = [[[TGHeaderActionButton alloc] initWithFrame:NSMakeRect(700, 332, 32, 32)] autorelease];
     [self.mediaCenterButton setTitle:@"media-center"];
@@ -3700,6 +3731,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+MessageMenus.inc"
 
+#include "TGStatusWindowController+ChatLifecycle.inc"
+
 #include "TGStatusWindowController+ChatSearchWindow.inc"
 
 #include "TGStatusWindowController+SearchNavigation.inc"
@@ -3803,6 +3836,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_loadMessagesButton release];
     [_loadOlderMessagesButton release];
     [_chatSearchButton release];
+    [_composeChatButton release];
     [_conversationSearchButton release];
     [_searchPanelView release];
     [_searchTextField release];
@@ -3985,6 +4019,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsCheckUpdatesButton release];
     [_settingsUpdateDotView release];
     [_storageUsageWindowController release];
+    [[_chatLifecycleWindowController window] close];
+    [_chatLifecycleWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_aboutIconView release];

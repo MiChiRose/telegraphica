@@ -522,6 +522,7 @@
         [self.authSecureField setStringValue:@""];
     }
     [self.loadChatsButton setEnabled:NO];
+    [self.composeChatButton setEnabled:NO];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.loadMessagesButton setEnabled:NO];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -720,6 +721,7 @@
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.chatSearchButton setEnabled:[state isEqualToString:@"ready"]];
+    [self.composeChatButton setEnabled:[state isEqualToString:@"ready"]];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -756,6 +758,7 @@
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.chatSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
+    [self.composeChatButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -773,6 +776,7 @@
         [self.loadChatsButton setEnabled:NO];
         [self.loadMoreChatsButton setEnabled:NO];
         [self.chatSearchButton setEnabled:NO];
+        [self.composeChatButton setEnabled:NO];
         [self.loadMessagesButton setEnabled:NO];
         [self.loadOlderMessagesButton setEnabled:NO];
         [self.conversationSearchButton setEnabled:NO];
