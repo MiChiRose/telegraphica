@@ -7398,10 +7398,39 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
-    [formattedText setObject:@"formattedText" forKey:@"@type"];
-    [formattedText setObject:text forKey:@"text"];
-    [formattedText setObject:[NSArray array] forKey:@"entities"];
+    NSString *formatSentinel = @"\u2063";
+    NSDictionary *formattedText = nil;
+    if ([text hasPrefix:formatSentinel]) {
+        NSString *markdownText = [text substringFromIndex:[formatSentinel length]];
+        NSDictionary *parseMode = [NSDictionary dictionaryWithObjectsAndKeys:
+                                   @"textParseModeMarkdown", @"@type",
+                                   [NSNumber numberWithInt:2], @"version",
+                                   nil];
+        NSDictionary *parseRequest = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      @"parseTextEntities", @"@type",
+                                      markdownText, @"text",
+                                      parseMode, @"parse_mode",
+                                      nil];
+        NSError *parseError = nil;
+        formattedText = [self sendTDLibRequestAndWaitForExtra:parseRequest
+                                                  extraPrefix:@"telegraphica-parse-composer-formatting"
+                                                      timeout:MIN(timeout, 4.0)
+                                                    errorCode:227
+                                                        error:&parseError];
+        if (![[formattedText objectForKey:@"@type"] isEqualToString:@"formattedText"]) {
+            if (error) {
+                *error = parseError ? parseError :
+                    [self errorWithDescription:@"TDLib could not parse the selected text formatting." code:228];
+            }
+            return nil;
+        }
+    } else {
+        formattedText = [NSDictionary dictionaryWithObjectsAndKeys:
+                         @"formattedText", @"@type",
+                         text, @"text",
+                         [NSArray array], @"entities",
+                         nil];
+    }
 
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
     [content setObject:@"inputMessageText" forKey:@"@type"];

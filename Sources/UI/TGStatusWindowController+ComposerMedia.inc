@@ -2586,6 +2586,29 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                  keyEquivalent:@""] autorelease];
     [attachItem setTarget:self];
     [menu addItem:attachItem];
+    NSMenuItem *formatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format")
+                                                        action:nil
+                                                 keyEquivalent:@""] autorelease];
+    NSMenu *formatMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"composer.format")] autorelease];
+    NSArray *formatTypes = [NSArray arrayWithObjects:
+                            [NSArray arrayWithObjects:TGLoc(@"composer.format.bold"), @"*", nil],
+                            [NSArray arrayWithObjects:TGLoc(@"composer.format.italic"), @"_", nil],
+                            [NSArray arrayWithObjects:TGLoc(@"composer.format.underline"), @"__", nil],
+                            [NSArray arrayWithObjects:TGLoc(@"composer.format.strike"), @"~", nil],
+                            [NSArray arrayWithObjects:TGLoc(@"composer.format.spoiler"), @"||", nil],
+                            [NSArray arrayWithObjects:TGLoc(@"composer.format.code"), @"`", nil],
+                            nil];
+    NSArray *formatType = nil;
+    for (formatType in formatTypes) {
+        NSMenuItem *item = [[[NSMenuItem alloc] initWithTitle:[formatType objectAtIndex:0]
+                                                       action:@selector(applyComposerFormatting:)
+                                                keyEquivalent:@""] autorelease];
+        [item setRepresentedObject:[formatType objectAtIndex:1]];
+        [item setTarget:self];
+        [formatMenu addItem:item];
+    }
+    [formatItem setSubmenu:formatMenu];
+    [menu addItem:formatItem];
     NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"poll.create.menu")
                                                       action:@selector(createPollFromComposerMenu:)
                                                keyEquivalent:@""] autorelease];
@@ -2594,6 +2617,36 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [menu popUpMenuPositioningItem:nil
                         atLocation:NSMakePoint(0.0, NSHeight([self.attachPhotoButton bounds]) + 2.0)
                             inView:self.attachPhotoButton];
+}
+
+- (void)applyComposerFormatting:(id)sender {
+    NSString *marker = [sender representedObject];
+    NSText *editor = [self.sendTextField currentEditor];
+    if (![marker isKindOfClass:[NSString class]] || ![editor isKindOfClass:[NSTextView class]]) {
+        [[self window] makeFirstResponder:self.sendTextField];
+        editor = [self.sendTextField currentEditor];
+    }
+    if (![editor isKindOfClass:[NSTextView class]]) {
+        return;
+    }
+    NSTextView *textView = (NSTextView *)editor;
+    NSRange selection = [textView selectedRange];
+    NSString *currentText = [textView string];
+    if (selection.length == 0 || NSMaxRange(selection) > [currentText length]) {
+        [self.statusField setStringValue:TGLoc(@"composer.format.select")];
+        return;
+    }
+    NSString *selectedText = [currentText substringWithRange:selection];
+    NSString *replacement = [NSString stringWithFormat:@"%@%@%@", marker, selectedText, marker];
+    [textView replaceCharactersInRange:selection withString:replacement];
+    NSString *sentinel = @"\u2063";
+    if (![[textView string] hasPrefix:sentinel]) {
+        [textView replaceCharactersInRange:NSMakeRange(0, 0) withString:sentinel];
+        selection.location += [sentinel length];
+    }
+    [textView setSelectedRange:NSMakeRange(selection.location + [marker length], selection.length)];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
 }
 
 - (void)sendMessage:(id)sender {
@@ -2609,6 +2662,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     if ([trimmedText length] == 0) {
         [self appendDetail:@"Message text is empty."];
         [self updateSendControls];
+        return;
+    }
+    if ([text hasPrefix:@"\u2063"] && [text length] > 4096) {
+        [self.statusField setStringValue:TGLoc(@"composer.format.tooLong")];
         return;
     }
     NSNumber *chatID = [self.selectedChatID retain];
