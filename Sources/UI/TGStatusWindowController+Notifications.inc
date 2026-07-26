@@ -365,7 +365,7 @@
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
         NSButton *button = [self.navigationButtons objectAtIndex:index];
-        if ([button tag] != 0 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
+        if ([button tag] != 2 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
             continue;
         }
         [(TGNavigationButtonCell *)[button cell] setBadgeText:badge];
@@ -379,7 +379,7 @@
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
         NSButton *button = [self.navigationButtons objectAtIndex:index];
-        if ([button tag] != 2 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
+        if ([button tag] != 3 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
             continue;
         }
         [(TGNavigationButtonCell *)[button cell] setBadgeText:badgeText];

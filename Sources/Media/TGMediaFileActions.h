@@ -6,6 +6,10 @@
 + (NSString *)saveCopyOfFileAtPath:(NSString *)sourcePath
                  suggestedFileName:(NSString *)suggestedFileName
                              error:(NSError **)error;
++ (NSString *)saveCopyOfFileAtPath:(NSString *)sourcePath
+                 suggestedFileName:(NSString *)suggestedFileName
+                       toDirectory:(NSString *)directoryPath
+                             error:(NSError **)error;
 + (BOOL)revealFileAtPath:(NSString *)path;
 
 @end

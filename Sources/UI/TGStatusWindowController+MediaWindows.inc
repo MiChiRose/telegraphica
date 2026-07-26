@@ -260,6 +260,26 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     return TGMediaCenterThumbnailForItem(item);
 }
 
+- (NSString *)mediaCenterSavedPathForItem:(TGMessageItem *)item {
+    NSNumber *fileID = TGMediaCenterFileIDForItem(item);
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        return nil;
+    }
+    NSString *path = [self.mediaCenterSavedPathsByFileID objectForKey:fileID];
+    if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        return path;
+    }
+    if ([path length] > 0) {
+        [self.mediaCenterSavedPathsByFileID removeObjectForKey:fileID];
+    }
+    return nil;
+}
+
+- (NSString *)mediaCenterPreferredPathForItem:(TGMessageItem *)item {
+    NSString *savedPath = [self mediaCenterSavedPathForItem:item];
+    return [savedPath length] > 0 ? savedPath : TGMediaCenterLocalPathForItem(item);
+}
+
 - (NSMenu *)mediaCenterContextMenuForIndex:(NSUInteger)index {
     NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
     TGMessageItem *item = nil;
@@ -275,6 +295,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSNumber *fileID = TGMediaCenterFileIDForItem(item);
     BOOL hasFileID = ([fileID respondsToSelector:@selector(integerValue)] && [fileID integerValue] > 0);
     BOOL downloading = (hasFileID && [self.mediaCenterDownloadingFileIDs containsObject:fileID]);
+    BOOL hasSavedFile = ([[self mediaCenterSavedPathForItem:item] length] > 0);
+    BOOL hasPreferredFile = (hasLocalFile || hasSavedFile);
 
     NSMenuItem *previewItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"media.center.preview")
                                                          action:@selector(previewMediaCenterItem:)
@@ -288,7 +310,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                 keyEquivalent:@""] autorelease];
     [openItem setTarget:self];
     [openItem setTag:(NSInteger)index];
-    [openItem setEnabled:hasLocalFile];
+    [openItem setEnabled:hasPreferredFile];
     [menu addItem:openItem];
 
     NSMenuItem *downloadItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(downloading ? @"media.center.cancelDownload" : @"media.center.download")
@@ -296,7 +318,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                     keyEquivalent:@""] autorelease];
     [downloadItem setTarget:self];
     [downloadItem setTag:(NSInteger)index];
-    [downloadItem setEnabled:(hasFileID && (!hasLocalFile || downloading))];
+    [downloadItem setEnabled:(hasFileID && (!hasSavedFile || downloading))];
     [menu addItem:downloadItem];
 
     NSMenuItem *saveItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"media.center.saveAs")
@@ -312,7 +334,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                   keyEquivalent:@""] autorelease];
     [revealItem setTarget:self];
     [revealItem setTag:(NSInteger)index];
-    [revealItem setEnabled:hasLocalFile];
+    [revealItem setEnabled:hasPreferredFile];
     [menu addItem:revealItem];
 
     [menu addItem:[NSMenuItem separatorItem]];
@@ -1195,8 +1217,10 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         return;
     }
     NSNumber *fileIDCopy = [fileID retain];
+    NSString *suggestedFileName = [TGMediaCenterTitleForItem(item) copy];
     if ([self.mediaCenterDownloadingFileIDs containsObject:fileIDCopy]) {
         [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.alreadyDownloading")];
+        [suggestedFileName release];
         [fileIDCopy release];
         return;
     }
@@ -1208,17 +1232,29 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *error = nil;
         NSString *path = [[client downloadedLocalPathForFileID:fileIDCopy timeout:18.0 error:&error] copy];
+        NSString *savedPath = nil;
+        if ([path length] > 0) {
+            savedPath = [[TGMediaFileActions saveCopyOfFileAtPath:path
+                                               suggestedFileName:suggestedFileName
+                                                     toDirectory:TGConfiguredDownloadFolderPath()
+                                                           error:&error] copy];
+        }
         NSString *message = [[error localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             [self.mediaCenterDownloadingFileIDs removeObject:fileIDCopy];
-            if ([path length] > 0) {
-                [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.downloaded"), [path lastPathComponent]]];
+            if ([savedPath length] > 0) {
+                [self.mediaCenterSavedPathsByFileID setObject:savedPath forKey:fileIDCopy];
+                [self.mediaCenterStatusField setStringValue:
+                 [NSString stringWithFormat:TGLoc(@"media.center.downloadedTo"),
+                  TGDisplayPathForDownloadFolder(savedPath)]];
             } else {
                 [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.downloadFailed"), ([message length] > 0 ? message : @"TDLib did not return a local path.")]];
             }
             [self rebuildMediaCenterRows];
+            [savedPath release];
             [path release];
             [message release];
+            [suggestedFileName release];
             [fileIDCopy release];
             [client release];
         });
@@ -1324,7 +1360,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 
 - (void)revealMediaCenterItem:(id)sender {
     TGMessageItem *item = [self mediaCenterItemForSender:sender];
-    NSString *path = TGMediaCenterLocalPathForItem(item);
+    NSString *path = [self mediaCenterPreferredPathForItem:item];
     if (![TGMediaFileActions revealFileAtPath:path]) {
         [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.revealFailed")];
     }
@@ -1332,7 +1368,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 
 - (void)openMediaCenterItem:(id)sender {
     TGMessageItem *item = [self mediaCenterItemForSender:sender];
-    NSString *path = TGMediaCenterLocalPathForItem(item);
+    NSString *path = [self mediaCenterPreferredPathForItem:item];
     if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
         [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.downloadBeforeOpen")];
         return;

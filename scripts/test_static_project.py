@@ -443,9 +443,11 @@ def check_media_file_management_contract(errors):
     for fragment in [
         "confirmDeleteLocalCopyWithFileName:",
         "saveCopyOfFileAtPath:",
+        "toDirectory:",
         "NSSavePanel",
         "selectFile:path",
         "copyItemAtPath:sourcePath",
+        "createDirectoryAtPath:directoryPath",
     ]:
         if fragment not in actions_text:
             errors.append("%s: focused local file action is missing `%s`" %
@@ -459,6 +461,9 @@ def check_media_file_management_contract(errors):
         "saveMediaCenterItemAs:",
         "revealMediaCenterItem:",
         "deleteCachedFileForFileID:",
+        "TGConfiguredDownloadFolderPath()",
+        "mediaCenterSavedPathsByFileID",
+        'TGLoc(@"media.center.downloadedTo")',
     ]:
         if fragment not in media_text:
             errors.append("%s: Media Center file action routing is missing `%s`" %
@@ -466,6 +471,35 @@ def check_media_file_management_contract(errors):
     if "removeItemAtPath:path error:&error" in media_text:
         errors.append("%s: Media Center must delete cached files through TDLib, not unlink cache paths directly" %
                       media_rel)
+
+
+def check_primary_navigation_contract(errors):
+    controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    for fragment in [
+        'arrayWithObjects:@"Contacts", @"Calls", @"Chats", @"Settings", nil',
+        "NSInteger navigationTags[] = {0, 1, 2, 3}",
+        "TGSectionContacts",
+        "TGSectionCalls",
+        "contactsViewController",
+        "callsPlaceholderView",
+        "settingsProfileButton",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: four-section navigation contract is missing `%s`" %
+                          (controller_rel, fragment))
+
+    contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
+    contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    for fragment in [
+        "contactSummariesWithTimeout:",
+        "privateChatIDForUserID:",
+        "applySearchFilter",
+        "contactsViewControllerDidRequestNewConversation:",
+    ]:
+        if fragment not in contacts_text:
+            errors.append("%s: contacts section is missing `%s`" %
+                          (contacts_rel, fragment))
 
 
 def main():
@@ -484,6 +518,7 @@ def main():
     check_composer_formatting_contract(errors)
     check_additional_message_types_contract(errors)
     check_media_file_management_contract(errors)
+    check_primary_navigation_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

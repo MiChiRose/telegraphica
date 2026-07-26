@@ -92,6 +92,11 @@
         [self showView:[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] visible:showLogin];
     }
 
+    BOOL showContacts = (ready && [section isEqualToString:TGSectionContacts]);
+    BOOL showCalls = (ready && [section isEqualToString:TGSectionCalls]);
+    [self showView:[self.contactsViewController view] visible:showContacts];
+    [self showView:self.callsPlaceholderView visible:showCalls];
+
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
                                  [self.workshopViewController hasActiveModule]);
@@ -213,6 +218,10 @@
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
     [self showView:self.settingsScrollView visible:showSettings];
+    [self showView:self.settingsProfileCardView visible:showSettings];
+    [self showView:self.settingsProfileSectionField visible:showSettings];
+    [self showView:self.settingsProfileDetailField visible:showSettings];
+    [self showView:self.settingsProfileButton visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
     [self showView:self.settingsResourceCardView visible:showSettings];
@@ -390,6 +399,14 @@
     [self.profilePanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    [[self.contactsViewController view] setFrame:NSMakeRect(mainX,
+                                                            mainY + 80.0,
+                                                            mainWidth,
+                                                            MAX(220.0, mainHeight - 80.0))];
+    [self.callsPlaceholderView setFrame:NSMakeRect(mainX,
+                                                   mainY + 80.0,
+                                                   mainWidth,
+                                                   MAX(220.0, mainHeight - 80.0))];
     [[self.workshopViewController view] setFrame:NSMakeRect(mainX,
                                                             mainY + 72.0,
                                                             mainWidth,
@@ -466,9 +483,12 @@
     CGFloat bottomNavigationButtonGap = 6.0;
     CGFloat bottomNavigationButtonHeight = 48.0;
     CGFloat bottomNavigationButtonY = bottomNavigationY + floor((bottomNavigationHeight - bottomNavigationButtonHeight) / 2.0);
-    CGFloat bottomNavigationButtonWidth = floor((bottomNavigationWidth - 16.0 - (bottomNavigationButtonGap * 2.0)) / 3.0);
-    if (bottomNavigationButtonWidth < 58.0) {
-        bottomNavigationButtonWidth = 58.0;
+    NSUInteger bottomNavigationButtonCount = MAX((NSUInteger)1, [self.navigationButtons count]);
+    CGFloat bottomNavigationButtonWidth = floor((bottomNavigationWidth - 16.0 -
+                                                  (bottomNavigationButtonGap * (bottomNavigationButtonCount - 1))) /
+                                                 bottomNavigationButtonCount);
+    if (bottomNavigationButtonWidth < 48.0) {
+        bottomNavigationButtonWidth = 48.0;
     }
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
@@ -477,7 +497,7 @@
                                               bottomNavigationButtonY,
                                               bottomNavigationButtonWidth,
                                               bottomNavigationButtonHeight)];
-        if (navigationIndex == 0 && self.markAllChatsReadSpinner) {
+        if (navigationIndex == 2 && self.markAllChatsReadSpinner) {
             [self.markAllChatsReadSpinner setFrame:NSMakeRect(buttonX + bottomNavigationButtonWidth - 22.0,
                                                               bottomNavigationButtonY + 6.0,
                                                               14.0,
@@ -1012,6 +1032,7 @@
     CGFloat settingsLabelGap = 7.0;
     CGFloat settingsGroupGap = 12.0;
     CGFloat settingsBottomPadding = 58.0;
+    CGFloat profileCardHeight = 72.0;
     CGFloat notificationCardHeight = 140.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
@@ -1020,6 +1041,7 @@
     CGFloat filesCardHeight = 140.0;
     CGFloat helpCardHeight = 112.0;
     CGFloat settingsDocHeight = 18.0;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
@@ -1049,6 +1071,25 @@
     CGFloat rowLeft = settingsGroupedX + 22.0;
     CGFloat rowWidth = settingsGroupedWidth - 44.0;
     CGFloat settingsNextY = 18.0;
+
+    [self.settingsProfileSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat profileCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsProfileCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      profileCardY,
+                                                      settingsGroupedWidth,
+                                                      profileCardHeight)];
+    [self.settingsProfileDetailField setFrame:NSMakeRect(rowLeft,
+                                                         profileCardY + 12.0,
+                                                         MAX(120.0, rowWidth - 210.0),
+                                                         42.0)];
+    [self.settingsProfileButton setFrame:NSMakeRect(NSMaxX([self.settingsProfileCardView frame]) - 200.0,
+                                                    profileCardY + 21.0,
+                                                    178.0,
+                                                    30.0)];
+    settingsNextY = profileCardY + profileCardHeight + settingsGroupGap;
 
     [self.settingsStateField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat notificationCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;

@@ -51,7 +51,20 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 
 static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
-    if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
+    if ([title isEqualToString:@"Contacts"] || [title isEqualToString:@"Контакты"] || [title isEqualToString:@"Кантакты"]) {
+        TGDrawTemplateIconAsset(@"contacts", iconRect, color, 1.0, flipped);
+    } else if ([title isEqualToString:@"Calls"] || [title isEqualToString:@"Звонки"] || [title isEqualToString:@"Званкі"]) {
+        NSBezierPath *receiver = [NSBezierPath bezierPath];
+        [receiver setLineWidth:3.0];
+        [receiver setLineCapStyle:NSRoundLineCapStyle];
+        [receiver moveToPoint:TGIconPoint(iconRect, 4.0, 14.5, flipped)];
+        [receiver curveToPoint:TGIconPoint(iconRect, 14.5, 4.0, flipped)
+                controlPoint1:TGIconPoint(iconRect, 5.0, 8.4, flipped)
+                controlPoint2:TGIconPoint(iconRect, 10.0, 3.6, flipped)];
+        [receiver stroke];
+        TGStrokeLine(TGIconPoint(iconRect, 3.4, 14.8, flipped), TGIconPoint(iconRect, 6.2, 16.0, flipped), 2.2);
+        TGStrokeLine(TGIconPoint(iconRect, 13.8, 2.8, flipped), TGIconPoint(iconRect, 15.2, 5.7, flipped), 2.2);
+    } else if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
         TGDrawTemplateIconAsset(@"chat", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Profile"] || [title isEqualToString:@"Профиль"] || [title isEqualToString:@"Профіль"]) {
         TGDrawTemplateIconAsset(@"user", iconRect, color, 1.0, flipped);
