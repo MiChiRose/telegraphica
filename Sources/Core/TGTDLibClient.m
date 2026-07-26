@@ -199,7 +199,7 @@ static BOOL TGPreviewLooksLikePlainMediaLabel(NSString *preview) {
     return NO;
 }
 
-static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
+static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *message = [[error localizedDescription] lowercaseString];
     if ([message length] == 0) {
         return NO;
@@ -338,8 +338,21 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                               timeout:(NSTimeInterval)timeout
                             errorCode:(NSInteger)errorCode
                                 error:(NSError **)error;
+- (NSMutableDictionary *)requestByApplyingReplyToMessageID:(NSNumber *)replyToMessageID
+                                                    request:(NSDictionary *)request
+                                              currentSchema:(BOOL)currentSchema;
+- (NSString *)sendStructuredMessageToChatID:(NSNumber *)chatID
+                             messageThreadID:(NSNumber *)messageThreadID
+                            messageTopicKind:(NSString *)messageTopicKind
+                              currentContent:(NSDictionary *)currentContent
+                               legacyContent:(NSDictionary *)legacyContent
+                            replyToMessageID:(NSNumber *)replyToMessageID
+                                       label:(NSString *)label
+                                     timeout:(NSTimeInterval)timeout
+                                       error:(NSError **)error;
 - (NSDictionary *)formattedCaptionForSendCaption:(NSString *)caption;
 - (NSDictionary *)inputFileLocalForPath:(NSString *)path;
+- (NSDictionary *)inputAnimationForInputFile:(NSDictionary *)inputFile;
 - (NSDictionary *)photoInputMessageContentForInputFile:(NSDictionary *)inputFile caption:(NSDictionary *)formattedCaption width:(NSNumber *)width height:(NSNumber *)height currentSchema:(BOOL)currentSchema;
 - (NSDictionary *)genericInputMessageContentForInputFile:(NSDictionary *)inputFile contentType:(NSString *)contentType caption:(NSDictionary *)formattedCaption currentSchema:(BOOL)currentSchema;
 - (BOOL)validateLocalSendFilePath:(NSString *)localPath label:(NSString *)label outPath:(NSString **)outPath error:(NSError **)error code:(NSInteger)code;
@@ -7802,6 +7815,185 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return response;
 }
 
+- (NSString *)sendStructuredMessageToChatID:(NSNumber *)chatID
+                             messageThreadID:(NSNumber *)messageThreadID
+                            messageTopicKind:(NSString *)messageTopicKind
+                              currentContent:(NSDictionary *)currentContent
+                               legacyContent:(NSDictionary *)legacyContent
+                            replyToMessageID:(NSNumber *)replyToMessageID
+                                       label:(NSString *)label
+                                     timeout:(NSTimeInterval)timeout
+                                       error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:176];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            *error = [self errorWithDescription:
+                      [NSString stringWithFormat:@"TDLib is not ready to send %@. Current auth state: %@",
+                       [label lowercaseString], authorizationState ? authorizationState : @"unknown"]
+                                               code:177];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *baseRequest = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                        @"sendMessage", @"@type",
+                                        chatID, @"chat_id",
+                                        currentContent, @"input_message_content",
+                                        nil];
+    NSMutableDictionary *request = [self requestByApplyingReplyToMessageID:replyToMessageID
+                                                                   request:baseRequest
+                                                             currentSchema:YES];
+    NSError *sendError = nil;
+    NSDictionary *response = [self sendMessageRequest:request
+                                      messageThreadID:messageThreadID
+                                     messageTopicKind:messageTopicKind
+                                          extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@", [label lowercaseString]]
+                                              timeout:timeout
+                                            errorCode:178
+                                                error:&sendError];
+
+    BOOL hasReply = ([replyToMessageID respondsToSelector:@selector(longLongValue)] &&
+                     [replyToMessageID longLongValue] > 0);
+    if (!response && hasReply && TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
+        request = [self requestByApplyingReplyToMessageID:replyToMessageID
+                                                  request:baseRequest
+                                            currentSchema:NO];
+        sendError = nil;
+        response = [self sendMessageRequest:request
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-legacy-reply", [label lowercaseString]]
+                                    timeout:timeout
+                                  errorCode:178
+                                      error:&sendError];
+    }
+
+    if (!response && legacyContent && TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
+        NSMutableDictionary *legacyBaseRequest = [NSMutableDictionary dictionaryWithDictionary:baseRequest];
+        [legacyBaseRequest setObject:legacyContent forKey:@"input_message_content"];
+        request = [self requestByApplyingReplyToMessageID:replyToMessageID
+                                                  request:legacyBaseRequest
+                                            currentSchema:!hasReply];
+        sendError = nil;
+        response = [self sendMessageRequest:request
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:[NSString stringWithFormat:@"telegraphica-send-%@-legacy-content", [label lowercaseString]]
+                                    timeout:timeout
+                                  errorCode:178
+                                      error:&sendError];
+    }
+    if (!response) {
+        if (error) {
+            *error = sendError ? sendError :
+                [self errorWithDescription:[NSString stringWithFormat:@"TDLib did not confirm %@ send.", [label lowercaseString]]
+                                      code:178];
+        }
+        return nil;
+    }
+    if (![[response objectForKey:@"@type"] isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:
+                      [NSString stringWithFormat:@"TDLib %@ send returned an unexpected response.", [label lowercaseString]]
+                                               code:179];
+        }
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%@ submitted", [label lowercaseString]];
+}
+
+- (NSString *)sendContactMessageToChatID:(NSNumber *)chatID
+                          messageThreadID:(NSNumber *)messageThreadID
+                         messageTopicKind:(NSString *)messageTopicKind
+                               firstName:(NSString *)firstName
+                                lastName:(NSString *)lastName
+                             phoneNumber:(NSString *)phoneNumber
+                        replyToMessageID:(NSNumber *)replyToMessageID
+                                 timeout:(NSTimeInterval)timeout
+                                   error:(NSError **)error {
+    NSString *safeFirstName = [firstName isKindOfClass:[NSString class]] ?
+        [firstName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"";
+    NSString *safeLastName = [lastName isKindOfClass:[NSString class]] ?
+        [lastName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"";
+    NSString *safePhone = [phoneNumber isKindOfClass:[NSString class]] ?
+        [phoneNumber stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] : @"";
+    if ([safeFirstName length] == 0 || [safePhone length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Contact first name and phone number are required." code:180];
+        }
+        return nil;
+    }
+    NSDictionary *contact = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"contact", @"@type",
+                             safePhone, @"phone_number",
+                             safeFirstName, @"first_name",
+                             safeLastName, @"last_name",
+                             @"", @"vcard",
+                             [NSNumber numberWithLongLong:0], @"user_id",
+                             nil];
+    NSDictionary *content = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"inputMessageContact", @"@type",
+                             contact, @"contact",
+                             nil];
+    return [self sendStructuredMessageToChatID:chatID
+                                messageThreadID:messageThreadID
+                               messageTopicKind:messageTopicKind
+                                 currentContent:content
+                                  legacyContent:content
+                               replyToMessageID:replyToMessageID
+                                          label:@"Contact"
+                                        timeout:timeout
+                                          error:error];
+}
+
+- (NSString *)sendLocationMessageToChatID:(NSNumber *)chatID
+                           messageThreadID:(NSNumber *)messageThreadID
+                          messageTopicKind:(NSString *)messageTopicKind
+                                  latitude:(double)latitude
+                                 longitude:(double)longitude
+                          replyToMessageID:(NSNumber *)replyToMessageID
+                                   timeout:(NSTimeInterval)timeout
+                                     error:(NSError **)error {
+    if (latitude < -90.0 || latitude > 90.0 || longitude < -180.0 || longitude > 180.0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Location coordinates are outside the allowed range." code:181];
+        }
+        return nil;
+    }
+    NSDictionary *location = [NSDictionary dictionaryWithObjectsAndKeys:
+                              @"location", @"@type",
+                              [NSNumber numberWithDouble:latitude], @"latitude",
+                              [NSNumber numberWithDouble:longitude], @"longitude",
+                              [NSNumber numberWithDouble:0.0], @"horizontal_accuracy",
+                              nil];
+    NSDictionary *currentContent = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    @"inputMessageLocation", @"@type",
+                                    location, @"location",
+                                    nil];
+    NSDictionary *legacyContent = [NSDictionary dictionaryWithObjectsAndKeys:
+                                   @"inputMessageLocation", @"@type",
+                                   location, @"location",
+                                   [NSNumber numberWithInt:0], @"live_period",
+                                   [NSNumber numberWithInt:0], @"heading",
+                                   [NSNumber numberWithInt:0], @"proximity_alert_radius",
+                                   nil];
+    return [self sendStructuredMessageToChatID:chatID
+                                messageThreadID:messageThreadID
+                               messageTopicKind:messageTopicKind
+                                 currentContent:currentContent
+                                  legacyContent:legacyContent
+                               replyToMessageID:replyToMessageID
+                                          label:@"Location"
+                                        timeout:timeout
+                                          error:error];
+}
+
 - (NSString *)sendPhotoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self sendPhotoMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption replyToMessageID:nil timeout:timeout error:error];
 }
@@ -7878,7 +8070,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                               timeout:timeout
                                             errorCode:67
                                                 error:&sendError];
-    if (!response && [replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+    if (!response &&
+        [replyToMessageID respondsToSelector:@selector(longLongValue)] &&
+        [replyToMessageID longLongValue] > 0 &&
+        TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         sendError = nil;
         NSMutableDictionary *legacyReplyRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:request currentSchema:NO];
         response = [self sendMessageRequest:legacyReplyRequest
@@ -7889,7 +8084,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                   errorCode:67
                                       error:&sendError];
     }
-    if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
+    if (!response && TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSDictionary *inputPhoto = [NSDictionary dictionaryWithObjectsAndKeys:
                                     @"inputPhoto", @"@type",
                                     inputFile, @"photo",
@@ -8045,7 +8240,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                               timeout:timeout
                                             errorCode:107
                                                 error:&sendError];
-    if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
+    if (!response && TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         acceptedSchema = @"legacy";
         NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionary];
         [legacyRequest setObject:@"sendMessageAlbum" forKey:@"@type"];
@@ -8159,6 +8354,18 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
             nil];
 }
 
+- (NSDictionary *)inputAnimationForInputFile:(NSDictionary *)inputFile {
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            @"inputAnimation", @"@type",
+            inputFile, @"animation",
+            [NSNull null], @"thumbnail",
+            [NSArray array], @"added_sticker_file_ids",
+            [NSNumber numberWithInt:0], @"duration",
+            [NSNumber numberWithInt:0], @"width",
+            [NSNumber numberWithInt:0], @"height",
+            nil];
+}
+
 - (NSDictionary *)inputAudioForInputFile:(NSDictionary *)inputFile duration:(NSNumber *)duration {
     return [NSDictionary dictionaryWithObjectsAndKeys:
             @"inputAudio", @"@type",
@@ -8184,7 +8391,22 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                  caption:(NSDictionary *)formattedCaption
                                           currentSchema:(BOOL)currentSchema {
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
-    if ([contentType isEqualToString:@"inputMessageVideo"]) {
+    if ([contentType isEqualToString:@"inputMessageAnimation"]) {
+        [content setObject:@"inputMessageAnimation" forKey:@"@type"];
+        [content setObject:(currentSchema ? [self inputAnimationForInputFile:inputFile] : inputFile)
+                    forKey:@"animation"];
+        [content setObject:formattedCaption forKey:@"caption"];
+        if (currentSchema) {
+            [content setObject:[NSNumber numberWithBool:NO] forKey:@"show_caption_above_media"];
+            [content setObject:[NSNumber numberWithBool:NO] forKey:@"has_spoiler"];
+        } else {
+            [content setObject:[NSNull null] forKey:@"thumbnail"];
+            [content setObject:[NSArray array] forKey:@"added_sticker_file_ids"];
+            [content setObject:[NSNumber numberWithInt:0] forKey:@"duration"];
+            [content setObject:[NSNumber numberWithInt:0] forKey:@"width"];
+            [content setObject:[NSNumber numberWithInt:0] forKey:@"height"];
+        }
+    } else if ([contentType isEqualToString:@"inputMessageVideo"]) {
         [content setObject:@"inputMessageVideo" forKey:@"@type"];
         [content setObject:(currentSchema ? [self inputVideoForInputFile:inputFile] : inputFile) forKey:@"video"];
         [content setObject:formattedCaption forKey:@"caption"];
@@ -8296,7 +8518,10 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                               timeout:timeout
                                             errorCode:71
                                                 error:&sendError];
-    if (!response && [replyToMessageID respondsToSelector:@selector(longLongValue)] && [replyToMessageID longLongValue] > 0) {
+    if (!response &&
+        [replyToMessageID respondsToSelector:@selector(longLongValue)] &&
+        [replyToMessageID longLongValue] > 0 &&
+        TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         sendError = nil;
         NSMutableDictionary *legacyReplyRequest = [self requestByApplyingReplyToMessageID:replyToMessageID request:request currentSchema:NO];
         response = [self sendMessageRequest:legacyReplyRequest
@@ -8307,7 +8532,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                   errorCode:71
                                       error:&sendError];
     }
-    if (!response && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
+    if (!response && TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSDictionary *currentContent = [self genericInputMessageContentForInputFile:inputFile
                                                                         contentType:contentType
                                                                             caption:formattedCaption
@@ -8323,7 +8548,9 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                   errorCode:71
                                       error:&sendError];
     }
-    if (!response && ![contentType isEqualToString:@"inputMessageDocument"]) {
+    if (!response &&
+        ![contentType isEqualToString:@"inputMessageDocument"] &&
+        TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSDictionary *documentContent = [self genericInputMessageContentForInputFile:inputFile
                                                                          contentType:@"inputMessageDocument"
                                                                              caption:formattedCaption
@@ -8339,7 +8566,7 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                   errorCode:71
                                       error:&sendError];
     }
-    if (!response && ![contentType isEqualToString:@"inputMessageDocument"] && TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(sendError)) {
+    if (!response && ![contentType isEqualToString:@"inputMessageDocument"] && TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
         NSDictionary *currentDocumentContent = [self genericInputMessageContentForInputFile:inputFile
                                                                                contentType:@"inputMessageDocument"
                                                                                    caption:formattedCaption
@@ -8378,6 +8605,19 @@ static BOOL TGTDLibPhotoSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (NSString *)sendDocumentMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self sendGenericFileMessageToChatID:chatID messageThreadID:messageThreadID messageTopicKind:messageTopicKind localPath:localPath caption:caption contentType:@"inputMessageDocument" label:@"Document" replyToMessageID:replyToMessageID timeout:timeout error:error];
+}
+
+- (NSString *)sendAnimationMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendGenericFileMessageToChatID:chatID
+                                messageThreadID:messageThreadID
+                               messageTopicKind:messageTopicKind
+                                      localPath:localPath
+                                        caption:caption
+                                    contentType:@"inputMessageAnimation"
+                                          label:@"Animation"
+                               replyToMessageID:replyToMessageID
+                                        timeout:timeout
+                                          error:error];
 }
 
 - (NSString *)sendVideoMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error {
