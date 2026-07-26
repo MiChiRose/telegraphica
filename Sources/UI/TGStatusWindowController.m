@@ -25,6 +25,7 @@
 #import "../Media/TGAttachmentDescriptor.h"
 #import "../Media/TGFileTransferState.h"
 #import "../Media/TGMediaImageLoader.h"
+#import "../Media/TGMediaFileActions.h"
 #import "../Media/TGMediaItemSupport.h"
 #import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
@@ -304,6 +305,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableDictionary *mediaCenterPaginationAnchorsByFilter;
 @property (nonatomic, retain) NSMutableSet *mediaCenterExhaustedFilterIdentifiers;
 @property (nonatomic, retain) NSMutableSet *mediaCenterSeenKeys;
+@property (nonatomic, retain) NSMutableSet *mediaCenterDownloadingFileIDs;
 @property (nonatomic, assign) NSUInteger mediaCenterGeneration;
 @property (nonatomic, assign) BOOL mediaCenterLoadingMore;
 @property (nonatomic, assign) BOOL mediaCenterExhausted;
@@ -744,6 +746,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaCenterPaginationAnchorsByFilter = _mediaCenterPaginationAnchorsByFilter;
 @synthesize mediaCenterExhaustedFilterIdentifiers = _mediaCenterExhaustedFilterIdentifiers;
 @synthesize mediaCenterSeenKeys = _mediaCenterSeenKeys;
+@synthesize mediaCenterDownloadingFileIDs = _mediaCenterDownloadingFileIDs;
 @synthesize mediaCenterGeneration = _mediaCenterGeneration;
 @synthesize mediaCenterLoadingMore = _mediaCenterLoadingMore;
 @synthesize mediaCenterExhausted = _mediaCenterExhausted;
@@ -1083,6 +1086,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.chatSearchWindowResults = [NSMutableArray array];
         self.chatSearchWindowResultButtons = [NSMutableArray array];
         self.mediaCenterItems = [NSMutableArray array];
+        self.mediaCenterDownloadingFileIDs = [NSMutableSet set];
         self.mediaCenterPaginationAnchorsByFilter = [NSMutableDictionary dictionary];
         self.mediaCenterExhaustedFilterIdentifiers = [NSMutableSet set];
         self.mediaCenterSeenKeys = [NSMutableSet set];
@@ -3878,6 +3882,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaCenterPaginationAnchorsByFilter release];
     [_mediaCenterExhaustedFilterIdentifiers release];
     [_mediaCenterSeenKeys release];
+    [_mediaCenterDownloadingFileIDs release];
     [_pinnedMessagePanelView release];
     [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];

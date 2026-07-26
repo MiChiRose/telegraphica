@@ -423,6 +423,51 @@ def check_additional_message_types_contract(errors):
                           (composer_rel, fragment))
 
 
+def check_media_file_management_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        "cancelDownloadForFileID:",
+        '"cancelDownloadFile"',
+        '"only_if_pending"',
+        "deleteCachedFileForFileID:",
+        '"deleteFile"',
+        "downloadedFileInfoForFileID:fileID timeout:timeout error:error",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: TDLib media file management is missing `%s`" %
+                          (client_rel, fragment))
+
+    actions_rel = os.path.join("Sources", "Media", "TGMediaFileActions.m")
+    actions_text = read_text(os.path.join(ROOT, actions_rel))
+    for fragment in [
+        "confirmDeleteLocalCopyWithFileName:",
+        "saveCopyOfFileAtPath:",
+        "NSSavePanel",
+        "selectFile:path",
+        "copyItemAtPath:sourcePath",
+    ]:
+        if fragment not in actions_text:
+            errors.append("%s: focused local file action is missing `%s`" %
+                          (actions_rel, fragment))
+
+    media_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MediaWindows.inc")
+    media_text = read_text(os.path.join(ROOT, media_rel))
+    for fragment in [
+        "mediaCenterDownloadingFileIDs",
+        "cancelMediaCenterDownload:",
+        "saveMediaCenterItemAs:",
+        "revealMediaCenterItem:",
+        "deleteCachedFileForFileID:",
+    ]:
+        if fragment not in media_text:
+            errors.append("%s: Media Center file action routing is missing `%s`" %
+                          (media_rel, fragment))
+    if "removeItemAtPath:path error:&error" in media_text:
+        errors.append("%s: Media Center must delete cached files through TDLib, not unlink cache paths directly" %
+                      media_rel)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -438,6 +483,7 @@ def main():
     check_conversation_creation_contract(errors)
     check_composer_formatting_contract(errors)
     check_additional_message_types_contract(errors)
+    check_media_file_management_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:
