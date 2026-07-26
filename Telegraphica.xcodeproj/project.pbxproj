@@ -66,6 +66,8 @@
 		111111111111111111111158 /* TGChatLifecycleWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111320 /* TGChatLifecycleWindowController.m */; };
 		111111111111111111111159 /* TGConversationCreationPrompt.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111322 /* TGConversationCreationPrompt.m */; };
 		111111111111111111111160 /* TGMediaFileActions.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111324 /* TGMediaFileActions.m */; };
+		111111111111111111111161 /* TGContactsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111326 /* TGContactsViewController.m */; };
+		111111111111111111111162 /* TGCallsPlaceholderView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111328 /* TGCallsPlaceholderView.m */; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -207,6 +209,10 @@
 		111111111111111111111322 /* TGConversationCreationPrompt.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGConversationCreationPrompt.m; sourceTree = "<group>"; };
 		111111111111111111111323 /* TGMediaFileActions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaFileActions.h; sourceTree = "<group>"; };
 		111111111111111111111324 /* TGMediaFileActions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaFileActions.m; sourceTree = "<group>"; };
+		111111111111111111111325 /* TGContactsViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGContactsViewController.h; sourceTree = "<group>"; };
+		111111111111111111111326 /* TGContactsViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGContactsViewController.m; sourceTree = "<group>"; };
+		111111111111111111111327 /* TGCallsPlaceholderView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGCallsPlaceholderView.h; sourceTree = "<group>"; };
+		111111111111111111111328 /* TGCallsPlaceholderView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGCallsPlaceholderView.m; sourceTree = "<group>"; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -359,6 +365,10 @@
 				111111111111111111111293 /* TGMessageViewersWindowController.m */,
 				111111111111111111111319 /* TGChatLifecycleWindowController.h */,
 				111111111111111111111320 /* TGChatLifecycleWindowController.m */,
+				111111111111111111111325 /* TGContactsViewController.h */,
+				111111111111111111111326 /* TGContactsViewController.m */,
+				111111111111111111111327 /* TGCallsPlaceholderView.h */,
+				111111111111111111111328 /* TGCallsPlaceholderView.m */,
 				111111111111111111111321 /* TGConversationCreationPrompt.h */,
 				111111111111111111111322 /* TGConversationCreationPrompt.m */,
 				111111111111111111111298 /* TGChatDisplayPreferences.h */,
@@ -597,6 +607,8 @@
 				111111111111111111111158 /* TGChatLifecycleWindowController.m in Sources */,
 				111111111111111111111159 /* TGConversationCreationPrompt.m in Sources */,
 				111111111111111111111160 /* TGMediaFileActions.m in Sources */,
+				111111111111111111111161 /* TGContactsViewController.m in Sources */,
+				111111111111111111111162 /* TGCallsPlaceholderView.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

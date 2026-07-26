@@ -2,6 +2,8 @@
 #import "TGActiveSessionsPresentation.h"
 #import "TGChatDisplayPreferences.h"
 #import "TGChatLifecycleWindowController.h"
+#import "TGContactsViewController.h"
+#import "TGCallsPlaceholderView.h"
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
@@ -51,6 +53,8 @@ static NSUInteger const TGMessagePreviewInitialLimit = 20;
 static NSUInteger const TGMessagePrefillMinimumRows = 20;
 static NSUInteger const TGMessagePrefillMaxAttempts = 3;
 static CGFloat const TGPanelHeaderHeight = 40.0;
+static NSString * const TGSectionContacts = @"contacts";
+static NSString * const TGSectionCalls = @"calls";
 static NSString * const TGSectionChats = @"chats";
 static NSString * const TGSectionProfile = @"profile";
 static NSString * const TGSectionSettings = @"settings";
@@ -203,12 +207,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) NSView *conversationPanelView;
 @property (nonatomic, retain) NSView *diagnosticsPanelView;
 @property (nonatomic, retain) NSView *loginPanelView;
+@property (nonatomic, retain) TGContactsViewController *contactsViewController;
+@property (nonatomic, retain) TGCallsPlaceholderView *callsPlaceholderView;
 @property (nonatomic, retain) NSView *profilePanelView;
 @property (nonatomic, retain) NSScrollView *profileScrollView;
 @property (nonatomic, retain) NSView *profileContentView;
@@ -232,6 +238,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGGroupedCardView *profileDetailsCardView;
 @property (nonatomic, retain) TGGroupedCardView *profileActionsCardView;
 @property (nonatomic, retain) TGProfileAvatarView *profileAvatarView;
+@property (nonatomic, retain) TGGroupedCardView *settingsProfileCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsAccountCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsThemeCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsSessionCardView;
@@ -243,6 +250,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGChatLifecycleWindowController *chatLifecycleWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
+@property (nonatomic, retain) TGSectionTitleField *settingsProfileSectionField;
+@property (nonatomic, retain) NSTextField *settingsProfileDetailField;
+@property (nonatomic, retain) NSButton *settingsProfileButton;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) NSTextField *statusField;
@@ -306,6 +316,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableSet *mediaCenterExhaustedFilterIdentifiers;
 @property (nonatomic, retain) NSMutableSet *mediaCenterSeenKeys;
 @property (nonatomic, retain) NSMutableSet *mediaCenterDownloadingFileIDs;
+@property (nonatomic, retain) NSMutableDictionary *mediaCenterSavedPathsByFileID;
 @property (nonatomic, assign) NSUInteger mediaCenterGeneration;
 @property (nonatomic, assign) BOOL mediaCenterLoadingMore;
 @property (nonatomic, assign) BOOL mediaCenterExhausted;
@@ -651,6 +662,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize conversationPanelView = _conversationPanelView;
 @synthesize diagnosticsPanelView = _diagnosticsPanelView;
 @synthesize loginPanelView = _loginPanelView;
+@synthesize contactsViewController = _contactsViewController;
+@synthesize callsPlaceholderView = _callsPlaceholderView;
 @synthesize profilePanelView = _profilePanelView;
 @synthesize profileScrollView = _profileScrollView;
 @synthesize profileContentView = _profileContentView;
@@ -674,6 +687,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize profileDetailsCardView = _profileDetailsCardView;
 @synthesize profileActionsCardView = _profileActionsCardView;
 @synthesize profileAvatarView = _profileAvatarView;
+@synthesize settingsProfileCardView = _settingsProfileCardView;
 @synthesize settingsAccountCardView = _settingsAccountCardView;
 @synthesize settingsThemeCardView = _settingsThemeCardView;
 @synthesize settingsSessionCardView = _settingsSessionCardView;
@@ -684,6 +698,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize storageUsageWindowController = _storageUsageWindowController;
 @synthesize aboutCardView = _aboutCardView;
 @synthesize logsCardView = _logsCardView;
+@synthesize settingsProfileSectionField = _settingsProfileSectionField;
+@synthesize settingsProfileDetailField = _settingsProfileDetailField;
+@synthesize settingsProfileButton = _settingsProfileButton;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
 @synthesize statusField = _statusField;
 @synthesize titleField = _titleField;
@@ -747,6 +764,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaCenterExhaustedFilterIdentifiers = _mediaCenterExhaustedFilterIdentifiers;
 @synthesize mediaCenterSeenKeys = _mediaCenterSeenKeys;
 @synthesize mediaCenterDownloadingFileIDs = _mediaCenterDownloadingFileIDs;
+@synthesize mediaCenterSavedPathsByFileID = _mediaCenterSavedPathsByFileID;
 @synthesize mediaCenterGeneration = _mediaCenterGeneration;
 @synthesize mediaCenterLoadingMore = _mediaCenterLoadingMore;
 @synthesize mediaCenterExhausted = _mediaCenterExhausted;
@@ -1087,6 +1105,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.chatSearchWindowResultButtons = [NSMutableArray array];
         self.mediaCenterItems = [NSMutableArray array];
         self.mediaCenterDownloadingFileIDs = [NSMutableSet set];
+        self.mediaCenterSavedPathsByFileID = [NSMutableDictionary dictionary];
         self.mediaCenterPaginationAnchorsByFilter = [NSMutableDictionary dictionary];
         self.mediaCenterExhaustedFilterIdentifiers = [NSMutableSet set];
         self.mediaCenterSeenKeys = [NSMutableSet set];
@@ -1477,6 +1496,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.profileIDRowTitleField setStringValue:TGLoc(@"profile.id")];
     [self applyDestructiveSettingsButtonStyle:self.logoutButton];
     [self.settingsTitleField setStringValue:TGLoc(@"settings")];
+    [self.settingsProfileSectionField setStringValue:TGLoc(@"settings.section.account")];
+    [self.settingsProfileButton setTitle:TGLoc(@"settings.profile.open")];
     [[self.sendTextField cell] setPlaceholderString:TGLoc(@"message.placeholder")];
     [self applyComposerPlaceholderStyle:self.sendTextField];
     [self.attachPhotoButton setToolTip:TGLoc(@"attach.photo")];
@@ -1553,15 +1574,20 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         }
         NSButton *button = (NSButton *)candidate;
         if ([button tag] == 0) {
-            [button setTitle:TGLoc(@"chats")];
+            [button setTitle:TGLoc(@"contacts")];
         } else if ([button tag] == 1) {
-            [button setTitle:TGLoc(@"profile")];
+            [button setTitle:TGLoc(@"calls")];
         } else if ([button tag] == 2) {
+            [button setTitle:TGLoc(@"chats")];
+        } else if ([button tag] == 3) {
             [button setTitle:TGLoc(@"settings")];
         }
         [button setToolTip:[button title]];
         [button setNeedsDisplay:YES];
     }
+    [self.contactsViewController refreshLocalizedText];
+    [self.callsPlaceholderView refreshLocalizedText];
+    [self refreshProfileDisplay];
 }
 
 - (void)refreshThemeAppearance {
@@ -1573,6 +1599,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self applyPanelHeaderLabelStyle:self.diagnosticsLabel];
     [self applyPanelHeaderLabelStyle:self.chatsLabel];
     [self applyPanelHeaderLabelStyle:self.messagesLabel];
+    [self.contactsViewController refreshThemeAppearance];
+    [self.callsPlaceholderView refreshThemeAppearance];
     [self applyPanelHeaderLabelStyle:self.profileTitleField];
     [self applyPanelHeaderLabelStyle:self.settingsTitleField];
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
@@ -1741,6 +1769,17 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                             self.profileFirstName,
                                                             self.profileLastName,
                                                             TGLoc(@"profile.fallback"))];
+    NSString *settingsProfileName = TGProfileFullName(self.profileDisplayName,
+                                                      self.profileFirstName,
+                                                      self.profileLastName,
+                                                      TGLoc(@"profile.fallback"));
+    NSString *settingsProfileSubtitle = TGProfileSubtitleText(self.profileUsername, self.profileUserID);
+    if ([settingsProfileSubtitle length] > 0) {
+        [self.settingsProfileDetailField setStringValue:
+         [NSString stringWithFormat:@"%@\n%@", settingsProfileName, settingsProfileSubtitle]];
+    } else {
+        [self.settingsProfileDetailField setStringValue:settingsProfileName];
+    }
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
 
     [self.settingsLibraryField setStringValue:TGLoc(@"settings.appearance")];
@@ -1921,6 +1960,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.loginPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.loginPanelView];
 
+    self.contactsViewController = [[[TGContactsViewController alloc] initWithClient:self.client] autorelease];
+    [self.contactsViewController setDelegate:self];
+    [[self.contactsViewController view] setFrame:NSMakeRect(16, 82, 948, 530)];
+    [contentView addSubview:[self.contactsViewController view]];
+
+    self.callsPlaceholderView = [[[TGCallsPlaceholderView alloc] initWithFrame:NSMakeRect(16, 82, 948, 530)] autorelease];
+    [contentView addSubview:self.callsPlaceholderView];
+
     self.profilePanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 948, 480)] autorelease];
     [self.profilePanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:self.profilePanelView];
@@ -1980,8 +2027,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.statusField setHidden:YES];
     [contentView addSubview:self.statusField];
 
-    NSArray *navigationTitles = [NSArray arrayWithObjects:@"Chats", @"Profile", @"Settings", nil];
-    NSInteger navigationTags[] = {0, 1, 2};
+    NSArray *navigationTitles = [NSArray arrayWithObjects:@"Contacts", @"Calls", @"Chats", @"Settings", nil];
+    NSInteger navigationTags[] = {0, 1, 2, 3};
     NSMutableArray *navigationButtons = [NSMutableArray arrayWithCapacity:[navigationTitles count]];
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [navigationTitles count]; navigationIndex++) {
@@ -1998,7 +2045,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [navigationButton setTarget:self];
         [navigationButton setAction:@selector(navigationChanged:)];
         [navigationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
-        if (navigationTags[navigationIndex] == 0) {
+        if (navigationTags[navigationIndex] == 2) {
             NSMenu *readAllMenu = [[[NSMenu alloc] initWithTitle:@"Chats"] autorelease];
             NSMenuItem *newChatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"contacts.newChat")
                                                                   action:@selector(openNewChatWindow:)
@@ -2813,6 +2860,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.profileDetailsSeparatorTwo setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.profileDetailsSeparatorTwo];
 
+    self.settingsProfileCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 470, 760, 72)] autorelease];
+    [self.settingsProfileCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsProfileCardView];
+
     self.settingsAccountCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 380, 760, 100)] autorelease];
     [self.settingsAccountCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.settingsAccountCardView];
@@ -2846,6 +2897,27 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                               font:[NSFont boldSystemFontOfSize:18.0]];
     [self applyPanelHeaderLabelStyle:self.settingsTitleField];
     [contentView addSubview:self.settingsTitleField];
+
+    self.settingsProfileSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 500, 760, 24)] autorelease];
+    [self.settingsProfileSectionField setStringValue:@"Account"];
+    [self.settingsProfileSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [(TGSectionTitleField *)self.settingsProfileSectionField setIconName:@"user"];
+    [self applyMutedLabelStyle:self.settingsProfileSectionField];
+    [contentView addSubview:self.settingsProfileSectionField];
+
+    self.settingsProfileDetailField = [self labelWithFrame:NSMakeRect(86, 476, 420, 18)
+                                                       text:@""
+                                                       font:[NSFont systemFontOfSize:12.0]];
+    [[self.settingsProfileDetailField cell] setLineBreakMode:NSLineBreakByWordWrapping];
+    [self applyMutedLabelStyle:self.settingsProfileDetailField];
+    [contentView addSubview:self.settingsProfileDetailField];
+
+    self.settingsProfileButton = [[[NSButton alloc] initWithFrame:NSMakeRect(520, 470, 260, 28)] autorelease];
+    [self.settingsProfileButton setTarget:self];
+    [self.settingsProfileButton setAction:@selector(openProfileFromSettings:)];
+    [self applyUtilityButtonStyle:self.settingsProfileButton];
+    [self.settingsProfileButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsProfileButton];
 
     self.settingsStateField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 458, 760, 24)] autorelease];
     [self.settingsStateField setStringValue:@"Notifications"];
@@ -3128,6 +3200,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [contentView addSubview:self.settingsAboutButton];
 
     NSArray *settingsContentViews = [NSArray arrayWithObjects:
+                                     self.settingsProfileCardView,
                                      self.settingsAccountCardView,
                                      self.settingsThemeCardView,
                                      self.settingsSessionCardView,
@@ -3135,6 +3208,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsResourceCardView,
                                      self.settingsFilesCardView,
                                      self.settingsHelpCardView,
+                                     self.settingsProfileSectionField,
+                                     self.settingsProfileDetailField,
+                                     self.settingsProfileButton,
                                      self.settingsStateField,
                                      self.settingsLibraryField,
                                      self.settingsStorageField,
@@ -3295,17 +3371,17 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (NSString *)sectionIdentifierForNavigationTag:(NSInteger)navigationTag {
+    if (navigationTag == 0) {
+        return TGSectionContacts;
+    }
     if (navigationTag == 1) {
-        return TGSectionProfile;
+        return TGSectionCalls;
     }
     if (navigationTag == 2) {
-        return TGSectionSettings;
+        return TGSectionChats;
     }
     if (navigationTag == 3) {
-        return TGSectionAbout;
-    }
-    if (navigationTag == 4) {
-        return TGSectionLogs;
+        return TGSectionSettings;
     }
     return TGSectionChats;
 }
@@ -3314,19 +3390,19 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     if ([section isEqualToString:TGSectionWorkshop]) {
         return -1;
     }
-    if ([section isEqualToString:TGSectionProfile]) {
+    if ([section isEqualToString:TGSectionContacts]) {
+        return 0;
+    }
+    if ([section isEqualToString:TGSectionCalls]) {
         return 1;
     }
-    if ([section isEqualToString:TGSectionSettings]) {
+    if ([section isEqualToString:TGSectionChats]) {
         return 2;
     }
-    if ([section isEqualToString:TGSectionAbout]) {
+    if ([section isEqualToString:TGSectionSettings]) {
         return 3;
     }
-    if ([section isEqualToString:TGSectionLogs]) {
-        return 4;
-    }
-    return 0;
+    return -1;
 }
 
 - (void)updateDrawerFolderButtonStates {
@@ -3621,7 +3697,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [self.workshopCoordinator closeActiveModule];
     }
     [self updateVisibleSection];
-    if ([self.activeSection isEqualToString:TGSectionProfile] &&
+    if ([self.activeSection isEqualToString:TGSectionContacts]) {
+        [self.contactsViewController refreshContactsIfNeeded];
+    } else if ([self.activeSection isEqualToString:TGSectionProfile] &&
         !self.profileSummaryLoaded && !self.profileSummaryLoading &&
         [self.currentAuthState isEqualToString:@"ready"] && !self.controlsBusy &&
         !TGMountainLionSafeLoginModeEnabled()) {
@@ -3795,6 +3873,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_conversationPanelView release];
     [_diagnosticsPanelView release];
     [_loginPanelView release];
+    [_contactsViewController setDelegate:nil];
+    [_contactsViewController release];
+    [_callsPlaceholderView release];
     [_profilePanelView release];
     [_profileScrollView release];
     [_profileContentView release];
@@ -3819,6 +3900,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_profileDetailsCardView release];
     [_profileActionsCardView release];
     [_profileAvatarView release];
+    [_settingsProfileCardView release];
     [_settingsAccountCardView release];
     [_settingsThemeCardView release];
     [_settingsSessionCardView release];
@@ -3883,6 +3965,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaCenterExhaustedFilterIdentifiers release];
     [_mediaCenterSeenKeys release];
     [_mediaCenterDownloadingFileIDs release];
+    [_mediaCenterSavedPathsByFileID release];
     [_pinnedMessagePanelView release];
     [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];
@@ -3975,6 +4058,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_profileIDRowValueField release];
     [_profileDetailsSeparatorOne release];
     [_profileDetailsSeparatorTwo release];
+    [_settingsProfileSectionField release];
+    [_settingsProfileDetailField release];
+    [_settingsProfileButton release];
     [_settingsTitleField release];
     [_settingsStateField release];
     [_settingsLibraryField release];

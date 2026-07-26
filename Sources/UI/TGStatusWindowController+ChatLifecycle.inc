@@ -32,14 +32,35 @@
         return;
     }
     [[controller window] orderOut:self];
+    self.activeSection = TGSectionChats;
     self.selectedChatFilterID = nil;
     self.chatNavigationClosed = NO;
     self.selectedChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
     self.selectedChatTitle = ([title length] > 0 ? title : TGLoc(@"chats"));
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
+    [self updateVisibleSection];
     [self appendDetail:[NSString stringWithFormat:@"Opening chat %@.", self.selectedChatID]];
     [self reloadChatsInteractive:NO preserveSelection:YES];
+}
+
+- (void)contactsViewController:(TGContactsViewController *)controller
+                 didOpenChatID:(NSNumber *)chatID
+                         title:(NSString *)title {
+    (void)controller;
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    [self chatLifecycleWindowController:nil didOpenChatID:chatID title:title];
+}
+
+- (void)contactsViewControllerDidRequestNewConversation:(TGContactsViewController *)controller {
+    (void)controller;
+    [self openNewChatWindow:nil];
+}
+
+- (void)openProfileFromSettings:(id)sender {
+    [self openProfileFromDrawer:sender];
 }
 
 - (void)leaveChatFromMenu:(id)sender {
