@@ -666,7 +666,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *sendError = nil;
         NSString *summary = nil;
-        if (descriptorCopy.kind == TGAttachmentKindVideo) {
+        if (descriptorCopy.kind == TGAttachmentKindAnimation) {
+            summary = [[client sendAnimationMessageToChatID:chatID
+                                            messageThreadID:messageThreadID
+                                           messageTopicKind:messageTopicKind
+                                                  localPath:descriptorCopy.path
+                                                    caption:attachmentCaption
+                                           replyToMessageID:replyToMessageID
+                                                    timeout:24.0
+                                                      error:&sendError] copy];
+        } else if (descriptorCopy.kind == TGAttachmentKindVideo) {
             summary = [[client sendVideoMessageToChatID:chatID
                                         messageThreadID:messageThreadID
                                        messageTopicKind:messageTopicKind
@@ -858,6 +867,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 	                                               replyToMessageID:(index == 0 ? replyToMessageID : nil)
 	                                                        timeout:18.0
 	                                                          error:&sendError] copy];
+                } else if (descriptor.kind == TGAttachmentKindAnimation) {
+                    summary = [[client sendAnimationMessageToChatID:chatID
+                                                    messageThreadID:messageThreadID
+                                                   messageTopicKind:messageTopicKind
+                                                          localPath:descriptor.path
+                                                            caption:captionForMessage
+                                                   replyToMessageID:(index == 0 ? replyToMessageID : nil)
+                                                            timeout:24.0
+                                                              error:&sendError] copy];
                 } else if (descriptor.kind == TGAttachmentKindVideo) {
                     summary = [[client sendVideoMessageToChatID:chatID
                                                messageThreadID:messageThreadID
@@ -2573,6 +2591,103 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     });
 }
 
+- (void)sendSharedComposerItemWithKind:(NSString *)kind values:(NSDictionary *)values {
+    BOOL hasMessageTarget = (self.selectedChatID != nil &&
+                             (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy ||
+        ![values isKindOfClass:[NSDictionary class]]) {
+        [self appendDetail:@"Select a chat after sign-in is ready before sharing this item."];
+        return;
+    }
+
+    NSNumber *chatID = [self.selectedChatID retain];
+    NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
+    NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
+    NSNumber *replyToMessageID = [[self composerReplyToMessageIDForChatID:chatID] retain];
+    NSString *kindCopy = [kind copy];
+    NSDictionary *valuesCopy = [values copy];
+    TGTDLibClient *client = [self.client retain];
+    BOOL sharingContact = [kindCopy isEqualToString:@"contact"];
+    [self setControlsBusy:YES];
+    [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.sending" : @"share.location.sending")];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *sendError = nil;
+        NSString *summary = nil;
+        if (sharingContact) {
+            summary = [[client sendContactMessageToChatID:chatID
+                                          messageThreadID:messageThreadID
+                                         messageTopicKind:messageTopicKind
+                                               firstName:[valuesCopy objectForKey:@"first_name"]
+                                                lastName:[valuesCopy objectForKey:@"last_name"]
+                                             phoneNumber:[valuesCopy objectForKey:@"phone_number"]
+                                        replyToMessageID:replyToMessageID
+                                                 timeout:8.0
+                                                   error:&sendError] copy];
+        } else {
+            summary = [[client sendLocationMessageToChatID:chatID
+                                           messageThreadID:messageThreadID
+                                          messageTopicKind:messageTopicKind
+                                                   latitude:[[valuesCopy objectForKey:@"latitude"] doubleValue]
+                                                  longitude:[[valuesCopy objectForKey:@"longitude"] doubleValue]
+                                           replyToMessageID:replyToMessageID
+                                                    timeout:8.0
+                                                      error:&sendError] copy];
+        }
+        NSString *errorMessage = [[sendError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL sameChat = ([self.selectedChatID respondsToSelector:@selector(longLongValue)] &&
+                             [self.selectedChatID longLongValue] == [chatID longLongValue]);
+            if ([summary length] > 0) {
+                [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.sent" : @"share.location.sent")];
+                if (sameChat && replyToMessageID) {
+                    [self clearReplyTarget];
+                }
+                self.forceMessageScrollToNewest = YES;
+                [self refreshSelectedChatMessages:self];
+            } else {
+                [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.failed" : @"share.location.failed")];
+                [self appendDetail:[NSString stringWithFormat:@"%@ send failed: %@",
+                                    sharingContact ? @"Contact" : @"Location",
+                                    [errorMessage length] > 0 ? errorMessage : @"unknown error"]];
+            }
+            [self setControlsBusy:NO];
+            [self requestComposerRefocus];
+            [errorMessage release];
+            [summary release];
+            [client release];
+            [valuesCopy release];
+            [kindCopy release];
+            [replyToMessageID release];
+            [messageTopicKind release];
+            [messageThreadID release];
+            [chatID release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)shareContactFromComposerMenu:(id)sender {
+    (void)sender;
+    NSDictionary *contact = [TGMessageActionDialogs contactToShare];
+    if (contact) {
+        [self sendSharedComposerItemWithKind:@"contact" values:contact];
+    } else {
+        [self requestComposerRefocus];
+    }
+}
+
+- (void)shareLocationFromComposerMenu:(id)sender {
+    (void)sender;
+    NSDictionary *location = [TGMessageActionDialogs locationToShare];
+    if (location) {
+        [self sendSharedComposerItemWithKind:@"location" values:location];
+    } else {
+        [self requestComposerRefocus];
+    }
+}
+
 - (void)attachPhoto:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
@@ -2586,6 +2701,17 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                  keyEquivalent:@""] autorelease];
     [attachItem setTarget:self];
     [menu addItem:attachItem];
+    NSMenuItem *contactItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.contact.menu")
+                                                         action:@selector(shareContactFromComposerMenu:)
+                                                  keyEquivalent:@""] autorelease];
+    [contactItem setTarget:self];
+    [menu addItem:contactItem];
+    NSMenuItem *locationItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.location.menu")
+                                                          action:@selector(shareLocationFromComposerMenu:)
+                                                   keyEquivalent:@""] autorelease];
+    [locationItem setTarget:self];
+    [menu addItem:locationItem];
+    [menu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *formatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format")
                                                         action:nil
                                                  keyEquivalent:@""] autorelease];

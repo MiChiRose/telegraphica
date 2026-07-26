@@ -380,6 +380,49 @@ def check_composer_formatting_contract(errors):
         errors.append("%s: formatting control markers must not sync into Telegram drafts" % draft_rel)
 
 
+def check_additional_message_types_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        "sendContactMessageToChatID:",
+        '"inputMessageContact"',
+        "sendLocationMessageToChatID:",
+        '"inputMessageLocation"',
+        '"live_period"',
+        "sendAnimationMessageToChatID:",
+        '"inputMessageAnimation"',
+        '"inputAnimation"',
+        "TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: additional message type compatibility is missing `%s`" %
+                          (client_rel, fragment))
+
+    descriptor_rel = os.path.join("Sources", "Media", "TGAttachmentDescriptor.m")
+    descriptor_text = read_text(os.path.join(ROOT, descriptor_rel))
+    for fragment in ['[descriptor.extension isEqualToString:@"gif"]',
+                     "TGAttachmentKindAnimation", 'descriptor.typeLabel = @"GIF"']:
+        if fragment not in descriptor_text:
+            errors.append("%s: GIF routing contract is missing `%s`" %
+                          (descriptor_rel, fragment))
+
+    dialogs_rel = os.path.join("Sources", "UI", "TGMessageActionDialogs.m")
+    dialogs_text = read_text(os.path.join(ROOT, dialogs_rel))
+    for fragment in ["contactToShare", "locationToShare",
+                     "latitude < -90.0", "longitude > 180.0"]:
+        if fragment not in dialogs_text:
+            errors.append("%s: share dialog validation is missing `%s`" %
+                          (dialogs_rel, fragment))
+
+    composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
+    composer_text = read_text(os.path.join(ROOT, composer_rel))
+    for fragment in ["shareContactFromComposerMenu:", "shareLocationFromComposerMenu:",
+                     "sendAnimationMessageToChatID:"]:
+        if fragment not in composer_text:
+            errors.append("%s: composer message-type routing is missing `%s`" %
+                          (composer_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -394,6 +437,7 @@ def main():
     check_no_local_runtime_data(errors)
     check_conversation_creation_contract(errors)
     check_composer_formatting_contract(errors)
+    check_additional_message_types_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

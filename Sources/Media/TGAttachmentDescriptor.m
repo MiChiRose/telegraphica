@@ -95,12 +95,20 @@ static void TGAttachmentReadImageDimensions(NSString *path, NSUInteger *width, N
         descriptor.fileSize = [sizeObject unsignedLongLongValue];
     }
 
-    NSArray *photoExtensions = [NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", @"gif", @"webp", nil];
+    NSArray *photoExtensions = [NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", @"tif", @"tiff", @"webp", nil];
     NSArray *videoExtensions = [NSArray arrayWithObjects:@"mp4", @"mov", @"m4v", @"webm", nil];
     NSArray *audioExtensions = [NSArray arrayWithObjects:@"mp3", @"m4a", @"aac", @"wav", @"aiff", @"ogg", @"oga", @"opus", nil];
     NSArray *documentExtensions = [NSArray arrayWithObjects:@"pdf", @"zip", @"rar", @"7z", @"txt", @"rtf", @"doc", @"docx", @"xls", @"xlsx", @"ppt", @"pptx", nil];
 
-    if (TGAttachmentExtensionInSet(descriptor.extension, photoExtensions)) {
+    if ([descriptor.extension isEqualToString:@"gif"]) {
+        descriptor.kind = TGAttachmentKindAnimation;
+        descriptor.typeLabel = @"GIF";
+        NSUInteger bestWidth = 0;
+        NSUInteger bestHeight = 0;
+        TGAttachmentReadImageDimensions(standardPath, &bestWidth, &bestHeight);
+        descriptor.pixelWidth = bestWidth;
+        descriptor.pixelHeight = bestHeight;
+    } else if (TGAttachmentExtensionInSet(descriptor.extension, photoExtensions)) {
         descriptor.kind = TGAttachmentKindPhoto;
         descriptor.typeLabel = @"Photo";
         NSUInteger bestWidth = 0;

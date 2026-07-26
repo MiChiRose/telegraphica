@@ -5,7 +5,8 @@ typedef enum {
     TGAttachmentKindPhoto = 1,
     TGAttachmentKindVideo = 2,
     TGAttachmentKindAudio = 3,
-    TGAttachmentKindDocument = 4
+    TGAttachmentKindDocument = 4,
+    TGAttachmentKindAnimation = 5
 } TGAttachmentKind;
 
 @interface TGAttachmentDescriptor : NSObject

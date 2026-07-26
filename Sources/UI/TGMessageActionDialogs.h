@@ -9,6 +9,8 @@ typedef enum {
 @interface TGMessageActionDialogs : NSObject
 
 + (NSString *)editedTextForCurrentText:(NSString *)currentText;
++ (NSDictionary *)contactToShare;
++ (NSDictionary *)locationToShare;
 + (BOOL)confirmPlainDeleteMessage;
 + (TGMessageDeleteChoice)deleteChoiceWithCanDeleteOnlyForSelf:(BOOL)canDeleteOnlyForSelf
                                          canDeleteForAllUsers:(BOOL)canDeleteForAllUsers;
