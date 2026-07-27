@@ -3,6 +3,7 @@
 #import "TGChatDisplayPreferences.h"
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
+#import "TGBotKeyboardWindowController.h"
 #import "TGChatLifecycleWindowController.h"
 #import "TGContactsViewController.h"
 #import "TGDownloadManagerWindowController.h"
@@ -269,6 +270,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGChatLifecycleWindowController *chatLifecycleWindowController;
 @property (nonatomic, retain) TGChatFolderManagementWindowController *chatFolderManagementWindowController;
 @property (nonatomic, retain) TGChatInfoWindowController *chatInfoWindowController;
+@property (nonatomic, retain) TGBotKeyboardWindowController *botKeyboardWindowController;
 @property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
 @property (nonatomic, retain) TGPrivacyWindowController *privacyWindowController;
 @property (nonatomic, retain) TGSavedMessagesWindowController *savedMessagesWindowController;
@@ -1085,6 +1087,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatLifecycleWindowController = _chatLifecycleWindowController;
 @synthesize chatFolderManagementWindowController = _chatFolderManagementWindowController;
 @synthesize chatInfoWindowController = _chatInfoWindowController;
+@synthesize botKeyboardWindowController = _botKeyboardWindowController;
 @synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
 @synthesize privacyWindowController = _privacyWindowController;
 @synthesize savedMessagesWindowController = _savedMessagesWindowController;
@@ -4410,6 +4413,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatFolderManagementWindowController release];
     [[_chatInfoWindowController window] close];
     [_chatInfoWindowController release];
+    [[_botKeyboardWindowController window] close];
+    [_botKeyboardWindowController release];
     [[_notificationSettingsWindowController window] close];
     [_notificationSettingsWindowController release];
     [[_privacyWindowController window] close];

@@ -117,6 +117,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize pendingPollOptionIndexes = _pendingPollOptionIndexes;
 @synthesize pollVoteState = _pollVoteState;
 @synthesize pollVoteMessage = _pollVoteMessage;
+@synthesize replyMarkup = _replyMarkup;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -395,6 +396,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setPendingPollOptionIndexes:_pendingPollOptionIndexes];
     [copy setPollVoteState:_pollVoteState];
     [copy setPollVoteMessage:_pollVoteMessage];
+    [copy setReplyMarkup:_replyMarkup];
     return copy;
 }
 
@@ -459,6 +461,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_pendingPollOptionIndexes release];
     [_pollVoteState release];
     [_pollVoteMessage release];
+    [_replyMarkup release];
     [super dealloc];
 }
 

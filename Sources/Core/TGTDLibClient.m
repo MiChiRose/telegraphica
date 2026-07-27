@@ -6583,6 +6583,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        id replyMarkup = [message objectForKey:@"reply_markup"];
+        if ([replyMarkup isKindOfClass:[NSDictionary class]]) {
+            [item setReplyMarkup:replyMarkup];
+        }
         if ([contentType isEqualToString:@"messagePoll"] && [contentObject isKindOfClass:[NSDictionary class]]) {
             NSDictionary *pollInfo = TGMessagePollInfoFromContentObject(contentObject);
             if ([pollInfo count] > 0) {

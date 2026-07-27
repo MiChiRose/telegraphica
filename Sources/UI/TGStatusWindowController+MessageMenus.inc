@@ -110,7 +110,7 @@
                                                 keyEquivalent:@""] autorelease];
     [menuItem setRepresentedObject:payload];
     [menuItem setTarget:self];
-    [menuItem setEnabled:(!chosen && ![item pollClosed])];
+    [menuItem setEnabled:(!chosen && ![item isPollClosed])];
     return menuItem;
 }
 
@@ -578,8 +578,18 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                                                     keyEquivalent:@""] autorelease];
         [pollItem setImage:TGTemplateIconAssetImage(@"poll", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.80)];
         [pollItem setSubmenu:[self pollOptionsMenuForItem:item]];
-        [pollItem setEnabled:(![item pollClosed] && [[item pollOptions] count] > 0)];
+        [pollItem setEnabled:(![item isPollClosed] && [[item pollOptions] count] > 0)];
         [menu addItem:pollItem];
+        addedMessageAction = YES;
+    }
+
+    if ([[item replyMarkup] isKindOfClass:[NSDictionary class]]) {
+        NSMenuItem *botButtonsItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"bot.keyboard.open")
+                                                                 action:@selector(openBotKeyboardFromMenu:)
+                                                          keyEquivalent:@""] autorelease];
+        [botButtonsItem setRepresentedObject:item];
+        [botButtonsItem setTarget:self];
+        [menu addItem:botButtonsItem];
         addedMessageAction = YES;
     }
 
@@ -710,6 +720,22 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [moreItem setSubmenu:moreMenu];
         [menu addItem:moreItem];
     }
+}
+
+- (void)openBotKeyboardFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![[item replyMarkup] isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    [[self.botKeyboardWindowController window] close];
+    self.botKeyboardWindowController = [[[TGBotKeyboardWindowController alloc] initWithClient:self.client
+                                                                                        chatID:[item chatID]
+                                                                                     messageID:[item messageID]
+                                                                                   replyMarkup:[item replyMarkup]] autorelease];
+    [self.botKeyboardWindowController showWindow:self];
+    [[self.botKeyboardWindowController window] center];
+    [[self.botKeyboardWindowController window] makeKeyAndOrderFront:self];
 }
 
 - (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item {

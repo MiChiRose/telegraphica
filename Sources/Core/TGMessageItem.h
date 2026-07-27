@@ -58,6 +58,7 @@
 @property (nonatomic, copy) NSArray *pendingPollOptionIndexes;
 @property (nonatomic, copy) NSString *pollVoteState;
 @property (nonatomic, copy) NSString *pollVoteMessage;
+@property (nonatomic, copy) NSDictionary *replyMarkup;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID

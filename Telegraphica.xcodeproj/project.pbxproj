@@ -88,6 +88,9 @@
 		111111111111111111111180 /* TGTDLibClient+MessageTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111364 /* TGTDLibClient+MessageTypes.m */; };
 		111111111111111111111181 /* TGTDLibClient+SavedMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111366 /* TGTDLibClient+SavedMessages.m */; };
 		111111111111111111111182 /* TGSavedMessagesWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111368 /* TGSavedMessagesWindowController.m */; };
+		111111111111111111111183 /* TGTDLibClient+Bots.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111370 /* TGTDLibClient+Bots.m */; };
+		111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111372 /* TGBotInteractionWindowController.m */; };
+		111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111374 /* TGBotKeyboardWindowController.m */; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -273,6 +276,12 @@
 		111111111111111111111366 /* TGTDLibClient+SavedMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+SavedMessages.m"; sourceTree = "<group>"; };
 		111111111111111111111367 /* TGSavedMessagesWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSavedMessagesWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111368 /* TGSavedMessagesWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSavedMessagesWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111369 /* TGTDLibClient+Bots.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Bots.h"; sourceTree = "<group>"; };
+		111111111111111111111370 /* TGTDLibClient+Bots.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Bots.m"; sourceTree = "<group>"; };
+		111111111111111111111371 /* TGBotInteractionWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGBotInteractionWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111372 /* TGBotInteractionWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotInteractionWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111373 /* TGBotKeyboardWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGBotKeyboardWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111374 /* TGBotKeyboardWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotKeyboardWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -385,6 +394,8 @@
 				111111111111111111111364 /* TGTDLibClient+MessageTypes.m */,
 				111111111111111111111365 /* TGTDLibClient+SavedMessages.h */,
 				111111111111111111111366 /* TGTDLibClient+SavedMessages.m */,
+				111111111111111111111369 /* TGTDLibClient+Bots.h */,
+				111111111111111111111370 /* TGTDLibClient+Bots.m */,
 				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
 				111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */,
 				111111111111111111111212 /* TGChatItem.h */,
@@ -467,6 +478,10 @@
 				111111111111111111111362 /* TGChatAdministrationWindowController.m */,
 				111111111111111111111367 /* TGSavedMessagesWindowController.h */,
 				111111111111111111111368 /* TGSavedMessagesWindowController.m */,
+				111111111111111111111371 /* TGBotInteractionWindowController.h */,
+				111111111111111111111372 /* TGBotInteractionWindowController.m */,
+				111111111111111111111373 /* TGBotKeyboardWindowController.h */,
+				111111111111111111111374 /* TGBotKeyboardWindowController.m */,
 				111111111111111111111327 /* TGCallsPlaceholderView.h */,
 				111111111111111111111328 /* TGCallsPlaceholderView.m */,
 				111111111111111111111321 /* TGConversationCreationPrompt.h */,
@@ -729,6 +744,9 @@
 				111111111111111111111180 /* TGTDLibClient+MessageTypes.m in Sources */,
 				111111111111111111111181 /* TGTDLibClient+SavedMessages.m in Sources */,
 				111111111111111111111182 /* TGSavedMessagesWindowController.m in Sources */,
+				111111111111111111111183 /* TGTDLibClient+Bots.m in Sources */,
+				111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */,
+				111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

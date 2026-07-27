@@ -3,9 +3,11 @@
 #import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+Privacy.h"
 #import "TGChatAdministrationWindowController.h"
+#import "TGBotInteractionWindowController.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
+#import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
 @interface TGChatInfoWindowController () <NSTableViewDataSource, NSTableViewDelegate>
@@ -24,6 +26,8 @@
 @property (nonatomic, retain) NSButton *refreshButton;
 @property (nonatomic, retain) NSButton *administrationButton;
 @property (nonatomic, retain) TGChatAdministrationWindowController *administrationWindowController;
+@property (nonatomic, retain) NSButton *botButton;
+@property (nonatomic, retain) TGBotInteractionWindowController *botWindowController;
 @property (nonatomic, retain) NSPopUpButton *autoDeletePopUpButton;
 @property (nonatomic, retain) NSButton *applyAutoDeleteButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -52,6 +56,8 @@
 @synthesize refreshButton = _refreshButton;
 @synthesize administrationButton = _administrationButton;
 @synthesize administrationWindowController = _administrationWindowController;
+@synthesize botButton = _botButton;
+@synthesize botWindowController = _botWindowController;
 @synthesize autoDeletePopUpButton = _autoDeletePopUpButton;
 @synthesize applyAutoDeleteButton = _applyAutoDeleteButton;
 @synthesize spinner = _spinner;
@@ -101,6 +107,9 @@
     [_administrationButton release];
     [[_administrationWindowController window] close];
     [_administrationWindowController release];
+    [_botButton release];
+    [[_botWindowController window] close];
+    [_botWindowController release];
     [_autoDeletePopUpButton release];
     [_applyAutoDeleteButton release];
     [_spinner release];
@@ -141,6 +150,15 @@
     [self.administrationButton setAction:@selector(administrationPressed:)];
     [self.administrationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.administrationButton];
+
+    self.botButton = [[[NSButton alloc] initWithFrame:NSMakeRect(486, 530, 114, 30)] autorelease];
+    [self.botButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"bot.open")] autorelease]];
+    [self.botButton setTitle:TGLoc(@"bot.open")];
+    [self.botButton setTarget:self];
+    [self.botButton setAction:@selector(botPressed:)];
+    [self.botButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [self.botButton setHidden:YES];
+    [root addSubview:self.botButton];
 
     self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(608, 530, 88, 30)] autorelease];
     [self.refreshButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"refresh")] autorelease]];
@@ -318,6 +336,8 @@
 - (void)updateControls {
     BOOL group = ([[self.chatSummary objectForKey:@"kind"] isEqualToString:@"basic_group"] ||
                   [[self.chatSummary objectForKey:@"kind"] isEqualToString:@"supergroup"]);
+    BOOL bot = (!group && [[self.chatSummary objectForKey:@"kind"] isEqualToString:@"private"] &&
+                [[[self.chatSummary objectForKey:@"profile"] objectForKey:@"is_bot"] boolValue]);
     BOOL canInvite = [[self.chatSummary objectForKey:@"can_invite_members"] boolValue];
     BOOL canManage = [[self.chatSummary objectForKey:@"can_manage_members"] boolValue];
     BOOL selected = ([self selectedMember] != nil);
@@ -330,6 +350,9 @@
     [self.autoDeletePopUpButton setEnabled:!self.loading];
     [self.applyAutoDeleteButton setEnabled:!self.loading];
     [self.administrationButton setEnabled:(!self.loading && group && (canInvite || canManage))];
+    [self.administrationButton setHidden:bot];
+    [self.botButton setHidden:!bot];
+    [self.botButton setEnabled:(!self.loading && bot)];
 }
 
 - (void)setLoading:(BOOL)loading status:(NSString *)status {
@@ -423,6 +446,23 @@
         });
         [pool drain];
     });
+}
+
+- (void)botPressed:(id)sender {
+    (void)sender;
+    NSNumber *userID = [self.chatSummary objectForKey:@"user_id"];
+    if (![userID respondsToSelector:@selector(longLongValue)] || [userID longLongValue] == 0) {
+        [self.statusField setStringValue:TGLoc(@"bot.unavailable")];
+        return;
+    }
+    [[self.botWindowController window] close];
+    self.botWindowController = [[[TGBotInteractionWindowController alloc] initWithClient:self.client
+                                                                                  userID:userID
+                                                                                  chatID:self.chatID] autorelease];
+    [self.botWindowController showWindow:self];
+    [[self.botWindowController window] center];
+    [[self.botWindowController window] makeKeyAndOrderFront:self];
+    [self.botWindowController reloadBot];
 }
 
 - (void)refreshPressed:(id)sender {
