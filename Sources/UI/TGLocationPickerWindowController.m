@@ -1,56 +1,13 @@
 #import "TGLocationPickerWindowController.h"
 
 #import <MapKit/MapKit.h>
-#include <math.h>
 #import "../Core/TGTDLibClient+MapThumbnail.h"
+#import "TGLocationStaticMapView.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
-
-@interface TGLocationMapImageView : NSImageView
-@property (nonatomic, assign) id coordinateTarget;
-@property (nonatomic, assign) SEL coordinateAction;
-@property (nonatomic, assign) double centerLatitude;
-@property (nonatomic, assign) double centerLongitude;
-@property (nonatomic, assign) NSInteger zoom;
-@end
-
-@implementation TGLocationMapImageView
-
-@synthesize coordinateTarget = _coordinateTarget;
-@synthesize coordinateAction = _coordinateAction;
-@synthesize centerLatitude = _centerLatitude;
-@synthesize centerLongitude = _centerLongitude;
-@synthesize zoom = _zoom;
-
-- (void)resetCursorRects {
-    [self addCursorRect:[self bounds] cursor:[NSCursor crosshairCursor]];
-}
-
-- (void)mouseDown:(NSEvent *)event {
-    NSPoint point = [self convertPoint:[event locationInWindow] fromView:nil];
-    CGFloat worldSize = 256.0 * pow(2.0, (double)self.zoom);
-    double centerX = (self.centerLongitude + 180.0) / 360.0 * worldSize;
-    double sinLatitude = sin(self.centerLatitude * M_PI / 180.0);
-    sinLatitude = MAX(-0.9999, MIN(0.9999, sinLatitude));
-    double centerY = (0.5 - log((1.0 + sinLatitude) / (1.0 - sinLatitude)) / (4.0 * M_PI)) * worldSize;
-    double pixelX = centerX + point.x - NSMidX([self bounds]);
-    double pixelY = centerY + NSMidY([self bounds]) - point.y;
-    double longitude = pixelX / worldSize * 360.0 - 180.0;
-    double mercator = M_PI - 2.0 * M_PI * pixelY / worldSize;
-    double latitude = 180.0 / M_PI * atan(0.5 * (exp(mercator) - exp(-mercator)));
-    NSDictionary *coordinate = [NSDictionary dictionaryWithObjectsAndKeys:
-                                [NSNumber numberWithDouble:latitude], @"latitude",
-                                [NSNumber numberWithDouble:longitude], @"longitude", nil];
-    if (self.coordinateTarget && self.coordinateAction &&
-        [self.coordinateTarget respondsToSelector:self.coordinateAction]) {
-        [self.coordinateTarget performSelector:self.coordinateAction withObject:coordinate];
-    }
-}
-
-@end
 
 @interface TGLocationPickerWindowController ()
 @property (nonatomic, retain) TGTDLibClient *client;
@@ -59,12 +16,14 @@
 @property (nonatomic, assign) BOOL hasSelection;
 @property (nonatomic, assign) NSUInteger mapGeneration;
 @property (nonatomic, assign) NSUInteger searchGeneration;
+@property (nonatomic, assign) NSInteger mapZoom;
 @property (nonatomic, assign) CLLocationCoordinate2D selectedCoordinate;
 @property (nonatomic, retain) MKMapView *locationServiceMapView;
 @property (nonatomic, retain) MKPointAnnotation *selectionAnnotation;
+@property (nonatomic, retain) MKPinAnnotationView *selectionPinView;
 @property (nonatomic, retain) MKLocalSearch *activeSearch;
 @property (nonatomic, retain) CLGeocoder *activeGeocoder;
-@property (nonatomic, retain) TGLocationMapImageView *mapImageView;
+@property (nonatomic, retain) TGLocationStaticMapView *mapImageView;
 @property (nonatomic, retain) NSTextField *searchField;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSButton *searchButton;
@@ -82,9 +41,11 @@
 @synthesize hasSelection = _hasSelection;
 @synthesize mapGeneration = _mapGeneration;
 @synthesize searchGeneration = _searchGeneration;
+@synthesize mapZoom = _mapZoom;
 @synthesize selectedCoordinate = _selectedCoordinate;
 @synthesize locationServiceMapView = _locationServiceMapView;
 @synthesize selectionAnnotation = _selectionAnnotation;
+@synthesize selectionPinView = _selectionPinView;
 @synthesize activeSearch = _activeSearch;
 @synthesize activeGeocoder = _activeGeocoder;
 @synthesize mapImageView = _mapImageView;
@@ -104,6 +65,7 @@
     self = [super initWithWindow:window];
     if (self) {
         self.client = client;
+        self.mapZoom = 15;
         self.mapServicesAvailable = (NSClassFromString(@"MKMapView") != Nil &&
                                      NSClassFromString(@"MKLocalSearch") != Nil);
         [[self window] setTitle:TGLoc(@"share.location.title")];
@@ -121,6 +83,7 @@
     [_client release];
     [_locationServiceMapView release];
     [_selectionAnnotation release];
+    [_selectionPinView release];
     [_activeSearch release];
     [_activeGeocoder release];
     [_mapImageView release];
@@ -189,36 +152,47 @@
 
     TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 116.0, 592.0, 306.0)] autorelease];
     [root addSubview:mapCard];
-    self.mapImageView = [[[TGLocationMapImageView alloc] initWithFrame:NSMakeRect(30.0, 122.0, 580.0, 294.0)] autorelease];
-    [self.mapImageView setImageFrameStyle:NSImageFrameNone];
-    [self.mapImageView setImageScaling:NSImageScaleAxesIndependently];
+    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 122.0, 580.0, 294.0)] autorelease];
     [self.mapImageView setCoordinateTarget:self];
     [self.mapImageView setCoordinateAction:@selector(mapCoordinateChosen:)];
-    [self.mapImageView setZoom:15];
+    [self.mapImageView setZoom:self.mapZoom];
     [root addSubview:self.mapImageView];
 
     if (self.mapServicesAvailable) {
         self.locationServiceMapView = [[[NSClassFromString(@"MKMapView") alloc]
-            initWithFrame:NSMakeRect(30.0, 122.0, 580.0, 294.0)] autorelease];
+            initWithFrame:NSMakeRect(-4.0, -4.0, 1.0, 1.0)] autorelease];
         [self.locationServiceMapView setDelegate:(id)self];
-        [self.locationServiceMapView setZoomEnabled:YES];
-        [self.locationServiceMapView setScrollEnabled:YES];
-        if ([self.locationServiceMapView respondsToSelector:@selector(setShowsZoomControls:)]) {
-            [self.locationServiceMapView setShowsZoomControls:YES];
-        }
-        [self.locationServiceMapView setMapType:MKMapTypeStandard];
-        [self.locationServiceMapView setHidden:NO];
+        [self.locationServiceMapView setHidden:YES];
         [root addSubview:self.locationServiceMapView];
-        [self.mapImageView setHidden:YES];
 
         self.selectionAnnotation = [[[NSClassFromString(@"MKPointAnnotation") alloc] init] autorelease];
         [self.selectionAnnotation setTitle:TGLoc(@"share.location.selected")];
-        [self.locationServiceMapView addAnnotation:self.selectionAnnotation];
+        self.selectionPinView = [[[NSClassFromString(@"MKPinAnnotationView") alloc]
+            initWithAnnotation:self.selectionAnnotation reuseIdentifier:@"telegraphica-location-pin"] autorelease];
+        [self.selectionPinView setAnimatesDrop:NO];
+        [self.selectionPinView setCanShowCallout:NO];
+        NSRect pinFrame = [self.selectionPinView frame];
+        if (NSWidth(pinFrame) < 8.0 || NSHeight(pinFrame) < 8.0) {
+            pinFrame.size = NSMakeSize(32.0, 39.0);
+        }
+        pinFrame.origin = NSMakePoint(NSMidX([self.mapImageView frame]) - floor(NSWidth(pinFrame) / 2.0),
+                                      NSMidY([self.mapImageView frame]));
+        [self.selectionPinView setFrame:pinFrame];
+        [root addSubview:self.selectionPinView];
     } else {
         [self.currentLocationButton setEnabled:NO];
         [self.searchButton setEnabled:NO];
         [self.searchField setEnabled:NO];
     }
+
+    [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 382.0, 28.0, 28.0)
+                                      title:@"−"
+                                     action:@selector(zoomOutPressed:)
+                                    primary:NO]];
+    [root addSubview:[self buttonWithFrame:NSMakeRect(578.0, 382.0, 28.0, 28.0)
+                                      title:@"+"
+                                     action:@selector(zoomInPressed:)
+                                    primary:NO]];
 
     self.statusField = [self labelWithFrame:NSMakeRect(24.0, 91.0, 390.0, 18.0)
                                        text:TGLoc(@"share.location.ready")
@@ -250,16 +224,13 @@
     if (self.selectionAnnotation) {
         [self.selectionAnnotation setCoordinate:coordinate];
     }
-    [self.mapImageView setCenterLatitude:coordinate.latitude];
-    [self.mapImageView setCenterLongitude:coordinate.longitude];
+    if (![self.mapImageView image]) {
+        [self.mapImageView setCenterLatitude:coordinate.latitude];
+        [self.mapImageView setCenterLongitude:coordinate.longitude];
+    }
     [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"share.location.coordinates"),
                                       coordinate.latitude, coordinate.longitude]];
-    if (self.locationServiceMapView) {
-        if (reloadMap) {
-            MKCoordinateSpan span = MKCoordinateSpanMake(0.018, 0.018);
-            [self.locationServiceMapView setRegion:MKCoordinateRegionMake(coordinate, span) animated:NO];
-        }
-    } else if (reloadMap) {
+    if (reloadMap) {
         [self reloadMapThumbnail];
     }
 }
@@ -268,6 +239,7 @@
     self.mapGeneration++;
     NSUInteger generation = self.mapGeneration;
     CLLocationCoordinate2D coordinate = self.selectedCoordinate;
+    NSInteger zoom = self.mapZoom;
     [self.spinner startAnimation:nil];
     [self.statusField setStringValue:TGLoc(@"share.location.mapLoading")];
     TGTDLibClient *client = [self.client retain];
@@ -276,7 +248,7 @@
         NSError *error = nil;
         NSString *path = [[client mapThumbnailPathForLatitude:coordinate.latitude
                                                    longitude:coordinate.longitude
-                                                        zoom:15 width:580 height:294
+                                                        zoom:zoom width:580 height:294
                                                      timeout:12.0 error:&error] copy];
         NSImage *image = [path length] > 0 ? [[NSImage alloc] initWithContentsOfFile:path] : nil;
         NSString *failure = [[error localizedDescription] copy];
@@ -284,7 +256,10 @@
             if (generation == self.mapGeneration) {
                 [self.spinner stopAnimation:nil];
                 if (image) {
-                    [self.mapImageView setImage:image];
+                    [self.mapImageView setMapImage:image
+                                    centerLatitude:coordinate.latitude
+                                         longitude:coordinate.longitude
+                                              zoom:zoom];
                     [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"share.location.coordinates"),
                                                       coordinate.latitude, coordinate.longitude]];
                 } else {
@@ -304,6 +279,10 @@
 - (void)mapCoordinateChosen:(NSDictionary *)coordinate {
     CLLocationCoordinate2D selected = CLLocationCoordinate2DMake([[coordinate objectForKey:@"latitude"] doubleValue],
                                                                  [[coordinate objectForKey:@"longitude"] doubleValue]);
+    id zoom = [coordinate objectForKey:@"zoom"];
+    if ([zoom respondsToSelector:@selector(integerValue)]) {
+        self.mapZoom = MAX(13, MIN(18, [zoom integerValue]));
+    }
     [self setSelectedCoordinate:selected reloadMap:YES];
 }
 
@@ -316,27 +295,21 @@
     [self setSelectedCoordinate:[[userLocation location] coordinate] reloadMap:YES];
 }
 
-- (void)mapView:(MKMapView *)mapView regionDidChangeAnimated:(BOOL)animated {
-    (void)animated;
-    if (mapView != self.locationServiceMapView) {
-        return;
-    }
-    CLLocationCoordinate2D coordinate = [mapView centerCoordinate];
-    if (!CLLocationCoordinate2DIsValid(coordinate)) {
-        return;
-    }
-    self.selectedCoordinate = coordinate;
-    self.hasSelection = YES;
-    [self.selectionAnnotation setCoordinate:coordinate];
-    [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"share.location.coordinates"),
-                                      coordinate.latitude, coordinate.longitude]];
-}
-
 - (void)mapView:(MKMapView *)mapView didFailToLocateUserWithError:(NSError *)error {
     (void)mapView;
     self.waitingForUserLocation = NO;
     [self.spinner stopAnimation:nil];
     [self.statusField setStringValue:[error localizedDescription] ?: TGLoc(@"share.location.locationFailed")];
+}
+
+- (void)zoomOutPressed:(id)sender {
+    (void)sender;
+    [self.mapImageView requestZoomDelta:-1];
+}
+
+- (void)zoomInPressed:(id)sender {
+    (void)sender;
+    [self.mapImageView requestZoomDelta:1];
 }
 
 - (void)currentLocationPressed:(id)sender {
@@ -363,9 +336,7 @@
 
     MKLocalSearchRequest *request = [[[MKLocalSearchRequest alloc] init] autorelease];
     [request setNaturalLanguageQuery:query];
-    if (self.locationServiceMapView) {
-        [request setRegion:[self.locationServiceMapView region]];
-    }
+    [request setRegion:MKCoordinateRegionMake(self.selectedCoordinate, MKCoordinateSpanMake(0.08, 0.08))];
     self.activeSearch = [[[MKLocalSearch alloc] initWithRequest:request] autorelease];
     [self.spinner startAnimation:nil];
     [self.searchButton setEnabled:NO];

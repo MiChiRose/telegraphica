@@ -166,6 +166,8 @@ NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
                                 @"GIF",
                                 @"[Video]",
                                 @"Video",
+                                @"Location",
+                                @"Place",
                                 nil];
         NSUInteger index = 0;
         for (index = 0; index < [mediaLabels count]; index++) {
@@ -368,6 +370,12 @@ NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem) {
     }
     if ([contentType isEqualToString:@"messageVideo"]) {
         return @"Video";
+    }
+    if ([contentType isEqualToString:@"messageLocation"]) {
+        return @"Location";
+    }
+    if ([contentType isEqualToString:@"messageVenue"]) {
+        return @"Place";
     }
     return @"Photo";
 }

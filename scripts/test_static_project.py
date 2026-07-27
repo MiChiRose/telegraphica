@@ -421,17 +421,38 @@ def check_additional_message_types_contract(errors):
     for fragment in ["NSClassFromString(@\"MKMapView\")",
                      "MKLocalSearchRequest",
                      "setShowsUserLocation:YES",
-                     "setZoomEnabled:YES",
-                     "setScrollEnabled:YES",
-                     "setShowsZoomControls:YES",
-                     "MKPointAnnotation",
-                     "regionDidChangeAnimated:",
+                     "TGLocationStaticMapView",
+                     "MKPinAnnotationView",
+                     "reloadMapThumbnail",
                      "activeSearch",
                      "geocodeAddressString:",
                      "mapUnavailable"]:
         if fragment not in location_picker_text:
             errors.append("%s: location picker regression guard is missing `%s`" %
                           (location_picker_rel, fragment))
+
+    static_map_rel = os.path.join("Sources", "UI", "TGLocationStaticMapView.m")
+    static_map_text = read_text(os.path.join(ROOT, static_map_rel))
+    for fragment in ["openHandCursor",
+                     "closedHandCursor",
+                     "scrollWheel:",
+                     "hasPreciseScrollingDeltas",
+                     "magnifyWithEvent:",
+                     "requestZoomDelta:",
+                     "coordinateForPoint:"]:
+        if fragment not in static_map_text:
+            errors.append("%s: interactive map fallback is missing `%s`" %
+                          (static_map_rel, fragment))
+
+    location_messages_rel = os.path.join("Sources", "Core", "TGTDLibClient+LocationMessages.m")
+    location_messages_text = read_text(os.path.join(ROOT, location_messages_rel))
+    for fragment in ["messageLocation",
+                     "messageVenue",
+                     "mapThumbnailPathForLatitude:",
+                     'path, @"local_path"']:
+        if fragment not in location_messages_text:
+            errors.append("%s: location message thumbnail support is missing `%s`" %
+                          (location_messages_rel, fragment))
 
     date_picker_rel = os.path.join("Sources", "UI", "TGDatePickerDialog.m")
     date_picker_text = read_text(os.path.join(ROOT, date_picker_rel))

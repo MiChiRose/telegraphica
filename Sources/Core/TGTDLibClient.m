@@ -1,5 +1,6 @@
 #import "TGTDLibClient.h"
 #import "TGTDLibBundledCredentials.h"
+#import "TGTDLibClient+LocationMessages.h"
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
 #import "TGMessagePollSupport.h"
@@ -6531,6 +6532,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSUInteger index = 0;
     NSUInteger visualMediaDownloadsRemaining = 30;
     NSUInteger playableMediaDownloadsRemaining = 12;
+    NSUInteger locationMapDownloadsRemaining = 6;
     for (index = 0; index < [messages count]; index++) {
         id messageObject = [messages objectAtIndex:index];
         if (![messageObject isKindOfClass:[NSDictionary class]]) {
@@ -6785,6 +6787,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 [mediaInfo setObject:placeholder forKey:@"placeholder"];
             }
             [item setMediaItems:[NSArray arrayWithObject:mediaInfo]];
+        }
+        if (([contentType isEqualToString:@"messageLocation"] ||
+             [contentType isEqualToString:@"messageVenue"]) &&
+            locationMapDownloadsRemaining > 0) {
+            locationMapDownloadsRemaining--;
+            NSDictionary *locationMediaInfo = [self locationMediaInfoFromMessageContentObject:contentObject timeout:7.0];
+            if ([locationMediaInfo count] > 0) {
+                [item setMediaLocalPath:[locationMediaInfo objectForKey:@"local_path"]];
+                [item setMediaWidth:[locationMediaInfo objectForKey:@"width"]];
+                [item setMediaHeight:[locationMediaInfo objectForKey:@"height"]];
+                [item setMediaItems:[NSArray arrayWithObject:locationMediaInfo]];
+            }
         }
         [items addObject:item];
     }

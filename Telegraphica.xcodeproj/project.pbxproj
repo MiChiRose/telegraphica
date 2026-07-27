@@ -96,6 +96,8 @@
 		111111111111111111111188 /* TGSavedMessagesCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111380 /* TGSavedMessagesCell.m */; };
 		111111111111111111111190 /* TGBotCommandPanelView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111384 /* TGBotCommandPanelView.m */; };
 		111111111111111111111191 /* TGTDLibClient+MapThumbnail.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */; };
+		111111111111111111111194 /* TGLocationStaticMapView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111392 /* TGLocationStaticMapView.m */; };
+		111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111394 /* TGTDLibClient+LocationMessages.m */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
@@ -298,6 +300,10 @@
 		111111111111111111111384 /* TGBotCommandPanelView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotCommandPanelView.m; sourceTree = "<group>"; };
 		111111111111111111111385 /* TGTDLibClient+MapThumbnail.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MapThumbnail.h"; sourceTree = "<group>"; };
 		111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MapThumbnail.m"; sourceTree = "<group>"; };
+		111111111111111111111391 /* TGLocationStaticMapView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocationStaticMapView.h; sourceTree = "<group>"; };
+		111111111111111111111392 /* TGLocationStaticMapView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationStaticMapView.m; sourceTree = "<group>"; };
+		111111111111111111111393 /* TGTDLibClient+LocationMessages.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+LocationMessages.h"; sourceTree = "<group>"; };
+		111111111111111111111394 /* TGTDLibClient+LocationMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+LocationMessages.m"; sourceTree = "<group>"; };
 		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
@@ -417,6 +423,8 @@
 				111111111111111111111370 /* TGTDLibClient+Bots.m */,
 				111111111111111111111385 /* TGTDLibClient+MapThumbnail.h */,
 				111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */,
+				111111111111111111111393 /* TGTDLibClient+LocationMessages.h */,
+				111111111111111111111394 /* TGTDLibClient+LocationMessages.m */,
 				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
 				111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */,
 				111111111111111111111212 /* TGChatItem.h */,
@@ -507,6 +515,8 @@
 				111111111111111111111376 /* TGDatePickerDialog.m */,
 				111111111111111111111377 /* TGLocationPickerWindowController.h */,
 				111111111111111111111378 /* TGLocationPickerWindowController.m */,
+				111111111111111111111391 /* TGLocationStaticMapView.h */,
+				111111111111111111111392 /* TGLocationStaticMapView.m */,
 				111111111111111111111379 /* TGSavedMessagesCell.h */,
 				111111111111111111111380 /* TGSavedMessagesCell.m */,
 				111111111111111111111383 /* TGBotCommandPanelView.h */,
@@ -781,6 +791,8 @@
 				111111111111111111111188 /* TGSavedMessagesCell.m in Sources */,
 				111111111111111111111190 /* TGBotCommandPanelView.m in Sources */,
 				111111111111111111111191 /* TGTDLibClient+MapThumbnail.m in Sources */,
+				111111111111111111111194 /* TGLocationStaticMapView.m in Sources */,
+				111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,
