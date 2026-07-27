@@ -737,10 +737,20 @@ def check_primary_navigation_contract(errors):
     for fragment in [
         "profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth",
         "profileGroupedWidth - 44.0",
+        "[self showView:self.profileEditButton visible:showProfile];",
     ]:
         if fragment not in section_layout_text:
             errors.append("%s: safe profile action layout is missing `%s`" %
                           (section_layout_rel, fragment))
+    for fragment in [
+        "supportsMessageViewers",
+        '[messageViewersChatType isEqualToString:@"Group"]',
+        '[messageViewersChatType isEqualToString:@"Supergroup"]',
+        "if ([item outgoing] && supportsMessageViewers)",
+    ]:
+        if fragment not in message_menus_text:
+            errors.append("%s: message viewers visibility contract is missing `%s`" %
+                          (message_menus_rel, fragment))
 
     calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
     calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
@@ -750,6 +760,44 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: calls must use the shared panel/header shell" % calls_header_rel)
     if "NSHeight(bounds) - 68.0" not in calls_implementation_text:
         errors.append("%s: calls card must fill the panel body" % calls_implementation_rel)
+
+
+def check_retro_console_contract(errors):
+    module_rel = os.path.join("WorkshopModules", "RetroConsole")
+    controller_rel = os.path.join(module_rel, "TGRetroConsoleViewController.m")
+    display_rel = os.path.join(module_rel, "TGRetroDisplayView.m")
+    core_rel = os.path.join(module_rel, "TGRetroLibretroCore.m")
+    build_rel = os.path.join("WorkshopModules", "scripts", "build_modules.sh")
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    display_text = read_text(os.path.join(ROOT, display_rel))
+    core_text = read_text(os.path.join(ROOT, core_rel))
+    build_text = read_text(os.path.join(ROOT, build_rel))
+    for fragment in [
+        "Вставить картридж",
+        "setAllowedFileTypes:",
+        "quicknes_libretro",
+        "genesis_plus_gx_libretro",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: retro cartridge flow is missing `%s`" %
+                          (controller_rel, fragment))
+    for fragment in ["NSFilenamesPboardType", "performDragOperation:", "keyDown:", "keyUp:"]:
+        if fragment not in display_text:
+            errors.append("%s: retro drag/drop or keyboard input is missing `%s`" %
+                          (display_rel, fragment))
+    for fragment in ["dlopen", "retro_load_game", "AudioOutputUnitStart", "renderAudioFrames:"]:
+        if fragment not in core_text:
+            errors.append("%s: retro runtime is missing `%s`" % (core_rel, fragment))
+    for fragment in ["QUICKNES_CORE_PATH", "GENESIS_PLUS_GX_CORE_PATH", 'build_module "RetroConsole"']:
+        if fragment not in build_text:
+            errors.append("%s: retro core packaging is missing `%s`" % (build_rel, fragment))
+
+    forbidden_extensions = (".nes", ".smd", ".gen", ".sms", ".gg", ".sg")
+    for directory, _, filenames in os.walk(os.path.join(ROOT, module_rel)):
+        for filename in filenames:
+            if filename.lower().endswith(forbidden_extensions):
+                errors.append("%s: game images must never be bundled" %
+                              os.path.relpath(os.path.join(directory, filename), ROOT))
 
 
 def main():
@@ -769,6 +817,7 @@ def main():
     check_additional_message_types_contract(errors)
     check_media_file_management_contract(errors)
     check_primary_navigation_contract(errors)
+    check_retro_console_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

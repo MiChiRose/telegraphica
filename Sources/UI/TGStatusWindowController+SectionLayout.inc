@@ -226,6 +226,7 @@
     [self showView:self.profileDetailsSeparatorOne visible:(showProfileDetails && profileDetailRows > 1)];
     [self showView:self.profileDetailsSeparatorTwo visible:(showProfileDetails && profileDetailRows > 2)];
     [self showView:self.profileRefreshButton visible:NO];
+    [self showView:self.profileEditButton visible:showProfile];
     [self showView:self.logoutButton visible:showProfile];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);

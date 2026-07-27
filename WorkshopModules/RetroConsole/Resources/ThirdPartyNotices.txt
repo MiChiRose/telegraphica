@@ -1,0 +1,18 @@
+Retro Console uses separately loaded libretro-compatible cores.
+
+QuickNES Core
+Copyright its contributors.
+License: GNU General Public License version 2.
+Source: https://github.com/libretro/QuickNES_Core
+Pinned revision for the Telegraphica build: 26bb785
+
+Genesis Plus GX
+Copyright (c) 1998-2003 Charles MacDonald.
+Copyright (c) 2007-2026 Eke-Eke and contributors.
+Redistribution is limited to non-commercial use and requires source availability.
+Source: https://github.com/libretro/Genesis-Plus-GX
+Pinned revision for the Telegraphica build: f687c49
+
+No game images, ROM files, firmware or console artwork are included.
+Users must select files they are legally entitled to use.
+
