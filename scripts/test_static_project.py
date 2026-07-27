@@ -269,6 +269,8 @@ def check_unified_legacy_contract(errors):
         "TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH",
         "libtdjson-mountain-lion.dylib",
         "Preserved the existing generated Telegram connection provider.",
+        "Found the existing Mavericks-and-newer TDLib JSON library.",
+        "Found the existing Mountain Lion TDLib JSON library.",
     ]:
         if fragment not in build_text:
             errors.append("%s: unified legacy build contract is missing `%s`" %
