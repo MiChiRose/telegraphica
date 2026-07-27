@@ -44,6 +44,7 @@
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+Notifications.h"
+#import "../Core/TGTDLibClient+MessageTypes.h"
 #import "../Services/TGLocalDataReset.h"
 #import "../Services/TGDownloadManager.h"
 #import "../Services/TGLogger.h"

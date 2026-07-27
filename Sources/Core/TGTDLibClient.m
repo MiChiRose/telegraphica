@@ -6227,6 +6227,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                             @"Sticker", @"messageSticker",
                             @"Contact", @"messageContact",
                             @"Location", @"messageLocation",
+                            @"Place", @"messageVenue",
+                            @"Dice", @"messageDice",
                             @"Poll", @"messagePoll",
                             @"Call", @"messageCall",
                             @"Invoice", @"messageInvoice",
@@ -6244,6 +6246,22 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0) {
                 label = [NSString stringWithFormat:@"%@ %@", label, emoji];
             }
+        }
+    }
+    if ([type isEqualToString:@"messageVenue"]) {
+        NSDictionary *venue = [[content objectForKey:@"venue"] isKindOfClass:[NSDictionary class]]
+            ? [content objectForKey:@"venue"] : nil;
+        NSString *title = [[venue objectForKey:@"title"] isKindOfClass:[NSString class]]
+            ? [venue objectForKey:@"title"] : @"";
+        if ([title length] > 0) {
+            label = [NSString stringWithFormat:@"%@: %@", label, title];
+        }
+    }
+    if ([type isEqualToString:@"messageDice"]) {
+        NSString *emoji = [[content objectForKey:@"emoji"] isKindOfClass:[NSString class]]
+            ? [content objectForKey:@"emoji"] : @"";
+        if ([emoji length] > 0) {
+            label = emoji;
         }
     }
     if ([type isEqualToString:@"messageDocument"]) {

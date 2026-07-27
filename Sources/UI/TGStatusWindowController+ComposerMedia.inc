@@ -2486,20 +2486,20 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [alert addButtonWithTitle:TGLoc(@"send")];
     [alert addButtonWithTitle:TGLoc(@"cancel")];
 
-    NSView *accessory = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 390, 194)] autorelease];
-    NSTextField *questionLabel = [self labelWithFrame:NSMakeRect(0, 170, 390, 18)
+    NSView *accessory = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 390, 286)] autorelease];
+    NSTextField *questionLabel = [self labelWithFrame:NSMakeRect(0, 262, 390, 18)
                                                  text:TGLoc(@"poll.create.question")
                                                  font:[NSFont systemFontOfSize:12.0]];
     [accessory addSubview:questionLabel];
-    NSTextField *questionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 145, 390, 22)] autorelease];
+    NSTextField *questionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 237, 390, 22)] autorelease];
     [questionField setStringValue:@""];
     [accessory addSubview:questionField];
 
-    NSTextField *optionsLabel = [self labelWithFrame:NSMakeRect(0, 120, 390, 18)
+    NSTextField *optionsLabel = [self labelWithFrame:NSMakeRect(0, 212, 390, 18)
                                                 text:TGLoc(@"poll.create.options")
                                                 font:[NSFont systemFontOfSize:12.0]];
     [accessory addSubview:optionsLabel];
-    NSScrollView *optionsScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 42, 390, 76)] autorelease];
+    NSScrollView *optionsScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 132, 390, 78)] autorelease];
     [optionsScroll setHasVerticalScroller:YES];
     [optionsScroll setBorderType:NSBezelBorder];
     NSTextView *optionsView = [[[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 372, 76)] autorelease];
@@ -2507,15 +2507,33 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [optionsScroll setDocumentView:optionsView];
     [accessory addSubview:optionsScroll];
 
-    NSButton *multipleButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 20, 185, 18)] autorelease];
+    NSButton *multipleButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 108, 185, 18)] autorelease];
     [multipleButton setButtonType:NSSwitchButton];
     [multipleButton setTitle:TGLoc(@"poll.create.multiple")];
     [accessory addSubview:multipleButton];
-    NSButton *anonymousButton = [[[NSButton alloc] initWithFrame:NSMakeRect(198, 20, 185, 18)] autorelease];
+    NSButton *anonymousButton = [[[NSButton alloc] initWithFrame:NSMakeRect(198, 108, 185, 18)] autorelease];
     [anonymousButton setButtonType:NSSwitchButton];
     [anonymousButton setTitle:TGLoc(@"poll.create.anonymous")];
     [anonymousButton setState:NSOnState];
     [accessory addSubview:anonymousButton];
+
+    NSButton *quizButton = [[[NSButton alloc] initWithFrame:NSMakeRect(0, 82, 185, 18)] autorelease];
+    [quizButton setButtonType:NSSwitchButton];
+    [quizButton setTitle:TGLoc(@"poll.create.quiz")];
+    [accessory addSubview:quizButton];
+    NSTextField *correctLabel = [self labelWithFrame:NSMakeRect(198, 82, 132, 18)
+                                                text:TGLoc(@"poll.create.correct")
+                                                font:[NSFont systemFontOfSize:11.0]];
+    [accessory addSubview:correctLabel];
+    NSTextField *correctField = [[[NSTextField alloc] initWithFrame:NSMakeRect(334, 79, 56, 22)] autorelease];
+    [[correctField cell] setPlaceholderString:@"1"];
+    [accessory addSubview:correctField];
+    NSTextField *explanationLabel = [self labelWithFrame:NSMakeRect(0, 56, 390, 18)
+                                                    text:TGLoc(@"poll.create.explanation")
+                                                    font:[NSFont systemFontOfSize:11.0]];
+    [accessory addSubview:explanationLabel];
+    NSTextField *explanationField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 30, 390, 22)] autorelease];
+    [accessory addSubview:explanationField];
 
     NSTextField *errorField = [self labelWithFrame:NSMakeRect(0, 0, 390, 16)
                                               text:@""
@@ -2546,6 +2564,21 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSArray *optionsCopy = [options copy];
     BOOL allowMultiple = ([multipleButton state] == NSOnState);
     BOOL anonymous = ([anonymousButton state] == NSOnState);
+    BOOL quiz = ([quizButton state] == NSOnState);
+    NSInteger correctOptionIndex = [[correctField stringValue] integerValue] - 1;
+    NSString *explanation = [[explanationField stringValue] copy];
+    if (quiz && (correctOptionIndex < 0 || (NSUInteger)correctOptionIndex >= [optionsCopy count])) {
+        NSRunAlertPanel(TGLoc(@"poll.create.failed"), @"%@", TGLoc(@"ok"), nil, nil,
+                        TGLoc(@"poll.create.error.correct"));
+        [explanation release];
+        [optionsCopy release];
+        [questionCopy release];
+        [messageTopicKind release];
+        [messageThreadID release];
+        [chatID release];
+        [self requestComposerRefocus];
+        return;
+    }
     TGTDLibClient *client = [self.client retain];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:TGLoc(@"poll.create.sending")];
@@ -2556,15 +2589,26 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *sendError = nil;
-        NSString *summary = [[client sendPollMessageToChatID:chatID
-                                             messageThreadID:messageThreadID
-                                            messageTopicKind:messageTopicKind
-                                                    question:questionCopy
-                                                     options:optionsCopy
-                                        allowMultipleAnswers:allowMultiple
-                                                   anonymous:anonymous
-                                                     timeout:8.0
-                                                       error:&sendError] copy];
+        NSString *summary = quiz
+            ? [[client sendQuizMessageToChatID:chatID
+                              messageThreadID:messageThreadID
+                             messageTopicKind:messageTopicKind
+                                     question:questionCopy
+                                      options:optionsCopy
+                           correctOptionIndex:correctOptionIndex
+                                  explanation:explanation
+                                    anonymous:anonymous
+                                      timeout:8.0
+                                        error:&sendError] copy]
+            : [[client sendPollMessageToChatID:chatID
+                               messageThreadID:messageThreadID
+                              messageTopicKind:messageTopicKind
+                                      question:questionCopy
+                                       options:optionsCopy
+                          allowMultipleAnswers:allowMultiple
+                                     anonymous:anonymous
+                                       timeout:8.0
+                                         error:&sendError] copy];
         NSString *errorMessage = [[sendError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if ([summary length] > 0) {
@@ -2582,6 +2626,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [errorMessage release];
             [optionsCopy release];
             [questionCopy release];
+            [explanation release];
             [messageTopicKind release];
             [messageThreadID release];
             [chatID release];
@@ -2608,8 +2653,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSDictionary *valuesCopy = [values copy];
     TGTDLibClient *client = [self.client retain];
     BOOL sharingContact = [kindCopy isEqualToString:@"contact"];
+    BOOL sharingLocation = [kindCopy isEqualToString:@"location"];
     [self setControlsBusy:YES];
-    [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.sending" : @"share.location.sending")];
+    [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.sending" :
+                                           (sharingLocation ? @"share.location.sending" : @"share.extra.sending"))];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -2625,7 +2672,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                         replyToMessageID:replyToMessageID
                                                  timeout:8.0
                                                    error:&sendError] copy];
-        } else {
+        } else if (sharingLocation) {
             summary = [[client sendLocationMessageToChatID:chatID
                                            messageThreadID:messageThreadID
                                           messageTopicKind:messageTopicKind
@@ -2634,22 +2681,61 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                            replyToMessageID:replyToMessageID
                                                     timeout:8.0
                                                       error:&sendError] copy];
+        } else if ([kindCopy isEqualToString:@"venue"]) {
+            summary = [[client sendVenueMessageToChatID:chatID
+                                        messageThreadID:messageThreadID
+                                       messageTopicKind:messageTopicKind
+                                               latitude:[[valuesCopy objectForKey:@"latitude"] doubleValue]
+                                              longitude:[[valuesCopy objectForKey:@"longitude"] doubleValue]
+                                                  title:[valuesCopy objectForKey:@"title"]
+                                                address:[valuesCopy objectForKey:@"address"]
+                                       replyToMessageID:replyToMessageID
+                                                timeout:8.0
+                                                  error:&sendError] copy];
+        } else if ([kindCopy isEqualToString:@"live_location"]) {
+            summary = [[client sendLiveLocationMessageToChatID:chatID
+                                               messageThreadID:messageThreadID
+                                              messageTopicKind:messageTopicKind
+                                                      latitude:[[valuesCopy objectForKey:@"latitude"] doubleValue]
+                                                     longitude:[[valuesCopy objectForKey:@"longitude"] doubleValue]
+                                                    livePeriod:[[valuesCopy objectForKey:@"live_period"] integerValue]
+                                              replyToMessageID:replyToMessageID
+                                                       timeout:8.0
+                                                         error:&sendError] copy];
+        } else if ([kindCopy isEqualToString:@"dice"]) {
+            summary = [[client sendDiceMessageToChatID:chatID
+                                       messageThreadID:messageThreadID
+                                      messageTopicKind:messageTopicKind
+                                                 emoji:[valuesCopy objectForKey:@"emoji"]
+                                      replyToMessageID:replyToMessageID
+                                               timeout:8.0
+                                                 error:&sendError] copy];
+        } else if ([kindCopy isEqualToString:@"video_note"]) {
+            summary = [[client sendVideoNoteMessageToChatID:chatID
+                                            messageThreadID:messageThreadID
+                                           messageTopicKind:messageTopicKind
+                                                  localPath:[valuesCopy objectForKey:@"path"]
+                                           replyToMessageID:replyToMessageID
+                                                    timeout:12.0
+                                                      error:&sendError] copy];
         }
         NSString *errorMessage = [[sendError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameChat = ([self.selectedChatID respondsToSelector:@selector(longLongValue)] &&
                              [self.selectedChatID longLongValue] == [chatID longLongValue]);
             if ([summary length] > 0) {
-                [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.sent" : @"share.location.sent")];
+                [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.sent" :
+                                                       (sharingLocation ? @"share.location.sent" : @"share.extra.sent"))];
                 if (sameChat && replyToMessageID) {
                     [self clearReplyTarget];
                 }
                 self.forceMessageScrollToNewest = YES;
                 [self refreshSelectedChatMessages:self];
             } else {
-                [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.failed" : @"share.location.failed")];
+                [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.failed" :
+                                                       (sharingLocation ? @"share.location.failed" : @"share.extra.failed"))];
                 [self appendDetail:[NSString stringWithFormat:@"%@ send failed: %@",
-                                    sharingContact ? @"Contact" : @"Location",
+                                    kindCopy,
                                     [errorMessage length] > 0 ? errorMessage : @"unknown error"]];
             }
             [self setControlsBusy:NO];
@@ -2688,6 +2774,51 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     }
 }
 
+- (void)shareVenueFromComposerMenu:(id)sender {
+    (void)sender;
+    NSDictionary *venue = [TGMessageActionDialogs venueToShare];
+    if (venue) {
+        [self sendSharedComposerItemWithKind:@"venue" values:venue];
+    } else {
+        [self requestComposerRefocus];
+    }
+}
+
+- (void)shareLiveLocationFromComposerMenu:(id)sender {
+    (void)sender;
+    NSDictionary *location = [TGMessageActionDialogs liveLocationToShare];
+    if (location) {
+        [self sendSharedComposerItemWithKind:@"live_location" values:location];
+    } else {
+        [self requestComposerRefocus];
+    }
+}
+
+- (void)sendDiceFromComposerMenu:(id)sender {
+    NSString *emoji = [sender representedObject];
+    if ([emoji length] > 0) {
+        [self sendSharedComposerItemWithKind:@"dice"
+                                     values:[NSDictionary dictionaryWithObject:emoji forKey:@"emoji"]];
+    }
+}
+
+- (void)sendVideoNoteFromComposerMenu:(id)sender {
+    (void)sender;
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    [panel setCanChooseFiles:YES];
+    [panel setCanChooseDirectories:NO];
+    [panel setAllowsMultipleSelection:NO];
+    [panel setAllowedFileTypes:[NSArray arrayWithObjects:@"mp4", @"m4v", @"mov", nil]];
+    [panel setTitle:TGLoc(@"share.videoNote.title")];
+    if ([panel runModal] != NSFileHandlingPanelOKButton || [[panel URLs] count] == 0) {
+        [self requestComposerRefocus];
+        return;
+    }
+    NSString *path = [[[panel URLs] objectAtIndex:0] path];
+    [self sendSharedComposerItemWithKind:@"video_note"
+                                 values:[NSDictionary dictionaryWithObject:path forKey:@"path"]];
+}
+
 - (void)attachPhoto:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
@@ -2711,6 +2842,37 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                    keyEquivalent:@""] autorelease];
     [locationItem setTarget:self];
     [menu addItem:locationItem];
+    NSMenuItem *venueItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.venue.menu")
+                                                       action:@selector(shareVenueFromComposerMenu:)
+                                                keyEquivalent:@""] autorelease];
+    [venueItem setTarget:self];
+    [menu addItem:venueItem];
+    NSMenuItem *liveLocationItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.liveLocation.menu")
+                                                              action:@selector(shareLiveLocationFromComposerMenu:)
+                                                       keyEquivalent:@""] autorelease];
+    [liveLocationItem setTarget:self];
+    [menu addItem:liveLocationItem];
+    NSMenuItem *videoNoteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.videoNote.menu")
+                                                           action:@selector(sendVideoNoteFromComposerMenu:)
+                                                    keyEquivalent:@""] autorelease];
+    [videoNoteItem setTarget:self];
+    [menu addItem:videoNoteItem];
+    NSMenuItem *diceItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.dice.menu")
+                                                      action:nil
+                                               keyEquivalent:@""] autorelease];
+    NSMenu *diceMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"share.dice.menu")] autorelease];
+    NSArray *diceEmojis = [NSArray arrayWithObjects:@"🎲", @"🎯", @"🏀", @"⚽", @"🎳", @"🎰", nil];
+    NSString *diceEmoji = nil;
+    for (diceEmoji in diceEmojis) {
+        NSMenuItem *choice = [[[NSMenuItem alloc] initWithTitle:diceEmoji
+                                                        action:@selector(sendDiceFromComposerMenu:)
+                                                 keyEquivalent:@""] autorelease];
+        [choice setTarget:self];
+        [choice setRepresentedObject:diceEmoji];
+        [diceMenu addItem:choice];
+    }
+    [diceItem setSubmenu:diceMenu];
+    [menu addItem:diceItem];
     [menu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *formatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format")
                                                         action:nil

@@ -123,6 +123,77 @@
             nil];
 }
 
++ (NSDictionary *)venueToShare {
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"share.venue.title")];
+    [alert setInformativeText:TGLoc(@"share.venue.hint")];
+    [alert addButtonWithTitle:TGLoc(@"send")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    NSView *accessory = [[[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 390.0, 154.0)] autorelease];
+    NSArray *labels = [NSArray arrayWithObjects:TGLoc(@"share.venue.name"), TGLoc(@"share.venue.address"),
+                       TGLoc(@"share.location.latitude"), TGLoc(@"share.location.longitude"), nil];
+    NSMutableArray *fields = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [labels count]; index++) {
+        CGFloat columnX = (index % 2 == 0) ? 0.0 : 200.0;
+        CGFloat y = (index < 2) ? 126.0 : 62.0;
+        [accessory addSubview:[self labelWithFrame:NSMakeRect(columnX, y, 190.0, 18.0)
+                                              text:[labels objectAtIndex:index]]];
+        NSTextField *field = [[[NSTextField alloc] initWithFrame:NSMakeRect(columnX, y - 26.0, 190.0, 22.0)] autorelease];
+        [accessory addSubview:field];
+        [fields addObject:field];
+    }
+    [alert setAccessoryView:accessory];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return nil;
+    }
+    double latitude = 0.0;
+    double longitude = 0.0;
+    NSString *title = [[(NSTextField *)[fields objectAtIndex:0] stringValue]
+                       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *address = [[(NSTextField *)[fields objectAtIndex:1] stringValue]
+                         stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    BOOL valid = [title length] > 0 &&
+        [self scanCoordinateText:[(NSTextField *)[fields objectAtIndex:2] stringValue] value:&latitude] &&
+        [self scanCoordinateText:[(NSTextField *)[fields objectAtIndex:3] stringValue] value:&longitude] &&
+        latitude >= -90.0 && latitude <= 90.0 && longitude >= -180.0 && longitude <= 180.0;
+    if (!valid) {
+        NSRunAlertPanel(TGLoc(@"share.venue.failed"), @"%@", TGLoc(@"ok"), nil, nil,
+                        TGLoc(@"share.venue.error"));
+        return nil;
+    }
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            title, @"title", address, @"address",
+            [NSNumber numberWithDouble:latitude], @"latitude",
+            [NSNumber numberWithDouble:longitude], @"longitude", nil];
+}
+
++ (NSDictionary *)liveLocationToShare {
+    NSMutableDictionary *values = [[[self locationToShare] mutableCopy] autorelease];
+    if (!values) {
+        return nil;
+    }
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"share.liveLocation.duration")];
+    [alert setInformativeText:TGLoc(@"share.liveLocation.warning")];
+    [alert addButtonWithTitle:TGLoc(@"send")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    NSPopUpButton *popup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(0.0, 0.0, 300.0, 28.0) pullsDown:NO] autorelease];
+    NSArray *periods = [NSArray arrayWithObjects:@900, @3600, @28800, @86400, nil];
+    NSArray *keys = [NSArray arrayWithObjects:@"15m", @"1h", @"8h", @"24h", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [periods count]; index++) {
+        [popup addItemWithTitle:TGLoc([@"share.liveLocation." stringByAppendingString:[keys objectAtIndex:index]])];
+        [[popup lastItem] setRepresentedObject:[periods objectAtIndex:index]];
+    }
+    [alert setAccessoryView:popup];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return nil;
+    }
+    [values setObject:[[popup selectedItem] representedObject] forKey:@"live_period"];
+    return values;
+}
+
 + (NSString *)editedTextForCurrentText:(NSString *)currentText {
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
     [alert setMessageText:TGLoc(@"message.edit.title")];
