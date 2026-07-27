@@ -2777,6 +2777,81 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)sendMessage:(id)sender {
     (void)sender;
+    [self sendMessageWithOptions:nil];
+}
+
+- (void)sendMessageSilently:(id)sender {
+    (void)sender;
+    [self sendMessageWithOptions:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES]
+                                                             forKey:@"silent"]];
+}
+
+- (void)sendMessageWhenOnline:(id)sender {
+    (void)sender;
+    [self sendMessageWithOptions:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES]
+                                                             forKey:@"send_when_online"]];
+}
+
+- (void)sendMessageWithoutLinkPreview:(id)sender {
+    (void)sender;
+    [self sendMessageWithOptions:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES]
+                                                             forKey:@"disable_link_preview"]];
+}
+
+- (void)sendMessageWithPreviewAboveText:(id)sender {
+    (void)sender;
+    [self sendMessageWithOptions:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES]
+                                                             forKey:@"preview_above_text"]];
+}
+
+- (void)showScheduledMessages:(id)sender {
+    (void)sender;
+    if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
+        NSBeep();
+        return;
+    }
+    if (self.scheduledMessagesWindowController) {
+        [[self.scheduledMessagesWindowController window] close];
+        self.scheduledMessagesWindowController = nil;
+    }
+    self.scheduledMessagesWindowController = [[[TGScheduledMessagesWindowController alloc] initWithClient:self.client
+                                                                                                   chatID:self.selectedChatID
+                                                                                                    title:self.selectedChatTitle] autorelease];
+    [[self.scheduledMessagesWindowController window] center];
+    [self.scheduledMessagesWindowController showWindow:self];
+    [[self.scheduledMessagesWindowController window] makeKeyAndOrderFront:self];
+    [self.scheduledMessagesWindowController reloadMessages];
+}
+
+- (void)scheduleMessage:(id)sender {
+    (void)sender;
+    NSDatePicker *picker = [[[NSDatePicker alloc] initWithFrame:NSMakeRect(0, 0, 260, 28)] autorelease];
+    [picker setDatePickerStyle:NSClockAndCalendarDatePickerStyle];
+    [picker setDatePickerElements:(NSYearMonthDayDatePickerElementFlag |
+                                   NSHourMinuteDatePickerElementFlag)];
+    [picker setMinDate:[NSDate dateWithTimeIntervalSinceNow:60.0]];
+    [picker setDateValue:[NSDate dateWithTimeIntervalSinceNow:60.0 * 60.0]];
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"composer.schedule.title")];
+    [alert setInformativeText:TGLoc(@"composer.schedule.help")];
+    [alert setAccessoryView:picker];
+    [alert addButtonWithTitle:TGLoc(@"composer.schedule.action")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+    NSInteger timestamp = (NSInteger)[[picker dateValue] timeIntervalSince1970];
+    if (timestamp <= (NSInteger)[[NSDate date] timeIntervalSince1970] + 30) {
+        [self.statusField setStringValue:TGLoc(@"composer.schedule.invalid")];
+        NSBeep();
+        return;
+    }
+    [self sendMessageWithOptions:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:timestamp]
+                                                             forKey:@"schedule_date"]];
+}
+
+- (void)sendMessageWithOptions:(NSDictionary *)sendOptions {
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget) {
         [self appendDetail:@"Select a chat after sign-in is ready before sending."];
@@ -2798,6 +2873,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSNumber *messageThreadID = [self.selectedMessageThreadID retain];
     NSString *messageTopicKind = [self.selectedMessageTopicKind copy];
     NSString *messageText = [text copy];
+    NSDictionary *messageSendOptions = [sendOptions copy];
     NSArray *messageChunks = [TGOutgoingTextMessageChunks(messageText) retain];
     NSNumber *replyToMessageID = nil;
     if (self.replyTargetMessageItem &&
@@ -2834,6 +2910,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                   messageTopicKind:messageTopicKind
                                                                text:chunkText
                                                     replyToMessageID:chunkReplyToMessageID
+                                                        sendOptions:messageSendOptions
                                                             timeout:8.0
                                                               error:&chunkError];
             if ([sendSummary length] == 0) {
@@ -2915,6 +2992,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [messageThreadID release];
             [messageTopicKind release];
             [messageText release];
+            [messageSendOptions release];
             [messageChunks release];
             [replyToMessageID release];
         });

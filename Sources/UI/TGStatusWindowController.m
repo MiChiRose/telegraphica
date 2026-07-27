@@ -17,6 +17,7 @@
 #import "TGProfileEditWindowController.h"
 #import "TGStatusButtonCells.h"
 #import "TGSectionTitleField.h"
+#import "TGScheduledMessagesWindowController.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusSupport.h"
@@ -262,6 +263,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGChatFolderManagementWindowController *chatFolderManagementWindowController;
 @property (nonatomic, retain) TGChatInfoWindowController *chatInfoWindowController;
 @property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
+@property (nonatomic, retain) TGScheduledMessagesWindowController *scheduledMessagesWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) TGSectionTitleField *settingsProfileSectionField;
@@ -1062,6 +1064,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatFolderManagementWindowController = _chatFolderManagementWindowController;
 @synthesize chatInfoWindowController = _chatInfoWindowController;
 @synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
+@synthesize scheduledMessagesWindowController = _scheduledMessagesWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -2814,6 +2817,32 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.sendMessageButton setBordered:NO];
     [self.sendMessageButton setToolTip:@"Send message"];
     [self.sendMessageButton setAutoresizingMask:NSViewMaxYMargin];
+    NSMenu *sendOptionsMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"composer.sendOptions")] autorelease];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.sendSilent")
+                               action:@selector(sendMessageSilently:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.schedule.action")
+                               action:@selector(scheduleMessage:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.sendWhenOnline")
+                               action:@selector(sendMessageWhenOnline:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItem:[NSMenuItem separatorItem]];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.noLinkPreview")
+                               action:@selector(sendMessageWithoutLinkPreview:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.previewAbove")
+                               action:@selector(sendMessageWithPreviewAboveText:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItem:[NSMenuItem separatorItem]];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"scheduled.open")
+                               action:@selector(showScheduledMessages:)
+                        keyEquivalent:@""];
+    NSUInteger sendOptionIndex = 0;
+    for (sendOptionIndex = 0; sendOptionIndex < [[sendOptionsMenu itemArray] count]; sendOptionIndex++) {
+        [[[sendOptionsMenu itemArray] objectAtIndex:sendOptionIndex] setTarget:self];
+    }
+    [self.sendMessageButton setMenu:sendOptionsMenu];
     [contentView addSubview:self.sendMessageButton];
 
     self.checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 28, 140, 32)] autorelease];
@@ -4277,6 +4306,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatInfoWindowController release];
     [[_notificationSettingsWindowController window] close];
     [_notificationSettingsWindowController release];
+    [[_scheduledMessagesWindowController window] close];
+    [_scheduledMessagesWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_profileEditButton release];
