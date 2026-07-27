@@ -1,0 +1,20 @@
+diff --git a/os/posix/NetworkSocketPosix.cpp b/os/posix/NetworkSocketPosix.cpp
+index 18a7370..6135d40 100644
+--- a/os/posix/NetworkSocketPosix.cpp
++++ b/os/posix/NetworkSocketPosix.cpp
+@@ -58,12 +58,14 @@ NetworkSocketPosix::~NetworkSocketPosix(){
+ }
+ 
+ void NetworkSocketPosix::SetMaxPriority(){
+-#ifdef __APPLE__
++#if defined(__APPLE__) && defined(SO_NET_SERVICE_TYPE) && defined(NET_SERVICE_TYPE_VO)
+ 	int prio=NET_SERVICE_TYPE_VO;
+ 	int res=setsockopt(fd, SOL_SOCKET, SO_NET_SERVICE_TYPE, &prio, sizeof(prio));
+ 	if(res<0){
+ 		LOGE("error setting darwin-specific net priority: %d / %s", errno, strerror(errno));
+ 	}
++#elif defined(__APPLE__)
++	LOGI("darwin socket priority is unavailable in this SDK");
+ #elif defined(__linux__)
+ 	int prio=6;
+ 	int res=setsockopt(fd, SOL_SOCKET, SO_PRIORITY, &prio, sizeof(prio));
