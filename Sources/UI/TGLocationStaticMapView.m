@@ -6,7 +6,6 @@
 @property (nonatomic, assign) NSPoint previewOffset;
 @property (nonatomic, assign) NSInteger requestedZoom;
 @property (nonatomic, assign) CGFloat magnificationAccumulator;
-@property (nonatomic, retain) NSImage *selectionPinImage;
 @end
 
 @implementation TGLocationStaticMapView
