@@ -97,6 +97,10 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @synthesize delegate = _delegate;
 
+- (CGFloat)initialDragWidth {
+    return _initialWidth;
+}
+
 - (BOOL)isFlipped {
     return YES;
 }

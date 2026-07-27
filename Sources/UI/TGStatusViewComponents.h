@@ -26,6 +26,7 @@
     NSPoint _initialScreenPoint;
 }
 @property (nonatomic, assign) id<TGSidebarResizeHandleDelegate> delegate;
+- (CGFloat)initialDragWidth;
 @end
 
 @protocol TGSidebarResizeHandleDelegate <NSObject>

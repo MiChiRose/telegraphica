@@ -359,6 +359,10 @@
     return 78.0;
 }
 
+- (CGFloat)standardChatSidebarWidth {
+    return 292.0;
+}
+
 - (CGFloat)maximumChatSidebarWidthForWindowWidth:(CGFloat)windowWidth mainX:(CGFloat)mainX margin:(CGFloat)margin {
     CGFloat available = windowWidth - mainX - margin - 320.0 - 10.0;
     return MAX([self minimumChatSidebarWidth], MIN(420.0, available));
@@ -374,16 +378,26 @@
 }
 
 - (void)sidebarResizeHandle:(TGSidebarResizeHandleView *)handle requestedWidth:(CGFloat)width {
-    (void)handle;
     NSView *contentView = [[self window] contentView];
     CGFloat margin = 10.0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
     CGFloat mainX = (!drawerHidden && self.drawerOpen) ? 128.0 : margin;
-    CGFloat clampedWidth = MAX([self minimumChatSidebarWidth],
-                               MIN([self maximumChatSidebarWidthForWindowWidth:NSWidth([contentView bounds])
-                                                                        mainX:mainX
-                                                                       margin:margin],
-                                   width));
+    CGFloat minimumWidth = [self minimumChatSidebarWidth];
+    CGFloat maximumWidth = [self maximumChatSidebarWidthForWindowWidth:NSWidth([contentView bounds])
+                                                                  mainX:mainX
+                                                                 margin:margin];
+    CGFloat standardWidth = MIN([self standardChatSidebarWidth], maximumWidth);
+    CGFloat initialWidth = [handle initialDragWidth];
+    CGFloat dragDelta = width - initialWidth;
+    CGFloat clampedWidth = minimumWidth;
+    if (initialWidth < standardWidth - 0.5) {
+        if (dragDelta > 0.0) {
+            clampedWidth = MIN(maximumWidth, standardWidth + MAX(0.0, dragDelta - 8.0));
+        }
+    } else {
+        CGFloat naturalWidth = MAX(minimumWidth, MIN(maximumWidth, width));
+        clampedWidth = (naturalWidth < standardWidth) ? minimumWidth : naturalWidth;
+    }
     self.chatSidebarPreferredWidth = clampedWidth;
     [[NSUserDefaults standardUserDefaults] setDouble:clampedWidth forKey:TGChatSidebarWidthDefaultsKey];
     [self layoutContentView];
@@ -393,7 +407,9 @@
 - (void)sidebarResizeHandleDidRequestToggle:(TGSidebarResizeHandleView *)handle {
     (void)handle;
     CGFloat currentWidth = NSWidth([self.sidebarPanelView frame]);
-    self.chatSidebarPreferredWidth = [self isChatSidebarCompactForWidth:currentWidth] ? 292.0 : [self minimumChatSidebarWidth];
+    self.chatSidebarPreferredWidth = [self isChatSidebarCompactForWidth:currentWidth]
+        ? [self standardChatSidebarWidth]
+        : [self minimumChatSidebarWidth];
     [[NSUserDefaults standardUserDefaults] setDouble:self.chatSidebarPreferredWidth forKey:TGChatSidebarWidthDefaultsKey];
     [self layoutContentView];
     [self updateVisibleSection];

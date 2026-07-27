@@ -474,7 +474,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, copy) NSString *selectedChatTitle;
 @property (nonatomic, copy) NSString *selectedChatTypeSummary;
 @property (nonatomic, copy) NSString *selectedChatAvatarLocalPath;
+@property (nonatomic, retain) NSNumber *selectedChatLastReadInboxMessageID;
 @property (nonatomic, retain) NSNumber *selectedChatLastReadOutboxMessageID;
+@property (nonatomic, assign) NSUInteger selectedChatUnreadCount;
+@property (nonatomic, assign) BOOL initialUnreadPositionPending;
+@property (nonatomic, retain) NSMutableSet *visibleReadReceiptMessageIDs;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
 @property (nonatomic, copy) NSString *commentThreadParentTitle;
@@ -925,7 +929,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize selectedChatTitle = _selectedChatTitle;
 @synthesize selectedChatTypeSummary = _selectedChatTypeSummary;
 @synthesize selectedChatAvatarLocalPath = _selectedChatAvatarLocalPath;
+@synthesize selectedChatLastReadInboxMessageID = _selectedChatLastReadInboxMessageID;
 @synthesize selectedChatLastReadOutboxMessageID = _selectedChatLastReadOutboxMessageID;
+@synthesize selectedChatUnreadCount = _selectedChatUnreadCount;
+@synthesize initialUnreadPositionPending = _initialUnreadPositionPending;
+@synthesize visibleReadReceiptMessageIDs = _visibleReadReceiptMessageIDs;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
 @synthesize commentThreadParentTitle = _commentThreadParentTitle;
@@ -1113,6 +1121,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.visibleReadReceiptMessageIDs = [NSMutableSet set];
         self.searchResultItems = [NSMutableArray array];
         self.chatSearchWindowResults = [NSMutableArray array];
         self.chatSearchWindowResultButtons = [NSMutableArray array];
@@ -1975,6 +1984,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.chatSidebarPreferredWidth = [[NSUserDefaults standardUserDefaults] doubleForKey:TGChatSidebarWidthDefaultsKey];
     if (self.chatSidebarPreferredWidth <= 0.0) {
         self.chatSidebarPreferredWidth = 292.0;
+    } else if (self.chatSidebarPreferredWidth > 78.0 && self.chatSidebarPreferredWidth < 292.0) {
+        self.chatSidebarPreferredWidth = (self.chatSidebarPreferredWidth < 248.0) ? 78.0 : 292.0;
     }
     self.sidebarResizeHandleView = [[[TGSidebarResizeHandleView alloc] initWithFrame:NSMakeRect(304, 132, 10, 480)] autorelease];
     [self.sidebarResizeHandleView setDelegate:self];
@@ -4161,7 +4172,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_selectedChatTitle release];
     [_selectedChatTypeSummary release];
     [_selectedChatAvatarLocalPath release];
+    [_selectedChatLastReadInboxMessageID release];
     [_selectedChatLastReadOutboxMessageID release];
+    [_visibleReadReceiptMessageIDs release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
     [_commentThreadParentTitle release];

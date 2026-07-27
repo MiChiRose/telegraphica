@@ -553,11 +553,14 @@ def check_primary_navigation_contract(errors):
                       section_layout_rel)
     for fragment in [
         "minimumChatSidebarWidth",
+        "standardChatSidebarWidth",
         "maximumChatSidebarWidthForWindowWidth",
         "sidebarResizeHandleDidRequestToggle",
         "compactChatSidebar",
         "return (width < 248.0)",
         "[self.drawerButton setFrame:NSMakeRect(mainX + 12.0",
+        "CGFloat initialWidth = [handle initialDragWidth]",
+        "clampedWidth = (naturalWidth < standardWidth) ? minimumWidth : naturalWidth",
     ]:
         if fragment not in section_layout_text:
             errors.append("%s: flexible chat sidebar is missing `%s`" %
@@ -566,6 +569,8 @@ def check_primary_navigation_contract(errors):
     components_header_text = read_text(os.path.join(ROOT, components_header_rel))
     if "TGSidebarResizeHandleView" not in components_header_text:
         errors.append("%s: chat sidebar resize handle is missing" % components_header_rel)
+    if "- (CGFloat)initialDragWidth;" not in components_header_text:
+        errors.append("%s: sidebar snap resizing needs the drag's initial width" % components_header_rel)
 
     chat_search_panel_rel = os.path.join("Sources", "UI", "TGChatSearchPanelView.inc")
     chat_search_panel_text = read_text(os.path.join(ROOT, chat_search_panel_rel))
