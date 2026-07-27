@@ -112,23 +112,18 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (titleAvailableWidth < 40.0) {
         titleAvailableWidth = 40.0;
     }
-    NSSize titleSize = [displayTitle sizeWithAttributes:titleAttributes];
-    CGFloat titleDrawWidth = titleAvailableWidth;
-    if (([item notificationsMuted] || [item isPinned]) && titleSize.width < titleAvailableWidth) {
-        titleDrawWidth = titleSize.width;
-    }
     NSRect titleRect = NSMakeRect(titleX,
                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
-                                  titleDrawWidth,
+                                  titleAvailableWidth,
                                   16.0);
     [displayTitle drawInRect:titleRect withAttributes:titleAttributes];
-    CGFloat iconX = NSMaxX(titleRect) + 4.0;
+    CGFloat iconX = titleRight - trailingIconWidth;
     if ([item isPinned]) {
         NSRect pinRect = NSMakeRect(iconX,
                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 12.0) / 2.0),
                                     12.0,
                                     12.0);
-        NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
+        NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicInkColor() colorWithAlphaComponent:0.72];
         TGDrawTemplateIconAsset(@"flag-triangle", pinRect, pinColor, 0.9, [controlView isFlipped]);
         iconX = NSMaxX(pinRect) + 4.0;
     }
@@ -137,7 +132,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
                                      15.0,
                                      15.0);
-        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
+        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicInkColor() colorWithAlphaComponent:0.78];
         TGDrawTemplateIconAsset(@"sound-off", muteRect, muteColor, 1.0, [controlView isFlipped]);
     }
     if ([unreadString length] > 0) {

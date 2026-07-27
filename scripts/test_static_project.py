@@ -501,6 +501,23 @@ def check_primary_navigation_contract(errors):
             errors.append("%s: contacts section is missing `%s`" %
                           (contacts_rel, fragment))
 
+    button_cells_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
+    button_cells_text = read_text(os.path.join(ROOT, button_cells_rel))
+    for asset_name in ["call-receive", "settings"]:
+        asset_rel = os.path.join("Sources", "Resources", "Icons", asset_name + ".png")
+        if not os.path.isfile(os.path.join(ROOT, asset_rel)):
+            errors.append("%s: approved navigation icon asset is missing" % asset_rel)
+        expected_draw = 'TGDrawTemplateIconAsset(@"%s"' % asset_name
+        if expected_draw not in button_cells_text:
+            errors.append("%s: navigation must render approved asset `%s`" %
+                          (button_cells_rel, asset_name))
+
+    navigation_draw_start = button_cells_text.find("static void TGDrawNavigationIcon")
+    navigation_draw_end = button_cells_text.find("@implementation TGNavigationButtonCell")
+    navigation_draw_text = button_cells_text[navigation_draw_start:navigation_draw_end]
+    if "NSBezierPath *receiver" in navigation_draw_text:
+        errors.append("%s: call navigation icon must not be hand-drawn" % button_cells_rel)
+
 
 def main():
     errors = []

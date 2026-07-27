@@ -541,6 +541,16 @@
         return;
     }
 
+    if (preserveSelection && preferredChatID) {
+        self.suppressChatSelectionHandling = YES;
+        [self.chatTableView deselectAll:nil];
+        self.suppressChatSelectionHandling = NO;
+        [self updateAuthControlsForState:self.currentAuthState];
+        [self updateVisibleSection];
+        [self layoutContentView];
+        return;
+    }
+
     if (self.chatNavigationClosed) {
         self.suppressChatSelectionHandling = YES;
         [self.chatTableView deselectAll:nil];

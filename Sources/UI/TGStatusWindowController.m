@@ -233,6 +233,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSArray *chatFilterInfos;
 @property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
 @property (nonatomic, retain) NSButton *drawerButton;
+@property (nonatomic, retain) NSButton *profileBackButton;
 @property (nonatomic, retain) TGGroupedCardView *profileSummaryCardView;
 @property (nonatomic, retain) TGGroupedCardView *profileInfoCardView;
 @property (nonatomic, retain) TGGroupedCardView *profileDetailsCardView;
@@ -682,6 +683,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatFilterInfos = _chatFilterInfos;
 @synthesize accountBadgeView = _accountBadgeView;
 @synthesize drawerButton = _drawerButton;
+@synthesize profileBackButton = _profileBackButton;
 @synthesize profileSummaryCardView = _profileSummaryCardView;
 @synthesize profileInfoCardView = _profileInfoCardView;
 @synthesize profileDetailsCardView = _profileDetailsCardView;
@@ -1489,6 +1491,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.workshopViewController refreshLocalization];
     [self.chatsLabel setStringValue:TGLoc(@"chats")];
     [self.profileTitleField setStringValue:TGLoc(@"profile.title")];
+    [self.profileBackButton setTitle:TGLoc(@"back")];
+    [self.profileBackButton setToolTip:TGLoc(@"back")];
     [self.profileAboutSectionField setStringValue:TGLoc(@"profile.about")];
     [self.profileAccountSectionField setStringValue:TGLoc(@"profile.account")];
     [self.profileUsernameRowTitleField setStringValue:TGLoc(@"profile.username")];
@@ -1603,6 +1607,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.callsPlaceholderView refreshThemeAppearance];
     [self applyPanelHeaderLabelStyle:self.profileTitleField];
     [self applyPanelHeaderLabelStyle:self.settingsTitleField];
+    NSDictionary *profileBackAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                            TGClassicNavigationTextColor(1.0), NSForegroundColorAttributeName,
+                                            nil];
+    [self.profileBackButton setAttributedTitle:[[[NSAttributedString alloc] initWithString:TGLoc(@"back")
+                                                                                attributes:profileBackAttributes] autorelease]];
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
 
     [self.loginBrandField setTextColor:TGClassicNavigationTextColor(1.0)];
@@ -1930,6 +1940,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.drawerButton setAction:@selector(toggleDrawer:)];
     [self.drawerButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
     [contentView addSubview:self.drawerButton];
+
+    self.profileBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 636, 72, 30)] autorelease];
+    [self.profileBackButton setTitle:TGLoc(@"back")];
+    [self.profileBackButton setBordered:NO];
+    [self.profileBackButton setFont:[NSFont boldSystemFontOfSize:12.0]];
+    [self.profileBackButton setTarget:self];
+    [self.profileBackButton setAction:@selector(returnFromProfileToSettings:)];
+    [self.profileBackButton setToolTip:TGLoc(@"back")];
+    [self.profileBackButton setHidden:YES];
+    [contentView addSubview:self.profileBackButton];
 
     self.workshopDrawerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 570, 92, 46)] autorelease];
     TGNavigationButtonCell *workshopCell = [[[TGNavigationButtonCell alloc] initTextCell:TGLoc(@"workshop.title")] autorelease];
@@ -3895,6 +3915,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatFilterInfos release];
     [_accountBadgeView release];
     [_drawerButton release];
+    [_profileBackButton release];
     [_profileSummaryCardView release];
     [_profileInfoCardView release];
     [_profileDetailsCardView release];

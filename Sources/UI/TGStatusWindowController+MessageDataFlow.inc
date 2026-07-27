@@ -1119,7 +1119,7 @@
     NSNumber *chatIDCopy = [chatID retain];
     NSNumber *messageThreadIDCopy = [self.selectedMessageThreadID retain];
     NSString *messageTopicKindCopy = [self.selectedMessageTopicKind copy];
-    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0 || self.forceMessageScrollToNewest);
+    BOOL shouldShowMessageLoading = (interactive || [self.messageItems count] == 0);
     NSUInteger messageLoadingGeneration = 0;
     if (shouldShowMessageLoading) {
         messageLoadingGeneration = self.messageLoadingGeneration + 1;
@@ -1162,9 +1162,6 @@
                 }
             } else if (itemsCopy) {
                 BOOL preserveOlder = (!interactive && [self.messageItems count] > 0);
-                if (self.forceMessageScrollToNewest) {
-                    preserveOlder = NO;
-                }
                 self.messageItemsRepresentFocusedContext = NO;
                 [self applyRecentMessageItems:itemsCopy preservingOlderItems:preserveOlder];
                 [self scheduleMessageItemsReadForChatID:chatIDCopy items:itemsCopy];

@@ -26,7 +26,8 @@
         [self.titleField setSelectable:NO];
         [self.titleField setBezeled:NO];
         [self.titleField setDrawsBackground:NO];
-        [self.titleField setFont:[NSFont boldSystemFontOfSize:18.0]];
+        [self.titleField setFont:[NSFont boldSystemFontOfSize:15.0]];
+        [self.titleField setAlignment:NSCenterTextAlignment];
         [self.titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
         [self addSubview:self.titleField];
 
@@ -58,7 +59,7 @@
 - (void)resizeSubviewsWithOldSize:(NSSize)oldSize {
     (void)oldSize;
     NSRect bounds = [self bounds];
-    [self.titleField setFrame:NSMakeRect(18.0, NSHeight(bounds) - 42.0, MAX(120.0, NSWidth(bounds) - 36.0), 24.0)];
+    [self.titleField setFrame:NSMakeRect(58.0, NSHeight(bounds) - 32.0, MAX(120.0, NSWidth(bounds) - 116.0), 20.0)];
     CGFloat cardWidth = MIN(560.0, MAX(300.0, NSWidth(bounds) - 120.0));
     CGFloat cardX = floor((NSWidth(bounds) - cardWidth) / 2.0);
     CGFloat cardY = floor((NSHeight(bounds) - 150.0) / 2.0);
@@ -72,7 +73,7 @@
 }
 
 - (void)refreshThemeAppearance {
-    [self.titleField setTextColor:TGClassicInkColor()];
+    [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self.messageField setTextColor:TGClassicCardMutedInkColor()];
     [self.cardView setNeedsDisplay:YES];
     [self setNeedsDisplay:YES];

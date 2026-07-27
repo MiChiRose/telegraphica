@@ -37,11 +37,27 @@
     self.chatNavigationClosed = NO;
     self.selectedChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
     self.selectedChatTitle = ([title length] > 0 ? title : TGLoc(@"chats"));
+    self.selectedChatTypeSummary = nil;
+    self.selectedChatAvatarLocalPath = nil;
+    self.selectedChatLastReadOutboxMessageID = nil;
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
+    self.suppressChatSelectionHandling = YES;
+    [self.chatTableView deselectAll:nil];
+    self.suppressChatSelectionHandling = NO;
+    [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    [self.messageTableView reloadData];
+    self.olderMessagesExhausted = NO;
+    self.autoOlderMessagesLoadArmed = YES;
+    self.forceMessageScrollToNewest = YES;
+    [self refreshSelectedChatHeaderDisplay];
     [self updateVisibleSection];
     [self appendDetail:[NSString stringWithFormat:@"Opening chat %@.", self.selectedChatID]];
-    [self reloadChatsInteractive:NO preserveSelection:YES];
+    [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+    [self reloadChatsInteractive:NO
+               preserveSelection:YES
+                  requestedLimit:TGStatusChatPreviewMaximumLimit];
 }
 
 - (void)contactsViewController:(TGContactsViewController *)controller
@@ -61,6 +77,12 @@
 
 - (void)openProfileFromSettings:(id)sender {
     [self openProfileFromDrawer:sender];
+}
+
+- (void)returnFromProfileToSettings:(id)sender {
+    (void)sender;
+    self.activeSection = TGSectionSettings;
+    [self updateVisibleSection];
 }
 
 - (void)leaveChatFromMenu:(id)sender {

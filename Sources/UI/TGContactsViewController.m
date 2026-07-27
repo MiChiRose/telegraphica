@@ -1,7 +1,9 @@
 #import "TGContactsViewController.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "TGIconAssets.h"
 #import "TGLocalization.h"
+#import "TGStatusButtonCells.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGTheme.h"
@@ -114,6 +116,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) NSSearchField *searchField;
+@property (nonatomic, retain) NSScrollView *scrollView;
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -133,6 +136,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
 @synthesize client = _client;
 @synthesize titleField = _titleField;
 @synthesize searchField = _searchField;
+@synthesize scrollView = _scrollView;
 @synthesize tableView = _tableView;
 @synthesize statusField = _statusField;
 @synthesize spinner = _spinner;
@@ -173,19 +177,24 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [self setView:root];
 
-    self.titleField = [self labelWithFrame:NSMakeRect(18, 520, 280, 24)
-                                      font:[NSFont boldSystemFontOfSize:18.0]
-                                     color:TGClassicInkColor()];
+    self.titleField = [self labelWithFrame:NSMakeRect(72, 520, 576, 24)
+                                      font:[NSFont boldSystemFontOfSize:15.0]
+                                     color:TGClassicNavigationTextColor(1.0)];
+    [self.titleField setAlignment:NSCenterTextAlignment];
     [self.titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.titleField];
 
-    self.createChatButton = [[[NSButton alloc] initWithFrame:NSMakeRect(478, 514, 108, 30)] autorelease];
+    self.createChatButton = [[[NSButton alloc] initWithFrame:NSMakeRect(634, 514, 30, 30)] autorelease];
+    [self.createChatButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"+"] autorelease]];
+    [self.createChatButton setTitle:@"+"];
     [self.createChatButton setTarget:self];
     [self.createChatButton setAction:@selector(requestNewConversation:)];
     [self.createChatButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.createChatButton];
 
-    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(594, 514, 108, 30)] autorelease];
+    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(672, 514, 30, 30)] autorelease];
+    [self.refreshButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"↻"] autorelease]];
+    [self.refreshButton setTitle:@"↻"];
     [self.refreshButton setTarget:self];
     [self.refreshButton setAction:@selector(refreshContacts:)];
     [self.refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
@@ -196,12 +205,12 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.searchField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.searchField];
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 52, 684, 416)] autorelease];
-    [scrollView setHasVerticalScroller:YES];
-    [scrollView setBorderType:NSBezelBorder];
-    [scrollView setAutohidesScrollers:YES];
-    [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    self.tableView = [[[NSTableView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
+    self.scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 52, 684, 416)] autorelease];
+    [self.scrollView setHasVerticalScroller:YES];
+    [self.scrollView setBorderType:NSBezelBorder];
+    [self.scrollView setAutohidesScrollers:YES];
+    [self.scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    self.tableView = [[[NSTableView alloc] initWithFrame:[[self.scrollView contentView] bounds]] autorelease];
     [self.tableView setDataSource:self];
     [self.tableView setDelegate:self];
     [self.tableView setHeaderView:nil];
@@ -214,8 +223,8 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [column setWidth:660.0];
     [column setDataCell:[[[TGContactRowCell alloc] initTextCell:@""] autorelease]];
     [self.tableView addTableColumn:column];
-    [scrollView setDocumentView:self.tableView];
-    [root addSubview:scrollView];
+    [self.scrollView setDocumentView:self.tableView];
+    [root addSubview:self.scrollView];
 
     self.statusField = [self labelWithFrame:NSMakeRect(18, 18, 450, 22)
                                       font:[NSFont systemFontOfSize:12.0]
@@ -239,13 +248,67 @@ static NSString *TGContactsInitials(NSString *displayName) {
 
     [self refreshLocalizedText];
     [self refreshThemeAppearance];
+    [self layoutContent];
+}
+
+- (void)layoutContent {
+    NSRect bounds = [[self view] bounds];
+    CGFloat width = NSWidth(bounds);
+    CGFloat height = NSHeight(bounds);
+    CGFloat margin = 14.0;
+    CGFloat headerHeight = 40.0;
+    CGFloat buttonSize = 30.0;
+    CGFloat buttonY = height - headerHeight + floor((headerHeight - buttonSize) / 2.0) - 2.0;
+    CGFloat refreshX = width - margin - buttonSize;
+    CGFloat createX = refreshX - 8.0 - buttonSize;
+    CGFloat titleX = 58.0;
+    CGFloat titleRight = createX - 8.0;
+    [self.titleField setFrame:NSMakeRect(titleX,
+                                         height - headerHeight + floor((headerHeight - 20.0) / 2.0) - 2.0,
+                                         MAX(80.0, titleRight - titleX),
+                                         20.0)];
+    [self.createChatButton setFrame:NSMakeRect(createX, buttonY, buttonSize, buttonSize)];
+    [self.refreshButton setFrame:NSMakeRect(refreshX, buttonY, buttonSize, buttonSize)];
+
+    CGFloat searchY = height - headerHeight - 40.0;
+    [self.searchField setFrame:NSMakeRect(margin, searchY, MAX(120.0, width - (margin * 2.0)), 28.0)];
+    CGFloat footerHeight = 48.0;
+    CGFloat tableTop = searchY - 8.0;
+    [self.scrollView setFrame:NSMakeRect(margin,
+                                         footerHeight,
+                                         MAX(120.0, width - (margin * 2.0)),
+                                         MAX(80.0, tableTop - footerHeight))];
+    [self.scrollView tile];
+    NSTableColumn *contactColumn = [self.tableView tableColumnWithIdentifier:@"contact"];
+    if (contactColumn) {
+        [contactColumn setWidth:MAX(100.0, NSWidth([[self.scrollView contentView] bounds]))];
+    }
+    [self.statusField setFrame:NSMakeRect(margin, 15.0, MAX(80.0, width - 230.0), 22.0)];
+    [self.spinner setFrame:NSMakeRect(width - 218.0, 18.0, 16.0, 16.0)];
+    [self.openButton setFrame:NSMakeRect(width - margin - 184.0, 10.0, 184.0, 30.0)];
+}
+
+- (void)setView:(NSView *)view {
+    [super setView:view];
+    [view setPostsFrameChangedNotifications:YES];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(viewFrameDidChange:)
+                                                 name:NSViewFrameDidChangeNotification
+                                               object:view];
+}
+
+- (void)viewFrameDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self layoutContent];
 }
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     _delegate = nil;
     [_client release];
     [_titleField release];
     [_searchField release];
+    [_scrollView release];
     [_tableView release];
     [_statusField release];
     [_spinner release];
@@ -260,8 +323,10 @@ static NSString *TGContactsInitials(NSString *displayName) {
 - (void)refreshLocalizedText {
     [self.titleField setStringValue:TGLoc(@"contacts.section.title")];
     [[self.searchField cell] setPlaceholderString:TGLoc(@"contacts.search")];
-    [self.refreshButton setTitle:TGLoc(@"contacts.refresh")];
-    [self.createChatButton setTitle:TGLoc(@"contacts.newChat")];
+    [self.refreshButton setTitle:@"↻"];
+    [self.refreshButton setToolTip:TGLoc(@"contacts.refresh")];
+    [self.createChatButton setTitle:@"+"];
+    [self.createChatButton setToolTip:TGLoc(@"contacts.newChat")];
     [self.openButton setTitle:TGLoc(@"contacts.open")];
     if (!self.loaded && !self.loading) {
         [self.statusField setStringValue:TGLoc(@"contacts.section.hint")];
@@ -270,7 +335,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
 }
 
 - (void)refreshThemeAppearance {
-    [self.titleField setTextColor:TGClassicInkColor()];
+    [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self.statusField setTextColor:TGClassicMutedInkColor()];
     [[self view] setNeedsDisplay:YES];
     [self.tableView setNeedsDisplay:YES];

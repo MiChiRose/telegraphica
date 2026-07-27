@@ -65,6 +65,7 @@
     }
     BOOL showLogin = !ready;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
     [self showView:self.topPanelView visible:(ready && !drawerHidden && self.drawerOpen)];
@@ -100,7 +101,8 @@
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
                                  [self.workshopViewController hasActiveModule]);
-    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive)];
+    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive && !showProfile)];
+    [self showView:self.profileBackButton visible:showProfile];
     [self showView:self.workshopDrawerButton visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
@@ -183,7 +185,6 @@
     [self showView:self.sendTextField visible:showConversationContent];
     [self showView:self.sendMessageButton visible:showConversationContent];
 
-    BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
     BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
@@ -584,6 +585,8 @@
         globalHeaderTitleX = headerLeftX;
         chatHeaderTitleX = headerLeftX;
     }
+    [self.profileBackButton setFrame:NSMakeRect(mainX + 10.0, headerButtonY, 72.0, headerButtonSize)];
+    [[self.profileBackButton superview] addSubview:self.profileBackButton positioned:NSWindowAbove relativeTo:nil];
     if (self.showingForumTopicList) {
         [self.topicBackButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
         chatHeaderTitleX = headerLeftX + headerButtonSize + 8.0;
@@ -825,7 +828,11 @@
     if (groupedWidth < 360.0) {
         groupedWidth = mainWidth - 32.0;
     }
-    [self.profileTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
+    [self.profileTitleField setAlignment:NSCenterTextAlignment];
+    [self.profileTitleField setFrame:NSMakeRect(mainX + 88.0,
+                                                panelTitleY,
+                                                MAX(120.0, mainWidth - 176.0),
+                                                20.0)];
     CGFloat profileScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat profileScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
     CGFloat profileScrollHeight = profileScrollTop - profileScrollBottom;
@@ -1006,7 +1013,11 @@
         [profileClipView setBoundsOrigin:NSMakePoint(0.0, profileClipOrigin.y)];
     }
 
-    [self.settingsTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
+    [self.settingsTitleField setAlignment:NSCenterTextAlignment];
+    [self.settingsTitleField setFrame:NSMakeRect(mainX + 58.0,
+                                                 panelTitleY,
+                                                 MAX(120.0, mainWidth - 116.0),
+                                                 20.0)];
 
     CGFloat settingsScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat settingsScrollTop = mainTop - TGPanelHeaderHeight - 8.0;

@@ -54,33 +54,13 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     if ([title isEqualToString:@"Contacts"] || [title isEqualToString:@"Контакты"] || [title isEqualToString:@"Кантакты"]) {
         TGDrawTemplateIconAsset(@"contacts", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Calls"] || [title isEqualToString:@"Звонки"] || [title isEqualToString:@"Званкі"]) {
-        NSBezierPath *receiver = [NSBezierPath bezierPath];
-        [receiver setLineWidth:3.0];
-        [receiver setLineCapStyle:NSRoundLineCapStyle];
-        [receiver moveToPoint:TGIconPoint(iconRect, 4.0, 14.5, flipped)];
-        [receiver curveToPoint:TGIconPoint(iconRect, 14.5, 4.0, flipped)
-                controlPoint1:TGIconPoint(iconRect, 5.0, 8.4, flipped)
-                controlPoint2:TGIconPoint(iconRect, 10.0, 3.6, flipped)];
-        [receiver stroke];
-        TGStrokeLine(TGIconPoint(iconRect, 3.4, 14.8, flipped), TGIconPoint(iconRect, 6.2, 16.0, flipped), 2.2);
-        TGStrokeLine(TGIconPoint(iconRect, 13.8, 2.8, flipped), TGIconPoint(iconRect, 15.2, 5.7, flipped), 2.2);
+        TGDrawTemplateIconAsset(@"call-receive", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Chats"] || [title isEqualToString:@"Чаты"]) {
         TGDrawTemplateIconAsset(@"chat", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Profile"] || [title isEqualToString:@"Профиль"] || [title isEqualToString:@"Профіль"]) {
         TGDrawTemplateIconAsset(@"user", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Settings"] || [title isEqualToString:@"Настройки"] || [title isEqualToString:@"Налады"]) {
-        TGStrokeLine(TGIconPoint(iconRect, 2.0, 14.0, flipped),
-                     TGIconPoint(iconRect, 16.0, 14.0, flipped),
-                     1.4);
-        TGStrokeLine(TGIconPoint(iconRect, 2.0, 9.0, flipped),
-                     TGIconPoint(iconRect, 16.0, 9.0, flipped),
-                     1.4);
-        TGStrokeLine(TGIconPoint(iconRect, 2.0, 4.0, flipped),
-                     TGIconPoint(iconRect, 16.0, 4.0, flipped),
-                     1.4);
-        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 5.0, 12.0, 4.0, 4.0, flipped)] fill];
-        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 11.0, 7.0, 4.0, 4.0, flipped)] fill];
-        [[NSBezierPath bezierPathWithOvalInRect:TGIconRect(iconRect, 7.0, 2.0, 4.0, 4.0, flipped)] fill];
+        TGDrawTemplateIconAsset(@"settings", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"]) {
         TGDrawTemplateIconAsset(@"folder-share", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Workshop"] || [title isEqualToString:@"Мастерская"] || [title isEqualToString:@"Майстэрня"]) {
@@ -135,25 +115,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [path stroke];
 
     NSString *title = [self title] ? [self title] : @"";
-    NSFont *font = selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0];
     NSColor *textColor = selected ? TGClassicNavigationTextColor(alpha) : TGClassicNavigationMutedTextColor(alpha);
     BOOL flipped = [controlView isFlipped];
-    NSRect iconRect = NSMakeRect(floor(NSMidX(cellFrame) - 9.0),
-                                 flipped ? (NSMinY(cellFrame) + 6.0) : (NSMaxY(cellFrame) - 24.0),
-                                 18.0,
-                                 18.0);
+    CGFloat iconSize = 27.0;
+    NSRect iconRect = NSMakeRect(floor(NSMidX(cellFrame) - (iconSize / 2.0)),
+                                 floor(NSMidY(cellFrame) - (iconSize / 2.0)),
+                                 iconSize,
+                                 iconSize);
     TGDrawNavigationIcon(title, iconRect, textColor, flipped);
-    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                font, NSFontAttributeName,
-                                textColor, NSForegroundColorAttributeName,
-                                nil];
-    NSSize titleSize = [title sizeWithAttributes:attributes];
-    CGFloat titleY = flipped ? (NSMaxY(cellFrame) - titleSize.height - 7.0) : (NSMinY(cellFrame) + 7.0);
-    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + floor((NSWidth(cellFrame) - titleSize.width) / 2.0),
-                                  titleY,
-                                  titleSize.width,
-                                  titleSize.height);
-    [title drawInRect:titleRect withAttributes:attributes];
 
     if ([self.badgeText length] > 0) {
         NSFont *badgeFont = [NSFont boldSystemFontOfSize:8.5];
