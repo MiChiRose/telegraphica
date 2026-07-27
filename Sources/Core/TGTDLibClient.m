@@ -242,6 +242,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSArray *_chatFilterInfos;
     NSMutableDictionary *_senderSummaryCache;
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
+    NSMutableDictionary *_notificationScopeMutedByType;
     NSString *_latestAuthorizationStateSummary;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
@@ -302,6 +303,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
+- (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject;
+- (BOOL)scopeNotificationsMutedForType:(NSString *)scopeType timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
 - (void)applyChatPositionFromChatObject:(NSDictionary *)chatObject toChatItem:(TGChatItem *)item chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
 - (TGChatItem *)chatPreviewItemFromChatObject:(NSDictionary *)chatResponse
@@ -376,6 +379,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _pendingUpdateSummaries = [[NSMutableArray alloc] init];
         _senderSummaryCache = [[NSMutableDictionary alloc] init];
         _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
+        _notificationScopeMutedByType = [[NSMutableDictionary alloc] init];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -510,6 +514,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_chatFilterInfos release];
     [_senderSummaryCache release];
     [_syntheticMediaAlbumIDByMessageKey release];
+    [_notificationScopeMutedByType release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
@@ -1100,6 +1105,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         }
     }
 
+    if ([type isEqualToString:@"updateScopeNotificationSettings"]) {
+        return [NSDictionary dictionaryWithObjectsAndKeys:
+                @"notification_settings", @"kind",
+                type, @"type",
+                nil];
+    }
+
     if ([type isEqualToString:@"updatePoll"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"poll_update" forKey:@"kind"];
@@ -1182,6 +1194,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
     id extraObject = [dictionary objectForKey:@"@extra"];
     NSArray *chatFilterInfos = [self chatFilterInfoItemsFromUpdateObject:dictionary];
+    NSString *scopeUpdateType = nil;
+    NSNumber *scopeUpdateMuted = nil;
+    if ([[dictionary objectForKey:@"@type"] isEqualToString:@"updateScopeNotificationSettings"]) {
+        id scope = [dictionary objectForKey:@"scope"];
+        id settings = [dictionary objectForKey:@"notification_settings"];
+        id scopeType = [scope isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)scope objectForKey:@"@type"] : nil;
+        id muteFor = [settings isKindOfClass:[NSDictionary class]] ? [(NSDictionary *)settings objectForKey:@"mute_for"] : nil;
+        if ([scopeType isKindOfClass:[NSString class]] && [muteFor respondsToSelector:@selector(integerValue)]) {
+            scopeUpdateType = (NSString *)scopeType;
+            scopeUpdateMuted = [NSNumber numberWithBool:([muteFor integerValue] > 0)];
+        }
+    }
     NSDictionary *updateSummary = nil;
     if (![extraObject isKindOfClass:[NSString class]]) {
         updateSummary = [self safeUpdateSummaryForObject:dictionary];
@@ -1199,6 +1223,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _chatFilterInfos = [chatFilterInfos copy];
         _chatFilterInfosKnown = YES;
         _chatFilterFallbackProbeFinished = NO;
+    }
+    if ([scopeUpdateType length] > 0 && scopeUpdateMuted) {
+        [_notificationScopeMutedByType setObject:scopeUpdateMuted forKey:scopeUpdateType];
     }
 
     if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
@@ -6077,6 +6104,64 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return info;
 }
 
+- (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject {
+    if (![chatTypeObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSString *type = [(NSDictionary *)chatTypeObject objectForKey:@"@type"];
+    if ([type isEqualToString:@"chatTypePrivate"] || [type isEqualToString:@"chatTypeSecret"]) {
+        return @"notificationSettingsScopePrivateChats";
+    }
+    if ([type isEqualToString:@"chatTypeBasicGroup"]) {
+        return @"notificationSettingsScopeGroupChats";
+    }
+    if ([type isEqualToString:@"chatTypeSupergroup"]) {
+        return [[(NSDictionary *)chatTypeObject objectForKey:@"is_channel"] boolValue]
+            ? @"notificationSettingsScopeChannelChats"
+            : @"notificationSettingsScopeGroupChats";
+    }
+    return nil;
+}
+
+- (BOOL)scopeNotificationsMutedForType:(NSString *)scopeType timeout:(NSTimeInterval)timeout {
+    if ([scopeType length] == 0) {
+        return NO;
+    }
+    [_responseCondition lock];
+    NSNumber *cached = [[_notificationScopeMutedByType objectForKey:scopeType] retain];
+    [_responseCondition unlock];
+    if (cached) {
+        BOOL muted = [cached boolValue];
+        [cached release];
+        return muted;
+    }
+
+    NSDictionary *scope = [NSDictionary dictionaryWithObject:scopeType forKey:@"@type"];
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getScopeNotificationSettings", @"@type",
+                             scope, @"scope",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-notification-scope"
+                                                            timeout:MIN(MAX(timeout, 0.5), 1.2)
+                                                          errorCode:124
+                                                              error:NULL];
+    NSDictionary *settingsResponse = response;
+    id nestedSettings = [response objectForKey:@"notification_settings"];
+    if ([nestedSettings isKindOfClass:[NSDictionary class]]) {
+        settingsResponse = (NSDictionary *)nestedSettings;
+    }
+    id muteFor = [settingsResponse objectForKey:@"mute_for"];
+    BOOL muted = ([muteFor respondsToSelector:@selector(integerValue)] && [muteFor integerValue] > 0);
+    if ([[response objectForKey:@"@type"] isEqualToString:@"scopeNotificationSettings"] ||
+        [nestedSettings isKindOfClass:[NSDictionary class]]) {
+        [_responseCondition lock];
+        [_notificationScopeMutedByType setObject:[NSNumber numberWithBool:muted] forKey:scopeType];
+        [_responseCondition unlock];
+    }
+    return muted;
+}
+
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject {
     if (![chatObject isKindOfClass:[NSDictionary class]]) {
         return NO;
@@ -6088,11 +6173,12 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     id muteFor = [(NSDictionary *)settingsObject objectForKey:@"mute_for"];
-    if ([muteFor respondsToSelector:@selector(integerValue)] && [muteFor integerValue] > 0) {
-        return YES;
+    id useDefault = [(NSDictionary *)settingsObject objectForKey:@"use_default_mute_for"];
+    if ([useDefault respondsToSelector:@selector(boolValue)] && [useDefault boolValue]) {
+        NSString *scopeType = [self notificationScopeTypeForChatTypeObject:[chatObject objectForKey:@"type"]];
+        return [self scopeNotificationsMutedForType:scopeType timeout:0.8];
     }
-
-    return NO;
+    return ([muteFor respondsToSelector:@selector(integerValue)] && [muteFor integerValue] > 0);
 }
 
 - (NSString *)syntheticMediaAlbumMessageKeyForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID {

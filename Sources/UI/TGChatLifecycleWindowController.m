@@ -3,6 +3,8 @@
 #import "../Core/TGTDLibClient.h"
 #import "TGConversationCreationPrompt.h"
 #import "TGLocalization.h"
+#import "TGStatusButtonCells.h"
+#import "TGStatusViewCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGTheme.h"
 
@@ -22,6 +24,72 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
     }
     return [parts componentsJoinedByString:@" · "];
 }
+
+@interface TGChatLifecycleContactCell : NSCell
+@end
+
+@implementation TGChatLifecycleContactCell
+
+- (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    NSDictionary *contact = [[self objectValue] isKindOfClass:[NSDictionary class]] ? [self objectValue] : nil;
+    if (!contact) {
+        return;
+    }
+    BOOL highlighted = [self isHighlighted];
+    NSString *name = [contact objectForKey:@"display_name"];
+    NSString *subtitle = TGContactSubtitle(contact);
+    NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 10.0,
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 36.0) / 2.0),
+                                   36.0,
+                                   36.0);
+    NSString *avatarPath = [contact objectForKey:@"avatar_local_path"];
+    NSImage *avatar = [avatarPath length] > 0 ? [[[NSImage alloc] initWithContentsOfFile:avatarPath] autorelease] : nil;
+    NSBezierPath *clip = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
+    [NSGraphicsContext saveGraphicsState];
+    [clip addClip];
+    if (avatar) {
+        [avatar drawInRect:avatarRect
+                  fromRect:NSZeroRect
+                 operation:NSCompositeSourceOver
+                  fraction:1.0
+            respectFlipped:[controlView isFlipped]
+                     hints:nil];
+    } else {
+        [[TGClassicNavigationSelectedColor(highlighted ? 0.34 : 0.18) colorWithAlphaComponent:1.0] set];
+        NSRectFill(avatarRect);
+        NSString *initial = [name length] > 0 ? [[name substringToIndex:1] uppercaseString] : @"?";
+        NSDictionary *initialAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                           highlighted ? [NSColor whiteColor] : TGClassicCardInkColor(), NSForegroundColorAttributeName,
+                                           nil];
+        NSSize size = [initial sizeWithAttributes:initialAttributes];
+        [initial drawAtPoint:NSMakePoint(NSMidX(avatarRect) - floor(size.width / 2.0),
+                                         NSMidY(avatarRect) - floor(size.height / 2.0))
+              withAttributes:initialAttributes];
+    }
+    [NSGraphicsContext restoreGraphicsState];
+
+    if ([[contact objectForKey:@"is_online"] boolValue]) {
+        NSRect dotRect = NSMakeRect(NSMaxX(avatarRect) - 9.0, NSMinY(avatarRect) + 1.0, 8.0, 8.0);
+        [[NSColor colorWithCalibratedRed:0.20 green:0.66 blue:0.31 alpha:1.0] set];
+        [[NSBezierPath bezierPathWithOvalInRect:dotRect] fill];
+    }
+
+    CGFloat textX = NSMaxX(avatarRect) + 11.0;
+    CGFloat textWidth = MAX(40.0, NSMaxX(cellFrame) - textX - 12.0);
+    NSDictionary *nameAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                    highlighted ? [NSColor whiteColor] : TGClassicCardInkColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont systemFontOfSize:11.0], NSFontAttributeName,
+                                        highlighted ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.80] : TGClassicCardMutedInkColor(), NSForegroundColorAttributeName,
+                                        nil];
+    [name drawInRect:NSMakeRect(textX, NSMinY(cellFrame) + 7.0, textWidth, 17.0) withAttributes:nameAttributes];
+    [subtitle drawInRect:NSMakeRect(textX, NSMinY(cellFrame) + 25.0, textWidth, 15.0) withAttributes:subtitleAttributes];
+}
+
+@end
 
 @interface TGChatLifecycleWindowController ()
 @property (nonatomic, retain) TGTDLibClient *client;
@@ -63,7 +131,7 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
 @synthesize requestGeneration = _requestGeneration;
 
 - (id)initWithClient:(TGTDLibClient *)client {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 600, 560)
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 640, 620)
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
@@ -73,7 +141,7 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
         self.contacts = [NSArray array];
         self.filteredContacts = [NSArray array];
         [[self window] setTitle:TGLoc(@"contacts.title")];
-        [[self window] setMinSize:NSMakeSize(540, 500)];
+        [[self window] setMinSize:NSMakeSize(560, 540)];
         [self buildViews];
     }
     return self;
@@ -115,86 +183,98 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
 
-    NSTextField *title = [self labelWithFrame:NSMakeRect(20, 520, 350, 24)
-                                         font:[NSFont boldSystemFontOfSize:18.0]
-                                        color:TGClassicInkColor()];
+    NSTextField *title = [self labelWithFrame:NSMakeRect(24, 578, 420, 26)
+                                         font:[NSFont boldSystemFontOfSize:20.0]
+                                        color:TGClassicHeaderTextColor(1.0)];
     [title setStringValue:TGLoc(@"contacts.title")];
     [title setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:title];
 
-    self.channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(376, 514, 114, 32)] autorelease];
-    [self.channelButton setTitle:TGLoc(@"create.channel")];
-    [self.channelButton setTarget:self];
-    [self.channelButton setAction:@selector(createChannel:)];
-    [self.channelButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
-    [root addSubview:self.channelButton];
-
-    self.searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(20, 482, 470, 28)] autorelease];
+    self.searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(24, 536, 544, 30)] autorelease];
     [[self.searchField cell] setPlaceholderString:TGLoc(@"contacts.search")];
     [self.searchField setDelegate:(id)self];
     [self.searchField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.searchField];
 
-    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(500, 480, 80, 32)] autorelease];
-    [self.refreshButton setTitle:TGLoc(@"contacts.refresh")];
+    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(580, 535, 36, 32)] autorelease];
+    [self.refreshButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"refresh"] autorelease]];
+    [self.refreshButton setTitle:@"refresh"];
+    [self.refreshButton setToolTip:TGLoc(@"contacts.refresh")];
     [self.refreshButton setTarget:self];
     [self.refreshButton setAction:@selector(refreshContactsAction:)];
     [self.refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.refreshButton];
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(20, 170, 560, 302)] autorelease];
+    TGGroupedCardView *contactsCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 190, 600, 332)] autorelease];
+    [contactsCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:contactsCard];
+
+    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(28, 198, 584, 316)] autorelease];
     [scrollView setHasVerticalScroller:YES];
-    [scrollView setBorderType:NSBezelBorder];
+    [scrollView setAutohidesScrollers:YES];
+    [scrollView setBorderType:NSNoBorder];
+    [scrollView setDrawsBackground:YES];
+    [scrollView setBackgroundColor:TGClassicTablePaperColor()];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     self.tableView = [[[NSTableView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
     [self.tableView setDataSource:self];
     [self.tableView setDelegate:self];
     [self.tableView setAllowsMultipleSelection:YES];
-    [self.tableView setRowHeight:32.0];
+    [self.tableView setHeaderView:nil];
+    [self.tableView setRowHeight:50.0];
+    [self.tableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
+    [self.tableView setBackgroundColor:TGClassicTablePaperColor()];
     [self.tableView setTarget:self];
     [self.tableView setDoubleAction:@selector(openSelectedContact:)];
-    NSTableColumn *nameColumn = [[[NSTableColumn alloc] initWithIdentifier:@"name"] autorelease];
-    [[nameColumn headerCell] setStringValue:TGLoc(@"contacts.name")];
-    [nameColumn setWidth:255.0];
-    [self.tableView addTableColumn:nameColumn];
-    NSTableColumn *detailsColumn = [[[NSTableColumn alloc] initWithIdentifier:@"details"] autorelease];
-    [[detailsColumn headerCell] setStringValue:TGLoc(@"contacts.details")];
-    [detailsColumn setWidth:205.0];
-    [self.tableView addTableColumn:detailsColumn];
+    NSTableColumn *contactColumn = [[[NSTableColumn alloc] initWithIdentifier:@"contact"] autorelease];
+    [contactColumn setWidth:560.0];
+    [contactColumn setDataCell:[[[TGChatLifecycleContactCell alloc] init] autorelease]];
+    [self.tableView addTableColumn:contactColumn];
     [scrollView setDocumentView:self.tableView];
     [root addSubview:scrollView];
 
-    self.statusField = [self labelWithFrame:NSMakeRect(20, 142, 190, 20)
+    self.statusField = [self labelWithFrame:NSMakeRect(24, 164, 210, 18)
                                        font:[NSFont systemFontOfSize:12.0]
-                                      color:TGClassicMutedInkColor()];
+                                      color:TGClassicHeaderDetailTextColor(0.92)];
     [self.statusField setStringValue:TGLoc(@"contacts.loading")];
     [self.statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [root addSubview:self.statusField];
 
-    self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(196, 143, 16, 16)] autorelease];
+    self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(236, 164, 16, 16)] autorelease];
     [self.spinner setStyle:NSProgressIndicatorSpinningStyle];
     [self.spinner setControlSize:NSSmallControlSize];
     [self.spinner setDisplayedWhenStopped:NO];
-    [self.spinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [self.spinner setAutoresizingMask:NSViewMaxYMargin];
     [root addSubview:self.spinner];
 
-    self.groupButton = [[[NSButton alloc] initWithFrame:NSMakeRect(220, 136, 110, 30)] autorelease];
+    self.channelButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 124, 126, 32)] autorelease];
+    [self.channelButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"create.channel")] autorelease]];
+    [self.channelButton setTitle:TGLoc(@"create.channel")];
+    [self.channelButton setTarget:self];
+    [self.channelButton setAction:@selector(createChannel:)];
+    [self.channelButton setAutoresizingMask:NSViewMaxYMargin];
+    [root addSubview:self.channelButton];
+
+    self.groupButton = [[[NSButton alloc] initWithFrame:NSMakeRect(158, 124, 126, 32)] autorelease];
+    [self.groupButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"create.group")] autorelease]];
     [self.groupButton setTitle:TGLoc(@"create.group")];
     [self.groupButton setTarget:self];
     [self.groupButton setAction:@selector(createGroup:)];
     [self.groupButton setEnabled:NO];
-    [self.groupButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [self.groupButton setAutoresizingMask:NSViewMaxYMargin];
     [root addSubview:self.groupButton];
 
-    self.secretButton = [[[NSButton alloc] initWithFrame:NSMakeRect(340, 136, 110, 30)] autorelease];
+    self.secretButton = [[[NSButton alloc] initWithFrame:NSMakeRect(292, 124, 126, 32)] autorelease];
+    [self.secretButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"create.secret")] autorelease]];
     [self.secretButton setTitle:TGLoc(@"create.secret")];
     [self.secretButton setTarget:self];
     [self.secretButton setAction:@selector(createSecretChat:)];
     [self.secretButton setEnabled:NO];
-    [self.secretButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [self.secretButton setAutoresizingMask:NSViewMaxYMargin];
     [root addSubview:self.secretButton];
 
-    self.openButton = [[[NSButton alloc] initWithFrame:NSMakeRect(460, 136, 120, 30)] autorelease];
+    self.openButton = [[[NSButton alloc] initWithFrame:NSMakeRect(440, 124, 176, 32)] autorelease];
+    [self.openButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"contacts.open")] autorelease]];
     [self.openButton setTitle:TGLoc(@"contacts.open")];
     [self.openButton setTarget:self];
     [self.openButton setAction:@selector(openSelectedContact:)];
@@ -202,25 +282,24 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
     [self.openButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [root addSubview:self.openButton];
 
-    NSBox *separator = [[[NSBox alloc] initWithFrame:NSMakeRect(20, 126, 560, 1)] autorelease];
-    [separator setBoxType:NSBoxSeparator];
-    [separator setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    [root addSubview:separator];
-
-    NSTextField *inviteLabel = [self labelWithFrame:NSMakeRect(20, 96, 560, 20)
+    TGGroupedCardView *inviteCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 18, 600, 94)] autorelease];
+    [inviteCard setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [root addSubview:inviteCard];
+    NSTextField *inviteLabel = [self labelWithFrame:NSMakeRect(34, 78, 560, 18)
                                                font:[NSFont boldSystemFontOfSize:13.0]
-                                              color:TGClassicInkColor()];
+                                              color:TGClassicCardInkColor()];
     [inviteLabel setStringValue:TGLoc(@"contacts.inviteTitle")];
     [inviteLabel setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [root addSubview:inviteLabel];
 
-    self.inviteField = [[[NSTextField alloc] initWithFrame:NSMakeRect(20, 54, 434, 30)] autorelease];
+    self.inviteField = [[[NSTextField alloc] initWithFrame:NSMakeRect(34, 36, 438, 30)] autorelease];
     [[self.inviteField cell] setPlaceholderString:TGLoc(@"contacts.invitePlaceholder")];
     [self.inviteField setDelegate:self];
     [self.inviteField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [root addSubview:self.inviteField];
 
-    self.joinButton = [[[NSButton alloc] initWithFrame:NSMakeRect(460, 52, 120, 32)] autorelease];
+    self.joinButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 34, 122, 32)] autorelease];
+    [self.joinButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"contacts.join")] autorelease]];
     [self.joinButton setTitle:TGLoc(@"contacts.join")];
     [self.joinButton setTarget:self];
     [self.joinButton setAction:@selector(joinInviteLink:)];
@@ -328,11 +407,11 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
     (void)tableView;
+    (void)column;
     if (row < 0 || (NSUInteger)row >= [self.filteredContacts count]) {
-        return @"";
+        return nil;
     }
-    NSDictionary *contact = [self.filteredContacts objectAtIndex:(NSUInteger)row];
-    return [[column identifier] isEqualToString:@"name"] ? [contact objectForKey:@"display_name"] : TGContactSubtitle(contact);
+    return [self.filteredContacts objectAtIndex:(NSUInteger)row];
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {

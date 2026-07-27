@@ -1435,6 +1435,10 @@
                 self.hasAccountUnreadCount = YES;
                 [self updateApplicationBadge];
             }
+        } else if ([kind isEqualToString:@"notification_settings"]) {
+            if (!mountainLionSafeLoginMode) {
+                needsChatRefresh = YES;
+            }
         } else if ([kind isEqualToString:@"chat_filters"]) {
             needsChatFilterRefresh = YES;
         }

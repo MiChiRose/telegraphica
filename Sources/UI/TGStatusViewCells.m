@@ -56,10 +56,12 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [selectedPath fill];
     }
 
-    NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 8.0,
-                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 26.0) / 2.0),
-                                   26.0,
-                                   26.0);
+    BOOL compact = (NSWidth(cellFrame) < 108.0);
+    CGFloat avatarSide = compact ? 32.0 : 26.0;
+    NSRect avatarRect = NSMakeRect(compact ? (NSMidX(cellFrame) - floor(avatarSide / 2.0)) : (NSMinX(cellFrame) + 8.0),
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - avatarSide) / 2.0),
+                                   avatarSide,
+                                   avatarSide);
     NSString *displayTitle = [item isSavedMessages] ? TGLoc(@"savedMessages") : [item title];
     if ([item isSavedMessages]) {
         NSBezierPath *savedPath = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
@@ -88,6 +90,43 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                       [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
                                       unreadTextColor, NSForegroundColorAttributeName,
                                       nil];
+    if (compact) {
+        if ([unreadString length] > 0) {
+            NSString *compactUnread = unreadCount > 99 ? @"99+" : unreadString;
+            NSSize compactUnreadSize = [compactUnread sizeWithAttributes:unreadAttributes];
+            CGFloat compactBadgeWidth = MAX(17.0, compactUnreadSize.width + 8.0);
+            NSRect compactBadgeRect = NSMakeRect(NSMaxX(avatarRect) - compactBadgeWidth + 4.0,
+                                                 NSMaxY(avatarRect) - 15.0,
+                                                 compactBadgeWidth,
+                                                 16.0);
+            NSBezierPath *compactBadgePath = [NSBezierPath bezierPathWithRoundedRect:compactBadgeRect
+                                                                            xRadius:8.0
+                                                                            yRadius:8.0];
+            [TGClassicHeaderBottomColor() set];
+            [compactBadgePath fill];
+            NSMutableParagraphStyle *compactParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+            [compactParagraph setAlignment:NSCenterTextAlignment];
+            NSMutableDictionary *compactAttributes = [NSMutableDictionary dictionaryWithDictionary:unreadAttributes];
+            [compactAttributes setObject:compactParagraph forKey:NSParagraphStyleAttributeName];
+            [compactUnread drawInRect:NSMakeRect(NSMinX(compactBadgeRect),
+                                                 NSMinY(compactBadgeRect) + 1.0,
+                                                 NSWidth(compactBadgeRect),
+                                                 14.0)
+                       withAttributes:compactAttributes];
+        }
+        if ([item notificationsMuted]) {
+            NSRect compactMuteRect = NSMakeRect(NSMinX(avatarRect) - 3.0,
+                                                NSMinY(avatarRect) - 2.0,
+                                                14.0,
+                                                14.0);
+            TGDrawTemplateIconAsset(@"sound-off",
+                                    compactMuteRect,
+                                    selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor(),
+                                    1.0,
+                                    [controlView isFlipped]);
+        }
+        return;
+    }
     NSSize unreadSize = [unreadString sizeWithAttributes:unreadAttributes];
     CGFloat unreadWidth = ([unreadString length] > 0) ? MAX(unreadSize.width + 13.0, 20.0) : 0.0;
     CGFloat unreadHeight = ([unreadString length] > 0) ? 18.0 : 0.0;
@@ -105,7 +144,13 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      nil];
     CGFloat titleX = NSMaxX(avatarRect) + 9.0;
     CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
-    CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
+    NSString *muteBadge = [item notificationsMuted] ? TGLoc(@"chat.notifications.mutedBadge") : @"";
+    NSDictionary *muteAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont boldSystemFontOfSize:9.0], NSFontAttributeName,
+                                    selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                    nil];
+    NSSize muteBadgeSize = [muteBadge sizeWithAttributes:muteAttributes];
+    CGFloat muteIconWidth = [item notificationsMuted] ? MAX(38.0, muteBadgeSize.width + 10.0) : 0.0;
     CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
     CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) + ([item isPinned] ? (pinIconWidth + 4.0) : 0.0);
     CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
@@ -129,11 +174,24 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
     if ([item notificationsMuted]) {
         NSRect muteRect = NSMakeRect(iconX,
-                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
-                                     15.0,
-                                     15.0);
-        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicInkColor() colorWithAlphaComponent:0.78];
-        TGDrawTemplateIconAsset(@"sound-off", muteRect, muteColor, 1.0, [controlView isFlipped]);
+                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 16.0) / 2.0),
+                                     muteIconWidth,
+                                     16.0);
+        NSBezierPath *mutePath = [NSBezierPath bezierPathWithRoundedRect:muteRect xRadius:8.0 yRadius:8.0];
+        NSColor *muteFill = selected
+            ? [TGClassicSelectedRowTextColor() colorWithAlphaComponent:0.16]
+            : [TGClassicMutedInkColor() colorWithAlphaComponent:0.12];
+        [muteFill set];
+        [mutePath fill];
+        NSMutableParagraphStyle *muteParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [muteParagraph setAlignment:NSCenterTextAlignment];
+        NSMutableDictionary *centeredMuteAttributes = [NSMutableDictionary dictionaryWithDictionary:muteAttributes];
+        [centeredMuteAttributes setObject:muteParagraph forKey:NSParagraphStyleAttributeName];
+        [muteBadge drawInRect:NSMakeRect(NSMinX(muteRect),
+                                         NSMinY(muteRect) + 1.0,
+                                         NSWidth(muteRect),
+                                         13.0)
+               withAttributes:centeredMuteAttributes];
     }
     if ([unreadString length] > 0) {
         NSBezierPath *unreadPath = [NSBezierPath bezierPathWithRoundedRect:unreadRect

@@ -18,6 +18,22 @@
 @interface TGUtilityWindowView : NSView
 @end
 
+@protocol TGSidebarResizeHandleDelegate;
+
+@interface TGSidebarResizeHandleView : NSView {
+    id<TGSidebarResizeHandleDelegate> _delegate;
+    CGFloat _initialWidth;
+    NSPoint _initialScreenPoint;
+}
+@property (nonatomic, assign) id<TGSidebarResizeHandleDelegate> delegate;
+@end
+
+@protocol TGSidebarResizeHandleDelegate <NSObject>
+- (CGFloat)sidebarResizeHandleCurrentWidth:(TGSidebarResizeHandleView *)handle;
+- (void)sidebarResizeHandle:(TGSidebarResizeHandleView *)handle requestedWidth:(CGFloat)width;
+- (void)sidebarResizeHandleDidRequestToggle:(TGSidebarResizeHandleView *)handle;
+@end
+
 @interface TGRailView : NSView
 @end
 

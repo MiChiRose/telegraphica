@@ -93,6 +93,51 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @end
 
+@implementation TGSidebarResizeHandleView
+
+@synthesize delegate = _delegate;
+
+- (BOOL)isFlipped {
+    return YES;
+}
+
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    if (![self isHidden]) {
+        [self addCursorRect:[self bounds] cursor:[NSCursor resizeLeftRightCursor]];
+    }
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect lineRect = NSMakeRect(floor(NSMidX([self bounds])), 7.0, 1.0, MAX(0.0, NSHeight([self bounds]) - 14.0));
+    [TGClassicPanelStrokeColor() set];
+    NSRectFill(lineRect);
+}
+
+- (void)mouseDown:(NSEvent *)event {
+    if ([event clickCount] > 1) {
+        if ([_delegate respondsToSelector:@selector(sidebarResizeHandleDidRequestToggle:)]) {
+            [_delegate sidebarResizeHandleDidRequestToggle:self];
+        }
+        return;
+    }
+    _initialScreenPoint = [NSEvent mouseLocation];
+    _initialWidth = [_delegate respondsToSelector:@selector(sidebarResizeHandleCurrentWidth:)]
+        ? [_delegate sidebarResizeHandleCurrentWidth:self] : 0.0;
+}
+
+- (void)mouseDragged:(NSEvent *)event {
+    (void)event;
+    if (![_delegate respondsToSelector:@selector(sidebarResizeHandle:requestedWidth:)]) {
+        return;
+    }
+    NSPoint currentPoint = [NSEvent mouseLocation];
+    [_delegate sidebarResizeHandle:self requestedWidth:(_initialWidth + currentPoint.x - _initialScreenPoint.x)];
+}
+
+@end
+
 @implementation TGMessageTableView
 
 @synthesize dropOverlayTarget = _dropOverlayTarget;

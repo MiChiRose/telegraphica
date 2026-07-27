@@ -69,6 +69,7 @@ static NSString * const TGNotificationPreviewEnabledDefaultsKey = @"Telegraphica
 static NSString * const TGNotificationsWhenActiveDefaultsKey = @"TelegraphicaNotificationsWhenActive";
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
+static NSString * const TGChatSidebarWidthDefaultsKey = @"TelegraphicaChatSidebarWidth";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
 static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
@@ -207,9 +208,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate, TGSidebarResizeHandleDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
+@property (nonatomic, retain) TGSidebarResizeHandleView *sidebarResizeHandleView;
+@property (nonatomic, assign) CGFloat chatSidebarPreferredWidth;
 @property (nonatomic, retain) NSView *conversationPanelView;
 @property (nonatomic, retain) NSView *diagnosticsPanelView;
 @property (nonatomic, retain) NSView *loginPanelView;
@@ -665,6 +668,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @synthesize topPanelView = _topPanelView;
 @synthesize sidebarPanelView = _sidebarPanelView;
+@synthesize sidebarResizeHandleView = _sidebarResizeHandleView;
+@synthesize chatSidebarPreferredWidth = _chatSidebarPreferredWidth;
 @synthesize conversationPanelView = _conversationPanelView;
 @synthesize diagnosticsPanelView = _diagnosticsPanelView;
 @synthesize loginPanelView = _loginPanelView;
@@ -1966,6 +1971,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.sidebarPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 286, 480)] autorelease];
     [self.sidebarPanelView setAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
     [contentView addSubview:self.sidebarPanelView];
+
+    self.chatSidebarPreferredWidth = [[NSUserDefaults standardUserDefaults] doubleForKey:TGChatSidebarWidthDefaultsKey];
+    if (self.chatSidebarPreferredWidth <= 0.0) {
+        self.chatSidebarPreferredWidth = 292.0;
+    }
+    self.sidebarResizeHandleView = [[[TGSidebarResizeHandleView alloc] initWithFrame:NSMakeRect(304, 132, 10, 480)] autorelease];
+    [self.sidebarResizeHandleView setDelegate:self];
+    [contentView addSubview:self.sidebarResizeHandleView];
 
     self.conversationPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(314, 132, 650, 480)] autorelease];
     [self.conversationPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -3890,6 +3903,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_authSecureField setDelegate:nil];
     [_topPanelView release];
     [_sidebarPanelView release];
+    [_sidebarResizeHandleView setDelegate:nil];
+    [_sidebarResizeHandleView release];
     [_conversationPanelView release];
     [_diagnosticsPanelView release];
     [_loginPanelView release];

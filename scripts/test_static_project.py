@@ -551,6 +551,46 @@ def check_primary_navigation_contract(errors):
     if "NSWidth([self.drawerFolderScrollView contentSize])" in section_layout_text:
         errors.append("%s: NSWidth requires NSRect; use the scroll contentView bounds on legacy AppKit" %
                       section_layout_rel)
+    for fragment in [
+        "minimumChatSidebarWidth",
+        "maximumChatSidebarWidthForWindowWidth",
+        "sidebarResizeHandleDidRequestToggle",
+        "compactChatSidebar",
+    ]:
+        if fragment not in section_layout_text:
+            errors.append("%s: flexible chat sidebar is missing `%s`" %
+                          (section_layout_rel, fragment))
+    components_header_rel = os.path.join("Sources", "UI", "TGStatusViewComponents.h")
+    components_header_text = read_text(os.path.join(ROOT, components_header_rel))
+    if "TGSidebarResizeHandleView" not in components_header_text:
+        errors.append("%s: chat sidebar resize handle is missing" % components_header_rel)
+
+    lifecycle_rel = os.path.join("Sources", "UI", "TGChatLifecycleWindowController.m")
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    for fragment in [
+        "TGChatLifecycleContactCell",
+        "TGGroupedCardView *contactsCard",
+        "TGPrimaryTextButtonCell",
+        "TGSecondaryTextButtonCell",
+    ]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: polished new-chat window is missing `%s`" %
+                          (lifecycle_rel, fragment))
+
+    chat_cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    chat_cells_text = read_text(os.path.join(ROOT, chat_cells_rel))
+    if 'TGLoc(@"chat.notifications.mutedBadge")' not in chat_cells_text:
+        errors.append("%s: muted chats need an explicit localized badge" % chat_cells_rel)
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        "getScopeNotificationSettings",
+        "use_default_mute_for",
+        "updateScopeNotificationSettings",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: server notification scope sync is missing `%s`" %
+                          (client_rel, fragment))
 
     message_hit_testing_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
     message_hit_testing_text = read_text(os.path.join(ROOT, message_hit_testing_rel))
