@@ -31,6 +31,9 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 @interface TGPrimaryTextButtonCell : NSButtonCell
 @end
 
+@interface TGSecondaryTextButtonCell : NSButtonCell
+@end
+
 @interface TGMediaZoomButtonCell : NSButtonCell
 @end
 

@@ -9,6 +9,8 @@
                  didOpenChatID:(NSNumber *)chatID
                          title:(NSString *)title;
 - (void)contactsViewControllerDidRequestNewConversation:(TGContactsViewController *)controller;
+- (BOOL)contactsViewController:(TGContactsViewController *)controller
+         didRequestSendContact:(NSDictionary *)contact;
 
 @end
 

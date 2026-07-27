@@ -1,6 +1,7 @@
 #import "TGContactsViewController.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "TGContactManagementDialogs.h"
 #import "TGContactProfileView.h"
 #import "TGIconAssets.h"
 #import "TGLocalization.h"
@@ -124,6 +125,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
 @property (nonatomic, retain) NSButton *refreshButton;
 @property (nonatomic, retain) NSButton *createChatButton;
 @property (nonatomic, retain) NSButton *openButton;
+@property (nonatomic, retain) NSButton *actionButton;
 @property (nonatomic, retain) TGContactProfileView *profileView;
 @property (nonatomic, copy) NSArray *contacts;
 @property (nonatomic, copy) NSArray *filteredContacts;
@@ -150,6 +152,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
 @synthesize refreshButton = _refreshButton;
 @synthesize createChatButton = _createChatButton;
 @synthesize openButton = _openButton;
+@synthesize actionButton = _actionButton;
 @synthesize profileView = _profileView;
 @synthesize contacts = _contacts;
 @synthesize filteredContacts = _filteredContacts;
@@ -200,7 +203,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.createChatButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"+"] autorelease]];
     [self.createChatButton setTitle:@"+"];
     [self.createChatButton setTarget:self];
-    [self.createChatButton setAction:@selector(requestNewConversation:)];
+    [self.createChatButton setAction:@selector(showCreateMenu:)];
     [self.createChatButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.createChatButton];
 
@@ -265,6 +268,17 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.openButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [root addSubview:self.openButton];
 
+    self.actionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(520, 12, 182, 30)] autorelease];
+    TGSecondaryTextButtonCell *actionCell = [[[TGSecondaryTextButtonCell alloc] initTextCell:@""] autorelease];
+    [actionCell setButtonType:NSMomentaryPushInButton];
+    [self.actionButton setCell:actionCell];
+    [self.actionButton setBordered:NO];
+    [self.actionButton setTarget:self];
+    [self.actionButton setAction:@selector(showSelectedContactActions:)];
+    [self.actionButton setEnabled:NO];
+    [self.actionButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [root addSubview:self.actionButton];
+
     [self refreshLocalizedText];
     [self refreshThemeAppearance];
     [self layoutContent];
@@ -317,11 +331,24 @@ static NSString *TGContactsInitials(NSString *displayName) {
         CGFloat profileX = margin * 2.0 + listWidth;
         [self.statusField setFrame:NSMakeRect(margin, 15.0, MAX(80.0, listWidth - 24.0), 22.0)];
         [self.spinner setFrame:NSMakeRect(margin + listWidth - 18.0, 18.0, 16.0, 16.0)];
-        [self.openButton setFrame:NSMakeRect(profileX, 9.0, profileWidth, 32.0)];
+        CGFloat actionGap = 8.0;
+        CGFloat actionWidth = floor((profileWidth - actionGap) / 2.0);
+        [self.openButton setFrame:NSMakeRect(profileX, 9.0, actionWidth, 32.0)];
+        [self.actionButton setFrame:NSMakeRect(profileX + actionWidth + actionGap,
+                                               9.0,
+                                               profileWidth - actionWidth - actionGap,
+                                               32.0)];
     } else {
         [self.statusField setFrame:NSMakeRect(margin, 48.0, MAX(80.0, width - margin * 2.0 - 24.0), 22.0)];
         [self.spinner setFrame:NSMakeRect(width - margin - 18.0, 51.0, 16.0, 16.0)];
-        [self.openButton setFrame:NSMakeRect(margin, 8.0, MAX(120.0, width - margin * 2.0), 32.0)];
+        CGFloat actionGap = 8.0;
+        CGFloat availableActionWidth = MAX(120.0, width - margin * 2.0);
+        CGFloat actionWidth = floor((availableActionWidth - actionGap) / 2.0);
+        [self.openButton setFrame:NSMakeRect(margin, 8.0, actionWidth, 32.0)];
+        [self.actionButton setFrame:NSMakeRect(margin + actionWidth + actionGap,
+                                               8.0,
+                                               availableActionWidth - actionWidth - actionGap,
+                                               32.0)];
     }
 }
 
@@ -352,6 +379,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [_refreshButton release];
     [_createChatButton release];
     [_openButton release];
+    [_actionButton release];
     [_profileView release];
     [_contacts release];
     [_filteredContacts release];
@@ -366,8 +394,9 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.refreshButton setTitle:@"↻"];
     [self.refreshButton setToolTip:TGLoc(@"contacts.refresh")];
     [self.createChatButton setTitle:@"+"];
-    [self.createChatButton setToolTip:TGLoc(@"contacts.newChat")];
+    [self.createChatButton setToolTip:TGLoc(@"contacts.actions")];
     [self.openButton setTitle:TGLoc(@"contacts.open")];
+    [self.actionButton setTitle:TGLoc(@"contacts.actions")];
     if (!self.loaded && !self.loading) {
         [self.statusField setStringValue:TGLoc(@"contacts.section.hint")];
     }
@@ -379,6 +408,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.statusField setTextColor:TGClassicMutedInkColor()];
     [self.profileView refreshThemeAppearance];
     [self.openButton setNeedsDisplay:YES];
+    [self.actionButton setNeedsDisplay:YES];
     [[self view] setNeedsDisplay:YES];
     [self.tableView setNeedsDisplay:YES];
 }
@@ -390,6 +420,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.searchField setEnabled:!loading];
     [self.tableView setEnabled:!loading];
     [self.openButton setEnabled:(!loading && [self.tableView selectedRow] >= 0)];
+    [self.actionButton setEnabled:(!loading && [self.tableView selectedRow] >= 0)];
     if (loading) {
         [self.spinner startAnimation:nil];
     } else {
@@ -498,7 +529,9 @@ static NSString *TGContactsInitials(NSString *displayName) {
 }
 
 - (void)updateSelection {
-    [self.openButton setEnabled:(!self.loading && [self.tableView selectedRow] >= 0)];
+    BOOL hasSelection = (!self.loading && [self.tableView selectedRow] >= 0);
+    [self.openButton setEnabled:hasSelection];
+    [self.actionButton setEnabled:hasSelection];
 }
 
 - (void)loadSelectedContactProfile {
@@ -579,6 +612,210 @@ static NSString *TGContactsInitials(NSString *displayName) {
 - (void)requestNewConversation:(id)sender {
     (void)sender;
     [self.delegate contactsViewControllerDidRequestNewConversation:self];
+}
+
+- (NSDictionary *)selectedContact {
+    NSInteger row = [self.tableView selectedRow];
+    if (row < 0 || (NSUInteger)row >= [self.filteredContacts count]) {
+        return nil;
+    }
+    id contact = [self.filteredContacts objectAtIndex:(NSUInteger)row];
+    return [contact isKindOfClass:[NSDictionary class]] ? contact : nil;
+}
+
+- (NSMenuItem *)menuItemWithTitle:(NSString *)title action:(SEL)action {
+    NSMenuItem *item = [[[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""] autorelease];
+    [item setTarget:self];
+    return item;
+}
+
+- (void)showMenu:(NSMenu *)menu fromButton:(NSButton *)button {
+    if (!menu || !button) {
+        return;
+    }
+    [menu popUpMenuPositioningItem:nil
+                       atLocation:NSMakePoint(0.0, NSHeight([button bounds]) + 2.0)
+                           inView:button];
+}
+
+- (void)showCreateMenu:(id)sender {
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+    [menu addItem:[self menuItemWithTitle:TGLoc(@"contacts.newChat")
+                                   action:@selector(requestNewConversation:)]];
+    [menu addItem:[NSMenuItem separatorItem]];
+    [menu addItem:[self menuItemWithTitle:TGLoc(@"contacts.add.action")
+                                   action:@selector(addContact:)]];
+    [menu addItem:[self menuItemWithTitle:TGLoc(@"contacts.invite.action")
+                                   action:@selector(invitePerson:)]];
+    [self showMenu:menu fromButton:[sender isKindOfClass:[NSButton class]] ? sender : self.createChatButton];
+}
+
+- (void)showSelectedContactActions:(id)sender {
+    NSDictionary *contact = [self selectedContact];
+    if (!contact) {
+        return;
+    }
+    BOOL hasPhoneNumber = [[contact objectForKey:@"phone_number"] length] > 0;
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+    NSMenuItem *sendItem = [self menuItemWithTitle:TGLoc(@"contacts.sendToCurrentChat")
+                                            action:@selector(sendSelectedContact:)];
+    [sendItem setEnabled:hasPhoneNumber];
+    [menu addItem:sendItem];
+    NSMenuItem *inviteItem = [self menuItemWithTitle:TGLoc(@"contacts.invite.selected")
+                                              action:@selector(inviteSelectedContact:)];
+    [inviteItem setEnabled:hasPhoneNumber];
+    [menu addItem:inviteItem];
+    [menu addItem:[NSMenuItem separatorItem]];
+    [menu addItem:[self menuItemWithTitle:TGLoc(@"contacts.remove.action")
+                                   action:@selector(removeSelectedContact:)]];
+    [self showMenu:menu fromButton:[sender isKindOfClass:[NSButton class]] ? sender : self.actionButton];
+}
+
+- (void)addContact:(id)sender {
+    (void)sender;
+    if (self.loading) {
+        return;
+    }
+    NSDictionary *contact = [TGContactManagementDialogs contactToAdd];
+    if (!contact) {
+        return;
+    }
+    NSDictionary *contactCopy = [contact copy];
+    TGTDLibClient *client = [self.client retain];
+    TGContactsViewController *controller = [self retain];
+    [self setLoading:YES];
+    [self.statusField setStringValue:TGLoc(@"contacts.add.saving")];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *addError = nil;
+        BOOL added = [client addContactWithPhoneNumber:[contactCopy objectForKey:@"phone_number"]
+                                             firstName:[contactCopy objectForKey:@"first_name"]
+                                              lastName:[contactCopy objectForKey:@"last_name"]
+                                      sharePhoneNumber:[[contactCopy objectForKey:@"share_phone_number"] boolValue]
+                                               timeout:8.0
+                                                 error:&addError];
+        NSString *errorMessage = [[addError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [controller setLoading:NO];
+            if (added) {
+                [controller.statusField setTextColor:TGClassicMutedInkColor()];
+                [controller.statusField setStringValue:TGLoc(@"contacts.add.saved")];
+                controller.loaded = NO;
+                [controller refreshContacts:nil];
+            } else {
+                [controller.statusField setTextColor:[NSColor colorWithCalibratedRed:0.63 green:0.12 blue:0.10 alpha:1.0]];
+                [controller.statusField setStringValue:([errorMessage length] > 0 ? errorMessage : TGLoc(@"contacts.add.failed"))];
+            }
+            [errorMessage release];
+            [contactCopy release];
+            [client release];
+            [controller release];
+        });
+        [pool drain];
+    });
+}
+
+- (NSString *)normalizedInvitationPhoneNumber:(NSString *)phoneNumber {
+    NSMutableString *normalized = [NSMutableString string];
+    NSUInteger index = 0;
+    for (index = 0; index < [phoneNumber length]; index++) {
+        unichar character = [phoneNumber characterAtIndex:index];
+        if ((character >= '0' && character <= '9') ||
+            (character == '+' && [normalized length] == 0)) {
+            [normalized appendFormat:@"%C", character];
+        }
+    }
+    return normalized;
+}
+
+- (void)openInvitationForPhoneNumber:(NSString *)phoneNumber {
+    NSString *normalizedPhoneNumber = [self normalizedInvitationPhoneNumber:phoneNumber];
+    if ([normalizedPhoneNumber length] == 0) {
+        [self.statusField setStringValue:TGLoc(@"contacts.invite.failed")];
+        return;
+    }
+    NSString *downloadLink = @"https://telegram.org/dl";
+    NSString *invitationText = [NSString stringWithFormat:TGLoc(@"contacts.invite.message"), downloadLink];
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pasteboard setString:invitationText forType:NSStringPboardType];
+
+    NSString *escapedPhoneNumber = [normalizedPhoneNumber stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    NSURL *messagesURL = [NSURL URLWithString:[NSString stringWithFormat:@"sms:%@", escapedPhoneNumber]];
+    if ([[NSWorkspace sharedWorkspace] openURL:messagesURL]) {
+        [self.statusField setStringValue:TGLoc(@"contacts.invite.opened")];
+    } else {
+        [self.statusField setStringValue:TGLoc(@"contacts.invite.copied")];
+    }
+}
+
+- (void)invitePerson:(id)sender {
+    (void)sender;
+    NSString *phoneNumber = [TGContactManagementDialogs phoneNumberForInvitation];
+    if ([phoneNumber length] > 0) {
+        [self openInvitationForPhoneNumber:phoneNumber];
+    }
+}
+
+- (void)inviteSelectedContact:(id)sender {
+    (void)sender;
+    NSDictionary *contact = [self selectedContact];
+    [self openInvitationForPhoneNumber:[contact objectForKey:@"phone_number"]];
+}
+
+- (void)sendSelectedContact:(id)sender {
+    (void)sender;
+    NSDictionary *contact = [self selectedContact];
+    if (!contact) {
+        return;
+    }
+    if ([self.delegate contactsViewController:self didRequestSendContact:contact]) {
+        [self.statusField setStringValue:TGLoc(@"contacts.sendRequested")];
+    } else {
+        [self.statusField setStringValue:TGLoc(@"contacts.sendNeedsChat")];
+    }
+}
+
+- (void)removeSelectedContact:(id)sender {
+    (void)sender;
+    if (self.loading) {
+        return;
+    }
+    NSDictionary *contact = [self selectedContact];
+    NSNumber *userID = [contact objectForKey:@"user_id"];
+    if (!contact || ![userID respondsToSelector:@selector(longLongValue)] ||
+        ![TGContactManagementDialogs confirmRemovalOfContactNamed:[contact objectForKey:@"display_name"]]) {
+        return;
+    }
+
+    NSNumber *userIDCopy = [userID retain];
+    TGTDLibClient *client = [self.client retain];
+    TGContactsViewController *controller = [self retain];
+    [self setLoading:YES];
+    [self.statusField setStringValue:TGLoc(@"contacts.remove.removing")];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *removeError = nil;
+        BOOL removed = [client removeContactWithUserID:userIDCopy timeout:8.0 error:&removeError];
+        NSString *errorMessage = [[removeError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [controller setLoading:NO];
+            if (removed) {
+                [controller.statusField setTextColor:TGClassicMutedInkColor()];
+                [controller.statusField setStringValue:TGLoc(@"contacts.remove.removed")];
+                controller.loaded = NO;
+                [controller refreshContacts:nil];
+            } else {
+                [controller.statusField setTextColor:[NSColor colorWithCalibratedRed:0.63 green:0.12 blue:0.10 alpha:1.0]];
+                [controller.statusField setStringValue:([errorMessage length] > 0 ? errorMessage : TGLoc(@"contacts.remove.failed"))];
+            }
+            [errorMessage release];
+            [userIDCopy release];
+            [client release];
+            [controller release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)openSelectedContact:(id)sender {

@@ -653,6 +653,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 - (NSString *)localAttachmentPathForMessageItem:(TGMessageItem *)item;
 - (void)openDocumentAttachmentForMessageItem:(TGMessageItem *)item;
 - (void)downloadAttachmentForMessageItem:(TGMessageItem *)item;
+- (void)sendSharedComposerItemWithKind:(NSString *)kind values:(NSDictionary *)values;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
 - (void)openWorkshopFromDrawer:(id)sender;

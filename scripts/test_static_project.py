@@ -576,6 +576,32 @@ def check_primary_navigation_contract(errors):
     if "TGMessageItemIsNonVisualDocument" not in table_flow_text:
         errors.append("%s: document bubbles must expose an action tooltip" % table_flow_rel)
 
+    contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
+    contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    client_header_rel = os.path.join("Sources", "Core", "TGTDLibClient.h")
+    client_header_text = read_text(os.path.join(ROOT, client_header_rel))
+    dialogs_rel = os.path.join("Sources", "UI", "TGContactManagementDialogs.m")
+    dialogs_text = read_text(os.path.join(ROOT, dialogs_rel))
+    for fragment in [
+        "addContactWithPhoneNumber",
+        "removeContactWithUserID",
+    ]:
+        if fragment not in client_header_text:
+            errors.append("%s: contact management API is missing `%s`" %
+                          (client_header_rel, fragment))
+    for fragment in [
+        "showCreateMenu",
+        "showSelectedContactActions",
+        "sendSelectedContact",
+        "removeSelectedContact",
+        "inviteSelectedContact",
+    ]:
+        if fragment not in contacts_text:
+            errors.append("%s: contact management action is missing `%s`" %
+                          (contacts_rel, fragment))
+    if "contactToAdd" not in dialogs_text or "confirmRemovalOfContactNamed" not in dialogs_text:
+        errors.append("%s: add/remove confirmation dialogs are incomplete" % dialogs_rel)
+
     calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
     calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     calls_header_text = read_text(os.path.join(ROOT, calls_header_rel))

@@ -3555,6 +3555,12 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *summary = [NSMutableDictionary dictionary];
     [summary setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"user_id"];
     [summary setObject:[self singleLineTrimmedString:displayName maximumLength:100] forKey:@"display_name"];
+    if ([firstName isKindOfClass:[NSString class]] && [(NSString *)firstName length] > 0) {
+        [summary setObject:firstName forKey:@"first_name"];
+    }
+    if ([lastName isKindOfClass:[NSString class]] && [(NSString *)lastName length] > 0) {
+        [summary setObject:lastName forKey:@"last_name"];
+    }
     if ([username length] > 0) {
         [summary setObject:username forKey:@"username"];
     }
@@ -3648,6 +3654,73 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 compare:[[right objectForKey:@"display_name"] lowercaseString]];
     }];
     return contacts;
+}
+
+- (BOOL)addContactWithPhoneNumber:(NSString *)phoneNumber
+                        firstName:(NSString *)firstName
+                         lastName:(NSString *)lastName
+                 sharePhoneNumber:(BOOL)sharePhoneNumber
+                          timeout:(NSTimeInterval)timeout
+                            error:(NSError **)error {
+    NSString *safePhoneNumber = [self singleLineTrimmedString:phoneNumber maximumLength:64];
+    NSString *safeFirstName = [self singleLineTrimmedString:firstName maximumLength:64];
+    NSString *safeLastName = [self singleLineTrimmedString:lastName maximumLength:64];
+    if ([safePhoneNumber length] == 0 || [safeFirstName length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Contact first name and phone number are required." code:221];
+        }
+        return NO;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        return NO;
+    }
+
+    NSDictionary *contact = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"contact", @"@type",
+                             safePhoneNumber, @"phone_number",
+                             safeFirstName, @"first_name",
+                             safeLastName ? safeLastName : @"", @"last_name",
+                             @"", @"vcard",
+                             [NSNumber numberWithLongLong:0LL], @"user_id",
+                             nil];
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"addContact", @"@type",
+                             contact, @"contact",
+                             [NSNumber numberWithBool:sharePhoneNumber], @"share_phone_number",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-add-contact"
+                                                           timeout:timeout
+                                                         errorCode:222
+                                                             error:error];
+    return [[response objectForKey:@"@type"] isEqualToString:@"ok"];
+}
+
+- (BOOL)removeContactWithUserID:(NSNumber *)userID
+                        timeout:(NSTimeInterval)timeout
+                          error:(NSError **)error {
+    if (![userID respondsToSelector:@selector(longLongValue)] || [userID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"Contact identifier is missing." code:223];
+        }
+        return NO;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        return NO;
+    }
+
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"removeContacts", @"@type",
+                             [NSArray arrayWithObject:[NSNumber numberWithLongLong:[userID longLongValue]]], @"user_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-remove-contact"
+                                                           timeout:timeout
+                                                         errorCode:224
+                                                             error:error];
+    return [[response objectForKey:@"@type"] isEqualToString:@"ok"];
 }
 
 - (NSDictionary *)userProfileSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error {

@@ -432,6 +432,41 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @end
 
+@implementation TGSecondaryTextButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.46;
+    NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:9.0 yRadius:9.0];
+    NSColor *backgroundColor = highlighted ? TGClassicSelectedRowColor() : TGClassicTablePaperColor();
+    [backgroundColor set];
+    [path fill];
+    [TGClassicTableGridColor() set];
+    [path setLineWidth:1.0];
+    [path stroke];
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSColor *textColor = highlighted ? TGClassicSelectedRowTextColor() : TGClassicCardInkColor();
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                [textColor colorWithAlphaComponent:alpha], NSForegroundColorAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSString *title = [self title] ? [self title] : @"";
+    NSSize titleSize = [title sizeWithAttributes:attributes];
+    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + 10.0,
+                                  floor(NSMidY(cellFrame) - (titleSize.height / 2.0)) - 1.0,
+                                  MAX(0.0, NSWidth(cellFrame) - 20.0),
+                                  titleSize.height + 2.0);
+    [title drawInRect:titleRect withAttributes:attributes];
+}
+
+@end
+
 @implementation TGMediaZoomButtonCell
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
