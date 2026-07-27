@@ -75,6 +75,8 @@
 		111111111111111111111167 /* TGChatFolderManagementWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111338 /* TGChatFolderManagementWindowController.m */; };
 		111111111111111111111168 /* TGTDLibClient+Notifications.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111340 /* TGTDLibClient+Notifications.m */; };
 		111111111111111111111169 /* TGNotificationSettingsWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111342 /* TGNotificationSettingsWindowController.m */; };
+		111111111111111111111170 /* TGTDLibClient+ChatMembers.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111344 /* TGTDLibClient+ChatMembers.m */; };
+		111111111111111111111171 /* TGChatInfoWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111346 /* TGChatInfoWindowController.m */; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -234,6 +236,10 @@
 		111111111111111111111340 /* TGTDLibClient+Notifications.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Notifications.m"; sourceTree = "<group>"; };
 		111111111111111111111341 /* TGNotificationSettingsWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGNotificationSettingsWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111342 /* TGNotificationSettingsWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGNotificationSettingsWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111343 /* TGTDLibClient+ChatMembers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+ChatMembers.h"; sourceTree = "<group>"; };
+		111111111111111111111344 /* TGTDLibClient+ChatMembers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ChatMembers.m"; sourceTree = "<group>"; };
+		111111111111111111111345 /* TGChatInfoWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatInfoWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111346 /* TGChatInfoWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatInfoWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -334,6 +340,8 @@
 				111111111111111111111336 /* TGTDLibClient+ChatFolders.m */,
 				111111111111111111111339 /* TGTDLibClient+Notifications.h */,
 				111111111111111111111340 /* TGTDLibClient+Notifications.m */,
+				111111111111111111111343 /* TGTDLibClient+ChatMembers.h */,
+				111111111111111111111344 /* TGTDLibClient+ChatMembers.m */,
 				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
 				111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */,
 				111111111111111111111212 /* TGChatItem.h */,
@@ -402,6 +410,8 @@
 				111111111111111111111338 /* TGChatFolderManagementWindowController.m */,
 				111111111111111111111341 /* TGNotificationSettingsWindowController.h */,
 				111111111111111111111342 /* TGNotificationSettingsWindowController.m */,
+				111111111111111111111345 /* TGChatInfoWindowController.h */,
+				111111111111111111111346 /* TGChatInfoWindowController.m */,
 				111111111111111111111327 /* TGCallsPlaceholderView.h */,
 				111111111111111111111328 /* TGCallsPlaceholderView.m */,
 				111111111111111111111321 /* TGConversationCreationPrompt.h */,
@@ -651,6 +661,8 @@
 				111111111111111111111167 /* TGChatFolderManagementWindowController.m in Sources */,
 				111111111111111111111168 /* TGTDLibClient+Notifications.m in Sources */,
 				111111111111111111111169 /* TGNotificationSettingsWindowController.m in Sources */,
+				111111111111111111111170 /* TGTDLibClient+ChatMembers.m in Sources */,
+				111111111111111111111171 /* TGChatInfoWindowController.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

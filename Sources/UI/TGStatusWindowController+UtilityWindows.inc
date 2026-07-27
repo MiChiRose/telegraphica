@@ -69,7 +69,22 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 }
 
 - (void)openSelectedChatProfile:(id)sender {
-    [self openMediaCenter:sender];
+    (void)sender;
+    if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
+        NSBeep();
+        return;
+    }
+    if (self.chatInfoWindowController) {
+        [[self.chatInfoWindowController window] close];
+        self.chatInfoWindowController = nil;
+    }
+    self.chatInfoWindowController = [[[TGChatInfoWindowController alloc] initWithClient:self.client
+                                                                                chatID:self.selectedChatID
+                                                                                 title:self.selectedChatTitle] autorelease];
+    [[self.chatInfoWindowController window] center];
+    [self.chatInfoWindowController showWindow:self];
+    [[self.chatInfoWindowController window] makeKeyAndOrderFront:self];
+    [self.chatInfoWindowController reloadChatInfo];
 }
 
 - (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {

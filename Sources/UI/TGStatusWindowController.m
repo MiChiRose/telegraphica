@@ -2,6 +2,7 @@
 #import "TGActiveSessionsPresentation.h"
 #import "TGChatDisplayPreferences.h"
 #import "TGChatFolderManagementWindowController.h"
+#import "TGChatInfoWindowController.h"
 #import "TGChatLifecycleWindowController.h"
 #import "TGContactsViewController.h"
 #import "TGCallsPlaceholderView.h"
@@ -259,6 +260,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGStorageUsageWindowController *storageUsageWindowController;
 @property (nonatomic, retain) TGChatLifecycleWindowController *chatLifecycleWindowController;
 @property (nonatomic, retain) TGChatFolderManagementWindowController *chatFolderManagementWindowController;
+@property (nonatomic, retain) TGChatInfoWindowController *chatInfoWindowController;
 @property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
@@ -1058,6 +1060,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatsNavigationContextMenu = _chatsNavigationContextMenu;
 @synthesize chatLifecycleWindowController = _chatLifecycleWindowController;
 @synthesize chatFolderManagementWindowController = _chatFolderManagementWindowController;
+@synthesize chatInfoWindowController = _chatInfoWindowController;
 @synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
@@ -4270,6 +4273,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatLifecycleWindowController release];
     [[_chatFolderManagementWindowController window] close];
     [_chatFolderManagementWindowController release];
+    [[_chatInfoWindowController window] close];
+    [_chatInfoWindowController release];
     [[_notificationSettingsWindowController window] close];
     [_notificationSettingsWindowController release];
     [_logoutButton release];
