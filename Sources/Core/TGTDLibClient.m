@@ -47,6 +47,7 @@ static NSUInteger const TGTDLibMaxMainChatPreviewLimit = 500;
 static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
 static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 NSString * const TGTDLibChatFiltersDidChangeNotification = @"TGTDLibChatFiltersDidChangeNotification";
+NSString * const TGTDLibCallDidUpdateNotification = @"TGTDLibCallDidUpdateNotification";
 
 static BOOL TGTDLibObjectIsBoolean(id object) {
     return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
@@ -1149,6 +1150,34 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 nil];
     }
 
+    if ([type isEqualToString:@"updateCall"]) {
+        NSDictionary *call = [[dictionary objectForKey:@"call"] isKindOfClass:[NSDictionary class]]
+            ? [dictionary objectForKey:@"call"] : nil;
+        if (!call) {
+            return nil;
+        }
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"call_update" forKey:@"kind"];
+        id callID = [call objectForKey:@"id"];
+        id userID = [call objectForKey:@"user_id"];
+        if ([callID respondsToSelector:@selector(integerValue)]) {
+            [summary setObject:[NSNumber numberWithInteger:[callID integerValue]] forKey:@"call_id"];
+        }
+        if ([userID respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[userID longLongValue]] forKey:@"user_id"];
+        }
+        [summary setObject:[NSNumber numberWithBool:[[call objectForKey:@"is_outgoing"] boolValue]]
+                    forKey:@"is_outgoing"];
+        NSDictionary *state = [[call objectForKey:@"state"] isKindOfClass:[NSDictionary class]]
+            ? [call objectForKey:@"state"] : nil;
+        NSString *stateType = [[state objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [state objectForKey:@"@type"] : @"";
+        if ([stateType length] > 0) {
+            [summary setObject:stateType forKey:@"state_type"];
+        }
+        return summary;
+    }
+
     if ([type isEqualToString:@"updatePoll"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"poll_update" forKey:@"kind"];
@@ -1299,6 +1328,25 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *userInfo = [NSDictionary dictionaryWithObject:chatFilterInfos forKey:@"chatFilterInfos"];
         [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibChatFiltersDidChangeNotification object:self userInfo:userInfo];
     }
+    if ([objectType isEqualToString:@"updateCall"]) {
+        NSDictionary *call = [[dictionary objectForKey:@"call"] isKindOfClass:[NSDictionary class]]
+            ? [dictionary objectForKey:@"call"] : nil;
+        if (call) {
+            [self performSelectorOnMainThread:@selector(postCallUpdateNotificationOnMainThread:)
+                                   withObject:call
+                                waitUntilDone:NO];
+        }
+    }
+}
+
+- (void)postCallUpdateNotificationOnMainThread:(NSDictionary *)call {
+    if (![call isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSDictionary *userInfo = [NSDictionary dictionaryWithObject:call forKey:@"call"];
+    [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibCallDidUpdateNotification
+                                                        object:self
+                                                      userInfo:userInfo];
 }
 
 - (NSArray *)savedMessagesTopicObjectsSnapshot {

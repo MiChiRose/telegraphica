@@ -102,6 +102,7 @@
 		111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111398 /* TGTDLibClient+ChatHistory.m */; };
 		111111111111111111111198 /* TGUpdateCheckScheduler.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111410 /* TGUpdateCheckScheduler.m */; };
 		111111111111111111111192 /* TGTDLibClient+Calls.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111388 /* TGTDLibClient+Calls.m */; };
+		111111111111111111111193 /* TGCallAudioEngine.mm in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111390 /* TGCallAudioEngine.mm */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
@@ -316,6 +317,8 @@
 		111111111111111111111410 /* TGUpdateCheckScheduler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGUpdateCheckScheduler.m; sourceTree = "<group>"; };
 		111111111111111111111387 /* TGTDLibClient+Calls.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Calls.h"; sourceTree = "<group>"; };
 		111111111111111111111388 /* TGTDLibClient+Calls.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Calls.m"; sourceTree = "<group>"; };
+		111111111111111111111389 /* TGCallAudioEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGCallAudioEngine.h; sourceTree = "<group>"; };
+		111111111111111111111390 /* TGCallAudioEngine.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = TGCallAudioEngine.mm; sourceTree = "<group>"; };
 		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
@@ -384,6 +387,7 @@
 				111111111111111111111405 /* Services */,
 				111111111111111111111406 /* UI */,
 				111111111111111111111408 /* Media */,
+				111111111111111111111409 /* Calls */,
 				222000000000000000000001 /* Workshop */,
 				111111111111111111111407 /* Resources */,
 			);
@@ -607,6 +611,15 @@
 			path = Media;
 			sourceTree = "<group>";
 		};
+		111111111111111111111409 /* Calls */ = {
+			isa = PBXGroup;
+			children = (
+				111111111111111111111389 /* TGCallAudioEngine.h */,
+				111111111111111111111390 /* TGCallAudioEngine.mm */,
+			);
+			path = Calls;
+			sourceTree = "<group>";
+		};
 		111111111111111111111407 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -817,6 +830,7 @@
 				111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */,
 				111111111111111111111198 /* TGUpdateCheckScheduler.m in Sources */,
 				111111111111111111111192 /* TGTDLibClient+Calls.m in Sources */,
+				111111111111111111111193 /* TGCallAudioEngine.mm in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,
