@@ -55,6 +55,12 @@
             return YES;
         }
     }
+    if (TGMessageItemIsNonVisualDocument(item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:item]);
+        if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
+            return YES;
+        }
+    }
     NSURL *url = [self messageLinkURLForItem:item inCellFrame:cellFrame atPoint:tablePoint];
     return (url != nil);
 }
@@ -341,6 +347,32 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     return fileID;
 }
 
+- (NSString *)localAttachmentPathForMessageItem:(TGMessageItem *)item {
+    NSString *localPath = nil;
+    [self downloadFileIDForMessageItem:item localPath:&localPath fileName:NULL];
+    BOOL isDirectory = NO;
+    if ([localPath length] > 0 &&
+        [[NSFileManager defaultManager] fileExistsAtPath:localPath isDirectory:&isDirectory] &&
+        !isDirectory) {
+        return localPath;
+    }
+    return nil;
+}
+
+- (void)openDocumentAttachmentForMessageItem:(TGMessageItem *)item {
+    NSString *localPath = [self localAttachmentPathForMessageItem:item];
+    if ([localPath length] == 0) {
+        [self downloadAttachmentForMessageItem:item];
+        return;
+    }
+    if ([[NSWorkspace sharedWorkspace] openFile:localPath]) {
+        [self.statusField setStringValue:TGLoc(@"media.center.open")];
+        [self appendDetail:[NSString stringWithFormat:@"Opened document %@", [localPath lastPathComponent]]];
+    } else {
+        [self.statusField setStringValue:TGLoc(@"media.center.openFailed")];
+    }
+}
+
 - (void)downloadAttachmentForMessageItem:(TGMessageItem *)item {
     NSString *localPath = nil;
     NSString *fileName = nil;
@@ -526,6 +558,29 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         return;
     }
     if (TGMessageItemHasDownloadableAttachment(item)) {
+        NSString *localAttachmentPath = [self localAttachmentPathForMessageItem:item];
+        if (TGMessageItemIsNonVisualDocument(item) && [localAttachmentPath length] > 0) {
+            NSMenuItem *openDocumentItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"media.center.open")
+                                                                        action:@selector(openMessageDocumentFromMenu:)
+                                                                 keyEquivalent:@""] autorelease];
+            [openDocumentItem setRepresentedObject:item];
+            [openDocumentItem setTarget:self];
+            [menu addItem:openDocumentItem];
+
+            NSMenuItem *saveDocumentItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"media.center.saveAs")
+                                                                        action:@selector(saveMessageDocumentAsFromMenu:)
+                                                                 keyEquivalent:@""] autorelease];
+            [saveDocumentItem setRepresentedObject:item];
+            [saveDocumentItem setTarget:self];
+            [menu addItem:saveDocumentItem];
+
+            NSMenuItem *revealDocumentItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"media.center.reveal")
+                                                                          action:@selector(revealMessageDocumentFromMenu:)
+                                                                   keyEquivalent:@""] autorelease];
+            [revealDocumentItem setRepresentedObject:item];
+            [revealDocumentItem setTarget:self];
+            [menu addItem:revealDocumentItem];
+        }
         NSString *downloadTitle = [item isDocumentMessage] ? TGLoc(@"message.downloadDocument") : TGLoc(@"message.downloadMedia");
         NSMenuItem *downloadItem = [[[NSMenuItem alloc] initWithTitle:downloadTitle
                                                                action:@selector(downloadMessageAttachmentFromMenu:)
@@ -974,6 +1029,40 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         return;
     }
     [self downloadAttachmentForMessageItem:item];
+}
+
+- (void)openMessageDocumentFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if ([item isKindOfClass:[TGMessageItem class]]) {
+        [self openDocumentAttachmentForMessageItem:item];
+    }
+}
+
+- (void)saveMessageDocumentAsFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    NSString *localPath = [self localAttachmentPathForMessageItem:item];
+    NSError *error = nil;
+    NSString *savedPath = [TGMediaFileActions saveCopyOfFileAtPath:localPath
+                                                 suggestedFileName:[item downloadFileName]
+                                                             error:&error];
+    if ([savedPath length] > 0) {
+        [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.savedAs"),
+                                         [savedPath lastPathComponent]]];
+    } else if (error) {
+        [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.saveAsFailed"),
+                                         [error localizedDescription]]];
+    }
+}
+
+- (void)revealMessageDocumentFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    NSString *localPath = [self localAttachmentPathForMessageItem:item];
+    if (![TGMediaFileActions revealFileAtPath:localPath]) {
+        [self.statusField setStringValue:TGLoc(@"media.center.revealFailed")];
+    }
 }
 
 - (void)votePollOptionFromMenu:(id)sender {

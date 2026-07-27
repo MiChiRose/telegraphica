@@ -533,6 +533,49 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: profile must reuse the drawer button back state, not add a separate text button" %
                       controller_rel)
 
+    section_layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    section_layout_text = read_text(os.path.join(ROOT, section_layout_rel))
+    for fragment in [
+        "drawerFolderScrollView",
+        "drawerFolderContentView",
+        "drawerFolderButtonHeight = 46.0",
+        "drawerFolderRequiredHeight",
+        "drawerTopInset = 8.0",
+    ]:
+        if fragment not in controller_text and fragment not in section_layout_text:
+            errors.append("%s: scrollable top-aligned drawer is missing `%s`" %
+                          (section_layout_rel, fragment))
+    if "drawerFolderButtonHeight = floor" in section_layout_text:
+        errors.append("%s: drawer folder rows must scroll instead of shrinking with the window" %
+                      section_layout_rel)
+    if "NSWidth([self.drawerFolderScrollView contentSize])" in section_layout_text:
+        errors.append("%s: NSWidth requires NSRect; use the scroll contentView bounds on legacy AppKit" %
+                      section_layout_rel)
+
+    message_hit_testing_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
+    message_hit_testing_text = read_text(os.path.join(ROOT, message_hit_testing_rel))
+    message_menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    message_menus_text = read_text(os.path.join(ROOT, message_menus_rel))
+    table_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    table_flow_text = read_text(os.path.join(ROOT, table_flow_rel))
+    for fragment in [
+        "TGMessageItemIsNonVisualDocument",
+        "openDocumentAttachmentForMessageItem",
+    ]:
+        if fragment not in message_hit_testing_text:
+            errors.append("%s: document bubble interaction is missing `%s`" %
+                          (message_hit_testing_rel, fragment))
+    for fragment in [
+        "openMessageDocumentFromMenu",
+        "saveMessageDocumentAsFromMenu",
+        "revealMessageDocumentFromMenu",
+    ]:
+        if fragment not in message_menus_text:
+            errors.append("%s: direct document action is missing `%s`" %
+                          (message_menus_rel, fragment))
+    if "TGMessageItemIsNonVisualDocument" not in table_flow_text:
+        errors.append("%s: document bubbles must expose an action tooltip" % table_flow_rel)
+
     calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
     calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     calls_header_text = read_text(os.path.join(ROOT, calls_header_rel))

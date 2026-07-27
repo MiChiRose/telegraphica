@@ -82,6 +82,14 @@
             return @"Play media";
         }
     }
+    if (TGMessageItemIsNonVisualDocument((TGMessageItem *)item)) {
+        NSRect bubbleRect = TGMessageBubbleRectForItem((TGMessageItem *)item, cellFrame, [self shouldShowGroupSenderDetailsForMessageItem:(TGMessageItem *)item]);
+        if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(mouseLocation, bubbleRect)) {
+            return ([self localAttachmentPathForMessageItem:(TGMessageItem *)item] != nil)
+                ? TGLoc(@"media.center.open")
+                : TGLoc(@"message.downloadDocument");
+        }
+    }
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
                                  inCellFrame:cellFrame
                                      atPoint:mouseLocation];
