@@ -33,7 +33,9 @@
     }
     [[controller window] orderOut:self];
     self.activeSection = TGSectionChats;
+    self.showingArchivedChats = NO;
     self.selectedChatFilterID = nil;
+    [self refreshChatListTitle];
     self.chatNavigationClosed = NO;
     self.selectedChatID = [NSNumber numberWithLongLong:[chatID longLongValue]];
     self.selectedChatTitle = ([title length] > 0 ? title : TGLoc(@"chats"));
@@ -106,6 +108,54 @@
     (void)sender;
     self.activeSection = TGSectionSettings;
     [self updateVisibleSection];
+}
+
+- (void)toggleChatArchivedFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        [item isForumTopic] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    BOOL targetArchived = !self.showingArchivedChats;
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSString *title = [([[item title] length] > 0 ? [item title] : TGLoc(@"chats")) copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:(targetArchived ? TGLoc(@"chat.archiving") : TGLoc(@"chat.unarchiving"))];
+    [self appendDetail:[NSString stringWithFormat:@"%@ %@...",
+                        targetArchived ? @"Archiving" : @"Unarchiving",
+                        title]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *archiveError = nil;
+        BOOL succeeded = [client setChatWithID:chatID
+                                      archived:targetArchived
+                                       timeout:8.0
+                                         error:&archiveError];
+        NSString *errorMessage = [[archiveError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:(targetArchived ? TGLoc(@"chat.archived") : TGLoc(@"chat.unarchived"))];
+                [self appendDetail:[NSString stringWithFormat:@"%@ %@.",
+                                    targetArchived ? @"Archived" : @"Returned from archive",
+                                    title]];
+                [self.client invalidateMainChatListExhaustion];
+                [self reloadChatsInteractive:NO preserveSelection:YES];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"chat.archiveFailed")];
+                [self appendDetail:[NSString stringWithFormat:@"Chat archive request failed: %@",
+                                    [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [chatID release];
+            [title release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)leaveChatFromMenu:(id)sender {

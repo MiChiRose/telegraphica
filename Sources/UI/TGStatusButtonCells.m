@@ -63,6 +63,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         TGDrawTemplateIconAsset(@"settings", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"All"] || [title isEqualToString:@"All chats"] || [title isEqualToString:@"Все чаты"] || [title isEqualToString:@"Усе чаты"]) {
         TGDrawTemplateIconAsset(@"folder-share", iconRect, color, 1.0, flipped);
+    } else if ([title isEqualToString:@"Archive"] || [title isEqualToString:@"Архив"] || [title isEqualToString:@"Архіў"]) {
+        TGDrawTemplateIconAsset(@"archive", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Workshop"] || [title isEqualToString:@"Мастерская"] || [title isEqualToString:@"Майстэрня"]) {
         TGDrawTemplateIconAsset(@"workshop", iconRect, color, 1.0, flipped);
     } else if ([title isEqualToString:@"Private"] || [title isEqualToString:@"Groups"]) {

@@ -572,6 +572,7 @@
         self.drawerOpen = NO;
         [self clearForumTopicListState];
         self.chatsExhausted = NO;
+        self.showingArchivedChats = NO;
         self.selectedChatFilterID = nil;
         self.chatFilterInfos = [NSArray array];
         self.chatFilterRefreshRetryCount = 0;

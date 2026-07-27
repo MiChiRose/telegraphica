@@ -842,6 +842,50 @@ def check_retro_console_contract(errors):
                               os.path.relpath(os.path.join(directory, filename), ROOT))
 
 
+def check_chat_archive_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    data_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    lifecycle_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatLifecycle.inc")
+    buttons_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    data_flow_text = read_text(os.path.join(ROOT, data_flow_rel))
+    menus_text = read_text(os.path.join(ROOT, menus_rel))
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    buttons_text = read_text(os.path.join(ROOT, buttons_rel))
+
+    for fragment in [
+        '"addChatToList"',
+        '"chatListArchive"',
+        "archivedChatPreviewItemsWithLimit:",
+        "archivedChatIDsWithLimit:",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: chat archive TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "showingArchivedChats",
+        'TGLoc(@"drawer.archive")',
+        "[NSNumber numberWithInteger:-2]",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: archive drawer state is missing `%s`" %
+                          (controller_rel, fragment))
+    if "loadingArchivedChats != self.showingArchivedChats" not in data_flow_text:
+        errors.append("%s: archive loads must reject stale list results" % data_flow_rel)
+    if 'TGTemplateIconAssetImage(@"archive"' not in menus_text:
+        errors.append("%s: archive menu must reuse the existing archive icon asset" % menus_rel)
+    if "toggleChatArchivedFromMenu:" not in lifecycle_text:
+        errors.append("%s: archive action wiring is missing" % lifecycle_rel)
+    if 'TGDrawTemplateIconAsset(@"archive"' not in buttons_text:
+        errors.append("%s: archive drawer must reuse the existing archive icon asset" % buttons_rel)
+    archive_icon = os.path.join(ROOT, "Sources", "Resources", "Icons", "archive.png")
+    if not os.path.isfile(archive_icon):
+        errors.append("Sources/Resources/Icons/archive.png: required existing archive icon is missing")
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -860,6 +904,7 @@ def main():
     check_media_file_management_contract(errors)
     check_primary_navigation_contract(errors)
     check_retro_console_contract(errors)
+    check_chat_archive_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

@@ -1078,6 +1078,7 @@
 
     NSNumber *preferredChatID = preserveSelection ? [self.selectedChatID retain] : nil;
     NSNumber *activeFilterID = [self.selectedChatFilterID retain];
+    BOOL loadingArchivedChats = self.showingArchivedChats;
     NSPoint visibleChatOrigin = NSZeroPoint;
     BOOL shouldRestoreChatOrigin = NO;
     if (!interactive) {
@@ -1093,7 +1094,11 @@
         if (TGMountainLionSafeLoginModeEnabled()) {
             [self appendDetail:@"Mountain Lion safe login mode: loading chats with TDLib message database disabled."];
         }
-        [self appendDetail:activeFilterID ? @"Loading folder chat previews from TDLib..." : @"Loading main chat previews from TDLib..."];
+        if (loadingArchivedChats) {
+            [self appendDetail:@"Loading archived chat previews from TDLib..."];
+        } else {
+            [self appendDetail:activeFilterID ? @"Loading folder chat previews from TDLib..." : @"Loading main chat previews from TDLib..."];
+        }
     } else {
         self.backgroundChatRefreshInFlight = YES;
     }
@@ -1110,7 +1115,12 @@
         NSError *chatError = nil;
         BOOL chatsExhausted = NO;
         NSArray *items = nil;
-        if (activeFilterID) {
+        if (loadingArchivedChats) {
+            items = [client archivedChatPreviewItemsWithLimit:requestedLimit
+                                                     timeout:10.0
+                                                   exhausted:&chatsExhausted
+                                                       error:&chatError];
+        } else if (activeFilterID) {
             items = [client chatPreviewItemsForChatFilterID:activeFilterID
                                                       limit:requestedLimit
                                                     timeout:10.0
@@ -1126,7 +1136,9 @@
 
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL filterStillCurrent = NO;
-            if (!activeFilterID && !self.selectedChatFilterID) {
+            if (loadingArchivedChats != self.showingArchivedChats) {
+                filterStillCurrent = NO;
+            } else if (!activeFilterID && !self.selectedChatFilterID) {
                 filterStillCurrent = YES;
             } else if (activeFilterID && self.selectedChatFilterID && [activeFilterID integerValue] == [self.selectedChatFilterID integerValue]) {
                 filterStillCurrent = YES;
@@ -1173,7 +1185,8 @@
                 [self setOfflineModeActive:NO reason:nil];
                 if (interactive) {
                     [self.statusField setStringValue:@"Connected"];
-                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu %@chat previews (limit %lu)", (unsigned long)[itemsCopy count], activeFilterID ? @"folder " : @"", (unsigned long)requestedLimit]];
+                    NSString *listKind = loadingArchivedChats ? @"archived " : (activeFilterID ? @"folder " : @"");
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib chats: loaded %lu %@chat previews (limit %lu)", (unsigned long)[itemsCopy count], listKind, (unsigned long)requestedLimit]];
                     if (self.chatsExhausted) {
                         [self appendDetail:@"TDLib chats: all currently available chat previews are loaded."];
                     }
