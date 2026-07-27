@@ -728,10 +728,19 @@ def check_primary_navigation_contract(errors):
         "showProfileEditWindow:",
         "didRequestSaveFirstName:",
         "reloadProfileSummaryIfReady",
+        "[NSApp activateIgnoringOtherApps:YES]",
+        'log:@"Profile editor presented."',
     ]:
         if fragment not in utility_windows_text:
             errors.append("%s: profile editor wiring is missing `%s`" %
                           (utility_windows_rel, fragment))
+    for fragment in [
+        "profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth",
+        "profileGroupedWidth - 44.0",
+    ]:
+        if fragment not in section_layout_text:
+            errors.append("%s: safe profile action layout is missing `%s`" %
+                          (section_layout_rel, fragment))
 
     calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
     calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")

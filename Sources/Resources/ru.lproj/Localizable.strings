@@ -10,5 +10,7 @@
 "profile.edit.bio" = "О себе";
 "profile.edit.firstNameRequired" = "Укажите имя.";
 "profile.edit.open" = "Редактировать профиль";
+"profile.edit.short" = "Изменить";
+"profile.edit.unavailable" = "Редактирование профиля станет доступно после подключения к Telegram.";
 "profile.edit.saving" = "Сохранение профиля…";
 "profile.edit.saved" = "Профиль обновлён.";

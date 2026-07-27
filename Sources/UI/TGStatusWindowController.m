@@ -1571,7 +1571,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.activeSessionsTerminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
     [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
     [self.profileRefreshButton setTitle:TGLoc(@"profile.refresh")];
-    [self.profileEditButton setTitle:TGLoc(@"profile.edit.open")];
+    [self.profileEditButton setTitle:TGLoc(@"profile.edit.short")];
+    [self.profileEditButton setToolTip:TGLoc(@"profile.edit.title")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
     [self.settingsAppearanceButton setTitle:@""];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
@@ -3333,10 +3334,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [contentView addSubview:self.profileRefreshButton];
 
     self.profileEditButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 314, 220, 30)] autorelease];
-    [self.profileEditButton setTitle:TGLoc(@"profile.edit.open")];
+    [self.profileEditButton setTitle:TGLoc(@"profile.edit.short")];
     [self.profileEditButton setTarget:self];
     [self.profileEditButton setAction:@selector(showProfileEditWindow:)];
-    [self.profileEditButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"profile.edit.open")] autorelease]];
+    [self.profileEditButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"profile.edit.short")] autorelease]];
+    [self.profileEditButton setToolTip:TGLoc(@"profile.edit.title")];
     [self.profileEditButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.profileEditButton];
 

@@ -409,7 +409,11 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 
 - (void)showProfileEditWindow:(id)sender {
     (void)sender;
-    if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy) {
+    [[TGLogger sharedLogger] log:@"Profile editor requested."];
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [[TGLogger sharedLogger] log:@"Profile editor deferred because TDLib is not ready."];
+        [self.statusField setStringValue:TGLoc(@"profile.edit.unavailable")];
+        NSBeep();
         return;
     }
     if (!self.profileEditWindowController) {
@@ -420,8 +424,11 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
                                                    lastName:self.profileLastName
                                                    username:self.profileUsername
                                                         bio:self.profileBio];
-    [[self.profileEditWindowController window] center];
-    [[self.profileEditWindowController window] makeKeyAndOrderFront:self];
+    NSWindow *profileEditWindow = [self.profileEditWindowController window];
+    [profileEditWindow center];
+    [NSApp activateIgnoringOtherApps:YES];
+    [profileEditWindow makeKeyAndOrderFront:self];
+    [[TGLogger sharedLogger] log:@"Profile editor presented."];
 }
 
 - (void)profileEditWindowController:(TGProfileEditWindowController *)controller

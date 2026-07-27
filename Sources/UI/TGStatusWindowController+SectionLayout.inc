@@ -973,6 +973,11 @@
                                                 profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
+    CGFloat profileEditWidth = (profileGroupedWidth >= 420.0) ? 112.0 : 82.0;
+    [self.profileEditButton setFrame:NSMakeRect(profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth,
+                                                profileSummaryY + 18.0,
+                                                profileEditWidth,
+                                                28.0)];
     CGFloat profileTextX = profileGroupedX + 22.0;
     CGFloat profileTextWidth = profileGroupedWidth - 44.0;
     [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 124.0, profileTextWidth, 26.0)];
@@ -1089,15 +1094,9 @@
     CGFloat profileActionsY = profileNextY;
     [self.profileActionsCardView setFrame:NSMakeRect(profileGroupedX, profileActionsY, profileGroupedWidth, profileActionsHeight)];
     [self.profileRefreshButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
-    CGFloat profileActionGap = 10.0;
-    CGFloat profileActionWidth = floor((profileGroupedWidth - 44.0 - profileActionGap) / 2.0);
-    [self.profileEditButton setFrame:NSMakeRect(profileGroupedX + 22.0,
-                                                profileActionsY + 11.0,
-                                                profileActionWidth,
-                                                30.0)];
-    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0 + profileActionWidth + profileActionGap,
+    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0,
                                            profileActionsY + 11.0,
-                                           profileActionWidth,
+                                           profileGroupedWidth - 44.0,
                                            30.0)];
     [self.profileIDField setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
     profileNextY = profileActionsY + profileActionsHeight + 18.0;
