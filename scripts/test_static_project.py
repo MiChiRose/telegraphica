@@ -890,9 +890,13 @@ def check_chat_folder_management_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatFolders.m")
     controller_rel = os.path.join("Sources", "UI", "TGChatFolderManagementWindowController.m")
     host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatFolders.inc")
+    status_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
     client_text = read_text(os.path.join(ROOT, client_rel))
     controller_text = read_text(os.path.join(ROOT, controller_rel))
     host_text = read_text(os.path.join(ROOT, host_rel))
+    status_text = read_text(os.path.join(ROOT, status_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
 
     for fragment in [
         '"createChatFolder"',
@@ -915,6 +919,9 @@ def check_chat_folder_management_contract(errors):
         "definitionHasInclusionRule:",
         "setObjectValue:",
         "shareLinkForChatFolderID:",
+        "TGChatFolderListCell",
+        'TGDrawTemplateIconAsset(@"folder"',
+        "setReleasedWhenClosed:NO",
     ]:
         if fragment not in controller_text:
             errors.append("%s: chat-folder management UI is missing `%s`" %
@@ -927,6 +934,23 @@ def check_chat_folder_management_contract(errors):
         if fragment not in host_text:
             errors.append("%s: chat-folder host wiring is missing `%s`" %
                           (host_rel, fragment))
+    for fragment in [
+        "settingsFoldersCardView",
+        "settingsFoldersSectionField",
+        'TGLoc(@"settings.section.folders")',
+        'setIconName:@"folder"',
+    ]:
+        if fragment not in status_text:
+            errors.append("%s: dedicated settings folder section is missing `%s`" %
+                          (status_rel, fragment))
+    for fragment in [
+        "foldersCardHeight",
+        "[self.settingsChatFoldersButton setFrame:",
+        "[self showView:self.settingsFoldersCardView visible:showSettings]",
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: settings folder section layout is missing `%s`" %
+                          (layout_rel, fragment))
     for icon_name in ["folder-add.png", "folder-remove.png", "folder-share.png"]:
         icon_path = os.path.join(ROOT, "Sources", "Resources", "Icons", icon_name)
         if not os.path.isfile(icon_path):

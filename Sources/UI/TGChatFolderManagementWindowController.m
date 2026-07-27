@@ -9,6 +9,58 @@
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
+@interface TGChatFolderListCell : NSCell
+@end
+
+@implementation TGChatFolderListCell
+
+- (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    NSDictionary *folder = [[self objectValue] isKindOfClass:[NSDictionary class]]
+        ? [self objectValue]
+        : nil;
+    if (!folder) {
+        return;
+    }
+
+    BOOL highlighted = [self isHighlighted];
+    NSColor *titleColor = highlighted ? [NSColor whiteColor] : TGClassicCardInkColor();
+    NSColor *detailColor = highlighted
+        ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.78]
+        : TGClassicCardMutedInkColor();
+    NSRect iconRect = NSMakeRect(NSMinX(cellFrame) + 8.0,
+                                 NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 18.0) / 2.0),
+                                 18.0,
+                                 18.0);
+    TGDrawTemplateIconAsset(@"folder", iconRect, titleColor, 0.92, [controlView isFlipped]);
+
+    CGFloat textX = NSMaxX(iconRect) + 8.0;
+    CGFloat textWidth = MAX(36.0, NSMaxX(cellFrame) - textX - 8.0);
+    BOOL shared = [[folder objectForKey:@"is_shareable"] boolValue];
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                     titleColor, NSForegroundColorAttributeName,
+                                     nil];
+    NSDictionary *detailAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                      detailColor, NSForegroundColorAttributeName,
+                                      nil];
+    NSString *title = [[folder objectForKey:@"title"] isKindOfClass:[NSString class]]
+        ? [folder objectForKey:@"title"]
+        : @"";
+    CGFloat titleY = shared ? NSMinY(cellFrame) + 5.0 : NSMinY(cellFrame) + 12.0;
+    [title drawInRect:NSMakeRect(textX, titleY, textWidth, 16.0)
+       withAttributes:titleAttributes];
+    if (shared) {
+        [TGLoc(@"folders.shared") drawInRect:NSMakeRect(textX,
+                                                        NSMinY(cellFrame) + 21.0,
+                                                        textWidth,
+                                                        13.0)
+                              withAttributes:detailAttributes];
+    }
+}
+
+@end
+
 @interface TGChatFolderChatCell : NSCell
 @end
 
@@ -137,6 +189,7 @@
         [[self window] setTitle:TGLoc(@"folders.manage.title")];
         [[self window] setMinSize:NSMakeSize(720.0, 600.0)];
         [[self window] setMaxSize:NSMakeSize(980.0, 760.0)];
+        [[self window] setReleasedWhenClosed:NO];
         [self buildViews];
     }
     return self;
@@ -272,11 +325,17 @@
     [self.folderTableView setDataSource:self];
     [self.folderTableView setDelegate:self];
     [self.folderTableView setHeaderView:nil];
-    [self.folderTableView setRowHeight:38.0];
+    [self.folderTableView setRowHeight:42.0];
     [self.folderTableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
     [self.folderTableView setBackgroundColor:TGClassicTablePaperColor()];
+    [self.folderTableView setAllowsEmptySelection:NO];
+    [self.folderTableView setAllowsMultipleSelection:NO];
+    [self.folderTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
+    [self.folderTableView setColumnAutoresizingStyle:NSTableViewLastColumnOnlyAutoresizingStyle];
     NSTableColumn *folderColumn = [[[NSTableColumn alloc] initWithIdentifier:@"folder"] autorelease];
     [folderColumn setWidth:190.0];
+    [folderColumn setMinWidth:120.0];
+    [folderColumn setDataCell:[[[TGChatFolderListCell alloc] init] autorelease]];
     [self.folderTableView addTableColumn:folderColumn];
     [folderScroll setDocumentView:self.folderTableView];
     [root addSubview:folderScroll];
@@ -548,14 +607,9 @@
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
     if (tableView == self.folderTableView) {
         if (row < 0 || (NSUInteger)row >= [self.folderDefinitions count]) {
-            return @"";
+            return nil;
         }
-        NSDictionary *folder = [self.folderDefinitions objectAtIndex:(NSUInteger)row];
-        NSString *title = [folder objectForKey:@"title"];
-        if ([[folder objectForKey:@"is_shareable"] boolValue]) {
-            return [NSString stringWithFormat:@"%@  ·  %@", title, TGLoc(@"folders.shared")];
-        }
-        return title;
+        return [self.folderDefinitions objectAtIndex:(NSUInteger)row];
     }
     if (row < 0 || (NSUInteger)row >= [self.filteredChatItems count]) {
         return nil;
