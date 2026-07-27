@@ -5,6 +5,7 @@
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
+#import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
 @interface TGDownloadManagerWindowController () <NSTableViewDataSource, NSTableViewDelegate>

@@ -5,6 +5,7 @@
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
+#import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
 @interface TGPrivacyWindowController () <NSTableViewDataSource, NSTableViewDelegate>
@@ -513,24 +514,24 @@
     if (!userID) {
         return;
     }
-    NSDictionary *sender = [[NSDictionary alloc] initWithObjectsAndKeys:
-                            @"messageSenderUser", @"@type", userID, @"user_id", nil];
+    NSDictionary *senderObject = [[NSDictionary alloc] initWithObjectsAndKeys:
+                                  @"messageSenderUser", @"@type", userID, @"user_id", nil];
     TGTDLibClient *client = [self.client retain];
     [self runMutation:^BOOL(NSError **error) {
-        BOOL result = [client setBlockedSender:sender blocked:YES timeout:10.0 error:error];
+        BOOL result = [client setBlockedSender:senderObject blocked:YES timeout:10.0 error:error];
         [client release];
-        [sender release];
+        [senderObject release];
         return result;
     }];
 }
 
 - (void)unblockPressed:(id)sender {
     (void)sender;
-    NSDictionary *sender = [[[[self selectedBlockedSummary] objectForKey:@"sender"] retain] autorelease];
-    if (!sender) {
+    NSDictionary *senderObject = [[[[self selectedBlockedSummary] objectForKey:@"sender"] retain] autorelease];
+    if (!senderObject) {
         return;
     }
-    NSDictionary *safeSender = [sender retain];
+    NSDictionary *safeSender = [senderObject retain];
     TGTDLibClient *client = [self.client retain];
     [self runMutation:^BOOL(NSError **error) {
         BOOL result = [client setBlockedSender:safeSender blocked:NO timeout:10.0 error:error];

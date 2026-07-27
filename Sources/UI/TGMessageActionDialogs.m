@@ -94,8 +94,8 @@
                                           text:TGLoc(@"share.location.longitude")]];
     NSTextField *latitudeField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0.0, 51.0, 185.0, 22.0)] autorelease];
     NSTextField *longitudeField = [[[NSTextField alloc] initWithFrame:NSMakeRect(205.0, 51.0, 185.0, 22.0)] autorelease];
-    [latitudeField setPlaceholderString:@"53.9006"];
-    [longitudeField setPlaceholderString:@"27.5590"];
+    [[latitudeField cell] setPlaceholderString:@"53.9006"];
+    [[longitudeField cell] setPlaceholderString:@"27.5590"];
     [accessory addSubview:latitudeField];
     [accessory addSubview:longitudeField];
     [accessory addSubview:[self labelWithFrame:NSMakeRect(0.0, 8.0, 390.0, 34.0)

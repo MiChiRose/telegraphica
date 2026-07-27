@@ -2,6 +2,7 @@
 
 #import "../Core/TGTDLibClient.h"
 #import "../Media/TGMediaFileActions.h"
+#import "../UI/TGStatusSupport.h"
 #import "TGResourcePolicy.h"
 
 NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDidChangeNotification";
