@@ -2,19 +2,29 @@
 #import "TGActiveSessionsPresentation.h"
 #import "TGChatDisplayPreferences.h"
 #import "TGChatFolderManagementWindowController.h"
+#import "TGChatInfoWindowController.h"
+#import "TGDatePickerDialog.h"
+#import "TGBotCommandPanelView.h"
+#import "TGBotKeyboardWindowController.h"
+#import "TGBotInteractionWindowController.h"
 #import "TGChatLifecycleWindowController.h"
 #import "TGContactsViewController.h"
+#import "TGDownloadManagerWindowController.h"
 #import "TGCallsPlaceholderView.h"
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGMessageViewersWindowController.h"
+#import "TGNotificationSettingsWindowController.h"
 #import "TGAnimationSupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
 #import "TGProfileEditWindowController.h"
+#import "TGPrivacyWindowController.h"
+#import "TGSavedMessagesWindowController.h"
 #import "TGStatusButtonCells.h"
 #import "TGSectionTitleField.h"
+#import "TGScheduledMessagesWindowController.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusSupport.h"
@@ -38,7 +48,11 @@
 #import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+ChatMembers.h"
+#import "../Core/TGTDLibClient+Notifications.h"
+#import "../Core/TGTDLibClient+MessageTypes.h"
 #import "../Services/TGLocalDataReset.h"
+#import "../Services/TGDownloadManager.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import "../Services/TGSystemCompatibility.h"
@@ -248,6 +262,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGGroupedCardView *settingsProfileCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsAccountCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsFoldersCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsSavedCardView;
+@property (nonatomic, retain) TGGroupedCardView *settingsPrivacyCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsThemeCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsSessionCardView;
 @property (nonatomic, retain) TGGroupedCardView *settingsDrawerCardView;
@@ -257,10 +273,27 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGStorageUsageWindowController *storageUsageWindowController;
 @property (nonatomic, retain) TGChatLifecycleWindowController *chatLifecycleWindowController;
 @property (nonatomic, retain) TGChatFolderManagementWindowController *chatFolderManagementWindowController;
+@property (nonatomic, retain) TGChatInfoWindowController *chatInfoWindowController;
+@property (nonatomic, retain) TGBotKeyboardWindowController *botKeyboardWindowController;
+@property (nonatomic, retain) TGBotInteractionWindowController *botInteractionWindowController;
+@property (nonatomic, retain) NSNumber *selectedBotUserID;
+@property (nonatomic, copy) NSDictionary *activeBotReplyMarkup;
+@property (nonatomic, retain) NSNumber *activeBotReplyMarkupMessageID;
+@property (nonatomic, assign) NSUInteger botComposerGeneration;
+@property (nonatomic, assign) BOOL botComposerVisible;
+@property (nonatomic, assign) BOOL botCommandPanelVisible;
+@property (nonatomic, retain) TGBotCommandPanelView *botCommandPanelView;
+@property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
+@property (nonatomic, retain) TGPrivacyWindowController *privacyWindowController;
+@property (nonatomic, retain) TGSavedMessagesWindowController *savedMessagesWindowController;
+@property (nonatomic, retain) TGScheduledMessagesWindowController *scheduledMessagesWindowController;
+@property (nonatomic, retain) TGDownloadManagerWindowController *downloadManagerWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) TGSectionTitleField *settingsProfileSectionField;
 @property (nonatomic, retain) TGSectionTitleField *settingsFoldersSectionField;
+@property (nonatomic, retain) TGSectionTitleField *settingsSavedSectionField;
+@property (nonatomic, retain) TGSectionTitleField *settingsPrivacySectionField;
 @property (nonatomic, retain) NSTextField *settingsProfileDetailField;
 @property (nonatomic, retain) NSButton *settingsProfileButton;
 @property (nonatomic, retain) NSTextField *diagnosticsLabel;
@@ -353,6 +386,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *attachPhotoButton;
+@property (nonatomic, retain) NSButton *botActionButton;
 @property (nonatomic, retain) NSButton *stickerButton;
 @property (nonatomic, retain) NSButton *voiceRecordButton;
 @property (nonatomic, retain) NSButton *sendMessageButton;
@@ -436,9 +470,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsNotificationBadgeButton;
 @property (nonatomic, retain) NSButton *settingsNotificationPreviewButton;
 @property (nonatomic, retain) NSButton *settingsNotificationsWhenActiveButton;
+@property (nonatomic, retain) NSButton *settingsNotificationExceptionsButton;
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
 @property (nonatomic, retain) NSButton *settingsTypingIndicatorsButton;
 @property (nonatomic, retain) NSButton *settingsChatFoldersButton;
+@property (nonatomic, retain) NSButton *settingsSavedMessagesButton;
+@property (nonatomic, retain) NSButton *settingsPrivacyButton;
 @property (nonatomic, retain) NSButton *settingsEconomyModeButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadPhotosButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadVideosButton;
@@ -463,6 +500,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
 @property (nonatomic, retain) NSButton *settingsStorageUsageButton;
+@property (nonatomic, retain) NSButton *settingsDownloadManagerButton;
 @property (nonatomic, retain) NSButton *settingsDeleteLocalDataButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) TGNotificationDotView *settingsUpdateDotView;
@@ -716,6 +754,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsProfileCardView = _settingsProfileCardView;
 @synthesize settingsAccountCardView = _settingsAccountCardView;
 @synthesize settingsFoldersCardView = _settingsFoldersCardView;
+@synthesize settingsSavedCardView = _settingsSavedCardView;
+@synthesize settingsPrivacyCardView = _settingsPrivacyCardView;
 @synthesize settingsThemeCardView = _settingsThemeCardView;
 @synthesize settingsSessionCardView = _settingsSessionCardView;
 @synthesize settingsDrawerCardView = _settingsDrawerCardView;
@@ -727,6 +767,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize logsCardView = _logsCardView;
 @synthesize settingsProfileSectionField = _settingsProfileSectionField;
 @synthesize settingsFoldersSectionField = _settingsFoldersSectionField;
+@synthesize settingsSavedSectionField = _settingsSavedSectionField;
+@synthesize settingsPrivacySectionField = _settingsPrivacySectionField;
 @synthesize settingsProfileDetailField = _settingsProfileDetailField;
 @synthesize settingsProfileButton = _settingsProfileButton;
 @synthesize diagnosticsLabel = _diagnosticsLabel;
@@ -819,6 +861,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
 @synthesize attachPhotoButton = _attachPhotoButton;
+@synthesize botActionButton = _botActionButton;
 @synthesize stickerButton = _stickerButton;
 @synthesize voiceRecordButton = _voiceRecordButton;
 @synthesize sendMessageButton = _sendMessageButton;
@@ -897,9 +940,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsNotificationBadgeButton = _settingsNotificationBadgeButton;
 @synthesize settingsNotificationPreviewButton = _settingsNotificationPreviewButton;
 @synthesize settingsNotificationsWhenActiveButton = _settingsNotificationsWhenActiveButton;
+@synthesize settingsNotificationExceptionsButton = _settingsNotificationExceptionsButton;
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
 @synthesize settingsTypingIndicatorsButton = _settingsTypingIndicatorsButton;
 @synthesize settingsChatFoldersButton = _settingsChatFoldersButton;
+@synthesize settingsSavedMessagesButton = _settingsSavedMessagesButton;
+@synthesize settingsPrivacyButton = _settingsPrivacyButton;
 @synthesize settingsEconomyModeButton = _settingsEconomyModeButton;
 @synthesize settingsAutoDownloadPhotosButton = _settingsAutoDownloadPhotosButton;
 @synthesize settingsAutoDownloadVideosButton = _settingsAutoDownloadVideosButton;
@@ -924,6 +970,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
 @synthesize settingsStorageUsageButton = _settingsStorageUsageButton;
+@synthesize settingsDownloadManagerButton = _settingsDownloadManagerButton;
 @synthesize settingsDeleteLocalDataButton = _settingsDeleteLocalDataButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsUpdateDotView = _settingsUpdateDotView;
@@ -1053,6 +1100,21 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatsNavigationContextMenu = _chatsNavigationContextMenu;
 @synthesize chatLifecycleWindowController = _chatLifecycleWindowController;
 @synthesize chatFolderManagementWindowController = _chatFolderManagementWindowController;
+@synthesize chatInfoWindowController = _chatInfoWindowController;
+@synthesize botKeyboardWindowController = _botKeyboardWindowController;
+@synthesize botInteractionWindowController = _botInteractionWindowController;
+@synthesize selectedBotUserID = _selectedBotUserID;
+@synthesize activeBotReplyMarkup = _activeBotReplyMarkup;
+@synthesize activeBotReplyMarkupMessageID = _activeBotReplyMarkupMessageID;
+@synthesize botComposerGeneration = _botComposerGeneration;
+@synthesize botComposerVisible = _botComposerVisible;
+@synthesize botCommandPanelVisible = _botCommandPanelVisible;
+@synthesize botCommandPanelView = _botCommandPanelView;
+@synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
+@synthesize privacyWindowController = _privacyWindowController;
+@synthesize savedMessagesWindowController = _savedMessagesWindowController;
+@synthesize scheduledMessagesWindowController = _scheduledMessagesWindowController;
+@synthesize downloadManagerWindowController = _downloadManagerWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -1118,6 +1180,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
+
+- (void)setClient:(TGTDLibClient *)client {
+    if (_client != client) {
+        [_client release];
+        _client = [client retain];
+    }
+    [[TGDownloadManager sharedManager] setClient:_client];
+}
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -1536,6 +1606,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsTitleField setStringValue:TGLoc(@"settings")];
     [self.settingsProfileSectionField setStringValue:TGLoc(@"settings.section.account")];
     [self.settingsFoldersSectionField setStringValue:TGLoc(@"settings.section.folders")];
+    [self.settingsSavedSectionField setStringValue:TGLoc(@"settings.section.saved")];
+    [self.settingsPrivacySectionField setStringValue:TGLoc(@"settings.section.privacy")];
     [self.settingsProfileButton setTitle:TGLoc(@"settings.profile.open")];
     [[self.sendTextField cell] setPlaceholderString:TGLoc(@"message.placeholder")];
     [self applyComposerPlaceholderStyle:self.sendTextField];
@@ -1548,9 +1620,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsNotificationBadgeButton setTitle:TGLoc(@"settings.badge")];
     [self.settingsNotificationPreviewButton setTitle:TGLoc(@"settings.preview")];
     [self.settingsNotificationsWhenActiveButton setTitle:TGLoc(@"settings.whenActive")];
+    [self.settingsNotificationExceptionsButton setTitle:TGLoc(@"notifications.exceptions.open")];
     [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
     [self.settingsTypingIndicatorsButton setTitle:TGLoc(@"settings.typing")];
     [self.settingsChatFoldersButton setTitle:TGLoc(@"folders.manage.open")];
+    [self.settingsSavedMessagesButton setTitle:TGLoc(@"saved.open")];
+    [self.settingsPrivacyButton setTitle:TGLoc(@"privacy.open")];
     [self.settingsStateField setStringValue:TGLoc(@"settings.section.notifications")];
     [self.settingsDrawerSectionField setStringValue:TGLoc(@"settings.section.drawer")];
     [self.settingsResourceSectionField setStringValue:TGLoc(@"settings.section.resources")];
@@ -1568,6 +1643,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsActiveSessionsDetailField setStringValue:TGLoc(@"settings.sessions.help")];
     [self.settingsActiveSessionsButton setTitle:TGLoc(@"settings.sessions.open")];
     [self.settingsStorageUsageButton setTitle:TGLoc(@"storage.open")];
+    [self.settingsDownloadManagerButton setTitle:TGLoc(@"downloads.open")];
     [self.settingsDeleteLocalDataButton setTitle:TGLoc(@"settings.localData.delete")];
     [self.settingsEconomyModeButton setTitle:TGLoc(@"settings.resources.economy")];
     [self.settingsAutoDownloadPhotosButton setTitle:TGLoc(@"settings.resources.photos")];
@@ -1655,6 +1731,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.profileUsernameField setFont:[NSFont systemFontOfSize:13.0]];
     [self applyMutedLabelStyle:self.settingsStateField];
     [self applyMutedLabelStyle:self.settingsFoldersSectionField];
+    [self applyMutedLabelStyle:self.settingsSavedSectionField];
+    [self applyMutedLabelStyle:self.settingsPrivacySectionField];
     [self applyMutedLabelStyle:self.settingsDrawerSectionField];
     [self applyMutedLabelStyle:self.settingsResourceSectionField];
     [self applyMutedLabelStyle:self.settingsStorageField];
@@ -1748,9 +1826,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
     [self.settingsActiveSessionsButton setNeedsDisplay:YES];
     [self.settingsChatFoldersButton setNeedsDisplay:YES];
+    [self.settingsSavedMessagesButton setNeedsDisplay:YES];
+    [self.settingsPrivacyButton setNeedsDisplay:YES];
     [self.profileRefreshButton setNeedsDisplay:YES];
     [self.settingsAccountCardView setNeedsDisplay:YES];
     [self.settingsFoldersCardView setNeedsDisplay:YES];
+    [self.settingsSavedCardView setNeedsDisplay:YES];
+    [self.settingsPrivacyCardView setNeedsDisplay:YES];
     [self.settingsDrawerCardView setNeedsDisplay:YES];
     [self.settingsThemeCardView setNeedsDisplay:YES];
     [self.settingsSessionCardView setNeedsDisplay:YES];
@@ -2743,6 +2825,29 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.attachPhotoButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.attachPhotoButton];
 
+    self.botActionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(68, 50, 38, 32)] autorelease];
+    TGDrawerButtonCell *botActionCell = [[[TGDrawerButtonCell alloc] initTextCell:@""] autorelease];
+    [botActionCell setButtonType:NSMomentaryPushInButton];
+    [self.botActionButton setCell:botActionCell];
+    [self.botActionButton setTitle:@""];
+    [self.botActionButton setTarget:self];
+    [self.botActionButton setAction:@selector(openBotActionsFromComposer:)];
+    [self.botActionButton setEnabled:NO];
+    [self.botActionButton setBordered:NO];
+    [self.botActionButton setToolTip:TGLoc(@"bot.composer.actions")];
+    [self.botActionButton setHidden:YES];
+    [self.botActionButton setAlphaValue:0.0];
+    [self.botActionButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.botActionButton];
+
+    self.botCommandPanelView = [[[TGBotCommandPanelView alloc] initWithFrame:NSMakeRect(116, 92, 520, 150)
+                                                                      client:self.client] autorelease];
+    [self.botCommandPanelView setTarget:self];
+    [self.botCommandPanelView setAction:@selector(botCommandChosen:)];
+    [self.botCommandPanelView setHidden:YES];
+    [self.botCommandPanelView setAlphaValue:0.0];
+    [contentView addSubview:self.botCommandPanelView];
+
     self.stickerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(76, 50, 34, 32)] autorelease];
     TGComposerSymbolButtonCell *stickerCell = [[[TGComposerSymbolButtonCell alloc] initTextCell:@"☺"] autorelease];
     [stickerCell setButtonType:NSMomentaryPushInButton];
@@ -2804,6 +2909,32 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.sendMessageButton setBordered:NO];
     [self.sendMessageButton setToolTip:@"Send message"];
     [self.sendMessageButton setAutoresizingMask:NSViewMaxYMargin];
+    NSMenu *sendOptionsMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"composer.sendOptions")] autorelease];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.sendSilent")
+                               action:@selector(sendMessageSilently:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.schedule.action")
+                               action:@selector(scheduleMessage:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.sendWhenOnline")
+                               action:@selector(sendMessageWhenOnline:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItem:[NSMenuItem separatorItem]];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.noLinkPreview")
+                               action:@selector(sendMessageWithoutLinkPreview:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.previewAbove")
+                               action:@selector(sendMessageWithPreviewAboveText:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItem:[NSMenuItem separatorItem]];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"scheduled.open")
+                               action:@selector(showScheduledMessages:)
+                        keyEquivalent:@""];
+    NSUInteger sendOptionIndex = 0;
+    for (sendOptionIndex = 0; sendOptionIndex < [[sendOptionsMenu itemArray] count]; sendOptionIndex++) {
+        [[[sendOptionsMenu itemArray] objectAtIndex:sendOptionIndex] setTarget:self];
+    }
+    [self.sendMessageButton setMenu:sendOptionsMenu];
     [contentView addSubview:self.sendMessageButton];
 
     self.checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 28, 140, 32)] autorelease];
@@ -2939,6 +3070,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsFoldersCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.settingsFoldersCardView];
 
+    self.settingsSavedCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 316, 760, 54)] autorelease];
+    [self.settingsSavedCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsSavedCardView];
+
+    self.settingsPrivacyCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 316, 760, 54)] autorelease];
+    [self.settingsPrivacyCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [contentView addSubview:self.settingsPrivacyCardView];
+
     self.settingsThemeCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(64, 316, 760, 54)] autorelease];
     [self.settingsThemeCardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [contentView addSubview:self.settingsThemeCardView];
@@ -3003,6 +3142,20 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsFoldersSectionField setIconName:@"folder"];
     [self applyMutedLabelStyle:self.settingsFoldersSectionField];
     [contentView addSubview:self.settingsFoldersSectionField];
+
+    self.settingsSavedSectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 424, 760, 24)] autorelease];
+    [self.settingsSavedSectionField setStringValue:TGLoc(@"settings.section.saved")];
+    [self.settingsSavedSectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsSavedSectionField setIconName:@"bookmark"];
+    [self applyMutedLabelStyle:self.settingsSavedSectionField];
+    [contentView addSubview:self.settingsSavedSectionField];
+
+    self.settingsPrivacySectionField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 424, 760, 24)] autorelease];
+    [self.settingsPrivacySectionField setStringValue:TGLoc(@"settings.section.privacy")];
+    [self.settingsPrivacySectionField setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsPrivacySectionField setIconName:@"user"];
+    [self applyMutedLabelStyle:self.settingsPrivacySectionField];
+    [contentView addSubview:self.settingsPrivacySectionField];
 
     self.settingsLibraryField = [[[TGSectionTitleField alloc] initWithFrame:NSMakeRect(64, 424, 760, 24)] autorelease];
     [self.settingsLibraryField setStringValue:@"Appearance"];
@@ -3122,6 +3275,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsNotificationsWhenActiveButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsNotificationsWhenActiveButton];
 
+    self.settingsNotificationExceptionsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 166, 716, 30)] autorelease];
+    [self.settingsNotificationExceptionsButton setTitle:TGLoc(@"notifications.exceptions.open")];
+    [self.settingsNotificationExceptionsButton setTarget:self];
+    [self.settingsNotificationExceptionsButton setAction:@selector(showNotificationSettingsWindow:)];
+    [self applyUtilityButtonStyle:self.settingsNotificationExceptionsButton];
+    [self.settingsNotificationExceptionsButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.settingsNotificationExceptionsButton];
+
     self.settingsDrawerHiddenButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 228, 260, 22)] autorelease];
     [self.settingsDrawerHiddenButton setButtonType:NSSwitchButton];
     [self.settingsDrawerHiddenButton setTitle:@"Hide side drawer"];
@@ -3151,6 +3312,24 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self applyUtilityButtonStyle:self.settingsChatFoldersButton];
     [self.settingsChatFoldersButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.settingsChatFoldersButton];
+
+    self.settingsSavedMessagesButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 201, 716, 30)] autorelease];
+    [self.settingsSavedMessagesButton setTitle:TGLoc(@"saved.open")];
+    [self.settingsSavedMessagesButton setTarget:self];
+    [self.settingsSavedMessagesButton setAction:@selector(showSavedMessagesWindow:)];
+    [self.settingsSavedMessagesButton setImage:TGTemplateIconAssetImage(@"bookmark", NSMakeSize(16.0, 16.0), TGClassicHeaderTextColor(0.96), 1.0)];
+    [self.settingsSavedMessagesButton setImagePosition:NSImageLeft];
+    [self applyUtilityButtonStyle:self.settingsSavedMessagesButton];
+    [self.settingsSavedMessagesButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.settingsSavedMessagesButton];
+
+    self.settingsPrivacyButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 201, 716, 30)] autorelease];
+    [self.settingsPrivacyButton setTitle:TGLoc(@"privacy.open")];
+    [self.settingsPrivacyButton setTarget:self];
+    [self.settingsPrivacyButton setAction:@selector(showPrivacyWindow:)];
+    [self applyUtilityButtonStyle:self.settingsPrivacyButton];
+    [self.settingsPrivacyButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.settingsPrivacyButton];
 
     [self buildResourceSettingsControlsInContentView:contentView];
 
@@ -3240,6 +3419,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];
 
+    self.settingsDownloadManagerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 136, 260, 22)] autorelease];
+    [self.settingsDownloadManagerButton setTitle:TGLoc(@"downloads.open")];
+    [self.settingsDownloadManagerButton setTarget:self];
+    [self.settingsDownloadManagerButton setAction:@selector(showDownloadManagerWindow:)];
+    [self applyUtilityButtonStyle:self.settingsDownloadManagerButton];
+    [self.settingsDownloadManagerButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsDownloadManagerButton];
+
     self.settingsDeleteLocalDataButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 120, 260, 22)] autorelease];
     [self.settingsDeleteLocalDataButton setTitle:@"Delete local data"];
     [self.settingsDeleteLocalDataButton setTarget:self];
@@ -3291,6 +3478,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsProfileCardView,
                                      self.settingsAccountCardView,
                                      self.settingsFoldersCardView,
+                                     self.settingsSavedCardView,
+                                     self.settingsPrivacyCardView,
                                      self.settingsThemeCardView,
                                      self.settingsSessionCardView,
                                      self.settingsDrawerCardView,
@@ -3299,6 +3488,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsHelpCardView,
                                      self.settingsProfileSectionField,
                                      self.settingsFoldersSectionField,
+                                     self.settingsSavedSectionField,
+                                     self.settingsPrivacySectionField,
                                      self.settingsProfileDetailField,
                                      self.settingsProfileButton,
                                      self.settingsStateField,
@@ -3317,9 +3508,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsNotificationBadgeButton,
                                      self.settingsNotificationPreviewButton,
                                      self.settingsNotificationsWhenActiveButton,
+                                     self.settingsNotificationExceptionsButton,
                                      self.settingsDrawerHiddenButton,
                                      self.settingsTypingIndicatorsButton,
                                      self.settingsChatFoldersButton,
+                                     self.settingsSavedMessagesButton,
+                                     self.settingsPrivacyButton,
                                      self.settingsEconomyModeButton,
                                      self.settingsAutoDownloadPhotosButton,
                                      self.settingsAutoDownloadVideosButton,
@@ -3344,6 +3538,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsDownloadFolderHelpField,
                                      self.settingsDownloadFolderButton,
                                      self.settingsStorageUsageButton,
+                                     self.settingsDownloadManagerButton,
                                      self.settingsDeleteLocalDataButton,
                                      self.settingsCheckUpdatesButton,
                                      self.settingsAppearanceButton,
@@ -3951,6 +4146,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+SearchNavigation.inc"
 
+#include "TGStatusWindowController+BotComposer.inc"
+
 #include "TGStatusWindowController+TableForumFlow.inc"
 
 #include "TGStatusWindowController+MessageDataFlow.inc"
@@ -4038,6 +4235,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsProfileCardView release];
     [_settingsAccountCardView release];
     [_settingsFoldersCardView release];
+    [_settingsSavedCardView release];
+    [_settingsPrivacyCardView release];
     [_settingsThemeCardView release];
     [_settingsSessionCardView release];
     [_settingsDrawerCardView release];
@@ -4124,6 +4323,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_sendTextFieldBackgroundView release];
     [_sendTextField release];
     [_attachPhotoButton release];
+    [_botActionButton release];
+    [_botCommandPanelView release];
     [_stickerButton release];
     [_voiceRecordButton release];
     [_sendMessageButton release];
@@ -4196,6 +4397,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_profileDetailsSeparatorTwo release];
     [_settingsProfileSectionField release];
     [_settingsFoldersSectionField release];
+    [_settingsSavedSectionField release];
+    [_settingsPrivacySectionField release];
     [_settingsProfileDetailField release];
     [_settingsProfileButton release];
     [_settingsTitleField release];
@@ -4218,9 +4421,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsNotificationBadgeButton release];
     [_settingsNotificationPreviewButton release];
     [_settingsNotificationsWhenActiveButton release];
+    [_settingsNotificationExceptionsButton release];
     [_settingsDrawerHiddenButton release];
     [_settingsTypingIndicatorsButton release];
     [_settingsChatFoldersButton release];
+    [_settingsSavedMessagesButton release];
+    [_settingsPrivacyButton release];
     [_settingsEconomyModeButton release];
     [_settingsAutoDownloadPhotosButton release];
     [_settingsAutoDownloadVideosButton release];
@@ -4245,6 +4451,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
     [_settingsStorageUsageButton release];
+    [_settingsDownloadManagerButton release];
     [_settingsDeleteLocalDataButton release];
     [_settingsCheckUpdatesButton release];
     [_settingsUpdateDotView release];
@@ -4253,6 +4460,25 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatLifecycleWindowController release];
     [[_chatFolderManagementWindowController window] close];
     [_chatFolderManagementWindowController release];
+    [[_chatInfoWindowController window] close];
+    [_chatInfoWindowController release];
+    [[_botKeyboardWindowController window] close];
+    [_botKeyboardWindowController release];
+    [[_botInteractionWindowController window] close];
+    [_botInteractionWindowController release];
+    [_selectedBotUserID release];
+    [_activeBotReplyMarkup release];
+    [_activeBotReplyMarkupMessageID release];
+    [[_notificationSettingsWindowController window] close];
+    [_notificationSettingsWindowController release];
+    [[_privacyWindowController window] close];
+    [_privacyWindowController release];
+    [[_savedMessagesWindowController window] close];
+    [_savedMessagesWindowController release];
+    [[_scheduledMessagesWindowController window] close];
+    [_scheduledMessagesWindowController release];
+    [[_downloadManagerWindowController window] close];
+    [_downloadManagerWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_profileEditButton release];

@@ -10,13 +10,15 @@ network calls.
 - `scripts/check_legacy_compat.py` scans project source for legacy macOS/Xcode
   hazards, committed secrets, project settings, local-data reset safety, and
   diagnostic log redaction.
+- `scripts/check_free_feature_policy.py` rejects Telegram payment, Premium,
+  Stars, gift, boost, paid-message and giveaway TDLib request types.
 - `scripts/check_media_item_support.sh` compiles `Tests/media_item_support_probe.m`
   and verifies the media-preview gate: photos/videos can preview, stickers and
   documents do not open the media preview.
 - `scripts/check_webp_legacy.sh` and `scripts/check_tgs_legacy.sh` compile
   decoder/view probes for WebP and TGS/WebM support. These are intentionally
   heavier and remain separate from the fast default test run.
-- `build_legacy.sh` runs `check_legacy_compat.py` and
+- `build_legacy.sh` runs both policy scanners and
   `check_media_item_support.sh` before building the app.
 - The Xcode scheme has an empty `TestAction`; there is no XCTest target yet.
 

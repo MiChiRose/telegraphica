@@ -368,6 +368,7 @@
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self updateAuthControlsForState:self.currentAuthState];
+        [self refreshBotComposerForSelectedChat];
         [previousChatID release];
         [previousThreadID release];
         [previousTopicKind release];
@@ -444,6 +445,9 @@
         self.autoOlderMessagesLoadArmed = YES;
     }
     [self updateAuthControlsForState:self.currentAuthState];
+    if (selectionChanged) {
+        [self refreshBotComposerForSelectedChat];
+    }
     if (selectionChanged || self.pinnedMessageItem == nil) {
         [self loadPinnedMessageForSelectedChat];
     }

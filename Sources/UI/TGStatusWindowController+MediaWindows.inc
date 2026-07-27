@@ -1226,40 +1226,30 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     }
     [self.mediaCenterDownloadingFileIDs addObject:fileIDCopy];
     [self rebuildMediaCenterRowsPreservingScroll:YES];
-    TGTDLibClient *client = [self.client retain];
     [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.downloading")];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *error = nil;
-        NSString *path = [[client downloadedLocalPathForFileID:fileIDCopy timeout:18.0 error:&error] copy];
-        NSString *savedPath = nil;
-        if ([path length] > 0) {
-            savedPath = [[TGMediaFileActions saveCopyOfFileAtPath:path
-                                               suggestedFileName:suggestedFileName
-                                                     toDirectory:TGConfiguredDownloadFolderPath()
-                                                           error:&error] copy];
+    [[TGDownloadManager sharedManager] setClient:self.client];
+    NSString *fallbackPath = TGMediaCenterLocalPathForItem(item);
+    [[TGDownloadManager sharedManager] enqueueFileID:fileIDCopy
+                                   suggestedFileName:suggestedFileName
+                                   fallbackLocalPath:fallbackPath
+                                          completion:^(NSString *savedPath, NSError *error, BOOL cancelled) {
+        [self.mediaCenterDownloadingFileIDs removeObject:fileIDCopy];
+        if ([savedPath length] > 0) {
+            [self.mediaCenterSavedPathsByFileID setObject:savedPath forKey:fileIDCopy];
+            [self.mediaCenterStatusField setStringValue:
+             [NSString stringWithFormat:TGLoc(@"media.center.downloadedTo"),
+              TGDisplayPathForDownloadFolder(savedPath)]];
+        } else if (cancelled) {
+            [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.downloadCancelled")];
+        } else {
+            [self.mediaCenterStatusField setStringValue:
+             [NSString stringWithFormat:TGLoc(@"media.center.downloadFailed"),
+              [[error localizedDescription] length] > 0 ? [error localizedDescription] : TGLoc(@"downloads.unavailable")]];
         }
-        NSString *message = [[error localizedDescription] copy];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self.mediaCenterDownloadingFileIDs removeObject:fileIDCopy];
-            if ([savedPath length] > 0) {
-                [self.mediaCenterSavedPathsByFileID setObject:savedPath forKey:fileIDCopy];
-                [self.mediaCenterStatusField setStringValue:
-                 [NSString stringWithFormat:TGLoc(@"media.center.downloadedTo"),
-                  TGDisplayPathForDownloadFolder(savedPath)]];
-            } else {
-                [self.mediaCenterStatusField setStringValue:[NSString stringWithFormat:TGLoc(@"media.center.downloadFailed"), ([message length] > 0 ? message : @"TDLib did not return a local path.")]];
-            }
-            [self rebuildMediaCenterRows];
-            [savedPath release];
-            [path release];
-            [message release];
-            [suggestedFileName release];
-            [fileIDCopy release];
-            [client release];
-        });
-        [pool drain];
-    });
+        [self rebuildMediaCenterRows];
+        [suggestedFileName release];
+        [fileIDCopy release];
+    }];
 }
 
 - (void)cancelMediaCenterDownload:(id)sender {
@@ -1270,30 +1260,11 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.noActiveDownload")];
         return;
     }
-    NSNumber *fileIDCopy = [fileID retain];
-    TGTDLibClient *client = [self.client retain];
     [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.cancellingDownload")];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *error = nil;
-        BOOL cancelled = [client cancelDownloadForFileID:fileIDCopy timeout:5.0 error:&error];
-        NSString *message = [[error localizedDescription] copy];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (cancelled) {
-                [self.mediaCenterDownloadingFileIDs removeObject:fileIDCopy];
-                [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.downloadCancelled")];
-                [self rebuildMediaCenterRowsPreservingScroll:YES];
-            } else {
-                [self.mediaCenterStatusField setStringValue:
-                 [NSString stringWithFormat:TGLoc(@"media.center.cancelDownloadFailed"),
-                  [message length] > 0 ? message : @"TDLib rejected the request."]];
-            }
-            [message release];
-            [fileIDCopy release];
-            [client release];
-        });
-        [pool drain];
-    });
+    [[TGDownloadManager sharedManager] cancelDownloadsForFileID:fileID];
+    [self.mediaCenterDownloadingFileIDs removeObject:fileID];
+    [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.downloadCancelled")];
+    [self rebuildMediaCenterRowsPreservingScroll:YES];
 }
 
 - (void)saveDownloadedMediaCenterItem:(TGMessageItem *)item path:(NSString *)path {

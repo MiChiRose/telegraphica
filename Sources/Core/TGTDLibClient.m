@@ -1,5 +1,6 @@
 #import "TGTDLibClient.h"
 #import "TGTDLibBundledCredentials.h"
+#import "TGTDLibClient+LocationMessages.h"
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
 #import "TGMessagePollSupport.h"
@@ -216,6 +217,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                         @"thumbnail",
                         @"self_destruct_type",
                         @"show_caption_above_media",
+                        @"messagesendoptions",
+                        @"linkpreviewoptions",
+                        @"link_preview_options",
+                        @"scheduling_state",
                         nil];
     NSUInteger index = 0;
     for (index = 0; index < [markers count]; index++) {
@@ -243,6 +248,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_senderSummaryCache;
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSMutableDictionary *_notificationScopeMutedByType;
+    NSMutableDictionary *_savedMessagesTopicsByID;
     NSString *_latestAuthorizationStateSummary;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
@@ -388,6 +394,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _senderSummaryCache = [[NSMutableDictionary alloc] init];
         _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
         _notificationScopeMutedByType = [[NSMutableDictionary alloc] init];
+        _savedMessagesTopicsByID = [[NSMutableDictionary alloc] init];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -523,6 +530,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_senderSummaryCache release];
     [_syntheticMediaAlbumIDByMessageKey release];
     [_notificationScopeMutedByType release];
+    [_savedMessagesTopicsByID release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
@@ -1200,6 +1208,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary {
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
+    NSString *objectType = [[dictionary objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [dictionary objectForKey:@"@type"] : @"";
     id extraObject = [dictionary objectForKey:@"@extra"];
     NSArray *chatFilterInfos = [self chatFilterInfoItemsFromUpdateObject:dictionary];
     NSString *scopeUpdateType = nil;
@@ -1235,6 +1245,15 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([scopeUpdateType length] > 0 && scopeUpdateMuted) {
         [_notificationScopeMutedByType setObject:scopeUpdateMuted forKey:scopeUpdateType];
     }
+    if ([objectType isEqualToString:@"updateSavedMessagesTopic"]) {
+        NSDictionary *topic = [[dictionary objectForKey:@"topic"] isKindOfClass:[NSDictionary class]]
+            ? [dictionary objectForKey:@"topic"] : nil;
+        id topicID = [topic objectForKey:@"id"];
+        if ([topicID respondsToSelector:@selector(longLongValue)] && [topicID longLongValue] != 0LL) {
+            [_savedMessagesTopicsByID setObject:topic
+                                         forKey:[NSNumber numberWithLongLong:[topicID longLongValue]]];
+        }
+    }
 
     if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
         NSString *extra = (NSString *)extraObject;
@@ -1259,6 +1278,27 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *userInfo = [NSDictionary dictionaryWithObject:chatFilterInfos forKey:@"chatFilterInfos"];
         [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibChatFiltersDidChangeNotification object:self userInfo:userInfo];
     }
+}
+
+- (NSArray *)savedMessagesTopicObjectsSnapshot {
+    [_responseCondition lock];
+    NSArray *topics = [[_savedMessagesTopicsByID allValues] copy];
+    [_responseCondition unlock];
+    NSArray *sorted = [topics sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+        long long leftOrder = [[left objectForKey:@"order"] respondsToSelector:@selector(longLongValue)]
+            ? [[left objectForKey:@"order"] longLongValue] : 0LL;
+        long long rightOrder = [[right objectForKey:@"order"] respondsToSelector:@selector(longLongValue)]
+            ? [[right objectForKey:@"order"] longLongValue] : 0LL;
+        if (leftOrder > rightOrder) {
+            return NSOrderedAscending;
+        }
+        if (leftOrder < rightOrder) {
+            return NSOrderedDescending;
+        }
+        return NSOrderedSame;
+    }];
+    [topics release];
+    return sorted;
 }
 
 - (void)receiverThreadMain {
@@ -6223,6 +6263,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                             @"Sticker", @"messageSticker",
                             @"Contact", @"messageContact",
                             @"Location", @"messageLocation",
+                            @"Place", @"messageVenue",
+                            @"Dice", @"messageDice",
                             @"Poll", @"messagePoll",
                             @"Call", @"messageCall",
                             @"Invoice", @"messageInvoice",
@@ -6240,6 +6282,22 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             if ([emoji isKindOfClass:[NSString class]] && [(NSString *)emoji length] > 0) {
                 label = [NSString stringWithFormat:@"%@ %@", label, emoji];
             }
+        }
+    }
+    if ([type isEqualToString:@"messageVenue"]) {
+        NSDictionary *venue = [[content objectForKey:@"venue"] isKindOfClass:[NSDictionary class]]
+            ? [content objectForKey:@"venue"] : nil;
+        NSString *title = [[venue objectForKey:@"title"] isKindOfClass:[NSString class]]
+            ? [venue objectForKey:@"title"] : @"";
+        if ([title length] > 0) {
+            label = [NSString stringWithFormat:@"%@: %@", label, title];
+        }
+    }
+    if ([type isEqualToString:@"messageDice"]) {
+        NSString *emoji = [[content objectForKey:@"emoji"] isKindOfClass:[NSString class]]
+            ? [content objectForKey:@"emoji"] : @"";
+        if ([emoji length] > 0) {
+            label = emoji;
         }
     }
     if ([type isEqualToString:@"messageDocument"]) {
@@ -6474,6 +6532,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSUInteger index = 0;
     NSUInteger visualMediaDownloadsRemaining = 30;
     NSUInteger playableMediaDownloadsRemaining = 12;
+    NSUInteger locationMapDownloadsRemaining = 6;
     for (index = 0; index < [messages count]; index++) {
         id messageObject = [messages objectAtIndex:index];
         if (![messageObject isKindOfClass:[NSDictionary class]]) {
@@ -6526,6 +6585,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        id replyMarkup = [message objectForKey:@"reply_markup"];
+        if ([replyMarkup isKindOfClass:[NSDictionary class]]) {
+            [item setReplyMarkup:replyMarkup];
+        }
         if ([contentType isEqualToString:@"messagePoll"] && [contentObject isKindOfClass:[NSDictionary class]]) {
             NSDictionary *pollInfo = TGMessagePollInfoFromContentObject(contentObject);
             if ([pollInfo count] > 0) {
@@ -6724,6 +6787,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 [mediaInfo setObject:placeholder forKey:@"placeholder"];
             }
             [item setMediaItems:[NSArray arrayWithObject:mediaInfo]];
+        }
+        if (([contentType isEqualToString:@"messageLocation"] ||
+             [contentType isEqualToString:@"messageVenue"]) &&
+            locationMapDownloadsRemaining > 0) {
+            locationMapDownloadsRemaining--;
+            NSDictionary *locationMediaInfo = [self locationMediaInfoFromMessageContentObject:contentObject timeout:7.0];
+            if ([locationMediaInfo count] > 0) {
+                [item setMediaLocalPath:[locationMediaInfo objectForKey:@"local_path"]];
+                [item setMediaWidth:[locationMediaInfo objectForKey:@"width"]];
+                [item setMediaHeight:[locationMediaInfo objectForKey:@"height"]];
+                [item setMediaItems:[NSArray arrayWithObject:locationMediaInfo]];
+            }
         }
         [items addObject:item];
     }
@@ -7935,6 +8010,24 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self sendTextMessageToChatID:chatID
+                         messageThreadID:messageThreadID
+                        messageTopicKind:messageTopicKind
+                                     text:text
+                         replyToMessageID:replyToMessageID
+                              sendOptions:nil
+                                  timeout:timeout
+                                    error:error];
+}
+
+- (NSString *)sendTextMessageToChatID:(NSNumber *)chatID
+                      messageThreadID:(NSNumber *)messageThreadID
+                     messageTopicKind:(NSString *)messageTopicKind
+                                  text:(NSString *)text
+                      replyToMessageID:(NSNumber *)replyToMessageID
+                           sendOptions:(NSDictionary *)sendOptions
+                               timeout:(NSTimeInterval)timeout
+                                 error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:42];
@@ -8010,11 +8103,48 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [content setObject:@"inputMessageText" forKey:@"@type"];
     [content setObject:formattedText forKey:@"text"];
     [content setObject:[NSNumber numberWithBool:YES] forKey:@"clear_draft"];
+    BOOL disableLinkPreview = [[sendOptions objectForKey:@"disable_link_preview"] boolValue];
+    BOOL previewAboveText = [[sendOptions objectForKey:@"preview_above_text"] boolValue];
+    if (disableLinkPreview || previewAboveText) {
+        NSDictionary *linkPreviewOptions = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            @"linkPreviewOptions", @"@type",
+                                            [NSNumber numberWithBool:disableLinkPreview], @"is_disabled",
+                                            @"", @"url",
+                                            [NSNumber numberWithBool:NO], @"force_small_media",
+                                            [NSNumber numberWithBool:NO], @"force_large_media",
+                                            [NSNumber numberWithBool:previewAboveText], @"show_above_text",
+                                            nil];
+        [content setObject:linkPreviewOptions forKey:@"link_preview_options"];
+    }
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"sendMessage" forKey:@"@type"];
     [request setObject:chatID forKey:@"chat_id"];
     [request setObject:content forKey:@"input_message_content"];
+    if ([sendOptions isKindOfClass:[NSDictionary class]] && [sendOptions count] > 0) {
+        NSMutableDictionary *options = [NSMutableDictionary dictionary];
+        [options setObject:@"messageSendOptions" forKey:@"@type"];
+        [options setObject:[NSNumber numberWithBool:[[sendOptions objectForKey:@"silent"] boolValue]]
+                    forKey:@"disable_notification"];
+        [options setObject:[NSNumber numberWithBool:NO] forKey:@"from_background"];
+        [options setObject:[NSNumber numberWithBool:NO] forKey:@"protect_content"];
+        [options setObject:[NSNumber numberWithBool:NO] forKey:@"update_order_of_installed_sticker_sets"];
+        NSDictionary *schedulingState = nil;
+        NSNumber *scheduleDate = [sendOptions objectForKey:@"schedule_date"];
+        if ([scheduleDate respondsToSelector:@selector(integerValue)] && [scheduleDate integerValue] > 0) {
+            schedulingState = [NSDictionary dictionaryWithObjectsAndKeys:
+                               @"messageSchedulingStateSendAtDate", @"@type",
+                               [NSNumber numberWithInteger:[scheduleDate integerValue]], @"send_date",
+                               nil];
+        } else if ([[sendOptions objectForKey:@"send_when_online"] boolValue]) {
+            schedulingState = [NSDictionary dictionaryWithObject:@"messageSchedulingStateSendWhenOnline"
+                                                            forKey:@"@type"];
+        }
+        if (schedulingState) {
+            [options setObject:schedulingState forKey:@"scheduling_state"];
+        }
+        [request setObject:options forKey:@"options"];
+    }
 
     NSError *sendError = nil;
     NSDictionary *response = nil;
@@ -8049,6 +8179,46 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                             messageThreadID:messageThreadID
                            messageTopicKind:messageTopicKind
                                 extraPrefix:@"telegraphica-send-text"
+                                    timeout:timeout
+                                  errorCode:46
+                                      error:&sendError];
+    }
+    if (!response && [sendOptions count] > 0 && !previewAboveText &&
+        TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)) {
+        NSMutableDictionary *legacyContent = [NSMutableDictionary dictionaryWithDictionary:content];
+        [legacyContent removeObjectForKey:@"link_preview_options"];
+        [legacyContent setObject:[NSNumber numberWithBool:disableLinkPreview]
+                          forKey:@"disable_web_page_preview"];
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
+        [legacyRequest removeObjectForKey:@"options"];
+        [legacyRequest setObject:legacyContent forKey:@"input_message_content"];
+        [legacyRequest setObject:[NSNumber numberWithBool:[[sendOptions objectForKey:@"silent"] boolValue]]
+                          forKey:@"disable_notification"];
+        [legacyRequest setObject:[NSNumber numberWithBool:NO] forKey:@"from_background"];
+        NSNumber *legacyScheduleDate = [sendOptions objectForKey:@"schedule_date"];
+        if ([legacyScheduleDate respondsToSelector:@selector(integerValue)] &&
+            [legacyScheduleDate integerValue] > 0) {
+            [legacyRequest setObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                      @"messageSchedulingStateSendAtDate", @"@type",
+                                      [NSNumber numberWithInteger:[legacyScheduleDate integerValue]], @"send_date",
+                                      nil]
+                              forKey:@"scheduling_state"];
+        } else if ([[sendOptions objectForKey:@"send_when_online"] boolValue]) {
+            [legacyRequest setObject:[NSDictionary dictionaryWithObject:@"messageSchedulingStateSendWhenOnline"
+                                                                  forKey:@"@type"]
+                              forKey:@"scheduling_state"];
+        }
+        if ([replyToMessageID respondsToSelector:@selector(longLongValue)] &&
+            [replyToMessageID longLongValue] > 0) {
+            [legacyRequest removeObjectForKey:@"reply_to"];
+            [legacyRequest setObject:[NSNumber numberWithLongLong:[replyToMessageID longLongValue]]
+                              forKey:@"reply_to_message_id"];
+        }
+        sendError = nil;
+        response = [self sendMessageRequest:legacyRequest
+                            messageThreadID:messageThreadID
+                           messageTopicKind:messageTopicKind
+                                extraPrefix:@"telegraphica-send-text-options-legacy"
                                     timeout:timeout
                                   errorCode:46
                                       error:&sendError];

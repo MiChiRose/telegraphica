@@ -110,7 +110,7 @@
                                                 keyEquivalent:@""] autorelease];
     [menuItem setRepresentedObject:payload];
     [menuItem setTarget:self];
-    [menuItem setEnabled:(!chosen && ![item pollClosed])];
+    [menuItem setEnabled:(!chosen && ![item isPollClosed])];
     return menuItem;
 }
 
@@ -142,12 +142,12 @@
 }
 
 - (NSMenuItem *)chatCurrentMuteStateMenuItemForChatItem:(TGChatItem *)item {
-    NSString *title = @"Notifications are on";
+    NSString *title = TGLoc(@"chat.notifications.serverOn");
     NSNumber *chatID = [self notificationChatIDForChatItem:item];
     if ([self isChatIDLocallyMuted:chatID]) {
-        title = @"Notifications are muted locally";
+        title = TGLoc(@"chat.notifications.localFallback");
     } else if ([item serverNotificationsMuted]) {
-        title = @"Muted in Telegram";
+        title = TGLoc(@"chat.notifications.serverMuted");
     }
     NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""] autorelease];
     [menuItem setEnabled:NO];
@@ -377,67 +377,26 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     NSString *localPath = nil;
     NSString *fileName = nil;
     NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:&localPath fileName:&fileName];
-    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
-        if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-            NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
-            NSError *copyError = nil;
-            if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
-                [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
-            } else {
-                [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-            }
-            return;
+    [[TGDownloadManager sharedManager] setClient:self.client];
+    NSString *identifier = [[TGDownloadManager sharedManager] enqueueFileID:fileID
+                                                          suggestedFileName:fileName
+                                                          fallbackLocalPath:localPath
+                                                                 completion:^(NSString *savedPath, NSError *error, BOOL cancelled) {
+        if (cancelled) {
+            [self.statusField setStringValue:TGLoc(@"downloads.state.cancelled")];
+        } else if ([savedPath length] > 0) {
+            [self.statusField setStringValue:TGLoc(@"downloads.state.completed")];
+            [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", savedPath]];
+        } else {
+            [self.statusField setStringValue:TGLoc(@"downloads.state.failed")];
+            [self appendDetail:[error localizedDescription]];
         }
-        [self appendDetail:@"Attachment file id is not available yet."];
-        return;
+    }];
+    if ([identifier length] > 0) {
+        [self.statusField setStringValue:TGLoc(@"downloads.state.queued")];
+    } else {
+        [self appendDetail:TGLoc(@"downloads.unavailable")];
     }
-
-    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Download media: requesting full file id %@ before copying to Downloads; fallback=%@.",
-                                  fileID,
-                                  [localPath length] > 0 ? [localPath lastPathComponent] : @"none"]];
-
-    NSNumber *fileIDCopy = [fileID retain];
-    NSString *fileNameCopy = [fileName copy];
-    TGTDLibClient *client = [self.client retain];
-    [self.statusField setStringValue:@"Downloading file..."];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *downloadError = nil;
-        NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:16.0 error:&downloadError] copy];
-        NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([downloadedPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:downloadedPath]) {
-                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
-                NSError *copyError = nil;
-                if ([[NSFileManager defaultManager] copyItemAtPath:downloadedPath toPath:destination error:&copyError]) {
-                    [self.statusField setStringValue:@"File downloaded"];
-                    [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
-                } else {
-                    [self.statusField setStringValue:@"Download failed"];
-                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-                }
-            } else if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
-                NSError *copyError = nil;
-                if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
-                    [self.statusField setStringValue:@"File downloaded"];
-                    [self appendDetail:[NSString stringWithFormat:@"Downloaded cached fallback to %@", destination]];
-                } else {
-                    [self.statusField setStringValue:@"Download failed"];
-                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-                }
-            } else {
-                [self.statusField setStringValue:@"Download failed"];
-                [self appendDetail:([downloadErrorMessage length] > 0 ? downloadErrorMessage : @"TDLib did not return a file path.")];
-            }
-            [downloadedPath release];
-            [downloadErrorMessage release];
-            [fileIDCopy release];
-            [fileNameCopy release];
-            [client release];
-        });
-        [pool drain];
-    });
 }
 
 - (void)populateChatContextMenu:(NSMenu *)menu {
@@ -483,7 +442,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
 
     [menu addItem:[self chatCurrentMuteStateMenuItemForChatItem:item]];
 
-    if ([self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]) {
+    if ([self isChatItemEffectivelyMuted:item]) {
         NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.notifications.enable")
                                                              action:@selector(unmuteChatFromMenu:)
                                                       keyEquivalent:@""] autorelease];
@@ -619,8 +578,18 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                                                     keyEquivalent:@""] autorelease];
         [pollItem setImage:TGTemplateIconAssetImage(@"poll", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.80)];
         [pollItem setSubmenu:[self pollOptionsMenuForItem:item]];
-        [pollItem setEnabled:(![item pollClosed] && [[item pollOptions] count] > 0)];
+        [pollItem setEnabled:(![item isPollClosed] && [[item pollOptions] count] > 0)];
         [menu addItem:pollItem];
+        addedMessageAction = YES;
+    }
+
+    if ([[item replyMarkup] isKindOfClass:[NSDictionary class]]) {
+        NSMenuItem *botButtonsItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"bot.keyboard.open")
+                                                                 action:@selector(openBotKeyboardFromMenu:)
+                                                          keyEquivalent:@""] autorelease];
+        [botButtonsItem setRepresentedObject:item];
+        [botButtonsItem setTarget:self];
+        [menu addItem:botButtonsItem];
         addedMessageAction = YES;
     }
 
@@ -751,6 +720,22 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [moreItem setSubmenu:moreMenu];
         [menu addItem:moreItem];
     }
+}
+
+- (void)openBotKeyboardFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![[item replyMarkup] isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    [[self.botKeyboardWindowController window] close];
+    self.botKeyboardWindowController = [[[TGBotKeyboardWindowController alloc] initWithClient:self.client
+                                                                                        chatID:[item chatID]
+                                                                                     messageID:[item messageID]
+                                                                                   replyMarkup:[item replyMarkup]] autorelease];
+    [self.botKeyboardWindowController showWindow:self];
+    [[self.botKeyboardWindowController window] center];
+    [[self.botKeyboardWindowController window] makeKeyAndOrderFront:self];
 }
 
 - (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item {
@@ -1134,7 +1119,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                 [item setPendingPollOptionIndexes:nil];
                 [self.statusField setStringValue:TGLoc(@"message.poll.sent")];
                 [self appendDetail:@"Poll vote accepted by TDLib."];
-                [self refreshSelectedChatMessages:self];
+                [self refreshSelectedMessagesAfterMediaSend];
             } else {
                 [self.statusField setStringValue:TGLoc(@"message.poll.failed")];
                 [self appendDetail:[NSString stringWithFormat:@"Poll vote failed: %@", [errorMessage length] > 0 ? errorMessage : @"TDLib rejected the vote"]];
@@ -1400,8 +1385,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     if (![chatID respondsToSelector:@selector(longLongValue)] || ![duration respondsToSelector:@selector(doubleValue)]) {
         return;
     }
-    [self setLocalNotificationMuteForChatID:chatID duration:[duration doubleValue]];
-    [self appendDetail:[NSString stringWithFormat:@"Notifications muted locally for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
+    [self setServerNotificationMuteForChatItem:item duration:[duration doubleValue]];
 }
 
 - (void)unmuteChatFromMenu:(id)sender {
@@ -1410,8 +1394,63 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         return;
     }
-    [self setLocalNotificationMuteForChatID:chatID duration:0.0];
-    [self appendDetail:[NSString stringWithFormat:@"Local notifications enabled for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
+    [self setServerNotificationMuteForChatItem:item duration:0.0];
+}
+
+- (void)setServerNotificationMuteForChatItem:(TGChatItem *)item duration:(NSTimeInterval)duration {
+    NSNumber *sourceChatID = [self notificationChatIDForChatItem:item];
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        ![sourceChatID respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    TGChatItem *itemCopy = [item retain];
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[sourceChatID longLongValue]] retain];
+    NSString *title = [[[item title] length] > 0 ? [item title] : @"chat" copy];
+    TGTDLibClient *client = [self.client retain];
+    BOOL targetMuted = (duration != 0.0);
+
+    [self.statusField setStringValue:(targetMuted ? TGLoc(@"chat.notifications.syncingMute")
+                                                   : TGLoc(@"chat.notifications.syncingEnable"))];
+    [[TGLogger sharedLogger] log:(targetMuted
+        ? @"TDLib server chat mute requested."
+        : @"TDLib server chat unmute requested.")];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *notificationError = nil;
+        BOOL succeeded = [client setChatNotificationMuteForChatID:chatID
+                                                          muteFor:duration
+                                                          timeout:8.0
+                                                            error:&notificationError];
+        NSString *errorMessage = [[notificationError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self setLocalNotificationMuteForChatID:chatID duration:0.0];
+                [itemCopy setServerNotificationsMuted:targetMuted];
+                [itemCopy setNotificationsMuted:targetMuted];
+                [self.chatTableView reloadData];
+                [self updateApplicationBadge];
+                [self.statusField setStringValue:(targetMuted ? TGLoc(@"chat.notifications.serverMuted")
+                                                               : TGLoc(@"chat.notifications.serverOn"))];
+                [self appendDetail:[NSString stringWithFormat:@"Telegram notification settings synchronized for %@.", title]];
+                [self reloadChatsInteractive:NO preserveSelection:YES];
+            } else {
+                [self setLocalNotificationMuteForChatID:chatID duration:duration];
+                [self.statusField setStringValue:TGLoc(@"chat.notifications.localFallback")];
+                [self appendDetail:[NSString stringWithFormat:@"Telegram notification synchronization unavailable for %@: %@",
+                                    title,
+                                    [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [itemCopy release];
+            [chatID release];
+            [title release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)submitReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item removing:(BOOL)removing {

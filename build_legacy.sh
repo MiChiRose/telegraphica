@@ -65,8 +65,10 @@ fi
 
 if [ -n "$PYTHON_BIN" ]; then
     "$PYTHON_BIN" scripts/check_legacy_compat.py
+    "$PYTHON_BIN" scripts/check_free_feature_policy.py
 else
     echo "Skipping legacy compatibility script: python/python3 was not found."
+    echo "Skipping free-feature policy script: python/python3 was not found."
 fi
 
 SDK_NAME="${TELEGRAPHICA_SDK_NAME:-macosx}"

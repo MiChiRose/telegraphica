@@ -114,6 +114,7 @@
     NSString *text = [self.sendTextField stringValue];
     NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     [self.attachPhotoButton setEnabled:canTargetChat];
+    [self.botActionButton setEnabled:(canTargetChat && self.botComposerVisible)];
     [self.stickerButton setEnabled:canTargetChat];
     [self.voiceRecordButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];

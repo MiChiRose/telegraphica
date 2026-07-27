@@ -68,8 +68,63 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     return [NSString stringWithFormat:@"%@\n%@", title, [details componentsJoinedByString:@" · "]];
 }
 
+- (void)showDownloadManagerWindow:(id)sender {
+    (void)sender;
+    if (!self.downloadManagerWindowController) {
+        self.downloadManagerWindowController = [[[TGDownloadManagerWindowController alloc] init] autorelease];
+    }
+    [[self.downloadManagerWindowController window] center];
+    [self.downloadManagerWindowController showWindow:self];
+    [[self.downloadManagerWindowController window] makeKeyAndOrderFront:self];
+    [self.downloadManagerWindowController reloadDownloads];
+}
+
+- (void)showPrivacyWindow:(id)sender {
+    (void)sender;
+    if (!self.client || ![self.currentAuthState isEqualToString:@"ready"]) {
+        NSBeep();
+        return;
+    }
+    if (!self.privacyWindowController) {
+        self.privacyWindowController = [[[TGPrivacyWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [[self.privacyWindowController window] center];
+    [self.privacyWindowController showWindow:self];
+    [[self.privacyWindowController window] makeKeyAndOrderFront:self];
+    [self.privacyWindowController reloadPrivacy];
+}
+
+- (void)showSavedMessagesWindow:(id)sender {
+    (void)sender;
+    if (!self.client ||
+        ![self.currentAuthState isEqualToString:@"ready"] ||
+        ![self.profileUserID respondsToSelector:@selector(longLongValue)] ||
+        [self.profileUserID longLongValue] == 0LL) {
+        NSBeep();
+        return;
+    }
+    [self chatLifecycleWindowController:nil
+                          didOpenChatID:self.profileUserID
+                                  title:TGLoc(@"savedMessages")];
+}
+
 - (void)openSelectedChatProfile:(id)sender {
-    [self openMediaCenter:sender];
+    (void)sender;
+    if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
+        NSBeep();
+        return;
+    }
+    if (self.chatInfoWindowController) {
+        [[self.chatInfoWindowController window] close];
+        self.chatInfoWindowController = nil;
+    }
+    self.chatInfoWindowController = [[[TGChatInfoWindowController alloc] initWithClient:self.client
+                                                                                chatID:self.selectedChatID
+                                                                                 title:self.selectedChatTitle] autorelease];
+    [[self.chatInfoWindowController window] center];
+    [self.chatInfoWindowController showWindow:self];
+    [[self.chatInfoWindowController window] makeKeyAndOrderFront:self];
+    [self.chatInfoWindowController reloadChatInfo];
 }
 
 - (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {

@@ -1,5 +1,6 @@
 #import "TGMessageActionDialogs.h"
 #import "TGLocalization.h"
+#import "TGLocationPickerWindowController.h"
 #include <float.h>
 
 @implementation TGMessageActionDialogs
@@ -80,47 +81,46 @@
             nil];
 }
 
-+ (NSDictionary *)locationToShare {
++ (NSDictionary *)locationToShareWithClient:(TGTDLibClient *)client {
+    TGLocationPickerWindowController *picker = [[[TGLocationPickerWindowController alloc] initWithClient:client] autorelease];
+    NSDictionary *values = [picker runModal];
+    double latitude = [[values objectForKey:@"latitude"] doubleValue];
+    double longitude = [[values objectForKey:@"longitude"] doubleValue];
+    if (values && (latitude < -90.0 || latitude > 90.0 ||
+                   longitude < -180.0 || longitude > 180.0)) {
+        return nil;
+    }
+    return values;
+}
+
++ (NSDictionary *)venueToShareWithClient:(TGTDLibClient *)client {
+    return [self locationToShareWithClient:client];
+}
+
++ (NSDictionary *)liveLocationToShareWithClient:(TGTDLibClient *)client {
+    NSMutableDictionary *values = [[[self locationToShareWithClient:client] mutableCopy] autorelease];
+    if (!values) {
+        return nil;
+    }
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setMessageText:TGLoc(@"share.location.title")];
-    [alert setInformativeText:TGLoc(@"share.location.hint")];
+    [alert setMessageText:TGLoc(@"share.liveLocation.duration")];
+    [alert setInformativeText:TGLoc(@"share.liveLocation.warning")];
     [alert addButtonWithTitle:TGLoc(@"send")];
     [alert addButtonWithTitle:TGLoc(@"cancel")];
-
-    NSView *accessory = [[[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 390.0, 102.0)] autorelease];
-    [accessory addSubview:[self labelWithFrame:NSMakeRect(0.0, 78.0, 185.0, 18.0)
-                                          text:TGLoc(@"share.location.latitude")]];
-    [accessory addSubview:[self labelWithFrame:NSMakeRect(205.0, 78.0, 185.0, 18.0)
-                                          text:TGLoc(@"share.location.longitude")]];
-    NSTextField *latitudeField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0.0, 51.0, 185.0, 22.0)] autorelease];
-    NSTextField *longitudeField = [[[NSTextField alloc] initWithFrame:NSMakeRect(205.0, 51.0, 185.0, 22.0)] autorelease];
-    [latitudeField setPlaceholderString:@"53.9006"];
-    [longitudeField setPlaceholderString:@"27.5590"];
-    [accessory addSubview:latitudeField];
-    [accessory addSubview:longitudeField];
-    [accessory addSubview:[self labelWithFrame:NSMakeRect(0.0, 8.0, 390.0, 34.0)
-                                          text:TGLoc(@"share.location.ranges")]];
-    [alert setAccessoryView:accessory];
+    NSPopUpButton *popup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(0.0, 0.0, 300.0, 28.0) pullsDown:NO] autorelease];
+    NSArray *periods = [NSArray arrayWithObjects:@900, @3600, @28800, @86400, nil];
+    NSArray *keys = [NSArray arrayWithObjects:@"15m", @"1h", @"8h", @"24h", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [periods count]; index++) {
+        [popup addItemWithTitle:TGLoc([@"share.liveLocation." stringByAppendingString:[keys objectAtIndex:index]])];
+        [[popup lastItem] setRepresentedObject:[periods objectAtIndex:index]];
+    }
+    [alert setAccessoryView:popup];
     if ([alert runModal] != NSAlertFirstButtonReturn) {
         return nil;
     }
-
-    double latitude = 0.0;
-    double longitude = 0.0;
-    BOOL validLatitude = [self scanCoordinateText:[latitudeField stringValue] value:&latitude];
-    BOOL validLongitude = [self scanCoordinateText:[longitudeField stringValue] value:&longitude];
-    if (!validLatitude || !validLongitude || latitude < -90.0 || latitude > 90.0 ||
-        longitude < -180.0 || longitude > 180.0) {
-        NSRunAlertPanel(TGLoc(@"share.location.failed"),
-                        @"%@",
-                        TGLoc(@"ok"), nil, nil,
-                        TGLoc(@"share.location.error.invalid"));
-        return nil;
-    }
-    return [NSDictionary dictionaryWithObjectsAndKeys:
-            [NSNumber numberWithDouble:latitude], @"latitude",
-            [NSNumber numberWithDouble:longitude], @"longitude",
-            nil];
+    [values setObject:[[popup selectedItem] representedObject] forKey:@"live_period"];
+    return values;
 }
 
 + (NSString *)editedTextForCurrentText:(NSString *)currentText {

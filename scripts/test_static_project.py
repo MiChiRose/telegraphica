@@ -416,13 +416,91 @@ def check_additional_message_types_contract(errors):
             errors.append("%s: share dialog validation is missing `%s`" %
                           (dialogs_rel, fragment))
 
+    location_picker_rel = os.path.join("Sources", "UI", "TGLocationPickerWindowController.m")
+    location_picker_text = read_text(os.path.join(ROOT, location_picker_rel))
+    for fragment in ["NSClassFromString(@\"MKMapView\")",
+                     "setShowsUserLocation:YES",
+                     "TGLocationStaticMapView",
+                     "MKPinAnnotationView",
+                     "reloadMapThumbnail",
+                     "prepareForClosing",
+                     "setCoordinateTarget:nil",
+                     "self.mapGeneration++;",
+                     "setShowsUserLocation:NO",
+                     "setDelegate:nil",
+                     "mapUnavailable"]:
+        if fragment not in location_picker_text:
+            errors.append("%s: location picker regression guard is missing `%s`" %
+                          (location_picker_rel, fragment))
+    if location_picker_text.count("[self prepareForClosing];") != 3:
+        errors.append("%s: Send, Cancel and window close must all prepare the location picker for closing" %
+                      location_picker_rel)
+    for fragment in ["MKLocalSearchRequest",
+                     "MKLocalSearch",
+                     "CLGeocoder",
+                     "searchPressed:",
+                     "searchField",
+                     "searchButton"]:
+        if fragment in location_picker_text:
+            errors.append("%s: disabled legacy location search leaked `%s`" %
+                          (location_picker_rel, fragment))
+
+    static_map_rel = os.path.join("Sources", "UI", "TGLocationStaticMapView.m")
+    static_map_text = read_text(os.path.join(ROOT, static_map_rel))
+    for fragment in ["openHandCursor",
+                     "closedHandCursor",
+                     "dragThreshold = 6.0",
+                     "scrollWheel:",
+                     "hasPreciseScrollingDeltas",
+                     "magnifyWithEvent:",
+                     "requestZoomDelta:",
+                     "coordinateForPoint:",
+                     "selectionPinImage"]:
+        if fragment not in static_map_text:
+            errors.append("%s: interactive map fallback is missing `%s`" %
+                          (static_map_rel, fragment))
+
+    location_messages_rel = os.path.join("Sources", "Core", "TGTDLibClient+LocationMessages.m")
+    location_messages_text = read_text(os.path.join(ROOT, location_messages_rel))
+    for fragment in ["messageLocation",
+                     "messageVenue",
+                     "mapThumbnailPathForLatitude:",
+                     'path, @"local_path"']:
+        if fragment not in location_messages_text:
+            errors.append("%s: location message thumbnail support is missing `%s`" %
+                          (location_messages_rel, fragment))
+
+    date_picker_rel = os.path.join("Sources", "UI", "TGDatePickerDialog.m")
+    date_picker_text = read_text(os.path.join(ROOT, date_picker_rel))
+    if "NSTextFieldAndStepperDatePickerStyle" not in date_picker_text:
+        errors.append("%s: compact legacy-safe date picker style is missing" % date_picker_rel)
+
+    saved_cell_rel = os.path.join("Sources", "UI", "TGSavedMessagesCell.m")
+    saved_cell_text = read_text(os.path.join(ROOT, saved_cell_rel))
+    for fragment in ["objectForKey:@\"title\"", "objectForKey:@\"detail\"",
+                     "NSLineBreakByTruncatingTail"]:
+        if fragment not in saved_cell_text:
+            errors.append("%s: saved-message row rendering is missing `%s`" %
+                          (saved_cell_rel, fragment))
+
+    bot_composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BotComposer.inc")
+    bot_composer_text = read_text(os.path.join(ROOT, bot_composer_rel))
+    for fragment in ["setBotComposerVisible", "replyMarkupShowKeyboard",
+                     "setBotCommandPanelVisible", "setDuration:0.16"]:
+        if fragment not in bot_composer_text:
+            errors.append("%s: bot composer integration is missing `%s`" %
+                          (bot_composer_rel, fragment))
+
     composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
     composer_text = read_text(os.path.join(ROOT, composer_rel))
     for fragment in ["shareContactFromComposerMenu:", "shareLocationFromComposerMenu:",
-                     "sendAnimationMessageToChatID:"]:
+                     "sendAnimationMessageToChatID:",
+                     "refreshSelectedMessagesAfterMediaSend"]:
         if fragment not in composer_text:
             errors.append("%s: composer message-type routing is missing `%s`" %
                           (composer_rel, fragment))
+    if "refreshSelectedChatMessages:" in composer_text:
+        errors.append("%s: removed media refresh selector was reintroduced" % composer_rel)
 
 
 def check_media_file_management_contract(errors):
@@ -463,7 +541,7 @@ def check_media_file_management_contract(errors):
         "saveMediaCenterItemAs:",
         "revealMediaCenterItem:",
         "deleteCachedFileForFileID:",
-        "TGConfiguredDownloadFolderPath()",
+        "TGDownloadManager sharedManager",
         "mediaCenterSavedPathsByFileID",
         'TGLoc(@"media.center.downloadedTo")',
     ]:
@@ -473,6 +551,18 @@ def check_media_file_management_contract(errors):
     if "removeItemAtPath:path error:&error" in media_text:
         errors.append("%s: Media Center must delete cached files through TDLib, not unlink cache paths directly" %
                       media_rel)
+
+    manager_rel = os.path.join("Sources", "Services", "TGDownloadManager.m")
+    manager_text = read_text(os.path.join(ROOT, manager_rel))
+    for fragment in [
+        "TGConfiguredDownloadFolderPath()",
+        "saveCopyOfFileAtPath:",
+        "cancelDownloadForFileID:",
+        "TGDownloadManagerDidChangeNotification",
+    ]:
+        if fragment not in manager_text:
+            errors.append("%s: shared Download Manager is missing `%s`" %
+                          (manager_rel, fragment))
 
 
 def check_primary_navigation_contract(errors):
@@ -832,7 +922,7 @@ def check_retro_console_contract(errors):
     core_text = read_text(os.path.join(ROOT, core_rel))
     build_text = read_text(os.path.join(ROOT, build_rel))
     for fragment in [
-        "Вставить картридж",
+        u"Вставить картридж",
         "setAllowedFileTypes:",
         "quicknes_libretro",
         "genesis_plus_gx_libretro",

@@ -196,6 +196,13 @@
     [self showView:self.sendTextFieldBackgroundView visible:showConversationContent];
     [self showView:self.sendTextField visible:showConversationContent];
     [self showView:self.sendMessageButton visible:showConversationContent];
+    BOOL showBotComposer = (showConversationContent && self.botComposerVisible);
+    [self showView:self.botActionButton visible:showBotComposer];
+    if (!showConversationContent && self.botCommandPanelVisible) {
+        [self setBotCommandPanelVisible:NO animated:NO];
+    } else {
+        [self showView:self.botCommandPanelView visible:(showConversationContent && self.botCommandPanelVisible)];
+    }
 
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
@@ -238,6 +245,8 @@
     [self showView:self.settingsProfileButton visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsFoldersCardView visible:showSettings];
+    [self showView:self.settingsSavedCardView visible:showSettings];
+    [self showView:self.settingsPrivacyCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
     [self showView:self.settingsResourceCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
@@ -247,6 +256,8 @@
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsFoldersSectionField visible:showSettings];
+    [self showView:self.settingsSavedSectionField visible:showSettings];
+    [self showView:self.settingsPrivacySectionField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
     [self showView:self.settingsResourceSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
@@ -262,9 +273,12 @@
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
     [self showView:self.settingsNotificationPreviewButton visible:showSettings];
     [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
+    [self showView:self.settingsNotificationExceptionsButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
     [self showView:self.settingsChatFoldersButton visible:showSettings];
+    [self showView:self.settingsSavedMessagesButton visible:showSettings];
+    [self showView:self.settingsPrivacyButton visible:showSettings];
     [self showView:self.settingsEconomyModeButton visible:showSettings];
     [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
@@ -289,6 +303,7 @@
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsStorageUsageButton visible:showSettings];
+    [self showView:self.settingsDownloadManagerButton visible:showSettings];
     [self showView:self.settingsDeleteLocalDataButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsUpdateDotView visible:(showSettings && self.updateAvailable)];
@@ -798,6 +813,9 @@
     CGFloat replyPanelHeight = hasReplyPanel ? 46.0 : 0.0;
     CGFloat replyPanelGap = hasReplyPanel ? 6.0 : 0.0;
     CGFloat messageBottom = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    CGFloat botCommandPanelHeight = self.botCommandPanelVisible ? 150.0 : 0.0;
+    CGFloat botCommandPanelGap = self.botCommandPanelVisible ? 6.0 : 0.0;
+    messageBottom += botCommandPanelHeight + botCommandPanelGap;
     if (self.chatNavigationClosed) {
         messageBottom = mainY + 18.0;
     }
@@ -877,10 +895,13 @@
     CGFloat smallComposerButtonWidth = 34.0;
     CGFloat composerButtonGap = 6.0;
     CGFloat attachButtonX = conversationX + 12.0;
+    CGFloat botButtonX = attachButtonX + attachButtonWidth + composerButtonGap;
     CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
     CGFloat voiceButtonX = sendButtonX - composerButtonGap - smallComposerButtonWidth;
     CGFloat stickerButtonX = voiceButtonX - composerButtonGap - smallComposerButtonWidth;
-    CGFloat sendFieldX = attachButtonX + attachButtonWidth + 8.0;
+    CGFloat sendFieldX = self.botComposerVisible
+        ? (botButtonX + attachButtonWidth + 8.0)
+        : (attachButtonX + attachButtonWidth + 8.0);
     CGFloat sendFieldWidth = stickerButtonX - sendFieldX - 10.0;
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
@@ -890,6 +911,11 @@
     CGFloat composerInputBackgroundY = composerY + floor((composerHeight - composerInnerHeight) / 2.0);
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
     [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerControlY, attachButtonWidth, 32.0)];
+    [self.botActionButton setFrame:NSMakeRect(botButtonX, composerControlY, attachButtonWidth, 32.0)];
+    CGFloat botPanelY = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    [self.botCommandPanelView setFrame:NSMakeRect(sendFieldX, botPanelY,
+                                                  MAX(220.0, sendButtonX + sendButtonWidth - sendFieldX),
+                                                  150.0)];
     [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerInputBackgroundY, sendFieldWidth, composerInnerHeight)];
     [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerInputBackgroundY + 5.0, sendFieldWidth - 16.0, composerInputHeight)];
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
@@ -1147,18 +1173,22 @@
     CGFloat settingsGroupGap = 12.0;
     CGFloat settingsBottomPadding = 58.0;
     CGFloat profileCardHeight = 72.0;
-    CGFloat notificationCardHeight = 140.0;
+    CGFloat notificationCardHeight = 180.0;
     CGFloat foldersCardHeight = 54.0;
+    CGFloat savedCardHeight = 54.0;
+    CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
-    CGFloat filesCardHeight = 140.0;
+    CGFloat filesCardHeight = 172.0;
     CGFloat helpCardHeight = 112.0;
     CGFloat settingsDocHeight = 18.0;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + foldersCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + savedCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + privacyCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + interfaceCardHeight + settingsGroupGap;
@@ -1215,6 +1245,10 @@
     [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 60.0, rowWidth, 22.0)];
     [self.settingsNotificationPreviewButton setFrame:NSMakeRect(rowLeft, notificationCardY + 84.0, rowWidth, 22.0)];
     [self.settingsNotificationsWhenActiveButton setFrame:NSMakeRect(rowLeft, notificationCardY + 108.0, rowWidth, 22.0)];
+    [self.settingsNotificationExceptionsButton setFrame:NSMakeRect(rowLeft,
+                                                                   notificationCardY + 140.0,
+                                                                   rowWidth,
+                                                                   30.0)];
     settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
 
     [self.settingsFoldersSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
@@ -1231,6 +1265,36 @@
                                                         rowWidth,
                                                         30.0)];
     settingsNextY = foldersCardY + foldersCardHeight + settingsGroupGap;
+
+    [self.settingsSavedSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                        settingsNextY,
+                                                        settingsGroupedWidth - 40.0,
+                                                        settingsLabelHeight)];
+    CGFloat savedCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsSavedCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                    savedCardY,
+                                                    settingsGroupedWidth,
+                                                    savedCardHeight)];
+    [self.settingsSavedMessagesButton setFrame:NSMakeRect(rowLeft,
+                                                          savedCardY + 12.0,
+                                                          rowWidth,
+                                                          30.0)];
+    settingsNextY = savedCardY + savedCardHeight + settingsGroupGap;
+
+    [self.settingsPrivacySectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat privacyCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsPrivacyCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      privacyCardY,
+                                                      settingsGroupedWidth,
+                                                      privacyCardHeight)];
+    [self.settingsPrivacyButton setFrame:NSMakeRect(rowLeft,
+                                                    privacyCardY + 12.0,
+                                                    rowWidth,
+                                                    30.0)];
+    settingsNextY = privacyCardY + privacyCardHeight + settingsGroupGap;
 
     [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
@@ -1307,8 +1371,9 @@
     [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
     [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
     [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 38.0, rowWidth, 28.0)];
-    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
-    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
+    [self.settingsDownloadManagerButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
+    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
+    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 134.0, rowWidth, 28.0)];
     settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
     [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];

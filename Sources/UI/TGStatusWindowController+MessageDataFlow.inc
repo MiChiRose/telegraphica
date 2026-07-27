@@ -345,6 +345,7 @@
         [self markVisiblePinnedMessagesFromPinnedItems];
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
+        [self refreshBotReplyMarkupFromMessages];
         if (self.initialUnreadPositionPending) {
             [self scrollMessagesToInitialUnreadIfAvailable];
         } else {
@@ -386,6 +387,7 @@
     [self markVisiblePinnedMessagesFromPinnedItems];
     [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
+    [self refreshBotReplyMarkupFromMessages];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
     } else {
