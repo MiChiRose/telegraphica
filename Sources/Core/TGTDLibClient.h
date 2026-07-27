@@ -3,6 +3,7 @@
 @class TGMessageItem;
 
 extern NSString * const TGTDLibChatFiltersDidChangeNotification;
+extern NSString * const TGTDLibCallDidUpdateNotification;
 
 @interface TGTDLibClient : NSObject
 
