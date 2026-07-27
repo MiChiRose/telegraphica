@@ -543,6 +543,15 @@ def check_additional_message_types_contract(errors):
     if "refreshSelectedChatMessages:" in composer_text:
         errors.append("%s: removed media refresh selector was reintroduced" % composer_rel)
 
+    calls_rel = os.path.join("Sources", "Core", "TGTDLibClient+Calls.m")
+    calls_text = read_text(os.path.join(ROOT, calls_rel))
+    for fragment in ['@"createCall"', '@"acceptCall"', '@"discardCall"',
+                     '@"2.4.4"', '@"min_layer"', '@"max_layer"',
+                     '[NSNumber numberWithBool:NO], @"is_video"']:
+        if fragment not in calls_text:
+            errors.append("%s: free audio-call signaling is missing `%s`" %
+                          (calls_rel, fragment))
+
 
 def check_media_file_management_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
