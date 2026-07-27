@@ -709,6 +709,8 @@ def check_primary_navigation_contract(errors):
     utility_windows_text = read_text(os.path.join(ROOT, utility_windows_rel))
     message_data_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
     message_data_flow_text = read_text(os.path.join(ROOT, message_data_flow_rel))
+    tdlib_client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    tdlib_client_text = read_text(os.path.join(ROOT, tdlib_client_rel))
     for fragment in [
         "setName",
         "setUsername",
@@ -746,6 +748,17 @@ def check_primary_navigation_contract(errors):
     elif network_diagnostics_index < authorization_probe_index:
         errors.append("%s: network diagnostics must not block the initial authorization-state probe" %
                       message_data_flow_rel)
+    for fragment in [
+        "parametersErrorCode",
+        "login.keychain.title",
+        "login.keychain.required",
+    ]:
+        if fragment not in message_data_flow_text:
+            errors.append("%s: Keychain bootstrap failure UI is missing `%s`" %
+                          (message_data_flow_rel, fragment))
+    if "mainThreadError = [keychainError retain]" not in tdlib_client_text:
+        errors.append("%s: the Mavericks MRC Keychain error must survive the main-thread handoff" %
+                      tdlib_client_rel)
     for fragment in [
         "profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth",
         "profileGroupedWidth - 44.0",

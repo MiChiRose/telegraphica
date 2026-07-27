@@ -1674,6 +1674,7 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *probeError = nil;
         NSError *authorizationError = nil;
+        NSError *parametersError = nil;
         NSError *encryptionKeyError = nil;
         NSError *finalAuthorizationError = nil;
         NSError *postLoginProbeError = nil;
@@ -1696,9 +1697,13 @@
             if ([authorizationState isEqualToString:@"waitTdlibParameters"]) {
                 parametersAttempted = YES;
                 BOOL parametersConfigurationAvailable = [client hasPotentialTDLibConfigurationSource];
-                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:NULL];
+                parametersSummary = [client setLocalTDLibParametersWithTimeout:4.0 error:&parametersError];
                 parametersMissingConfiguration = ([parametersSummary length] == 0 &&
                                                   !parametersConfigurationAvailable);
+                if (!parametersSummary && parametersError) {
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib bootstrap parameters failed: %@",
+                                                  [parametersError localizedDescription]]];
+                }
             }
             BOOL missingInternalConfiguration = parametersMissingConfiguration;
             if ([authorizationState isEqualToString:@"waitTdlibParameters"] && missingInternalConfiguration) {
@@ -1751,6 +1756,10 @@
         if (parametersSummary) {
             [uiState setObject:parametersSummary forKey:@"parametersSummary"];
         }
+        if (parametersError) {
+            [uiState setObject:[parametersError localizedDescription] forKey:@"parametersErrorSummary"];
+            [uiState setObject:[NSNumber numberWithInteger:[parametersError code]] forKey:@"parametersErrorCode"];
+        }
         if (encryptionKeySummary) {
             [uiState setObject:encryptionKeySummary forKey:@"encryptionKeySummary"];
         }
@@ -1778,6 +1787,8 @@
             NSString *probeSummaryForUI = [uiState objectForKey:@"probeSummary"];
             NSString *authorizationStateForUI = [uiState objectForKey:@"authorizationState"];
             NSString *parametersSummaryForUI = [uiState objectForKey:@"parametersSummary"];
+            NSString *parametersErrorSummaryForUI = [uiState objectForKey:@"parametersErrorSummary"];
+            NSNumber *parametersErrorCodeForUI = [uiState objectForKey:@"parametersErrorCode"];
             NSString *encryptionKeySummaryForUI = [uiState objectForKey:@"encryptionKeySummary"];
             NSString *finalAuthorizationStateForUI = [uiState objectForKey:@"finalAuthorizationState"];
             NSString *postLoginProbeSummaryForUI = [uiState objectForKey:@"postLoginProbeSummary"];
@@ -1809,7 +1820,10 @@
                 if (parametersSummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@", parametersSummaryForUI]];
                 } else if (parametersAttempted) {
-                    [self appendDetail:@"TDLib parameters: request did not complete; authorization state will be checked again."];
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib parameters: %@",
+                                        [parametersErrorSummaryForUI length] > 0
+                                            ? parametersErrorSummaryForUI
+                                            : @"request did not complete; authorization state will be checked again."]];
                 }
                 if (encryptionKeySummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib encryption key: %@", encryptionKeySummaryForUI]];
@@ -1821,7 +1835,11 @@
                     [self appendDetail:[NSString stringWithFormat:@"TDLib post-login probe: %@", postLoginProbeSummaryForUI]];
                 }
                 [self updateAuthControlsForState:finalAuthorizationStateForUI];
-                if ([finalAuthorizationStateForUI isEqualToString:@"waitApiCredentials"]) {
+                if ([parametersErrorCodeForUI integerValue] == 19) {
+                    [self.statusField setStringValue:TGLoc(@"login.keychain.title")];
+                    [self setLoginErrorWithLocalizationKey:@"login.keychain.required"];
+                    [self updateVisibleSection];
+                } else if ([finalAuthorizationStateForUI isEqualToString:@"waitApiCredentials"]) {
                     [self setLoginErrorWithLocalizationKey:@"login.config.missing"];
                     [self updateVisibleSection];
                 }

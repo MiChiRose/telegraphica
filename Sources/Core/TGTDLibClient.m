@@ -2312,6 +2312,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([existingKey length] > 0) {
         return existingKey;
     }
+    OSStatus readStatus = [keychain lastStatus];
+    if (readStatus != errSecItemNotFound && readStatus != errSecSuccess) {
+        if (error) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"Could not read the TDLib database encryption key from Keychain (OSStatus %ld).", (long)readStatus] code:19];
+        }
+        return nil;
+    }
 
     NSMutableData *keyData = [NSMutableData dataWithLength:32];
     OSStatus randomStatus = SecRandomCopyBytes(kSecRandomDefault, [keyData length], [keyData mutableBytes]);
@@ -2341,20 +2348,29 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     __block NSData *result = nil;
     __block NSError *mainThreadError = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        NSData *keyData = [self databaseEncryptionKeyDataFromKeychainWithError:&mainThreadError];
+        NSError *keychainError = nil;
+        NSData *keyData = [self databaseEncryptionKeyDataFromKeychainWithError:&keychainError];
 #if __has_feature(objc_arc)
         result = keyData;
+        mainThreadError = keychainError;
 #else
         result = [keyData retain];
+        mainThreadError = [keychainError retain];
 #endif
     });
 
     if (!result && error) {
+#if __has_feature(objc_arc)
         *error = mainThreadError;
+#else
+        *error = [mainThreadError autorelease];
+        mainThreadError = nil;
+#endif
     }
 #if __has_feature(objc_arc)
     return result;
 #else
+    [mainThreadError release];
     return [result autorelease];
 #endif
 }
