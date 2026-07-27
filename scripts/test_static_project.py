@@ -425,11 +425,16 @@ def check_additional_message_types_contract(errors):
                      "reloadMapThumbnail",
                      "prepareForClosing",
                      "setCoordinateTarget:nil",
-                     "[self prepareForClosing];",
+                     "self.mapGeneration++;",
+                     "setShowsUserLocation:NO",
+                     "setDelegate:nil",
                      "mapUnavailable"]:
         if fragment not in location_picker_text:
             errors.append("%s: location picker regression guard is missing `%s`" %
                           (location_picker_rel, fragment))
+    if location_picker_text.count("[self prepareForClosing];") != 3:
+        errors.append("%s: Send, Cancel and window close must all prepare the location picker for closing" %
+                      location_picker_rel)
     for fragment in ["MKLocalSearchRequest",
                      "MKLocalSearch",
                      "CLGeocoder",
