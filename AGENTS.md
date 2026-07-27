@@ -49,6 +49,18 @@ These project rules apply to Codex work in this repository.
   custom `NSBezierPath` glyphs. Use only user-provided or already approved
   project image assets. If no suitable asset exists, leave the icon placement
   empty and ask the user to provide or choose an icon before continuing.
+- Do not implement purchases, checkout, Premium acquisition, Telegram Stars
+  payments, paid subscriptions, paid messages/media, gifts, boosts, paid
+  reactions, giveaways, or any other Telegram monetization transaction inside
+  Telegraphica.
+- Telegraphica may safely render already-existing paid or Premium-gated content
+  when TDLib supplies it. If a user tries to manage a paid-only capability,
+  explain that it is unavailable in Telegraphica and direct them to the
+  official Telegram application. Never provide an in-app purchase path, payment
+  link, billing flow, or wording that implies Telegraphica can sell it.
+- Prefer and fully implement free Telegram functionality. Runtime capability
+  gating must distinguish "unsupported by the loaded TDLib" from "available
+  only through an official paid Telegram feature".
 - Target OS: one application and release artifact for OS X 10.8 through macOS 10.13.
 - Target architecture: Intel x86_64.
 - Target toolchain: Xcode 5.1.1-compatible for the shared 10.8 deployment target, while preserving Xcode 6.2 compatibility.

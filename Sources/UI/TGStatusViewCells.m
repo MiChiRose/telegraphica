@@ -12,6 +12,29 @@
 static CGFloat const TGPanelCornerRadius = 8.0;
 static CGFloat const TGPanelHeaderHeight = 40.0;
 
+@implementation TGRepresentedObjectCell
+
+@synthesize representedObject = _representedObject;
+
+- (id)copyWithZone:(NSZone *)zone {
+    TGRepresentedObjectCell *cell = [super copyWithZone:zone];
+    cell->_representedObject = nil;
+    [cell setRepresentedObject:self.representedObject];
+    return cell;
+}
+
+- (void)setObjectValue:(id)value {
+    self.representedObject = value;
+    [super setObjectValue:@""];
+}
+
+- (void)dealloc {
+    [_representedObject release];
+    [super dealloc];
+}
+
+@end
+
 @implementation TGChatListCell
 
 @synthesize chatItem = _chatItem;

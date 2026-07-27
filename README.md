@@ -353,6 +353,7 @@ PRODUCT.md                     Product and design direction
 
 ## Roadmap
 
+- See the current [feature coverage and priority audit](docs/feature-audit-2026-07.md).
 - Improve edge-case animated sticker playback and GIF handling.
 - More complete document download and preview handling.
 - Deeper group/channel profiles and member-management views.

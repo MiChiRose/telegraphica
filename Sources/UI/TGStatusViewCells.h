@@ -3,6 +3,12 @@
 @class TGChatItem;
 @class TGMessageItem;
 
+@interface TGRepresentedObjectCell : NSTextFieldCell {
+    id _representedObject;
+}
+@property (nonatomic, retain) id representedObject;
+@end
+
 @interface TGChatListCell : NSTextFieldCell {
     TGChatItem *_chatItem;
 }

@@ -493,6 +493,10 @@ def check_primary_navigation_contract(errors):
 
     contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
     contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    cells_header_rel = os.path.join("Sources", "UI", "TGStatusViewCells.h")
+    cells_header_text = read_text(os.path.join(ROOT, cells_header_rel))
+    cells_impl_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    cells_impl_text = read_text(os.path.join(ROOT, cells_impl_rel))
     for fragment in [
         "contactSummariesWithTimeout:",
         "privateChatIDForUserID:",
@@ -500,11 +504,22 @@ def check_primary_navigation_contract(errors):
         "applySearchFilter",
         "loadSelectedContactProfile",
         "TGContactProfileView",
+        "TGDrawAvatarInRect",
         "contactsViewControllerDidRequestNewConversation:",
     ]:
         if fragment not in contacts_text:
             errors.append("%s: contacts section is missing `%s`" %
                           (contacts_rel, fragment))
+    for fragment in [
+        "TGRepresentedObjectCell",
+        "representedObject",
+    ]:
+        if fragment not in cells_header_text or fragment not in cells_impl_text:
+            errors.append("%s: legacy model-backed table cell is missing `%s`" %
+                          (cells_impl_rel, fragment))
+    if "@interface TGContactRowCell : TGRepresentedObjectCell" not in contacts_text:
+        errors.append("%s: contact rows must preserve dictionary models on legacy AppKit" %
+                      contacts_rel)
 
     button_cells_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
     button_cells_text = read_text(os.path.join(ROOT, button_cells_rel))
@@ -609,6 +624,8 @@ def check_primary_navigation_contract(errors):
     lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
     for fragment in [
         "TGChatLifecycleContactCell",
+        "@interface TGChatLifecycleContactCell : TGRepresentedObjectCell",
+        "TGDrawAvatarInRect",
         "TGGroupedCardView *contactsCard",
         "TGPrimaryTextButtonCell",
         "TGSecondaryTextButtonCell",
@@ -886,6 +903,82 @@ def check_chat_archive_contract(errors):
         errors.append("Sources/Resources/Icons/archive.png: required existing archive icon is missing")
 
 
+def check_chat_folder_management_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatFolders.m")
+    controller_rel = os.path.join("Sources", "UI", "TGChatFolderManagementWindowController.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatFolders.inc")
+    status_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    status_text = read_text(os.path.join(ROOT, status_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+
+    for fragment in [
+        '"createChatFolder"',
+        '"editChatFolder"',
+        '"deleteChatFolder"',
+        '"createChatFilter"',
+        '"editChatFilter"',
+        '"deleteChatFilter"',
+        '"getChatFolderInviteLinks"',
+        '"createChatFolderInviteLink"',
+        '"mountain-lion"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: unified chat-folder TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        'assetName:@"folder-add"',
+        'assetName:@"folder-remove"',
+        'assetName:@"folder-share"',
+        "definitionHasInclusionRule:",
+        "setObjectValue:",
+        "shareLinkForChatFolderID:",
+        "TGChatFolderListCell",
+        "@interface TGChatFolderListCell : TGRepresentedObjectCell",
+        "@interface TGChatFolderChatCell : TGRepresentedObjectCell",
+        "[self representedObject]",
+        "TGDrawAvatarInRect",
+        'TGDrawTemplateIconAsset(@"folder"',
+        "setReleasedWhenClosed:NO",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: chat-folder management UI is missing `%s`" %
+                          (controller_rel, fragment))
+    for fragment in [
+        "showChatFolderManagementWindow:",
+        "chatFolderManagementWindowControllerDidChangeFolders:",
+        "reloadChatFiltersIfReady",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: chat-folder host wiring is missing `%s`" %
+                          (host_rel, fragment))
+    for fragment in [
+        "settingsFoldersCardView",
+        "settingsFoldersSectionField",
+        'TGLoc(@"settings.section.folders")',
+        'setIconName:@"folder"',
+    ]:
+        if fragment not in status_text:
+            errors.append("%s: dedicated settings folder section is missing `%s`" %
+                          (status_rel, fragment))
+    for fragment in [
+        "foldersCardHeight",
+        "[self.settingsChatFoldersButton setFrame:",
+        "[self showView:self.settingsFoldersCardView visible:showSettings]",
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: settings folder section layout is missing `%s`" %
+                          (layout_rel, fragment))
+    for icon_name in ["folder-add.png", "folder-remove.png", "folder-share.png"]:
+        icon_path = os.path.join(ROOT, "Sources", "Resources", "Icons", icon_name)
+        if not os.path.isfile(icon_path):
+            errors.append("Sources/Resources/Icons/%s: required existing icon is missing" %
+                          icon_name)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -905,6 +998,7 @@ def main():
     check_primary_navigation_contract(errors)
     check_retro_console_contract(errors)
     check_chat_archive_contract(errors)
+    check_chat_folder_management_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

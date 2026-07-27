@@ -237,6 +237,7 @@
     [self showView:self.settingsProfileDetailField visible:showSettings];
     [self showView:self.settingsProfileButton visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
+    [self showView:self.settingsFoldersCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
     [self showView:self.settingsResourceCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
@@ -245,6 +246,7 @@
     [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
+    [self showView:self.settingsFoldersSectionField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
     [self showView:self.settingsResourceSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
@@ -262,6 +264,7 @@
     [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
+    [self showView:self.settingsChatFoldersButton visible:showSettings];
     [self showView:self.settingsEconomyModeButton visible:showSettings];
     [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
@@ -1145,6 +1148,7 @@
     CGFloat settingsBottomPadding = 58.0;
     CGFloat profileCardHeight = 72.0;
     CGFloat notificationCardHeight = 140.0;
+    CGFloat foldersCardHeight = 54.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
     CGFloat interfaceCardHeight = 184.0;
@@ -1154,6 +1158,7 @@
     CGFloat settingsDocHeight = 18.0;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + foldersCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + interfaceCardHeight + settingsGroupGap;
@@ -1211,6 +1216,21 @@
     [self.settingsNotificationPreviewButton setFrame:NSMakeRect(rowLeft, notificationCardY + 84.0, rowWidth, 22.0)];
     [self.settingsNotificationsWhenActiveButton setFrame:NSMakeRect(rowLeft, notificationCardY + 108.0, rowWidth, 22.0)];
     settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
+
+    [self.settingsFoldersSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat foldersCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsFoldersCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      foldersCardY,
+                                                      settingsGroupedWidth,
+                                                      foldersCardHeight)];
+    [self.settingsChatFoldersButton setFrame:NSMakeRect(rowLeft,
+                                                        foldersCardY + 12.0,
+                                                        rowWidth,
+                                                        30.0)];
+    settingsNextY = foldersCardY + foldersCardHeight + settingsGroupGap;
 
     [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
