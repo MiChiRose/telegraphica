@@ -1,6 +1,7 @@
 # Telegraphica Feature Audit
 
 Date: 2026-07-27
+Verified code snapshot: `b77e491` (`feature/chat-folder-management`)
 
 Scope: the unified OS X 10.8-macOS 10.13 application on the
 `feature/chat-folder-management` branch.
@@ -17,6 +18,13 @@ The current Telegram feature reference is the official
 [Evolution of Telegram](https://telegram.org/evolution/) timeline. The API
 reference is the official [TDLib documentation](https://core.telegram.org/tdlib/docs/)
 and [TDLib class index](https://core.telegram.org/tdlib/docs/classes.html).
+
+The audit was refreshed after the folder and contact-avatar HITL fixes. It is
+based on the public `TGTDLibClient` surface, all TDLib request types used by the
+implementation, the AppKit controllers and focused UI modules, the current
+static/unit probes, and the feature's successful Mavericks HITL pass. A visible
+button without its matching TDLib read/write path is counted as partial, not
+complete.
 
 ## Executive Summary
 
@@ -49,15 +57,15 @@ download manager and richer bot support.
 | Contacts | List, search, profile, add, remove, invite through Messages, send contact | Contact notes, birthday suggestions, bulk import and duplicate handling |
 | Profile | Name, surname, username, bio and avatar upload | Avatar history/removal, phone change, birthday, emoji status, profile music, default profile tab |
 | Messaging | Read, send, reply, forward, edit, delete, pin, drafts, long-text chunking | Scheduled, silent, recurring, send-when-online and link-preview controls |
-| Formatting | Bold, italic, underline, strike, spoiler and monospace through TDLib entity parsing | Links, block quotes, expandable quotes and a visual rich-text editor |
+| Formatting | Selection-based bold, italic, underline, strike, spoiler and monospace through TDLib entity parsing | Link editor, block quotes, expandable quotes, formatted editing and a visual rich-text editor |
 | Message types | Photo, album, GIF animation, video, audio, document, sticker, voice, contact, location, poll | Video note, live location, venue, dice, checklist, paid media |
 | Reactions | Add and remove ordinary emoji reactions, reaction display | Available-reaction picker, custom emoji, paid Star reactions, reaction details |
 | Polls | Display, vote and create regular anonymous or multiple-choice polls | Quiz mode, correct-answer explanation, media, option links, closing and scheduling |
 | Search | Chat search, public chat lookup, in-chat and global message search, media filters | Public post search, semantic filters, saved searches |
 | Topics and comments | Forum topic list, topic history, channel comment threads | Create/edit/close topics, topic tabs, topic permissions and admin actions |
-| Media | Download, Save As, Finder reveal, cache delete, media center, image/video/audio preview | Download queue, pause/resume, aggregate progress, streaming, speed, quality and playlists |
-| Notifications | OS notifications, app-level sound/preview/badge settings, server mute detection | Server-side per-chat mute/sound/settings synchronization and exception management |
-| Folders | Read, create, edit, delete and share on the capable TDLib lane | Reorder, edit invite links, import shared folders, folder limits and recommendations |
+| Media | Per-chat media center with filtering, pagination, download/cancel, Save As, Finder reveal, cache delete and image/video/audio preview | Global download queue, aggregate progress, resumable partial downloads, streaming, speed, quality and playlists |
+| Notifications | OS notifications, app-level sound/preview/badge settings and server mute detection | Current mute menu writes only a local override; server-side per-chat mute/sound/preview synchronization and exception management are missing |
+| Folders | Read, create, edit, delete and create/reuse a share link on the capable TDLib lane | Reorder, manage invite links, import shared folders, process newly suggested chats, folder limits and recommendations |
 | Storage and sessions | Storage statistics, cache cleanup, active sessions and remote termination | Per-chat cache policy, auto-remove periods, session detail and passkey management |
 | Secret chats | Creation and normal conversation opening | Dedicated secret-chat information, key visualization, TTL and destructive controls |
 | Calls | Navigation destination and prepared placeholder | All voice/video/group-call functionality |
@@ -88,6 +96,26 @@ download manager and richer bot support.
 4. Failure and cancellation consistency.
    Long downloads and TDLib requests need one shared cancellable operation
    model with stale-result protection and consistent status presentation.
+
+## Best Next Implementations
+
+| Order | Feature | User value | Scope | Legacy risk | Why it belongs here |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | Server-synchronized per-chat notifications | Very high | Medium | Low | Fixes a real mismatch with Telegram and reuses the existing mute menu and server-read path |
+| 2 | Chat information and participant list | Very high | Medium | Low/medium | Unlocks member profiles, roles, permissions and the foundation for administration |
+| 3 | Scheduled, silent and send-when-online messages | High | Medium | Medium | Extends the existing send pipeline through `messageSendOptions` without a new subsystem |
+| 4 | Link-preview controls | High | Small/medium | Medium | Adds disable, URL choice, size and placement to the existing text composer |
+| 5 | Global download manager | High | Medium/large | Low | Most download primitives already exist; the missing part is queue/state presentation |
+| 6 | Blocked users and privacy rules | High | Medium | Low/medium | Important account control with classic TDLib APIs and little rendering complexity |
+| 7 | Invite links, join requests and basic member administration | High for group owners | Large | Medium | TDLib supports the workflow, but permissions and destructive confirmations need careful UX |
+| 8 | Quiz polls, video notes, venue, live location and dice | Medium | Medium | Medium | Bounded message types that can reuse current composer and message rendering |
+| 9 | Saved Messages organization | Medium/high | Medium | Medium/high | Useful daily feature, but modern topics/tags depend more strongly on the loaded TDLib schema |
+| 10 | Bot commands, callback buttons and reply keyboards | Medium/high | Large | Medium/high | High compatibility value, but requires a reusable reply-markup renderer and capability gating |
+
+The first five can be delivered incrementally without changing Telegraphica's
+overall architecture. Multiple accounts, calls, Mini Apps and Stories are not
+good "next feature" candidates: each introduces a separate session, media or
+runtime architecture and carries a much larger regression surface.
 
 ### P1: highest daily value
 
@@ -136,9 +164,9 @@ budget.
 
 1. Server notification synchronization.
 2. Chat information and participant list.
-3. Basic member administration and invite links.
-4. Scheduled/silent sending and link-preview controls.
-5. Download manager.
+3. Scheduled/silent sending and link-preview controls.
+4. Global download manager.
+5. Basic member administration and invite links.
 
 These features are broadly useful, fit the native AppKit product and do not
 require recreating the newest Telegram product layers.
@@ -176,12 +204,37 @@ Every feature must be classified before UI implementation:
 
 Current examples:
 
-- basic chats, messages, contacts and classic privacy features should be
+- basic chats, messages, contacts, notification settings and classic privacy features should be
   implemented across both paths;
 - shared folder links already use a normal-path capability and are disabled on
   the OS X 10.8 fallback;
+- scheduling, modern link-preview options, shared-folder import and newer
+  message types need runtime request-shape probing before their UI is enabled;
 - 2025-2026 Telegram features must not be assumed available merely because
   they exist in current online TDLib documentation.
+
+## Verified Gaps in the Current Code
+
+The following are not guesses based on missing UI. Their TDLib write/read
+requests are absent from the current code:
+
+- `setChatNotificationSettings` and notification exception management;
+- scheduled-message retrieval and scheduling states;
+- chat administrators, supergroup members, member-status changes and bans;
+- chat invite-link administration and join-request processing;
+- blocked-user lists, privacy rules, account TTL and per-chat auto-delete;
+- QR authorization, registration, email authorization and password recovery;
+- profile-photo history/removal, phone-number change, birthdays and emoji status;
+- video-note, venue, live-location and dice sending;
+- custom/paid reactions and server-provided available-reaction selection;
+- inline bot queries, callback answers, bot command menus and reply keyboards;
+- Saved Messages topics/tags, Stories, Business, Stars and gift workflows.
+
+Conversely, the audit must not list these as missing: contact add/remove/invite,
+contact sending, location sending, regular poll creation/voting, album and GIF
+sending, media download cancellation, viewport-based read receipts, archive
+management, secret-chat creation, profile editing, or chat-folder
+create/edit/delete/share. Each has both UI and a TDLib path in this snapshot.
 
 ## Engineering Optimization Audit
 
@@ -223,4 +276,3 @@ It is the best next step because:
   state refresh;
 - it fixes a real daily inconsistency with official Telegram before adding
   another isolated feature.
-
