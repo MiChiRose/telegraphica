@@ -707,6 +707,8 @@ def check_primary_navigation_contract(errors):
     profile_editor_text = read_text(os.path.join(ROOT, profile_editor_rel))
     utility_windows_rel = os.path.join("Sources", "UI", "TGStatusWindowController+UtilityWindows.inc")
     utility_windows_text = read_text(os.path.join(ROOT, utility_windows_rel))
+    message_data_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    message_data_flow_text = read_text(os.path.join(ROOT, message_data_flow_rel))
     for fragment in [
         "setName",
         "setUsername",
@@ -734,6 +736,16 @@ def check_primary_navigation_contract(errors):
         if fragment not in utility_windows_text:
             errors.append("%s: profile editor wiring is missing `%s`" %
                           (utility_windows_rel, fragment))
+    authorization_probe_index = message_data_flow_text.find(
+        "authorizationState = [client authorizationStateSummaryWithTimeout:")
+    network_diagnostics_index = message_data_flow_text.find(
+        "networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:")
+    if authorization_probe_index < 0 or network_diagnostics_index < 0:
+        errors.append("%s: TDLib bootstrap diagnostics contract is incomplete" %
+                      message_data_flow_rel)
+    elif network_diagnostics_index < authorization_probe_index:
+        errors.append("%s: network diagnostics must not block the initial authorization-state probe" %
+                      message_data_flow_rel)
     for fragment in [
         "profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth",
         "profileGroupedWidth - 44.0",

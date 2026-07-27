@@ -1689,7 +1689,6 @@
         NSString *networkDiagnosticsSummary = nil;
         if (probeSummary) {
             proxySummary = [client configureNetworkProxyIfNeededWithTimeout:5.0 error:NULL];
-            networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:2.0 error:NULL];
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
                 authorizationState = [client currentAuthorizationStatePreparingIfNeededWithTimeout:4.0 error:&authorizationError];
@@ -1733,6 +1732,14 @@
             if (![finalAuthorizationState length] && [authorizationState length] > 0) {
                 finalAuthorizationState = authorizationState;
             }
+            if ([finalAuthorizationState length] > 0 &&
+                ![finalAuthorizationState isEqualToString:@"waitTdlibParameters"]) {
+                networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:1.0 error:NULL];
+            }
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"TDLib bootstrap auth state: %@",
+                                          [finalAuthorizationState length] > 0
+                                              ? finalAuthorizationState
+                                              : @"unavailable"]];
         }
         NSMutableDictionary *uiState = [[NSMutableDictionary alloc] init];
         if (probeSummary) {
