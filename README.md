@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.8 through macOS 10.13 on Intel Macs.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.5.2-blue" alt="version v0.5.2" />
+    <img src="https://img.shields.io/badge/version-v0.5.3-blue" alt="version v0.5.3" />
     <img src="https://img.shields.io/badge/macOS-10.8--10.13-black" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -105,7 +105,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Open Beta: `v0.5.2`
+## Current Open Beta: `v0.5.3`
 
 This open beta is ready for broader legacy-Mac testing. Telegraphica is still
 young software, but the everyday loop is now useful enough for real feedback:
@@ -140,6 +140,27 @@ voice messages, and keep the app updated from GitHub Releases.
 - 🧩 Native sticker display with WEBP, TGS, and animated WEBM/VP9 sticker
   support on Mavericks.
 - 🔍 Chat search/navigation with a native search field.
+- 👥 Contacts browser with search, direct chat opening, and profile details
+  including presence, username, phone number, biography, and avatar.
+- 🧭 Private-chat, group, channel, secret-chat, archive, invite-link, member,
+  role, restriction, and channel-administration workflows.
+- 🗂 Telegram chat-folder creation, editing, deletion, and supported share-link
+  management.
+- 🔕 Per-chat server mute, sound, and preview synchronization.
+- ✨ Bold, italic, underline, strikethrough, spoiler, and monospace message
+  formatting.
+- ⏰ Silent, scheduled, and send-when-online messages with link-preview
+  controls.
+- 📍 Contacts, GIF animations, video notes, locations, live locations, venues,
+  dice, regular polls, and quizzes.
+- 🤖 Bot commands, inline results, callback buttons, reply keyboards, and
+  confirmed Login URLs.
+- 🔒 Privacy rules, blocked-user management, account inactivity TTL,
+  auto-delete controls, active sessions, and remote session termination.
+- 📥 A shared Download Manager with progress, retry, cancellation, Save As,
+  Finder reveal, and cache cleanup.
+- 🎮 An optional Retro Console Workshop module for user-supplied compatible
+  game files and cores.
 - 🧽 Storage usage view with cache cleanup.
 - 🧩 Optional Workshop modules that can be installed without increasing the
   base application download.
@@ -157,6 +178,13 @@ voice messages, and keep the app updated from GitHub Releases.
   installers.
 - Release confidence requires the same unchanged app bundle to pass on Mountain
   Lion and Mavericks; broader 10.10-10.13 reports remain welcome.
+- Text address search in the location picker is temporarily disabled after a
+  legacy MapKit lifecycle crash. Mavericks and newer retain map, pin, zoom, and
+  current-location selection; Mountain Lion has no native MapKit picker.
+- Calls remain a placeholder. Voice, video, and group calling are not included
+  in this release.
+- Telegram Premium, Stars, payments, subscriptions, gifts, paid media, and
+  other purchase flows are intentionally not implemented.
 - The project is moving fast, so UI details and release packaging may change.
 
 ---
@@ -351,9 +379,10 @@ PRODUCT.md                     Product and design direction
 
 ## Roadmap
 
+- See the current [feature coverage and priority audit](docs/feature-audit-2026-07.md).
 - Improve edge-case animated sticker playback and GIF handling.
 - More complete document download and preview handling.
-- Richer contact/profile views.
+- Deeper group/channel profiles and member-management views.
 - More polished skeuomorphic theme variants.
 - Safer automatic update flow for legacy Macs.
 - Optional all-in-one installer once the redistributable Mavericks TDLib lane is

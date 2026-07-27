@@ -12,7 +12,8 @@ COMPATIBILITY_TAG="${TELEGRAPHICA_COMPATIBILITY_TAG:-macos10.8-10.13}"
 
 usage() {
     cat <<USAGE
-Usage: $0 [--tdjson /path/to/libtdjson.dylib]
+Usage: $0 --tdjson /path/to/modern/libtdjson.dylib \
+          --mountain-lion-tdjson /path/to/10.8/libtdjson.dylib
 
 Builds Telegraphica with bundled TDLib on the legacy Mac, then creates release
 artifacts in dist/:
@@ -21,12 +22,13 @@ artifacts in dist/:
   - Telegraphica-v<VERSION>-${COMPATIBILITY_TAG}-x86_64.app.zip
   - matching .sha256 files
 
-The script refuses to package a public installer unless libtdjson.dylib is
-bundled inside Telegraphica.app.
+The script refuses to package a public installer unless the OS X 10.9+ and
+OS X 10.8 TDLib runtimes are both bundled inside Telegraphica.app.
 USAGE
 }
 
 TDJSON_PATH="${TELEGRAPHICA_TDJSON_PATH:-}"
+TDJSON_MOUNTAIN_LION_PATH="${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}"
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --tdjson)
@@ -36,6 +38,14 @@ while [ "$#" -gt 0 ]; do
                 exit 1
             fi
             TDJSON_PATH="$1"
+            ;;
+        --mountain-lion-tdjson)
+            shift
+            if [ "$#" -eq 0 ]; then
+                echo "--mountain-lion-tdjson requires a path."
+                exit 1
+            fi
+            TDJSON_MOUNTAIN_LION_PATH="$1"
             ;;
         -h|--help)
             usage
@@ -68,14 +78,21 @@ find_tdjson() {
     done
 }
 
-if [ -z "$TDJSON_PATH" ]; then
-    TDJSON_PATH="$(find_tdjson)"
-fi
-
 if [ -z "$TDJSON_PATH" ] || [ ! -f "$TDJSON_PATH" ]; then
-    echo "libtdjson.dylib was not found."
+    echo "The modern OS X 10.9+ libtdjson.dylib was not found."
     echo "Pass it explicitly:"
     echo "  $0 --tdjson /path/to/libtdjson.dylib"
+    exit 1
+fi
+
+if [ -z "$TDJSON_MOUNTAIN_LION_PATH" ]; then
+    TDJSON_MOUNTAIN_LION_PATH="$(find_tdjson)"
+fi
+
+if [ -z "$TDJSON_MOUNTAIN_LION_PATH" ] || [ ! -f "$TDJSON_MOUNTAIN_LION_PATH" ]; then
+    echo "The OS X 10.8 libtdjson.dylib was not found."
+    echo "Pass it explicitly:"
+    echo "  $0 --tdjson /path/to/modern/libtdjson.dylib --mountain-lion-tdjson /path/to/10.8/libtdjson.dylib"
     exit 1
 fi
 
@@ -93,10 +110,12 @@ if [ -n "$PYTHON_BIN" ]; then
     "$PYTHON_BIN" scripts/check_legacy_compat.py
 fi
 
-scripts/check_tdjson_legacy.sh "$TDJSON_PATH"
+MACOSX_DEPLOYMENT_TARGET=10.9 scripts/check_tdjson_legacy.sh "$TDJSON_PATH"
+MACOSX_DEPLOYMENT_TARGET=10.8 scripts/check_tdjson_legacy.sh "$TDJSON_MOUNTAIN_LION_PATH"
 
-echo "Building Telegraphica with bundled TDLib:"
-echo "$TDJSON_PATH"
+echo "Building Telegraphica with bundled TDLib runtimes:"
+echo "  OS X 10.9+: $TDJSON_PATH"
+echo "  OS X 10.8:  $TDJSON_MOUNTAIN_LION_PATH"
 BUILD_DIST_DIR="$(mktemp -d /tmp/telegraphica-release-build.XXXXXX)"
 cleanup_build_dist() {
     rm -rf "$BUILD_DIST_DIR"
@@ -104,17 +123,21 @@ cleanup_build_dist() {
 trap cleanup_build_dist EXIT
 TELEGRAPHICA_DIST_DIR="$BUILD_DIST_DIR" \
 TELEGRAPHICA_TDJSON_PATH="$TDJSON_PATH" \
+TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH="$TDJSON_MOUNTAIN_LION_PATH" \
 TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL="${TELEGRAPHICA_REMOTE_TDLIB_CONFIG_URL:-}" \
 ./build_legacy.sh
 
 BUNDLED_TDJSON="$APP_PATH/Contents/Frameworks/libtdjson.dylib"
-if [ ! -f "$BUNDLED_TDJSON" ]; then
-    echo "Build finished, but bundled TDLib is missing:"
-    echo "$BUNDLED_TDJSON"
+BUNDLED_TDJSON_MOUNTAIN_LION="$APP_PATH/Contents/Frameworks/libtdjson-mountain-lion.dylib"
+if [ ! -f "$BUNDLED_TDJSON" ] || [ ! -f "$BUNDLED_TDJSON_MOUNTAIN_LION" ]; then
+    echo "Build finished, but one or both bundled TDLib runtimes are missing:"
+    echo "  $BUNDLED_TDJSON"
+    echo "  $BUNDLED_TDJSON_MOUNTAIN_LION"
     exit 1
 fi
 
-TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON"
+MACOSX_DEPLOYMENT_TARGET=10.9 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON"
+MACOSX_DEPLOYMENT_TARGET=10.8 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$BUNDLED_TDJSON_MOUNTAIN_LION"
 TELEGRAPHICA_BUNDLE_MANIFEST_PATH="$BUILD_DIST_DIR/TelegraphicaLegacyBinaryManifest.tsv" \
 scripts/check_release_bundle_legacy.sh "$APP_PATH" "$DEPLOYMENT_TARGET"
 

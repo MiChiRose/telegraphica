@@ -65,8 +65,10 @@ fi
 
 if [ -n "$PYTHON_BIN" ]; then
     "$PYTHON_BIN" scripts/check_legacy_compat.py
+    "$PYTHON_BIN" scripts/check_free_feature_policy.py
 else
     echo "Skipping legacy compatibility script: python/python3 was not found."
+    echo "Skipping free-feature policy script: python/python3 was not found."
 fi
 
 SDK_NAME="${TELEGRAPHICA_SDK_NAME:-macosx}"
@@ -272,11 +274,15 @@ if [ -z "$BUNDLED_TDLIB_CONFIG_SOURCE" ] && [ -z "$BUNDLED_TDLIB_CREDENTIALS_SOU
 fi
 
 TDJSON_STAGED_PATH=""
+TDJSON_MOUNTAIN_LION_STAGED_PATH=""
 BUNDLED_TDLIB_CONFIG_TEMP=""
 BUNDLED_TDLIB_CREDENTIALS_TEMP=""
 cleanup_legacy_build_inputs() {
     if [ -n "$TDJSON_STAGED_PATH" ]; then
         rm -f "$TDJSON_STAGED_PATH"
+    fi
+    if [ -n "$TDJSON_MOUNTAIN_LION_STAGED_PATH" ]; then
+        rm -f "$TDJSON_MOUNTAIN_LION_STAGED_PATH"
     fi
     if [ -n "$BUNDLED_TDLIB_CONFIG_TEMP" ]; then
         rm -f "$BUNDLED_TDLIB_CONFIG_TEMP"
@@ -304,6 +310,34 @@ else
     echo "This development build will not be able to start a new Telegram sign-in."
 fi
 
+if [ -z "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
+    for TDJSON_CANDIDATE in \
+        "$BUILD_ROOT/Release/$APP_NAME/Contents/Frameworks/libtdjson.dylib" \
+        "$APP_NAME/Contents/Frameworks/libtdjson.dylib" \
+        "/Applications/$APP_NAME/Contents/Frameworks/libtdjson.dylib"
+    do
+        if [ -f "$TDJSON_CANDIDATE" ]; then
+            TELEGRAPHICA_TDJSON_PATH="$TDJSON_CANDIDATE"
+            echo "Found the existing Mavericks-and-newer TDLib JSON library."
+            break
+        fi
+    done
+fi
+
+if [ -z "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
+    for TDJSON_MOUNTAIN_LION_CANDIDATE in \
+        "$BUILD_ROOT/Release/$APP_NAME/Contents/Frameworks/libtdjson-mountain-lion.dylib" \
+        "$APP_NAME/Contents/Frameworks/libtdjson-mountain-lion.dylib" \
+        "/Applications/$APP_NAME/Contents/Frameworks/libtdjson-mountain-lion.dylib"
+    do
+        if [ -f "$TDJSON_MOUNTAIN_LION_CANDIDATE" ]; then
+            TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH="$TDJSON_MOUNTAIN_LION_CANDIDATE"
+            echo "Found the existing Mountain Lion TDLib JSON library."
+            break
+        fi
+    done
+fi
+
 if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     if [ ! -f "$TELEGRAPHICA_TDJSON_PATH" ]; then
         echo "TELEGRAPHICA_TDJSON_PATH does not point to a file: $TELEGRAPHICA_TDJSON_PATH"
@@ -314,6 +348,18 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     chmod 0644 "$TDJSON_STAGED_PATH"
     TELEGRAPHICA_TDJSON_PATH="$TDJSON_STAGED_PATH"
     echo "Staged TDLib JSON library for rebuild."
+fi
+
+if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" ]; then
+        echo "TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH does not point to a file: $TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH"
+        exit 1
+    fi
+    TDJSON_MOUNTAIN_LION_STAGED_PATH="$(mktemp /tmp/telegraphica-tdjson-mountain-lion.XXXXXX)"
+    ditto "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" "$TDJSON_MOUNTAIN_LION_STAGED_PATH"
+    chmod 0644 "$TDJSON_MOUNTAIN_LION_STAGED_PATH"
+    TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH="$TDJSON_MOUNTAIN_LION_STAGED_PATH"
+    echo "Staged Mountain Lion TDLib JSON library for rebuild."
 fi
 
 rm -rf "$BUILD_ROOT" "$APP_NAME"
@@ -488,7 +534,21 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
 
     mkdir -p "$FRAMEWORKS_DIR"
     ditto "$TELEGRAPHICA_TDJSON_PATH" "$TDJSON_DEST"
-    TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
+    MACOSX_DEPLOYMENT_TARGET=10.9 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
+fi
+
+if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" ]; then
+        echo "TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH does not point to a file: $TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH"
+        exit 1
+    fi
+
+    FRAMEWORKS_DIR="$APP_NAME/Contents/Frameworks"
+    TDJSON_MOUNTAIN_LION_DEST="$FRAMEWORKS_DIR/libtdjson-mountain-lion.dylib"
+
+    mkdir -p "$FRAMEWORKS_DIR"
+    ditto "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" "$TDJSON_MOUNTAIN_LION_DEST"
+    MACOSX_DEPLOYMENT_TARGET=10.8 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_MOUNTAIN_LION_DEST"
 fi
 
 RESOURCES_DIR="$APP_NAME/Contents/Resources"

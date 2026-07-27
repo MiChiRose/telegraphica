@@ -12,6 +12,29 @@
 static CGFloat const TGPanelCornerRadius = 8.0;
 static CGFloat const TGPanelHeaderHeight = 40.0;
 
+@implementation TGRepresentedObjectCell
+
+@synthesize representedObject = _representedObject;
+
+- (id)copyWithZone:(NSZone *)zone {
+    TGRepresentedObjectCell *cell = [super copyWithZone:zone];
+    cell->_representedObject = nil;
+    [cell setRepresentedObject:self.representedObject];
+    return cell;
+}
+
+- (void)setObjectValue:(id)value {
+    self.representedObject = value;
+    [super setObjectValue:@""];
+}
+
+- (void)dealloc {
+    [_representedObject release];
+    [super dealloc];
+}
+
+@end
+
 @implementation TGChatListCell
 
 @synthesize chatItem = _chatItem;
@@ -56,10 +79,12 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [selectedPath fill];
     }
 
-    NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 8.0,
-                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 26.0) / 2.0),
-                                   26.0,
-                                   26.0);
+    BOOL compact = (NSWidth(cellFrame) < 223.0);
+    CGFloat avatarSide = compact ? 32.0 : 26.0;
+    NSRect avatarRect = NSMakeRect(compact ? (NSMidX(cellFrame) - floor(avatarSide / 2.0)) : (NSMinX(cellFrame) + 8.0),
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - avatarSide) / 2.0),
+                                   avatarSide,
+                                   avatarSide);
     NSString *displayTitle = [item isSavedMessages] ? TGLoc(@"savedMessages") : [item title];
     if ([item isSavedMessages]) {
         NSBezierPath *savedPath = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
@@ -88,6 +113,32 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                       [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
                                       unreadTextColor, NSForegroundColorAttributeName,
                                       nil];
+    if (compact) {
+        if ([unreadString length] > 0) {
+            NSString *compactUnread = unreadCount > 99 ? @"99+" : unreadString;
+            NSSize compactUnreadSize = [compactUnread sizeWithAttributes:unreadAttributes];
+            CGFloat compactBadgeWidth = MAX(17.0, compactUnreadSize.width + 8.0);
+            NSRect compactBadgeRect = NSMakeRect(NSMaxX(avatarRect) - compactBadgeWidth + 4.0,
+                                                 NSMaxY(avatarRect) - 15.0,
+                                                 compactBadgeWidth,
+                                                 16.0);
+            NSBezierPath *compactBadgePath = [NSBezierPath bezierPathWithRoundedRect:compactBadgeRect
+                                                                            xRadius:8.0
+                                                                            yRadius:8.0];
+            [TGClassicHeaderBottomColor() set];
+            [compactBadgePath fill];
+            NSMutableParagraphStyle *compactParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+            [compactParagraph setAlignment:NSCenterTextAlignment];
+            NSMutableDictionary *compactAttributes = [NSMutableDictionary dictionaryWithDictionary:unreadAttributes];
+            [compactAttributes setObject:compactParagraph forKey:NSParagraphStyleAttributeName];
+            [compactUnread drawInRect:NSMakeRect(NSMinX(compactBadgeRect),
+                                                 NSMinY(compactBadgeRect) + 1.0,
+                                                 NSWidth(compactBadgeRect),
+                                                 14.0)
+                       withAttributes:compactAttributes];
+        }
+        return;
+    }
     NSSize unreadSize = [unreadString sizeWithAttributes:unreadAttributes];
     CGFloat unreadWidth = ([unreadString length] > 0) ? MAX(unreadSize.width + 13.0, 20.0) : 0.0;
     CGFloat unreadHeight = ([unreadString length] > 0) ? 18.0 : 0.0;
@@ -112,23 +163,18 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (titleAvailableWidth < 40.0) {
         titleAvailableWidth = 40.0;
     }
-    NSSize titleSize = [displayTitle sizeWithAttributes:titleAttributes];
-    CGFloat titleDrawWidth = titleAvailableWidth;
-    if (([item notificationsMuted] || [item isPinned]) && titleSize.width < titleAvailableWidth) {
-        titleDrawWidth = titleSize.width;
-    }
     NSRect titleRect = NSMakeRect(titleX,
                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
-                                  titleDrawWidth,
+                                  titleAvailableWidth,
                                   16.0);
     [displayTitle drawInRect:titleRect withAttributes:titleAttributes];
-    CGFloat iconX = NSMaxX(titleRect) + 4.0;
+    CGFloat iconX = titleRight - trailingIconWidth;
     if ([item isPinned]) {
         NSRect pinRect = NSMakeRect(iconX,
                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 12.0) / 2.0),
                                     12.0,
                                     12.0);
-        NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
+        NSColor *pinColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicInkColor() colorWithAlphaComponent:0.72];
         TGDrawTemplateIconAsset(@"flag-triangle", pinRect, pinColor, 0.9, [controlView isFlipped]);
         iconX = NSMaxX(pinRect) + 4.0;
     }
@@ -137,7 +183,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
                                      15.0,
                                      15.0);
-        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor();
+        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicInkColor() colorWithAlphaComponent:0.78];
         TGDrawTemplateIconAsset(@"sound-off", muteRect, muteColor, 1.0, [controlView isFlipped]);
     }
     if ([unreadString length] > 0) {

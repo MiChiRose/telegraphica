@@ -25,6 +25,17 @@ These project rules apply to Codex work in this repository.
 - Keep branch write scopes clear when multiple agents are active.
 - Ask the user questions during development when product, credential, legacy-machine, or HITL decisions are genuinely unclear.
 
+## Unified Legacy Release
+
+- Treat OS X 10.8 through macOS 10.13 as one product and release lane. The canonical deliverable is one Intel `x86_64` application built from one source tree, one application target, and one build/package pipeline.
+- Do not split compatibility work into separate Mountain Lion and Mavericks source trees, long-lived OS-specific branches, duplicated project files, generated source variants, app bundles, DMGs, or ZIPs. Historical `mountain-lion/*` branches are reference-only; start all new work from `develop`.
+- Keep the shared deployment target at OS X 10.8. Implement unavoidable OS differences inside the common codebase with runtime capability/version checks and focused compatibility helpers. Use conditional compilation only when an SDK or compiler difference cannot be handled at runtime.
+- Preserve the normal 10.9-10.13 feature path while providing 10.8-safe fallbacks. If a feature or optional Workshop module requires 10.9 or newer, express that through availability metadata and runtime gating instead of forking the host application or release.
+- Treat platform checks as complementary validation of the same deliverable: Xcode 5.1.1 / OS X 10.8 checks cover the minimum deployment target and fallback path; Mavericks and newer checks cover the normal path. A pass on one OS does not replace the other checks.
+- Use one stable old-Mac source/build folder, `~/Desktop/Telegraphica-current`, for the unified lane on every supported OS. Validation logs may be separated and labelled by OS, but they must refer to the same source revision and release candidate.
+- Produce one canonical release artifact set named for the complete range, such as `macos10.8-10.13-x86_64`. Do not publish separate `ml`, `mountain-lion`, `mavericks`, or `macos10.9` variants unless the user explicitly authorizes a temporary diagnostic build.
+- If a dependency or toolchain appears to require divergent product artifacts, stop and raise the incompatibility for a product decision instead of silently creating a second lane.
+
 ## Remote HITL Builds
 
 - Prefer the configured `telegraphica-mavericks` SSH alias for old-Mac HITL builds when it is available; do not use raw IP addresses unless the user explicitly asks.
@@ -34,6 +45,22 @@ These project rules apply to Codex work in this repository.
 
 ## Project Constraints
 
+- Never invent, hand-draw, or generate replacement UI icons in code, including
+  custom `NSBezierPath` glyphs. Use only user-provided or already approved
+  project image assets. If no suitable asset exists, leave the icon placement
+  empty and ask the user to provide or choose an icon before continuing.
+- Do not implement purchases, checkout, Premium acquisition, Telegram Stars
+  payments, paid subscriptions, paid messages/media, gifts, boosts, paid
+  reactions, giveaways, or any other Telegram monetization transaction inside
+  Telegraphica.
+- Telegraphica may safely render already-existing paid or Premium-gated content
+  when TDLib supplies it. If a user tries to manage a paid-only capability,
+  explain that it is unavailable in Telegraphica and direct them to the
+  official Telegram application. Never provide an in-app purchase path, payment
+  link, billing flow, or wording that implies Telegraphica can sell it.
+- Prefer and fully implement free Telegram functionality. Runtime capability
+  gating must distinguish "unsupported by the loaded TDLib" from "available
+  only through an official paid Telegram feature".
 - Target OS: one application and release artifact for OS X 10.8 through macOS 10.13.
 - Target architecture: Intel x86_64.
 - Target toolchain: Xcode 5.1.1-compatible for the shared 10.8 deployment target, while preserving Xcode 6.2 compatibility.
@@ -41,6 +68,6 @@ These project rules apply to Codex work in this repository.
 - Do not use Swift, SwiftUI, official Telegram branding/logo/assets, or OS X 10.9+ APIs without a Mountain Lion-safe fallback.
 - When adding UI or feature code, prefer focused component/helper files over growing large controllers such as `TGStatusWindowController.m`; keep new modules cohesive and import them from the owning controller.
 - Do not let one file become a broad mixed-responsibility dump. If a feature adds a meaningful amount of UI, media, data-flow, presentation, or TDLib orchestration code, split that area into a small focused file during the same task.
-- For refactors of oversized files, prefer substantial cohesive moves of complete method groups or helper responsibilities over tiny cosmetic reductions. Verify with local checks and, when relevant, the remote Mavericks HITL build flow.
+- For refactors of oversized files, prefer substantial cohesive moves of complete method groups or helper responsibilities over tiny cosmetic reductions. Verify with local checks and, when relevant, the applicable unified legacy HITL checks.
 - Do not commit Telegram `api_id`, `api_hash`, sessions, phone numbers, login codes, TDLib databases, generated database keys, or local credentials.
 - Periodically clean `dist` from obsolete Telegraphica build archives and scratch artifacts after newer verified builds replace them, using narrow exact-path cleanup only.

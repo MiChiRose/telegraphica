@@ -237,6 +237,16 @@ def check_unified_legacy_contract(errors):
     tdlib_text = read_text(os.path.join(ROOT, "Sources", "Core", "TGTDLibClient.m"))
     if "TGTDLibPruneMountainLionBackups(backupRoot, 3)" not in tdlib_text:
         errors.append("Sources/Core/TGTDLibClient.m: Mountain Lion cache backups must stay bounded")
+    for fragment in [
+        'TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH',
+        'mountainLion ? @"libtdjson-mountain-lion.dylib" : @"libtdjson.dylib"',
+        "if (!mountainLion)",
+    ]:
+        if fragment not in tdlib_text:
+            errors.append("Sources/Core/TGTDLibClient.m: dual TDLib runtime selection is missing `%s`" %
+                          fragment)
+    if "TGTDLibStartupRecovery" in tdlib_text:
+        errors.append("Sources/Core/TGTDLibClient.m: TDLib cache migration recovery must not return")
 
     startup_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
     startup_text = read_text(os.path.join(ROOT, startup_rel))
@@ -256,7 +266,11 @@ def check_unified_legacy_contract(errors):
         "check_release_bundle_legacy.sh",
         "Xcode 5.1.1.app",
         "TELEGRAPHICA_BUNDLED_TDLIB_CREDENTIALS_SOURCE_PATH",
+        "TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH",
+        "libtdjson-mountain-lion.dylib",
         "Preserved the existing generated Telegram connection provider.",
+        "Found the existing Mavericks-and-newer TDLib JSON library.",
+        "Found the existing Mountain Lion TDLib JSON library.",
     ]:
         if fragment not in build_text:
             errors.append("%s: unified legacy build contract is missing `%s`" %
@@ -266,6 +280,14 @@ def check_unified_legacy_contract(errors):
     package_text = read_text(os.path.join(ROOT, package_rel))
     if "macos10.8-10.13" not in package_text:
         errors.append("%s: unified release artifact compatibility tag is missing" % package_rel)
+    for fragment in ["--mountain-lion-tdjson", "libtdjson-mountain-lion.dylib"]:
+        if fragment not in package_text:
+            errors.append("%s: dual TDLib release contract is missing `%s`" %
+                          (package_rel, fragment))
+
+    recovery_rel = os.path.join("Sources", "Services", "TGTDLibStartupRecovery.m")
+    if os.path.exists(os.path.join(ROOT, recovery_rel)):
+        errors.append("%s: destructive TDLib cache recovery helper must not return" % recovery_rel)
 
     for rel in [
         os.path.join("Sources", "UI", "TGUpdateSupport.h"),
@@ -304,6 +326,749 @@ def check_no_local_runtime_data(errors):
                 errors.append("%s: tests/scripts must not contain Telegram API credentials" % rel)
 
 
+def check_conversation_creation_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        'createNewBasicGroupChat',
+        'createNewSecretChat',
+        'createNewSupergroupChat',
+        'createdBasicGroupChat',
+        'message_auto_delete_time',
+        'telegraphica-create-basic-group-legacy',
+        'telegraphica-create-supergroup-legacy',
+        'isTDLibSchemaCompatibilityError',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: conversation creation compatibility is missing `%s`" %
+                          (client_rel, fragment))
+
+    prompt_rel = os.path.join("Sources", "UI", "TGConversationCreationPrompt.m")
+    prompt_text = read_text(os.path.join(ROOT, prompt_rel))
+    for fragment in ["runGroupPromptWithMemberCount:", "runChannelPromptWithTitle:",
+                     "[safeTitle length] > 128", "[safeDescription length] > 255"]:
+        if fragment not in prompt_text:
+            errors.append("%s: focused creation prompt is missing `%s`" %
+                          (prompt_rel, fragment))
+
+    lifecycle_rel = os.path.join("Sources", "UI", "TGChatLifecycleWindowController.m")
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    for fragment in ["setAllowsMultipleSelection:YES", "createGroup:",
+                     "createSecretChat:", "createChannel:"]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: conversation creation UI is missing `%s`" %
+                          (lifecycle_rel, fragment))
+
+
+def check_composer_formatting_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in ["parseTextEntities", "textParseModeMarkdown",
+                     "telegraphica-parse-composer-formatting", u'@"\\u2063"']:
+        if fragment not in client_text:
+            errors.append("%s: rich composer parsing is missing `%s`" %
+                          (client_rel, fragment))
+
+    composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
+    composer_text = read_text(os.path.join(ROOT, composer_rel))
+    for fragment in ["applyComposerFormatting:", 'TGLoc(@"composer.format.spoiler")',
+                     'TGLoc(@"composer.format.code")']:
+        if fragment not in composer_text:
+            errors.append("%s: composer formatting UI is missing `%s`" %
+                          (composer_rel, fragment))
+
+    draft_rel = os.path.join("Sources", "UI", "TGStatusWindowController+AuthComposerState.inc")
+    if u'[text hasPrefix:@"\\u2063"]' not in read_text(os.path.join(ROOT, draft_rel)):
+        errors.append("%s: formatting control markers must not sync into Telegram drafts" % draft_rel)
+
+
+def check_additional_message_types_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        "sendContactMessageToChatID:",
+        '"inputMessageContact"',
+        "sendLocationMessageToChatID:",
+        '"inputMessageLocation"',
+        '"live_period"',
+        "sendAnimationMessageToChatID:",
+        '"inputMessageAnimation"',
+        '"inputAnimation"',
+        "TGTDLibSendErrorLooksLikeSchemaMismatch(sendError)",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: additional message type compatibility is missing `%s`" %
+                          (client_rel, fragment))
+
+    descriptor_rel = os.path.join("Sources", "Media", "TGAttachmentDescriptor.m")
+    descriptor_text = read_text(os.path.join(ROOT, descriptor_rel))
+    for fragment in ['[descriptor.extension isEqualToString:@"gif"]',
+                     "TGAttachmentKindAnimation", 'descriptor.typeLabel = @"GIF"']:
+        if fragment not in descriptor_text:
+            errors.append("%s: GIF routing contract is missing `%s`" %
+                          (descriptor_rel, fragment))
+
+    dialogs_rel = os.path.join("Sources", "UI", "TGMessageActionDialogs.m")
+    dialogs_text = read_text(os.path.join(ROOT, dialogs_rel))
+    for fragment in ["contactToShare", "locationToShare",
+                     "latitude < -90.0", "longitude > 180.0"]:
+        if fragment not in dialogs_text:
+            errors.append("%s: share dialog validation is missing `%s`" %
+                          (dialogs_rel, fragment))
+
+    location_picker_rel = os.path.join("Sources", "UI", "TGLocationPickerWindowController.m")
+    location_picker_text = read_text(os.path.join(ROOT, location_picker_rel))
+    for fragment in ["NSClassFromString(@\"MKMapView\")",
+                     "setShowsUserLocation:YES",
+                     "TGLocationStaticMapView",
+                     "MKPinAnnotationView",
+                     "reloadMapThumbnail",
+                     "prepareForClosing",
+                     "setCoordinateTarget:nil",
+                     "self.mapGeneration++;",
+                     "setShowsUserLocation:NO",
+                     "setDelegate:nil",
+                     "mapUnavailable"]:
+        if fragment not in location_picker_text:
+            errors.append("%s: location picker regression guard is missing `%s`" %
+                          (location_picker_rel, fragment))
+    if location_picker_text.count("[self prepareForClosing];") != 3:
+        errors.append("%s: Send, Cancel and window close must all prepare the location picker for closing" %
+                      location_picker_rel)
+    for fragment in ["MKLocalSearchRequest",
+                     "MKLocalSearch",
+                     "CLGeocoder",
+                     "searchPressed:",
+                     "searchField",
+                     "searchButton"]:
+        if fragment in location_picker_text:
+            errors.append("%s: disabled legacy location search leaked `%s`" %
+                          (location_picker_rel, fragment))
+
+    static_map_rel = os.path.join("Sources", "UI", "TGLocationStaticMapView.m")
+    static_map_text = read_text(os.path.join(ROOT, static_map_rel))
+    for fragment in ["openHandCursor",
+                     "closedHandCursor",
+                     "dragThreshold = 6.0",
+                     "scrollWheel:",
+                     "hasPreciseScrollingDeltas",
+                     "magnifyWithEvent:",
+                     "requestZoomDelta:",
+                     "coordinateForPoint:",
+                     "selectionPinImage"]:
+        if fragment not in static_map_text:
+            errors.append("%s: interactive map fallback is missing `%s`" %
+                          (static_map_rel, fragment))
+
+    location_messages_rel = os.path.join("Sources", "Core", "TGTDLibClient+LocationMessages.m")
+    location_messages_text = read_text(os.path.join(ROOT, location_messages_rel))
+    for fragment in ["messageLocation",
+                     "messageVenue",
+                     "mapThumbnailPathForLatitude:",
+                     'path, @"local_path"']:
+        if fragment not in location_messages_text:
+            errors.append("%s: location message thumbnail support is missing `%s`" %
+                          (location_messages_rel, fragment))
+
+    date_picker_rel = os.path.join("Sources", "UI", "TGDatePickerDialog.m")
+    date_picker_text = read_text(os.path.join(ROOT, date_picker_rel))
+    if "NSTextFieldAndStepperDatePickerStyle" not in date_picker_text:
+        errors.append("%s: compact legacy-safe date picker style is missing" % date_picker_rel)
+
+    saved_cell_rel = os.path.join("Sources", "UI", "TGSavedMessagesCell.m")
+    saved_cell_text = read_text(os.path.join(ROOT, saved_cell_rel))
+    for fragment in ["objectForKey:@\"title\"", "objectForKey:@\"detail\"",
+                     "NSLineBreakByTruncatingTail"]:
+        if fragment not in saved_cell_text:
+            errors.append("%s: saved-message row rendering is missing `%s`" %
+                          (saved_cell_rel, fragment))
+
+    bot_composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BotComposer.inc")
+    bot_composer_text = read_text(os.path.join(ROOT, bot_composer_rel))
+    for fragment in ["setBotComposerVisible", "replyMarkupShowKeyboard",
+                     "setBotCommandPanelVisible", "setDuration:0.16"]:
+        if fragment not in bot_composer_text:
+            errors.append("%s: bot composer integration is missing `%s`" %
+                          (bot_composer_rel, fragment))
+
+    composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
+    composer_text = read_text(os.path.join(ROOT, composer_rel))
+    for fragment in ["shareContactFromComposerMenu:", "shareLocationFromComposerMenu:",
+                     "sendAnimationMessageToChatID:",
+                     "refreshSelectedMessagesAfterMediaSend"]:
+        if fragment not in composer_text:
+            errors.append("%s: composer message-type routing is missing `%s`" %
+                          (composer_rel, fragment))
+    if "refreshSelectedChatMessages:" in composer_text:
+        errors.append("%s: removed media refresh selector was reintroduced" % composer_rel)
+
+
+def check_media_file_management_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        "cancelDownloadForFileID:",
+        '"cancelDownloadFile"',
+        '"only_if_pending"',
+        "deleteCachedFileForFileID:",
+        '"deleteFile"',
+        "downloadedFileInfoForFileID:fileID timeout:timeout error:error",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: TDLib media file management is missing `%s`" %
+                          (client_rel, fragment))
+
+    actions_rel = os.path.join("Sources", "Media", "TGMediaFileActions.m")
+    actions_text = read_text(os.path.join(ROOT, actions_rel))
+    for fragment in [
+        "confirmDeleteLocalCopyWithFileName:",
+        "saveCopyOfFileAtPath:",
+        "toDirectory:",
+        "NSSavePanel",
+        "selectFile:path",
+        "copyItemAtPath:sourcePath",
+        "createDirectoryAtPath:directoryPath",
+    ]:
+        if fragment not in actions_text:
+            errors.append("%s: focused local file action is missing `%s`" %
+                          (actions_rel, fragment))
+
+    media_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MediaWindows.inc")
+    media_text = read_text(os.path.join(ROOT, media_rel))
+    for fragment in [
+        "mediaCenterDownloadingFileIDs",
+        "cancelMediaCenterDownload:",
+        "saveMediaCenterItemAs:",
+        "revealMediaCenterItem:",
+        "deleteCachedFileForFileID:",
+        "TGDownloadManager sharedManager",
+        "mediaCenterSavedPathsByFileID",
+        'TGLoc(@"media.center.downloadedTo")',
+    ]:
+        if fragment not in media_text:
+            errors.append("%s: Media Center file action routing is missing `%s`" %
+                          (media_rel, fragment))
+    if "removeItemAtPath:path error:&error" in media_text:
+        errors.append("%s: Media Center must delete cached files through TDLib, not unlink cache paths directly" %
+                      media_rel)
+
+    manager_rel = os.path.join("Sources", "Services", "TGDownloadManager.m")
+    manager_text = read_text(os.path.join(ROOT, manager_rel))
+    for fragment in [
+        "TGConfiguredDownloadFolderPath()",
+        "saveCopyOfFileAtPath:",
+        "cancelDownloadForFileID:",
+        "TGDownloadManagerDidChangeNotification",
+    ]:
+        if fragment not in manager_text:
+            errors.append("%s: shared Download Manager is missing `%s`" %
+                          (manager_rel, fragment))
+
+
+def check_primary_navigation_contract(errors):
+    controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    for fragment in [
+        'arrayWithObjects:@"Contacts", @"Calls", @"Chats", @"Settings", nil',
+        "NSInteger navigationTags[] = {0, 1, 2, 3}",
+        "TGSectionContacts",
+        "TGSectionCalls",
+        "contactsViewController",
+        "callsPlaceholderView",
+        "settingsProfileButton",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: four-section navigation contract is missing `%s`" %
+                          (controller_rel, fragment))
+
+    contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
+    contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    cells_header_rel = os.path.join("Sources", "UI", "TGStatusViewCells.h")
+    cells_header_text = read_text(os.path.join(ROOT, cells_header_rel))
+    cells_impl_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    cells_impl_text = read_text(os.path.join(ROOT, cells_impl_rel))
+    for fragment in [
+        "contactSummariesWithTimeout:",
+        "privateChatIDForUserID:",
+        "userProfileSummaryForUserID:",
+        "applySearchFilter",
+        "loadSelectedContactProfile",
+        "TGContactProfileView",
+        "TGDrawAvatarInRect",
+        "contactsViewControllerDidRequestNewConversation:",
+    ]:
+        if fragment not in contacts_text:
+            errors.append("%s: contacts section is missing `%s`" %
+                          (contacts_rel, fragment))
+    for fragment in [
+        "TGRepresentedObjectCell",
+        "representedObject",
+    ]:
+        if fragment not in cells_header_text or fragment not in cells_impl_text:
+            errors.append("%s: legacy model-backed table cell is missing `%s`" %
+                          (cells_impl_rel, fragment))
+    if "@interface TGContactRowCell : TGRepresentedObjectCell" not in contacts_text:
+        errors.append("%s: contact rows must preserve dictionary models on legacy AppKit" %
+                      contacts_rel)
+
+    button_cells_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
+    button_cells_text = read_text(os.path.join(ROOT, button_cells_rel))
+    for asset_name in ["call-receive", "settings"]:
+        asset_rel = os.path.join("Sources", "Resources", "Icons", asset_name + ".png")
+        if not os.path.isfile(os.path.join(ROOT, asset_rel)):
+            errors.append("%s: approved navigation icon asset is missing" % asset_rel)
+        expected_draw = 'TGDrawTemplateIconAsset(@"%s"' % asset_name
+        if expected_draw not in button_cells_text:
+            errors.append("%s: navigation must render approved asset `%s`" %
+                          (button_cells_rel, asset_name))
+
+    navigation_draw_start = button_cells_text.find("static void TGDrawNavigationIcon")
+    navigation_draw_end = button_cells_text.find("@implementation TGNavigationButtonCell")
+    navigation_draw_text = button_cells_text[navigation_draw_start:navigation_draw_end]
+    if "NSBezierPath *receiver" in navigation_draw_text:
+        errors.append("%s: call navigation icon must not be hand-drawn" % button_cells_rel)
+    if "CGFloat iconSize = 18.0;" not in button_cells_text:
+        errors.append("%s: primary navigation icons must keep the compact 18-point size" %
+                      button_cells_rel)
+    if "TGPrimaryTextButtonCell *openCell" not in contacts_text:
+        errors.append("%s: open-chat action must use the themed primary text-button cell" %
+                      contacts_rel)
+    if 'TGDrawTemplateIconAsset(@"route-arrow"' not in button_cells_text:
+        errors.append("%s: drawer back state must use the approved route-arrow asset" %
+                      button_cells_rel)
+    if "profileBackButton" in controller_text:
+        errors.append("%s: profile must reuse the drawer button back state, not add a separate text button" %
+                      controller_rel)
+
+    section_layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    section_layout_text = read_text(os.path.join(ROOT, section_layout_rel))
+    for fragment in [
+        "drawerFolderScrollView",
+        "drawerFolderContentView",
+        "drawerFolderButtonHeight = 46.0",
+        "drawerFolderRequiredHeight",
+        "drawerTopInset = 8.0",
+    ]:
+        if fragment not in controller_text and fragment not in section_layout_text:
+            errors.append("%s: scrollable top-aligned drawer is missing `%s`" %
+                          (section_layout_rel, fragment))
+    if "drawerFolderButtonHeight = floor" in section_layout_text:
+        errors.append("%s: drawer folder rows must scroll instead of shrinking with the window" %
+                      section_layout_rel)
+    if "NSWidth([self.drawerFolderScrollView contentSize])" in section_layout_text:
+        errors.append("%s: NSWidth requires NSRect; use the scroll contentView bounds on legacy AppKit" %
+                      section_layout_rel)
+    for fragment in [
+        "minimumChatSidebarWidth",
+        "standardChatSidebarWidth",
+        "maximumChatSidebarWidthForWindowWidth",
+        "sidebarResizeHandleDidRequestToggle",
+        "compactChatSidebar",
+        "return (width < 248.0)",
+        "[self.drawerButton setFrame:NSMakeRect(mainX + 12.0",
+        "CGFloat initialWidth = [handle initialDragWidth]",
+        "clampedWidth = (naturalWidth < standardWidth) ? minimumWidth : naturalWidth",
+    ]:
+        if fragment not in section_layout_text:
+            errors.append("%s: flexible chat sidebar is missing `%s`" %
+                          (section_layout_rel, fragment))
+    components_header_rel = os.path.join("Sources", "UI", "TGStatusViewComponents.h")
+    components_header_text = read_text(os.path.join(ROOT, components_header_rel))
+    if "TGSidebarResizeHandleView" not in components_header_text:
+        errors.append("%s: chat sidebar resize handle is missing" % components_header_rel)
+    if "- (CGFloat)initialDragWidth;" not in components_header_text:
+        errors.append("%s: sidebar snap resizing needs the drag's initial width" % components_header_rel)
+    components_impl_rel = os.path.join("Sources", "UI", "TGStatusViewComponents.m")
+    components_impl_text = read_text(os.path.join(ROOT, components_impl_rel))
+    for fragment in [
+        "NSTrackingMouseEnteredAndExited",
+        "[[NSCursor resizeLeftRightCursor] set]",
+        "- (void)mouseUp:(NSEvent *)event",
+    ]:
+        if fragment not in components_impl_text:
+            errors.append("%s: resize handle cursor tracking is missing `%s`" %
+                          (components_impl_rel, fragment))
+
+    chat_search_panel_rel = os.path.join("Sources", "UI", "TGChatSearchPanelView.inc")
+    chat_search_panel_text = read_text(os.path.join(ROOT, chat_search_panel_rel))
+    if '[_searchField setAction:@selector(commitSearch:)]' in chat_search_panel_text:
+        errors.append("%s: typing in NSSearchField must not auto-commit the first result" %
+                      chat_search_panel_rel)
+    for fragment in [
+        "[_tableView setAction:@selector(commitSearch:)]",
+        "commandSelector == @selector(moveDown:)",
+        "commandSelector == @selector(moveUp:)",
+        "[_tableView deselectAll:self]",
+        "[TGClassicSelectedRowColor() set]",
+    ]:
+        if fragment not in chat_search_panel_text:
+            errors.append("%s: explicit chat-search selection is missing `%s`" %
+                          (chat_search_panel_rel, fragment))
+    chat_search_window_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatSearchWindow.inc")
+    chat_search_window_text = read_text(os.path.join(ROOT, chat_search_window_rel))
+    if "result = [self.chatSearchWindowResults objectAtIndex:0]" in chat_search_window_text:
+        errors.append("%s: chat search must not navigate to the first result without a selection" %
+                      chat_search_window_rel)
+
+    lifecycle_rel = os.path.join("Sources", "UI", "TGChatLifecycleWindowController.m")
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    for fragment in [
+        "TGChatLifecycleContactCell",
+        "@interface TGChatLifecycleContactCell : TGRepresentedObjectCell",
+        "TGDrawAvatarInRect",
+        "TGGroupedCardView *contactsCard",
+        "TGPrimaryTextButtonCell",
+        "TGSecondaryTextButtonCell",
+    ]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: polished new-chat window is missing `%s`" %
+                          (lifecycle_rel, fragment))
+
+    chat_cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    chat_cells_text = read_text(os.path.join(ROOT, chat_cells_rel))
+    if 'TGDrawTemplateIconAsset(@"sound-off"' not in chat_cells_text:
+        errors.append("%s: muted chats need the approved sound-off icon" % chat_cells_rel)
+    if 'TGLoc(@"chat.notifications.mutedBadge")' in chat_cells_text:
+        errors.append("%s: muted chats must not replace the sound-off icon with text" % chat_cells_rel)
+    if "BOOL compact = (NSWidth(cellFrame) < 223.0)" not in chat_cells_text:
+        errors.append("%s: chat rows must switch to compact rendering with the sidebar shell" % chat_cells_rel)
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        "getScopeNotificationSettings",
+        "use_default_mute_for",
+        "updateScopeNotificationSettings",
+        "last_read_inbox_message_id",
+        "aroundMessageID:",
+        "offset:-safeNewerCount",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: server notification scope sync is missing `%s`" %
+                          (client_rel, fragment))
+    message_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    message_flow_text = read_text(os.path.join(ROOT, message_flow_rel))
+    for fragment in [
+        "scrollMessagesToInitialUnreadIfAvailable",
+        "visibleUnreadMessageItemsAwaitingReceipt",
+        "markVisibleMessageItemsReadForChatID",
+        "!shouldLoadUnreadBoundary",
+    ]:
+        if fragment not in message_flow_text:
+            errors.append("%s: viewport-based unread handling is missing `%s`" %
+                          (message_flow_rel, fragment))
+    if "scheduleMessageItemsReadForChatID" in message_flow_text:
+        errors.append("%s: loading a chat must not mark the whole fetched history as read" %
+                      message_flow_rel)
+
+    message_hit_testing_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
+    message_hit_testing_text = read_text(os.path.join(ROOT, message_hit_testing_rel))
+    message_menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    message_menus_text = read_text(os.path.join(ROOT, message_menus_rel))
+    table_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    table_flow_text = read_text(os.path.join(ROOT, table_flow_rel))
+    for fragment in [
+        "TGMessageItemIsNonVisualDocument",
+        "openDocumentAttachmentForMessageItem",
+    ]:
+        if fragment not in message_hit_testing_text:
+            errors.append("%s: document bubble interaction is missing `%s`" %
+                          (message_hit_testing_rel, fragment))
+    for fragment in [
+        "openMessageDocumentFromMenu",
+        "saveMessageDocumentAsFromMenu",
+        "revealMessageDocumentFromMenu",
+    ]:
+        if fragment not in message_menus_text:
+            errors.append("%s: direct document action is missing `%s`" %
+                          (message_menus_rel, fragment))
+    if "TGMessageItemIsNonVisualDocument" not in table_flow_text:
+        errors.append("%s: document bubbles must expose an action tooltip" % table_flow_rel)
+
+    contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
+    contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    client_header_rel = os.path.join("Sources", "Core", "TGTDLibClient.h")
+    client_header_text = read_text(os.path.join(ROOT, client_header_rel))
+    dialogs_rel = os.path.join("Sources", "UI", "TGContactManagementDialogs.m")
+    dialogs_text = read_text(os.path.join(ROOT, dialogs_rel))
+    for fragment in [
+        "addContactWithPhoneNumber",
+        "removeContactWithUserID",
+    ]:
+        if fragment not in client_header_text:
+            errors.append("%s: contact management API is missing `%s`" %
+                          (client_header_rel, fragment))
+    for fragment in [
+        "showCreateMenu",
+        "showSelectedContactActions",
+        "sendSelectedContact",
+        "removeSelectedContact",
+        "inviteSelectedContact",
+    ]:
+        if fragment not in contacts_text:
+            errors.append("%s: contact management action is missing `%s`" %
+                          (contacts_rel, fragment))
+    if "contactToAdd" not in dialogs_text or "confirmRemovalOfContactNamed" not in dialogs_text:
+        errors.append("%s: add/remove confirmation dialogs are incomplete" % dialogs_rel)
+
+    profile_editor_rel = os.path.join("Sources", "UI", "TGProfileEditWindowController.m")
+    profile_editor_text = read_text(os.path.join(ROOT, profile_editor_rel))
+    utility_windows_rel = os.path.join("Sources", "UI", "TGStatusWindowController+UtilityWindows.inc")
+    utility_windows_text = read_text(os.path.join(ROOT, utility_windows_rel))
+    message_data_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    message_data_flow_text = read_text(os.path.join(ROOT, message_data_flow_rel))
+    tdlib_client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    tdlib_client_text = read_text(os.path.join(ROOT, tdlib_client_rel))
+    for fragment in [
+        "setName",
+        "setUsername",
+        "setBio",
+        "setProfilePhoto",
+        "inputChatPhotoStatic",
+        "inputFileLocal",
+        "updateCurrentUserFirstName",
+        "setCurrentUserProfilePhotoAtPath",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: profile editing TDLib request is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "TGProfileEditWindowController",
+        "TGPrimaryTextButtonCell",
+        "profile.edit.firstNameRequired",
+        "profile.edit.photo.choose",
+        "TGPreparedProfilePhotoPath",
+        "didRequestSetPhotoAtPath",
+    ]:
+        if fragment not in profile_editor_text:
+            errors.append("%s: profile editor is missing `%s`" %
+                          (profile_editor_rel, fragment))
+    for fragment in [
+        "showProfileEditWindow:",
+        "didRequestSaveFirstName:",
+        "didRequestSetPhotoAtPath:",
+        "reloadProfileSummaryIfReady",
+        "[NSApp activateIgnoringOtherApps:YES]",
+        'log:@"Profile editor presented."',
+    ]:
+        if fragment not in utility_windows_text:
+            errors.append("%s: profile editor wiring is missing `%s`" %
+                          (utility_windows_rel, fragment))
+    profile_button_cell_index = controller_text.find(
+        "[self.profileEditButton setCell:")
+    profile_button_action_index = controller_text.find(
+        "[self.profileEditButton setAction:@selector(showProfileEditWindow:)]")
+    if profile_button_cell_index < 0 or profile_button_action_index < 0:
+        errors.append("%s: profile edit button wiring is incomplete" % controller_rel)
+    elif profile_button_action_index < profile_button_cell_index:
+        errors.append("%s: profile edit button cell replacement must happen before target/action wiring" %
+                      controller_rel)
+    authorization_probe_index = message_data_flow_text.find(
+        "authorizationState = [client authorizationStateSummaryWithTimeout:")
+    network_diagnostics_index = message_data_flow_text.find(
+        "networkDiagnosticsSummary = [client networkDiagnosticsSummaryWithTimeout:")
+    if authorization_probe_index < 0 or network_diagnostics_index < 0:
+        errors.append("%s: TDLib bootstrap diagnostics contract is incomplete" %
+                      message_data_flow_rel)
+    elif network_diagnostics_index < authorization_probe_index:
+        errors.append("%s: network diagnostics must not block the initial authorization-state probe" %
+                      message_data_flow_rel)
+    for fragment in [
+        "parametersErrorCode",
+        "login.keychain.title",
+        "login.keychain.required",
+    ]:
+        if fragment not in message_data_flow_text:
+            errors.append("%s: Keychain bootstrap failure UI is missing `%s`" %
+                          (message_data_flow_rel, fragment))
+    if "mainThreadError = [keychainError retain]" not in tdlib_client_text:
+        errors.append("%s: the Mavericks MRC Keychain error must survive the main-thread handoff" %
+                      tdlib_client_rel)
+    for fragment in [
+        "profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth",
+        "profileGroupedWidth - 44.0",
+        "[self showView:self.profileEditButton visible:showProfile];",
+    ]:
+        if fragment not in section_layout_text:
+            errors.append("%s: safe profile action layout is missing `%s`" %
+                          (section_layout_rel, fragment))
+    for fragment in [
+        "supportsMessageViewers",
+        '[messageViewersChatType isEqualToString:@"Group"]',
+        '[messageViewersChatType isEqualToString:@"Supergroup"]',
+        "if ([item outgoing] && supportsMessageViewers)",
+    ]:
+        if fragment not in message_menus_text:
+            errors.append("%s: message viewers visibility contract is missing `%s`" %
+                          (message_menus_rel, fragment))
+
+    calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
+    calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
+    calls_header_text = read_text(os.path.join(ROOT, calls_header_rel))
+    calls_implementation_text = read_text(os.path.join(ROOT, calls_implementation_rel))
+    if "TGCallsPlaceholderView : TGPanelView" not in calls_header_text:
+        errors.append("%s: calls must use the shared panel/header shell" % calls_header_rel)
+    if "NSHeight(bounds) - 68.0" not in calls_implementation_text:
+        errors.append("%s: calls card must fill the panel body" % calls_implementation_rel)
+
+
+def check_retro_console_contract(errors):
+    module_rel = os.path.join("WorkshopModules", "RetroConsole")
+    controller_rel = os.path.join(module_rel, "TGRetroConsoleViewController.m")
+    display_rel = os.path.join(module_rel, "TGRetroDisplayView.m")
+    core_rel = os.path.join(module_rel, "TGRetroLibretroCore.m")
+    build_rel = os.path.join("WorkshopModules", "scripts", "build_modules.sh")
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    display_text = read_text(os.path.join(ROOT, display_rel))
+    core_text = read_text(os.path.join(ROOT, core_rel))
+    build_text = read_text(os.path.join(ROOT, build_rel))
+    for fragment in [
+        u"Вставить картридж",
+        "setAllowedFileTypes:",
+        "quicknes_libretro",
+        "genesis_plus_gx_libretro",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: retro cartridge flow is missing `%s`" %
+                          (controller_rel, fragment))
+    for fragment in ["NSFilenamesPboardType", "performDragOperation:", "keyDown:", "keyUp:"]:
+        if fragment not in display_text:
+            errors.append("%s: retro drag/drop or keyboard input is missing `%s`" %
+                          (display_rel, fragment))
+    for fragment in ["dlopen", "retro_load_game", "AudioOutputUnitStart", "renderAudioFrames:"]:
+        if fragment not in core_text:
+            errors.append("%s: retro runtime is missing `%s`" % (core_rel, fragment))
+    for fragment in ["QUICKNES_CORE_PATH", "GENESIS_PLUS_GX_CORE_PATH", 'build_module "RetroConsole"']:
+        if fragment not in build_text:
+            errors.append("%s: retro core packaging is missing `%s`" % (build_rel, fragment))
+
+    forbidden_extensions = (".nes", ".smd", ".gen", ".sms", ".gg", ".sg")
+    for directory, _, filenames in os.walk(os.path.join(ROOT, module_rel)):
+        for filename in filenames:
+            if filename.lower().endswith(forbidden_extensions):
+                errors.append("%s: game images must never be bundled" %
+                              os.path.relpath(os.path.join(directory, filename), ROOT))
+
+
+def check_chat_archive_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    data_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    lifecycle_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatLifecycle.inc")
+    buttons_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    data_flow_text = read_text(os.path.join(ROOT, data_flow_rel))
+    menus_text = read_text(os.path.join(ROOT, menus_rel))
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    buttons_text = read_text(os.path.join(ROOT, buttons_rel))
+
+    for fragment in [
+        '"addChatToList"',
+        '"chatListArchive"',
+        "archivedChatPreviewItemsWithLimit:",
+        "archivedChatIDsWithLimit:",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: chat archive TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "showingArchivedChats",
+        'TGLoc(@"drawer.archive")',
+        "[NSNumber numberWithInteger:-2]",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: archive drawer state is missing `%s`" %
+                          (controller_rel, fragment))
+    if "loadingArchivedChats != self.showingArchivedChats" not in data_flow_text:
+        errors.append("%s: archive loads must reject stale list results" % data_flow_rel)
+    if 'TGTemplateIconAssetImage(@"archive"' not in menus_text:
+        errors.append("%s: archive menu must reuse the existing archive icon asset" % menus_rel)
+    if "toggleChatArchivedFromMenu:" not in lifecycle_text:
+        errors.append("%s: archive action wiring is missing" % lifecycle_rel)
+    if 'TGDrawTemplateIconAsset(@"archive"' not in buttons_text:
+        errors.append("%s: archive drawer must reuse the existing archive icon asset" % buttons_rel)
+    archive_icon = os.path.join(ROOT, "Sources", "Resources", "Icons", "archive.png")
+    if not os.path.isfile(archive_icon):
+        errors.append("Sources/Resources/Icons/archive.png: required existing archive icon is missing")
+
+
+def check_chat_folder_management_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatFolders.m")
+    controller_rel = os.path.join("Sources", "UI", "TGChatFolderManagementWindowController.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatFolders.inc")
+    status_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    status_text = read_text(os.path.join(ROOT, status_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+
+    for fragment in [
+        '"createChatFolder"',
+        '"editChatFolder"',
+        '"deleteChatFolder"',
+        '"createChatFilter"',
+        '"editChatFilter"',
+        '"deleteChatFilter"',
+        '"getChatFolderInviteLinks"',
+        '"createChatFolderInviteLink"',
+        '"mountain-lion"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: unified chat-folder TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        'assetName:@"folder-add"',
+        'assetName:@"folder-remove"',
+        'assetName:@"folder-share"',
+        "definitionHasInclusionRule:",
+        "setObjectValue:",
+        "shareLinkForChatFolderID:",
+        "TGChatFolderListCell",
+        "@interface TGChatFolderListCell : TGRepresentedObjectCell",
+        "@interface TGChatFolderChatCell : TGRepresentedObjectCell",
+        "[self representedObject]",
+        "TGDrawAvatarInRect",
+        'TGDrawTemplateIconAsset(@"folder"',
+        "setReleasedWhenClosed:NO",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: chat-folder management UI is missing `%s`" %
+                          (controller_rel, fragment))
+    for fragment in [
+        "showChatFolderManagementWindow:",
+        "chatFolderManagementWindowControllerDidChangeFolders:",
+        "reloadChatFiltersIfReady",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: chat-folder host wiring is missing `%s`" %
+                          (host_rel, fragment))
+    for fragment in [
+        "settingsFoldersCardView",
+        "settingsFoldersSectionField",
+        'TGLoc(@"settings.section.folders")',
+        'setIconName:@"folder"',
+    ]:
+        if fragment not in status_text:
+            errors.append("%s: dedicated settings folder section is missing `%s`" %
+                          (status_rel, fragment))
+    for fragment in [
+        "foldersCardHeight",
+        "[self.settingsChatFoldersButton setFrame:",
+        "[self showView:self.settingsFoldersCardView visible:showSettings]",
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: settings folder section layout is missing `%s`" %
+                          (layout_rel, fragment))
+    for icon_name in ["folder-add.png", "folder-remove.png", "folder-share.png"]:
+        icon_path = os.path.join(ROOT, "Sources", "Resources", "Icons", icon_name)
+        if not os.path.isfile(icon_path):
+            errors.append("Sources/Resources/Icons/%s: required existing icon is missing" %
+                          icon_name)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -316,6 +1081,14 @@ def main():
     check_workshop_installed_presentation(errors)
     check_unified_legacy_contract(errors)
     check_no_local_runtime_data(errors)
+    check_conversation_creation_contract(errors)
+    check_composer_formatting_contract(errors)
+    check_additional_message_types_contract(errors)
+    check_media_file_management_contract(errors)
+    check_primary_navigation_contract(errors)
+    check_retro_console_contract(errors)
+    check_chat_archive_contract(errors)
+    check_chat_folder_management_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

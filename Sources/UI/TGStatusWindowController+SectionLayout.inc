@@ -65,11 +65,18 @@
     }
     BOOL showLogin = !ready;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
+    CGFloat currentSidebarWidth = NSWidth([self.sidebarPanelView frame]);
+    if (currentSidebarWidth <= 0.0) {
+        currentSidebarWidth = self.chatSidebarPreferredWidth;
+    }
+    BOOL compactChatSidebar = [self isChatSidebarCompactForWidth:currentSidebarWidth];
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
     [self showView:self.topPanelView visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.accountBadgeView visible:(ready && !drawerHidden && self.drawerOpen)];
-    [self showView:self.bottomNavigationView visible:ready];
+    [self showView:self.drawerFolderScrollView visible:(ready && !drawerHidden && self.drawerOpen)];
+    [self showView:self.bottomNavigationView visible:(ready && !compactChatSidebar)];
 
     [self showView:self.loginPanelView visible:showLogin];
     [self showView:self.loginIconView visible:showLogin];
@@ -92,18 +99,31 @@
         [self showView:[self.loginLanguageButtons objectAtIndex:loginLanguageIndex] visible:showLogin];
     }
 
+    BOOL showContacts = (ready && [section isEqualToString:TGSectionContacts]);
+    BOOL showCalls = (ready && [section isEqualToString:TGSectionCalls]);
+    [self showView:[self.contactsViewController view] visible:showContacts];
+    [self showView:self.callsPlaceholderView visible:showCalls];
+
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
                                  [self.workshopViewController hasActiveModule]);
-    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive)];
+    TGDrawerButtonCell *drawerCell = [[self.drawerButton cell] isKindOfClass:[TGDrawerButtonCell class]]
+        ? (TGDrawerButtonCell *)[self.drawerButton cell] : nil;
+    [drawerCell setBackStyle:showProfile];
+    [self.drawerButton setAction:(showProfile ? @selector(returnFromProfileToSettings:) : @selector(toggleDrawer:))];
+    [self.drawerButton setToolTip:(showProfile ? TGLoc(@"back") : @"Chat folders")];
+    [self.drawerButton setNeedsDisplay:YES];
+    [self showView:self.drawerButton visible:(ready && !workshopModuleActive && (showProfile || !drawerHidden || (showChats && compactChatSidebar)))];
     [self showView:self.workshopDrawerButton visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.sidebarPanelView visible:showChats];
+    [self showView:self.sidebarResizeHandleView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
-    [self showView:self.chatsLabel visible:showChats];
-    [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList)];
-    [self showView:self.loadChatsButton visible:showChats];
+    [self showView:self.chatsLabel visible:(showChats && !compactChatSidebar)];
+    [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList && !compactChatSidebar)];
+    [self showView:self.loadChatsButton visible:(showChats && !compactChatSidebar)];
     [self showView:self.loadMoreChatsButton visible:NO];
-    [self showView:self.chatSearchButton visible:showChats];
+    [self showView:self.chatSearchButton visible:(showChats && !compactChatSidebar)];
+    [self showView:self.composeChatButton visible:(showChats && !compactChatSidebar)];
     [self showView:self.chatScrollSurfaceView visible:showChats];
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
@@ -176,8 +196,14 @@
     [self showView:self.sendTextFieldBackgroundView visible:showConversationContent];
     [self showView:self.sendTextField visible:showConversationContent];
     [self showView:self.sendMessageButton visible:showConversationContent];
+    BOOL showBotComposer = (showConversationContent && self.botComposerVisible);
+    [self showView:self.botActionButton visible:showBotComposer];
+    if (!showConversationContent && self.botCommandPanelVisible) {
+        [self setBotCommandPanelVisible:NO animated:NO];
+    } else {
+        [self showView:self.botCommandPanelView visible:(showConversationContent && self.botCommandPanelVisible)];
+    }
 
-    BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
     BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
@@ -207,12 +233,20 @@
     [self showView:self.profileDetailsSeparatorOne visible:(showProfileDetails && profileDetailRows > 1)];
     [self showView:self.profileDetailsSeparatorTwo visible:(showProfileDetails && profileDetailRows > 2)];
     [self showView:self.profileRefreshButton visible:NO];
+    [self showView:self.profileEditButton visible:showProfile];
     [self showView:self.logoutButton visible:showProfile];
 
     BOOL showSettings = (ready && [section isEqualToString:TGSectionSettings]);
     [self showView:self.settingsPanelView visible:showSettings];
     [self showView:self.settingsScrollView visible:showSettings];
+    [self showView:self.settingsProfileCardView visible:showSettings];
+    [self showView:self.settingsProfileSectionField visible:showSettings];
+    [self showView:self.settingsProfileDetailField visible:showSettings];
+    [self showView:self.settingsProfileButton visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
+    [self showView:self.settingsFoldersCardView visible:showSettings];
+    [self showView:self.settingsSavedCardView visible:showSettings];
+    [self showView:self.settingsPrivacyCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
     [self showView:self.settingsResourceCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
@@ -221,6 +255,9 @@
     [self showView:self.settingsSessionCardView visible:showSettings];
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
+    [self showView:self.settingsFoldersSectionField visible:showSettings];
+    [self showView:self.settingsSavedSectionField visible:showSettings];
+    [self showView:self.settingsPrivacySectionField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
     [self showView:self.settingsResourceSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
@@ -236,8 +273,12 @@
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
     [self showView:self.settingsNotificationPreviewButton visible:showSettings];
     [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
+    [self showView:self.settingsNotificationExceptionsButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
+    [self showView:self.settingsChatFoldersButton visible:showSettings];
+    [self showView:self.settingsSavedMessagesButton visible:showSettings];
+    [self showView:self.settingsPrivacyButton visible:showSettings];
     [self showView:self.settingsEconomyModeButton visible:showSettings];
     [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
@@ -262,6 +303,7 @@
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsStorageUsageButton visible:showSettings];
+    [self showView:self.settingsDownloadManagerButton visible:showSettings];
     [self showView:self.settingsDeleteLocalDataButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsUpdateDotView visible:(showSettings && self.updateAvailable)];
@@ -332,6 +374,66 @@
     return height;
 }
 
+- (CGFloat)minimumChatSidebarWidth {
+    return 78.0;
+}
+
+- (CGFloat)standardChatSidebarWidth {
+    return 292.0;
+}
+
+- (CGFloat)maximumChatSidebarWidthForWindowWidth:(CGFloat)windowWidth mainX:(CGFloat)mainX margin:(CGFloat)margin {
+    CGFloat available = windowWidth - mainX - margin - 320.0 - 10.0;
+    return MAX([self minimumChatSidebarWidth], MIN(420.0, available));
+}
+
+- (BOOL)isChatSidebarCompactForWidth:(CGFloat)width {
+    return (width < 248.0);
+}
+
+- (CGFloat)sidebarResizeHandleCurrentWidth:(TGSidebarResizeHandleView *)handle {
+    (void)handle;
+    return NSWidth([self.sidebarPanelView frame]);
+}
+
+- (void)sidebarResizeHandle:(TGSidebarResizeHandleView *)handle requestedWidth:(CGFloat)width {
+    NSView *contentView = [[self window] contentView];
+    CGFloat margin = 10.0;
+    BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    CGFloat mainX = (!drawerHidden && self.drawerOpen) ? 128.0 : margin;
+    CGFloat minimumWidth = [self minimumChatSidebarWidth];
+    CGFloat maximumWidth = [self maximumChatSidebarWidthForWindowWidth:NSWidth([contentView bounds])
+                                                                  mainX:mainX
+                                                                 margin:margin];
+    CGFloat standardWidth = MIN([self standardChatSidebarWidth], maximumWidth);
+    CGFloat initialWidth = [handle initialDragWidth];
+    CGFloat dragDelta = width - initialWidth;
+    CGFloat clampedWidth = minimumWidth;
+    if (initialWidth < standardWidth - 0.5) {
+        if (dragDelta > 0.0) {
+            clampedWidth = MIN(maximumWidth, standardWidth + MAX(0.0, dragDelta - 8.0));
+        }
+    } else {
+        CGFloat naturalWidth = MAX(minimumWidth, MIN(maximumWidth, width));
+        clampedWidth = (naturalWidth < standardWidth) ? minimumWidth : naturalWidth;
+    }
+    self.chatSidebarPreferredWidth = clampedWidth;
+    [[NSUserDefaults standardUserDefaults] setDouble:clampedWidth forKey:TGChatSidebarWidthDefaultsKey];
+    [self layoutContentView];
+    [self updateVisibleSection];
+}
+
+- (void)sidebarResizeHandleDidRequestToggle:(TGSidebarResizeHandleView *)handle {
+    (void)handle;
+    CGFloat currentWidth = NSWidth([self.sidebarPanelView frame]);
+    self.chatSidebarPreferredWidth = [self isChatSidebarCompactForWidth:currentWidth]
+        ? [self standardChatSidebarWidth]
+        : [self minimumChatSidebarWidth];
+    [[NSUserDefaults standardUserDefaults] setDouble:self.chatSidebarPreferredWidth forKey:TGChatSidebarWidthDefaultsKey];
+    [self layoutContentView];
+    [self updateVisibleSection];
+}
+
 - (void)layoutContentView {
     NSView *contentView = [[self window] contentView];
     NSRect bounds = [contentView bounds];
@@ -339,6 +441,7 @@
     CGFloat height = NSHeight(bounds);
     CGFloat margin = 10.0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL profileActive = [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionProfile];
     BOOL drawerVisible = (!drawerHidden && self.drawerOpen);
     BOOL drawerConsumesLayout = drawerVisible;
     CGFloat railGutter = (!drawerHidden && self.drawerOpen) ? 10.0 : 0.0;
@@ -353,7 +456,7 @@
     CGFloat mainWidth = width - mainX - margin;
     CGFloat mainHeight = railHeight;
     CGFloat mainTop = mainY + mainHeight;
-    CGFloat sidebarWidth = 292.0;
+    CGFloat sidebarWidth = self.chatSidebarPreferredWidth > 0.0 ? self.chatSidebarPreferredWidth : 292.0;
 
     if (railHeight < 520.0) {
         railHeight = 520.0;
@@ -361,19 +464,17 @@
         mainHeight = railHeight;
         mainTop = mainY + mainHeight;
     }
-    if (width < 900.0) {
-        sidebarWidth = 248.0;
-    } else if (width < 1040.0) {
-        sidebarWidth = 272.0;
-    }
+    sidebarWidth = MAX([self minimumChatSidebarWidth],
+                       MIN([self maximumChatSidebarWidthForWindowWidth:width mainX:mainX margin:margin],
+                           sidebarWidth));
 
     CGFloat conversationX = mainX + sidebarWidth + panelGutter;
     CGFloat conversationWidth = width - conversationX - margin;
     if (conversationWidth < 320.0) {
         CGFloat reduction = 320.0 - conversationWidth;
         sidebarWidth -= reduction;
-        if (sidebarWidth < 220.0) {
-            sidebarWidth = 220.0;
+        if (sidebarWidth < [self minimumChatSidebarWidth]) {
+            sidebarWidth = [self minimumChatSidebarWidth];
         }
         conversationX = mainX + sidebarWidth + panelGutter;
         conversationWidth = width - conversationX - margin;
@@ -384,11 +485,20 @@
 
     [self.topPanelView setFrame:NSMakeRect(railX, railY, railWidth, railHeight)];
     [self.sidebarPanelView setFrame:NSMakeRect(mainX, mainY, sidebarWidth, mainHeight)];
+    [self.sidebarResizeHandleView setFrame:NSMakeRect(mainX + sidebarWidth, mainY, panelGutter, mainHeight)];
     [self.conversationPanelView setFrame:NSMakeRect(conversationX, mainY, conversationWidth, mainHeight)];
     [self.diagnosticsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.profilePanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.settingsPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
     [self.aboutPanelView setFrame:NSMakeRect(mainX, mainY, mainWidth, mainHeight)];
+    [[self.contactsViewController view] setFrame:NSMakeRect(mainX,
+                                                            mainY + 80.0,
+                                                            mainWidth,
+                                                            MAX(220.0, mainHeight - 80.0))];
+    [self.callsPlaceholderView setFrame:NSMakeRect(mainX,
+                                                   mainY + 80.0,
+                                                   mainWidth,
+                                                   MAX(220.0, mainHeight - 80.0))];
     [[self.workshopViewController view] setFrame:NSMakeRect(mainX,
                                                             mainY + 72.0,
                                                             mainWidth,
@@ -401,11 +511,17 @@
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
     }
+    CGFloat drawerTopInset = 8.0;
+    CGFloat drawerItemGap = 8.0;
+    CGFloat workshopHeight = 46.0;
+    CGFloat accountHeight = 54.0;
+    CGFloat workshopY = railTop - drawerTopInset - workshopHeight;
+    CGFloat accountY = workshopY - drawerItemGap - accountHeight;
     [self.workshopDrawerButton setFrame:NSMakeRect(railX + 8.0,
-                                                   railTop - 112.0,
+                                                   workshopY,
                                                    railWidth - 16.0,
-                                                   46.0)];
-    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, railTop - 176.0, accountBadgeWidth, 54.0)];
+                                                   workshopHeight)];
+    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, accountY, accountBadgeWidth, accountHeight)];
     if (drawerVisible) {
         [contentView addSubview:self.accountBadgeView positioned:NSWindowAbove relativeTo:nil];
     }
@@ -418,70 +534,78 @@
 
     CGFloat drawerFolderButtonHeight = 46.0;
     CGFloat drawerFolderButtonGap = 8.0;
-    CGFloat drawerFolderButtonY = railTop - 238.0;
-    CGFloat drawerFolderAvailableHeight = drawerFolderButtonY - railY - 8.0;
+    CGFloat drawerFolderInset = 4.0;
+    CGFloat drawerFolderScrollTop = accountY - drawerItemGap;
+    CGFloat drawerFolderScrollBottom = railY + 8.0;
+    CGFloat drawerFolderScrollHeight = MAX(44.0, drawerFolderScrollTop - drawerFolderScrollBottom);
+    [self.drawerFolderScrollView setFrame:NSMakeRect(railX + 4.0,
+                                                     drawerFolderScrollBottom,
+                                                     MAX(44.0, railWidth - 8.0),
+                                                     drawerFolderScrollHeight)];
+    CGFloat drawerFolderContentWidth = MAX(44.0, NSWidth([[self.drawerFolderScrollView contentView] bounds]));
+    CGFloat drawerFolderRequiredHeight = (drawerFolderInset * 2.0);
     if ([self.drawerFolderButtons count] > 0) {
-        CGFloat requiredHeight = ([self.drawerFolderButtons count] * drawerFolderButtonHeight) +
-                                 (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap);
-        if (requiredHeight > drawerFolderAvailableHeight) {
-            drawerFolderButtonGap = 4.0;
-            drawerFolderButtonHeight = floor((drawerFolderAvailableHeight -
-                                              (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap)) /
-                                             [self.drawerFolderButtons count]);
-            if (drawerFolderButtonHeight < 32.0) {
-                drawerFolderButtonHeight = 32.0;
-            }
-        }
+        drawerFolderRequiredHeight += ([self.drawerFolderButtons count] * drawerFolderButtonHeight) +
+                                      (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap);
     }
+    CGFloat drawerFolderContentHeight = MAX(drawerFolderScrollHeight, drawerFolderRequiredHeight);
+    [self.drawerFolderContentView setFrame:NSMakeRect(0.0,
+                                                      0.0,
+                                                      drawerFolderContentWidth,
+                                                      drawerFolderContentHeight)];
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.drawerFolderButtons count]; navigationIndex++) {
         NSButton *folderButton = [self.drawerFolderButtons objectAtIndex:navigationIndex];
-        [folderButton setFrame:NSMakeRect(railX + 8.0, drawerFolderButtonY, railWidth - 16.0, drawerFolderButtonHeight)];
-        if (drawerVisible) {
-            [contentView addSubview:folderButton positioned:NSWindowAbove relativeTo:nil];
-        }
-        drawerFolderButtonY -= (drawerFolderButtonHeight + drawerFolderButtonGap);
+        CGFloat folderButtonY = drawerFolderInset +
+                                (navigationIndex * (drawerFolderButtonHeight + drawerFolderButtonGap));
+        [folderButton setFrame:NSMakeRect(drawerFolderInset,
+                                          folderButtonY,
+                                          MAX(36.0, drawerFolderContentWidth - (drawerFolderInset * 2.0)),
+                                          drawerFolderButtonHeight)];
     }
     if (drawerVisible) {
         [contentView addSubview:self.titleField positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.statusField positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.workshopDrawerButton positioned:NSWindowAbove relativeTo:nil];
+        [contentView addSubview:self.drawerFolderScrollView positioned:NSWindowAbove relativeTo:nil];
     }
 
-    CGFloat bottomNavigationHeight = 62.0;
+    BOOL compactChatSidebar = [self isChatSidebarCompactForWidth:sidebarWidth];
+    CGFloat bottomNavigationHeight = compactChatSidebar ? 0.0 : 62.0;
     CGFloat bottomNavigationX = mainX + 8.0;
     CGFloat bottomNavigationY = mainY + 8.0;
-    CGFloat bottomNavigationWidth = sidebarWidth - 16.0;
-    if (bottomNavigationWidth < 204.0) {
-        bottomNavigationWidth = sidebarWidth - 8.0;
-        bottomNavigationX = mainX + 4.0;
-    }
+    CGFloat bottomNavigationWidth = compactChatSidebar ? 0.0 : (sidebarWidth - 16.0);
     [self.bottomNavigationView setFrame:NSMakeRect(bottomNavigationX,
                                                    bottomNavigationY,
                                                    bottomNavigationWidth,
                                                    bottomNavigationHeight)];
+    [self.bottomNavigationView setHidden:compactChatSidebar];
     CGFloat bottomNavigationInnerX = bottomNavigationX + 8.0;
     CGFloat bottomNavigationButtonGap = 6.0;
     CGFloat bottomNavigationButtonHeight = 48.0;
     CGFloat bottomNavigationButtonY = bottomNavigationY + floor((bottomNavigationHeight - bottomNavigationButtonHeight) / 2.0);
-    CGFloat bottomNavigationButtonWidth = floor((bottomNavigationWidth - 16.0 - (bottomNavigationButtonGap * 2.0)) / 3.0);
-    if (bottomNavigationButtonWidth < 58.0) {
-        bottomNavigationButtonWidth = 58.0;
-    }
+    NSUInteger bottomNavigationButtonCount = MAX((NSUInteger)1, [self.navigationButtons count]);
+    CGFloat bottomNavigationButtonWidth = compactChatSidebar ? 0.0
+        : floor((bottomNavigationWidth - 16.0 -
+                 (bottomNavigationButtonGap * (bottomNavigationButtonCount - 1))) /
+                bottomNavigationButtonCount);
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
         CGFloat buttonX = bottomNavigationInnerX + ((bottomNavigationButtonWidth + bottomNavigationButtonGap) * navigationIndex);
-        [navigationButton setFrame:NSMakeRect(buttonX,
-                                              bottomNavigationButtonY,
-                                              bottomNavigationButtonWidth,
-                                              bottomNavigationButtonHeight)];
-        if (navigationIndex == 0 && self.markAllChatsReadSpinner) {
+        CGFloat effectiveButtonY = bottomNavigationButtonY;
+        [navigationButton setFrame:(compactChatSidebar
+            ? NSZeroRect
+            : NSMakeRect(buttonX, effectiveButtonY, bottomNavigationButtonWidth, bottomNavigationButtonHeight))];
+        if (navigationIndex == 2 && self.markAllChatsReadSpinner) {
             [self.markAllChatsReadSpinner setFrame:NSMakeRect(buttonX + bottomNavigationButtonWidth - 22.0,
-                                                              bottomNavigationButtonY + 6.0,
+                                                              effectiveButtonY + 6.0,
                                                               14.0,
                                                               14.0)];
         }
+    }
+    if (compactChatSidebar && self.markAllChatsReadSpinner) {
+        [self.markAllChatsReadSpinner setFrame:NSZeroRect];
     }
     BOOL readyForMainShell = [self.currentAuthState isEqualToString:@"ready"];
     CGFloat loginAreaX = readyForMainShell ? mainX : margin;
@@ -556,7 +680,7 @@
     CGFloat headerLeftX = mainX + 12.0;
     CGFloat globalHeaderTitleX = mainX + 18.0;
     CGFloat chatHeaderTitleX = mainX + 16.0;
-    if (!drawerHidden) {
+    if (!drawerHidden || profileActive) {
         [self.drawerButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
         [[self.drawerButton superview] addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         headerLeftX += headerButtonSize + 8.0;
@@ -569,15 +693,26 @@
     } else {
         [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
     }
-    [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
-    [self.chatSearchButton setFrame:NSMakeRect(mainX + sidebarWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
-    CGFloat chatHeaderTitleMaxX = NSMinX([self.chatSearchButton frame]) - 8.0;
+    if (compactChatSidebar) {
+        [self.drawerButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
+        [[self.drawerButton superview] addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
+        [self.topicBackButton setFrame:NSZeroRect];
+        [self.loadMoreChatsButton setFrame:NSZeroRect];
+        [self.loadChatsButton setFrame:NSZeroRect];
+        [self.chatSearchButton setFrame:NSZeroRect];
+        [self.composeChatButton setFrame:NSZeroRect];
+    } else {
+        [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+        [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
+        [self.chatSearchButton setFrame:NSMakeRect(mainX + sidebarWidth - 18.0 - (headerButtonSize * 2.0), headerButtonY, headerButtonSize, headerButtonSize)];
+        [self.composeChatButton setFrame:NSMakeRect(mainX + sidebarWidth - 24.0 - (headerButtonSize * 3.0), headerButtonY, headerButtonSize, headerButtonSize)];
+    }
+    CGFloat chatHeaderTitleMaxX = NSMinX([self.composeChatButton frame]) - 8.0;
     CGFloat chatHeaderTitleWidth = chatHeaderTitleMaxX - chatHeaderTitleX;
     if (chatHeaderTitleWidth < 42.0) {
         chatHeaderTitleWidth = 42.0;
     }
-    [self.chatsLabel setFrame:NSMakeRect(chatHeaderTitleX, headerLabelY, chatHeaderTitleWidth, 20.0)];
+    [self.chatsLabel setFrame:(compactChatSidebar ? NSZeroRect : NSMakeRect(chatHeaderTitleX, headerLabelY, chatHeaderTitleWidth, 20.0))];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
     CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
@@ -586,8 +721,8 @@
         chatListHeight = 128.0;
     }
     CGFloat chatListWidth = sidebarWidth - 16.0;
-    if (chatListWidth < 132.0) {
-        chatListWidth = 132.0;
+    if (chatListWidth < 54.0) {
+        chatListWidth = 54.0;
     }
     NSRect chatSurfaceFrame = NSMakeRect(chatListX, chatListBottom, chatListWidth, chatListHeight);
     [self.chatScrollSurfaceView setFrame:chatSurfaceFrame];
@@ -596,8 +731,8 @@
     if (chatColumn) {
         [self.chatScrollView tile];
         CGFloat chatWidth = NSWidth([[self.chatScrollView contentView] bounds]);
-        if (chatWidth < 132.0) {
-            chatWidth = 132.0;
+        if (chatWidth < 48.0) {
+            chatWidth = 48.0;
         }
         [chatColumn setWidth:chatWidth];
     }
@@ -678,6 +813,9 @@
     CGFloat replyPanelHeight = hasReplyPanel ? 46.0 : 0.0;
     CGFloat replyPanelGap = hasReplyPanel ? 6.0 : 0.0;
     CGFloat messageBottom = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    CGFloat botCommandPanelHeight = self.botCommandPanelVisible ? 150.0 : 0.0;
+    CGFloat botCommandPanelGap = self.botCommandPanelVisible ? 6.0 : 0.0;
+    messageBottom += botCommandPanelHeight + botCommandPanelGap;
     if (self.chatNavigationClosed) {
         messageBottom = mainY + 18.0;
     }
@@ -757,10 +895,13 @@
     CGFloat smallComposerButtonWidth = 34.0;
     CGFloat composerButtonGap = 6.0;
     CGFloat attachButtonX = conversationX + 12.0;
+    CGFloat botButtonX = attachButtonX + attachButtonWidth + composerButtonGap;
     CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
     CGFloat voiceButtonX = sendButtonX - composerButtonGap - smallComposerButtonWidth;
     CGFloat stickerButtonX = voiceButtonX - composerButtonGap - smallComposerButtonWidth;
-    CGFloat sendFieldX = attachButtonX + attachButtonWidth + 8.0;
+    CGFloat sendFieldX = self.botComposerVisible
+        ? (botButtonX + attachButtonWidth + 8.0)
+        : (attachButtonX + attachButtonWidth + 8.0);
     CGFloat sendFieldWidth = stickerButtonX - sendFieldX - 10.0;
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
@@ -770,6 +911,11 @@
     CGFloat composerInputBackgroundY = composerY + floor((composerHeight - composerInnerHeight) / 2.0);
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
     [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerControlY, attachButtonWidth, 32.0)];
+    [self.botActionButton setFrame:NSMakeRect(botButtonX, composerControlY, attachButtonWidth, 32.0)];
+    CGFloat botPanelY = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    [self.botCommandPanelView setFrame:NSMakeRect(sendFieldX, botPanelY,
+                                                  MAX(220.0, sendButtonX + sendButtonWidth - sendFieldX),
+                                                  150.0)];
     [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerInputBackgroundY, sendFieldWidth, composerInnerHeight)];
     [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerInputBackgroundY + 5.0, sendFieldWidth - 16.0, composerInputHeight)];
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];
@@ -803,7 +949,11 @@
     if (groupedWidth < 360.0) {
         groupedWidth = mainWidth - 32.0;
     }
-    [self.profileTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
+    [self.profileTitleField setAlignment:NSCenterTextAlignment];
+    [self.profileTitleField setFrame:NSMakeRect(mainX + 88.0,
+                                                panelTitleY,
+                                                MAX(120.0, mainWidth - 176.0),
+                                                20.0)];
     CGFloat profileScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat profileScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
     CGFloat profileScrollHeight = profileScrollTop - profileScrollBottom;
@@ -853,6 +1003,11 @@
                                                 profileAvatarY,
                                                 profileAvatarSize,
                                                 profileAvatarSize)];
+    CGFloat profileEditWidth = (profileGroupedWidth >= 420.0) ? 112.0 : 82.0;
+    [self.profileEditButton setFrame:NSMakeRect(profileGroupedX + profileGroupedWidth - 22.0 - profileEditWidth,
+                                                profileSummaryY + 18.0,
+                                                profileEditWidth,
+                                                28.0)];
     CGFloat profileTextX = profileGroupedX + 22.0;
     CGFloat profileTextWidth = profileGroupedWidth - 44.0;
     [self.profileNameField setFrame:NSMakeRect(profileTextX, profileSummaryY + 124.0, profileTextWidth, 26.0)];
@@ -969,7 +1124,10 @@
     CGFloat profileActionsY = profileNextY;
     [self.profileActionsCardView setFrame:NSMakeRect(profileGroupedX, profileActionsY, profileGroupedWidth, profileActionsHeight)];
     [self.profileRefreshButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
-    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 11.0, profileGroupedWidth - 44.0, 30.0)];
+    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0,
+                                           profileActionsY + 11.0,
+                                           profileGroupedWidth - 44.0,
+                                           30.0)];
     [self.profileIDField setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
     profileNextY = profileActionsY + profileActionsHeight + 18.0;
 
@@ -984,7 +1142,11 @@
         [profileClipView setBoundsOrigin:NSMakePoint(0.0, profileClipOrigin.y)];
     }
 
-    [self.settingsTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
+    [self.settingsTitleField setAlignment:NSCenterTextAlignment];
+    [self.settingsTitleField setFrame:NSMakeRect(mainX + 58.0,
+                                                 panelTitleY,
+                                                 MAX(120.0, mainWidth - 116.0),
+                                                 20.0)];
 
     CGFloat settingsScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat settingsScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
@@ -1010,15 +1172,23 @@
     CGFloat settingsLabelGap = 7.0;
     CGFloat settingsGroupGap = 12.0;
     CGFloat settingsBottomPadding = 58.0;
-    CGFloat notificationCardHeight = 140.0;
+    CGFloat profileCardHeight = 72.0;
+    CGFloat notificationCardHeight = 180.0;
+    CGFloat foldersCardHeight = 54.0;
+    CGFloat savedCardHeight = 54.0;
+    CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
-    CGFloat filesCardHeight = 140.0;
+    CGFloat filesCardHeight = 172.0;
     CGFloat helpCardHeight = 112.0;
     CGFloat settingsDocHeight = 18.0;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + foldersCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + savedCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + privacyCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + interfaceCardHeight + settingsGroupGap;
@@ -1048,6 +1218,25 @@
     CGFloat rowWidth = settingsGroupedWidth - 44.0;
     CGFloat settingsNextY = 18.0;
 
+    [self.settingsProfileSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat profileCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsProfileCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      profileCardY,
+                                                      settingsGroupedWidth,
+                                                      profileCardHeight)];
+    [self.settingsProfileDetailField setFrame:NSMakeRect(rowLeft,
+                                                         profileCardY + 12.0,
+                                                         MAX(120.0, rowWidth - 210.0),
+                                                         42.0)];
+    [self.settingsProfileButton setFrame:NSMakeRect(NSMaxX([self.settingsProfileCardView frame]) - 200.0,
+                                                    profileCardY + 21.0,
+                                                    178.0,
+                                                    30.0)];
+    settingsNextY = profileCardY + profileCardHeight + settingsGroupGap;
+
     [self.settingsStateField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat notificationCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
     [self.settingsAccountCardView setFrame:NSMakeRect(settingsGroupedX, notificationCardY, settingsGroupedWidth, notificationCardHeight)];
@@ -1056,7 +1245,56 @@
     [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 60.0, rowWidth, 22.0)];
     [self.settingsNotificationPreviewButton setFrame:NSMakeRect(rowLeft, notificationCardY + 84.0, rowWidth, 22.0)];
     [self.settingsNotificationsWhenActiveButton setFrame:NSMakeRect(rowLeft, notificationCardY + 108.0, rowWidth, 22.0)];
+    [self.settingsNotificationExceptionsButton setFrame:NSMakeRect(rowLeft,
+                                                                   notificationCardY + 140.0,
+                                                                   rowWidth,
+                                                                   30.0)];
     settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
+
+    [self.settingsFoldersSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat foldersCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsFoldersCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      foldersCardY,
+                                                      settingsGroupedWidth,
+                                                      foldersCardHeight)];
+    [self.settingsChatFoldersButton setFrame:NSMakeRect(rowLeft,
+                                                        foldersCardY + 12.0,
+                                                        rowWidth,
+                                                        30.0)];
+    settingsNextY = foldersCardY + foldersCardHeight + settingsGroupGap;
+
+    [self.settingsSavedSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                        settingsNextY,
+                                                        settingsGroupedWidth - 40.0,
+                                                        settingsLabelHeight)];
+    CGFloat savedCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsSavedCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                    savedCardY,
+                                                    settingsGroupedWidth,
+                                                    savedCardHeight)];
+    [self.settingsSavedMessagesButton setFrame:NSMakeRect(rowLeft,
+                                                          savedCardY + 12.0,
+                                                          rowWidth,
+                                                          30.0)];
+    settingsNextY = savedCardY + savedCardHeight + settingsGroupGap;
+
+    [self.settingsPrivacySectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat privacyCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsPrivacyCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      privacyCardY,
+                                                      settingsGroupedWidth,
+                                                      privacyCardHeight)];
+    [self.settingsPrivacyButton setFrame:NSMakeRect(rowLeft,
+                                                    privacyCardY + 12.0,
+                                                    rowWidth,
+                                                    30.0)];
+    settingsNextY = privacyCardY + privacyCardHeight + settingsGroupGap;
 
     [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
@@ -1133,8 +1371,9 @@
     [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
     [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
     [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 38.0, rowWidth, 28.0)];
-    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
-    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
+    [self.settingsDownloadManagerButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
+    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
+    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 134.0, rowWidth, 28.0)];
     settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
     [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];

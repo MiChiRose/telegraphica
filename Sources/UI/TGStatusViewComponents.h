@@ -18,6 +18,25 @@
 @interface TGUtilityWindowView : NSView
 @end
 
+@protocol TGSidebarResizeHandleDelegate;
+
+@interface TGSidebarResizeHandleView : NSView {
+    id<TGSidebarResizeHandleDelegate> _delegate;
+    CGFloat _initialWidth;
+    NSPoint _initialScreenPoint;
+    NSTrackingArea *_trackingArea;
+    BOOL _dragging;
+}
+@property (nonatomic, assign) id<TGSidebarResizeHandleDelegate> delegate;
+- (CGFloat)initialDragWidth;
+@end
+
+@protocol TGSidebarResizeHandleDelegate <NSObject>
+- (CGFloat)sidebarResizeHandleCurrentWidth:(TGSidebarResizeHandleView *)handle;
+- (void)sidebarResizeHandle:(TGSidebarResizeHandleView *)handle requestedWidth:(CGFloat)width;
+- (void)sidebarResizeHandleDidRequestToggle:(TGSidebarResizeHandleView *)handle;
+@end
+
 @interface TGRailView : NSView
 @end
 

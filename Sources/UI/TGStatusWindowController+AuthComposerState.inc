@@ -114,6 +114,7 @@
     NSString *text = [self.sendTextField stringValue];
     NSString *trimmedText = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     [self.attachPhotoButton setEnabled:canTargetChat];
+    [self.botActionButton setEnabled:(canTargetChat && self.botComposerVisible)];
     [self.stickerButton setEnabled:canTargetChat];
     [self.voiceRecordButton setEnabled:canTargetChat];
     [self.sendTextField setEnabled:canTargetChat];
@@ -223,6 +224,13 @@
                                       text:(NSString *)text
                           replyToMessageID:(NSNumber *)replyToMessageID {
     if (![self.currentAuthState isEqualToString:@"ready"] || ![chatID respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    if ([text hasPrefix:@"\u2063"]) {
+        /* Formatted drafts stay local so Markdown control markers never leak into Telegram draft text. */
+        [self.composerDraftSyncTimer invalidate];
+        self.composerDraftSyncTimer = nil;
+        self.composerDraftSyncGeneration++;
         return;
     }
 
@@ -522,6 +530,7 @@
         [self.authSecureField setStringValue:@""];
     }
     [self.loadChatsButton setEnabled:NO];
+    [self.composeChatButton setEnabled:NO];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.loadMessagesButton setEnabled:NO];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -564,6 +573,7 @@
         self.drawerOpen = NO;
         [self clearForumTopicListState];
         self.chatsExhausted = NO;
+        self.showingArchivedChats = NO;
         self.selectedChatFilterID = nil;
         self.chatFilterInfos = [NSArray array];
         self.chatFilterRefreshRetryCount = 0;
@@ -720,6 +730,7 @@
     [self.loadChatsButton setEnabled:[state isEqualToString:@"ready"]];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.chatSearchButton setEnabled:[state isEqualToString:@"ready"]];
+    [self.composeChatButton setEnabled:[state isEqualToString:@"ready"]];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:([state isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -756,6 +767,7 @@
     [self.loadChatsButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     [self.loadMoreChatsButton setEnabled:NO];
     [self.chatSearchButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
+    [self.composeChatButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"])];
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
     [self.loadMessagesButton setEnabled:(!busy && [self.currentAuthState isEqualToString:@"ready"] && hasMessageTarget)];
     [self.loadOlderMessagesButton setEnabled:NO];
@@ -773,6 +785,7 @@
         [self.loadChatsButton setEnabled:NO];
         [self.loadMoreChatsButton setEnabled:NO];
         [self.chatSearchButton setEnabled:NO];
+        [self.composeChatButton setEnabled:NO];
         [self.loadMessagesButton setEnabled:NO];
         [self.loadOlderMessagesButton setEnabled:NO];
         [self.conversationSearchButton setEnabled:NO];

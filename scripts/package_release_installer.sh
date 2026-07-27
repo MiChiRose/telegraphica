@@ -25,13 +25,16 @@ if [ -z "$APP_VERSION" ]; then
 fi
 
 TDJSON_BUNDLED_PATH="$APP_PATH/Contents/Frameworks/libtdjson.dylib"
-if [ ! -f "$TDJSON_BUNDLED_PATH" ]; then
+TDJSON_MOUNTAIN_LION_BUNDLED_PATH="$APP_PATH/Contents/Frameworks/libtdjson-mountain-lion.dylib"
+if [ ! -f "$TDJSON_BUNDLED_PATH" ] || [ ! -f "$TDJSON_MOUNTAIN_LION_BUNDLED_PATH" ]; then
     if [ "$ALLOW_TDLIBLESS_INSTALLER" != "1" ]; then
-        echo "Refusing to create a public installer without bundled TDLib:"
-        echo "  $TDJSON_BUNDLED_PATH was not found."
+        echo "Refusing to create a public installer without both bundled TDLib runtimes:"
+        echo "  modern: $TDJSON_BUNDLED_PATH"
+        echo "  Mountain Lion: $TDJSON_MOUNTAIN_LION_BUNDLED_PATH"
         echo
         echo "Build Telegraphica first with:"
-        echo "  TELEGRAPHICA_TDJSON_PATH=/path/to/libtdjson.dylib ./build_legacy.sh"
+        echo "  TELEGRAPHICA_TDJSON_PATH=/path/to/modern/libtdjson.dylib \\"
+        echo "  TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH=/path/to/10.8/libtdjson.dylib ./build_legacy.sh"
         echo
         echo "For a development-only DMG without TDLib, rerun with:"
         echo "  TELEGRAPHICA_ALLOW_TDLIBLESS_INSTALLER=1 ./scripts/package_release_installer.sh"

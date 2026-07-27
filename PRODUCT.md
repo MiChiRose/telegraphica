@@ -18,6 +18,18 @@ client for legacy macOS. Success means the app can authorize through TDLib, keep
 the local session safe, list chats, read recent messages, send plain text, and
 grow into a dependable daily-use interface without modern macOS-only APIs.
 
+## Monetization Boundary
+
+Telegraphica implements free Telegram workflows only. It does not sell or
+purchase Telegram Premium, Stars, subscriptions, paid messages or media, gifts,
+boosts, paid reactions, giveaways, or any other Telegram product.
+
+The app may render paid or Premium-gated content already present in an account
+when TDLib provides a safe read-only representation. When an action requires a
+paid Telegram entitlement, Telegraphica explains that the action is unavailable
+and tells the user to use the official Telegram application. It never embeds a
+checkout, billing link, purchase prompt, or payment transaction.
+
 ## Brand Personality
 
 Quiet, tactile, resilient. The app should feel like a native old-Mac utility:

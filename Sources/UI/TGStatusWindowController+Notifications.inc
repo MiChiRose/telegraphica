@@ -365,7 +365,7 @@
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
         NSButton *button = [self.navigationButtons objectAtIndex:index];
-        if ([button tag] != 0 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
+        if ([button tag] != 2 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
             continue;
         }
         [(TGNavigationButtonCell *)[button cell] setBadgeText:badge];
@@ -379,7 +379,7 @@
     NSUInteger index = 0;
     for (index = 0; index < [self.navigationButtons count]; index++) {
         NSButton *button = [self.navigationButtons objectAtIndex:index];
-        if ([button tag] != 2 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
+        if ([button tag] != 3 || ![[button cell] isKindOfClass:[TGNavigationButtonCell class]]) {
             continue;
         }
         [(TGNavigationButtonCell *)[button cell] setBadgeText:badgeText];
@@ -424,6 +424,17 @@
                                             forKey:TGNotificationsWhenActiveDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [self updateApplicationBadge];
+}
+
+- (void)showNotificationSettingsWindow:(id)sender {
+    (void)sender;
+    if (!self.notificationSettingsWindowController) {
+        self.notificationSettingsWindowController = [[[TGNotificationSettingsWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [[self.notificationSettingsWindowController window] center];
+    [self.notificationSettingsWindowController showWindow:self];
+    [[self.notificationSettingsWindowController window] makeKeyAndOrderFront:self];
+    [self.notificationSettingsWindowController reloadExceptions];
 }
 
 - (void)interfaceSettingChanged:(id)sender {
@@ -912,6 +923,11 @@
     [[self window] makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
     self.activeSection = TGSectionChats;
+    self.showingArchivedChats = NO;
+    self.selectedChatFilterID = nil;
+    [self.client invalidateMainChatListExhaustion];
+    [self refreshChatListTitle];
+    [self updateDrawerFolderButtonStates];
     [self updateNavigationButtonsForSection:TGSectionChats enabled:!self.controlsBusy];
     [self layoutContentView];
     [self updateVisibleSection];

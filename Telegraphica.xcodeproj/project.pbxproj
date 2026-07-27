@@ -63,6 +63,42 @@
 		111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111299 /* TGChatDisplayPreferences.m */; };
 		111111111111111111111154 /* TGLocalDataReset.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111311 /* TGLocalDataReset.m */; };
 		111111111111111111111155 /* TGMessagePollSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111313 /* TGMessagePollSupport.m */; };
+		111111111111111111111158 /* TGChatLifecycleWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111320 /* TGChatLifecycleWindowController.m */; };
+		111111111111111111111159 /* TGConversationCreationPrompt.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111322 /* TGConversationCreationPrompt.m */; };
+		111111111111111111111160 /* TGMediaFileActions.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111324 /* TGMediaFileActions.m */; };
+		111111111111111111111161 /* TGContactsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111326 /* TGContactsViewController.m */; };
+		111111111111111111111162 /* TGCallsPlaceholderView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111328 /* TGCallsPlaceholderView.m */; };
+		111111111111111111111163 /* TGContactProfileView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111330 /* TGContactProfileView.m */; };
+		111111111111111111111164 /* TGContactManagementDialogs.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111332 /* TGContactManagementDialogs.m */; };
+		111111111111111111111165 /* TGProfileEditWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111334 /* TGProfileEditWindowController.m */; };
+		111111111111111111111166 /* TGTDLibClient+ChatFolders.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111336 /* TGTDLibClient+ChatFolders.m */; };
+		111111111111111111111167 /* TGChatFolderManagementWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111338 /* TGChatFolderManagementWindowController.m */; };
+		111111111111111111111168 /* TGTDLibClient+Notifications.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111340 /* TGTDLibClient+Notifications.m */; };
+		111111111111111111111169 /* TGNotificationSettingsWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111342 /* TGNotificationSettingsWindowController.m */; };
+		111111111111111111111170 /* TGTDLibClient+ChatMembers.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111344 /* TGTDLibClient+ChatMembers.m */; };
+		111111111111111111111171 /* TGChatInfoWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111346 /* TGChatInfoWindowController.m */; };
+		111111111111111111111172 /* TGTDLibClient+ScheduledMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111348 /* TGTDLibClient+ScheduledMessages.m */; };
+		111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111350 /* TGScheduledMessagesWindowController.m */; };
+		111111111111111111111174 /* TGDownloadManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111352 /* TGDownloadManager.m */; };
+		111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111354 /* TGDownloadManagerWindowController.m */; };
+		111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111356 /* TGTDLibClient+Privacy.m */; };
+		111111111111111111111177 /* TGPrivacyWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111358 /* TGPrivacyWindowController.m */; };
+		111111111111111111111178 /* TGTDLibClient+Administration.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111360 /* TGTDLibClient+Administration.m */; };
+		111111111111111111111179 /* TGChatAdministrationWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111362 /* TGChatAdministrationWindowController.m */; };
+		111111111111111111111180 /* TGTDLibClient+MessageTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111364 /* TGTDLibClient+MessageTypes.m */; };
+		111111111111111111111181 /* TGTDLibClient+SavedMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111366 /* TGTDLibClient+SavedMessages.m */; };
+		111111111111111111111182 /* TGSavedMessagesWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111368 /* TGSavedMessagesWindowController.m */; };
+		111111111111111111111183 /* TGTDLibClient+Bots.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111370 /* TGTDLibClient+Bots.m */; };
+		111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111372 /* TGBotInteractionWindowController.m */; };
+		111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111374 /* TGBotKeyboardWindowController.m */; };
+		111111111111111111111186 /* TGDatePickerDialog.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111376 /* TGDatePickerDialog.m */; };
+		111111111111111111111187 /* TGLocationPickerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111378 /* TGLocationPickerWindowController.m */; };
+		111111111111111111111188 /* TGSavedMessagesCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111380 /* TGSavedMessagesCell.m */; };
+		111111111111111111111190 /* TGBotCommandPanelView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111384 /* TGBotCommandPanelView.m */; };
+		111111111111111111111191 /* TGTDLibClient+MapThumbnail.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */; };
+		111111111111111111111194 /* TGLocationStaticMapView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111392 /* TGLocationStaticMapView.m */; };
+		111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111394 /* TGTDLibClient+LocationMessages.m */; };
+		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -198,6 +234,77 @@
 		111111111111111111111231 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		111111111111111111111232 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		111111111111111111111316 /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
+		111111111111111111111319 /* TGChatLifecycleWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatLifecycleWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111320 /* TGChatLifecycleWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatLifecycleWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111321 /* TGConversationCreationPrompt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGConversationCreationPrompt.h; sourceTree = "<group>"; };
+		111111111111111111111322 /* TGConversationCreationPrompt.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGConversationCreationPrompt.m; sourceTree = "<group>"; };
+		111111111111111111111323 /* TGMediaFileActions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaFileActions.h; sourceTree = "<group>"; };
+		111111111111111111111324 /* TGMediaFileActions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaFileActions.m; sourceTree = "<group>"; };
+		111111111111111111111325 /* TGContactsViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGContactsViewController.h; sourceTree = "<group>"; };
+		111111111111111111111326 /* TGContactsViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGContactsViewController.m; sourceTree = "<group>"; };
+		111111111111111111111327 /* TGCallsPlaceholderView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGCallsPlaceholderView.h; sourceTree = "<group>"; };
+		111111111111111111111328 /* TGCallsPlaceholderView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGCallsPlaceholderView.m; sourceTree = "<group>"; };
+		111111111111111111111329 /* TGContactProfileView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGContactProfileView.h; sourceTree = "<group>"; };
+		111111111111111111111330 /* TGContactProfileView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGContactProfileView.m; sourceTree = "<group>"; };
+		111111111111111111111331 /* TGContactManagementDialogs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGContactManagementDialogs.h; sourceTree = "<group>"; };
+		111111111111111111111332 /* TGContactManagementDialogs.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGContactManagementDialogs.m; sourceTree = "<group>"; };
+		111111111111111111111333 /* TGProfileEditWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGProfileEditWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111334 /* TGProfileEditWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGProfileEditWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111335 /* TGTDLibClient+ChatFolders.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+ChatFolders.h"; sourceTree = "<group>"; };
+		111111111111111111111336 /* TGTDLibClient+ChatFolders.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ChatFolders.m"; sourceTree = "<group>"; };
+		111111111111111111111337 /* TGChatFolderManagementWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatFolderManagementWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111338 /* TGChatFolderManagementWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatFolderManagementWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111339 /* TGTDLibClient+Notifications.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Notifications.h"; sourceTree = "<group>"; };
+		111111111111111111111340 /* TGTDLibClient+Notifications.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Notifications.m"; sourceTree = "<group>"; };
+		111111111111111111111341 /* TGNotificationSettingsWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGNotificationSettingsWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111342 /* TGNotificationSettingsWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGNotificationSettingsWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111343 /* TGTDLibClient+ChatMembers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+ChatMembers.h"; sourceTree = "<group>"; };
+		111111111111111111111344 /* TGTDLibClient+ChatMembers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ChatMembers.m"; sourceTree = "<group>"; };
+		111111111111111111111345 /* TGChatInfoWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatInfoWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111346 /* TGChatInfoWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatInfoWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111347 /* TGTDLibClient+ScheduledMessages.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+ScheduledMessages.h"; sourceTree = "<group>"; };
+		111111111111111111111348 /* TGTDLibClient+ScheduledMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ScheduledMessages.m"; sourceTree = "<group>"; };
+		111111111111111111111349 /* TGScheduledMessagesWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGScheduledMessagesWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111350 /* TGScheduledMessagesWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGScheduledMessagesWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111351 /* TGDownloadManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManager.h; sourceTree = "<group>"; };
+		111111111111111111111352 /* TGDownloadManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManager.m; sourceTree = "<group>"; };
+		111111111111111111111353 /* TGDownloadManagerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManagerWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111354 /* TGDownloadManagerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManagerWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111355 /* TGTDLibClient+Privacy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Privacy.h"; sourceTree = "<group>"; };
+		111111111111111111111356 /* TGTDLibClient+Privacy.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Privacy.m"; sourceTree = "<group>"; };
+		111111111111111111111357 /* TGPrivacyWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGPrivacyWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111358 /* TGPrivacyWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGPrivacyWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111359 /* TGTDLibClient+Administration.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Administration.h"; sourceTree = "<group>"; };
+		111111111111111111111360 /* TGTDLibClient+Administration.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Administration.m"; sourceTree = "<group>"; };
+		111111111111111111111361 /* TGChatAdministrationWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatAdministrationWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111362 /* TGChatAdministrationWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatAdministrationWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111363 /* TGTDLibClient+MessageTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MessageTypes.h"; sourceTree = "<group>"; };
+		111111111111111111111364 /* TGTDLibClient+MessageTypes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MessageTypes.m"; sourceTree = "<group>"; };
+		111111111111111111111365 /* TGTDLibClient+SavedMessages.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+SavedMessages.h"; sourceTree = "<group>"; };
+		111111111111111111111366 /* TGTDLibClient+SavedMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+SavedMessages.m"; sourceTree = "<group>"; };
+		111111111111111111111367 /* TGSavedMessagesWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSavedMessagesWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111368 /* TGSavedMessagesWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSavedMessagesWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111369 /* TGTDLibClient+Bots.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Bots.h"; sourceTree = "<group>"; };
+		111111111111111111111370 /* TGTDLibClient+Bots.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Bots.m"; sourceTree = "<group>"; };
+		111111111111111111111371 /* TGBotInteractionWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGBotInteractionWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111372 /* TGBotInteractionWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotInteractionWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111373 /* TGBotKeyboardWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGBotKeyboardWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111374 /* TGBotKeyboardWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotKeyboardWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111375 /* TGDatePickerDialog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDatePickerDialog.h; sourceTree = "<group>"; };
+		111111111111111111111376 /* TGDatePickerDialog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDatePickerDialog.m; sourceTree = "<group>"; };
+		111111111111111111111377 /* TGLocationPickerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocationPickerWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111378 /* TGLocationPickerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationPickerWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111379 /* TGSavedMessagesCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSavedMessagesCell.h; sourceTree = "<group>"; };
+		111111111111111111111380 /* TGSavedMessagesCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSavedMessagesCell.m; sourceTree = "<group>"; };
+		111111111111111111111383 /* TGBotCommandPanelView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGBotCommandPanelView.h; sourceTree = "<group>"; };
+		111111111111111111111384 /* TGBotCommandPanelView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotCommandPanelView.m; sourceTree = "<group>"; };
+		111111111111111111111385 /* TGTDLibClient+MapThumbnail.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MapThumbnail.h"; sourceTree = "<group>"; };
+		111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MapThumbnail.m"; sourceTree = "<group>"; };
+		111111111111111111111391 /* TGLocationStaticMapView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocationStaticMapView.h; sourceTree = "<group>"; };
+		111111111111111111111392 /* TGLocationStaticMapView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationStaticMapView.m; sourceTree = "<group>"; };
+		111111111111111111111393 /* TGTDLibClient+LocationMessages.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+LocationMessages.h"; sourceTree = "<group>"; };
+		111111111111111111111394 /* TGTDLibClient+LocationMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+LocationMessages.m"; sourceTree = "<group>"; };
+		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -237,6 +344,7 @@
 				111111111111111111111109 /* Security.framework in Frameworks */,
 				111111111111111111111113 /* AVFoundation.framework in Frameworks */,
 				111111111111111111111157 /* ImageIO.framework in Frameworks */,
+				111111111111111111111189 /* MapKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,6 +385,7 @@
 				111111111111111111111231 /* Security.framework */,
 				111111111111111111111232 /* AVFoundation.framework */,
 				111111111111111111111316 /* ImageIO.framework */,
+				111111111111111111111381 /* MapKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -294,6 +403,28 @@
 			children = (
 				111111111111111111111204 /* TGTDLibClient.h */,
 				111111111111111111111205 /* TGTDLibClient.m */,
+				111111111111111111111335 /* TGTDLibClient+ChatFolders.h */,
+				111111111111111111111336 /* TGTDLibClient+ChatFolders.m */,
+				111111111111111111111339 /* TGTDLibClient+Notifications.h */,
+				111111111111111111111340 /* TGTDLibClient+Notifications.m */,
+				111111111111111111111343 /* TGTDLibClient+ChatMembers.h */,
+				111111111111111111111344 /* TGTDLibClient+ChatMembers.m */,
+				111111111111111111111347 /* TGTDLibClient+ScheduledMessages.h */,
+				111111111111111111111348 /* TGTDLibClient+ScheduledMessages.m */,
+				111111111111111111111355 /* TGTDLibClient+Privacy.h */,
+				111111111111111111111356 /* TGTDLibClient+Privacy.m */,
+				111111111111111111111359 /* TGTDLibClient+Administration.h */,
+				111111111111111111111360 /* TGTDLibClient+Administration.m */,
+				111111111111111111111363 /* TGTDLibClient+MessageTypes.h */,
+				111111111111111111111364 /* TGTDLibClient+MessageTypes.m */,
+				111111111111111111111365 /* TGTDLibClient+SavedMessages.h */,
+				111111111111111111111366 /* TGTDLibClient+SavedMessages.m */,
+				111111111111111111111369 /* TGTDLibClient+Bots.h */,
+				111111111111111111111370 /* TGTDLibClient+Bots.m */,
+				111111111111111111111385 /* TGTDLibClient+MapThumbnail.h */,
+				111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */,
+				111111111111111111111393 /* TGTDLibClient+LocationMessages.h */,
+				111111111111111111111394 /* TGTDLibClient+LocationMessages.m */,
 				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
 				111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */,
 				111111111111111111111212 /* TGChatItem.h */,
@@ -319,6 +450,8 @@
 				111111111111111111111209 /* TGLogger.m */,
 				111111111111111111111310 /* TGLocalDataReset.h */,
 				111111111111111111111311 /* TGLocalDataReset.m */,
+				111111111111111111111351 /* TGDownloadManager.h */,
+				111111111111111111111352 /* TGDownloadManager.m */,
 				111111111111111111111280 /* TGResourcePolicy.h */,
 				111111111111111111111281 /* TGResourcePolicy.m */,
 			);
@@ -348,6 +481,50 @@
 				111111111111111111111246 /* TGMessageActionDialogs.m */,
 				111111111111111111111292 /* TGMessageViewersWindowController.h */,
 				111111111111111111111293 /* TGMessageViewersWindowController.m */,
+				111111111111111111111319 /* TGChatLifecycleWindowController.h */,
+				111111111111111111111320 /* TGChatLifecycleWindowController.m */,
+				111111111111111111111325 /* TGContactsViewController.h */,
+				111111111111111111111326 /* TGContactsViewController.m */,
+				111111111111111111111329 /* TGContactProfileView.h */,
+				111111111111111111111330 /* TGContactProfileView.m */,
+				111111111111111111111331 /* TGContactManagementDialogs.h */,
+				111111111111111111111332 /* TGContactManagementDialogs.m */,
+				111111111111111111111333 /* TGProfileEditWindowController.h */,
+				111111111111111111111334 /* TGProfileEditWindowController.m */,
+				111111111111111111111337 /* TGChatFolderManagementWindowController.h */,
+				111111111111111111111338 /* TGChatFolderManagementWindowController.m */,
+				111111111111111111111341 /* TGNotificationSettingsWindowController.h */,
+				111111111111111111111342 /* TGNotificationSettingsWindowController.m */,
+				111111111111111111111345 /* TGChatInfoWindowController.h */,
+				111111111111111111111346 /* TGChatInfoWindowController.m */,
+				111111111111111111111349 /* TGScheduledMessagesWindowController.h */,
+				111111111111111111111350 /* TGScheduledMessagesWindowController.m */,
+				111111111111111111111353 /* TGDownloadManagerWindowController.h */,
+				111111111111111111111354 /* TGDownloadManagerWindowController.m */,
+				111111111111111111111357 /* TGPrivacyWindowController.h */,
+				111111111111111111111358 /* TGPrivacyWindowController.m */,
+				111111111111111111111361 /* TGChatAdministrationWindowController.h */,
+				111111111111111111111362 /* TGChatAdministrationWindowController.m */,
+				111111111111111111111367 /* TGSavedMessagesWindowController.h */,
+				111111111111111111111368 /* TGSavedMessagesWindowController.m */,
+				111111111111111111111371 /* TGBotInteractionWindowController.h */,
+				111111111111111111111372 /* TGBotInteractionWindowController.m */,
+				111111111111111111111373 /* TGBotKeyboardWindowController.h */,
+				111111111111111111111374 /* TGBotKeyboardWindowController.m */,
+				111111111111111111111375 /* TGDatePickerDialog.h */,
+				111111111111111111111376 /* TGDatePickerDialog.m */,
+				111111111111111111111377 /* TGLocationPickerWindowController.h */,
+				111111111111111111111378 /* TGLocationPickerWindowController.m */,
+				111111111111111111111391 /* TGLocationStaticMapView.h */,
+				111111111111111111111392 /* TGLocationStaticMapView.m */,
+				111111111111111111111379 /* TGSavedMessagesCell.h */,
+				111111111111111111111380 /* TGSavedMessagesCell.m */,
+				111111111111111111111383 /* TGBotCommandPanelView.h */,
+				111111111111111111111384 /* TGBotCommandPanelView.m */,
+				111111111111111111111327 /* TGCallsPlaceholderView.h */,
+				111111111111111111111328 /* TGCallsPlaceholderView.m */,
+				111111111111111111111321 /* TGConversationCreationPrompt.h */,
+				111111111111111111111322 /* TGConversationCreationPrompt.m */,
 				111111111111111111111298 /* TGChatDisplayPreferences.h */,
 				111111111111111111111299 /* TGChatDisplayPreferences.m */,
 				111111111111111111111247 /* TGMessageLayoutSupport.h */,
@@ -395,6 +572,8 @@
 				111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */,
 				111111111111111111111282 /* TGAttachmentDescriptor.h */,
 				111111111111111111111283 /* TGAttachmentDescriptor.m */,
+				111111111111111111111323 /* TGMediaFileActions.h */,
+				111111111111111111111324 /* TGMediaFileActions.m */,
 				111111111111111111111284 /* TGFileTransferState.h */,
 				111111111111111111111285 /* TGFileTransferState.m */,
 				111111111111111111111288 /* TGOpusVoiceTranscoder.h */,
@@ -579,6 +758,41 @@
 				111111111111111111111152 /* TGChatDisplayPreferences.m in Sources */,
 				111111111111111111111154 /* TGLocalDataReset.m in Sources */,
 				111111111111111111111155 /* TGMessagePollSupport.m in Sources */,
+				111111111111111111111158 /* TGChatLifecycleWindowController.m in Sources */,
+				111111111111111111111159 /* TGConversationCreationPrompt.m in Sources */,
+				111111111111111111111160 /* TGMediaFileActions.m in Sources */,
+				111111111111111111111161 /* TGContactsViewController.m in Sources */,
+				111111111111111111111162 /* TGCallsPlaceholderView.m in Sources */,
+				111111111111111111111163 /* TGContactProfileView.m in Sources */,
+				111111111111111111111164 /* TGContactManagementDialogs.m in Sources */,
+				111111111111111111111165 /* TGProfileEditWindowController.m in Sources */,
+				111111111111111111111166 /* TGTDLibClient+ChatFolders.m in Sources */,
+				111111111111111111111167 /* TGChatFolderManagementWindowController.m in Sources */,
+				111111111111111111111168 /* TGTDLibClient+Notifications.m in Sources */,
+				111111111111111111111169 /* TGNotificationSettingsWindowController.m in Sources */,
+				111111111111111111111170 /* TGTDLibClient+ChatMembers.m in Sources */,
+				111111111111111111111171 /* TGChatInfoWindowController.m in Sources */,
+				111111111111111111111172 /* TGTDLibClient+ScheduledMessages.m in Sources */,
+				111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */,
+				111111111111111111111174 /* TGDownloadManager.m in Sources */,
+				111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */,
+				111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */,
+				111111111111111111111177 /* TGPrivacyWindowController.m in Sources */,
+				111111111111111111111178 /* TGTDLibClient+Administration.m in Sources */,
+				111111111111111111111179 /* TGChatAdministrationWindowController.m in Sources */,
+				111111111111111111111180 /* TGTDLibClient+MessageTypes.m in Sources */,
+				111111111111111111111181 /* TGTDLibClient+SavedMessages.m in Sources */,
+				111111111111111111111182 /* TGSavedMessagesWindowController.m in Sources */,
+				111111111111111111111183 /* TGTDLibClient+Bots.m in Sources */,
+				111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */,
+				111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */,
+				111111111111111111111186 /* TGDatePickerDialog.m in Sources */,
+				111111111111111111111187 /* TGLocationPickerWindowController.m in Sources */,
+				111111111111111111111188 /* TGSavedMessagesCell.m in Sources */,
+				111111111111111111111190 /* TGBotCommandPanelView.m in Sources */,
+				111111111111111111111191 /* TGTDLibClient+MapThumbnail.m in Sources */,
+				111111111111111111111194 /* TGLocationStaticMapView.m in Sources */,
+				111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

@@ -86,6 +86,15 @@ MODULES = {
         "category": "utilities",
         "permissions": ["user-selected-files"],
     },
+    "RetroConsole": {
+        "id": "com.michirose.telegraphica.workshop.retroconsole",
+        "name": "Retro Console",
+        "ru_name": "Ретро-консоль",
+        "en_description": "Play your own NES, Dendy and Sega cartridge files locally.",
+        "ru_description": "Локальный запуск собственных файлов картриджей NES, Dendy и Sega.",
+        "category": "games",
+        "permissions": ["module-data", "user-selected-files"],
+    },
 }
 
 
