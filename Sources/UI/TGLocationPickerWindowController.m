@@ -19,8 +19,6 @@
 @property (nonatomic, assign) NSInteger mapZoom;
 @property (nonatomic, assign) CLLocationCoordinate2D selectedCoordinate;
 @property (nonatomic, retain) MKMapView *locationServiceMapView;
-@property (nonatomic, retain) MKPointAnnotation *selectionAnnotation;
-@property (nonatomic, retain) MKPinAnnotationView *selectionPinView;
 @property (nonatomic, retain) MKLocalSearch *activeSearch;
 @property (nonatomic, retain) CLGeocoder *activeGeocoder;
 @property (nonatomic, retain) TGLocationStaticMapView *mapImageView;
@@ -44,8 +42,6 @@
 @synthesize mapZoom = _mapZoom;
 @synthesize selectedCoordinate = _selectedCoordinate;
 @synthesize locationServiceMapView = _locationServiceMapView;
-@synthesize selectionAnnotation = _selectionAnnotation;
-@synthesize selectionPinView = _selectionPinView;
 @synthesize activeSearch = _activeSearch;
 @synthesize activeGeocoder = _activeGeocoder;
 @synthesize mapImageView = _mapImageView;
@@ -82,8 +78,6 @@
     [_activeGeocoder cancelGeocode];
     [_client release];
     [_locationServiceMapView release];
-    [_selectionAnnotation release];
-    [_selectionPinView release];
     [_activeSearch release];
     [_activeGeocoder release];
     [_mapImageView release];
@@ -119,6 +113,32 @@
     [button setTarget:self];
     [button setAction:action];
     return button;
+}
+
+- (NSImage *)systemSelectionPinImage {
+    MKPointAnnotation *annotation = [[[NSClassFromString(@"MKPointAnnotation") alloc] init] autorelease];
+    MKPinAnnotationView *pinView = [[[NSClassFromString(@"MKPinAnnotationView") alloc]
+        initWithAnnotation:annotation reuseIdentifier:@"telegraphica-location-pin-image"] autorelease];
+    [pinView setAnimatesDrop:NO];
+    [pinView setCanShowCallout:NO];
+    NSRect pinFrame = [pinView frame];
+    if (NSWidth(pinFrame) < 8.0 || NSHeight(pinFrame) < 8.0) {
+        pinFrame = NSMakeRect(0.0, 0.0, 32.0, 39.0);
+        [pinView setFrame:pinFrame];
+    }
+    NSImage *builtInImage = [pinView image];
+    if (builtInImage && [builtInImage size].width >= 8.0) {
+        return builtInImage;
+    }
+    NSRect bounds = [pinView bounds];
+    NSBitmapImageRep *representation = [pinView bitmapImageRepForCachingDisplayInRect:bounds];
+    if (!representation) {
+        return nil;
+    }
+    [pinView cacheDisplayInRect:bounds toBitmapImageRep:representation];
+    NSImage *image = [[[NSImage alloc] initWithSize:bounds.size] autorelease];
+    [image addRepresentation:representation];
+    return image;
 }
 
 - (void)buildViews {
@@ -165,20 +185,7 @@
         [self.locationServiceMapView setHidden:YES];
         [root addSubview:self.locationServiceMapView];
 
-        self.selectionAnnotation = [[[NSClassFromString(@"MKPointAnnotation") alloc] init] autorelease];
-        [self.selectionAnnotation setTitle:TGLoc(@"share.location.selected")];
-        self.selectionPinView = [[[NSClassFromString(@"MKPinAnnotationView") alloc]
-            initWithAnnotation:self.selectionAnnotation reuseIdentifier:@"telegraphica-location-pin"] autorelease];
-        [self.selectionPinView setAnimatesDrop:NO];
-        [self.selectionPinView setCanShowCallout:NO];
-        NSRect pinFrame = [self.selectionPinView frame];
-        if (NSWidth(pinFrame) < 8.0 || NSHeight(pinFrame) < 8.0) {
-            pinFrame.size = NSMakeSize(32.0, 39.0);
-        }
-        pinFrame.origin = NSMakePoint(NSMidX([self.mapImageView frame]) - floor(NSWidth(pinFrame) / 2.0),
-                                      NSMidY([self.mapImageView frame]));
-        [self.selectionPinView setFrame:pinFrame];
-        [root addSubview:self.selectionPinView];
+        [self.mapImageView setSelectionPinImage:[self systemSelectionPinImage]];
     } else {
         [self.currentLocationButton setEnabled:NO];
         [self.searchButton setEnabled:NO];
@@ -221,9 +228,6 @@
     }
     self.selectedCoordinate = coordinate;
     self.hasSelection = YES;
-    if (self.selectionAnnotation) {
-        [self.selectionAnnotation setCoordinate:coordinate];
-    }
     if (![self.mapImageView image]) {
         [self.mapImageView setCenterLatitude:coordinate.latitude];
         [self.mapImageView setCenterLongitude:coordinate.longitude];
