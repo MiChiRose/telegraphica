@@ -3572,6 +3572,11 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSString *statusType = [(NSDictionary *)status objectForKey:@"@type"];
         if ([statusType isEqualToString:@"userStatusOnline"]) {
             [summary setObject:[NSNumber numberWithBool:YES] forKey:@"is_online"];
+        } else if ([statusType isEqualToString:@"userStatusOffline"]) {
+            id wasOnline = [(NSDictionary *)status objectForKey:@"was_online"];
+            if ([wasOnline respondsToSelector:@selector(longLongValue)] && [wasOnline longLongValue] > 0LL) {
+                [summary setObject:[NSNumber numberWithLongLong:[wasOnline longLongValue]] forKey:@"was_online"];
+            }
         }
     }
 
@@ -3643,6 +3648,59 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 compare:[[right objectForKey:@"display_name"] lowercaseString]];
     }];
     return contacts;
+}
+
+- (NSDictionary *)userProfileSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![userID respondsToSelector:@selector(longLongValue)] || [userID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"Contact identifier is missing." code:206];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        return nil;
+    }
+
+    NSNumber *safeUserID = [NSNumber numberWithLongLong:[userID longLongValue]];
+    NSMutableDictionary *userRequest = [NSMutableDictionary dictionary];
+    [userRequest setObject:@"getUser" forKey:@"@type"];
+    [userRequest setObject:safeUserID forKey:@"user_id"];
+    NSDictionary *userResponse = [self sendTDLibRequestAndWaitForExtra:userRequest
+                                                           extraPrefix:@"telegraphica-contact-profile-user"
+                                                               timeout:timeout
+                                                             errorCode:207
+                                                                 error:error];
+    NSMutableDictionary *summary = [[[self contactSummaryFromUserObject:userResponse timeout:timeout] mutableCopy] autorelease];
+    if (!summary) {
+        return nil;
+    }
+
+    BOOL didRequestAvatarDownload = NO;
+    NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[userResponse objectForKey:@"profile_photo"]
+                                                  downloadMissing:YES
+                                                          timeout:MIN(timeout, 1.5)
+                                               didRequestDownload:&didRequestAvatarDownload];
+    NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
+    if ([avatarPath length] > 0) {
+        [summary setObject:avatarPath forKey:@"avatar_local_path"];
+    }
+
+    NSMutableDictionary *fullInfoRequest = [NSMutableDictionary dictionary];
+    [fullInfoRequest setObject:@"getUserFullInfo" forKey:@"@type"];
+    [fullInfoRequest setObject:safeUserID forKey:@"user_id"];
+    NSDictionary *fullInfoResponse = [self sendTDLibRequestAndWaitForExtra:fullInfoRequest
+                                                               extraPrefix:@"telegraphica-contact-profile-full-info"
+                                                                   timeout:MIN(timeout, 2.5)
+                                                                 errorCode:208
+                                                                     error:NULL];
+    if ([[fullInfoResponse objectForKey:@"@type"] isEqualToString:@"userFullInfo"]) {
+        NSString *bio = [self textFromFormattedTextObject:[fullInfoResponse objectForKey:@"bio"]];
+        if ([bio length] > 0) {
+            [summary setObject:bio forKey:@"bio"];
+        }
+    }
+    return summary;
 }
 
 - (NSNumber *)privateChatIDForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error {

@@ -230,6 +230,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSArray *navigationButtons;
 @property (nonatomic, retain) NSProgressIndicator *markAllChatsReadSpinner;
 @property (nonatomic, retain) NSArray *drawerFolderButtons;
+@property (nonatomic, retain) NSScrollView *drawerFolderScrollView;
+@property (nonatomic, retain) NSView *drawerFolderContentView;
 @property (nonatomic, retain) NSArray *chatFilterInfos;
 @property (nonatomic, retain) TGAccountBadgeView *accountBadgeView;
 @property (nonatomic, retain) NSButton *drawerButton;
@@ -648,6 +650,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 - (void)forwardMessageToSavedMessagesFromMenu:(id)sender;
 - (void)submitPollAnswerForMessageItem:(TGMessageItem *)item optionIndexes:(NSArray *)optionIndexes;
 - (void)togglePollOptionForMessageItem:(TGMessageItem *)item optionIndex:(NSUInteger)optionIndex;
+- (NSString *)localAttachmentPathForMessageItem:(TGMessageItem *)item;
+- (void)openDocumentAttachmentForMessageItem:(TGMessageItem *)item;
+- (void)downloadAttachmentForMessageItem:(TGMessageItem *)item;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
 - (void)openWorkshopFromDrawer:(id)sender;
@@ -679,6 +684,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize navigationButtons = _navigationButtons;
 @synthesize markAllChatsReadSpinner = _markAllChatsReadSpinner;
 @synthesize drawerFolderButtons = _drawerFolderButtons;
+@synthesize drawerFolderScrollView = _drawerFolderScrollView;
+@synthesize drawerFolderContentView = _drawerFolderContentView;
 @synthesize chatFilterInfos = _chatFilterInfos;
 @synthesize accountBadgeView = _accountBadgeView;
 @synthesize drawerButton = _drawerButton;
@@ -1934,6 +1941,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.workshopDrawerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(18, 570, 92, 46)] autorelease];
     TGNavigationButtonCell *workshopCell = [[[TGNavigationButtonCell alloc] initTextCell:TGLoc(@"workshop.title")] autorelease];
     [workshopCell setButtonType:NSToggleButton];
+    [workshopCell setIconOnly:NO];
     [self.workshopDrawerButton setCell:workshopCell];
     [self.workshopDrawerButton setTitle:TGLoc(@"workshop.title")];
     [self.workshopDrawerButton setButtonType:NSToggleButton];
@@ -1943,6 +1951,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.workshopDrawerButton setAction:@selector(openWorkshopFromDrawer:)];
     [self.workshopDrawerButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
     [contentView addSubview:self.workshopDrawerButton];
+
+    self.drawerFolderScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 18, 92, 380)] autorelease];
+    [self.drawerFolderScrollView setBorderType:NSNoBorder];
+    [self.drawerFolderScrollView setDrawsBackground:NO];
+    [self.drawerFolderScrollView setHasVerticalScroller:YES];
+    [self.drawerFolderScrollView setHasHorizontalScroller:NO];
+    [self.drawerFolderScrollView setAutohidesScrollers:YES];
+    self.drawerFolderContentView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0, 0, 92, 380)] autorelease];
+    [self.drawerFolderScrollView setDocumentView:self.drawerFolderContentView];
+    [contentView addSubview:self.drawerFolderScrollView];
 
     self.sidebarPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 286, 480)] autorelease];
     [self.sidebarPanelView setAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
@@ -2036,6 +2054,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         NSButton *navigationButton = [[[NSButton alloc] initWithFrame:NSMakeRect(260 + (navigationIndex * 82), 636, 78, 28)] autorelease];
         TGNavigationButtonCell *navigationCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
         [navigationCell setButtonType:NSToggleButton];
+        [navigationCell setIconOnly:YES];
         [navigationButton setCell:navigationCell];
         [navigationButton setTitle:buttonTitle];
         [navigationButton setButtonType:NSToggleButton];
@@ -3423,8 +3442,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)rebuildDrawerFolderButtons {
-    NSView *contentView = [[self window] contentView];
-    if (!contentView) {
+    if (![[self window] contentView] || !self.drawerFolderContentView) {
         return;
     }
 
@@ -3458,6 +3476,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         NSButton *folderButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20, 500 - (index * 48), 92, 42)] autorelease];
         TGNavigationButtonCell *folderCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
         [folderCell setButtonType:NSToggleButton];
+        [folderCell setIconOnly:NO];
         [folderButton setCell:folderCell];
         [folderButton setTitle:buttonTitle];
         [folderButton setButtonType:NSToggleButton];
@@ -3466,8 +3485,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [folderButton setToolTip:([filterID integerValue] < 0) ? TGLoc(@"drawer.all.tooltip") : [NSString stringWithFormat:@"%@ folder", buttonTitle]];
         [folderButton setTarget:self];
         [folderButton setAction:@selector(folderFilterChanged:)];
-        [folderButton setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-        [contentView addSubview:folderButton];
+        [folderButton setAutoresizingMask:NSViewWidthSizable];
+        [self.drawerFolderContentView addSubview:folderButton];
         [buttons addObject:folderButton];
     }
 
@@ -3892,6 +3911,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_navigationButtons release];
     [_markAllChatsReadSpinner release];
     [_drawerFolderButtons release];
+    [_drawerFolderScrollView release];
+    [_drawerFolderContentView release];
     [_chatFilterInfos release];
     [_accountBadgeView release];
     [_drawerButton release];

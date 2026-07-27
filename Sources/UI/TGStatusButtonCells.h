@@ -4,11 +4,16 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 
 @interface TGNavigationButtonCell : NSButtonCell {
     NSString *_badgeText;
+    BOOL _iconOnly;
 }
 @property (nonatomic, copy) NSString *badgeText;
+@property (nonatomic, assign) BOOL iconOnly;
 @end
 
-@interface TGDrawerButtonCell : NSButtonCell
+@interface TGDrawerButtonCell : NSButtonCell {
+    BOOL _backStyle;
+}
+@property (nonatomic, assign) BOOL backStyle;
 @end
 
 @interface TGSendButtonCell : NSButtonCell
@@ -21,6 +26,9 @@ void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped)
 @end
 
 @interface TGHeaderIconButtonCell : NSButtonCell
+@end
+
+@interface TGPrimaryTextButtonCell : NSButtonCell
 @end
 
 @interface TGMediaZoomButtonCell : NSButtonCell

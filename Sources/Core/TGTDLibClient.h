@@ -24,6 +24,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (NSArray *)chatFilterInfoItemsWithTimeout:(NSTimeInterval)timeout;
 - (NSDictionary *)chatSummaryForChatID:(NSNumber *)chatID downloadAvatar:(BOOL)downloadAvatar timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)contactSummariesWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)userProfileSummaryForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSNumber *)privateChatIDForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSNumber *)basicGroupChatIDWithUserIDs:(NSArray *)userIDs title:(NSString *)title timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSNumber *)secretChatIDForUserID:(NSNumber *)userID timeout:(NSTimeInterval)timeout error:(NSError **)error;

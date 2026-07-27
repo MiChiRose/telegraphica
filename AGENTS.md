@@ -45,6 +45,10 @@ These project rules apply to Codex work in this repository.
 
 ## Project Constraints
 
+- Never invent, hand-draw, or generate replacement UI icons in code, including
+  custom `NSBezierPath` glyphs. Use only user-provided or already approved
+  project image assets. If no suitable asset exists, leave the icon placement
+  empty and ask the user to provide or choose an icon before continuing.
 - Target OS: one application and release artifact for OS X 10.8 through macOS 10.13.
 - Target architecture: Intel x86_64.
 - Target toolchain: Xcode 5.1.1-compatible for the shared 10.8 deployment target, while preserving Xcode 6.2 compatibility.

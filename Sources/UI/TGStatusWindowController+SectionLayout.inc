@@ -65,10 +65,12 @@
     }
     BOOL showLogin = !ready;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
 
     [self updateNavigationButtonsForSection:section enabled:!self.controlsBusy];
     [self showView:self.topPanelView visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.accountBadgeView visible:(ready && !drawerHidden && self.drawerOpen)];
+    [self showView:self.drawerFolderScrollView visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.bottomNavigationView visible:ready];
 
     [self showView:self.loginPanelView visible:showLogin];
@@ -100,7 +102,13 @@
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
                                  [self.workshopViewController hasActiveModule]);
-    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive)];
+    TGDrawerButtonCell *drawerCell = [[self.drawerButton cell] isKindOfClass:[TGDrawerButtonCell class]]
+        ? (TGDrawerButtonCell *)[self.drawerButton cell] : nil;
+    [drawerCell setBackStyle:showProfile];
+    [self.drawerButton setAction:(showProfile ? @selector(returnFromProfileToSettings:) : @selector(toggleDrawer:))];
+    [self.drawerButton setToolTip:(showProfile ? TGLoc(@"back") : @"Chat folders")];
+    [self.drawerButton setNeedsDisplay:YES];
+    [self showView:self.drawerButton visible:(ready && !workshopModuleActive && (showProfile || !drawerHidden))];
     [self showView:self.workshopDrawerButton visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
@@ -183,7 +191,6 @@
     [self showView:self.sendTextField visible:showConversationContent];
     [self showView:self.sendMessageButton visible:showConversationContent];
 
-    BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
     BOOL profileHasPhone = ([[self.profilePhoneRowValueField stringValue] length] > 0);
@@ -349,6 +356,7 @@
     CGFloat height = NSHeight(bounds);
     CGFloat margin = 10.0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL profileActive = [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionProfile];
     BOOL drawerVisible = (!drawerHidden && self.drawerOpen);
     BOOL drawerConsumesLayout = drawerVisible;
     CGFloat railGutter = (!drawerHidden && self.drawerOpen) ? 10.0 : 0.0;
@@ -419,11 +427,17 @@
     if (accountBadgeWidth < 0.0) {
         accountBadgeWidth = 0.0;
     }
+    CGFloat drawerTopInset = 8.0;
+    CGFloat drawerItemGap = 8.0;
+    CGFloat workshopHeight = 46.0;
+    CGFloat accountHeight = 54.0;
+    CGFloat workshopY = railTop - drawerTopInset - workshopHeight;
+    CGFloat accountY = workshopY - drawerItemGap - accountHeight;
     [self.workshopDrawerButton setFrame:NSMakeRect(railX + 8.0,
-                                                   railTop - 112.0,
+                                                   workshopY,
                                                    railWidth - 16.0,
-                                                   46.0)];
-    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, railTop - 176.0, accountBadgeWidth, 54.0)];
+                                                   workshopHeight)];
+    [self.accountBadgeView setFrame:NSMakeRect(railX + 24.0, accountY, accountBadgeWidth, accountHeight)];
     if (drawerVisible) {
         [contentView addSubview:self.accountBadgeView positioned:NSWindowAbove relativeTo:nil];
     }
@@ -436,35 +450,41 @@
 
     CGFloat drawerFolderButtonHeight = 46.0;
     CGFloat drawerFolderButtonGap = 8.0;
-    CGFloat drawerFolderButtonY = railTop - 238.0;
-    CGFloat drawerFolderAvailableHeight = drawerFolderButtonY - railY - 8.0;
+    CGFloat drawerFolderInset = 4.0;
+    CGFloat drawerFolderScrollTop = accountY - drawerItemGap;
+    CGFloat drawerFolderScrollBottom = railY + 8.0;
+    CGFloat drawerFolderScrollHeight = MAX(44.0, drawerFolderScrollTop - drawerFolderScrollBottom);
+    [self.drawerFolderScrollView setFrame:NSMakeRect(railX + 4.0,
+                                                     drawerFolderScrollBottom,
+                                                     MAX(44.0, railWidth - 8.0),
+                                                     drawerFolderScrollHeight)];
+    CGFloat drawerFolderContentWidth = MAX(44.0, NSWidth([[self.drawerFolderScrollView contentView] bounds]));
+    CGFloat drawerFolderRequiredHeight = (drawerFolderInset * 2.0);
     if ([self.drawerFolderButtons count] > 0) {
-        CGFloat requiredHeight = ([self.drawerFolderButtons count] * drawerFolderButtonHeight) +
-                                 (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap);
-        if (requiredHeight > drawerFolderAvailableHeight) {
-            drawerFolderButtonGap = 4.0;
-            drawerFolderButtonHeight = floor((drawerFolderAvailableHeight -
-                                              (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap)) /
-                                             [self.drawerFolderButtons count]);
-            if (drawerFolderButtonHeight < 32.0) {
-                drawerFolderButtonHeight = 32.0;
-            }
-        }
+        drawerFolderRequiredHeight += ([self.drawerFolderButtons count] * drawerFolderButtonHeight) +
+                                      (([self.drawerFolderButtons count] - 1) * drawerFolderButtonGap);
     }
+    CGFloat drawerFolderContentHeight = MAX(drawerFolderScrollHeight, drawerFolderRequiredHeight);
+    [self.drawerFolderContentView setFrame:NSMakeRect(0.0,
+                                                      0.0,
+                                                      drawerFolderContentWidth,
+                                                      drawerFolderContentHeight)];
     NSUInteger navigationIndex = 0;
     for (navigationIndex = 0; navigationIndex < [self.drawerFolderButtons count]; navigationIndex++) {
         NSButton *folderButton = [self.drawerFolderButtons objectAtIndex:navigationIndex];
-        [folderButton setFrame:NSMakeRect(railX + 8.0, drawerFolderButtonY, railWidth - 16.0, drawerFolderButtonHeight)];
-        if (drawerVisible) {
-            [contentView addSubview:folderButton positioned:NSWindowAbove relativeTo:nil];
-        }
-        drawerFolderButtonY -= (drawerFolderButtonHeight + drawerFolderButtonGap);
+        CGFloat folderButtonY = drawerFolderInset +
+                                (navigationIndex * (drawerFolderButtonHeight + drawerFolderButtonGap));
+        [folderButton setFrame:NSMakeRect(drawerFolderInset,
+                                          folderButtonY,
+                                          MAX(36.0, drawerFolderContentWidth - (drawerFolderInset * 2.0)),
+                                          drawerFolderButtonHeight)];
     }
     if (drawerVisible) {
         [contentView addSubview:self.titleField positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.statusField positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         [contentView addSubview:self.workshopDrawerButton positioned:NSWindowAbove relativeTo:nil];
+        [contentView addSubview:self.drawerFolderScrollView positioned:NSWindowAbove relativeTo:nil];
     }
 
     CGFloat bottomNavigationHeight = 62.0;
@@ -577,7 +597,7 @@
     CGFloat headerLeftX = mainX + 12.0;
     CGFloat globalHeaderTitleX = mainX + 18.0;
     CGFloat chatHeaderTitleX = mainX + 16.0;
-    if (!drawerHidden) {
+    if (!drawerHidden || profileActive) {
         [self.drawerButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
         [[self.drawerButton superview] addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         headerLeftX += headerButtonSize + 8.0;
@@ -825,7 +845,11 @@
     if (groupedWidth < 360.0) {
         groupedWidth = mainWidth - 32.0;
     }
-    [self.profileTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
+    [self.profileTitleField setAlignment:NSCenterTextAlignment];
+    [self.profileTitleField setFrame:NSMakeRect(mainX + 88.0,
+                                                panelTitleY,
+                                                MAX(120.0, mainWidth - 176.0),
+                                                20.0)];
     CGFloat profileScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat profileScrollTop = mainTop - TGPanelHeaderHeight - 8.0;
     CGFloat profileScrollHeight = profileScrollTop - profileScrollBottom;
@@ -1006,7 +1030,11 @@
         [profileClipView setBoundsOrigin:NSMakePoint(0.0, profileClipOrigin.y)];
     }
 
-    [self.settingsTitleField setFrame:NSMakeRect(globalHeaderTitleX, panelTitleY, 240.0, 22.0)];
+    [self.settingsTitleField setAlignment:NSCenterTextAlignment];
+    [self.settingsTitleField setFrame:NSMakeRect(mainX + 58.0,
+                                                 panelTitleY,
+                                                 MAX(120.0, mainWidth - 116.0),
+                                                 20.0)];
 
     CGFloat settingsScrollBottom = bottomNavigationY + bottomNavigationHeight + 10.0;
     CGFloat settingsScrollTop = mainTop - TGPanelHeaderHeight - 8.0;

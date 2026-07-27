@@ -494,12 +494,96 @@ def check_primary_navigation_contract(errors):
     for fragment in [
         "contactSummariesWithTimeout:",
         "privateChatIDForUserID:",
+        "userProfileSummaryForUserID:",
         "applySearchFilter",
+        "loadSelectedContactProfile",
+        "TGContactProfileView",
         "contactsViewControllerDidRequestNewConversation:",
     ]:
         if fragment not in contacts_text:
             errors.append("%s: contacts section is missing `%s`" %
                           (contacts_rel, fragment))
+
+    button_cells_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
+    button_cells_text = read_text(os.path.join(ROOT, button_cells_rel))
+    for asset_name in ["call-receive", "settings"]:
+        asset_rel = os.path.join("Sources", "Resources", "Icons", asset_name + ".png")
+        if not os.path.isfile(os.path.join(ROOT, asset_rel)):
+            errors.append("%s: approved navigation icon asset is missing" % asset_rel)
+        expected_draw = 'TGDrawTemplateIconAsset(@"%s"' % asset_name
+        if expected_draw not in button_cells_text:
+            errors.append("%s: navigation must render approved asset `%s`" %
+                          (button_cells_rel, asset_name))
+
+    navigation_draw_start = button_cells_text.find("static void TGDrawNavigationIcon")
+    navigation_draw_end = button_cells_text.find("@implementation TGNavigationButtonCell")
+    navigation_draw_text = button_cells_text[navigation_draw_start:navigation_draw_end]
+    if "NSBezierPath *receiver" in navigation_draw_text:
+        errors.append("%s: call navigation icon must not be hand-drawn" % button_cells_rel)
+    if "CGFloat iconSize = 18.0;" not in button_cells_text:
+        errors.append("%s: primary navigation icons must keep the compact 18-point size" %
+                      button_cells_rel)
+    if "TGPrimaryTextButtonCell *openCell" not in contacts_text:
+        errors.append("%s: open-chat action must use the themed primary text-button cell" %
+                      contacts_rel)
+    if 'TGDrawTemplateIconAsset(@"route-arrow"' not in button_cells_text:
+        errors.append("%s: drawer back state must use the approved route-arrow asset" %
+                      button_cells_rel)
+    if "profileBackButton" in controller_text:
+        errors.append("%s: profile must reuse the drawer button back state, not add a separate text button" %
+                      controller_rel)
+
+    section_layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    section_layout_text = read_text(os.path.join(ROOT, section_layout_rel))
+    for fragment in [
+        "drawerFolderScrollView",
+        "drawerFolderContentView",
+        "drawerFolderButtonHeight = 46.0",
+        "drawerFolderRequiredHeight",
+        "drawerTopInset = 8.0",
+    ]:
+        if fragment not in controller_text and fragment not in section_layout_text:
+            errors.append("%s: scrollable top-aligned drawer is missing `%s`" %
+                          (section_layout_rel, fragment))
+    if "drawerFolderButtonHeight = floor" in section_layout_text:
+        errors.append("%s: drawer folder rows must scroll instead of shrinking with the window" %
+                      section_layout_rel)
+    if "NSWidth([self.drawerFolderScrollView contentSize])" in section_layout_text:
+        errors.append("%s: NSWidth requires NSRect; use the scroll contentView bounds on legacy AppKit" %
+                      section_layout_rel)
+
+    message_hit_testing_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
+    message_hit_testing_text = read_text(os.path.join(ROOT, message_hit_testing_rel))
+    message_menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    message_menus_text = read_text(os.path.join(ROOT, message_menus_rel))
+    table_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    table_flow_text = read_text(os.path.join(ROOT, table_flow_rel))
+    for fragment in [
+        "TGMessageItemIsNonVisualDocument",
+        "openDocumentAttachmentForMessageItem",
+    ]:
+        if fragment not in message_hit_testing_text:
+            errors.append("%s: document bubble interaction is missing `%s`" %
+                          (message_hit_testing_rel, fragment))
+    for fragment in [
+        "openMessageDocumentFromMenu",
+        "saveMessageDocumentAsFromMenu",
+        "revealMessageDocumentFromMenu",
+    ]:
+        if fragment not in message_menus_text:
+            errors.append("%s: direct document action is missing `%s`" %
+                          (message_menus_rel, fragment))
+    if "TGMessageItemIsNonVisualDocument" not in table_flow_text:
+        errors.append("%s: document bubbles must expose an action tooltip" % table_flow_rel)
+
+    calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
+    calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
+    calls_header_text = read_text(os.path.join(ROOT, calls_header_rel))
+    calls_implementation_text = read_text(os.path.join(ROOT, calls_implementation_rel))
+    if "TGCallsPlaceholderView : TGPanelView" not in calls_header_text:
+        errors.append("%s: calls must use the shared panel/header shell" % calls_header_rel)
+    if "NSHeight(bounds) - 68.0" not in calls_implementation_text:
+        errors.append("%s: calls card must fill the panel body" % calls_implementation_rel)
 
 
 def main():

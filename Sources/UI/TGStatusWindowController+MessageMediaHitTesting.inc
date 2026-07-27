@@ -478,6 +478,12 @@
             return;
         }
     }
+    if (TGMessageItemIsNonVisualDocument((TGMessageItem *)item)) {
+        if (!NSIsEmptyRect(bubbleRect) && NSPointInRect(tablePoint, bubbleRect)) {
+            [self openDocumentAttachmentForMessageItem:(TGMessageItem *)item];
+            return;
+        }
+    }
 
     NSURL *url = [self messageLinkURLForItem:(TGMessageItem *)item
                                  inCellFrame:cellFrame
