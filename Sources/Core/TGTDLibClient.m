@@ -247,6 +247,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_senderSummaryCache;
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSMutableDictionary *_notificationScopeMutedByType;
+    NSMutableDictionary *_savedMessagesTopicsByID;
     NSString *_latestAuthorizationStateSummary;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
@@ -392,6 +393,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _senderSummaryCache = [[NSMutableDictionary alloc] init];
         _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
         _notificationScopeMutedByType = [[NSMutableDictionary alloc] init];
+        _savedMessagesTopicsByID = [[NSMutableDictionary alloc] init];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -527,6 +529,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_senderSummaryCache release];
     [_syntheticMediaAlbumIDByMessageKey release];
     [_notificationScopeMutedByType release];
+    [_savedMessagesTopicsByID release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
     [_sendLock release];
@@ -1204,6 +1207,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary {
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
+    NSString *objectType = [[dictionary objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [dictionary objectForKey:@"@type"] : @"";
     id extraObject = [dictionary objectForKey:@"@extra"];
     NSArray *chatFilterInfos = [self chatFilterInfoItemsFromUpdateObject:dictionary];
     NSString *scopeUpdateType = nil;
@@ -1239,6 +1244,15 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([scopeUpdateType length] > 0 && scopeUpdateMuted) {
         [_notificationScopeMutedByType setObject:scopeUpdateMuted forKey:scopeUpdateType];
     }
+    if ([objectType isEqualToString:@"updateSavedMessagesTopic"]) {
+        NSDictionary *topic = [[dictionary objectForKey:@"topic"] isKindOfClass:[NSDictionary class]]
+            ? [dictionary objectForKey:@"topic"] : nil;
+        id topicID = [topic objectForKey:@"id"];
+        if ([topicID respondsToSelector:@selector(longLongValue)] && [topicID longLongValue] != 0LL) {
+            [_savedMessagesTopicsByID setObject:topic
+                                         forKey:[NSNumber numberWithLongLong:[topicID longLongValue]]];
+        }
+    }
 
     if ([extraObject isKindOfClass:[NSString class]] && [_waitingResponseExtras containsObject:extraObject]) {
         NSString *extra = (NSString *)extraObject;
@@ -1263,6 +1277,27 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSDictionary *userInfo = [NSDictionary dictionaryWithObject:chatFilterInfos forKey:@"chatFilterInfos"];
         [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibChatFiltersDidChangeNotification object:self userInfo:userInfo];
     }
+}
+
+- (NSArray *)savedMessagesTopicObjectsSnapshot {
+    [_responseCondition lock];
+    NSArray *topics = [[_savedMessagesTopicsByID allValues] copy];
+    [_responseCondition unlock];
+    NSArray *sorted = [topics sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+        long long leftOrder = [[left objectForKey:@"order"] respondsToSelector:@selector(longLongValue)]
+            ? [[left objectForKey:@"order"] longLongValue] : 0LL;
+        long long rightOrder = [[right objectForKey:@"order"] respondsToSelector:@selector(longLongValue)]
+            ? [[right objectForKey:@"order"] longLongValue] : 0LL;
+        if (leftOrder > rightOrder) {
+            return NSOrderedAscending;
+        }
+        if (leftOrder < rightOrder) {
+            return NSOrderedDescending;
+        }
+        return NSOrderedSame;
+    }];
+    [topics release];
+    return sorted;
 }
 
 - (void)receiverThreadMain {

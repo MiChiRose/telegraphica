@@ -238,6 +238,8 @@
     [self showView:self.settingsProfileButton visible:showSettings];
     [self showView:self.settingsAccountCardView visible:showSettings];
     [self showView:self.settingsFoldersCardView visible:showSettings];
+    [self showView:self.settingsSavedCardView visible:showSettings];
+    [self showView:self.settingsPrivacyCardView visible:showSettings];
     [self showView:self.settingsDrawerCardView visible:showSettings];
     [self showView:self.settingsResourceCardView visible:showSettings];
     [self showView:self.settingsThemeCardView visible:showSettings];
@@ -247,6 +249,8 @@
     [self showView:self.settingsTitleField visible:showSettings];
     [self showView:self.settingsStateField visible:showSettings];
     [self showView:self.settingsFoldersSectionField visible:showSettings];
+    [self showView:self.settingsSavedSectionField visible:showSettings];
+    [self showView:self.settingsPrivacySectionField visible:showSettings];
     [self showView:self.settingsDrawerSectionField visible:showSettings];
     [self showView:self.settingsResourceSectionField visible:showSettings];
     [self showView:self.settingsLibraryField visible:showSettings];
@@ -266,6 +270,8 @@
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
     [self showView:self.settingsChatFoldersButton visible:showSettings];
+    [self showView:self.settingsSavedMessagesButton visible:showSettings];
+    [self showView:self.settingsPrivacyButton visible:showSettings];
     [self showView:self.settingsEconomyModeButton visible:showSettings];
     [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
@@ -1151,6 +1157,7 @@
     CGFloat profileCardHeight = 72.0;
     CGFloat notificationCardHeight = 180.0;
     CGFloat foldersCardHeight = 54.0;
+    CGFloat savedCardHeight = 54.0;
     CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
@@ -1162,6 +1169,7 @@
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + foldersCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + savedCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + privacyCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
@@ -1239,6 +1247,21 @@
                                                         rowWidth,
                                                         30.0)];
     settingsNextY = foldersCardY + foldersCardHeight + settingsGroupGap;
+
+    [self.settingsSavedSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                        settingsNextY,
+                                                        settingsGroupedWidth - 40.0,
+                                                        settingsLabelHeight)];
+    CGFloat savedCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsSavedCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                    savedCardY,
+                                                    settingsGroupedWidth,
+                                                    savedCardHeight)];
+    [self.settingsSavedMessagesButton setFrame:NSMakeRect(rowLeft,
+                                                          savedCardY + 12.0,
+                                                          rowWidth,
+                                                          30.0)];
+    settingsNextY = savedCardY + savedCardHeight + settingsGroupGap;
 
     [self.settingsPrivacySectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
                                                           settingsNextY,
