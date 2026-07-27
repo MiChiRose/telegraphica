@@ -426,6 +426,17 @@
     [self updateApplicationBadge];
 }
 
+- (void)showNotificationSettingsWindow:(id)sender {
+    (void)sender;
+    if (!self.notificationSettingsWindowController) {
+        self.notificationSettingsWindowController = [[[TGNotificationSettingsWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [[self.notificationSettingsWindowController window] center];
+    [self.notificationSettingsWindowController showWindow:self];
+    [[self.notificationSettingsWindowController window] makeKeyAndOrderFront:self];
+    [self.notificationSettingsWindowController reloadExceptions];
+}
+
 - (void)interfaceSettingChanged:(id)sender {
     (void)sender;
     BOOL drawerHidden = ([self.settingsDrawerHiddenButton state] == NSOnState);

@@ -262,6 +262,7 @@
     [self showView:self.settingsNotificationBadgeButton visible:showSettings];
     [self showView:self.settingsNotificationPreviewButton visible:showSettings];
     [self showView:self.settingsNotificationsWhenActiveButton visible:showSettings];
+    [self showView:self.settingsNotificationExceptionsButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
     [self showView:self.settingsChatFoldersButton visible:showSettings];
@@ -1147,7 +1148,7 @@
     CGFloat settingsGroupGap = 12.0;
     CGFloat settingsBottomPadding = 58.0;
     CGFloat profileCardHeight = 72.0;
-    CGFloat notificationCardHeight = 140.0;
+    CGFloat notificationCardHeight = 180.0;
     CGFloat foldersCardHeight = 54.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
@@ -1215,6 +1216,10 @@
     [self.settingsNotificationBadgeButton setFrame:NSMakeRect(rowLeft, notificationCardY + 60.0, rowWidth, 22.0)];
     [self.settingsNotificationPreviewButton setFrame:NSMakeRect(rowLeft, notificationCardY + 84.0, rowWidth, 22.0)];
     [self.settingsNotificationsWhenActiveButton setFrame:NSMakeRect(rowLeft, notificationCardY + 108.0, rowWidth, 22.0)];
+    [self.settingsNotificationExceptionsButton setFrame:NSMakeRect(rowLeft,
+                                                                   notificationCardY + 140.0,
+                                                                   rowWidth,
+                                                                   30.0)];
     settingsNextY = notificationCardY + notificationCardHeight + settingsGroupGap;
 
     [self.settingsFoldersSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,

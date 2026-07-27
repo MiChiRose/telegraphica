@@ -142,12 +142,12 @@
 }
 
 - (NSMenuItem *)chatCurrentMuteStateMenuItemForChatItem:(TGChatItem *)item {
-    NSString *title = @"Notifications are on";
+    NSString *title = TGLoc(@"chat.notifications.serverOn");
     NSNumber *chatID = [self notificationChatIDForChatItem:item];
     if ([self isChatIDLocallyMuted:chatID]) {
-        title = @"Notifications are muted locally";
+        title = TGLoc(@"chat.notifications.localFallback");
     } else if ([item serverNotificationsMuted]) {
-        title = @"Muted in Telegram";
+        title = TGLoc(@"chat.notifications.serverMuted");
     }
     NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""] autorelease];
     [menuItem setEnabled:NO];
@@ -483,7 +483,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
 
     [menu addItem:[self chatCurrentMuteStateMenuItemForChatItem:item]];
 
-    if ([self isChatIDLocallyMuted:[self notificationChatIDForChatItem:item]]) {
+    if ([self isChatItemEffectivelyMuted:item]) {
         NSMenuItem *unmuteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.notifications.enable")
                                                              action:@selector(unmuteChatFromMenu:)
                                                       keyEquivalent:@""] autorelease];
@@ -1400,8 +1400,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     if (![chatID respondsToSelector:@selector(longLongValue)] || ![duration respondsToSelector:@selector(doubleValue)]) {
         return;
     }
-    [self setLocalNotificationMuteForChatID:chatID duration:[duration doubleValue]];
-    [self appendDetail:[NSString stringWithFormat:@"Notifications muted locally for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
+    [self setServerNotificationMuteForChatItem:item duration:[duration doubleValue]];
 }
 
 - (void)unmuteChatFromMenu:(id)sender {
@@ -1410,8 +1409,63 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         return;
     }
-    [self setLocalNotificationMuteForChatID:chatID duration:0.0];
-    [self appendDetail:[NSString stringWithFormat:@"Local notifications enabled for %@.", [[item title] length] > 0 ? [item title] : @"chat"]];
+    [self setServerNotificationMuteForChatItem:item duration:0.0];
+}
+
+- (void)setServerNotificationMuteForChatItem:(TGChatItem *)item duration:(NSTimeInterval)duration {
+    NSNumber *sourceChatID = [self notificationChatIDForChatItem:item];
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        ![sourceChatID respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    TGChatItem *itemCopy = [item retain];
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[sourceChatID longLongValue]] retain];
+    NSString *title = [[[item title] length] > 0 ? [item title] : @"chat" copy];
+    TGTDLibClient *client = [self.client retain];
+    BOOL targetMuted = (duration != 0.0);
+
+    [self.statusField setStringValue:(targetMuted ? TGLoc(@"chat.notifications.syncingMute")
+                                                   : TGLoc(@"chat.notifications.syncingEnable"))];
+    [[TGLogger sharedLogger] log:(targetMuted
+        ? @"TDLib server chat mute requested."
+        : @"TDLib server chat unmute requested.")];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *notificationError = nil;
+        BOOL succeeded = [client setChatNotificationMuteForChatID:chatID
+                                                          muteFor:duration
+                                                          timeout:8.0
+                                                            error:&notificationError];
+        NSString *errorMessage = [[notificationError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self setLocalNotificationMuteForChatID:chatID duration:0.0];
+                [itemCopy setServerNotificationsMuted:targetMuted];
+                [itemCopy setNotificationsMuted:targetMuted];
+                [self.chatTableView reloadData];
+                [self updateApplicationBadge];
+                [self.statusField setStringValue:(targetMuted ? TGLoc(@"chat.notifications.serverMuted")
+                                                               : TGLoc(@"chat.notifications.serverOn"))];
+                [self appendDetail:[NSString stringWithFormat:@"Telegram notification settings synchronized for %@.", title]];
+                [self reloadChatsInteractive:NO preserveSelection:YES];
+            } else {
+                [self setLocalNotificationMuteForChatID:chatID duration:duration];
+                [self.statusField setStringValue:TGLoc(@"chat.notifications.localFallback")];
+                [self appendDetail:[NSString stringWithFormat:@"Telegram notification synchronization unavailable for %@: %@",
+                                    title,
+                                    [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [itemCopy release];
+            [chatID release];
+            [title release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)submitReactionEmoji:(NSString *)emoji toMessageItem:(TGMessageItem *)item removing:(BOOL)removing {

@@ -9,6 +9,7 @@
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGMessageViewersWindowController.h"
+#import "TGNotificationSettingsWindowController.h"
 #import "TGAnimationSupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
@@ -38,6 +39,7 @@
 #import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+Notifications.h"
 #import "../Services/TGLocalDataReset.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
@@ -257,6 +259,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGStorageUsageWindowController *storageUsageWindowController;
 @property (nonatomic, retain) TGChatLifecycleWindowController *chatLifecycleWindowController;
 @property (nonatomic, retain) TGChatFolderManagementWindowController *chatFolderManagementWindowController;
+@property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) TGSectionTitleField *settingsProfileSectionField;
@@ -436,6 +439,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsNotificationBadgeButton;
 @property (nonatomic, retain) NSButton *settingsNotificationPreviewButton;
 @property (nonatomic, retain) NSButton *settingsNotificationsWhenActiveButton;
+@property (nonatomic, retain) NSButton *settingsNotificationExceptionsButton;
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
 @property (nonatomic, retain) NSButton *settingsTypingIndicatorsButton;
 @property (nonatomic, retain) NSButton *settingsChatFoldersButton;
@@ -897,6 +901,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsNotificationBadgeButton = _settingsNotificationBadgeButton;
 @synthesize settingsNotificationPreviewButton = _settingsNotificationPreviewButton;
 @synthesize settingsNotificationsWhenActiveButton = _settingsNotificationsWhenActiveButton;
+@synthesize settingsNotificationExceptionsButton = _settingsNotificationExceptionsButton;
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
 @synthesize settingsTypingIndicatorsButton = _settingsTypingIndicatorsButton;
 @synthesize settingsChatFoldersButton = _settingsChatFoldersButton;
@@ -1053,6 +1058,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatsNavigationContextMenu = _chatsNavigationContextMenu;
 @synthesize chatLifecycleWindowController = _chatLifecycleWindowController;
 @synthesize chatFolderManagementWindowController = _chatFolderManagementWindowController;
+@synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -1548,6 +1554,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsNotificationBadgeButton setTitle:TGLoc(@"settings.badge")];
     [self.settingsNotificationPreviewButton setTitle:TGLoc(@"settings.preview")];
     [self.settingsNotificationsWhenActiveButton setTitle:TGLoc(@"settings.whenActive")];
+    [self.settingsNotificationExceptionsButton setTitle:TGLoc(@"notifications.exceptions.open")];
     [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
     [self.settingsTypingIndicatorsButton setTitle:TGLoc(@"settings.typing")];
     [self.settingsChatFoldersButton setTitle:TGLoc(@"folders.manage.open")];
@@ -3122,6 +3129,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsNotificationsWhenActiveButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsNotificationsWhenActiveButton];
 
+    self.settingsNotificationExceptionsButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 166, 716, 30)] autorelease];
+    [self.settingsNotificationExceptionsButton setTitle:TGLoc(@"notifications.exceptions.open")];
+    [self.settingsNotificationExceptionsButton setTarget:self];
+    [self.settingsNotificationExceptionsButton setAction:@selector(showNotificationSettingsWindow:)];
+    [self applyUtilityButtonStyle:self.settingsNotificationExceptionsButton];
+    [self.settingsNotificationExceptionsButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:self.settingsNotificationExceptionsButton];
+
     self.settingsDrawerHiddenButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 228, 260, 22)] autorelease];
     [self.settingsDrawerHiddenButton setButtonType:NSSwitchButton];
     [self.settingsDrawerHiddenButton setTitle:@"Hide side drawer"];
@@ -3317,6 +3332,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsNotificationBadgeButton,
                                      self.settingsNotificationPreviewButton,
                                      self.settingsNotificationsWhenActiveButton,
+                                     self.settingsNotificationExceptionsButton,
                                      self.settingsDrawerHiddenButton,
                                      self.settingsTypingIndicatorsButton,
                                      self.settingsChatFoldersButton,
@@ -4218,6 +4234,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsNotificationBadgeButton release];
     [_settingsNotificationPreviewButton release];
     [_settingsNotificationsWhenActiveButton release];
+    [_settingsNotificationExceptionsButton release];
     [_settingsDrawerHiddenButton release];
     [_settingsTypingIndicatorsButton release];
     [_settingsChatFoldersButton release];
@@ -4253,6 +4270,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatLifecycleWindowController release];
     [[_chatFolderManagementWindowController window] close];
     [_chatFolderManagementWindowController release];
+    [[_notificationSettingsWindowController window] close];
+    [_notificationSettingsWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_profileEditButton release];
