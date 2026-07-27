@@ -31,11 +31,11 @@
         [self.titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
         [self addSubview:self.titleField];
 
-        self.cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(80, 180, MAX(320.0, NSWidth(frame) - 160.0), 150)] autorelease];
-        [self.cardView setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin | NSViewMaxYMargin)];
+        self.cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(14, 14, MAX(280.0, NSWidth(frame) - 28.0), MAX(150.0, NSHeight(frame) - 68.0))] autorelease];
+        [self.cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self addSubview:self.cardView];
 
-        self.messageField = [[[NSTextField alloc] initWithFrame:NSMakeRect(108, 222, MAX(264.0, NSWidth(frame) - 216.0), 66)] autorelease];
+        self.messageField = [[[NSTextField alloc] initWithFrame:NSMakeRect(42, 222, MAX(224.0, NSWidth(frame) - 84.0), 66)] autorelease];
         [self.messageField setEditable:NO];
         [self.messageField setSelectable:NO];
         [self.messageField setBezeled:NO];
@@ -60,11 +60,15 @@
     (void)oldSize;
     NSRect bounds = [self bounds];
     [self.titleField setFrame:NSMakeRect(58.0, NSHeight(bounds) - 32.0, MAX(120.0, NSWidth(bounds) - 116.0), 20.0)];
-    CGFloat cardWidth = MIN(560.0, MAX(300.0, NSWidth(bounds) - 120.0));
-    CGFloat cardX = floor((NSWidth(bounds) - cardWidth) / 2.0);
-    CGFloat cardY = floor((NSHeight(bounds) - 150.0) / 2.0);
-    [self.cardView setFrame:NSMakeRect(cardX, cardY, cardWidth, 150.0)];
-    [self.messageField setFrame:NSMakeRect(cardX + 28.0, cardY + 42.0, cardWidth - 56.0, 66.0)];
+    CGFloat cardX = 14.0;
+    CGFloat cardY = 14.0;
+    CGFloat cardWidth = MAX(280.0, NSWidth(bounds) - 28.0);
+    CGFloat cardHeight = MAX(150.0, NSHeight(bounds) - 68.0);
+    [self.cardView setFrame:NSMakeRect(cardX, cardY, cardWidth, cardHeight)];
+    [self.messageField setFrame:NSMakeRect(cardX + 28.0,
+                                           cardY + floor((cardHeight - 66.0) / 2.0),
+                                           MAX(224.0, cardWidth - 56.0),
+                                           66.0)];
 }
 
 - (void)refreshLocalizedText {

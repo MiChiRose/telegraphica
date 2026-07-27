@@ -1,6 +1,7 @@
 #import "TGContactsViewController.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "TGContactProfileView.h"
 #import "TGIconAssets.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
@@ -123,11 +124,17 @@ static NSString *TGContactsInitials(NSString *displayName) {
 @property (nonatomic, retain) NSButton *refreshButton;
 @property (nonatomic, retain) NSButton *createChatButton;
 @property (nonatomic, retain) NSButton *openButton;
+@property (nonatomic, retain) TGContactProfileView *profileView;
 @property (nonatomic, copy) NSArray *contacts;
 @property (nonatomic, copy) NSArray *filteredContacts;
+@property (nonatomic, retain) NSMutableDictionary *profilesByUserID;
+@property (nonatomic, retain) NSNumber *profileLoadingUserID;
 @property (nonatomic, assign) BOOL loading;
 @property (nonatomic, assign) BOOL loaded;
 @property (nonatomic, assign) NSUInteger requestGeneration;
+@property (nonatomic, assign) NSUInteger profileRequestGeneration;
+- (void)layoutContent;
+- (void)loadSelectedContactProfile;
 @end
 
 @implementation TGContactsViewController
@@ -143,11 +150,15 @@ static NSString *TGContactsInitials(NSString *displayName) {
 @synthesize refreshButton = _refreshButton;
 @synthesize createChatButton = _createChatButton;
 @synthesize openButton = _openButton;
+@synthesize profileView = _profileView;
 @synthesize contacts = _contacts;
 @synthesize filteredContacts = _filteredContacts;
+@synthesize profilesByUserID = _profilesByUserID;
+@synthesize profileLoadingUserID = _profileLoadingUserID;
 @synthesize loading = _loading;
 @synthesize loaded = _loaded;
 @synthesize requestGeneration = _requestGeneration;
+@synthesize profileRequestGeneration = _profileRequestGeneration;
 
 - (id)initWithClient:(TGTDLibClient *)client {
     self = [super initWithNibName:nil bundle:nil];
@@ -155,6 +166,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
         self.client = client;
         self.contacts = [NSArray array];
         self.filteredContacts = [NSArray array];
+        self.profilesByUserID = [NSMutableDictionary dictionary];
         [self buildView];
     }
     return self;
@@ -226,6 +238,9 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [self.scrollView setDocumentView:self.tableView];
     [root addSubview:self.scrollView];
 
+    self.profileView = [[[TGContactProfileView alloc] initWithFrame:NSMakeRect(470, 52, 232, 416)] autorelease];
+    [root addSubview:self.profileView];
+
     self.statusField = [self labelWithFrame:NSMakeRect(18, 18, 450, 22)
                                       font:[NSFont systemFontOfSize:12.0]
                                      color:TGClassicMutedInkColor()];
@@ -240,6 +255,10 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [root addSubview:self.spinner];
 
     self.openButton = [[[NSButton alloc] initWithFrame:NSMakeRect(520, 12, 182, 30)] autorelease];
+    TGPrimaryTextButtonCell *openCell = [[[TGPrimaryTextButtonCell alloc] initTextCell:@""] autorelease];
+    [openCell setButtonType:NSMomentaryPushInButton];
+    [self.openButton setCell:openCell];
+    [self.openButton setBordered:NO];
     [self.openButton setTarget:self];
     [self.openButton setAction:@selector(openSelectedContact:)];
     [self.openButton setEnabled:NO];
@@ -272,20 +291,38 @@ static NSString *TGContactsInitials(NSString *displayName) {
 
     CGFloat searchY = height - headerHeight - 40.0;
     [self.searchField setFrame:NSMakeRect(margin, searchY, MAX(120.0, width - (margin * 2.0)), 28.0)];
-    CGFloat footerHeight = 48.0;
     CGFloat tableTop = searchY - 8.0;
+    BOOL showsProfile = (width >= 720.0);
+    CGFloat footerHeight = showsProfile ? 48.0 : 78.0;
+    CGFloat profileWidth = showsProfile ? MIN(320.0, MAX(250.0, floor(width * 0.34))) : 0.0;
+    CGFloat listWidth = showsProfile ? (width - (margin * 3.0) - profileWidth) : (width - (margin * 2.0));
+    [self.searchField setFrame:NSMakeRect(margin, searchY, MAX(120.0, listWidth), 28.0)];
+    [self.profileView setHidden:!showsProfile];
     [self.scrollView setFrame:NSMakeRect(margin,
                                          footerHeight,
-                                         MAX(120.0, width - (margin * 2.0)),
+                                         MAX(120.0, listWidth),
                                          MAX(80.0, tableTop - footerHeight))];
+    if (showsProfile) {
+        [self.profileView setFrame:NSMakeRect(margin * 2.0 + listWidth,
+                                              footerHeight,
+                                              profileWidth,
+                                              MAX(80.0, tableTop - footerHeight))];
+    }
     [self.scrollView tile];
     NSTableColumn *contactColumn = [self.tableView tableColumnWithIdentifier:@"contact"];
     if (contactColumn) {
         [contactColumn setWidth:MAX(100.0, NSWidth([[self.scrollView contentView] bounds]))];
     }
-    [self.statusField setFrame:NSMakeRect(margin, 15.0, MAX(80.0, width - 230.0), 22.0)];
-    [self.spinner setFrame:NSMakeRect(width - 218.0, 18.0, 16.0, 16.0)];
-    [self.openButton setFrame:NSMakeRect(width - margin - 184.0, 10.0, 184.0, 30.0)];
+    if (showsProfile) {
+        CGFloat profileX = margin * 2.0 + listWidth;
+        [self.statusField setFrame:NSMakeRect(margin, 15.0, MAX(80.0, listWidth - 24.0), 22.0)];
+        [self.spinner setFrame:NSMakeRect(margin + listWidth - 18.0, 18.0, 16.0, 16.0)];
+        [self.openButton setFrame:NSMakeRect(profileX, 9.0, profileWidth, 32.0)];
+    } else {
+        [self.statusField setFrame:NSMakeRect(margin, 48.0, MAX(80.0, width - margin * 2.0 - 24.0), 22.0)];
+        [self.spinner setFrame:NSMakeRect(width - margin - 18.0, 51.0, 16.0, 16.0)];
+        [self.openButton setFrame:NSMakeRect(margin, 8.0, MAX(120.0, width - margin * 2.0), 32.0)];
+    }
 }
 
 - (void)setView:(NSView *)view {
@@ -315,8 +352,11 @@ static NSString *TGContactsInitials(NSString *displayName) {
     [_refreshButton release];
     [_createChatButton release];
     [_openButton release];
+    [_profileView release];
     [_contacts release];
     [_filteredContacts release];
+    [_profilesByUserID release];
+    [_profileLoadingUserID release];
     [super dealloc];
 }
 
@@ -337,6 +377,8 @@ static NSString *TGContactsInitials(NSString *displayName) {
 - (void)refreshThemeAppearance {
     [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self.statusField setTextColor:TGClassicMutedInkColor()];
+    [self.profileView refreshThemeAppearance];
+    [self.openButton setNeedsDisplay:YES];
     [[self view] setNeedsDisplay:YES];
     [self.tableView setNeedsDisplay:YES];
 }
@@ -367,6 +409,9 @@ static NSString *TGContactsInitials(NSString *displayName) {
         return;
     }
     self.requestGeneration++;
+    self.profileRequestGeneration++;
+    self.profileLoadingUserID = nil;
+    [self.profilesByUserID removeAllObjects];
     NSUInteger generation = self.requestGeneration;
     [self setLoading:YES];
     [self.statusField setTextColor:TGClassicMutedInkColor()];
@@ -425,6 +470,7 @@ static NSString *TGContactsInitials(NSString *displayName) {
     }
     [self.tableView reloadData];
     [self updateSelection];
+    [self loadSelectedContactProfile];
     if ([self.filteredContacts count] == 0) {
         [self.statusField setStringValue:([self.contacts count] == 0 ? TGLoc(@"contacts.empty") : TGLoc(@"contacts.noResults"))];
     } else {
@@ -448,10 +494,80 @@ static NSString *TGContactsInitials(NSString *displayName) {
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
     (void)notification;
     [self updateSelection];
+    [self loadSelectedContactProfile];
 }
 
 - (void)updateSelection {
     [self.openButton setEnabled:(!self.loading && [self.tableView selectedRow] >= 0)];
+}
+
+- (void)loadSelectedContactProfile {
+    NSInteger row = [self.tableView selectedRow];
+    if (row < 0 || (NSUInteger)row >= [self.filteredContacts count]) {
+        self.profileRequestGeneration++;
+        self.profileLoadingUserID = nil;
+        [self.profileView showPlaceholder];
+        return;
+    }
+    NSDictionary *contact = [[self.filteredContacts objectAtIndex:(NSUInteger)row] retain];
+    NSNumber *userID = [[contact objectForKey:@"user_id"] retain];
+    NSDictionary *cachedProfile = [self.profilesByUserID objectForKey:userID];
+    if (cachedProfile) {
+        self.profileRequestGeneration++;
+        self.profileLoadingUserID = nil;
+        [self.profileView showContact:cachedProfile];
+        [userID release];
+        [contact release];
+        return;
+    }
+    if ([self.profileLoadingUserID isEqualToNumber:userID]) {
+        [self.profileView showLoadingForContact:contact];
+        [userID release];
+        [contact release];
+        return;
+    }
+    self.profileRequestGeneration++;
+    NSUInteger generation = self.profileRequestGeneration;
+    self.profileLoadingUserID = userID;
+    [self.profileView showLoadingForContact:contact];
+    TGTDLibClient *client = [self.client retain];
+    TGContactsViewController *controller = [self retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *profileError = nil;
+        NSDictionary *profile = [[client userProfileSummaryForUserID:userID timeout:6.0 error:&profileError] copy];
+        NSString *errorMessage = [[profileError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSInteger selectedRow = [controller.tableView selectedRow];
+            NSNumber *selectedUserID = nil;
+            if (selectedRow >= 0 && (NSUInteger)selectedRow < [controller.filteredContacts count]) {
+                selectedUserID = [[controller.filteredContacts objectAtIndex:(NSUInteger)selectedRow] objectForKey:@"user_id"];
+            }
+            BOOL sameSelection = (selectedUserID &&
+                                  [selectedUserID respondsToSelector:@selector(longLongValue)] &&
+                                  [selectedUserID longLongValue] == [userID longLongValue]);
+            if ([controller.profileLoadingUserID isEqualToNumber:userID]) {
+                controller.profileLoadingUserID = nil;
+            }
+            if (profile) {
+                [controller.profilesByUserID setObject:profile forKey:userID];
+            }
+            if (generation == controller.profileRequestGeneration && sameSelection) {
+                if (profile) {
+                    [controller.profileView showContact:profile];
+                } else {
+                    [controller.profileView showError:errorMessage contact:contact];
+                }
+            }
+            [profile release];
+            [errorMessage release];
+            [client release];
+            [controller release];
+            [userID release];
+            [contact release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)controlTextDidChange:(NSNotification *)notification {

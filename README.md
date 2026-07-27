@@ -140,6 +140,8 @@ voice messages, and keep the app updated from GitHub Releases.
 - 🧩 Native sticker display with WEBP, TGS, and animated WEBM/VP9 sticker
   support on Mavericks.
 - 🔍 Chat search/navigation with a native search field.
+- 👥 Contacts browser with search, direct chat opening, and profile details
+  including presence, username, phone number, biography, and avatar.
 - 🧽 Storage usage view with cache cleanup.
 - 🧩 Optional Workshop modules that can be installed without increasing the
   base application download.
@@ -353,7 +355,7 @@ PRODUCT.md                     Product and design direction
 
 - Improve edge-case animated sticker playback and GIF handling.
 - More complete document download and preview handling.
-- Richer contact/profile views.
+- Deeper group/channel profiles and member-management views.
 - More polished skeuomorphic theme variants.
 - Safer automatic update flow for legacy Macs.
 - Optional all-in-one installer once the redistributable Mavericks TDLib lane is

@@ -494,7 +494,10 @@ def check_primary_navigation_contract(errors):
     for fragment in [
         "contactSummariesWithTimeout:",
         "privateChatIDForUserID:",
+        "userProfileSummaryForUserID:",
         "applySearchFilter",
+        "loadSelectedContactProfile",
+        "TGContactProfileView",
         "contactsViewControllerDidRequestNewConversation:",
     ]:
         if fragment not in contacts_text:
@@ -517,6 +520,27 @@ def check_primary_navigation_contract(errors):
     navigation_draw_text = button_cells_text[navigation_draw_start:navigation_draw_end]
     if "NSBezierPath *receiver" in navigation_draw_text:
         errors.append("%s: call navigation icon must not be hand-drawn" % button_cells_rel)
+    if "CGFloat iconSize = 18.0;" not in button_cells_text:
+        errors.append("%s: primary navigation icons must keep the compact 18-point size" %
+                      button_cells_rel)
+    if "TGPrimaryTextButtonCell *openCell" not in contacts_text:
+        errors.append("%s: open-chat action must use the themed primary text-button cell" %
+                      contacts_rel)
+    if 'TGDrawTemplateIconAsset(@"route-arrow"' not in button_cells_text:
+        errors.append("%s: drawer back state must use the approved route-arrow asset" %
+                      button_cells_rel)
+    if "profileBackButton" in controller_text:
+        errors.append("%s: profile must reuse the drawer button back state, not add a separate text button" %
+                      controller_rel)
+
+    calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
+    calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
+    calls_header_text = read_text(os.path.join(ROOT, calls_header_rel))
+    calls_implementation_text = read_text(os.path.join(ROOT, calls_implementation_rel))
+    if "TGCallsPlaceholderView : TGPanelView" not in calls_header_text:
+        errors.append("%s: calls must use the shared panel/header shell" % calls_header_rel)
+    if "NSHeight(bounds) - 68.0" not in calls_implementation_text:
+        errors.append("%s: calls card must fill the panel body" % calls_implementation_rel)
 
 
 def main():

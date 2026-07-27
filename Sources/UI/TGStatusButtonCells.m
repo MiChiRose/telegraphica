@@ -119,7 +119,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *title = [self title] ? [self title] : @"";
     NSColor *textColor = selected ? TGClassicNavigationTextColor(alpha) : TGClassicNavigationMutedTextColor(alpha);
     BOOL flipped = [controlView isFlipped];
-    CGFloat iconSize = self.iconOnly ? 27.0 : 18.0;
+    CGFloat iconSize = 18.0;
     NSRect iconRect = NSMakeRect(floor(NSMidX(cellFrame) - (iconSize / 2.0)),
                                  self.iconOnly ? floor(NSMidY(cellFrame) - (iconSize / 2.0)) :
                                      (flipped ? (NSMinY(cellFrame) + 6.0) : (NSMaxY(cellFrame) - 24.0)),
@@ -179,6 +179,14 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 
 @implementation TGDrawerButtonCell
 
+@synthesize backStyle = _backStyle;
+
+- (id)copyWithZone:(NSZone *)zone {
+    TGDrawerButtonCell *cell = [super copyWithZone:zone];
+    [cell setBackStyle:self.backStyle];
+    return cell;
+}
+
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
     (void)controlView;
     BOOL highlighted = [self isHighlighted];
@@ -194,6 +202,20 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSColor *lineColor = TGClassicNavigationTextColor(alpha);
     [lineColor set];
     BOOL flipped = [controlView isFlipped];
+    if (self.backStyle) {
+        NSRect backRect = NSMakeRect(floor(NSMidX(cellFrame) - 9.0),
+                                     floor(NSMidY(cellFrame) - 9.0),
+                                     18.0,
+                                     18.0);
+        [NSGraphicsContext saveGraphicsState];
+        NSAffineTransform *transform = [NSAffineTransform transform];
+        [transform translateXBy:(NSMinX(backRect) + NSMaxX(backRect)) yBy:0.0];
+        [transform scaleXBy:-1.0 yBy:1.0];
+        [transform concat];
+        TGDrawTemplateIconAsset(@"route-arrow", backRect, lineColor, 1.0, flipped);
+        [NSGraphicsContext restoreGraphicsState];
+        return;
+    }
     NSRect iconRect = NSMakeRect(NSMinX(cellFrame) + floor((NSWidth(cellFrame) - 18.0) / 2.0),
                                  NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 14.0) / 2.0),
                                  18.0,
@@ -367,6 +389,43 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSRect titleRect = NSMakeRect(NSMinX(buttonRect),
                                   NSMinY(buttonRect) + floor((NSHeight(buttonRect) - titleSize.height) / 2.0),
                                   NSWidth(buttonRect),
+                                  titleSize.height + 2.0);
+    [title drawInRect:titleRect withAttributes:attributes];
+}
+
+@end
+
+@implementation TGPrimaryTextButtonCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    BOOL highlighted = [self isHighlighted];
+    BOOL enabled = [self isEnabled];
+    CGFloat alpha = enabled ? 1.0 : 0.46;
+    NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:9.0 yRadius:9.0];
+    TGThemeDrawEnamelButtonInPath(path,
+                                 buttonRect,
+                                 highlighted,
+                                 YES,
+                                 enabled,
+                                 [controlView isFlipped]);
+    [TGClassicNavigationSelectedStrokeColor(0.92 * alpha) set];
+    [path setLineWidth:1.0];
+    [path stroke];
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
+                                TGClassicNavigationTextColor(alpha), NSForegroundColorAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSString *title = [self title] ? [self title] : @"";
+    NSSize titleSize = [title sizeWithAttributes:attributes];
+    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + 12.0,
+                                  floor(NSMidY(cellFrame) - (titleSize.height / 2.0)) - 1.0,
+                                  MAX(0.0, NSWidth(cellFrame) - 24.0),
                                   titleSize.height + 2.0);
     [title drawInRect:titleRect withAttributes:attributes];
 }

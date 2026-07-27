@@ -1,6 +1,8 @@
 #import <Cocoa/Cocoa.h>
 
-@interface TGCallsPlaceholderView : NSView
+#import "TGStatusViewCells.h"
+
+@interface TGCallsPlaceholderView : TGPanelView
 - (void)refreshLocalizedText;
 - (void)refreshThemeAppearance;
 @end

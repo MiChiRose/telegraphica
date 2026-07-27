@@ -101,8 +101,13 @@
     BOOL showChats = (ready && [section isEqualToString:TGSectionChats]);
     BOOL workshopModuleActive = ([section isEqualToString:TGSectionWorkshop] &&
                                  [self.workshopViewController hasActiveModule]);
-    [self showView:self.drawerButton visible:(ready && !drawerHidden && !workshopModuleActive && !showProfile)];
-    [self showView:self.profileBackButton visible:showProfile];
+    TGDrawerButtonCell *drawerCell = [[self.drawerButton cell] isKindOfClass:[TGDrawerButtonCell class]]
+        ? (TGDrawerButtonCell *)[self.drawerButton cell] : nil;
+    [drawerCell setBackStyle:showProfile];
+    [self.drawerButton setAction:(showProfile ? @selector(returnFromProfileToSettings:) : @selector(toggleDrawer:))];
+    [self.drawerButton setToolTip:(showProfile ? TGLoc(@"back") : @"Chat folders")];
+    [self.drawerButton setNeedsDisplay:YES];
+    [self showView:self.drawerButton visible:(ready && !workshopModuleActive && (showProfile || !drawerHidden))];
     [self showView:self.workshopDrawerButton visible:(ready && !drawerHidden && self.drawerOpen)];
     [self showView:self.sidebarPanelView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
@@ -350,6 +355,7 @@
     CGFloat height = NSHeight(bounds);
     CGFloat margin = 10.0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
+    BOOL profileActive = [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionProfile];
     BOOL drawerVisible = (!drawerHidden && self.drawerOpen);
     BOOL drawerConsumesLayout = drawerVisible;
     CGFloat railGutter = (!drawerHidden && self.drawerOpen) ? 10.0 : 0.0;
@@ -578,15 +584,13 @@
     CGFloat headerLeftX = mainX + 12.0;
     CGFloat globalHeaderTitleX = mainX + 18.0;
     CGFloat chatHeaderTitleX = mainX + 16.0;
-    if (!drawerHidden) {
+    if (!drawerHidden || profileActive) {
         [self.drawerButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
         [[self.drawerButton superview] addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         headerLeftX += headerButtonSize + 8.0;
         globalHeaderTitleX = headerLeftX;
         chatHeaderTitleX = headerLeftX;
     }
-    [self.profileBackButton setFrame:NSMakeRect(mainX + 10.0, headerButtonY, 72.0, headerButtonSize)];
-    [[self.profileBackButton superview] addSubview:self.profileBackButton positioned:NSWindowAbove relativeTo:nil];
     if (self.showingForumTopicList) {
         [self.topicBackButton setFrame:NSMakeRect(headerLeftX, headerButtonY, headerButtonSize, headerButtonSize)];
         chatHeaderTitleX = headerLeftX + headerButtonSize + 8.0;
