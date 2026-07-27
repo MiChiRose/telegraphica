@@ -84,7 +84,6 @@
         _searchField = [[NSSearchField alloc] initWithFrame:NSZeroRect];
         [_searchField setDelegate:self];
         [_searchField setTarget:self];
-        [_searchField setAction:@selector(commitSearch:)];
         [_searchField setBezeled:NO];
         [_searchField setBordered:NO];
         [_searchField setDrawsBackground:NO];
@@ -283,11 +282,7 @@
     [_results release];
     _results = [results retain];
     [_tableView reloadData];
-    if ([_results count] > 0) {
-        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
-    } else {
-        [_tableView deselectAll:self];
-    }
+    [_tableView deselectAll:self];
 }
 
 - (TGSearchResultItem *)selectedResult {
@@ -332,6 +327,21 @@
     if (commandSelector == @selector(insertNewline:) ||
         commandSelector == @selector(insertNewlineIgnoringFieldEditor:)) {
         [self commitSearch:self];
+        return YES;
+    }
+    if (commandSelector == @selector(moveDown:) || commandSelector == @selector(moveUp:)) {
+        NSInteger resultCount = (NSInteger)[_results count];
+        if (resultCount == 0) {
+            return YES;
+        }
+        NSInteger selectedRow = [_tableView selectedRow];
+        if (commandSelector == @selector(moveDown:)) {
+            selectedRow = (selectedRow < 0) ? 0 : MIN(resultCount - 1, selectedRow + 1);
+        } else {
+            selectedRow = (selectedRow < 0) ? (resultCount - 1) : MAX(0, selectedRow - 1);
+        }
+        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)selectedRow] byExtendingSelection:NO];
+        [_tableView scrollRowToVisible:selectedRow];
         return YES;
     }
     return NO;

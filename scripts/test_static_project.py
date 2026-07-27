@@ -556,7 +556,7 @@ def check_primary_navigation_contract(errors):
         "maximumChatSidebarWidthForWindowWidth",
         "sidebarResizeHandleDidRequestToggle",
         "compactChatSidebar",
-        "return (width < 286.0)",
+        "return (width < 248.0)",
         "[self.drawerButton setFrame:NSMakeRect(mainX + 12.0",
     ]:
         if fragment not in section_layout_text:
@@ -566,6 +566,25 @@ def check_primary_navigation_contract(errors):
     components_header_text = read_text(os.path.join(ROOT, components_header_rel))
     if "TGSidebarResizeHandleView" not in components_header_text:
         errors.append("%s: chat sidebar resize handle is missing" % components_header_rel)
+
+    chat_search_panel_rel = os.path.join("Sources", "UI", "TGChatSearchPanelView.inc")
+    chat_search_panel_text = read_text(os.path.join(ROOT, chat_search_panel_rel))
+    if '[_searchField setAction:@selector(commitSearch:)]' in chat_search_panel_text:
+        errors.append("%s: typing in NSSearchField must not auto-commit the first result" %
+                      chat_search_panel_rel)
+    for fragment in [
+        "commandSelector == @selector(moveDown:)",
+        "commandSelector == @selector(moveUp:)",
+        "[_tableView deselectAll:self]",
+    ]:
+        if fragment not in chat_search_panel_text:
+            errors.append("%s: explicit chat-search selection is missing `%s`" %
+                          (chat_search_panel_rel, fragment))
+    chat_search_window_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatSearchWindow.inc")
+    chat_search_window_text = read_text(os.path.join(ROOT, chat_search_window_rel))
+    if "result = [self.chatSearchWindowResults objectAtIndex:0]" in chat_search_window_text:
+        errors.append("%s: chat search must not navigate to the first result without a selection" %
+                      chat_search_window_rel)
 
     lifecycle_rel = os.path.join("Sources", "UI", "TGChatLifecycleWindowController.m")
     lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
@@ -585,7 +604,7 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: muted chats need the approved sound-off icon" % chat_cells_rel)
     if 'TGLoc(@"chat.notifications.mutedBadge")' in chat_cells_text:
         errors.append("%s: muted chats must not replace the sound-off icon with text" % chat_cells_rel)
-    if "BOOL compact = (NSWidth(cellFrame) < 245.0)" not in chat_cells_text:
+    if "BOOL compact = (NSWidth(cellFrame) < 223.0)" not in chat_cells_text:
         errors.append("%s: chat rows must switch to compact rendering with the sidebar shell" % chat_cells_rel)
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
