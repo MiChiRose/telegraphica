@@ -349,7 +349,11 @@
         self.selectedChatTitle = nil;
         self.selectedChatTypeSummary = nil;
         self.selectedChatAvatarLocalPath = nil;
+        self.selectedChatLastReadInboxMessageID = nil;
         self.selectedChatLastReadOutboxMessageID = nil;
+        self.selectedChatUnreadCount = 0;
+        self.initialUnreadPositionPending = NO;
+        [self.visibleReadReceiptMessageIDs removeAllObjects];
         self.selectedMessageThreadID = nil;
         self.selectedMessageTopicKind = nil;
         self.pinnedMessageItems = [NSArray array];
@@ -405,7 +409,14 @@
     self.selectedChatTitle = [title isKindOfClass:[NSString class]] ? (NSString *)title : @"Selected chat";
     self.selectedChatTypeSummary = [item typeSummary];
     self.selectedChatAvatarLocalPath = [item avatarLocalPath];
+    self.selectedChatLastReadInboxMessageID = [item lastReadInboxMessageID];
     self.selectedChatLastReadOutboxMessageID = [item lastReadOutboxMessageID];
+    NSNumber *selectedUnreadCount = [item unreadCount];
+    self.selectedChatUnreadCount = [selectedUnreadCount respondsToSelector:@selector(unsignedIntegerValue)] ? [selectedUnreadCount unsignedIntegerValue] : 0;
+    if (selectionChanged) {
+        self.initialUnreadPositionPending = (self.selectedChatUnreadCount > 0);
+        [self.visibleReadReceiptMessageIDs removeAllObjects];
+    }
     [self updateOutgoingReadStateForVisibleMessages];
     [self refreshSelectedChatHeaderDisplay];
     BOOL shouldOpenTopicList = (!selectedForumTopic &&
@@ -543,7 +554,9 @@
                                                                          object:self.chatTableView]];
         id selectedItem = [items objectAtIndex:selectedIndex];
         if ([selectedItem isKindOfClass:[TGChatItem class]]) {
+            self.selectedChatLastReadInboxMessageID = [(TGChatItem *)selectedItem lastReadInboxMessageID];
             self.selectedChatLastReadOutboxMessageID = [(TGChatItem *)selectedItem lastReadOutboxMessageID];
+            self.selectedChatUnreadCount = [[(TGChatItem *)selectedItem unreadCount] unsignedIntegerValue];
             [self updateOutgoingReadStateForVisibleMessages];
         }
         return;
@@ -584,7 +597,11 @@
     self.selectedChatTitle = nil;
     self.selectedChatTypeSummary = nil;
     self.selectedChatAvatarLocalPath = nil;
+    self.selectedChatLastReadInboxMessageID = nil;
     self.selectedChatLastReadOutboxMessageID = nil;
+    self.selectedChatUnreadCount = 0;
+    self.initialUnreadPositionPending = NO;
+    [self.visibleReadReceiptMessageIDs removeAllObjects];
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
     [self refreshSelectedChatHeaderDisplay];

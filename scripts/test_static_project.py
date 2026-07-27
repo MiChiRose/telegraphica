@@ -629,10 +629,27 @@ def check_primary_navigation_contract(errors):
         "getScopeNotificationSettings",
         "use_default_mute_for",
         "updateScopeNotificationSettings",
+        "last_read_inbox_message_id",
+        "aroundMessageID:",
+        "offset:-safeNewerCount",
     ]:
         if fragment not in client_text:
             errors.append("%s: server notification scope sync is missing `%s`" %
                           (client_rel, fragment))
+    message_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
+    message_flow_text = read_text(os.path.join(ROOT, message_flow_rel))
+    for fragment in [
+        "scrollMessagesToInitialUnreadIfAvailable",
+        "visibleUnreadMessageItemsAwaitingReceipt",
+        "markVisibleMessageItemsReadForChatID",
+        "!shouldLoadUnreadBoundary",
+    ]:
+        if fragment not in message_flow_text:
+            errors.append("%s: viewport-based unread handling is missing `%s`" %
+                          (message_flow_rel, fragment))
+    if "scheduleMessageItemsReadForChatID" in message_flow_text:
+        errors.append("%s: loading a chat must not mark the whole fetched history as read" %
+                      message_flow_rel)
 
     message_hit_testing_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
     message_hit_testing_text = read_text(os.path.join(ROOT, message_hit_testing_rel))

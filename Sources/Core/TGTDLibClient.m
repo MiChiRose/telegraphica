@@ -258,6 +258,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSUInteger _activeRequestCount;
 }
 @property (nonatomic, copy) NSString *loadedPath;
+- (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID
+                          messageThreadID:(NSNumber *)messageThreadID
+                         messageTopicKind:(NSString *)messageTopicKind
+                            fromMessageID:(NSNumber *)fromMessageID
+                                   offset:(NSInteger)historyOffset
+                                    limit:(NSUInteger)limit
+                                  timeout:(NSTimeInterval)timeout
+                                    error:(NSError **)error;
 - (void)stopReceiverThread;
 - (BOOL)beginActiveRequestWithError:(NSError **)error;
 - (void)endActiveRequest;
@@ -3354,6 +3362,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
     [item setServerNotificationsMuted:serverMuted];
     [item setNotificationsMuted:serverMuted];
+    id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
+    if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
+        [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
+    }
     id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
     if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
         [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
@@ -3447,6 +3459,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
+        id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
+        if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
+            [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
+        }
         id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
         if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
@@ -4360,6 +4376,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
+        id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
+        if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
+            [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
+        }
         id lastReadOutboxValue = [chatResponse objectForKey:@"last_read_outbox_message_id"];
         if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
@@ -6638,6 +6658,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             BOOL serverMuted = [self chatNotificationsMutedFromObject:topic];
             [topicItem setServerNotificationsMuted:serverMuted];
             [topicItem setNotificationsMuted:serverMuted];
+            id lastReadInboxValue = [topic objectForKey:@"last_read_inbox_message_id"];
+            if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
+                [topicItem setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
+            }
             id lastReadOutboxValue = [topic objectForKey:@"last_read_outbox_message_id"];
             if ([lastReadOutboxValue respondsToSelector:@selector(longLongValue)]) {
                 [topicItem setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
@@ -6781,6 +6805,36 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind fromMessageID:(NSNumber *)fromMessageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self messagePreviewItemsForChatID:chatID
+                             messageThreadID:messageThreadID
+                            messageTopicKind:messageTopicKind
+                               fromMessageID:fromMessageID
+                                      offset:0
+                                       limit:limit
+                                     timeout:timeout
+                                       error:error];
+}
+
+- (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind aroundMessageID:(NSNumber *)messageID newerMessageCount:(NSUInteger)newerMessageCount limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSInteger safeNewerCount = (NSInteger)MIN((NSUInteger)40, newerMessageCount);
+    return [self messagePreviewItemsForChatID:chatID
+                             messageThreadID:messageThreadID
+                            messageTopicKind:messageTopicKind
+                               fromMessageID:messageID
+                                      offset:-safeNewerCount
+                                       limit:MAX(limit, (NSUInteger)safeNewerCount)
+                                     timeout:timeout
+                                       error:error];
+}
+
+- (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID
+                          messageThreadID:(NSNumber *)messageThreadID
+                         messageTopicKind:(NSString *)messageTopicKind
+                            fromMessageID:(NSNumber *)fromMessageID
+                                   offset:(NSInteger)historyOffset
+                                    limit:(NSUInteger)limit
+                                  timeout:(NSTimeInterval)timeout
+                                    error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:38];
@@ -6826,7 +6880,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [request setObject:chatID forKey:@"chat_id"];
         [request setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"forum_topic_id"];
         [request setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
-        [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+        [request setObject:[NSNumber numberWithInteger:historyOffset] forKey:@"offset"];
         [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
         response = [self sendTDLibRequestAndWaitForExtra:request
                                              extraPrefix:@"telegraphica-forum-topic-history"
@@ -6839,7 +6893,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [request setObject:@"getChatHistory" forKey:@"@type"];
         [request setObject:chatID forKey:@"chat_id"];
         [request setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
-        [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+        [request setObject:[NSNumber numberWithInteger:historyOffset] forKey:@"offset"];
         [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
         [request setObject:[NSNumber numberWithBool:NO] forKey:@"only_local"];
         response = [self sendTDLibRequestAndWaitForExtra:request
@@ -6855,7 +6909,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [legacyThreadRequest setObject:chatID forKey:@"chat_id"];
         [legacyThreadRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_id"];
         [legacyThreadRequest setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
-        [legacyThreadRequest setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
+        [legacyThreadRequest setObject:[NSNumber numberWithInteger:historyOffset] forKey:@"offset"];
         [legacyThreadRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
         response = [self sendTDLibRequestAndWaitForExtra:legacyThreadRequest
                                              extraPrefix:@"telegraphica-message-thread-history"
