@@ -1,3 +1,14 @@
 "telegraphica" = "Telegraphica";
 "core_spike" = "Telegraphica core spike";
 "tdlib_not_checked" = "TDLib status: not checked";
+"save" = "Save";
+"cancel" = "Cancel";
+"profile.edit.title" = "Edit Profile";
+"profile.edit.firstName" = "First name";
+"profile.edit.lastName" = "Last name";
+"profile.edit.username" = "Username";
+"profile.edit.bio" = "Bio";
+"profile.edit.firstNameRequired" = "First name is required.";
+"profile.edit.open" = "Edit profile";
+"profile.edit.saving" = "Saving profile…";
+"profile.edit.saved" = "Profile updated.";

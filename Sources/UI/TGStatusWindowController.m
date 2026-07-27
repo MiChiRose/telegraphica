@@ -11,6 +11,7 @@
 #import "TGAnimationSupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
+#import "TGProfileEditWindowController.h"
 #import "TGStatusButtonCells.h"
 #import "TGSectionTitleField.h"
 #import "TGStatusViewComponents.h"
@@ -208,7 +209,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate, TGSidebarResizeHandleDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate, TGSidebarResizeHandleDelegate, TGProfileEditWindowControllerDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) TGSidebarResizeHandleView *sidebarResizeHandleView;
@@ -465,6 +466,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsAboutButton;
 @property (nonatomic, retain) NSButton *logoutButton;
 @property (nonatomic, retain) NSButton *profileRefreshButton;
+@property (nonatomic, retain) NSButton *profileEditButton;
+@property (nonatomic, retain) TGProfileEditWindowController *profileEditWindowController;
 @property (nonatomic, retain) NSImageView *aboutIconView;
 @property (nonatomic, retain) NSTextField *aboutTitleField;
 @property (nonatomic, retain) NSTextField *aboutVersionField;
@@ -920,6 +923,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsAboutButton = _settingsAboutButton;
 @synthesize logoutButton = _logoutButton;
 @synthesize profileRefreshButton = _profileRefreshButton;
+@synthesize profileEditButton = _profileEditButton;
+@synthesize profileEditWindowController = _profileEditWindowController;
 @synthesize aboutIconView = _aboutIconView;
 @synthesize aboutTitleField = _aboutTitleField;
 @synthesize aboutVersionField = _aboutVersionField;
@@ -1566,6 +1571,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.activeSessionsTerminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
     [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
     [self.profileRefreshButton setTitle:TGLoc(@"profile.refresh")];
+    [self.profileEditButton setTitle:TGLoc(@"profile.edit.open")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
     [self.settingsAppearanceButton setTitle:@""];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
@@ -3326,6 +3332,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.profileRefreshButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.profileRefreshButton];
 
+    self.profileEditButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 314, 220, 30)] autorelease];
+    [self.profileEditButton setTitle:TGLoc(@"profile.edit.open")];
+    [self.profileEditButton setTarget:self];
+    [self.profileEditButton setAction:@selector(showProfileEditWindow:)];
+    [self.profileEditButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"profile.edit.open")] autorelease]];
+    [self.profileEditButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.profileEditButton];
+
     NSArray *profileContentViews = [NSArray arrayWithObjects:
                                     self.profileSummaryCardView,
                                     self.profileInfoCardView,
@@ -3347,6 +3361,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                     self.profileDetailsSeparatorOne,
                                     self.profileDetailsSeparatorTwo,
                                     self.profileRefreshButton,
+                                    self.profileEditButton,
                                     self.logoutButton,
                                     nil];
     NSUInteger profileViewIndex = 0;
@@ -4163,6 +4178,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatLifecycleWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
+    [_profileEditButton release];
+    [[_profileEditWindowController window] close];
+    [_profileEditWindowController release];
     [_aboutIconView release];
     [_aboutTitleField release];
     [_aboutVersionField release];

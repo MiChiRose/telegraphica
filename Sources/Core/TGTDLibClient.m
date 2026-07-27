@@ -10016,6 +10016,70 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return summary;
 }
 
+- (BOOL)updateCurrentUserFirstName:(NSString *)firstName
+                         lastName:(NSString *)lastName
+                         username:(NSString *)username
+                              bio:(NSString *)bio
+                          timeout:(NSTimeInterval)timeout
+                            error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib is not ready to update the profile." code:105];
+        }
+        return NO;
+    }
+
+    NSString *safeFirstName = [firstName isKindOfClass:[NSString class]] ? firstName : @"";
+    NSString *safeLastName = [lastName isKindOfClass:[NSString class]] ? lastName : @"";
+    NSString *safeUsername = [username isKindOfClass:[NSString class]] ? username : @"";
+    NSString *safeBio = [bio isKindOfClass:[NSString class]] ? bio : @"";
+    if ([safeFirstName length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"First name is required." code:105];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *setNameRequest = [NSMutableDictionary dictionary];
+    [setNameRequest setObject:@"setName" forKey:@"@type"];
+    [setNameRequest setObject:safeFirstName forKey:@"first_name"];
+    [setNameRequest setObject:safeLastName forKey:@"last_name"];
+
+    NSMutableDictionary *setUsernameRequest = [NSMutableDictionary dictionary];
+    [setUsernameRequest setObject:@"setUsername" forKey:@"@type"];
+    [setUsernameRequest setObject:safeUsername forKey:@"username"];
+
+    NSMutableDictionary *setBioRequest = [NSMutableDictionary dictionary];
+    [setBioRequest setObject:@"setBio" forKey:@"@type"];
+    [setBioRequest setObject:safeBio forKey:@"bio"];
+
+    NSArray *requests = [NSArray arrayWithObjects:setNameRequest, setUsernameRequest, setBioRequest, nil];
+    NSArray *prefixes = [NSArray arrayWithObjects:@"telegraphica-profile-set-name",
+                                                  @"telegraphica-profile-set-username",
+                                                  @"telegraphica-profile-set-bio", nil];
+    NSUInteger requestIndex = 0;
+    for (requestIndex = 0; requestIndex < [requests count]; requestIndex++) {
+        NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:[requests objectAtIndex:requestIndex]
+                                                            extraPrefix:[prefixes objectAtIndex:requestIndex]
+                                                                timeout:timeout
+                                                              errorCode:(105 + (NSInteger)requestIndex)
+                                                                  error:error];
+        if (!response) {
+            return NO;
+        }
+        id responseType = [response objectForKey:@"@type"];
+        if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+            if (error) {
+                *error = [self errorWithDescription:@"TDLib returned an unexpected profile update response."
+                                               code:(105 + (NSInteger)requestIndex)];
+            }
+            return NO;
+        }
+    }
+    return YES;
+}
+
 - (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self cachedAuthorizationStateSummary];
     if (![authorizationState isEqualToString:@"ready"]) {

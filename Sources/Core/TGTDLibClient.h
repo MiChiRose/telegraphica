@@ -19,6 +19,7 @@ extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 - (NSString *)networkDiagnosticsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (BOOL)updateCurrentUserFirstName:(NSString *)firstName lastName:(NSString *)lastName username:(NSString *)username bio:(NSString *)bio timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)terminateActiveSessionWithID:(NSNumber *)sessionID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)chatFilterInfoItemsWithTimeout:(NSTimeInterval)timeout;

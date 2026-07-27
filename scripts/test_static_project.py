@@ -701,6 +701,36 @@ def check_primary_navigation_contract(errors):
     if "contactToAdd" not in dialogs_text or "confirmRemovalOfContactNamed" not in dialogs_text:
         errors.append("%s: add/remove confirmation dialogs are incomplete" % dialogs_rel)
 
+    profile_editor_rel = os.path.join("Sources", "UI", "TGProfileEditWindowController.m")
+    profile_editor_text = read_text(os.path.join(ROOT, profile_editor_rel))
+    utility_windows_rel = os.path.join("Sources", "UI", "TGStatusWindowController+UtilityWindows.inc")
+    utility_windows_text = read_text(os.path.join(ROOT, utility_windows_rel))
+    for fragment in [
+        "setName",
+        "setUsername",
+        "setBio",
+        "updateCurrentUserFirstName",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: profile editing TDLib request is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "TGProfileEditWindowController",
+        "TGPrimaryTextButtonCell",
+        "profile.edit.firstNameRequired",
+    ]:
+        if fragment not in profile_editor_text:
+            errors.append("%s: profile editor is missing `%s`" %
+                          (profile_editor_rel, fragment))
+    for fragment in [
+        "showProfileEditWindow:",
+        "didRequestSaveFirstName:",
+        "reloadProfileSummaryIfReady",
+    ]:
+        if fragment not in utility_windows_text:
+            errors.append("%s: profile editor wiring is missing `%s`" %
+                          (utility_windows_rel, fragment))
+
     calls_header_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.h")
     calls_implementation_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     calls_header_text = read_text(os.path.join(ROOT, calls_header_rel))

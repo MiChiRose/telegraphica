@@ -1089,7 +1089,16 @@
     CGFloat profileActionsY = profileNextY;
     [self.profileActionsCardView setFrame:NSMakeRect(profileGroupedX, profileActionsY, profileGroupedWidth, profileActionsHeight)];
     [self.profileRefreshButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
-    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY + 11.0, profileGroupedWidth - 44.0, 30.0)];
+    CGFloat profileActionGap = 10.0;
+    CGFloat profileActionWidth = floor((profileGroupedWidth - 44.0 - profileActionGap) / 2.0);
+    [self.profileEditButton setFrame:NSMakeRect(profileGroupedX + 22.0,
+                                                profileActionsY + 11.0,
+                                                profileActionWidth,
+                                                30.0)];
+    [self.logoutButton setFrame:NSMakeRect(profileGroupedX + 22.0 + profileActionWidth + profileActionGap,
+                                           profileActionsY + 11.0,
+                                           profileActionWidth,
+                                           30.0)];
     [self.profileIDField setFrame:NSMakeRect(profileGroupedX + 22.0, profileActionsY, 0.0, 0.0)];
     profileNextY = profileActionsY + profileActionsHeight + 18.0;
 

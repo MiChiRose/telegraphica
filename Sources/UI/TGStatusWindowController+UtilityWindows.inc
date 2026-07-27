@@ -407,6 +407,82 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     [self reloadProfileSummaryIfReady];
 }
 
+- (void)showProfileEditWindow:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"ready"] || self.controlsBusy) {
+        return;
+    }
+    if (!self.profileEditWindowController) {
+        self.profileEditWindowController = [[[TGProfileEditWindowController alloc] init] autorelease];
+        [self.profileEditWindowController setDelegate:self];
+    }
+    [self.profileEditWindowController configureWithFirstName:self.profileFirstName
+                                                   lastName:self.profileLastName
+                                                   username:self.profileUsername
+                                                        bio:self.profileBio];
+    [[self.profileEditWindowController window] center];
+    [[self.profileEditWindowController window] makeKeyAndOrderFront:self];
+}
+
+- (void)profileEditWindowController:(TGProfileEditWindowController *)controller
+            didRequestSaveFirstName:(NSString *)firstName
+                           lastName:(NSString *)lastName
+                           username:(NSString *)username
+                                bio:(NSString *)bio {
+    if (controller != self.profileEditWindowController ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    [controller setSaving:YES];
+    [controller showErrorMessage:nil];
+    [self.statusField setStringValue:TGLoc(@"profile.edit.saving")];
+
+    NSString *firstNameCopy = [firstName copy];
+    NSString *lastNameCopy = [lastName copy];
+    NSString *usernameCopy = [username copy];
+    NSString *bioCopy = [bio copy];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *updateError = nil;
+        BOOL success = [client updateCurrentUserFirstName:firstNameCopy
+                                                 lastName:lastNameCopy
+                                                 username:usernameCopy
+                                                      bio:bioCopy
+                                                  timeout:6.0
+                                                    error:&updateError];
+        NSString *errorMessage = [[updateError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (controller == self.profileEditWindowController) {
+                [controller setSaving:NO];
+                if (success) {
+                    self.profileFirstName = firstNameCopy;
+                    self.profileLastName = lastNameCopy;
+                    self.profileUsername = usernameCopy;
+                    self.profileBio = bioCopy;
+                    self.profileDisplayName = [[NSArray arrayWithObjects:firstNameCopy, ([lastNameCopy length] > 0 ? lastNameCopy : nil), nil] componentsJoinedByString:@" "];
+                    [self refreshProfileDisplay];
+                    [self layoutContentView];
+                    [[controller window] orderOut:self];
+                    [self.statusField setStringValue:TGLoc(@"profile.edit.saved")];
+                } else {
+                    [controller showErrorMessage:([errorMessage length] > 0 ? errorMessage : @"Profile update failed.")];
+                    [self.statusField setStringValue:@"Profile update failed"];
+                }
+            }
+            self.profileSummaryLoaded = NO;
+            [self reloadProfileSummaryIfReady];
+            [errorMessage release];
+            [firstNameCopy release];
+            [lastNameCopy release];
+            [usernameCopy release];
+            [bioCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)showAppearanceWindow:(id)sender {
     (void)sender;
     if (!self.appearanceWindow) {
