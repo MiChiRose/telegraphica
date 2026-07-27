@@ -844,7 +844,7 @@ def check_retro_console_contract(errors):
     core_text = read_text(os.path.join(ROOT, core_rel))
     build_text = read_text(os.path.join(ROOT, build_rel))
     for fragment in [
-        "Вставить картридж",
+        u"Вставить картридж",
         "setAllowedFileTypes:",
         "quicknes_libretro",
         "genesis_plus_gx_libretro",
