@@ -2766,7 +2766,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)shareLocationFromComposerMenu:(id)sender {
     (void)sender;
-    NSDictionary *location = [TGMessageActionDialogs locationToShare];
+    NSDictionary *location = [TGMessageActionDialogs locationToShareWithClient:self.client];
     if (location) {
         [self sendSharedComposerItemWithKind:@"location" values:location];
     } else {
@@ -2776,9 +2776,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)shareVenueFromComposerMenu:(id)sender {
     (void)sender;
-    NSDictionary *venue = [TGMessageActionDialogs venueToShare];
+    NSDictionary *venue = [TGMessageActionDialogs venueToShareWithClient:self.client];
     if (venue) {
-        [self sendSharedComposerItemWithKind:@"venue" values:venue];
+        [self sendSharedComposerItemWithKind:@"location" values:venue];
     } else {
         [self requestComposerRefocus];
     }
@@ -2786,7 +2786,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)shareLiveLocationFromComposerMenu:(id)sender {
     (void)sender;
-    NSDictionary *location = [TGMessageActionDialogs liveLocationToShare];
+    NSDictionary *location = [TGMessageActionDialogs liveLocationToShareWithClient:self.client];
     if (location) {
         [self sendSharedComposerItemWithKind:@"live_location" values:location];
     } else {

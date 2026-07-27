@@ -1,8 +1,10 @@
 #import <Cocoa/Cocoa.h>
 
+@class TGTDLibClient;
+
 @interface TGLocationPickerWindowController : NSWindowController
 
-- (id)initForVenue:(BOOL)venue;
+- (id)initWithClient:(TGTDLibClient *)client;
 - (NSDictionary *)runModal;
 
 @end

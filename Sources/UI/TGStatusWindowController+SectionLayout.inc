@@ -196,6 +196,13 @@
     [self showView:self.sendTextFieldBackgroundView visible:showConversationContent];
     [self showView:self.sendTextField visible:showConversationContent];
     [self showView:self.sendMessageButton visible:showConversationContent];
+    BOOL showBotComposer = (showConversationContent && self.botComposerVisible);
+    [self showView:self.botActionButton visible:showBotComposer];
+    if (!showConversationContent && self.botCommandPanelVisible) {
+        [self setBotCommandPanelVisible:NO animated:NO];
+    } else {
+        [self showView:self.botCommandPanelView visible:(showConversationContent && self.botCommandPanelVisible)];
+    }
 
     BOOL profileHasBio = ([[self.profileStateField stringValue] length] > 0);
     BOOL profileHasUsername = ([[self.profileUsernameRowValueField stringValue] length] > 0);
@@ -806,6 +813,9 @@
     CGFloat replyPanelHeight = hasReplyPanel ? 46.0 : 0.0;
     CGFloat replyPanelGap = hasReplyPanel ? 6.0 : 0.0;
     CGFloat messageBottom = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    CGFloat botCommandPanelHeight = self.botCommandPanelVisible ? 150.0 : 0.0;
+    CGFloat botCommandPanelGap = self.botCommandPanelVisible ? 6.0 : 0.0;
+    messageBottom += botCommandPanelHeight + botCommandPanelGap;
     if (self.chatNavigationClosed) {
         messageBottom = mainY + 18.0;
     }
@@ -902,6 +912,10 @@
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
     [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerControlY, attachButtonWidth, 32.0)];
     [self.botActionButton setFrame:NSMakeRect(botButtonX, composerControlY, attachButtonWidth, 32.0)];
+    CGFloat botPanelY = composerY + composerHeight + replyPanelHeight + replyPanelGap + 4.0;
+    [self.botCommandPanelView setFrame:NSMakeRect(sendFieldX, botPanelY,
+                                                  MAX(220.0, sendButtonX + sendButtonWidth - sendFieldX),
+                                                  150.0)];
     [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerInputBackgroundY, sendFieldWidth, composerInnerHeight)];
     [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerInputBackgroundY + 5.0, sendFieldWidth - 16.0, composerInputHeight)];
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];

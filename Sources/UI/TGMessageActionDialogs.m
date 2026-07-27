@@ -81,8 +81,8 @@
             nil];
 }
 
-+ (NSDictionary *)locationToShare {
-    TGLocationPickerWindowController *picker = [[[TGLocationPickerWindowController alloc] initForVenue:NO] autorelease];
++ (NSDictionary *)locationToShareWithClient:(TGTDLibClient *)client {
+    TGLocationPickerWindowController *picker = [[[TGLocationPickerWindowController alloc] initWithClient:client] autorelease];
     NSDictionary *values = [picker runModal];
     double latitude = [[values objectForKey:@"latitude"] doubleValue];
     double longitude = [[values objectForKey:@"longitude"] doubleValue];
@@ -93,20 +93,12 @@
     return values;
 }
 
-+ (NSDictionary *)venueToShare {
-    TGLocationPickerWindowController *picker = [[[TGLocationPickerWindowController alloc] initForVenue:YES] autorelease];
-    NSDictionary *values = [picker runModal];
-    double latitude = [[values objectForKey:@"latitude"] doubleValue];
-    double longitude = [[values objectForKey:@"longitude"] doubleValue];
-    if (values && (latitude < -90.0 || latitude > 90.0 ||
-                   longitude < -180.0 || longitude > 180.0)) {
-        return nil;
-    }
-    return values;
++ (NSDictionary *)venueToShareWithClient:(TGTDLibClient *)client {
+    return [self locationToShareWithClient:client];
 }
 
-+ (NSDictionary *)liveLocationToShare {
-    NSMutableDictionary *values = [[[self locationToShare] mutableCopy] autorelease];
++ (NSDictionary *)liveLocationToShareWithClient:(TGTDLibClient *)client {
+    NSMutableDictionary *values = [[[self locationToShareWithClient:client] mutableCopy] autorelease];
     if (!values) {
         return nil;
     }

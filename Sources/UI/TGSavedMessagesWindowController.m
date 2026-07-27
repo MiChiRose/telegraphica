@@ -144,10 +144,12 @@
     [title setStringValue:TGLoc(@"saved.title")];
     [title setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:title];
-    NSTextField *subtitle = [self labelWithFrame:NSMakeRect(24, 516, 730, 18)
+    NSTextField *subtitle = [self labelWithFrame:NSMakeRect(24, 506, 730, 30)
                                             font:[NSFont systemFontOfSize:11.0]
                                            color:TGClassicHeaderTextColor(0.82)];
     [subtitle setStringValue:TGLoc(@"saved.help")];
+    [[subtitle cell] setUsesSingleLineMode:NO];
+    [[subtitle cell] setLineBreakMode:NSLineBreakByWordWrapping];
     [subtitle setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:subtitle];
 
@@ -188,27 +190,10 @@
     [messagesTitle setStringValue:TGLoc(@"saved.messages")];
     [messagesTitle setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:messagesTitle];
-    self.historyTableView = [self tableInScrollViewWithFrame:NSMakeRect(304, 230, 520, 222)
+    self.historyTableView = [self tableInScrollViewWithFrame:NSMakeRect(304, 92, 520, 360)
                                                  identifier:@"history"
-                                                  rowHeight:58.0
+                                                  rowHeight:70.0
                                                        root:root];
-    NSTextField *tagsTitle = [self labelWithFrame:NSMakeRect(306, 202, 320, 20)
-                                             font:[NSFont boldSystemFontOfSize:13.0]
-                                            color:TGClassicCardInkColor()];
-    [tagsTitle setStringValue:TGLoc(@"saved.tags")];
-    [root addSubview:tagsTitle];
-    self.tagsTableView = [self tableInScrollViewWithFrame:NSMakeRect(304, 118, 520, 78)
-                                              identifier:@"tags"
-                                               rowHeight:28.0
-                                                    root:root];
-    NSTextField *premiumNote = [self labelWithFrame:NSMakeRect(306, 82, 510, 28)
-                                               font:[NSFont systemFontOfSize:10.0]
-                                              color:TGClassicCardMutedInkColor()];
-    [premiumNote setStringValue:TGLoc(@"saved.premiumNote")];
-    [[premiumNote cell] setLineBreakMode:NSLineBreakByWordWrapping];
-    [[premiumNote cell] setUsesSingleLineMode:NO];
-    [premiumNote setAutoresizingMask:NSViewWidthSizable];
-    [root addSubview:premiumNote];
 
     self.statusField = [self labelWithFrame:NSMakeRect(24, 42, 760, 18)
                                        font:[NSFont systemFontOfSize:10.0]
@@ -252,10 +237,14 @@
     if (tableView == self.historyTableView && (NSUInteger)row < [self.history count]) {
         TGMessageItem *item = [self.history objectAtIndex:(NSUInteger)row];
         NSString *sender = [item.senderDisplayName length] > 0 ? item.senderDisplayName : TGLoc(@"saved.message");
-        return [NSDictionary dictionaryWithObjectsAndKeys:
-                sender, @"title",
-                [item.preview length] > 0 ? item.preview : TGLoc(@"saved.message"), @"detail",
-                nil];
+        NSMutableDictionary *value = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                      sender, @"title",
+                                      [item.preview length] > 0 ? item.preview : TGLoc(@"saved.message"), @"detail",
+                                      nil];
+        if ([[item mediaLocalPath] length] > 0 && [item isVisualMediaMessage]) {
+            [value setObject:[item mediaLocalPath] forKey:@"image_path"];
+        }
+        return value;
     }
     if (tableView == self.tagsTableView && (NSUInteger)row < [self.tags count]) {
         NSDictionary *tag = [self.tags objectAtIndex:(NSUInteger)row];
@@ -264,6 +253,21 @@
                 (long)[[tag objectForKey:@"count"] integerValue]];
     }
     return @"";
+}
+
+- (NSString *)tableView:(NSTableView *)tableView
+         toolTipForCell:(NSCell *)cell
+                   rect:(NSRectPointer)rect
+            tableColumn:(NSTableColumn *)tableColumn
+                    row:(NSInteger)row
+          mouseLocation:(NSPoint)mouseLocation {
+    (void)tableView;
+    (void)cell;
+    (void)rect;
+    (void)tableColumn;
+    (void)row;
+    (void)mouseLocation;
+    return nil;
 }
 
 - (NSDictionary *)selectedTopic {
@@ -354,25 +358,31 @@
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *historyError = nil;
         NSArray *history = [[client savedMessagesHistoryForTopicID:topicID limit:60 timeout:12.0 error:&historyError] retain];
-        NSError *tagsError = nil;
-        NSArray *tags = [[client savedMessagesTagSummariesForTopicID:topicID timeout:8.0 error:&tagsError] retain];
         NSString *detail = [[historyError localizedDescription] copy];
-        if (!detail) {
-            detail = [[tagsError localizedDescription] copy];
+        NSUInteger downloadedPreviews = 0;
+        NSUInteger historyIndex = 0;
+        for (historyIndex = 0; historyIndex < [history count] && downloadedPreviews < 8; historyIndex++) {
+            TGMessageItem *item = [history objectAtIndex:historyIndex];
+            if (![item isVisualMediaMessage] || [[item mediaLocalPath] length] > 0 ||
+                ![[item mediaFileID] respondsToSelector:@selector(integerValue)]) {
+                continue;
+            }
+            NSString *path = [client downloadedLocalPathForFileID:[item mediaFileID] timeout:4.0 error:NULL];
+            if ([path length] > 0) {
+                [item setMediaLocalPath:path];
+                downloadedPreviews++;
+            }
         }
         dispatch_async(dispatch_get_main_queue(), ^{
             if (generation == self.requestGeneration) {
                 self.history = history ?: [NSArray array];
-                self.tags = tags ?: [NSArray array];
+                self.tags = [NSArray array];
                 [self.historyTableView reloadData];
-                [self.tagsTableView reloadData];
                 [self setLoading:NO status:detail ?: [NSString stringWithFormat:TGLoc(@"saved.topicLoaded"),
-                                                       (unsigned long)[self.history count],
-                                                       (unsigned long)[self.tags count]]];
+                                                       (unsigned long)[self.history count]]];
             }
             [detail release];
             [history release];
-            [tags release];
             [topicID release];
             [client release];
         });

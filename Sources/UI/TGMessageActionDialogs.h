@@ -1,5 +1,7 @@
 #import <Cocoa/Cocoa.h>
 
+@class TGTDLibClient;
+
 typedef enum {
     TGMessageDeleteChoiceCancel = 0,
     TGMessageDeleteChoiceOnlyForSelf = 1,
@@ -10,9 +12,9 @@ typedef enum {
 
 + (NSString *)editedTextForCurrentText:(NSString *)currentText;
 + (NSDictionary *)contactToShare;
-+ (NSDictionary *)locationToShare;
-+ (NSDictionary *)venueToShare;
-+ (NSDictionary *)liveLocationToShare;
++ (NSDictionary *)locationToShareWithClient:(TGTDLibClient *)client;
++ (NSDictionary *)venueToShareWithClient:(TGTDLibClient *)client;
++ (NSDictionary *)liveLocationToShareWithClient:(TGTDLibClient *)client;
 + (BOOL)confirmPlainDeleteMessage;
 + (TGMessageDeleteChoice)deleteChoiceWithCanDeleteOnlyForSelf:(BOOL)canDeleteOnlyForSelf
                                          canDeleteForAllUsers:(BOOL)canDeleteForAllUsers;

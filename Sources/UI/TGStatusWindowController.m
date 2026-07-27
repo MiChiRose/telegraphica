@@ -4,6 +4,7 @@
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
 #import "TGDatePickerDialog.h"
+#import "TGBotCommandPanelView.h"
 #import "TGBotKeyboardWindowController.h"
 #import "TGBotInteractionWindowController.h"
 #import "TGChatLifecycleWindowController.h"
@@ -280,6 +281,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSNumber *activeBotReplyMarkupMessageID;
 @property (nonatomic, assign) NSUInteger botComposerGeneration;
 @property (nonatomic, assign) BOOL botComposerVisible;
+@property (nonatomic, assign) BOOL botCommandPanelVisible;
+@property (nonatomic, retain) TGBotCommandPanelView *botCommandPanelView;
 @property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
 @property (nonatomic, retain) TGPrivacyWindowController *privacyWindowController;
 @property (nonatomic, retain) TGSavedMessagesWindowController *savedMessagesWindowController;
@@ -1105,6 +1108,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize activeBotReplyMarkupMessageID = _activeBotReplyMarkupMessageID;
 @synthesize botComposerGeneration = _botComposerGeneration;
 @synthesize botComposerVisible = _botComposerVisible;
+@synthesize botCommandPanelVisible = _botCommandPanelVisible;
+@synthesize botCommandPanelView = _botCommandPanelView;
 @synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
 @synthesize privacyWindowController = _privacyWindowController;
 @synthesize savedMessagesWindowController = _savedMessagesWindowController;
@@ -2835,6 +2840,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.botActionButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.botActionButton];
 
+    self.botCommandPanelView = [[[TGBotCommandPanelView alloc] initWithFrame:NSMakeRect(116, 92, 520, 150)
+                                                                      client:self.client] autorelease];
+    [self.botCommandPanelView setTarget:self];
+    [self.botCommandPanelView setAction:@selector(botCommandChosen:)];
+    [self.botCommandPanelView setHidden:YES];
+    [self.botCommandPanelView setAlphaValue:0.0];
+    [contentView addSubview:self.botCommandPanelView];
+
     self.stickerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(76, 50, 34, 32)] autorelease];
     TGComposerSymbolButtonCell *stickerCell = [[[TGComposerSymbolButtonCell alloc] initTextCell:@"☺"] autorelease];
     [stickerCell setButtonType:NSMomentaryPushInButton];
@@ -4311,6 +4324,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_sendTextField release];
     [_attachPhotoButton release];
     [_botActionButton release];
+    [_botCommandPanelView release];
     [_stickerButton release];
     [_voiceRecordButton release];
     [_sendMessageButton release];

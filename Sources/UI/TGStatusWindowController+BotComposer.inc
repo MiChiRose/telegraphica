@@ -1,7 +1,14 @@
 - (void)setBotComposerVisible:(BOOL)visible animated:(BOOL)animated {
+    BOOL chatsVisible = ([self.currentAuthState isEqualToString:@"ready"] &&
+                         [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
+                         !self.chatNavigationClosed);
+    BOOL presentationVisible = (visible && chatsVisible);
     if (self.botComposerVisible == visible) {
-        [self.botActionButton setHidden:!visible];
-        [self.botActionButton setAlphaValue:visible ? 1.0 : 0.0];
+        [self.botActionButton setHidden:!presentationVisible];
+        [self.botActionButton setAlphaValue:presentationVisible ? 1.0 : 0.0];
+        if (!presentationVisible && self.botCommandPanelVisible) {
+            [self setBotCommandPanelVisible:NO animated:NO];
+        }
         [self updateSendControls];
         return;
     }
@@ -15,9 +22,12 @@
     NSRect targetBackgroundFrame = [self.sendTextFieldBackgroundView frame];
     NSRect targetTextFrame = [self.sendTextField frame];
 
-    if (!animated || ![[self window] isVisible]) {
-        [self.botActionButton setHidden:!visible];
-        [self.botActionButton setAlphaValue:visible ? 1.0 : 0.0];
+    if (!animated || ![[self window] isVisible] || !chatsVisible) {
+        [self.botActionButton setHidden:!presentationVisible];
+        [self.botActionButton setAlphaValue:presentationVisible ? 1.0 : 0.0];
+        if (!presentationVisible && self.botCommandPanelVisible) {
+            [self setBotCommandPanelVisible:NO animated:NO];
+        }
         [self updateSendControls];
         return;
     }
@@ -48,6 +58,37 @@
     [self updateSendControls];
 }
 
+- (void)setBotCommandPanelVisible:(BOOL)visible animated:(BOOL)animated {
+    BOOL canShow = (visible && self.botComposerVisible && self.selectedBotUserID != nil &&
+                    [self.currentAuthState isEqualToString:@"ready"] &&
+                    [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
+                    !self.chatNavigationClosed);
+    if (self.botCommandPanelVisible == canShow) {
+        [self.botCommandPanelView setHidden:!canShow];
+        [self.botCommandPanelView setAlphaValue:canShow ? 1.0 : 0.0];
+        return;
+    }
+    self.botCommandPanelVisible = canShow;
+    [self layoutContentView];
+    if (canShow) {
+        [self.botCommandPanelView loadCommandsForUserID:self.selectedBotUserID];
+    }
+    if (!animated || ![[self window] isVisible]) {
+        [self.botCommandPanelView setHidden:!canShow];
+        [self.botCommandPanelView setAlphaValue:canShow ? 1.0 : 0.0];
+        return;
+    }
+    [self.botCommandPanelView setHidden:NO];
+    [self.botCommandPanelView setAlphaValue:canShow ? 0.0 : 1.0];
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        [context setDuration:0.16];
+        [[self.botCommandPanelView animator] setAlphaValue:canShow ? 1.0 : 0.0];
+    } completionHandler:^{
+        [self.botCommandPanelView setHidden:!canShow];
+        [self.botCommandPanelView setAlphaValue:canShow ? 1.0 : 0.0];
+    }];
+}
+
 - (void)refreshBotReplyMarkupFromMessages {
     NSDictionary *replyMarkup = nil;
     NSNumber *messageID = nil;
@@ -73,6 +114,9 @@
     self.activeBotReplyMarkup = replyMarkup;
     self.activeBotReplyMarkupMessageID = messageID;
     [self setBotComposerVisible:(self.selectedBotUserID != nil || replyMarkup != nil) animated:YES];
+    if (!self.selectedBotUserID && self.botCommandPanelVisible) {
+        [self setBotCommandPanelVisible:NO animated:YES];
+    }
 }
 
 - (void)refreshBotComposerForSelectedChat {
@@ -118,6 +162,10 @@
         NSBeep();
         return;
     }
+    if (self.selectedBotUserID) {
+        [self setBotCommandPanelVisible:!self.botCommandPanelVisible animated:YES];
+        return;
+    }
     if (self.activeBotReplyMarkup && self.activeBotReplyMarkupMessageID) {
         [[self.botKeyboardWindowController window] close];
         self.botKeyboardWindowController = [[[TGBotKeyboardWindowController alloc] initWithClient:self.client
@@ -129,16 +177,17 @@
         [[self.botKeyboardWindowController window] makeKeyAndOrderFront:self];
         return;
     }
-    if (!self.selectedBotUserID) {
+    NSBeep();
+}
+
+- (void)botCommandChosen:(NSDictionary *)command {
+    NSString *name = [[command objectForKey:@"command"] isKindOfClass:[NSString class]]
+        ? [command objectForKey:@"command"] : @"";
+    if ([name length] == 0) {
         NSBeep();
         return;
     }
-    [[self.botInteractionWindowController window] close];
-    self.botInteractionWindowController = [[[TGBotInteractionWindowController alloc] initWithClient:self.client
-                                                                                              userID:self.selectedBotUserID
-                                                                                              chatID:self.selectedChatID] autorelease];
-    [self.botInteractionWindowController showWindow:self];
-    [[self.botInteractionWindowController window] center];
-    [[self.botInteractionWindowController window] makeKeyAndOrderFront:self];
-    [self.botInteractionWindowController reloadBot];
+    [self.sendTextField setStringValue:[@"/" stringByAppendingString:name]];
+    [self setBotCommandPanelVisible:NO animated:YES];
+    [[self window] makeFirstResponder:self.sendTextField];
 }
