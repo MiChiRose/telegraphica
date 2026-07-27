@@ -79,6 +79,21 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     [self.downloadManagerWindowController reloadDownloads];
 }
 
+- (void)showPrivacyWindow:(id)sender {
+    (void)sender;
+    if (!self.client || ![self.currentAuthState isEqualToString:@"ready"]) {
+        NSBeep();
+        return;
+    }
+    if (!self.privacyWindowController) {
+        self.privacyWindowController = [[[TGPrivacyWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [[self.privacyWindowController window] center];
+    [self.privacyWindowController showWindow:self];
+    [[self.privacyWindowController window] makeKeyAndOrderFront:self];
+    [self.privacyWindowController reloadPrivacy];
+}
+
 - (void)openSelectedChatProfile:(id)sender {
     (void)sender;
     if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {

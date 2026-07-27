@@ -1,6 +1,7 @@
 #import "TGChatInfoWindowController.h"
 
 #import "../Core/TGTDLibClient+ChatMembers.h"
+#import "../Core/TGTDLibClient+Privacy.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
@@ -20,6 +21,8 @@
 @property (nonatomic, retain) NSButton *addButton;
 @property (nonatomic, retain) NSButton *applyRoleButton;
 @property (nonatomic, retain) NSButton *refreshButton;
+@property (nonatomic, retain) NSPopUpButton *autoDeletePopUpButton;
+@property (nonatomic, retain) NSButton *applyAutoDeleteButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
 @property (nonatomic, copy) NSDictionary *chatSummary;
 @property (nonatomic, copy) NSArray *members;
@@ -44,6 +47,8 @@
 @synthesize addButton = _addButton;
 @synthesize applyRoleButton = _applyRoleButton;
 @synthesize refreshButton = _refreshButton;
+@synthesize autoDeletePopUpButton = _autoDeletePopUpButton;
+@synthesize applyAutoDeleteButton = _applyAutoDeleteButton;
 @synthesize spinner = _spinner;
 @synthesize chatSummary = _chatSummary;
 @synthesize members = _members;
@@ -88,6 +93,8 @@
     [_addButton release];
     [_applyRoleButton release];
     [_refreshButton release];
+    [_autoDeletePopUpButton release];
+    [_applyAutoDeleteButton release];
     [_spinner release];
     [_chatSummary release];
     [_members release];
@@ -156,6 +163,32 @@
     [membersLabel setStringValue:TGLoc(@"chat.info.members")];
     [membersLabel setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:membersLabel];
+
+    NSTextField *autoDeleteLabel = [self labelWithFrame:NSMakeRect(268, 362, 104, 18)
+                                                   font:[NSFont systemFontOfSize:11.0]
+                                                  color:TGClassicCardMutedInkColor()];
+    [autoDeleteLabel setStringValue:TGLoc(@"privacy.chatAutoDelete")];
+    [autoDeleteLabel setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [root addSubview:autoDeleteLabel];
+
+    self.autoDeletePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(368, 356, 152, 28) pullsDown:NO] autorelease];
+    NSArray *seconds = [NSArray arrayWithObjects:@0, @86400, @604800, @2678400, @7776000, @31536000, nil];
+    NSArray *timeKeys = [NSArray arrayWithObjects:@"off", @"day", @"week", @"month", @"threeMonths", @"year", nil];
+    NSUInteger timeIndex = 0;
+    for (timeIndex = 0; timeIndex < [seconds count]; timeIndex++) {
+        [self.autoDeletePopUpButton addItemWithTitle:TGLoc([@"privacy.time." stringByAppendingString:[timeKeys objectAtIndex:timeIndex]])];
+        [[self.autoDeletePopUpButton lastItem] setRepresentedObject:[seconds objectAtIndex:timeIndex]];
+    }
+    [self.autoDeletePopUpButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [root addSubview:self.autoDeletePopUpButton];
+
+    self.applyAutoDeleteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(528, 356, 158, 28)] autorelease];
+    [self.applyAutoDeleteButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"apply")] autorelease]];
+    [self.applyAutoDeleteButton setTitle:TGLoc(@"apply")];
+    [self.applyAutoDeleteButton setTarget:self];
+    [self.applyAutoDeleteButton setAction:@selector(applyAutoDeletePressed:)];
+    [self.applyAutoDeleteButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [root addSubview:self.applyAutoDeleteButton];
 
     NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(34, 156, 652, 198)] autorelease];
     [scrollView setHasVerticalScroller:YES];
@@ -278,6 +311,8 @@
     [self.rolePopUpButton setEnabled:(!self.loading && group && canManage && selected)];
     [self.applyRoleButton setEnabled:(!self.loading && group && canManage && selected &&
                                       ![[[self selectedMember] objectForKey:@"role"] isEqualToString:@"creator"])];
+    [self.autoDeletePopUpButton setEnabled:!self.loading];
+    [self.applyAutoDeleteButton setEnabled:!self.loading];
 }
 
 - (void)setLoading:(BOOL)loading status:(NSString *)status {
@@ -310,6 +345,20 @@
         description = [profile objectForKey:@"bio"];
     }
     [self.descriptionField setStringValue:[description length] > 0 ? description : TGLoc(@"chat.info.noDescription")];
+    NSInteger autoDeleteTime = [[self.chatSummary objectForKey:@"message_auto_delete_time"] integerValue];
+    NSArray *autoDeleteItems = [self.autoDeletePopUpButton itemArray];
+    NSInteger selectedAutoDeleteIndex = 0;
+    NSInteger nearestDistance = NSIntegerMax;
+    NSUInteger autoDeleteIndex = 0;
+    for (autoDeleteIndex = 0; autoDeleteIndex < [autoDeleteItems count]; autoDeleteIndex++) {
+        NSInteger value = [[[autoDeleteItems objectAtIndex:autoDeleteIndex] representedObject] integerValue];
+        NSInteger distance = labs(value - autoDeleteTime);
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            selectedAutoDeleteIndex = (NSInteger)autoDeleteIndex;
+        }
+    }
+    [self.autoDeletePopUpButton selectItemAtIndex:selectedAutoDeleteIndex];
     [self.memberTableView reloadData];
     [self.memberTableView deselectAll:nil];
     [self.contactPopUpButton removeAllItems];
@@ -397,6 +446,34 @@
         }
     }
     [self runMemberMutationForUserID:userID role:role];
+}
+
+- (void)applyAutoDeletePressed:(id)sender {
+    (void)sender;
+    if (self.loading || !self.chatID) {
+        return;
+    }
+    NSNumber *secondsNumber = [[self.autoDeletePopUpButton selectedItem] representedObject];
+    NSInteger seconds = [secondsNumber integerValue];
+    [self setLoading:YES status:TGLoc(@"privacy.saving")];
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *chatID = [self.chatID retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        BOOL success = [client setMessageAutoDeleteTime:seconds forChatID:chatID timeout:10.0 error:&error];
+        NSString *detail = [[error localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setLoading:NO status:success ? TGLoc(@"privacy.saved") : (detail ? detail : TGLoc(@"privacy.failed"))];
+            [detail release];
+            [chatID release];
+            [client release];
+            if (success) {
+                [self reloadChatInfo];
+            }
+        });
+        [pool drain];
+    });
 }
 
 - (void)runMemberMutationForUserID:(NSNumber *)userID role:(NSString *)role {

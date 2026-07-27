@@ -1151,6 +1151,7 @@
     CGFloat profileCardHeight = 72.0;
     CGFloat notificationCardHeight = 180.0;
     CGFloat foldersCardHeight = 54.0;
+    CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 78.0;
     CGFloat resourceCardHeight = 276.0;
     CGFloat interfaceCardHeight = 184.0;
@@ -1161,6 +1162,7 @@
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + notificationCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + foldersCardHeight + settingsGroupGap;
+    settingsDocHeight += settingsLabelHeight + settingsLabelGap + privacyCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + drawerCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + resourceCardHeight + settingsGroupGap;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + interfaceCardHeight + settingsGroupGap;
@@ -1237,6 +1239,21 @@
                                                         rowWidth,
                                                         30.0)];
     settingsNextY = foldersCardY + foldersCardHeight + settingsGroupGap;
+
+    [self.settingsPrivacySectionField setFrame:NSMakeRect(settingsGroupedX + 20.0,
+                                                          settingsNextY,
+                                                          settingsGroupedWidth - 40.0,
+                                                          settingsLabelHeight)];
+    CGFloat privacyCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
+    [self.settingsPrivacyCardView setFrame:NSMakeRect(settingsGroupedX,
+                                                      privacyCardY,
+                                                      settingsGroupedWidth,
+                                                      privacyCardHeight)];
+    [self.settingsPrivacyButton setFrame:NSMakeRect(rowLeft,
+                                                    privacyCardY + 12.0,
+                                                    rowWidth,
+                                                    30.0)];
+    settingsNextY = privacyCardY + privacyCardHeight + settingsGroupGap;
 
     [self.settingsDrawerSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
     CGFloat drawerCardY = settingsNextY + settingsLabelHeight + settingsLabelGap;
