@@ -79,6 +79,8 @@
 		111111111111111111111171 /* TGChatInfoWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111346 /* TGChatInfoWindowController.m */; };
 		111111111111111111111172 /* TGTDLibClient+ScheduledMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111348 /* TGTDLibClient+ScheduledMessages.m */; };
 		111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111350 /* TGScheduledMessagesWindowController.m */; };
+		111111111111111111111174 /* TGDownloadManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111352 /* TGDownloadManager.m */; };
+		111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111354 /* TGDownloadManagerWindowController.m */; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -246,6 +248,10 @@
 		111111111111111111111348 /* TGTDLibClient+ScheduledMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ScheduledMessages.m"; sourceTree = "<group>"; };
 		111111111111111111111349 /* TGScheduledMessagesWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGScheduledMessagesWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111350 /* TGScheduledMessagesWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGScheduledMessagesWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111351 /* TGDownloadManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManager.h; sourceTree = "<group>"; };
+		111111111111111111111352 /* TGDownloadManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManager.m; sourceTree = "<group>"; };
+		111111111111111111111353 /* TGDownloadManagerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManagerWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111354 /* TGDownloadManagerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManagerWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -375,6 +381,8 @@
 				111111111111111111111209 /* TGLogger.m */,
 				111111111111111111111310 /* TGLocalDataReset.h */,
 				111111111111111111111311 /* TGLocalDataReset.m */,
+				111111111111111111111351 /* TGDownloadManager.h */,
+				111111111111111111111352 /* TGDownloadManager.m */,
 				111111111111111111111280 /* TGResourcePolicy.h */,
 				111111111111111111111281 /* TGResourcePolicy.m */,
 			);
@@ -422,6 +430,8 @@
 				111111111111111111111346 /* TGChatInfoWindowController.m */,
 				111111111111111111111349 /* TGScheduledMessagesWindowController.h */,
 				111111111111111111111350 /* TGScheduledMessagesWindowController.m */,
+				111111111111111111111353 /* TGDownloadManagerWindowController.h */,
+				111111111111111111111354 /* TGDownloadManagerWindowController.m */,
 				111111111111111111111327 /* TGCallsPlaceholderView.h */,
 				111111111111111111111328 /* TGCallsPlaceholderView.m */,
 				111111111111111111111321 /* TGConversationCreationPrompt.h */,
@@ -675,6 +685,8 @@
 				111111111111111111111171 /* TGChatInfoWindowController.m in Sources */,
 				111111111111111111111172 /* TGTDLibClient+ScheduledMessages.m in Sources */,
 				111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */,
+				111111111111111111111174 /* TGDownloadManager.m in Sources */,
+				111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

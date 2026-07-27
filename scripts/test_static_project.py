@@ -463,7 +463,7 @@ def check_media_file_management_contract(errors):
         "saveMediaCenterItemAs:",
         "revealMediaCenterItem:",
         "deleteCachedFileForFileID:",
-        "TGConfiguredDownloadFolderPath()",
+        "TGDownloadManager sharedManager",
         "mediaCenterSavedPathsByFileID",
         'TGLoc(@"media.center.downloadedTo")',
     ]:
@@ -473,6 +473,18 @@ def check_media_file_management_contract(errors):
     if "removeItemAtPath:path error:&error" in media_text:
         errors.append("%s: Media Center must delete cached files through TDLib, not unlink cache paths directly" %
                       media_rel)
+
+    manager_rel = os.path.join("Sources", "Services", "TGDownloadManager.m")
+    manager_text = read_text(os.path.join(ROOT, manager_rel))
+    for fragment in [
+        "TGConfiguredDownloadFolderPath()",
+        "saveCopyOfFileAtPath:",
+        "cancelDownloadForFileID:",
+        "TGDownloadManagerDidChangeNotification",
+    ]:
+        if fragment not in manager_text:
+            errors.append("%s: shared Download Manager is missing `%s`" %
+                          (manager_rel, fragment))
 
 
 def check_primary_navigation_contract(errors):

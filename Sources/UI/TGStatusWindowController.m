@@ -5,6 +5,7 @@
 #import "TGChatInfoWindowController.h"
 #import "TGChatLifecycleWindowController.h"
 #import "TGContactsViewController.h"
+#import "TGDownloadManagerWindowController.h"
 #import "TGCallsPlaceholderView.h"
 #import "TGLocalization.h"
 #import "TGMessageActionDialogs.h"
@@ -43,6 +44,7 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Services/TGLocalDataReset.h"
+#import "../Services/TGDownloadManager.h"
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import "../Services/TGSystemCompatibility.h"
@@ -264,6 +266,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGChatInfoWindowController *chatInfoWindowController;
 @property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
 @property (nonatomic, retain) TGScheduledMessagesWindowController *scheduledMessagesWindowController;
+@property (nonatomic, retain) TGDownloadManagerWindowController *downloadManagerWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) TGSectionTitleField *settingsProfileSectionField;
@@ -471,6 +474,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTextField *settingsDownloadFolderHelpField;
 @property (nonatomic, retain) NSButton *settingsDownloadFolderButton;
 @property (nonatomic, retain) NSButton *settingsStorageUsageButton;
+@property (nonatomic, retain) NSButton *settingsDownloadManagerButton;
 @property (nonatomic, retain) NSButton *settingsDeleteLocalDataButton;
 @property (nonatomic, retain) NSButton *settingsCheckUpdatesButton;
 @property (nonatomic, retain) TGNotificationDotView *settingsUpdateDotView;
@@ -933,6 +937,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsDownloadFolderHelpField = _settingsDownloadFolderHelpField;
 @synthesize settingsDownloadFolderButton = _settingsDownloadFolderButton;
 @synthesize settingsStorageUsageButton = _settingsStorageUsageButton;
+@synthesize settingsDownloadManagerButton = _settingsDownloadManagerButton;
 @synthesize settingsDeleteLocalDataButton = _settingsDeleteLocalDataButton;
 @synthesize settingsCheckUpdatesButton = _settingsCheckUpdatesButton;
 @synthesize settingsUpdateDotView = _settingsUpdateDotView;
@@ -1065,6 +1070,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatInfoWindowController = _chatInfoWindowController;
 @synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
 @synthesize scheduledMessagesWindowController = _scheduledMessagesWindowController;
+@synthesize downloadManagerWindowController = _downloadManagerWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -1130,6 +1136,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
+
+- (void)setClient:(TGTDLibClient *)client {
+    if (_client != client) {
+        [_client release];
+        _client = [client retain];
+    }
+    [[TGDownloadManager sharedManager] setClient:_client];
+}
 
 - (instancetype)init {
     NSRect frame = NSMakeRect(0, 0, 980, 700);
@@ -1581,6 +1595,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsActiveSessionsDetailField setStringValue:TGLoc(@"settings.sessions.help")];
     [self.settingsActiveSessionsButton setTitle:TGLoc(@"settings.sessions.open")];
     [self.settingsStorageUsageButton setTitle:TGLoc(@"storage.open")];
+    [self.settingsDownloadManagerButton setTitle:TGLoc(@"downloads.open")];
     [self.settingsDeleteLocalDataButton setTitle:TGLoc(@"settings.localData.delete")];
     [self.settingsEconomyModeButton setTitle:TGLoc(@"settings.resources.economy")];
     [self.settingsAutoDownloadPhotosButton setTitle:TGLoc(@"settings.resources.photos")];
@@ -3287,6 +3302,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];
 
+    self.settingsDownloadManagerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 136, 260, 22)] autorelease];
+    [self.settingsDownloadManagerButton setTitle:TGLoc(@"downloads.open")];
+    [self.settingsDownloadManagerButton setTarget:self];
+    [self.settingsDownloadManagerButton setAction:@selector(showDownloadManagerWindow:)];
+    [self applyUtilityButtonStyle:self.settingsDownloadManagerButton];
+    [self.settingsDownloadManagerButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsDownloadManagerButton];
+
     self.settingsDeleteLocalDataButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 120, 260, 22)] autorelease];
     [self.settingsDeleteLocalDataButton setTitle:@"Delete local data"];
     [self.settingsDeleteLocalDataButton setTarget:self];
@@ -3392,6 +3415,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsDownloadFolderHelpField,
                                      self.settingsDownloadFolderButton,
                                      self.settingsStorageUsageButton,
+                                     self.settingsDownloadManagerButton,
                                      self.settingsDeleteLocalDataButton,
                                      self.settingsCheckUpdatesButton,
                                      self.settingsAppearanceButton,
@@ -4294,6 +4318,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsDownloadFolderHelpField release];
     [_settingsDownloadFolderButton release];
     [_settingsStorageUsageButton release];
+    [_settingsDownloadManagerButton release];
     [_settingsDeleteLocalDataButton release];
     [_settingsCheckUpdatesButton release];
     [_settingsUpdateDotView release];
@@ -4308,6 +4333,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_notificationSettingsWindowController release];
     [[_scheduledMessagesWindowController window] close];
     [_scheduledMessagesWindowController release];
+    [[_downloadManagerWindowController window] close];
+    [_downloadManagerWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
     [_profileEditButton release];

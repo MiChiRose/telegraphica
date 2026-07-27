@@ -377,67 +377,26 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     NSString *localPath = nil;
     NSString *fileName = nil;
     NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:&localPath fileName:&fileName];
-    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
-        if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-            NSString *destination = [self uniqueDownloadDestinationForFileName:fileName];
-            NSError *copyError = nil;
-            if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
-                [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
-            } else {
-                [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-            }
-            return;
+    [[TGDownloadManager sharedManager] setClient:self.client];
+    NSString *identifier = [[TGDownloadManager sharedManager] enqueueFileID:fileID
+                                                          suggestedFileName:fileName
+                                                          fallbackLocalPath:localPath
+                                                                 completion:^(NSString *savedPath, NSError *error, BOOL cancelled) {
+        if (cancelled) {
+            [self.statusField setStringValue:TGLoc(@"downloads.state.cancelled")];
+        } else if ([savedPath length] > 0) {
+            [self.statusField setStringValue:TGLoc(@"downloads.state.completed")];
+            [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", savedPath]];
+        } else {
+            [self.statusField setStringValue:TGLoc(@"downloads.state.failed")];
+            [self appendDetail:[error localizedDescription]];
         }
-        [self appendDetail:@"Attachment file id is not available yet."];
-        return;
+    }];
+    if ([identifier length] > 0) {
+        [self.statusField setStringValue:TGLoc(@"downloads.state.queued")];
+    } else {
+        [self appendDetail:TGLoc(@"downloads.unavailable")];
     }
-
-    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Download media: requesting full file id %@ before copying to Downloads; fallback=%@.",
-                                  fileID,
-                                  [localPath length] > 0 ? [localPath lastPathComponent] : @"none"]];
-
-    NSNumber *fileIDCopy = [fileID retain];
-    NSString *fileNameCopy = [fileName copy];
-    TGTDLibClient *client = [self.client retain];
-    [self.statusField setStringValue:@"Downloading file..."];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *downloadError = nil;
-        NSString *downloadedPath = [[client downloadedLocalPathForFileID:fileIDCopy timeout:16.0 error:&downloadError] copy];
-        NSString *downloadErrorMessage = [[downloadError localizedDescription] copy];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([downloadedPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:downloadedPath]) {
-                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
-                NSError *copyError = nil;
-                if ([[NSFileManager defaultManager] copyItemAtPath:downloadedPath toPath:destination error:&copyError]) {
-                    [self.statusField setStringValue:@"File downloaded"];
-                    [self appendDetail:[NSString stringWithFormat:@"Downloaded to %@", destination]];
-                } else {
-                    [self.statusField setStringValue:@"Download failed"];
-                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-                }
-            } else if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-                NSString *destination = [self uniqueDownloadDestinationForFileName:fileNameCopy];
-                NSError *copyError = nil;
-                if ([[NSFileManager defaultManager] copyItemAtPath:localPath toPath:destination error:&copyError]) {
-                    [self.statusField setStringValue:@"File downloaded"];
-                    [self appendDetail:[NSString stringWithFormat:@"Downloaded cached fallback to %@", destination]];
-                } else {
-                    [self.statusField setStringValue:@"Download failed"];
-                    [self appendDetail:[NSString stringWithFormat:@"Download copy failed: %@", [copyError localizedDescription]]];
-                }
-            } else {
-                [self.statusField setStringValue:@"Download failed"];
-                [self appendDetail:([downloadErrorMessage length] > 0 ? downloadErrorMessage : @"TDLib did not return a file path.")];
-            }
-            [downloadedPath release];
-            [downloadErrorMessage release];
-            [fileIDCopy release];
-            [fileNameCopy release];
-            [client release];
-        });
-        [pool drain];
-    });
 }
 
 - (void)populateChatContextMenu:(NSMenu *)menu {

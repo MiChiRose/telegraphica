@@ -290,6 +290,7 @@
     [self showView:self.settingsDownloadFolderHelpField visible:showSettings];
     [self showView:self.settingsDownloadFolderButton visible:showSettings];
     [self showView:self.settingsStorageUsageButton visible:showSettings];
+    [self showView:self.settingsDownloadManagerButton visible:showSettings];
     [self showView:self.settingsDeleteLocalDataButton visible:showSettings];
     [self showView:self.settingsCheckUpdatesButton visible:showSettings];
     [self showView:self.settingsUpdateDotView visible:(showSettings && self.updateAvailable)];
@@ -1154,7 +1155,7 @@
     CGFloat resourceCardHeight = 276.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
-    CGFloat filesCardHeight = 140.0;
+    CGFloat filesCardHeight = 172.0;
     CGFloat helpCardHeight = 112.0;
     CGFloat settingsDocHeight = 18.0;
     settingsDocHeight += settingsLabelHeight + settingsLabelGap + profileCardHeight + settingsGroupGap;
@@ -1312,8 +1313,9 @@
     [self.settingsFilesCardView setFrame:NSMakeRect(settingsGroupedX, filesCardY, settingsGroupedWidth, filesCardHeight)];
     [self.settingsDownloadFolderHelpField setFrame:NSMakeRect(rowLeft, filesCardY + 12.0, rowWidth, 18.0)];
     [self.settingsDownloadFolderButton setFrame:NSMakeRect(rowLeft, filesCardY + 38.0, rowWidth, 28.0)];
-    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
-    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
+    [self.settingsDownloadManagerButton setFrame:NSMakeRect(rowLeft, filesCardY + 70.0, rowWidth, 28.0)];
+    [self.settingsStorageUsageButton setFrame:NSMakeRect(rowLeft, filesCardY + 102.0, rowWidth, 28.0)];
+    [self.settingsDeleteLocalDataButton setFrame:NSMakeRect(rowLeft, filesCardY + 134.0, rowWidth, 28.0)];
     settingsNextY = filesCardY + filesCardHeight + settingsGroupGap;
 
     [self.settingsHelpSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];

@@ -68,6 +68,17 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     return [NSString stringWithFormat:@"%@\n%@", title, [details componentsJoinedByString:@" · "]];
 }
 
+- (void)showDownloadManagerWindow:(id)sender {
+    (void)sender;
+    if (!self.downloadManagerWindowController) {
+        self.downloadManagerWindowController = [[[TGDownloadManagerWindowController alloc] init] autorelease];
+    }
+    [[self.downloadManagerWindowController window] center];
+    [self.downloadManagerWindowController showWindow:self];
+    [[self.downloadManagerWindowController window] makeKeyAndOrderFront:self];
+    [self.downloadManagerWindowController reloadDownloads];
+}
+
 - (void)openSelectedChatProfile:(id)sender {
     (void)sender;
     if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
