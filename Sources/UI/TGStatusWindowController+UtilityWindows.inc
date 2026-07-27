@@ -96,17 +96,16 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 
 - (void)showSavedMessagesWindow:(id)sender {
     (void)sender;
-    if (!self.client || ![self.currentAuthState isEqualToString:@"ready"]) {
+    if (!self.client ||
+        ![self.currentAuthState isEqualToString:@"ready"] ||
+        ![self.profileUserID respondsToSelector:@selector(longLongValue)] ||
+        [self.profileUserID longLongValue] == 0LL) {
         NSBeep();
         return;
     }
-    if (!self.savedMessagesWindowController) {
-        self.savedMessagesWindowController = [[[TGSavedMessagesWindowController alloc] initWithClient:self.client] autorelease];
-    }
-    [[self.savedMessagesWindowController window] center];
-    [self.savedMessagesWindowController showWindow:self];
-    [[self.savedMessagesWindowController window] makeKeyAndOrderFront:self];
-    [self.savedMessagesWindowController reloadSavedMessages];
+    [self chatLifecycleWindowController:nil
+                          didOpenChatID:self.profileUserID
+                                  title:TGLoc(@"savedMessages")];
 }
 
 - (void)openSelectedChatProfile:(id)sender {

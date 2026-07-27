@@ -2615,7 +2615,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                 [self.statusField setStringValue:TGLoc(@"poll.create.sent")];
                 [self appendDetail:@"Poll sent."];
                 self.forceMessageScrollToNewest = YES;
-                [self refreshSelectedChatMessages:self];
+                [self refreshSelectedMessagesAfterMediaSend];
             } else {
                 [self.statusField setStringValue:TGLoc(@"poll.create.failed")];
                 [self appendDetail:[NSString stringWithFormat:@"Poll send failed: %@", [errorMessage length] > 0 ? errorMessage : @"unknown error"]];
@@ -2730,7 +2730,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                     [self clearReplyTarget];
                 }
                 self.forceMessageScrollToNewest = YES;
-                [self refreshSelectedChatMessages:self];
+                [self refreshSelectedMessagesAfterMediaSend];
             } else {
                 [self.statusField setStringValue:TGLoc(sharingContact ? @"share.contact.failed" :
                                                        (sharingLocation ? @"share.location.failed" : @"share.extra.failed"))];

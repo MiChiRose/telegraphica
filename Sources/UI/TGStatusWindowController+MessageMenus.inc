@@ -1119,7 +1119,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                 [item setPendingPollOptionIndexes:nil];
                 [self.statusField setStringValue:TGLoc(@"message.poll.sent")];
                 [self appendDetail:@"Poll vote accepted by TDLib."];
-                [self refreshSelectedChatMessages:self];
+                [self refreshSelectedMessagesAfterMediaSend];
             } else {
                 [self.statusField setStringValue:TGLoc(@"message.poll.failed")];
                 [self appendDetail:[NSString stringWithFormat:@"Poll vote failed: %@", [errorMessage length] > 0 ? errorMessage : @"TDLib rejected the vote"]];

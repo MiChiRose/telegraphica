@@ -442,7 +442,7 @@ def check_additional_message_types_contract(errors):
     bot_composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BotComposer.inc")
     bot_composer_text = read_text(os.path.join(ROOT, bot_composer_rel))
     for fragment in ["setBotComposerVisible", "replyMarkupShowKeyboard",
-                     "TGBotInteractionWindowController", "setDuration:0.16"]:
+                     "setBotCommandPanelVisible", "setDuration:0.16"]:
         if fragment not in bot_composer_text:
             errors.append("%s: bot composer integration is missing `%s`" %
                           (bot_composer_rel, fragment))
@@ -450,10 +450,13 @@ def check_additional_message_types_contract(errors):
     composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
     composer_text = read_text(os.path.join(ROOT, composer_rel))
     for fragment in ["shareContactFromComposerMenu:", "shareLocationFromComposerMenu:",
-                     "sendAnimationMessageToChatID:"]:
+                     "sendAnimationMessageToChatID:",
+                     "refreshSelectedMessagesAfterMediaSend"]:
         if fragment not in composer_text:
             errors.append("%s: composer message-type routing is missing `%s`" %
                           (composer_rel, fragment))
+    if "refreshSelectedChatMessages:" in composer_text:
+        errors.append("%s: removed media refresh selector was reintroduced" % composer_rel)
 
 
 def check_media_file_management_contract(errors):
