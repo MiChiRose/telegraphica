@@ -47,6 +47,18 @@ chat management around messaging: server-synchronized notification settings,
 participants and administration, send options, privacy controls, a real
 download manager and richer bot support.
 
+## Product Boundary: Free Features Only
+
+Telegraphica will not implement Telegram Premium purchasing, Stars payments,
+paid subscriptions, paid messages or media, gifts, boosts, paid reactions,
+giveaways, or any other monetization transaction.
+
+Already-existing paid content may be rendered read-only when TDLib supplies a
+safe representation. An attempted paid-only action must show a neutral
+explanation that it is unavailable in Telegraphica and can be managed in the
+official Telegram application. No checkout, payment link, purchase prompt or
+billing workflow belongs in the app.
+
 ## Current Coverage
 
 | Area | Current status | Important remaining work |
@@ -58,8 +70,8 @@ download manager and richer bot support.
 | Profile | Name, surname, username, bio and avatar upload | Avatar history/removal, phone change, birthday, emoji status, profile music, default profile tab |
 | Messaging | Read, send, reply, forward, edit, delete, pin, drafts, long-text chunking | Scheduled, silent, recurring, send-when-online and link-preview controls |
 | Formatting | Selection-based bold, italic, underline, strike, spoiler and monospace through TDLib entity parsing | Link editor, block quotes, expandable quotes, formatted editing and a visual rich-text editor |
-| Message types | Photo, album, GIF animation, video, audio, document, sticker, voice, contact, location, poll | Video note, live location, venue, dice, checklist, paid media |
-| Reactions | Add and remove ordinary emoji reactions, reaction display | Available-reaction picker, custom emoji, paid Star reactions, reaction details |
+| Message types | Photo, album, GIF animation, video, audio, document, sticker, voice, contact, location, poll | Video note, live location, venue, dice and free checklist handling; paid media is read-only/out of scope |
+| Reactions | Add and remove ordinary emoji reactions, reaction display | Server-provided free reaction picker, custom emoji display where available and reaction details; paid Star reactions are out of scope |
 | Polls | Display, vote and create regular anonymous or multiple-choice polls | Quiz mode, correct-answer explanation, media, option links, closing and scheduling |
 | Search | Chat search, public chat lookup, in-chat and global message search, media filters | Public post search, semantic filters, saved searches |
 | Topics and comments | Forum topic list, topic history, channel comment threads | Create/edit/close topics, topic tabs, topic permissions and admin actions |
@@ -73,7 +85,7 @@ download manager and richer bot support.
 | Administration | Basic group/channel creation and leave | Members, roles, bans, permissions, invite links, join requests, event log, slow mode |
 | Stories | Not implemented | Viewing, publishing, reactions, privacy, albums and live stories |
 | Business | Not implemented | Quick replies, greeting/away messages, links, locations, hours and connected bots |
-| Premium, Stars and gifts | Not implemented | Premium state, Stars, paid messages/media, gifts, boosts, subscriptions and giveaways |
+| Premium, Stars and gifts | Intentionally not implemented | Read-only rendering or an official-app explanation only; all purchases and monetization actions are prohibited |
 | 2025-2026 additions | Not implemented | Checklists, suggested posts, communities, ephemeral group messages, public-post search, rich editor and AI tools |
 
 ## Priority Backlog
@@ -150,13 +162,13 @@ runtime architecture and carries a much larger regression surface.
 3. Stories and live stories.
 4. Mini Apps runtime and permission model.
 5. Business accounts and connected bots.
-6. Stars, gifts, boosts, subscriptions and paid media.
+6. Paid Telegram functionality remains intentionally out of scope.
 7. Communities, suggested posts and ephemeral group messages.
 8. AI editor, summaries and moderation assistants.
 
-These projects should not block the legacy daily-use client. Calls and Mini
-Apps in particular need their own architecture, dependencies and performance
-budget.
+These projects should not block the legacy daily-use client. Paid Telegram
+functionality will not be implemented. Calls and Mini Apps in particular need
+their own architecture, dependencies and performance budget.
 
 ## Recommended Development Sequence
 
