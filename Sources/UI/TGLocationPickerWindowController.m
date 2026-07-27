@@ -15,16 +15,11 @@
 @property (nonatomic, assign) BOOL waitingForUserLocation;
 @property (nonatomic, assign) BOOL hasSelection;
 @property (nonatomic, assign) NSUInteger mapGeneration;
-@property (nonatomic, assign) NSUInteger searchGeneration;
 @property (nonatomic, assign) NSInteger mapZoom;
 @property (nonatomic, assign) CLLocationCoordinate2D selectedCoordinate;
 @property (nonatomic, retain) MKMapView *locationServiceMapView;
-@property (nonatomic, retain) MKLocalSearch *activeSearch;
-@property (nonatomic, retain) CLGeocoder *activeGeocoder;
 @property (nonatomic, retain) TGLocationStaticMapView *mapImageView;
-@property (nonatomic, retain) NSTextField *searchField;
 @property (nonatomic, retain) NSTextField *statusField;
-@property (nonatomic, retain) NSButton *searchButton;
 @property (nonatomic, retain) NSButton *currentLocationButton;
 @property (nonatomic, retain) NSButton *sendButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -38,16 +33,11 @@
 @synthesize waitingForUserLocation = _waitingForUserLocation;
 @synthesize hasSelection = _hasSelection;
 @synthesize mapGeneration = _mapGeneration;
-@synthesize searchGeneration = _searchGeneration;
 @synthesize mapZoom = _mapZoom;
 @synthesize selectedCoordinate = _selectedCoordinate;
 @synthesize locationServiceMapView = _locationServiceMapView;
-@synthesize activeSearch = _activeSearch;
-@synthesize activeGeocoder = _activeGeocoder;
 @synthesize mapImageView = _mapImageView;
-@synthesize searchField = _searchField;
 @synthesize statusField = _statusField;
-@synthesize searchButton = _searchButton;
 @synthesize currentLocationButton = _currentLocationButton;
 @synthesize sendButton = _sendButton;
 @synthesize spinner = _spinner;
@@ -63,7 +53,7 @@
         self.client = client;
         self.mapZoom = 15;
         self.mapServicesAvailable = (NSClassFromString(@"MKMapView") != Nil &&
-                                     NSClassFromString(@"MKLocalSearch") != Nil);
+                                     NSClassFromString(@"MKPinAnnotationView") != Nil);
         [[self window] setTitle:TGLoc(@"share.location.title")];
         [[self window] setReleasedWhenClosed:NO];
         [[self window] setDelegate:(id)self];
@@ -74,16 +64,10 @@
 
 - (void)dealloc {
     [_locationServiceMapView setDelegate:nil];
-    [_activeSearch cancel];
-    [_activeGeocoder cancelGeocode];
     [_client release];
     [_locationServiceMapView release];
-    [_activeSearch release];
-    [_activeGeocoder release];
     [_mapImageView release];
-    [_searchField release];
     [_statusField release];
-    [_searchButton release];
     [_currentLocationButton release];
     [_sendButton release];
     [_spinner release];
@@ -154,17 +138,7 @@
                                      font:[NSFont systemFontOfSize:11.0]
                                     color:TGClassicHeaderDetailTextColor(0.9)]];
 
-    self.searchField = [[[NSTextField alloc] initWithFrame:NSMakeRect(24.0, height - 112.0, 420.0, 24.0)] autorelease];
-    [[self.searchField cell] setPlaceholderString:TGLoc(@"share.location.searchPlaceholder")];
-    [self.searchField setTarget:self];
-    [self.searchField setAction:@selector(searchPressed:)];
-    [root addSubview:self.searchField];
-    self.searchButton = [self buttonWithFrame:NSMakeRect(452.0, height - 116.0, 76.0, 30.0)
-                                        title:TGLoc(@"share.location.search")
-                                       action:@selector(searchPressed:)
-                                      primary:NO];
-    [root addSubview:self.searchButton];
-    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(536.0, height - 116.0, 80.0, 30.0)
+    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(500.0, height - 116.0, 116.0, 30.0)
                                                  title:TGLoc(@"share.location.mine")
                                                 action:@selector(currentLocationPressed:)
                                                primary:NO];
@@ -188,8 +162,6 @@
         [self.mapImageView setSelectionPinImage:[self systemSelectionPinImage]];
     } else {
         [self.currentLocationButton setEnabled:NO];
-        [self.searchButton setEnabled:NO];
-        [self.searchField setEnabled:NO];
     }
 
     [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 382.0, 28.0, 28.0)
@@ -325,56 +297,14 @@
     [self.locationServiceMapView setShowsUserLocation:YES];
 }
 
-- (void)searchPressed:(id)sender {
-    (void)sender;
-    NSString *query = [[self.searchField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if ([query length] == 0 || !self.mapServicesAvailable) {
-        NSBeep();
-        return;
-    }
-    [self.activeSearch cancel];
-    [self.activeGeocoder cancelGeocode];
-    self.activeSearch = nil;
-    self.activeGeocoder = nil;
-    NSUInteger generation = ++self.searchGeneration;
-
-    MKLocalSearchRequest *request = [[[MKLocalSearchRequest alloc] init] autorelease];
-    [request setNaturalLanguageQuery:query];
-    [request setRegion:MKCoordinateRegionMake(self.selectedCoordinate, MKCoordinateSpanMake(0.08, 0.08))];
-    self.activeSearch = [[[MKLocalSearch alloc] initWithRequest:request] autorelease];
-    [self.spinner startAnimation:nil];
-    [self.searchButton setEnabled:NO];
-    [self.statusField setStringValue:TGLoc(@"share.location.searching")];
-    [self.activeSearch startWithCompletionHandler:^(MKLocalSearchResponse *response, NSError *error) {
-        if (generation != self.searchGeneration) {
-            return;
-        }
-        self.activeSearch = nil;
-        MKMapItem *item = [[response mapItems] count] > 0 ? [[response mapItems] objectAtIndex:0] : nil;
-        if (item) {
-            [self.spinner stopAnimation:nil];
-            [self.searchButton setEnabled:YES];
-            [self setSelectedCoordinate:[[[item placemark] location] coordinate] reloadMap:YES];
-            return;
-        }
-
-        self.activeGeocoder = [[[CLGeocoder alloc] init] autorelease];
-        [self.activeGeocoder geocodeAddressString:query completionHandler:^(NSArray *placemarks, NSError *geocodeError) {
-            if (generation != self.searchGeneration) {
-                return;
-            }
-            self.activeGeocoder = nil;
-            [self.spinner stopAnimation:nil];
-            [self.searchButton setEnabled:YES];
-            CLPlacemark *placemark = [placemarks count] > 0 ? [placemarks objectAtIndex:0] : nil;
-            if (placemark && [placemark location]) {
-                [self setSelectedCoordinate:[[placemark location] coordinate] reloadMap:YES];
-                return;
-            }
-            NSError *displayError = geocodeError ? geocodeError : error;
-            [self.statusField setStringValue:[displayError localizedDescription] ?: TGLoc(@"share.location.notFound")];
-        }];
-    }];
+- (void)prepareForClosing {
+    self.mapGeneration++;
+    self.waitingForUserLocation = NO;
+    [self.spinner stopAnimation:nil];
+    [self.locationServiceMapView setShowsUserLocation:NO];
+    [self.locationServiceMapView setDelegate:nil];
+    [self.mapImageView setCoordinateTarget:nil];
+    [self.mapImageView setCoordinateAction:NULL];
 }
 
 - (void)sendPressed:(id)sender {
@@ -390,24 +320,21 @@
     self.result = [NSDictionary dictionaryWithObjectsAndKeys:
                    [NSNumber numberWithDouble:coordinate.latitude], @"latitude",
                    [NSNumber numberWithDouble:coordinate.longitude], @"longitude", nil];
+    [self prepareForClosing];
     [NSApp stopModalWithCode:NSOKButton];
     [[self window] orderOut:self];
 }
 
 - (void)cancelPressed:(id)sender {
     (void)sender;
-    self.searchGeneration++;
-    [self.activeSearch cancel];
-    [self.activeGeocoder cancelGeocode];
+    [self prepareForClosing];
     [NSApp abortModal];
     [[self window] orderOut:self];
 }
 
 - (BOOL)windowShouldClose:(id)sender {
     (void)sender;
-    self.searchGeneration++;
-    [self.activeSearch cancel];
-    [self.activeGeocoder cancelGeocode];
+    [self prepareForClosing];
     [NSApp abortModal];
     return YES;
 }

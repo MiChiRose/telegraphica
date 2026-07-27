@@ -419,16 +419,25 @@ def check_additional_message_types_contract(errors):
     location_picker_rel = os.path.join("Sources", "UI", "TGLocationPickerWindowController.m")
     location_picker_text = read_text(os.path.join(ROOT, location_picker_rel))
     for fragment in ["NSClassFromString(@\"MKMapView\")",
-                     "MKLocalSearchRequest",
                      "setShowsUserLocation:YES",
                      "TGLocationStaticMapView",
                      "MKPinAnnotationView",
                      "reloadMapThumbnail",
-                     "activeSearch",
-                     "geocodeAddressString:",
+                     "prepareForClosing",
+                     "setCoordinateTarget:nil",
+                     "[self prepareForClosing];",
                      "mapUnavailable"]:
         if fragment not in location_picker_text:
             errors.append("%s: location picker regression guard is missing `%s`" %
+                          (location_picker_rel, fragment))
+    for fragment in ["MKLocalSearchRequest",
+                     "MKLocalSearch",
+                     "CLGeocoder",
+                     "searchPressed:",
+                     "searchField",
+                     "searchButton"]:
+        if fragment in location_picker_text:
+            errors.append("%s: disabled legacy location search leaked `%s`" %
                           (location_picker_rel, fragment))
 
     static_map_rel = os.path.join("Sources", "UI", "TGLocationStaticMapView.m")
