@@ -2056,6 +2056,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         NSButton *navigationButton = [[[NSButton alloc] initWithFrame:NSMakeRect(260 + (navigationIndex * 82), 636, 78, 28)] autorelease];
         TGNavigationButtonCell *navigationCell = [[[TGNavigationButtonCell alloc] initTextCell:buttonTitle] autorelease];
         [navigationCell setButtonType:NSToggleButton];
+        [navigationCell setIconOnly:YES];
         [navigationButton setCell:navigationCell];
         [navigationButton setTitle:buttonTitle];
         [navigationButton setButtonType:NSToggleButton];

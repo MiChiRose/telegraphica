@@ -92,10 +92,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 @implementation TGNavigationButtonCell
 
 @synthesize badgeText = _badgeText;
+@synthesize iconOnly = _iconOnly;
 
 - (id)copyWithZone:(NSZone *)zone {
     TGNavigationButtonCell *cell = [super copyWithZone:zone];
     [cell setBadgeText:self.badgeText];
+    [cell setIconOnly:self.iconOnly];
     return cell;
 }
 
@@ -117,12 +119,27 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSString *title = [self title] ? [self title] : @"";
     NSColor *textColor = selected ? TGClassicNavigationTextColor(alpha) : TGClassicNavigationMutedTextColor(alpha);
     BOOL flipped = [controlView isFlipped];
-    CGFloat iconSize = 27.0;
+    CGFloat iconSize = self.iconOnly ? 27.0 : 18.0;
     NSRect iconRect = NSMakeRect(floor(NSMidX(cellFrame) - (iconSize / 2.0)),
-                                 floor(NSMidY(cellFrame) - (iconSize / 2.0)),
+                                 self.iconOnly ? floor(NSMidY(cellFrame) - (iconSize / 2.0)) :
+                                     (flipped ? (NSMinY(cellFrame) + 6.0) : (NSMaxY(cellFrame) - 24.0)),
                                  iconSize,
                                  iconSize);
     TGDrawNavigationIcon(title, iconRect, textColor, flipped);
+    if (!self.iconOnly) {
+        NSFont *font = selected ? [NSFont boldSystemFontOfSize:11.0] : [NSFont systemFontOfSize:11.0];
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    font, NSFontAttributeName,
+                                    textColor, NSForegroundColorAttributeName,
+                                    nil];
+        NSSize titleSize = [title sizeWithAttributes:attributes];
+        CGFloat titleY = flipped ? (NSMaxY(cellFrame) - titleSize.height - 7.0) : (NSMinY(cellFrame) + 7.0);
+        NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + floor((NSWidth(cellFrame) - titleSize.width) / 2.0),
+                                     titleY,
+                                     titleSize.width,
+                                     titleSize.height);
+        [title drawInRect:titleRect withAttributes:attributes];
+    }
 
     if ([self.badgeText length] > 0) {
         NSFont *badgeFont = [NSFont boldSystemFontOfSize:8.5];
