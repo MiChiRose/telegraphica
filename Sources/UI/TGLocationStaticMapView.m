@@ -6,6 +6,7 @@
 @property (nonatomic, assign) NSPoint previewOffset;
 @property (nonatomic, assign) NSInteger requestedZoom;
 @property (nonatomic, assign) CGFloat magnificationAccumulator;
+@property (nonatomic, retain) NSImage *selectionPinImage;
 @end
 
 @implementation TGLocationStaticMapView
@@ -18,6 +19,7 @@
 @synthesize previewOffset = _previewOffset;
 @synthesize requestedZoom = _requestedZoom;
 @synthesize magnificationAccumulator = _magnificationAccumulator;
+@synthesize selectionPinImage = _selectionPinImage;
 
 - (id)initWithFrame:(NSRect)frame {
     self = [super initWithFrame:frame];
@@ -28,6 +30,11 @@
         [self setImageScaling:NSImageScaleAxesIndependently];
     }
     return self;
+}
+
+- (void)dealloc {
+    [_selectionPinImage release];
+    [super dealloc];
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -54,6 +61,17 @@
                  fromRect:NSZeroRect
                 operation:NSCompositeSourceOver
                  fraction:1.0];
+    }
+    if (self.selectionPinImage) {
+        NSSize pinSize = [self.selectionPinImage size];
+        NSRect pinRect = NSMakeRect(floor(NSMidX([self bounds]) - pinSize.width / 2.0),
+                                    floor(NSMidY([self bounds])),
+                                    pinSize.width,
+                                    pinSize.height);
+        [self.selectionPinImage drawInRect:pinRect
+                                 fromRect:NSZeroRect
+                                operation:NSCompositeSourceOver
+                                 fraction:1.0];
     }
 }
 
@@ -96,26 +114,35 @@
     NSPoint startPoint = [self convertPoint:[event locationInWindow] fromView:nil];
     NSPoint lastPoint = startPoint;
     BOOL dragged = NO;
-    [[NSCursor closedHandCursor] push];
+    const CGFloat dragThreshold = 6.0;
     while (YES) {
         NSEvent *nextEvent = [[self window] nextEventMatchingMask:(NSLeftMouseDraggedMask | NSLeftMouseUpMask)];
         if ([nextEvent type] == NSLeftMouseDragged) {
             NSPoint currentPoint = [self convertPoint:[nextEvent locationInWindow] fromView:nil];
-            CGFloat dx = currentPoint.x - lastPoint.x;
-            CGFloat dy = currentPoint.y - lastPoint.y;
-            if (fabs(currentPoint.x - startPoint.x) > 2.0 || fabs(currentPoint.y - startPoint.y) > 2.0) {
+            CGFloat totalDX = currentPoint.x - startPoint.x;
+            CGFloat totalDY = currentPoint.y - startPoint.y;
+            if (!dragged && sqrt(totalDX * totalDX + totalDY * totalDY) >= dragThreshold) {
                 dragged = YES;
+                [[NSCursor closedHandCursor] push];
+                self.previewOffset = NSMakePoint(self.previewOffset.x + totalDX,
+                                                 self.previewOffset.y + totalDY);
+            } else if (dragged) {
+                self.previewOffset = NSMakePoint(self.previewOffset.x + currentPoint.x - lastPoint.x,
+                                                 self.previewOffset.y + currentPoint.y - lastPoint.y);
             }
-            self.previewOffset = NSMakePoint(self.previewOffset.x + dx, self.previewOffset.y + dy);
             lastPoint = currentPoint;
-            [self setNeedsDisplay:YES];
+            if (dragged) {
+                [self setNeedsDisplay:YES];
+            }
             continue;
         }
         if ([nextEvent type] == NSLeftMouseUp) {
             break;
         }
     }
-    [NSCursor pop];
+    if (dragged) {
+        [NSCursor pop];
+    }
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(commitPreviewPan) object:nil];
     if (dragged) {
         [self commitPreviewPan];
@@ -173,6 +200,15 @@
     self.zoom = zoom;
     self.previewOffset = NSZeroPoint;
     [self setImage:image];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setSelectionPinImage:(NSImage *)image {
+    if (_selectionPinImage == image) {
+        return;
+    }
+    [_selectionPinImage release];
+    _selectionPinImage = [image retain];
     [self setNeedsDisplay:YES];
 }
 

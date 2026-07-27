@@ -435,11 +435,13 @@ def check_additional_message_types_contract(errors):
     static_map_text = read_text(os.path.join(ROOT, static_map_rel))
     for fragment in ["openHandCursor",
                      "closedHandCursor",
+                     "dragThreshold = 6.0",
                      "scrollWheel:",
                      "hasPreciseScrollingDeltas",
                      "magnifyWithEvent:",
                      "requestZoomDelta:",
-                     "coordinateForPoint:"]:
+                     "coordinateForPoint:",
+                     "selectionPinImage"]:
         if fragment not in static_map_text:
             errors.append("%s: interactive map fallback is missing `%s`" %
                           (static_map_rel, fragment))
