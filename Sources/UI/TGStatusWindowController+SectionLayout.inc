@@ -365,7 +365,7 @@
 }
 
 - (BOOL)isChatSidebarCompactForWidth:(CGFloat)width {
-    return (width < 132.0);
+    return (width < 286.0);
 }
 
 - (CGFloat)sidebarResizeHandleCurrentWidth:(TGSidebarResizeHandleView *)handle {

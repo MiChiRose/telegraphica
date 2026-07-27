@@ -579,8 +579,10 @@ def check_primary_navigation_contract(errors):
 
     chat_cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
     chat_cells_text = read_text(os.path.join(ROOT, chat_cells_rel))
-    if 'TGLoc(@"chat.notifications.mutedBadge")' not in chat_cells_text:
-        errors.append("%s: muted chats need an explicit localized badge" % chat_cells_rel)
+    if 'TGDrawTemplateIconAsset(@"sound-off"' not in chat_cells_text:
+        errors.append("%s: muted chats need the approved sound-off icon" % chat_cells_rel)
+    if 'TGLoc(@"chat.notifications.mutedBadge")' in chat_cells_text:
+        errors.append("%s: muted chats must not replace the sound-off icon with text" % chat_cells_rel)
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
     for fragment in [

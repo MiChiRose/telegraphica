@@ -133,13 +133,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      nil];
     CGFloat titleX = NSMaxX(avatarRect) + 9.0;
     CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
-    NSString *muteBadge = [item notificationsMuted] ? TGLoc(@"chat.notifications.mutedBadge") : @"";
-    NSDictionary *muteAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont boldSystemFontOfSize:9.0], NSFontAttributeName,
-                                    selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor(), NSForegroundColorAttributeName,
-                                    nil];
-    NSSize muteBadgeSize = [muteBadge sizeWithAttributes:muteAttributes];
-    CGFloat muteIconWidth = [item notificationsMuted] ? MAX(38.0, muteBadgeSize.width + 10.0) : 0.0;
+    CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
     CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
     CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) + ([item isPinned] ? (pinIconWidth + 4.0) : 0.0);
     CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
@@ -163,24 +157,11 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
     if ([item notificationsMuted]) {
         NSRect muteRect = NSMakeRect(iconX,
-                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 16.0) / 2.0),
-                                     muteIconWidth,
-                                     16.0);
-        NSBezierPath *mutePath = [NSBezierPath bezierPathWithRoundedRect:muteRect xRadius:8.0 yRadius:8.0];
-        NSColor *muteFill = selected
-            ? [TGClassicSelectedRowTextColor() colorWithAlphaComponent:0.16]
-            : [TGClassicMutedInkColor() colorWithAlphaComponent:0.12];
-        [muteFill set];
-        [mutePath fill];
-        NSMutableParagraphStyle *muteParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-        [muteParagraph setAlignment:NSCenterTextAlignment];
-        NSMutableDictionary *centeredMuteAttributes = [NSMutableDictionary dictionaryWithDictionary:muteAttributes];
-        [centeredMuteAttributes setObject:muteParagraph forKey:NSParagraphStyleAttributeName];
-        [muteBadge drawInRect:NSMakeRect(NSMinX(muteRect),
-                                         NSMinY(muteRect) + 1.0,
-                                         NSWidth(muteRect),
-                                         13.0)
-               withAttributes:centeredMuteAttributes];
+                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
+                                     15.0,
+                                     15.0);
+        NSColor *muteColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicInkColor() colorWithAlphaComponent:0.78];
+        TGDrawTemplateIconAsset(@"sound-off", muteRect, muteColor, 1.0, [controlView isFlipped]);
     }
     if ([unreadString length] > 0) {
         NSBezierPath *unreadPath = [NSBezierPath bezierPathWithRoundedRect:unreadRect
