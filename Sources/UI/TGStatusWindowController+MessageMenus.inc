@@ -470,6 +470,15 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [pinItem setTarget:self];
     [pinItem setEnabled:(![item isForumTopic])];
     [menu addItem:pinItem];
+
+    NSMenuItem *archiveItem = [[[NSMenuItem alloc] initWithTitle:(self.showingArchivedChats ? TGLoc(@"chat.unarchive") : TGLoc(@"chat.archive"))
+                                                          action:@selector(toggleChatArchivedFromMenu:)
+                                                   keyEquivalent:@""] autorelease];
+    [archiveItem setRepresentedObject:item];
+    [archiveItem setTarget:self];
+    [archiveItem setEnabled:(![item isForumTopic])];
+    [archiveItem setImage:TGTemplateIconAssetImage(@"archive", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
+    [menu addItem:archiveItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
     [menu addItem:[self chatCurrentMuteStateMenuItemForChatItem:item]];
@@ -1337,6 +1346,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     TGChatItem *itemCopy = [item retain];
     NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
     NSNumber *chatFilterID = [self.selectedChatFilterID retain];
+    BOOL archived = self.showingArchivedChats;
     NSString *title = [[item title] copy];
     TGTDLibClient *client = [self.client retain];
 
@@ -1349,7 +1359,12 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *pinError = nil;
-        BOOL succeeded = [client toggleChatPinnedForChatID:chatID chatFilterID:chatFilterID pinned:targetPinned timeout:6.0 error:&pinError];
+        BOOL succeeded = [client toggleChatPinnedForChatID:chatID
+                                              chatFilterID:chatFilterID
+                                                  archived:archived
+                                                    pinned:targetPinned
+                                                   timeout:6.0
+                                                     error:&pinError];
         NSString *errorMessage = [[pinError localizedDescription] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{

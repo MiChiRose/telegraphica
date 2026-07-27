@@ -491,6 +491,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, copy) NSString *topicParentTitle;
 @property (nonatomic, copy) NSString *topicParentAvatarLocalPath;
 @property (nonatomic, retain) NSNumber *selectedChatFilterID;
+@property (nonatomic, assign) BOOL showingArchivedChats;
 @property (nonatomic, copy) NSString *profileDisplayName;
 @property (nonatomic, copy) NSString *profileFirstName;
 @property (nonatomic, copy) NSString *profileLastName;
@@ -948,6 +949,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize topicParentTitle = _topicParentTitle;
 @synthesize topicParentAvatarLocalPath = _topicParentAvatarLocalPath;
 @synthesize selectedChatFilterID = _selectedChatFilterID;
+@synthesize showingArchivedChats = _showingArchivedChats;
 @synthesize profileDisplayName = _profileDisplayName;
 @synthesize profileFirstName = _profileFirstName;
 @synthesize profileLastName = _profileLastName;
@@ -1514,7 +1516,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.workshopDrawerButton setToolTip:TGLoc(@"workshop.openTooltip")];
     [self.workshopDrawerButton setNeedsDisplay:YES];
     [self.workshopViewController refreshLocalization];
-    [self.chatsLabel setStringValue:TGLoc(@"chats")];
+    [self refreshChatListTitle];
     [self.profileTitleField setStringValue:TGLoc(@"profile.title")];
     [self.profileAboutSectionField setStringValue:TGLoc(@"profile.about")];
     [self.profileAccountSectionField setStringValue:TGLoc(@"profile.account")];
@@ -1909,7 +1911,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.topicParentChatID = nil;
     self.topicParentTitle = nil;
     self.topicParentAvatarLocalPath = nil;
-    [self.chatsLabel setStringValue:TGLoc(@"chats")];
+    [self refreshChatListTitle];
     [self.loadChatsButton setToolTip:TGLoc(@"settings.sessions.refresh")];
 }
 
@@ -3466,6 +3468,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     return -1;
 }
 
+- (void)refreshChatListTitle {
+    if (self.showingForumTopicList) {
+        return;
+    }
+    [self.chatsLabel setStringValue:(self.showingArchivedChats ? TGLoc(@"drawer.archive") : TGLoc(@"chats"))];
+}
+
 - (void)updateDrawerFolderButtonStates {
     NSUInteger index = 0;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
@@ -3473,10 +3482,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
         BOOL selected = NO;
-        if ([button tag] < 0) {
-            selected = (self.selectedChatFilterID == nil);
+        if ([button tag] == -2) {
+            selected = self.showingArchivedChats;
+        } else if ([button tag] == -1) {
+            selected = (!self.showingArchivedChats && self.selectedChatFilterID == nil);
         } else if (self.selectedChatFilterID && [button tag] == [self.selectedChatFilterID integerValue]) {
-            selected = YES;
+            selected = !self.showingArchivedChats;
         }
         [button setState:selected ? NSOnState : NSOffState];
         [button setHidden:(!ready || drawerHidden || !self.drawerOpen)];
@@ -3501,6 +3512,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                              TGLoc(@"drawer.all"), @"title",
                              nil];
     [folderItems addObject:allItem];
+    NSDictionary *archiveItem = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 [NSNumber numberWithInteger:-2], @"id",
+                                 TGLoc(@"drawer.archive"), @"title",
+                                 nil];
+    [folderItems addObject:archiveItem];
     if ([self.chatFilterInfos count] > 0) {
         [folderItems addObjectsFromArray:self.chatFilterInfos];
     }
@@ -3524,7 +3540,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [folderButton setButtonType:NSToggleButton];
         [folderButton setBordered:NO];
         [folderButton setTag:[filterID integerValue]];
-        [folderButton setToolTip:([filterID integerValue] < 0) ? TGLoc(@"drawer.all.tooltip") : [NSString stringWithFormat:@"%@ folder", buttonTitle]];
+        if ([filterID integerValue] == -2) {
+            [folderButton setToolTip:TGLoc(@"drawer.archive.tooltip")];
+        } else if ([filterID integerValue] == -1) {
+            [folderButton setToolTip:TGLoc(@"drawer.all.tooltip")];
+        } else {
+            [folderButton setToolTip:[NSString stringWithFormat:@"%@ folder", buttonTitle]];
+        }
         [folderButton setTarget:self];
         [folderButton setAction:@selector(folderFilterChanged:)];
         [folderButton setAutoresizingMask:NSViewWidthSizable];
@@ -3780,18 +3802,26 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
     NSInteger tag = [sender tag];
     NSNumber *filterID = nil;
+    BOOL targetArchive = (tag == -2);
     if (tag >= 0) {
         filterID = [NSNumber numberWithInteger:tag];
     }
 
-    BOOL sameFilter = NO;
-    if (!filterID && !self.selectedChatFilterID) {
-        sameFilter = YES;
-    } else if (filterID && self.selectedChatFilterID && [filterID integerValue] == [self.selectedChatFilterID integerValue]) {
-        sameFilter = YES;
+    BOOL sameFilter = (targetArchive == self.showingArchivedChats);
+    if (sameFilter) {
+        if (!filterID && !self.selectedChatFilterID) {
+            sameFilter = YES;
+        } else if (filterID && self.selectedChatFilterID &&
+                   [filterID integerValue] == [self.selectedChatFilterID integerValue]) {
+            sameFilter = YES;
+        } else {
+            sameFilter = NO;
+        }
     }
 
+    self.showingArchivedChats = targetArchive;
     self.selectedChatFilterID = filterID;
+    [self refreshChatListTitle];
     [self updateDrawerFolderButtonStates];
     if (sameFilter) {
         return;
@@ -3802,7 +3832,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.chatPreviewLimit = TGStatusChatPreviewInitialLimit;
     self.autoChatListLoadArmed = YES;
     self.autoChatListRefreshArmed = YES;
-    if (!self.selectedChatFilterID) {
+    if (!self.selectedChatFilterID && !self.showingArchivedChats) {
         [self.client invalidateMainChatListExhaustion];
     }
     [self reloadChatsInteractive:YES preserveSelection:NO requestedLimit:TGStatusChatPreviewInitialLimit];

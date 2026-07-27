@@ -3509,6 +3509,169 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return items;
 }
 
+- (NSArray *)archivedChatIDsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error {
+    if (exhausted) {
+        *exhausted = NO;
+    }
+
+    NSUInteger safeLimit = limit;
+    if (safeLimit == 0) {
+        safeLimit = TGTDLibMainChatLoadBatchSize;
+    } else if (safeLimit > TGTDLibMaxMainChatPreviewLimit) {
+        safeLimit = TGTDLibMaxMainChatPreviewLimit;
+    }
+
+    NSDictionary *chatList = [NSDictionary dictionaryWithObject:@"chatListArchive" forKey:@"@type"];
+    NSTimeInterval loadChatsTimeout = timeout;
+    if (loadChatsTimeout > 1.0) {
+        loadChatsTimeout = 1.0;
+    }
+
+    NSMutableDictionary *getChatsRequest = [NSMutableDictionary dictionary];
+    [getChatsRequest setObject:@"getChats" forKey:@"@type"];
+    [getChatsRequest setObject:chatList forKey:@"chat_list"];
+    [getChatsRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
+
+    NSError *currentChatsError = nil;
+    NSDictionary *chatsResponse = nil;
+    NSUInteger lastChatIDCount = 0;
+    NSUInteger stagnantAttemptCount = 0;
+    BOOL reachedEndOfChatList = NO;
+    NSUInteger attempt = 0;
+    for (attempt = 0; attempt < TGTDLibMainChatLoadAttemptLimit; attempt++) {
+        currentChatsError = nil;
+        chatsResponse = [self sendTDLibRequestAndWaitForExtra:getChatsRequest
+                                                  extraPrefix:@"telegraphica-archive-chats"
+                                                      timeout:timeout
+                                                    errorCode:221
+                                                        error:&currentChatsError];
+        if (!chatsResponse) {
+            break;
+        }
+
+        id currentChatIDs = [chatsResponse objectForKey:@"chat_ids"];
+        NSUInteger currentChatIDCount = [currentChatIDs isKindOfClass:[NSArray class]] ? [(NSArray *)currentChatIDs count] : 0;
+        if (currentChatIDCount >= safeLimit || reachedEndOfChatList) {
+            break;
+        }
+        if (attempt > 0 && currentChatIDCount == lastChatIDCount) {
+            stagnantAttemptCount++;
+            if (stagnantAttemptCount >= 2) {
+                break;
+            }
+        } else {
+            stagnantAttemptCount = 0;
+        }
+
+        NSUInteger requestedBatchSize = safeLimit - currentChatIDCount;
+        if (requestedBatchSize == 0 || requestedBatchSize > TGTDLibMainChatLoadBatchSize) {
+            requestedBatchSize = TGTDLibMainChatLoadBatchSize;
+        }
+
+        NSMutableDictionary *loadChatsRequest = [NSMutableDictionary dictionary];
+        [loadChatsRequest setObject:@"loadChats" forKey:@"@type"];
+        [loadChatsRequest setObject:chatList forKey:@"chat_list"];
+        [loadChatsRequest setObject:[NSNumber numberWithInt:(int)requestedBatchSize] forKey:@"limit"];
+
+        NSError *loadChatsError = nil;
+        NSDictionary *loadResponse = [self sendTDLibRequestAndWaitForExtra:loadChatsRequest
+                                                                extraPrefix:@"telegraphica-load-archive-chats"
+                                                                    timeout:loadChatsTimeout
+                                                                  errorCode:222
+                                                                      error:&loadChatsError];
+        if (!loadResponse) {
+            if ([self isTDLibLoadChatsExhaustedError:loadChatsError]) {
+                reachedEndOfChatList = YES;
+                if (exhausted) {
+                    *exhausted = YES;
+                }
+            }
+            break;
+        }
+        lastChatIDCount = currentChatIDCount;
+    }
+
+    if (!chatsResponse) {
+        if (error) {
+            *error = currentChatsError ? currentChatsError : [self errorWithDescription:@"TDLib archive getChats failed." code:221];
+        }
+        return nil;
+    }
+
+    id chatsType = [chatsResponse objectForKey:@"@type"];
+    id chatIDs = [chatsResponse objectForKey:@"chat_ids"];
+    if (![chatsType isKindOfClass:[NSString class]] ||
+        ![(NSString *)chatsType isEqualToString:@"chats"] ||
+        ![chatIDs isKindOfClass:[NSArray class]]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib archive getChats returned an unexpected response." code:223];
+        }
+        return nil;
+    }
+    return chatIDs;
+}
+
+- (NSArray *)archivedChatPreviewItemsWithLimit:(NSUInteger)limit timeout:(NSTimeInterval)timeout exhausted:(BOOL *)exhausted error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load archived chats. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:224];
+        }
+        return nil;
+    }
+
+    NSArray *chatIDs = [self archivedChatIDsWithLimit:limit timeout:timeout exhausted:exhausted error:error];
+    if (!chatIDs) {
+        return nil;
+    }
+
+    NSUInteger returnedChatIDCount = [chatIDs count];
+    NSMutableArray *items = [NSMutableArray array];
+    NSTimeInterval chatTimeout = timeout;
+    if (chatTimeout > 1.0) {
+        chatTimeout = 1.0;
+    }
+
+    NSUInteger avatarDownloadsRemaining = 12;
+    NSUInteger index = 0;
+    for (index = 0; index < [chatIDs count]; index++) {
+        id chatID = [chatIDs objectAtIndex:index];
+        if (![chatID respondsToSelector:@selector(longLongValue)]) {
+            continue;
+        }
+
+        NSMutableDictionary *getChatRequest = [NSMutableDictionary dictionary];
+        [getChatRequest setObject:@"getChat" forKey:@"@type"];
+        [getChatRequest setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+        NSDictionary *chatResponse = [self sendTDLibRequestAndWaitForExtra:getChatRequest
+                                                               extraPrefix:@"telegraphica-get-archive-chat"
+                                                                   timeout:chatTimeout
+                                                                 errorCode:225
+                                                                     error:NULL];
+        TGChatItem *item = [self chatPreviewItemFromChatObject:chatResponse
+                                                   chatListType:@"chatListArchive"
+                                                       filterID:nil
+                                                 downloadAvatar:YES
+                                          avatarDownloadCounter:&avatarDownloadsRemaining
+                                                       timeout:0.9];
+        if (item) {
+            [items addObject:item];
+        }
+    }
+
+    if (returnedChatIDCount > 0 && [items count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib returned archived chat IDs, but no chat previews could be loaded." code:226];
+        }
+        return nil;
+    }
+
+    [items sortUsingFunction:TGTDLibCompareChatItemsByPinnedOrder context:NULL];
+    return items;
+}
+
 - (NSDictionary *)chatSummaryForChatID:(NSNumber *)chatID downloadAvatar:(BOOL)downloadAvatar timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
@@ -4120,6 +4283,45 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
     if (error && response) {
         *error = [self errorWithDescription:@"TDLib leaveChat returned an unexpected response." code:216];
+    }
+    return NO;
+}
+
+- (BOOL)setChatWithID:(NSNumber *)chatID archived:(BOOL)archived timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:217];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to update the chat list. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:218];
+        }
+        return NO;
+    }
+
+    NSDictionary *chatList = [NSDictionary dictionaryWithObject:(archived ? @"chatListArchive" : @"chatListMain")
+                                                          forKey:@"@type"];
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"addChatToList" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:chatList forKey:@"chat_list"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:(archived ? @"telegraphica-archive-chat" : @"telegraphica-unarchive-chat")
+                                                           timeout:timeout
+                                                         errorCode:219
+                                                             error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"ok"]) {
+        return YES;
+    }
+    if (error && response && *error == nil) {
+        *error = [self errorWithDescription:@"TDLib addChatToList returned an unexpected response." code:220];
     }
     return NO;
 }
@@ -7494,6 +7696,15 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self toggleChatPinnedForChatID:chatID
+                             chatFilterID:chatFilterID
+                                 archived:NO
+                                   pinned:pinned
+                                  timeout:timeout
+                                    error:error];
+}
+
+- (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID archived:(BOOL)archived pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Chat identifier is missing." code:94];
@@ -7510,7 +7721,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return NO;
     }
 
-    NSDictionary *chatList = [self chatListObjectForChatFilterID:chatFilterID];
+    NSDictionary *chatList = archived
+        ? [NSDictionary dictionaryWithObject:@"chatListArchive" forKey:@"@type"]
+        : [self chatListObjectForChatFilterID:chatFilterID];
 
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"toggleChatIsPinned" forKey:@"@type"];

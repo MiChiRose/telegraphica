@@ -912,6 +912,11 @@
     [[self window] makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
     self.activeSection = TGSectionChats;
+    self.showingArchivedChats = NO;
+    self.selectedChatFilterID = nil;
+    [self.client invalidateMainChatListExhaustion];
+    [self refreshChatListTitle];
+    [self updateDrawerFolderButtonStates];
     [self updateNavigationButtonsForSection:TGSectionChats enabled:!self.controlsBusy];
     [self layoutContentView];
     [self updateVisibleSection];
