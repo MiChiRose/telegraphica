@@ -3,6 +3,7 @@
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGTDLibClient+SavedMessages.h"
 #import "TGLocalization.h"
+#import "TGSavedMessagesCell.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
@@ -103,6 +104,9 @@
     NSTableColumn *column = [[[NSTableColumn alloc] initWithIdentifier:identifier] autorelease];
     [column setWidth:NSWidth(frame) - 12.0];
     [column setResizingMask:NSTableColumnAutoresizingMask];
+    if (![identifier isEqualToString:@"tags"]) {
+        [column setDataCell:[[[TGSavedMessagesCell alloc] initTextCell:@""] autorelease]];
+    }
     [table addTableColumn:column];
     [table setHeaderView:nil];
     [table setRowHeight:rowHeight];
@@ -166,7 +170,7 @@
     [root addSubview:topicsTitle];
     self.topicsTableView = [self tableInScrollViewWithFrame:NSMakeRect(32, 118, 232, 334)
                                                 identifier:@"topics"
-                                                 rowHeight:40.0
+                                                 rowHeight:52.0
                                                       root:root];
     [self.topicsTableView setAutoresizingMask:NSViewHeightSizable];
     self.pinButton = [self textButtonWithFrame:NSMakeRect(32, 82, 232, 30)
@@ -186,7 +190,7 @@
     [root addSubview:messagesTitle];
     self.historyTableView = [self tableInScrollViewWithFrame:NSMakeRect(304, 230, 520, 222)
                                                  identifier:@"history"
-                                                  rowHeight:42.0
+                                                  rowHeight:58.0
                                                        root:root];
     NSTextField *tagsTitle = [self labelWithFrame:NSMakeRect(306, 202, 320, 20)
                                              font:[NSFont boldSystemFontOfSize:13.0]
@@ -240,13 +244,18 @@
         NSDictionary *topic = [self.topics objectAtIndex:(NSUInteger)row];
         NSString *suffix = [[topic objectForKey:@"is_pinned"] boolValue]
             ? [NSString stringWithFormat:@" · %@", TGLoc(@"saved.pinned")] : @"";
-        return [NSString stringWithFormat:@"%@%@\n%@", [topic objectForKey:@"title"], suffix,
-                [[topic objectForKey:@"preview"] length] > 0 ? [topic objectForKey:@"preview"] : TGLoc(@"saved.noMessages")];
+        return [NSDictionary dictionaryWithObjectsAndKeys:
+                [NSString stringWithFormat:@"%@%@", [topic objectForKey:@"title"], suffix], @"title",
+                [[topic objectForKey:@"preview"] length] > 0 ? [topic objectForKey:@"preview"] : TGLoc(@"saved.noMessages"), @"detail",
+                nil];
     }
     if (tableView == self.historyTableView && (NSUInteger)row < [self.history count]) {
         TGMessageItem *item = [self.history objectAtIndex:(NSUInteger)row];
         NSString *sender = [item.senderDisplayName length] > 0 ? item.senderDisplayName : TGLoc(@"saved.message");
-        return [NSString stringWithFormat:@"%@\n%@", sender, [item.preview length] > 0 ? item.preview : TGLoc(@"saved.message")];
+        return [NSDictionary dictionaryWithObjectsAndKeys:
+                sender, @"title",
+                [item.preview length] > 0 ? item.preview : TGLoc(@"saved.message"), @"detail",
+                nil];
     }
     if (tableView == self.tagsTableView && (NSUInteger)row < [self.tags count]) {
         NSDictionary *tag = [self.tags objectAtIndex:(NSUInteger)row];

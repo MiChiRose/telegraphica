@@ -2,6 +2,7 @@
 
 #import "../Core/TGTDLibClient+ScheduledMessages.h"
 #import "TGLocalization.h"
+#import "TGDatePickerDialog.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
@@ -333,18 +334,13 @@
 
 - (void)reschedulePressed:(id)sender {
     (void)sender;
-    NSDatePicker *picker = [[[NSDatePicker alloc] initWithFrame:NSMakeRect(0, 0, 260, 28)] autorelease];
-    [picker setDatePickerStyle:NSClockAndCalendarDatePickerStyle];
-    [picker setDatePickerElements:(NSYearMonthDayDatePickerElementFlag | NSHourMinuteDatePickerElementFlag)];
-    [picker setMinDate:[NSDate dateWithTimeIntervalSinceNow:60.0]];
-    [picker setDateValue:[NSDate dateWithTimeIntervalSinceNow:60.0 * 60.0]];
-    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setMessageText:TGLoc(@"scheduled.reschedule")];
-    [alert setAccessoryView:picker];
-    [alert addButtonWithTitle:TGLoc(@"apply")];
-    [alert addButtonWithTitle:TGLoc(@"cancel")];
-    if ([alert runModal] == NSAlertFirstButtonReturn) {
-        [self runScheduleMutationWithDate:[NSNumber numberWithInteger:(NSInteger)[[picker dateValue] timeIntervalSince1970]]
+    NSDate *date = [TGDatePickerDialog dateWithTitle:TGLoc(@"scheduled.reschedule")
+                                               help:TGLoc(@"composer.schedule.help")
+                                        actionTitle:TGLoc(@"apply")
+                                        initialDate:[NSDate dateWithTimeIntervalSinceNow:60.0 * 60.0]
+                                            minDate:[NSDate dateWithTimeIntervalSinceNow:60.0]];
+    if (date) {
+        [self runScheduleMutationWithDate:[NSNumber numberWithInteger:(NSInteger)[date timeIntervalSince1970]]
                               whenOnline:NO];
     }
 }

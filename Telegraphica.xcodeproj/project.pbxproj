@@ -91,6 +91,10 @@
 		111111111111111111111183 /* TGTDLibClient+Bots.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111370 /* TGTDLibClient+Bots.m */; };
 		111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111372 /* TGBotInteractionWindowController.m */; };
 		111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111374 /* TGBotKeyboardWindowController.m */; };
+		111111111111111111111186 /* TGDatePickerDialog.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111376 /* TGDatePickerDialog.m */; };
+		111111111111111111111187 /* TGLocationPickerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111378 /* TGLocationPickerWindowController.m */; };
+		111111111111111111111188 /* TGSavedMessagesCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111380 /* TGSavedMessagesCell.m */; };
+		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
 		220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000003 /* TGWorkshopCatalogEntry.m */; };
@@ -282,6 +286,13 @@
 		111111111111111111111372 /* TGBotInteractionWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotInteractionWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111373 /* TGBotKeyboardWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGBotKeyboardWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111374 /* TGBotKeyboardWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotKeyboardWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111375 /* TGDatePickerDialog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDatePickerDialog.h; sourceTree = "<group>"; };
+		111111111111111111111376 /* TGDatePickerDialog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDatePickerDialog.m; sourceTree = "<group>"; };
+		111111111111111111111377 /* TGLocationPickerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocationPickerWindowController.h; sourceTree = "<group>"; };
+		111111111111111111111378 /* TGLocationPickerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationPickerWindowController.m; sourceTree = "<group>"; };
+		111111111111111111111379 /* TGSavedMessagesCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSavedMessagesCell.h; sourceTree = "<group>"; };
+		111111111111111111111380 /* TGSavedMessagesCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSavedMessagesCell.m; sourceTree = "<group>"; };
+		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
 		221000000000000000000002 /* TGWorkshopCatalogClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalogClient.m; sourceTree = "<group>"; };
@@ -321,6 +332,7 @@
 				111111111111111111111109 /* Security.framework in Frameworks */,
 				111111111111111111111113 /* AVFoundation.framework in Frameworks */,
 				111111111111111111111157 /* ImageIO.framework in Frameworks */,
+				111111111111111111111189 /* MapKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,6 +373,7 @@
 				111111111111111111111231 /* Security.framework */,
 				111111111111111111111232 /* AVFoundation.framework */,
 				111111111111111111111316 /* ImageIO.framework */,
+				111111111111111111111381 /* MapKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -482,6 +495,12 @@
 				111111111111111111111372 /* TGBotInteractionWindowController.m */,
 				111111111111111111111373 /* TGBotKeyboardWindowController.h */,
 				111111111111111111111374 /* TGBotKeyboardWindowController.m */,
+				111111111111111111111375 /* TGDatePickerDialog.h */,
+				111111111111111111111376 /* TGDatePickerDialog.m */,
+				111111111111111111111377 /* TGLocationPickerWindowController.h */,
+				111111111111111111111378 /* TGLocationPickerWindowController.m */,
+				111111111111111111111379 /* TGSavedMessagesCell.h */,
+				111111111111111111111380 /* TGSavedMessagesCell.m */,
 				111111111111111111111327 /* TGCallsPlaceholderView.h */,
 				111111111111111111111328 /* TGCallsPlaceholderView.m */,
 				111111111111111111111321 /* TGConversationCreationPrompt.h */,
@@ -747,6 +766,9 @@
 				111111111111111111111183 /* TGTDLibClient+Bots.m in Sources */,
 				111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */,
 				111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */,
+				111111111111111111111186 /* TGDatePickerDialog.m in Sources */,
+				111111111111111111111187 /* TGLocationPickerWindowController.m in Sources */,
+				111111111111111111111188 /* TGSavedMessagesCell.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

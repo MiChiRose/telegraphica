@@ -885,10 +885,13 @@
     CGFloat smallComposerButtonWidth = 34.0;
     CGFloat composerButtonGap = 6.0;
     CGFloat attachButtonX = conversationX + 12.0;
+    CGFloat botButtonX = attachButtonX + attachButtonWidth + composerButtonGap;
     CGFloat sendButtonX = conversationX + conversationWidth - sendButtonWidth - 12.0;
     CGFloat voiceButtonX = sendButtonX - composerButtonGap - smallComposerButtonWidth;
     CGFloat stickerButtonX = voiceButtonX - composerButtonGap - smallComposerButtonWidth;
-    CGFloat sendFieldX = attachButtonX + attachButtonWidth + 8.0;
+    CGFloat sendFieldX = self.botComposerVisible
+        ? (botButtonX + attachButtonWidth + 8.0)
+        : (attachButtonX + attachButtonWidth + 8.0);
     CGFloat sendFieldWidth = stickerButtonX - sendFieldX - 10.0;
     if (sendFieldWidth < 160.0) {
         sendFieldWidth = 160.0;
@@ -898,6 +901,7 @@
     CGFloat composerInputBackgroundY = composerY + floor((composerHeight - composerInnerHeight) / 2.0);
     [self.sendLabel setFrame:NSMakeRect(conversationX + 14.0, composerY + 8.0, 0.0, 22.0)];
     [self.attachPhotoButton setFrame:NSMakeRect(attachButtonX, composerControlY, attachButtonWidth, 32.0)];
+    [self.botActionButton setFrame:NSMakeRect(botButtonX, composerControlY, attachButtonWidth, 32.0)];
     [self.sendTextFieldBackgroundView setFrame:NSMakeRect(sendFieldX, composerInputBackgroundY, sendFieldWidth, composerInnerHeight)];
     [self.sendTextField setFrame:NSMakeRect(sendFieldX + 8.0, composerInputBackgroundY + 5.0, sendFieldWidth - 16.0, composerInputHeight)];
     [self.stickerButton setFrame:NSMakeRect(stickerButtonX, composerControlY, smallComposerButtonWidth, 32.0)];

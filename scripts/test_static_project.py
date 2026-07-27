@@ -416,6 +416,37 @@ def check_additional_message_types_contract(errors):
             errors.append("%s: share dialog validation is missing `%s`" %
                           (dialogs_rel, fragment))
 
+    location_picker_rel = os.path.join("Sources", "UI", "TGLocationPickerWindowController.m")
+    location_picker_text = read_text(os.path.join(ROOT, location_picker_rel))
+    for fragment in ["NSClassFromString(@\"MKMapView\")",
+                     "MKLocalSearchRequest",
+                     "setShowsUserLocation:YES",
+                     "mapUnavailable"]:
+        if fragment not in location_picker_text:
+            errors.append("%s: location picker regression guard is missing `%s`" %
+                          (location_picker_rel, fragment))
+
+    date_picker_rel = os.path.join("Sources", "UI", "TGDatePickerDialog.m")
+    date_picker_text = read_text(os.path.join(ROOT, date_picker_rel))
+    if "NSTextFieldAndStepperDatePickerStyle" not in date_picker_text:
+        errors.append("%s: compact legacy-safe date picker style is missing" % date_picker_rel)
+
+    saved_cell_rel = os.path.join("Sources", "UI", "TGSavedMessagesCell.m")
+    saved_cell_text = read_text(os.path.join(ROOT, saved_cell_rel))
+    for fragment in ["objectForKey:@\"title\"", "objectForKey:@\"detail\"",
+                     "NSLineBreakByTruncatingTail"]:
+        if fragment not in saved_cell_text:
+            errors.append("%s: saved-message row rendering is missing `%s`" %
+                          (saved_cell_rel, fragment))
+
+    bot_composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BotComposer.inc")
+    bot_composer_text = read_text(os.path.join(ROOT, bot_composer_rel))
+    for fragment in ["setBotComposerVisible", "replyMarkupShowKeyboard",
+                     "TGBotInteractionWindowController", "setDuration:0.16"]:
+        if fragment not in bot_composer_text:
+            errors.append("%s: bot composer integration is missing `%s`" %
+                          (bot_composer_rel, fragment))
+
     composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
     composer_text = read_text(os.path.join(ROOT, composer_rel))
     for fragment in ["shareContactFromComposerMenu:", "shareLocationFromComposerMenu:",

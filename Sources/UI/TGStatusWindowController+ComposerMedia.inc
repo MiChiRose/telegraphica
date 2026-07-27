@@ -2987,23 +2987,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)scheduleMessage:(id)sender {
     (void)sender;
-    NSDatePicker *picker = [[[NSDatePicker alloc] initWithFrame:NSMakeRect(0, 0, 260, 28)] autorelease];
-    [picker setDatePickerStyle:NSClockAndCalendarDatePickerStyle];
-    [picker setDatePickerElements:(NSYearMonthDayDatePickerElementFlag |
-                                   NSHourMinuteDatePickerElementFlag)];
-    [picker setMinDate:[NSDate dateWithTimeIntervalSinceNow:60.0]];
-    [picker setDateValue:[NSDate dateWithTimeIntervalSinceNow:60.0 * 60.0]];
-
-    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setMessageText:TGLoc(@"composer.schedule.title")];
-    [alert setInformativeText:TGLoc(@"composer.schedule.help")];
-    [alert setAccessoryView:picker];
-    [alert addButtonWithTitle:TGLoc(@"composer.schedule.action")];
-    [alert addButtonWithTitle:TGLoc(@"cancel")];
-    if ([alert runModal] != NSAlertFirstButtonReturn) {
+    NSDate *date = [TGDatePickerDialog dateWithTitle:TGLoc(@"composer.schedule.title")
+                                               help:TGLoc(@"composer.schedule.help")
+                                        actionTitle:TGLoc(@"composer.schedule.action")
+                                        initialDate:[NSDate dateWithTimeIntervalSinceNow:60.0 * 60.0]
+                                            minDate:[NSDate dateWithTimeIntervalSinceNow:60.0]];
+    if (!date) {
         return;
     }
-    NSInteger timestamp = (NSInteger)[[picker dateValue] timeIntervalSince1970];
+    NSInteger timestamp = (NSInteger)[date timeIntervalSince1970];
     if (timestamp <= (NSInteger)[[NSDate date] timeIntervalSince1970] + 30) {
         [self.statusField setStringValue:TGLoc(@"composer.schedule.invalid")];
         NSBeep();

@@ -124,6 +124,20 @@
 "search" = "Search";
 "bot.open" = "Bot tools";
 "bot.window.title" = "Bot tools";
+"bot.composer.actions" = "Bot actions";
+
+"share.location.pickerHint" = "Search for a place, use your location, or move the map.";
+"share.location.searchPlaceholder" = "City, street, or place";
+"share.location.search" = "Find";
+"share.location.mine" = "I'm here";
+"share.location.selected" = "Selected place";
+"share.location.mapUnavailable" = "The map is unavailable on OS X 10.8. You can enter coordinates manually.";
+"share.location.ready" = "Move the map to choose a point.";
+"share.location.coordinates" = "%.5f, %.5f";
+"share.location.locating" = "Finding your location...";
+"share.location.locationFailed" = "Your location could not be found.";
+"share.location.searching" = "Searching for a place...";
+"share.location.notFound" = "No place was found.";
 "bot.commands.title" = "Commands";
 "bot.command.send" = "Send command";
 "bot.command.noDescription" = "No description";

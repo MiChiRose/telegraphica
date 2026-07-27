@@ -30,6 +30,8 @@
 	<string>Copyright 2026 Yura Menschikov. All rights reserved.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Telegraphica uses the microphone only when you record a voice message.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Telegraphica uses your location only when you choose to send it.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>TelegraphicaCompatibilitySummary</key>

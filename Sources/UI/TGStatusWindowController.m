@@ -3,7 +3,9 @@
 #import "TGChatDisplayPreferences.h"
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
+#import "TGDatePickerDialog.h"
 #import "TGBotKeyboardWindowController.h"
+#import "TGBotInteractionWindowController.h"
 #import "TGChatLifecycleWindowController.h"
 #import "TGContactsViewController.h"
 #import "TGDownloadManagerWindowController.h"
@@ -45,6 +47,7 @@
 #import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Core/TGTDLibClient+MessageTypes.h"
 #import "../Services/TGLocalDataReset.h"
@@ -271,6 +274,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGChatFolderManagementWindowController *chatFolderManagementWindowController;
 @property (nonatomic, retain) TGChatInfoWindowController *chatInfoWindowController;
 @property (nonatomic, retain) TGBotKeyboardWindowController *botKeyboardWindowController;
+@property (nonatomic, retain) TGBotInteractionWindowController *botInteractionWindowController;
+@property (nonatomic, retain) NSNumber *selectedBotUserID;
+@property (nonatomic, copy) NSDictionary *activeBotReplyMarkup;
+@property (nonatomic, retain) NSNumber *activeBotReplyMarkupMessageID;
+@property (nonatomic, assign) NSUInteger botComposerGeneration;
+@property (nonatomic, assign) BOOL botComposerVisible;
 @property (nonatomic, retain) TGNotificationSettingsWindowController *notificationSettingsWindowController;
 @property (nonatomic, retain) TGPrivacyWindowController *privacyWindowController;
 @property (nonatomic, retain) TGSavedMessagesWindowController *savedMessagesWindowController;
@@ -374,6 +383,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSView *sendTextFieldBackgroundView;
 @property (nonatomic, retain) NSTextField *sendTextField;
 @property (nonatomic, retain) NSButton *attachPhotoButton;
+@property (nonatomic, retain) NSButton *botActionButton;
 @property (nonatomic, retain) NSButton *stickerButton;
 @property (nonatomic, retain) NSButton *voiceRecordButton;
 @property (nonatomic, retain) NSButton *sendMessageButton;
@@ -848,6 +858,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize sendTextFieldBackgroundView = _sendTextFieldBackgroundView;
 @synthesize sendTextField = _sendTextField;
 @synthesize attachPhotoButton = _attachPhotoButton;
+@synthesize botActionButton = _botActionButton;
 @synthesize stickerButton = _stickerButton;
 @synthesize voiceRecordButton = _voiceRecordButton;
 @synthesize sendMessageButton = _sendMessageButton;
@@ -1088,6 +1099,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatFolderManagementWindowController = _chatFolderManagementWindowController;
 @synthesize chatInfoWindowController = _chatInfoWindowController;
 @synthesize botKeyboardWindowController = _botKeyboardWindowController;
+@synthesize botInteractionWindowController = _botInteractionWindowController;
+@synthesize selectedBotUserID = _selectedBotUserID;
+@synthesize activeBotReplyMarkup = _activeBotReplyMarkup;
+@synthesize activeBotReplyMarkupMessageID = _activeBotReplyMarkupMessageID;
+@synthesize botComposerGeneration = _botComposerGeneration;
+@synthesize botComposerVisible = _botComposerVisible;
 @synthesize notificationSettingsWindowController = _notificationSettingsWindowController;
 @synthesize privacyWindowController = _privacyWindowController;
 @synthesize savedMessagesWindowController = _savedMessagesWindowController;
@@ -2803,6 +2820,21 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.attachPhotoButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.attachPhotoButton];
 
+    self.botActionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(68, 50, 38, 32)] autorelease];
+    TGDrawerButtonCell *botActionCell = [[[TGDrawerButtonCell alloc] initTextCell:@""] autorelease];
+    [botActionCell setButtonType:NSMomentaryPushInButton];
+    [self.botActionButton setCell:botActionCell];
+    [self.botActionButton setTitle:@""];
+    [self.botActionButton setTarget:self];
+    [self.botActionButton setAction:@selector(openBotActionsFromComposer:)];
+    [self.botActionButton setEnabled:NO];
+    [self.botActionButton setBordered:NO];
+    [self.botActionButton setToolTip:TGLoc(@"bot.composer.actions")];
+    [self.botActionButton setHidden:YES];
+    [self.botActionButton setAlphaValue:0.0];
+    [self.botActionButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.botActionButton];
+
     self.stickerButton = [[[NSButton alloc] initWithFrame:NSMakeRect(76, 50, 34, 32)] autorelease];
     TGComposerSymbolButtonCell *stickerCell = [[[TGComposerSymbolButtonCell alloc] initTextCell:@"☺"] autorelease];
     [stickerCell setButtonType:NSMomentaryPushInButton];
@@ -4101,6 +4133,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+SearchNavigation.inc"
 
+#include "TGStatusWindowController+BotComposer.inc"
+
 #include "TGStatusWindowController+TableForumFlow.inc"
 
 #include "TGStatusWindowController+MessageDataFlow.inc"
@@ -4276,6 +4310,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_sendTextFieldBackgroundView release];
     [_sendTextField release];
     [_attachPhotoButton release];
+    [_botActionButton release];
     [_stickerButton release];
     [_voiceRecordButton release];
     [_sendMessageButton release];
@@ -4415,6 +4450,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatInfoWindowController release];
     [[_botKeyboardWindowController window] close];
     [_botKeyboardWindowController release];
+    [[_botInteractionWindowController window] close];
+    [_botInteractionWindowController release];
+    [_selectedBotUserID release];
+    [_activeBotReplyMarkup release];
+    [_activeBotReplyMarkupMessageID release];
     [[_notificationSettingsWindowController window] close];
     [_notificationSettingsWindowController release];
     [[_privacyWindowController window] close];
