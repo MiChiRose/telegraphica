@@ -58,8 +58,12 @@
 @property (nonatomic, assign) BOOL waitingForUserLocation;
 @property (nonatomic, assign) BOOL hasSelection;
 @property (nonatomic, assign) NSUInteger mapGeneration;
+@property (nonatomic, assign) NSUInteger searchGeneration;
 @property (nonatomic, assign) CLLocationCoordinate2D selectedCoordinate;
 @property (nonatomic, retain) MKMapView *locationServiceMapView;
+@property (nonatomic, retain) MKPointAnnotation *selectionAnnotation;
+@property (nonatomic, retain) MKLocalSearch *activeSearch;
+@property (nonatomic, retain) CLGeocoder *activeGeocoder;
 @property (nonatomic, retain) TGLocationMapImageView *mapImageView;
 @property (nonatomic, retain) NSTextField *searchField;
 @property (nonatomic, retain) NSTextField *statusField;
@@ -77,8 +81,12 @@
 @synthesize waitingForUserLocation = _waitingForUserLocation;
 @synthesize hasSelection = _hasSelection;
 @synthesize mapGeneration = _mapGeneration;
+@synthesize searchGeneration = _searchGeneration;
 @synthesize selectedCoordinate = _selectedCoordinate;
 @synthesize locationServiceMapView = _locationServiceMapView;
+@synthesize selectionAnnotation = _selectionAnnotation;
+@synthesize activeSearch = _activeSearch;
+@synthesize activeGeocoder = _activeGeocoder;
 @synthesize mapImageView = _mapImageView;
 @synthesize searchField = _searchField;
 @synthesize statusField = _statusField;
@@ -108,8 +116,13 @@
 
 - (void)dealloc {
     [_locationServiceMapView setDelegate:nil];
+    [_activeSearch cancel];
+    [_activeGeocoder cancelGeocode];
     [_client release];
     [_locationServiceMapView release];
+    [_selectionAnnotation release];
+    [_activeSearch release];
+    [_activeGeocoder release];
     [_mapImageView release];
     [_searchField release];
     [_statusField release];
@@ -185,10 +198,22 @@
     [root addSubview:self.mapImageView];
 
     if (self.mapServicesAvailable) {
-        self.locationServiceMapView = [[[NSClassFromString(@"MKMapView") alloc] initWithFrame:NSMakeRect(-4.0, -4.0, 1.0, 1.0)] autorelease];
+        self.locationServiceMapView = [[[NSClassFromString(@"MKMapView") alloc]
+            initWithFrame:NSMakeRect(30.0, 122.0, 580.0, 294.0)] autorelease];
         [self.locationServiceMapView setDelegate:(id)self];
-        [self.locationServiceMapView setHidden:YES];
+        [self.locationServiceMapView setZoomEnabled:YES];
+        [self.locationServiceMapView setScrollEnabled:YES];
+        if ([self.locationServiceMapView respondsToSelector:@selector(setShowsZoomControls:)]) {
+            [self.locationServiceMapView setShowsZoomControls:YES];
+        }
+        [self.locationServiceMapView setMapType:MKMapTypeStandard];
+        [self.locationServiceMapView setHidden:NO];
         [root addSubview:self.locationServiceMapView];
+        [self.mapImageView setHidden:YES];
+
+        self.selectionAnnotation = [[[NSClassFromString(@"MKPointAnnotation") alloc] init] autorelease];
+        [self.selectionAnnotation setTitle:TGLoc(@"share.location.selected")];
+        [self.locationServiceMapView addAnnotation:self.selectionAnnotation];
     } else {
         [self.currentLocationButton setEnabled:NO];
         [self.searchButton setEnabled:NO];
@@ -222,11 +247,19 @@
     }
     self.selectedCoordinate = coordinate;
     self.hasSelection = YES;
+    if (self.selectionAnnotation) {
+        [self.selectionAnnotation setCoordinate:coordinate];
+    }
     [self.mapImageView setCenterLatitude:coordinate.latitude];
     [self.mapImageView setCenterLongitude:coordinate.longitude];
     [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"share.location.coordinates"),
                                       coordinate.latitude, coordinate.longitude]];
-    if (reloadMap) {
+    if (self.locationServiceMapView) {
+        if (reloadMap) {
+            MKCoordinateSpan span = MKCoordinateSpanMake(0.018, 0.018);
+            [self.locationServiceMapView setRegion:MKCoordinateRegionMake(coordinate, span) animated:NO];
+        }
+    } else if (reloadMap) {
         [self reloadMapThumbnail];
     }
 }
@@ -283,6 +316,22 @@
     [self setSelectedCoordinate:[[userLocation location] coordinate] reloadMap:YES];
 }
 
+- (void)mapView:(MKMapView *)mapView regionDidChangeAnimated:(BOOL)animated {
+    (void)animated;
+    if (mapView != self.locationServiceMapView) {
+        return;
+    }
+    CLLocationCoordinate2D coordinate = [mapView centerCoordinate];
+    if (!CLLocationCoordinate2DIsValid(coordinate)) {
+        return;
+    }
+    self.selectedCoordinate = coordinate;
+    self.hasSelection = YES;
+    [self.selectionAnnotation setCoordinate:coordinate];
+    [self.statusField setStringValue:[NSString stringWithFormat:TGLoc(@"share.location.coordinates"),
+                                      coordinate.latitude, coordinate.longitude]];
+}
+
 - (void)mapView:(MKMapView *)mapView didFailToLocateUserWithError:(NSError *)error {
     (void)mapView;
     self.waitingForUserLocation = NO;
@@ -306,21 +355,50 @@
         NSBeep();
         return;
     }
+    [self.activeSearch cancel];
+    [self.activeGeocoder cancelGeocode];
+    self.activeSearch = nil;
+    self.activeGeocoder = nil;
+    NSUInteger generation = ++self.searchGeneration;
+
     MKLocalSearchRequest *request = [[[MKLocalSearchRequest alloc] init] autorelease];
     [request setNaturalLanguageQuery:query];
-    MKLocalSearch *search = [[[MKLocalSearch alloc] initWithRequest:request] autorelease];
+    if (self.locationServiceMapView) {
+        [request setRegion:[self.locationServiceMapView region]];
+    }
+    self.activeSearch = [[[MKLocalSearch alloc] initWithRequest:request] autorelease];
     [self.spinner startAnimation:nil];
     [self.searchButton setEnabled:NO];
     [self.statusField setStringValue:TGLoc(@"share.location.searching")];
-    [search startWithCompletionHandler:^(MKLocalSearchResponse *response, NSError *error) {
-        [self.spinner stopAnimation:nil];
-        [self.searchButton setEnabled:YES];
-        MKMapItem *item = [[response mapItems] count] > 0 ? [[response mapItems] objectAtIndex:0] : nil;
-        if (!item) {
-            [self.statusField setStringValue:[error localizedDescription] ?: TGLoc(@"share.location.notFound")];
+    [self.activeSearch startWithCompletionHandler:^(MKLocalSearchResponse *response, NSError *error) {
+        if (generation != self.searchGeneration) {
             return;
         }
-        [self setSelectedCoordinate:[[[item placemark] location] coordinate] reloadMap:YES];
+        self.activeSearch = nil;
+        MKMapItem *item = [[response mapItems] count] > 0 ? [[response mapItems] objectAtIndex:0] : nil;
+        if (item) {
+            [self.spinner stopAnimation:nil];
+            [self.searchButton setEnabled:YES];
+            [self setSelectedCoordinate:[[[item placemark] location] coordinate] reloadMap:YES];
+            return;
+        }
+
+        self.activeGeocoder = [[[CLGeocoder alloc] init] autorelease];
+        [self.activeGeocoder geocodeAddressString:query completionHandler:^(NSArray *placemarks, NSError *geocodeError) {
+            if (generation != self.searchGeneration) {
+                return;
+            }
+            self.activeGeocoder = nil;
+            [self.spinner stopAnimation:nil];
+            [self.searchButton setEnabled:YES];
+            CLPlacemark *placemark = [placemarks count] > 0 ? [placemarks objectAtIndex:0] : nil;
+            if (placemark && [placemark location]) {
+                [self setSelectedCoordinate:[[placemark location] coordinate] reloadMap:YES];
+                return;
+            }
+            NSError *displayError = geocodeError ? geocodeError : error;
+            [self.statusField setStringValue:[displayError localizedDescription] ?: TGLoc(@"share.location.notFound")];
+        }];
     }];
 }
 
@@ -343,12 +421,18 @@
 
 - (void)cancelPressed:(id)sender {
     (void)sender;
+    self.searchGeneration++;
+    [self.activeSearch cancel];
+    [self.activeGeocoder cancelGeocode];
     [NSApp abortModal];
     [[self window] orderOut:self];
 }
 
 - (BOOL)windowShouldClose:(id)sender {
     (void)sender;
+    self.searchGeneration++;
+    [self.activeSearch cancel];
+    [self.activeGeocoder cancelGeocode];
     [NSApp abortModal];
     return YES;
 }

@@ -421,6 +421,13 @@ def check_additional_message_types_contract(errors):
     for fragment in ["NSClassFromString(@\"MKMapView\")",
                      "MKLocalSearchRequest",
                      "setShowsUserLocation:YES",
+                     "setZoomEnabled:YES",
+                     "setScrollEnabled:YES",
+                     "setShowsZoomControls:YES",
+                     "MKPointAnnotation",
+                     "regionDidChangeAnimated:",
+                     "activeSearch",
+                     "geocodeAddressString:",
                      "mapUnavailable"]:
         if fragment not in location_picker_text:
             errors.append("%s: location picker regression guard is missing `%s`" %
