@@ -56,7 +56,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [selectedPath fill];
     }
 
-    BOOL compact = (NSWidth(cellFrame) < 108.0);
+    BOOL compact = (NSWidth(cellFrame) < 245.0);
     CGFloat avatarSide = compact ? 32.0 : 26.0;
     NSRect avatarRect = NSMakeRect(compact ? (NSMidX(cellFrame) - floor(avatarSide / 2.0)) : (NSMinX(cellFrame) + 8.0),
                                    NSMinY(cellFrame) + floor((NSHeight(cellFrame) - avatarSide) / 2.0),

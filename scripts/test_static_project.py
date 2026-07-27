@@ -556,6 +556,8 @@ def check_primary_navigation_contract(errors):
         "maximumChatSidebarWidthForWindowWidth",
         "sidebarResizeHandleDidRequestToggle",
         "compactChatSidebar",
+        "return (width < 286.0)",
+        "[self.drawerButton setFrame:NSMakeRect(mainX + 12.0",
     ]:
         if fragment not in section_layout_text:
             errors.append("%s: flexible chat sidebar is missing `%s`" %
@@ -583,6 +585,8 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: muted chats need the approved sound-off icon" % chat_cells_rel)
     if 'TGLoc(@"chat.notifications.mutedBadge")' in chat_cells_text:
         errors.append("%s: muted chats must not replace the sound-off icon with text" % chat_cells_rel)
+    if "BOOL compact = (NSWidth(cellFrame) < 245.0)" not in chat_cells_text:
+        errors.append("%s: chat rows must switch to compact rendering with the sidebar shell" % chat_cells_rel)
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
     for fragment in [

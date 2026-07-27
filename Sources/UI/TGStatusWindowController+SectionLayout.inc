@@ -659,8 +659,7 @@
         [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
     }
     if (compactChatSidebar) {
-        CGFloat compactDrawerX = mainX + floor((sidebarWidth - headerButtonSize) / 2.0);
-        [self.drawerButton setFrame:NSMakeRect(compactDrawerX, headerButtonY, headerButtonSize, headerButtonSize)];
+        [self.drawerButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
         [[self.drawerButton superview] addSubview:self.drawerButton positioned:NSWindowAbove relativeTo:nil];
         [self.topicBackButton setFrame:NSZeroRect];
         [self.loadMoreChatsButton setFrame:NSZeroRect];
