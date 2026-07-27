@@ -21,8 +21,9 @@
         return;
     }
     NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:rowRect xRadius:7.0 yRadius:7.0];
-    TGThemeDrawEnamelButtonInPath(selectedPath, rowRect, NO, YES, YES, [self isFlipped]);
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.30] set];
+    [TGClassicSelectedRowColor() set];
+    [selectedPath fill];
+    [TGClassicNavigationSelectedStrokeColor(0.62) set];
     [selectedPath setLineWidth:1.0];
     [selectedPath stroke];
 }
@@ -123,6 +124,7 @@
         [_tableView setDelegate:self];
         [_tableView setDataSource:self];
         [_tableView setTarget:self];
+        [_tableView setAction:@selector(commitSearch:)];
         [_tableView setDoubleAction:@selector(commitSearch:)];
         [_tableView setAllowsEmptySelection:YES];
         [_tableView setBackgroundColor:[NSColor clearColor]];

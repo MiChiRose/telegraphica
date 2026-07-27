@@ -24,6 +24,8 @@
     id<TGSidebarResizeHandleDelegate> _delegate;
     CGFloat _initialWidth;
     NSPoint _initialScreenPoint;
+    NSTrackingArea *_trackingArea;
+    BOOL _dragging;
 }
 @property (nonatomic, assign) id<TGSidebarResizeHandleDelegate> delegate;
 - (CGFloat)initialDragWidth;

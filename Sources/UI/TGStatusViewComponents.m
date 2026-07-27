@@ -97,6 +97,14 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @synthesize delegate = _delegate;
 
+- (void)dealloc {
+    if (_trackingArea) {
+        [self removeTrackingArea:_trackingArea];
+        [_trackingArea release];
+    }
+    [super dealloc];
+}
+
 - (CGFloat)initialDragWidth {
     return _initialWidth;
 }
@@ -112,6 +120,36 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     }
 }
 
+- (void)updateTrackingAreas {
+    [super updateTrackingAreas];
+    if (_trackingArea) {
+        [self removeTrackingArea:_trackingArea];
+        [_trackingArea release];
+        _trackingArea = nil;
+    }
+    _trackingArea = [[NSTrackingArea alloc] initWithRect:NSZeroRect
+                                                options:(NSTrackingMouseEnteredAndExited |
+                                                         NSTrackingActiveAlways |
+                                                         NSTrackingInVisibleRect)
+                                                  owner:self
+                                               userInfo:nil];
+    [self addTrackingArea:_trackingArea];
+}
+
+- (void)mouseEntered:(NSEvent *)event {
+    (void)event;
+    if (![self isHidden]) {
+        [[NSCursor resizeLeftRightCursor] set];
+    }
+}
+
+- (void)mouseExited:(NSEvent *)event {
+    (void)event;
+    if (!_dragging) {
+        [[NSCursor arrowCursor] set];
+    }
+}
+
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     NSRect lineRect = NSMakeRect(floor(NSMidX([self bounds])), 7.0, 1.0, MAX(0.0, NSHeight([self bounds]) - 14.0));
@@ -120,6 +158,7 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 }
 
 - (void)mouseDown:(NSEvent *)event {
+    [[NSCursor resizeLeftRightCursor] set];
     if ([event clickCount] > 1) {
         if ([_delegate respondsToSelector:@selector(sidebarResizeHandleDidRequestToggle:)]) {
             [_delegate sidebarResizeHandleDidRequestToggle:self];
@@ -129,15 +168,26 @@ static CGFloat const TGPanelCornerRadius = 8.0;
     _initialScreenPoint = [NSEvent mouseLocation];
     _initialWidth = [_delegate respondsToSelector:@selector(sidebarResizeHandleCurrentWidth:)]
         ? [_delegate sidebarResizeHandleCurrentWidth:self] : 0.0;
+    _dragging = YES;
 }
 
 - (void)mouseDragged:(NSEvent *)event {
     (void)event;
+    [[NSCursor resizeLeftRightCursor] set];
     if (![_delegate respondsToSelector:@selector(sidebarResizeHandle:requestedWidth:)]) {
         return;
     }
     NSPoint currentPoint = [NSEvent mouseLocation];
     [_delegate sidebarResizeHandle:self requestedWidth:(_initialWidth + currentPoint.x - _initialScreenPoint.x)];
+}
+
+- (void)mouseUp:(NSEvent *)event {
+    _dragging = NO;
+    NSPoint point = [self convertPoint:[event locationInWindow] fromView:nil];
+    NSCursor *cursor = NSPointInRect(point, [self bounds])
+        ? [NSCursor resizeLeftRightCursor]
+        : [NSCursor arrowCursor];
+    [cursor set];
 }
 
 @end

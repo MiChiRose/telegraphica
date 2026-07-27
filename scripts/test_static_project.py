@@ -571,6 +571,16 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: chat sidebar resize handle is missing" % components_header_rel)
     if "- (CGFloat)initialDragWidth;" not in components_header_text:
         errors.append("%s: sidebar snap resizing needs the drag's initial width" % components_header_rel)
+    components_impl_rel = os.path.join("Sources", "UI", "TGStatusViewComponents.m")
+    components_impl_text = read_text(os.path.join(ROOT, components_impl_rel))
+    for fragment in [
+        "NSTrackingMouseEnteredAndExited",
+        "[[NSCursor resizeLeftRightCursor] set]",
+        "- (void)mouseUp:(NSEvent *)event",
+    ]:
+        if fragment not in components_impl_text:
+            errors.append("%s: resize handle cursor tracking is missing `%s`" %
+                          (components_impl_rel, fragment))
 
     chat_search_panel_rel = os.path.join("Sources", "UI", "TGChatSearchPanelView.inc")
     chat_search_panel_text = read_text(os.path.join(ROOT, chat_search_panel_rel))
@@ -578,9 +588,11 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: typing in NSSearchField must not auto-commit the first result" %
                       chat_search_panel_rel)
     for fragment in [
+        "[_tableView setAction:@selector(commitSearch:)]",
         "commandSelector == @selector(moveDown:)",
         "commandSelector == @selector(moveUp:)",
         "[_tableView deselectAll:self]",
+        "[TGClassicSelectedRowColor() set]",
     ]:
         if fragment not in chat_search_panel_text:
             errors.append("%s: explicit chat-search selection is missing `%s`" %
