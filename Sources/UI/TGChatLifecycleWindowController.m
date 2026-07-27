@@ -3,6 +3,7 @@
 #import "../Core/TGTDLibClient.h"
 #import "TGConversationCreationPrompt.h"
 #import "TGLocalization.h"
+#import "TGMessageLayoutSupport.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusViewComponents.h"
@@ -45,31 +46,7 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
                                    36.0,
                                    36.0);
     NSString *avatarPath = [contact objectForKey:@"avatar_local_path"];
-    NSImage *avatar = [avatarPath length] > 0 ? [[[NSImage alloc] initWithContentsOfFile:avatarPath] autorelease] : nil;
-    NSBezierPath *clip = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
-    [NSGraphicsContext saveGraphicsState];
-    [clip addClip];
-    if (avatar) {
-        [avatar drawInRect:avatarRect
-                  fromRect:NSZeroRect
-                 operation:NSCompositeSourceOver
-                  fraction:1.0
-            respectFlipped:[controlView isFlipped]
-                     hints:nil];
-    } else {
-        [[TGClassicNavigationSelectedColor(highlighted ? 0.34 : 0.18) colorWithAlphaComponent:1.0] set];
-        NSRectFill(avatarRect);
-        NSString *initial = [name length] > 0 ? [[name substringToIndex:1] uppercaseString] : @"?";
-        NSDictionary *initialAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                           [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
-                                           highlighted ? [NSColor whiteColor] : TGClassicCardInkColor(), NSForegroundColorAttributeName,
-                                           nil];
-        NSSize size = [initial sizeWithAttributes:initialAttributes];
-        [initial drawAtPoint:NSMakePoint(NSMidX(avatarRect) - floor(size.width / 2.0),
-                                         NSMidY(avatarRect) - floor(size.height / 2.0))
-              withAttributes:initialAttributes];
-    }
-    [NSGraphicsContext restoreGraphicsState];
+    TGDrawAvatarInRect(avatarPath, name, avatarRect, highlighted, [controlView isFlipped]);
 
     if ([[contact objectForKey:@"is_online"] boolValue]) {
         NSRect dotRect = NSMakeRect(NSMaxX(avatarRect) - 9.0, NSMinY(avatarRect) + 1.0, 8.0, 8.0);

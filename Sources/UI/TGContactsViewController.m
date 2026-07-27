@@ -5,6 +5,7 @@
 #import "TGContactProfileView.h"
 #import "TGIconAssets.h"
 #import "TGLocalization.h"
+#import "TGMessageLayoutSupport.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewCells.h"
 #import "TGStatusViewComponents.h"
@@ -25,19 +26,6 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
         [parts addObject:TGLoc(@"contacts.online")];
     }
     return [parts componentsJoinedByString:@"  "];
-}
-
-static NSString *TGContactsInitials(NSString *displayName) {
-    NSArray *parts = [displayName componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    NSMutableString *initials = [NSMutableString string];
-    NSUInteger index = 0;
-    for (index = 0; index < [parts count] && [initials length] < 2; index++) {
-        NSString *part = [parts objectAtIndex:index];
-        if ([part length] > 0) {
-            [initials appendString:[[part substringToIndex:1] uppercaseString]];
-        }
-    }
-    return [initials length] > 0 ? initials : @"?";
 }
 
 @interface TGContactRowCell : TGRepresentedObjectCell
@@ -62,33 +50,8 @@ static NSString *TGContactsInitials(NSString *displayName) {
                                    34.0,
                                    34.0);
     NSString *avatarPath = [contact objectForKey:@"avatar_local_path"];
-    NSImage *avatar = ([avatarPath length] > 0) ? [[[NSImage alloc] initWithContentsOfFile:avatarPath] autorelease] : nil;
-    NSBezierPath *avatarPathShape = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
-    [NSGraphicsContext saveGraphicsState];
-    [avatarPathShape addClip];
-    if (avatar) {
-        [avatar drawInRect:avatarRect
-                  fromRect:NSZeroRect
-                 operation:NSCompositeSourceOver
-                  fraction:1.0
-            respectFlipped:flipped
-                     hints:nil];
-    } else {
-        NSColor *fill = highlighted ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.18] :
-            [NSColor colorWithCalibratedRed:0.29 green:0.53 blue:0.73 alpha:0.22];
-        [fill set];
-        NSRectFill(avatarRect);
-        NSString *initials = TGContactsInitials([contact objectForKey:@"display_name"]);
-        NSDictionary *initialAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                           [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
-                                           ink, NSForegroundColorAttributeName,
-                                           nil];
-        NSSize initialsSize = [initials sizeWithAttributes:initialAttributes];
-        [initials drawAtPoint:NSMakePoint(NSMidX(avatarRect) - floor(initialsSize.width / 2.0),
-                                          NSMidY(avatarRect) - floor(initialsSize.height / 2.0))
-               withAttributes:initialAttributes];
-    }
-    [NSGraphicsContext restoreGraphicsState];
+    NSString *name = [contact objectForKey:@"display_name"];
+    TGDrawAvatarInRect(avatarPath, name, avatarRect, highlighted, flipped);
 
     if ([[contact objectForKey:@"is_online"] boolValue]) {
         NSRect onlineRect = NSMakeRect(NSMaxX(avatarRect) - 9.0, NSMinY(avatarRect) + 1.0, 8.0, 8.0);
@@ -98,7 +61,6 @@ static NSString *TGContactsInitials(NSString *displayName) {
 
     CGFloat textX = NSMaxX(avatarRect) + 11.0;
     CGFloat textWidth = MAX(20.0, NSMaxX(cellFrame) - textX - 10.0);
-    NSString *name = [contact objectForKey:@"display_name"];
     NSDictionary *nameAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
                                     ink, NSForegroundColorAttributeName,

@@ -4,6 +4,7 @@
 #import "../Core/TGTDLibClient+ChatFolders.h"
 #import "TGIconAssets.h"
 #import "TGLocalization.h"
+#import "TGMessageLayoutSupport.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
@@ -78,24 +79,11 @@
                                    NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 28.0) / 2.0),
                                    28.0,
                                    28.0);
-    NSImage *avatar = [[item avatarLocalPath] length] > 0
-        ? [[[NSImage alloc] initWithContentsOfFile:[item avatarLocalPath]] autorelease]
-        : nil;
-    NSBezierPath *clip = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
-    [NSGraphicsContext saveGraphicsState];
-    [clip addClip];
-    if (avatar) {
-        [avatar drawInRect:avatarRect
-                  fromRect:NSZeroRect
-                 operation:NSCompositeSourceOver
-                  fraction:1.0
-            respectFlipped:[controlView isFlipped]
-                     hints:nil];
-    } else {
-        [TGClassicNavigationSelectedColor(highlighted ? 0.36 : 0.20) set];
-        [clip fill];
-    }
-    [NSGraphicsContext restoreGraphicsState];
+    TGDrawAvatarInRect([item avatarLocalPath],
+                       [item title],
+                       avatarRect,
+                       highlighted,
+                       [controlView isFlipped]);
 
     CGFloat textX = NSMaxX(avatarRect) + 9.0;
     CGFloat width = MAX(40.0, NSMaxX(cellFrame) - textX - 8.0);

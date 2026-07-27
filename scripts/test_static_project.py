@@ -504,6 +504,7 @@ def check_primary_navigation_contract(errors):
         "applySearchFilter",
         "loadSelectedContactProfile",
         "TGContactProfileView",
+        "TGDrawAvatarInRect",
         "contactsViewControllerDidRequestNewConversation:",
     ]:
         if fragment not in contacts_text:
@@ -624,6 +625,7 @@ def check_primary_navigation_contract(errors):
     for fragment in [
         "TGChatLifecycleContactCell",
         "@interface TGChatLifecycleContactCell : TGRepresentedObjectCell",
+        "TGDrawAvatarInRect",
         "TGGroupedCardView *contactsCard",
         "TGPrimaryTextButtonCell",
         "TGSecondaryTextButtonCell",
@@ -938,6 +940,7 @@ def check_chat_folder_management_contract(errors):
         "@interface TGChatFolderListCell : TGRepresentedObjectCell",
         "@interface TGChatFolderChatCell : TGRepresentedObjectCell",
         "[self representedObject]",
+        "TGDrawAvatarInRect",
         'TGDrawTemplateIconAsset(@"folder"',
         "setReleasedWhenClosed:NO",
     ]:
