@@ -197,8 +197,8 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
     [root addSubview:self.searchField];
 
     self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(580, 535, 36, 32)] autorelease];
-    [self.refreshButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"refresh"] autorelease]];
-    [self.refreshButton setTitle:@"refresh"];
+    [self.refreshButton setCell:[[[TGHeaderIconButtonCell alloc] initTextCell:@"↻"] autorelease]];
+    [self.refreshButton setTitle:@"↻"];
     [self.refreshButton setToolTip:TGLoc(@"contacts.refresh")];
     [self.refreshButton setTarget:self];
     [self.refreshButton setAction:@selector(refreshContactsAction:)];

@@ -114,17 +114,6 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                  14.0)
                        withAttributes:compactAttributes];
         }
-        if ([item notificationsMuted]) {
-            NSRect compactMuteRect = NSMakeRect(NSMinX(avatarRect) - 3.0,
-                                                NSMinY(avatarRect) - 2.0,
-                                                14.0,
-                                                14.0);
-            TGDrawTemplateIconAsset(@"sound-off",
-                                    compactMuteRect,
-                                    selected ? TGClassicSelectedRowTextColor() : TGClassicMutedInkColor(),
-                                    1.0,
-                                    [controlView isFlipped]);
-        }
         return;
     }
     NSSize unreadSize = [unreadString sizeWithAttributes:unreadAttributes];

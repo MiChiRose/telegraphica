@@ -530,7 +530,7 @@
     }
 
     BOOL compactChatSidebar = [self isChatSidebarCompactForWidth:sidebarWidth];
-    CGFloat bottomNavigationHeight = compactChatSidebar ? 78.0 : 62.0;
+    CGFloat bottomNavigationHeight = compactChatSidebar ? 150.0 : 62.0;
     CGFloat bottomNavigationX = mainX + 8.0;
     CGFloat bottomNavigationY = mainY + 8.0;
     CGFloat bottomNavigationWidth = compactChatSidebar ? (sidebarWidth - 8.0) : (sidebarWidth - 16.0);
@@ -541,20 +541,20 @@
                                                    bottomNavigationY,
                                                    bottomNavigationWidth,
                                                    bottomNavigationHeight)];
-    CGFloat bottomNavigationInnerX = bottomNavigationX + (compactChatSidebar ? 4.0 : 8.0);
+    CGFloat bottomNavigationInnerX = bottomNavigationX + (compactChatSidebar ? 5.0 : 8.0);
     CGFloat bottomNavigationButtonGap = compactChatSidebar ? 4.0 : 6.0;
     CGFloat bottomNavigationButtonHeight = compactChatSidebar ? 32.0 : 48.0;
     CGFloat bottomNavigationButtonY = bottomNavigationY + floor((bottomNavigationHeight - bottomNavigationButtonHeight) / 2.0);
     NSUInteger bottomNavigationButtonCount = MAX((NSUInteger)1, [self.navigationButtons count]);
     CGFloat bottomNavigationButtonWidth = compactChatSidebar
-        ? floor((bottomNavigationWidth - 12.0) / 2.0)
+        ? (bottomNavigationWidth - 10.0)
         : floor((bottomNavigationWidth - 16.0 -
                  (bottomNavigationButtonGap * (bottomNavigationButtonCount - 1))) /
                 bottomNavigationButtonCount);
     for (navigationIndex = 0; navigationIndex < [self.navigationButtons count]; navigationIndex++) {
         NSButton *navigationButton = [self.navigationButtons objectAtIndex:navigationIndex];
-        NSUInteger buttonColumn = compactChatSidebar ? (navigationIndex % 2) : navigationIndex;
-        NSUInteger buttonRow = compactChatSidebar ? (navigationIndex / 2) : 0;
+        NSUInteger buttonColumn = compactChatSidebar ? 0 : navigationIndex;
+        NSUInteger buttonRow = compactChatSidebar ? ((bottomNavigationButtonCount - 1) - navigationIndex) : 0;
         CGFloat buttonX = bottomNavigationInnerX + ((bottomNavigationButtonWidth + bottomNavigationButtonGap) * buttonColumn);
         CGFloat effectiveButtonY = compactChatSidebar
             ? (bottomNavigationY + 5.0 + ((bottomNavigationButtonHeight + 4.0) * buttonRow))
@@ -657,16 +657,12 @@
         [self.topicBackButton setFrame:NSMakeRect(mainX + 12.0, headerButtonY, headerButtonSize, headerButtonSize)];
     }
     if (compactChatSidebar) {
+        [self.drawerButton setFrame:NSZeroRect];
+        [self.topicBackButton setFrame:NSZeroRect];
         [self.loadMoreChatsButton setFrame:NSZeroRect];
         [self.loadChatsButton setFrame:NSZeroRect];
         [self.chatSearchButton setFrame:NSZeroRect];
-        CGFloat compactComposeX = drawerHidden
-            ? (mainX + floor((sidebarWidth - headerButtonSize) / 2.0))
-            : (mainX + sidebarWidth - headerButtonSize - 6.0);
-        [self.composeChatButton setFrame:NSMakeRect(compactComposeX,
-                                                    headerButtonY,
-                                                    headerButtonSize,
-                                                    headerButtonSize)];
+        [self.composeChatButton setFrame:NSZeroRect];
     } else {
         [self.loadMoreChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
         [self.loadChatsButton setFrame:NSMakeRect(mainX + sidebarWidth - 12.0 - headerButtonSize, headerButtonY, headerButtonSize, headerButtonSize)];
@@ -681,7 +677,7 @@
     [self.chatsLabel setFrame:(compactChatSidebar ? NSZeroRect : NSMakeRect(chatHeaderTitleX, headerLabelY, chatHeaderTitleWidth, 20.0))];
     CGFloat chatListX = mainX + 8.0;
     CGFloat chatListBottom = bottomNavigationY + bottomNavigationHeight + 9.0;
-    CGFloat chatListTop = mainTop - TGPanelHeaderHeight - 7.0;
+    CGFloat chatListTop = compactChatSidebar ? (mainTop - 7.0) : (mainTop - TGPanelHeaderHeight - 7.0);
     CGFloat chatListHeight = chatListTop - chatListBottom;
     if (chatListHeight < 128.0) {
         chatListHeight = 128.0;
