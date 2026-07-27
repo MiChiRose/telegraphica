@@ -40,13 +40,15 @@ static NSString *TGContactsInitials(NSString *displayName) {
     return [initials length] > 0 ? initials : @"?";
 }
 
-@interface TGContactRowCell : NSCell
+@interface TGContactRowCell : TGRepresentedObjectCell
 @end
 
 @implementation TGContactRowCell
 
 - (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    NSDictionary *contact = [[self objectValue] isKindOfClass:[NSDictionary class]] ? [self objectValue] : nil;
+    NSDictionary *contact = [[self representedObject] isKindOfClass:[NSDictionary class]]
+        ? [self representedObject]
+        : nil;
     if (!contact) {
         return;
     }

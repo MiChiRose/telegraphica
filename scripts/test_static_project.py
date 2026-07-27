@@ -493,6 +493,10 @@ def check_primary_navigation_contract(errors):
 
     contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
     contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    cells_header_rel = os.path.join("Sources", "UI", "TGStatusViewCells.h")
+    cells_header_text = read_text(os.path.join(ROOT, cells_header_rel))
+    cells_impl_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    cells_impl_text = read_text(os.path.join(ROOT, cells_impl_rel))
     for fragment in [
         "contactSummariesWithTimeout:",
         "privateChatIDForUserID:",
@@ -505,6 +509,16 @@ def check_primary_navigation_contract(errors):
         if fragment not in contacts_text:
             errors.append("%s: contacts section is missing `%s`" %
                           (contacts_rel, fragment))
+    for fragment in [
+        "TGRepresentedObjectCell",
+        "representedObject",
+    ]:
+        if fragment not in cells_header_text or fragment not in cells_impl_text:
+            errors.append("%s: legacy model-backed table cell is missing `%s`" %
+                          (cells_impl_rel, fragment))
+    if "@interface TGContactRowCell : TGRepresentedObjectCell" not in contacts_text:
+        errors.append("%s: contact rows must preserve dictionary models on legacy AppKit" %
+                      contacts_rel)
 
     button_cells_rel = os.path.join("Sources", "UI", "TGStatusButtonCells.m")
     button_cells_text = read_text(os.path.join(ROOT, button_cells_rel))
@@ -609,6 +623,7 @@ def check_primary_navigation_contract(errors):
     lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
     for fragment in [
         "TGChatLifecycleContactCell",
+        "@interface TGChatLifecycleContactCell : TGRepresentedObjectCell",
         "TGGroupedCardView *contactsCard",
         "TGPrimaryTextButtonCell",
         "TGSecondaryTextButtonCell",
@@ -920,6 +935,9 @@ def check_chat_folder_management_contract(errors):
         "setObjectValue:",
         "shareLinkForChatFolderID:",
         "TGChatFolderListCell",
+        "@interface TGChatFolderListCell : TGRepresentedObjectCell",
+        "@interface TGChatFolderChatCell : TGRepresentedObjectCell",
+        "[self representedObject]",
         'TGDrawTemplateIconAsset(@"folder"',
         "setReleasedWhenClosed:NO",
     ]:

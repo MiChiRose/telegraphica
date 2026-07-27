@@ -25,13 +25,15 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
     return [parts componentsJoinedByString:@" · "];
 }
 
-@interface TGChatLifecycleContactCell : NSCell
+@interface TGChatLifecycleContactCell : TGRepresentedObjectCell
 @end
 
 @implementation TGChatLifecycleContactCell
 
 - (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    NSDictionary *contact = [[self objectValue] isKindOfClass:[NSDictionary class]] ? [self objectValue] : nil;
+    NSDictionary *contact = [[self representedObject] isKindOfClass:[NSDictionary class]]
+        ? [self representedObject]
+        : nil;
     if (!contact) {
         return;
     }
@@ -228,7 +230,7 @@ static NSString *TGContactSubtitle(NSDictionary *contact) {
     [self.tableView setDoubleAction:@selector(openSelectedContact:)];
     NSTableColumn *contactColumn = [[[NSTableColumn alloc] initWithIdentifier:@"contact"] autorelease];
     [contactColumn setWidth:560.0];
-    [contactColumn setDataCell:[[[TGChatLifecycleContactCell alloc] init] autorelease]];
+    [contactColumn setDataCell:[[[TGChatLifecycleContactCell alloc] initTextCell:@""] autorelease]];
     [self.tableView addTableColumn:contactColumn];
     [scrollView setDocumentView:self.tableView];
     [root addSubview:scrollView];

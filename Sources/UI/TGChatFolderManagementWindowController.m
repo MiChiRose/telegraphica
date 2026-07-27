@@ -9,14 +9,14 @@
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
-@interface TGChatFolderListCell : NSCell
+@interface TGChatFolderListCell : TGRepresentedObjectCell
 @end
 
 @implementation TGChatFolderListCell
 
 - (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    NSDictionary *folder = [[self objectValue] isKindOfClass:[NSDictionary class]]
-        ? [self objectValue]
+    NSDictionary *folder = [[self representedObject] isKindOfClass:[NSDictionary class]]
+        ? [self representedObject]
         : nil;
     if (!folder) {
         return;
@@ -61,13 +61,15 @@
 
 @end
 
-@interface TGChatFolderChatCell : NSCell
+@interface TGChatFolderChatCell : TGRepresentedObjectCell
 @end
 
 @implementation TGChatFolderChatCell
 
 - (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    TGChatItem *item = [[self objectValue] isKindOfClass:[TGChatItem class]] ? [self objectValue] : nil;
+    TGChatItem *item = [[self representedObject] isKindOfClass:[TGChatItem class]]
+        ? [self representedObject]
+        : nil;
     if (!item) {
         return;
     }
@@ -335,7 +337,7 @@
     NSTableColumn *folderColumn = [[[NSTableColumn alloc] initWithIdentifier:@"folder"] autorelease];
     [folderColumn setWidth:190.0];
     [folderColumn setMinWidth:120.0];
-    [folderColumn setDataCell:[[[TGChatFolderListCell alloc] init] autorelease]];
+    [folderColumn setDataCell:[[[TGChatFolderListCell alloc] initTextCell:@""] autorelease]];
     [self.folderTableView addTableColumn:folderColumn];
     [folderScroll setDocumentView:self.folderTableView];
     [root addSubview:folderScroll];
@@ -439,7 +441,7 @@
     [self.chatTableView addTableColumn:includeColumn];
     NSTableColumn *chatColumn = [[[NSTableColumn alloc] initWithIdentifier:@"chat"] autorelease];
     [chatColumn setWidth:450.0];
-    [chatColumn setDataCell:[[[TGChatFolderChatCell alloc] init] autorelease]];
+    [chatColumn setDataCell:[[[TGChatFolderChatCell alloc] initTextCell:@""] autorelease]];
     [self.chatTableView addTableColumn:chatColumn];
     [chatScroll setDocumentView:self.chatTableView];
     [root addSubview:chatScroll];
