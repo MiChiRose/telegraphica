@@ -496,8 +496,8 @@
 
 - (void)applyRetentionPressed:(id)sender {
     (void)sender;
-    NSInteger days = [[self.accountTTLPopUpButton selectedItem].representedObject integerValue];
-    NSInteger seconds = [[self.autoDeletePopUpButton selectedItem].representedObject integerValue];
+    NSInteger days = [[[self.accountTTLPopUpButton selectedItem] representedObject] integerValue];
+    NSInteger seconds = [[[self.autoDeletePopUpButton selectedItem] representedObject] integerValue];
     TGTDLibClient *client = [self.client retain];
     [self runMutation:^BOOL(NSError **error) {
         BOOL ttlSaved = [client setAccountTTLInDays:days timeout:10.0 error:error];

@@ -2,6 +2,7 @@
 
 #import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+Privacy.h"
+#import "TGChatAdministrationWindowController.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
@@ -21,6 +22,8 @@
 @property (nonatomic, retain) NSButton *addButton;
 @property (nonatomic, retain) NSButton *applyRoleButton;
 @property (nonatomic, retain) NSButton *refreshButton;
+@property (nonatomic, retain) NSButton *administrationButton;
+@property (nonatomic, retain) TGChatAdministrationWindowController *administrationWindowController;
 @property (nonatomic, retain) NSPopUpButton *autoDeletePopUpButton;
 @property (nonatomic, retain) NSButton *applyAutoDeleteButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -47,6 +50,8 @@
 @synthesize addButton = _addButton;
 @synthesize applyRoleButton = _applyRoleButton;
 @synthesize refreshButton = _refreshButton;
+@synthesize administrationButton = _administrationButton;
+@synthesize administrationWindowController = _administrationWindowController;
 @synthesize autoDeletePopUpButton = _autoDeletePopUpButton;
 @synthesize applyAutoDeleteButton = _applyAutoDeleteButton;
 @synthesize spinner = _spinner;
@@ -93,6 +98,9 @@
     [_addButton release];
     [_applyRoleButton release];
     [_refreshButton release];
+    [_administrationButton release];
+    [[_administrationWindowController window] close];
+    [_administrationWindowController release];
     [_autoDeletePopUpButton release];
     [_applyAutoDeleteButton release];
     [_spinner release];
@@ -125,6 +133,14 @@
     [self.titleField setStringValue:[self.chatTitle length] > 0 ? self.chatTitle : TGLoc(@"chat.info.title")];
     [self.titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.titleField];
+
+    self.administrationButton = [[[NSButton alloc] initWithFrame:NSMakeRect(486, 530, 114, 30)] autorelease];
+    [self.administrationButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"admin.open")] autorelease]];
+    [self.administrationButton setTitle:TGLoc(@"admin.open")];
+    [self.administrationButton setTarget:self];
+    [self.administrationButton setAction:@selector(administrationPressed:)];
+    [self.administrationButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [root addSubview:self.administrationButton];
 
     self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(608, 530, 88, 30)] autorelease];
     [self.refreshButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"refresh")] autorelease]];
@@ -313,6 +329,7 @@
                                       ![[[self selectedMember] objectForKey:@"role"] isEqualToString:@"creator"])];
     [self.autoDeletePopUpButton setEnabled:!self.loading];
     [self.applyAutoDeleteButton setEnabled:!self.loading];
+    [self.administrationButton setEnabled:(!self.loading && group && (canInvite || canManage))];
 }
 
 - (void)setLoading:(BOOL)loading status:(NSString *)status {
@@ -411,6 +428,20 @@
 - (void)refreshPressed:(id)sender {
     (void)sender;
     [self reloadChatInfo];
+}
+
+- (void)administrationPressed:(id)sender {
+    (void)sender;
+    if (!self.administrationWindowController) {
+        self.administrationWindowController = [[[TGChatAdministrationWindowController alloc]
+                                                initWithClient:self.client
+                                                chatID:self.chatID
+                                                title:[self.titleField stringValue]] autorelease];
+    }
+    [[self.administrationWindowController window] center];
+    [self.administrationWindowController showWindow:self];
+    [[self.administrationWindowController window] makeKeyAndOrderFront:self];
+    [self.administrationWindowController reloadAdministration];
 }
 
 - (void)addPressed:(id)sender {
