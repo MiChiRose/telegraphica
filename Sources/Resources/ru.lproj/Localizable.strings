@@ -1,3 +1,16 @@
 "telegraphica" = "Telegraphica";
 "core_spike" = "Telegraphica core spike";
 "tdlib_not_checked" = "TDLib status: not checked";
+"save" = "Сохранить";
+"cancel" = "Отмена";
+"profile.edit.title" = "Редактировать профиль";
+"profile.edit.firstName" = "Имя";
+"profile.edit.lastName" = "Фамилия";
+"profile.edit.username" = "Имя пользователя";
+"profile.edit.bio" = "О себе";
+"profile.edit.firstNameRequired" = "Укажите имя.";
+"profile.edit.open" = "Редактировать профиль";
+"profile.edit.short" = "Изменить";
+"profile.edit.unavailable" = "Редактирование профиля станет доступно после подключения к Telegram.";
+"profile.edit.saving" = "Сохранение профиля…";
+"profile.edit.saved" = "Профиль обновлён.";

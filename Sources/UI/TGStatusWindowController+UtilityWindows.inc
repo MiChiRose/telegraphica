@@ -407,6 +407,131 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     [self reloadProfileSummaryIfReady];
 }
 
+- (void)showProfileEditWindow:(id)sender {
+    (void)sender;
+    [[TGLogger sharedLogger] log:@"Profile editor requested."];
+    if (![self.currentAuthState isEqualToString:@"ready"]) {
+        [[TGLogger sharedLogger] log:@"Profile editor deferred because TDLib is not ready."];
+        [self.statusField setStringValue:TGLoc(@"profile.edit.unavailable")];
+        NSBeep();
+        return;
+    }
+    if (!self.profileEditWindowController) {
+        self.profileEditWindowController = [[[TGProfileEditWindowController alloc] init] autorelease];
+        [self.profileEditWindowController setDelegate:self];
+    }
+    [self.profileEditWindowController configureWithFirstName:self.profileFirstName
+                                                   lastName:self.profileLastName
+                                                   username:self.profileUsername
+                                                        bio:self.profileBio];
+    NSWindow *profileEditWindow = [self.profileEditWindowController window];
+    [profileEditWindow center];
+    [NSApp activateIgnoringOtherApps:YES];
+    [profileEditWindow makeKeyAndOrderFront:self];
+    [[TGLogger sharedLogger] log:@"Profile editor presented."];
+}
+
+- (void)profileEditWindowController:(TGProfileEditWindowController *)controller
+            didRequestSaveFirstName:(NSString *)firstName
+                           lastName:(NSString *)lastName
+                           username:(NSString *)username
+                                bio:(NSString *)bio {
+    if (controller != self.profileEditWindowController ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+    [controller setSaving:YES];
+    [controller showErrorMessage:nil];
+    [self.statusField setStringValue:TGLoc(@"profile.edit.saving")];
+
+    NSString *firstNameCopy = [firstName copy];
+    NSString *lastNameCopy = [lastName copy];
+    NSString *usernameCopy = [username copy];
+    NSString *bioCopy = [bio copy];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *updateError = nil;
+        BOOL success = [client updateCurrentUserFirstName:firstNameCopy
+                                                 lastName:lastNameCopy
+                                                 username:usernameCopy
+                                                      bio:bioCopy
+                                                  timeout:6.0
+                                                    error:&updateError];
+        NSString *errorMessage = [[updateError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (controller == self.profileEditWindowController) {
+                [controller setSaving:NO];
+                if (success) {
+                    self.profileFirstName = firstNameCopy;
+                    self.profileLastName = lastNameCopy;
+                    self.profileUsername = usernameCopy;
+                    self.profileBio = bioCopy;
+                    self.profileDisplayName = [[NSArray arrayWithObjects:firstNameCopy, ([lastNameCopy length] > 0 ? lastNameCopy : nil), nil] componentsJoinedByString:@" "];
+                    [self refreshProfileDisplay];
+                    [self layoutContentView];
+                    [[controller window] orderOut:self];
+                    [self.statusField setStringValue:TGLoc(@"profile.edit.saved")];
+                } else {
+                    [controller showErrorMessage:([errorMessage length] > 0 ? errorMessage : @"Profile update failed.")];
+                    [self.statusField setStringValue:@"Profile update failed"];
+                }
+            }
+            self.profileSummaryLoaded = NO;
+            [self reloadProfileSummaryIfReady];
+            [errorMessage release];
+            [firstNameCopy release];
+            [lastNameCopy release];
+            [usernameCopy release];
+            [bioCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)profileEditWindowController:(TGProfileEditWindowController *)controller
+            didRequestSetPhotoAtPath:(NSString *)localPath {
+    if (controller != self.profileEditWindowController ||
+        ![self.currentAuthState isEqualToString:@"ready"] ||
+        [localPath length] == 0) {
+        return;
+    }
+    [controller setSaving:YES];
+    [controller showErrorMessage:nil];
+    [self.statusField setStringValue:TGLoc(@"profile.edit.photo.saving")];
+
+    NSString *photoPathCopy = [localPath copy];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *photoError = nil;
+        BOOL success = [client setCurrentUserProfilePhotoAtPath:photoPathCopy
+                                                       timeout:20.0
+                                                         error:&photoError];
+        NSString *errorMessage = [[photoError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (controller == self.profileEditWindowController) {
+                [controller setSaving:NO];
+                if (success) {
+                    [self.statusField setStringValue:TGLoc(@"profile.edit.photo.saved")];
+                    self.profileSummaryLoaded = NO;
+                    [self reloadProfileSummaryIfReady];
+                } else {
+                    [controller showErrorMessage:([errorMessage length] > 0
+                                                    ? errorMessage
+                                                    : TGLoc(@"profile.edit.photo.failed"))];
+                    [self.statusField setStringValue:TGLoc(@"profile.edit.photo.failed")];
+                }
+            }
+            [errorMessage release];
+            [photoPathCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)showAppearanceWindow:(id)sender {
     (void)sender;
     if (!self.appearanceWindow) {

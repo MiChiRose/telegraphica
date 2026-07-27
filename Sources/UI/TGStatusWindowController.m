@@ -11,6 +11,7 @@
 #import "TGAnimationSupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
+#import "TGProfileEditWindowController.h"
 #import "TGStatusButtonCells.h"
 #import "TGSectionTitleField.h"
 #import "TGStatusViewComponents.h"
@@ -69,6 +70,7 @@ static NSString * const TGNotificationPreviewEnabledDefaultsKey = @"Telegraphica
 static NSString * const TGNotificationsWhenActiveDefaultsKey = @"TelegraphicaNotificationsWhenActive";
 static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"TelegraphicaChatNotificationMuteOverrides";
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
+static NSString * const TGChatSidebarWidthDefaultsKey = @"TelegraphicaChatSidebarWidth";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
 static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
@@ -207,9 +209,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGContactsViewControllerDelegate, TGSidebarResizeHandleDelegate, TGProfileEditWindowControllerDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
+@property (nonatomic, retain) TGSidebarResizeHandleView *sidebarResizeHandleView;
+@property (nonatomic, assign) CGFloat chatSidebarPreferredWidth;
 @property (nonatomic, retain) NSView *conversationPanelView;
 @property (nonatomic, retain) NSView *diagnosticsPanelView;
 @property (nonatomic, retain) NSView *loginPanelView;
@@ -462,6 +466,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsAboutButton;
 @property (nonatomic, retain) NSButton *logoutButton;
 @property (nonatomic, retain) NSButton *profileRefreshButton;
+@property (nonatomic, retain) NSButton *profileEditButton;
+@property (nonatomic, retain) TGProfileEditWindowController *profileEditWindowController;
 @property (nonatomic, retain) NSImageView *aboutIconView;
 @property (nonatomic, retain) NSTextField *aboutTitleField;
 @property (nonatomic, retain) NSTextField *aboutVersionField;
@@ -471,7 +477,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, copy) NSString *selectedChatTitle;
 @property (nonatomic, copy) NSString *selectedChatTypeSummary;
 @property (nonatomic, copy) NSString *selectedChatAvatarLocalPath;
+@property (nonatomic, retain) NSNumber *selectedChatLastReadInboxMessageID;
 @property (nonatomic, retain) NSNumber *selectedChatLastReadOutboxMessageID;
+@property (nonatomic, assign) NSUInteger selectedChatUnreadCount;
+@property (nonatomic, assign) BOOL initialUnreadPositionPending;
+@property (nonatomic, retain) NSMutableSet *visibleReadReceiptMessageIDs;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
 @property (nonatomic, copy) NSString *commentThreadParentTitle;
@@ -653,6 +663,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 - (NSString *)localAttachmentPathForMessageItem:(TGMessageItem *)item;
 - (void)openDocumentAttachmentForMessageItem:(TGMessageItem *)item;
 - (void)downloadAttachmentForMessageItem:(TGMessageItem *)item;
+- (void)sendSharedComposerItemWithKind:(NSString *)kind values:(NSDictionary *)values;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
 - (void)openWorkshopFromDrawer:(id)sender;
@@ -664,6 +675,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @synthesize topPanelView = _topPanelView;
 @synthesize sidebarPanelView = _sidebarPanelView;
+@synthesize sidebarResizeHandleView = _sidebarResizeHandleView;
+@synthesize chatSidebarPreferredWidth = _chatSidebarPreferredWidth;
 @synthesize conversationPanelView = _conversationPanelView;
 @synthesize diagnosticsPanelView = _diagnosticsPanelView;
 @synthesize loginPanelView = _loginPanelView;
@@ -910,6 +923,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsAboutButton = _settingsAboutButton;
 @synthesize logoutButton = _logoutButton;
 @synthesize profileRefreshButton = _profileRefreshButton;
+@synthesize profileEditButton = _profileEditButton;
+@synthesize profileEditWindowController = _profileEditWindowController;
 @synthesize aboutIconView = _aboutIconView;
 @synthesize aboutTitleField = _aboutTitleField;
 @synthesize aboutVersionField = _aboutVersionField;
@@ -919,7 +934,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize selectedChatTitle = _selectedChatTitle;
 @synthesize selectedChatTypeSummary = _selectedChatTypeSummary;
 @synthesize selectedChatAvatarLocalPath = _selectedChatAvatarLocalPath;
+@synthesize selectedChatLastReadInboxMessageID = _selectedChatLastReadInboxMessageID;
 @synthesize selectedChatLastReadOutboxMessageID = _selectedChatLastReadOutboxMessageID;
+@synthesize selectedChatUnreadCount = _selectedChatUnreadCount;
+@synthesize initialUnreadPositionPending = _initialUnreadPositionPending;
+@synthesize visibleReadReceiptMessageIDs = _visibleReadReceiptMessageIDs;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
 @synthesize commentThreadParentTitle = _commentThreadParentTitle;
@@ -1107,6 +1126,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.visibleReadReceiptMessageIDs = [NSMutableSet set];
         self.searchResultItems = [NSMutableArray array];
         self.chatSearchWindowResults = [NSMutableArray array];
         self.chatSearchWindowResultButtons = [NSMutableArray array];
@@ -1551,6 +1571,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.activeSessionsTerminateButton setTitle:TGLoc(@"settings.sessions.terminate")];
     [self.activeSessionsCloseButton setTitle:TGLoc(@"close")];
     [self.profileRefreshButton setTitle:TGLoc(@"profile.refresh")];
+    [self.profileEditButton setTitle:TGLoc(@"profile.edit.short")];
+    [self.profileEditButton setToolTip:TGLoc(@"profile.edit.title")];
     [self.settingsCheckUpdatesButton setTitle:TGLoc(@"settings.update")];
     [self.settingsAppearanceButton setTitle:@""];
     [self.settingsLogsButton setTitle:TGLoc(@"settings.logs")];
@@ -1965,6 +1987,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.sidebarPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(16, 132, 286, 480)] autorelease];
     [self.sidebarPanelView setAutoresizingMask:(NSViewHeightSizable | NSViewMaxXMargin)];
     [contentView addSubview:self.sidebarPanelView];
+
+    self.chatSidebarPreferredWidth = [[NSUserDefaults standardUserDefaults] doubleForKey:TGChatSidebarWidthDefaultsKey];
+    if (self.chatSidebarPreferredWidth <= 0.0) {
+        self.chatSidebarPreferredWidth = 292.0;
+    } else if (self.chatSidebarPreferredWidth > 78.0 && self.chatSidebarPreferredWidth < 292.0) {
+        self.chatSidebarPreferredWidth = (self.chatSidebarPreferredWidth < 248.0) ? 78.0 : 292.0;
+    }
+    self.sidebarResizeHandleView = [[[TGSidebarResizeHandleView alloc] initWithFrame:NSMakeRect(304, 132, 10, 480)] autorelease];
+    [self.sidebarResizeHandleView setDelegate:self];
+    [contentView addSubview:self.sidebarResizeHandleView];
 
     self.conversationPanelView = [[[TGPanelView alloc] initWithFrame:NSMakeRect(314, 132, 650, 480)] autorelease];
     [self.conversationPanelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -3301,6 +3333,15 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.profileRefreshButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.profileRefreshButton];
 
+    self.profileEditButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 314, 220, 30)] autorelease];
+    [self.profileEditButton setTitle:TGLoc(@"profile.edit.short")];
+    [self.profileEditButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"profile.edit.short")] autorelease]];
+    [self.profileEditButton setTarget:self];
+    [self.profileEditButton setAction:@selector(showProfileEditWindow:)];
+    [self.profileEditButton setToolTip:TGLoc(@"profile.edit.title")];
+    [self.profileEditButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.profileEditButton];
+
     NSArray *profileContentViews = [NSArray arrayWithObjects:
                                     self.profileSummaryCardView,
                                     self.profileInfoCardView,
@@ -3322,6 +3363,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                     self.profileDetailsSeparatorOne,
                                     self.profileDetailsSeparatorTwo,
                                     self.profileRefreshButton,
+                                    self.profileEditButton,
                                     self.logoutButton,
                                     nil];
     NSUInteger profileViewIndex = 0;
@@ -3889,6 +3931,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_authSecureField setDelegate:nil];
     [_topPanelView release];
     [_sidebarPanelView release];
+    [_sidebarResizeHandleView setDelegate:nil];
+    [_sidebarResizeHandleView release];
     [_conversationPanelView release];
     [_diagnosticsPanelView release];
     [_loginPanelView release];
@@ -4136,6 +4180,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatLifecycleWindowController release];
     [_logoutButton release];
     [_profileRefreshButton release];
+    [_profileEditButton release];
+    [[_profileEditWindowController window] close];
+    [_profileEditWindowController release];
     [_aboutIconView release];
     [_aboutTitleField release];
     [_aboutVersionField release];
@@ -4145,7 +4192,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_selectedChatTitle release];
     [_selectedChatTypeSummary release];
     [_selectedChatAvatarLocalPath release];
+    [_selectedChatLastReadInboxMessageID release];
     [_selectedChatLastReadOutboxMessageID release];
+    [_visibleReadReceiptMessageIDs release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
     [_commentThreadParentTitle release];

@@ -75,6 +75,29 @@
     [self openNewChatWindow:nil];
 }
 
+- (BOOL)contactsViewController:(TGContactsViewController *)controller
+         didRequestSendContact:(NSDictionary *)contact {
+    (void)controller;
+    if (![self.currentAuthState isEqualToString:@"ready"] ||
+        ![self.selectedChatID respondsToSelector:@selector(longLongValue)] ||
+        [[contact objectForKey:@"phone_number"] length] == 0) {
+        return NO;
+    }
+    NSString *firstName = [contact objectForKey:@"first_name"];
+    if ([firstName length] == 0) {
+        firstName = [contact objectForKey:@"display_name"];
+    }
+    NSDictionary *values = [NSDictionary dictionaryWithObjectsAndKeys:
+                            firstName ? firstName : @"", @"first_name",
+                            [contact objectForKey:@"last_name"] ? [contact objectForKey:@"last_name"] : @"", @"last_name",
+                            [contact objectForKey:@"phone_number"], @"phone_number",
+                            nil];
+    self.activeSection = TGSectionChats;
+    [self updateVisibleSection];
+    [self sendSharedComposerItemWithKind:@"contact" values:values];
+    return YES;
+}
+
 - (void)openProfileFromSettings:(id)sender {
     [self openProfileFromDrawer:sender];
 }

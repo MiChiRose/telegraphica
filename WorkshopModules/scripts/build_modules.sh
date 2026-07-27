@@ -48,6 +48,8 @@ build_module() {
         -mmacosx-version-min=10.9 \
         -isysroot "$SDKROOT" \
         -framework Cocoa \
+        -framework AudioUnit \
+        -framework AudioToolbox \
         -framework QuartzCore \
         -undefined dynamic_lookup
     chmod 755 "$executable"
@@ -76,5 +78,22 @@ build_module "PacMan" "TGPacManModule"
 build_module "Fifteen" "TGFifteenModule"
 build_module "DiagnosticCenter" "TGDiagnosticCenterModule"
 build_module "MediaWorkbench" "TGMediaWorkbenchModule"
+
+if [ -n "${QUICKNES_CORE_PATH:-}" ] || [ -n "${GENESIS_PLUS_GX_CORE_PATH:-}" ]; then
+    if [ ! -f "${QUICKNES_CORE_PATH:-}" ] || [ ! -f "${GENESIS_PLUS_GX_CORE_PATH:-}" ]; then
+        echo "RetroConsole requires both QUICKNES_CORE_PATH and GENESIS_PLUS_GX_CORE_PATH." >&2
+        exit 1
+    fi
+    build_module "RetroConsole" "TGRetroConsoleModule"
+    retro_cores="$PRODUCT_ROOT/RetroConsole.bundle/Contents/Resources/Cores"
+    mkdir -p "$retro_cores"
+    cp "$QUICKNES_CORE_PATH" "$retro_cores/quicknes_libretro.dylib"
+    cp "$GENESIS_PLUS_GX_CORE_PATH" "$retro_cores/genesis_plus_gx_libretro.dylib"
+    chmod 755 "$retro_cores/quicknes_libretro.dylib" \
+              "$retro_cores/genesis_plus_gx_libretro.dylib"
+    echo "Bundled user-supplied libretro cores in RetroConsole.bundle"
+else
+    echo "Skipped RetroConsole (set QUICKNES_CORE_PATH and GENESIS_PLUS_GX_CORE_PATH to build it)"
+fi
 
 echo "Workshop modules are ready in $PRODUCT_ROOT"

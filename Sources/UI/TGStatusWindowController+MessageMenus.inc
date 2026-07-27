@@ -661,7 +661,11 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [menu addItem:pinMessageItem];
         addedMessageAction = YES;
     }
-    if ([item outgoing]) {
+    NSString *messageViewersChatType = [self.selectedChatTypeSummary isKindOfClass:[NSString class]]
+        ? self.selectedChatTypeSummary : @"";
+    BOOL supportsMessageViewers = ([messageViewersChatType isEqualToString:@"Group"] ||
+                                   [messageViewersChatType isEqualToString:@"Supergroup"]);
+    if ([item outgoing] && supportsMessageViewers) {
         NSMenuItem *readByItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.whoRead")
                                                              action:nil
                                                       keyEquivalent:@""] autorelease];

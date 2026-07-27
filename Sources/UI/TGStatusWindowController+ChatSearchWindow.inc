@@ -269,9 +269,6 @@
 - (void)chatSearchWindowResultActivated:(id)sender {
     TGChatSearchPanelView *panelView = [sender isKindOfClass:[TGChatSearchPanelView class]] ? (TGChatSearchPanelView *)sender : [self chatSearchPanelView];
     TGSearchResultItem *result = [panelView selectedResult];
-    if (!result && [self.chatSearchWindowResults count] > 0) {
-        result = [self.chatSearchWindowResults objectAtIndex:0];
-    }
     if (![result isKindOfClass:[TGSearchResultItem class]]) {
         return;
     }

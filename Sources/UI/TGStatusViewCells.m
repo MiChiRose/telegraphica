@@ -56,10 +56,12 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [selectedPath fill];
     }
 
-    NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 8.0,
-                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 26.0) / 2.0),
-                                   26.0,
-                                   26.0);
+    BOOL compact = (NSWidth(cellFrame) < 223.0);
+    CGFloat avatarSide = compact ? 32.0 : 26.0;
+    NSRect avatarRect = NSMakeRect(compact ? (NSMidX(cellFrame) - floor(avatarSide / 2.0)) : (NSMinX(cellFrame) + 8.0),
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - avatarSide) / 2.0),
+                                   avatarSide,
+                                   avatarSide);
     NSString *displayTitle = [item isSavedMessages] ? TGLoc(@"savedMessages") : [item title];
     if ([item isSavedMessages]) {
         NSBezierPath *savedPath = [NSBezierPath bezierPathWithOvalInRect:avatarRect];
@@ -88,6 +90,32 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                       [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
                                       unreadTextColor, NSForegroundColorAttributeName,
                                       nil];
+    if (compact) {
+        if ([unreadString length] > 0) {
+            NSString *compactUnread = unreadCount > 99 ? @"99+" : unreadString;
+            NSSize compactUnreadSize = [compactUnread sizeWithAttributes:unreadAttributes];
+            CGFloat compactBadgeWidth = MAX(17.0, compactUnreadSize.width + 8.0);
+            NSRect compactBadgeRect = NSMakeRect(NSMaxX(avatarRect) - compactBadgeWidth + 4.0,
+                                                 NSMaxY(avatarRect) - 15.0,
+                                                 compactBadgeWidth,
+                                                 16.0);
+            NSBezierPath *compactBadgePath = [NSBezierPath bezierPathWithRoundedRect:compactBadgeRect
+                                                                            xRadius:8.0
+                                                                            yRadius:8.0];
+            [TGClassicHeaderBottomColor() set];
+            [compactBadgePath fill];
+            NSMutableParagraphStyle *compactParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+            [compactParagraph setAlignment:NSCenterTextAlignment];
+            NSMutableDictionary *compactAttributes = [NSMutableDictionary dictionaryWithDictionary:unreadAttributes];
+            [compactAttributes setObject:compactParagraph forKey:NSParagraphStyleAttributeName];
+            [compactUnread drawInRect:NSMakeRect(NSMinX(compactBadgeRect),
+                                                 NSMinY(compactBadgeRect) + 1.0,
+                                                 NSWidth(compactBadgeRect),
+                                                 14.0)
+                       withAttributes:compactAttributes];
+        }
+        return;
+    }
     NSSize unreadSize = [unreadString sizeWithAttributes:unreadAttributes];
     CGFloat unreadWidth = ([unreadString length] > 0) ? MAX(unreadSize.width + 13.0, 20.0) : 0.0;
     CGFloat unreadHeight = ([unreadString length] > 0) ? 18.0 : 0.0;

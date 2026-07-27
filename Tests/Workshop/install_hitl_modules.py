@@ -18,6 +18,7 @@ MODULES = (
     ("Fifteen", "com.michirose.telegraphica.workshop.fifteen"),
     ("DiagnosticCenter", "com.michirose.telegraphica.workshop.diagnosticcenter"),
     ("MediaWorkbench", "com.michirose.telegraphica.workshop.mediaworkbench"),
+    ("RetroConsole", "com.michirose.telegraphica.workshop.retroconsole"),
 )
 
 RETIRED_MODULES = (

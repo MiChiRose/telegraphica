@@ -308,6 +308,34 @@ else
     echo "This development build will not be able to start a new Telegram sign-in."
 fi
 
+if [ -z "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
+    for TDJSON_CANDIDATE in \
+        "$BUILD_ROOT/Release/$APP_NAME/Contents/Frameworks/libtdjson.dylib" \
+        "$APP_NAME/Contents/Frameworks/libtdjson.dylib" \
+        "/Applications/$APP_NAME/Contents/Frameworks/libtdjson.dylib"
+    do
+        if [ -f "$TDJSON_CANDIDATE" ]; then
+            TELEGRAPHICA_TDJSON_PATH="$TDJSON_CANDIDATE"
+            echo "Found the existing Mavericks-and-newer TDLib JSON library."
+            break
+        fi
+    done
+fi
+
+if [ -z "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
+    for TDJSON_MOUNTAIN_LION_CANDIDATE in \
+        "$BUILD_ROOT/Release/$APP_NAME/Contents/Frameworks/libtdjson-mountain-lion.dylib" \
+        "$APP_NAME/Contents/Frameworks/libtdjson-mountain-lion.dylib" \
+        "/Applications/$APP_NAME/Contents/Frameworks/libtdjson-mountain-lion.dylib"
+    do
+        if [ -f "$TDJSON_MOUNTAIN_LION_CANDIDATE" ]; then
+            TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH="$TDJSON_MOUNTAIN_LION_CANDIDATE"
+            echo "Found the existing Mountain Lion TDLib JSON library."
+            break
+        fi
+    done
+fi
+
 if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     if [ ! -f "$TELEGRAPHICA_TDJSON_PATH" ]; then
         echo "TELEGRAPHICA_TDJSON_PATH does not point to a file: $TELEGRAPHICA_TDJSON_PATH"

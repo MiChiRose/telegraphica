@@ -70,6 +70,10 @@ static NSDictionary *TGWorkshopInstalledLocalizedNames(NSString *identifier) {
         english = @"Media Center";
         russian = @"Медиацентр";
         belarusian = @"Медыяцэнтр";
+    } else if ([identifier hasSuffix:@".retroconsole"]) {
+        english = @"Retro Console";
+        russian = @"Ретро-консоль";
+        belarusian = @"Рэтра-кансоль";
     } else {
         NSArray *components = [identifier componentsSeparatedByString:@"."];
         NSString *fallback = [components count] > 0 ? [components lastObject] : identifier;
