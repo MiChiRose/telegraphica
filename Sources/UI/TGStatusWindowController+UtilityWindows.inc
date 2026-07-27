@@ -490,6 +490,48 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     });
 }
 
+- (void)profileEditWindowController:(TGProfileEditWindowController *)controller
+            didRequestSetPhotoAtPath:(NSString *)localPath {
+    if (controller != self.profileEditWindowController ||
+        ![self.currentAuthState isEqualToString:@"ready"] ||
+        [localPath length] == 0) {
+        return;
+    }
+    [controller setSaving:YES];
+    [controller showErrorMessage:nil];
+    [self.statusField setStringValue:TGLoc(@"profile.edit.photo.saving")];
+
+    NSString *photoPathCopy = [localPath copy];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *photoError = nil;
+        BOOL success = [client setCurrentUserProfilePhotoAtPath:photoPathCopy
+                                                       timeout:20.0
+                                                         error:&photoError];
+        NSString *errorMessage = [[photoError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (controller == self.profileEditWindowController) {
+                [controller setSaving:NO];
+                if (success) {
+                    [self.statusField setStringValue:TGLoc(@"profile.edit.photo.saved")];
+                    self.profileSummaryLoaded = NO;
+                    [self reloadProfileSummaryIfReady];
+                } else {
+                    [controller showErrorMessage:([errorMessage length] > 0
+                                                    ? errorMessage
+                                                    : TGLoc(@"profile.edit.photo.failed"))];
+                    [self.statusField setStringValue:TGLoc(@"profile.edit.photo.failed")];
+                }
+            }
+            [errorMessage release];
+            [photoPathCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)showAppearanceWindow:(id)sender {
     (void)sender;
     if (!self.appearanceWindow) {

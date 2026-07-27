@@ -10096,6 +10096,61 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return YES;
 }
 
+- (BOOL)setCurrentUserProfilePhotoAtPath:(NSString *)localPath
+                                 timeout:(NSTimeInterval)timeout
+                                   error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib is not ready to update the profile photo." code:108];
+        }
+        return NO;
+    }
+
+    BOOL isDirectory = NO;
+    if (![localPath isKindOfClass:[NSString class]] ||
+        [localPath length] == 0 ||
+        ![[NSFileManager defaultManager] fileExistsAtPath:localPath isDirectory:&isDirectory] ||
+        isDirectory) {
+        if (error) {
+            *error = [self errorWithDescription:@"The prepared profile photo file is unavailable." code:108];
+        }
+        return NO;
+    }
+
+    NSDictionary *inputFile = [NSDictionary dictionaryWithObjectsAndKeys:
+                               @"inputFileLocal", @"@type",
+                               localPath, @"path",
+                               nil];
+    NSDictionary *photo = [NSDictionary dictionaryWithObjectsAndKeys:
+                           @"inputChatPhotoStatic", @"@type",
+                           inputFile, @"photo",
+                           nil];
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"setProfilePhoto" forKey:@"@type"];
+    [request setObject:photo forKey:@"photo"];
+    [request setObject:[NSNumber numberWithBool:NO] forKey:@"is_public"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-profile-set-photo"
+                                                            timeout:timeout
+                                                          errorCode:108
+                                                              error:error];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] ||
+        ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (response && error) {
+            NSString *summary = [self summaryForAuthorizationStateObject:response];
+            *error = [self errorWithDescription:([summary length] > 0
+                                                    ? summary
+                                                    : @"TDLib returned an unexpected profile photo response.")
+                                           code:108];
+        }
+        return NO;
+    }
+    return YES;
+}
+
 - (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self cachedAuthorizationStateSummary];
     if (![authorizationState isEqualToString:@"ready"]) {

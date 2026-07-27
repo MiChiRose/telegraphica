@@ -20,9 +20,11 @@
     NSTextField *_usernameField;
     NSTextField *_bioField;
     NSTextField *_errorField;
+    NSButton *_photoButton;
     NSButton *_saveButton;
     NSButton *_cancelButton;
 }
+- (void)chooseProfilePhoto:(id)sender;
 - (void)saveProfile:(id)sender;
 - (void)cancelProfileEdit:(id)sender;
 @end
@@ -54,8 +56,50 @@ static NSTextField *TGProfileEditInput(NSRect frame) {
     return field;
 }
 
+static NSString *TGPreparedProfilePhotoPath(NSString *sourcePath, NSError **error) {
+    NSImage *sourceImage = [[[NSImage alloc] initWithContentsOfFile:sourcePath] autorelease];
+    NSData *tiffData = [sourceImage TIFFRepresentation];
+    NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:tiffData];
+    NSDictionary *properties = [NSDictionary dictionaryWithObject:[NSNumber numberWithDouble:0.9]
+                                                            forKey:NSImageCompressionFactor];
+    NSData *jpegData = [bitmap representationUsingType:NSJPEGFileType properties:properties];
+    if ([jpegData length] == 0) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"Telegraphica.ProfilePhoto"
+                                         code:1
+                                     userInfo:[NSDictionary dictionaryWithObject:TGLoc(@"profile.edit.photo.invalid")
+                                                                          forKey:NSLocalizedDescriptionKey]];
+        }
+        return nil;
+    }
+
+    NSArray *cachePaths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    NSString *cacheRoot = ([cachePaths count] > 0)
+        ? [cachePaths objectAtIndex:0]
+        : [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Caches"];
+    NSString *directory = [cacheRoot stringByAppendingPathComponent:@"Telegraphica/ProfilePhotoUploads"];
+    NSError *directoryError = nil;
+    if (![[NSFileManager defaultManager] createDirectoryAtPath:directory
+                                  withIntermediateDirectories:YES
+                                                   attributes:nil
+                                                        error:&directoryError]) {
+        if (error) {
+            *error = directoryError;
+        }
+        return nil;
+    }
+
+    NSString *fileName = [NSString stringWithFormat:@"profile-%@.jpg",
+                          [[NSProcessInfo processInfo] globallyUniqueString]];
+    NSString *destinationPath = [directory stringByAppendingPathComponent:fileName];
+    if (![jpegData writeToFile:destinationPath options:NSDataWritingAtomic error:error]) {
+        return nil;
+    }
+    return destinationPath;
+}
+
 - (id)init {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 470.0, 390.0)
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 470.0, 450.0)
                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                      backing:NSBackingStoreBuffered
                                                        defer:NO] autorelease];
@@ -63,13 +107,21 @@ static NSTextField *TGProfileEditInput(NSRect frame) {
     [window setReleasedWhenClosed:NO];
     self = [super initWithWindow:window];
     if (self) {
-        TGProfileEditBackgroundView *contentView = [[[TGProfileEditBackgroundView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 470.0, 390.0)] autorelease];
+        TGProfileEditBackgroundView *contentView = [[[TGProfileEditBackgroundView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 470.0, 450.0)] autorelease];
         [window setContentView:contentView];
 
-        NSTextField *titleField = TGProfileEditLabel(TGLoc(@"profile.edit.title"), NSMakeRect(28.0, 344.0, 414.0, 24.0));
+        NSTextField *titleField = TGProfileEditLabel(TGLoc(@"profile.edit.title"), NSMakeRect(28.0, 404.0, 414.0, 24.0));
         [titleField setFont:[NSFont boldSystemFontOfSize:18.0]];
         [titleField setTextColor:TGClassicInkColor()];
         [contentView addSubview:titleField];
+
+        [contentView addSubview:TGProfileEditLabel(TGLoc(@"profile.edit.photo"), NSMakeRect(30.0, 363.0, 188.0, 18.0))];
+        _photoButton = [[NSButton alloc] initWithFrame:NSMakeRect(248.0, 354.0, 194.0, 30.0)];
+        [_photoButton setTitle:TGLoc(@"profile.edit.photo.choose")];
+        [_photoButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"profile.edit.photo.choose")] autorelease]];
+        [_photoButton setTarget:self];
+        [_photoButton setAction:@selector(chooseProfilePhoto:)];
+        [contentView addSubview:_photoButton];
 
         [contentView addSubview:TGProfileEditLabel(TGLoc(@"profile.edit.firstName"), NSMakeRect(30.0, 305.0, 190.0, 18.0))];
         [contentView addSubview:TGProfileEditLabel(TGLoc(@"profile.edit.lastName"), NSMakeRect(250.0, 305.0, 190.0, 18.0))];
@@ -118,6 +170,7 @@ static NSTextField *TGProfileEditInput(NSRect frame) {
     [_usernameField release];
     [_bioField release];
     [_errorField release];
+    [_photoButton release];
     [_saveButton release];
     [_cancelButton release];
     [super dealloc];
@@ -140,12 +193,37 @@ static NSTextField *TGProfileEditInput(NSRect frame) {
     [_lastNameField setEnabled:!saving];
     [_usernameField setEnabled:!saving];
     [_bioField setEnabled:!saving];
+    [_photoButton setEnabled:!saving];
     [_saveButton setEnabled:!saving];
     [_cancelButton setEnabled:!saving];
 }
 
 - (void)showErrorMessage:(NSString *)message {
     [_errorField setStringValue:message ? message : @""];
+}
+
+- (void)chooseProfilePhoto:(id)sender {
+    (void)sender;
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    [panel setCanChooseDirectories:NO];
+    [panel setCanChooseFiles:YES];
+    [panel setAllowsMultipleSelection:NO];
+    [panel setAllowedFileTypes:[NSArray arrayWithObjects:@"jpg", @"jpeg", @"png", nil]];
+    if ([panel runModal] != NSOKButton) {
+        return;
+    }
+    NSURL *selectedURL = ([[panel URLs] count] > 0) ? [[panel URLs] objectAtIndex:0] : nil;
+    NSError *preparationError = nil;
+    NSString *preparedPath = TGPreparedProfilePhotoPath([selectedURL path], &preparationError);
+    if ([preparedPath length] == 0) {
+        NSString *message = [preparationError localizedDescription];
+        [self showErrorMessage:([message length] > 0 ? message : TGLoc(@"profile.edit.photo.invalid"))];
+        return;
+    }
+    [self showErrorMessage:nil];
+    if (_delegate && [_delegate respondsToSelector:@selector(profileEditWindowController:didRequestSetPhotoAtPath:)]) {
+        [_delegate profileEditWindowController:self didRequestSetPhotoAtPath:preparedPath];
+    }
 }
 
 - (void)saveProfile:(id)sender {

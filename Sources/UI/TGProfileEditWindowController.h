@@ -8,6 +8,8 @@
                            lastName:(NSString *)lastName
                            username:(NSString *)username
                                 bio:(NSString *)bio;
+- (void)profileEditWindowController:(TGProfileEditWindowController *)controller
+            didRequestSetPhotoAtPath:(NSString *)localPath;
 @end
 
 @interface TGProfileEditWindowController : NSWindowController

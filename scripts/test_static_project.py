@@ -715,7 +715,11 @@ def check_primary_navigation_contract(errors):
         "setName",
         "setUsername",
         "setBio",
+        "setProfilePhoto",
+        "inputChatPhotoStatic",
+        "inputFileLocal",
         "updateCurrentUserFirstName",
+        "setCurrentUserProfilePhotoAtPath",
     ]:
         if fragment not in client_text:
             errors.append("%s: profile editing TDLib request is missing `%s`" %
@@ -724,6 +728,9 @@ def check_primary_navigation_contract(errors):
         "TGProfileEditWindowController",
         "TGPrimaryTextButtonCell",
         "profile.edit.firstNameRequired",
+        "profile.edit.photo.choose",
+        "TGPreparedProfilePhotoPath",
+        "didRequestSetPhotoAtPath",
     ]:
         if fragment not in profile_editor_text:
             errors.append("%s: profile editor is missing `%s`" %
@@ -731,6 +738,7 @@ def check_primary_navigation_contract(errors):
     for fragment in [
         "showProfileEditWindow:",
         "didRequestSaveFirstName:",
+        "didRequestSetPhotoAtPath:",
         "reloadProfileSummaryIfReady",
         "[NSApp activateIgnoringOtherApps:YES]",
         'log:@"Profile editor presented."',
@@ -738,6 +746,15 @@ def check_primary_navigation_contract(errors):
         if fragment not in utility_windows_text:
             errors.append("%s: profile editor wiring is missing `%s`" %
                           (utility_windows_rel, fragment))
+    profile_button_cell_index = controller_text.find(
+        "[self.profileEditButton setCell:")
+    profile_button_action_index = controller_text.find(
+        "[self.profileEditButton setAction:@selector(showProfileEditWindow:)]")
+    if profile_button_cell_index < 0 or profile_button_action_index < 0:
+        errors.append("%s: profile edit button wiring is incomplete" % controller_rel)
+    elif profile_button_action_index < profile_button_cell_index:
+        errors.append("%s: profile edit button cell replacement must happen before target/action wiring" %
+                      controller_rel)
     authorization_probe_index = message_data_flow_text.find(
         "authorizationState = [client authorizationStateSummaryWithTimeout:")
     network_diagnostics_index = message_data_flow_text.find(
