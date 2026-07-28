@@ -407,6 +407,25 @@ if [ ! -x "$OPUS_HELPER_PATH" ]; then
     exit 1
 fi
 
+TGVOIP_HEADER_SEARCH_PATH=""
+TGVOIP_LINK_FLAGS=""
+TGVOIP_PREPROCESSOR_DEFINITION="TELEGRAPHICA_HAS_TGVOIP=0"
+if [ -n "${TELEGRAPHICA_LIBTGVOIP_SOURCE:-}" ]; then
+    TGVOIP_BUILD_DIR="$BUILD_ROOT/Vendor/libtgvoip"
+    scripts/build_libtgvoip_legacy.sh "$TELEGRAPHICA_LIBTGVOIP_SOURCE" "$ARCH" "$TGVOIP_BUILD_DIR" "$SDK_NAME"
+    TGVOIP_OUTPUT_DIR="$PWD/$TGVOIP_BUILD_DIR/output"
+    TGVOIP_STATIC_LIBRARY="$TGVOIP_OUTPUT_DIR/libtgvoip.a"
+    OPUS_STATIC_LIBRARY="$PWD/$OPUS_BUILD_DIR/prefix/lib/libopus.a"
+    if [ ! -f "$TGVOIP_STATIC_LIBRARY" ] || [ ! -f "$OPUS_STATIC_LIBRARY" ]; then
+        echo "The optional audio-call transport was not produced."
+        exit 1
+    fi
+    TGVOIP_HEADER_SEARCH_PATH="$TGVOIP_OUTPUT_DIR"
+    TGVOIP_LINK_FLAGS="$TGVOIP_STATIC_LIBRARY $OPUS_STATIC_LIBRARY -framework AudioToolbox -framework AudioUnit -framework CoreAudio"
+    TGVOIP_PREPROCESSOR_DEFINITION="TELEGRAPHICA_HAS_TGVOIP=1 TGVOIP_USE_CUSTOM_CRYPTO"
+    echo "Audio-call transport enabled with libtgvoip 2.4.4."
+fi
+
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
     "VALID_ARCHS=$ARCH"
@@ -427,8 +446,9 @@ COMMON_SETTINGS=(
     "CODE_SIGNING_ALLOWED=NO"
     "CODE_SIGNING_REQUIRED=NO"
     "CODE_SIGN_IDENTITY="
-    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc $PWD/Vendor/libvpx $PWD/Vendor/libvpx/third_party/libwebm $PWD/$VPX_BUILD_DIR"
-    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY $VPX_STATIC_LIBRARY -lc++ -lz"
+    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc $PWD/Vendor/libvpx $PWD/Vendor/libvpx/third_party/libwebm $PWD/$VPX_BUILD_DIR $TGVOIP_HEADER_SEARCH_PATH"
+    "GCC_PREPROCESSOR_DEFINITIONS=\$(inherited) $TGVOIP_PREPROCESSOR_DEFINITION"
+    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY $VPX_STATIC_LIBRARY $TGVOIP_LINK_FLAGS -lc++ -lz"
     "SYMROOT=$BUILD_ROOT"
     "OBJROOT=$BUILD_ROOT/Intermediates"
     "DSTROOT=$BUILD_ROOT/Install"

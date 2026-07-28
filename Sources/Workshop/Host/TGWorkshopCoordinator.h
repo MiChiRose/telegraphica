@@ -42,6 +42,6 @@
 - (void)installOrUpdateEntry:(TGWorkshopCatalogEntry *)entry;
 - (void)openEntry:(TGWorkshopCatalogEntry *)entry;
 - (void)closeActiveModule;
-- (void)removeEntry:(TGWorkshopCatalogEntry *)entry removeData:(BOOL)removeData;
+- (BOOL)removeEntry:(TGWorkshopCatalogEntry *)entry removeData:(BOOL)removeData;
 
 @end

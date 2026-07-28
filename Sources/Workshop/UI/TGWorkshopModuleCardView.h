@@ -34,6 +34,7 @@ typedef enum {
     double _progress;
     NSString *_errorMessage;
     BOOL _showingSuccess;
+    BOOL _showingUpdateSuccess;
 }
 
 @property(nonatomic, assign) id<TGWorkshopModuleCardViewDelegate> delegate;
@@ -46,7 +47,7 @@ typedef enum {
 - (void)refreshTheme;
 - (void)refreshLocalization;
 - (void)updateProgress:(double)progress;
-- (void)showInstallSuccess;
+- (void)showInstallSuccessForUpdate:(BOOL)isUpdate;
 - (void)beginRemovalAnimation;
 
 @end

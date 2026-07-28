@@ -12,6 +12,15 @@ static NSString *TGWorkshopBundleString(id value) {
     return [value isKindOfClass:[NSString class]] ? value : nil;
 }
 
+static BOOL TGWorkshopIsApprovedRetroConsoleCore(NSString *moduleIdentifier,
+                                                  NSString *relativePath) {
+    if (![moduleIdentifier isEqualToString:@"com.michirose.telegraphica.workshop.retroconsole"]) {
+        return NO;
+    }
+    return [relativePath isEqualToString:@"Contents/Resources/Cores/quicknes_libretro.dylib"] ||
+           [relativePath isEqualToString:@"Contents/Resources/Cores/genesis_plus_gx_libretro.dylib"];
+}
+
 @implementation TGWorkshopBundleValidator
 
 - (BOOL)validateBundleAtPath:(NSString *)bundlePath
@@ -69,9 +78,11 @@ static NSString *TGWorkshopBundleString(id value) {
         NSDictionary *attributes = [fileManager attributesOfItemAtPath:fullPath error:error];
         NSString *fileType = [attributes objectForKey:NSFileType];
         NSString *extension = [[relativePath pathExtension] lowercaseString];
+        BOOL approvedRetroCore = ([extension isEqualToString:@"dylib"] &&
+                                  TGWorkshopIsApprovedRetroConsoleCore(expectedIdentifier, relativePath));
         if ([fileType isEqualToString:NSFileTypeSymbolicLink] ||
             [extension isEqualToString:@"framework"] ||
-            [extension isEqualToString:@"dylib"] ||
+            ([extension isEqualToString:@"dylib"] && !approvedRetroCore) ||
             [extension isEqualToString:@"bundle"]) {
             if (error && !*error) *error = TGWorkshopBundleError(344, @"Workshop bundle contains a forbidden nested executable component.");
             return NO;

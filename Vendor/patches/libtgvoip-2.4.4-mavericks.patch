@@ -1,0 +1,128 @@
+diff --git a/os/posix/NetworkSocketPosix.cpp b/os/posix/NetworkSocketPosix.cpp
+index 18a7370..6135d40 100644
+--- a/os/posix/NetworkSocketPosix.cpp
++++ b/os/posix/NetworkSocketPosix.cpp
+@@ -58,12 +58,14 @@ NetworkSocketPosix::~NetworkSocketPosix(){
+ }
+ 
+ void NetworkSocketPosix::SetMaxPriority(){
+-#ifdef __APPLE__
++#if defined(__APPLE__) && defined(SO_NET_SERVICE_TYPE) && defined(NET_SERVICE_TYPE_VO)
+ 	int prio=NET_SERVICE_TYPE_VO;
+ 	int res=setsockopt(fd, SOL_SOCKET, SO_NET_SERVICE_TYPE, &prio, sizeof(prio));
+ 	if(res<0){
+ 		LOGE("error setting darwin-specific net priority: %d / %s", errno, strerror(errno));
+ 	}
++#elif defined(__APPLE__)
++	LOGI("darwin socket priority is unavailable in this SDK");
+ #elif defined(__linux__)
+ 	int prio=6;
+ 	int res=setsockopt(fd, SOL_SOCKET, SO_PRIORITY, &prio, sizeof(prio));
+diff --git a/VoIPController.cpp b/VoIPController.cpp
+index f7e1350..941e814 100644
+--- a/VoIPController.cpp
++++ b/VoIPController.cpp
+@@ -80,8 +80,8 @@ VoIPController::VoIPController() : activeNetItfName(""),
+ 								   proxyAddress(""),
+ 								   proxyUsername(""),
+ 								   proxyPassword(""),
+-								   outputVolume(std::make_unique<effects::Volume>()),
+-								   inputVolume(std::make_unique<effects::Volume>())
++								   outputVolume(std::unique_ptr<effects::Volume>(new effects::Volume())),
++								   inputVolume(std::unique_ptr<effects::Volume>(new effects::Volume()))
+ {
+ 	seq=1;
+ 	lastRemoteSeq=0;
+diff --git a/TgVoip.cpp b/TgVoip.cpp
+index bfeb8f9..74f278b 100644
+--- a/TgVoip.cpp
++++ b/TgVoip.cpp
+@@ -302,12 +302,12 @@ public:
+     TgVoipTrafficStats getTrafficStats() override {
+         tgvoip::VoIPController::TrafficStats stats;
+         controller_->GetStats(&stats);
+-        return {
+-            .bytesSentWifi = stats.bytesSentWifi,
+-            .bytesReceivedWifi = stats.bytesRecvdWifi,
+-            .bytesSentMobile = stats.bytesSentMobile,
+-            .bytesReceivedMobile = stats.bytesRecvdMobile
+-        };
++        TgVoipTrafficStats result;
++        result.bytesSentWifi = stats.bytesSentWifi;
++        result.bytesReceivedWifi = stats.bytesRecvdWifi;
++        result.bytesSentMobile = stats.bytesSentMobile;
++        result.bytesReceivedMobile = stats.bytesRecvdMobile;
++        return result;
+     }
+ 
+     TgVoipPersistentState getPersistentState() override {
+@@ -317,12 +317,11 @@ public:
+     TgVoipFinalState stop() override {
+         controller_->Stop();
+ 
+-        TgVoipFinalState finalState = {
+-            .persistentState = getPersistentState(),
+-            .debugLog = controller_->GetDebugLog(),
+-            .trafficStats = getTrafficStats(),
+-            .isRatingSuggested = controller_->NeedRate()
+-        };
++        TgVoipFinalState finalState;
++        finalState.persistentState = getPersistentState();
++        finalState.debugLog = controller_->GetDebugLog();
++        finalState.trafficStats = getTrafficStats();
++        finalState.isRatingSuggested = controller_->NeedRate();
+ 
+         delete controller_;
+         controller_ = nullptr;
+@@ -419,8 +418,8 @@ std::unique_ptr<TgVoip> TgVoip::makeInstance(
+     ,
+     TgVoipAudioDataCallbacks const &audioDataCallbacks
+ #endif
+ ) {
+-    return std::make_unique<TgVoipImpl>(
++    return std::unique_ptr<TgVoip>(new TgVoipImpl(
+         endpoints,
+         persistentState,
+         proxy,
+@@ -437,7 +436,7 @@ std::unique_ptr<TgVoip> TgVoip::makeInstance(
+         ,
+         audioDataCallbacks
+ #endif
+-    );
++    ));
+ }
+ 
+ TgVoip::~TgVoip() = default;
+diff --git a/os/darwin/DarwinSpecific.mm b/os/darwin/DarwinSpecific.mm
+index 723d5c4..b4600ed 100644
+--- a/os/darwin/DarwinSpecific.mm
++++ b/os/darwin/DarwinSpecific.mm
+@@ -24,6 +24,7 @@ void DarwinSpecific::GetSystemName(char* buf, size_t len){
+ 
+ void DarwinSpecific::SetCurrentThreadPriority(int priority){
+ 	NSThread* thread=[NSThread currentThread];
++#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
+ 	if([thread respondsToSelector:@selector(setQualityOfService:)]){
+ 		NSQualityOfService qos;
+ 		switch(priority){
+@@ -45,7 +46,9 @@ void DarwinSpecific::SetCurrentThreadPriority(int priority){
+ 		}
+ 		[thread setQualityOfService:qos];
+ 	}else{
+-		double p;
++#endif
++		double p = 0.5;
++		(void)thread;
+ 		switch(priority){
+ 			case THREAD_PRIO_USER_INTERACTIVE:
+ 				p=1.0;
+@@ -65,7 +68,9 @@ void DarwinSpecific::SetCurrentThreadPriority(int priority){
+ 				break;
+ 		}
+ 		[NSThread setThreadPriority:p];
++#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
+ 	}
++#endif
+ }
+ 
+ CellularCarrierInfo DarwinSpecific::GetCarrierInfo(){
