@@ -345,9 +345,11 @@ static TgVoipEndpointType TGEndpointTypeForServer(NSDictionary *server) {
 #if TELEGRAPHICA_HAS_TGVOIP
     if (_voip) {
         TgVoip *voip = (TgVoip *)_voip;
+        voip->setOnStateUpdated(std::function<void(TgVoipState)>());
+        voip->setOnSignalBarsUpdated(std::function<void(int)>());
+        long long relayID = voip->getPreferredRelayId();
         TgVoipFinalState finalState = voip->stop();
         (void)finalState;
-        long long relayID = voip->getPreferredRelayId();
         [_preferredRelayID release];
         _preferredRelayID = [[NSNumber alloc] initWithLongLong:relayID];
         delete voip;

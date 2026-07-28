@@ -25,6 +25,7 @@ typedef NS_ENUM(NSInteger, TGCallPresentationState) {
 
 - (id)initWithProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing;
 - (void)updateProfile:(NSDictionary *)profile;
+- (void)updateSignalBars:(NSUInteger)signalBars;
 - (void)setPresentationState:(TGCallPresentationState)state detail:(NSString *)detail;
 - (NSTimeInterval)connectedDuration;
 - (void)closeAfterDelay:(NSTimeInterval)delay;

@@ -553,6 +553,48 @@ def check_additional_message_types_contract(errors):
                           (calls_rel, fragment))
 
 
+def check_call_transport_stability_contract(errors):
+    audio_rel = os.path.join("Sources", "Calls", "TGCallAudioEngine.mm")
+    audio_text = read_text(os.path.join(ROOT, audio_rel))
+    relay_lookup = "long long relayID = voip->getPreferredRelayId();"
+    transport_stop = "TgVoipFinalState finalState = voip->stop();"
+    if relay_lookup not in audio_text or transport_stop not in audio_text:
+        errors.append("%s: relay shutdown contract is incomplete" % audio_rel)
+    elif audio_text.find(relay_lookup) > audio_text.find(transport_stop):
+        errors.append("%s: relay ID must be captured before libtgvoip stop invalidates its controller" %
+                      audio_rel)
+    for fragment in [
+        "voip->setOnStateUpdated(std::function<void(TgVoipState)>());",
+        "voip->setOnSignalBarsUpdated(std::function<void(int)>());",
+    ]:
+        if fragment not in audio_text:
+            errors.append("%s: libtgvoip callbacks must be cleared before transport shutdown `%s`" %
+                          (audio_rel, fragment))
+
+    window_rel = os.path.join("Sources", "Calls", "TGCallWindowController.m")
+    window_text = read_text(os.path.join(ROOT, window_rel))
+    if "cell->_actionColor = [_actionColor retain];" not in window_text:
+        errors.append("%s: legacy NSCell copies must retain the bit-copied action color directly" %
+                      window_rel)
+    if "cell.actionColor = self.actionColor;" in window_text:
+        errors.append("%s: synthesized setters over-release bit-copied NSCell subclass ivars" %
+                      window_rel)
+    for fragment in [
+        "updateSignalBars:",
+        'TGLoc(@"calls.quality")',
+        "[self.qualityField setHidden:!connected]",
+    ]:
+        if fragment not in window_text:
+            errors.append("%s: call quality presentation is missing `%s`" %
+                          (window_rel, fragment))
+
+    history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
+    history_text = read_text(os.path.join(ROOT, history_rel))
+    if "cell->_callSummary = [_callSummary retain];" not in history_text:
+        errors.append("%s: call history cells must own copied row summaries on legacy AppKit" %
+                      history_rel)
+
+
 def check_media_file_management_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
@@ -1220,6 +1262,7 @@ def main():
     check_composer_formatting_contract(errors)
     check_text_interaction_contract(errors)
     check_additional_message_types_contract(errors)
+    check_call_transport_stability_contract(errors)
     check_media_file_management_contract(errors)
     check_primary_navigation_contract(errors)
     check_retro_console_contract(errors)
