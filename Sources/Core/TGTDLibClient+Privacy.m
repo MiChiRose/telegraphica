@@ -91,6 +91,15 @@ static NSString *TGPrivacySimpleRule(NSArray *rules) {
                                 ? displayName
                                 : [NSString stringWithFormat:@"User %@", userID])
                         forKey:@"title"];
+            NSString *avatarPath = [contact objectForKey:@"avatar_local_path"];
+            if ([avatarPath length] > 0) {
+                [summary setObject:avatarPath forKey:@"avatar_local_path"];
+            }
+            NSString *username = [contact objectForKey:@"username"];
+            if ([username length] > 0) {
+                [summary setObject:username forKey:@"username"];
+            }
+            [summary setObject:@"user" forKey:@"kind"];
         } else if ([senderType isEqualToString:@"messageSenderChat"]) {
             NSNumber *chatID = [sender objectForKey:@"chat_id"];
             NSDictionary *chatRequest = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -104,6 +113,17 @@ static NSString *TGPrivacySimpleRule(NSArray *rules) {
                                 ? [chat objectForKey:@"title"]
                                 : [NSString stringWithFormat:@"Chat %@", chatID])
                         forKey:@"title"];
+            NSDictionary *photo = [[chat objectForKey:@"photo"] isKindOfClass:[NSDictionary class]]
+                ? [chat objectForKey:@"photo"] : nil;
+            NSDictionary *smallPhoto = [[photo objectForKey:@"small"] isKindOfClass:[NSDictionary class]]
+                ? [photo objectForKey:@"small"] : nil;
+            NSDictionary *local = [[smallPhoto objectForKey:@"local"] isKindOfClass:[NSDictionary class]]
+                ? [smallPhoto objectForKey:@"local"] : nil;
+            NSString *avatarPath = [local objectForKey:@"path"];
+            if ([avatarPath length] > 0) {
+                [summary setObject:avatarPath forKey:@"avatar_local_path"];
+            }
+            [summary setObject:@"chat" forKey:@"kind"];
         }
         [summaries addObject:summary];
     }

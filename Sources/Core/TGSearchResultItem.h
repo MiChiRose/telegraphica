@@ -9,6 +9,7 @@
 @property (nonatomic, retain) NSNumber *messageThreadID;
 @property (nonatomic, copy) NSString *messageTopicKind;
 @property (nonatomic, copy) NSString *chatTitle;
+@property (nonatomic, copy) NSString *avatarLocalPath;
 @property (nonatomic, copy) NSString *senderName;
 @property (nonatomic, retain) NSNumber *date;
 @property (nonatomic, copy) NSString *snippet;

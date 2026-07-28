@@ -8,6 +8,7 @@
 @synthesize messageThreadID = _messageThreadID;
 @synthesize messageTopicKind = _messageTopicKind;
 @synthesize chatTitle = _chatTitle;
+@synthesize avatarLocalPath = _avatarLocalPath;
 @synthesize senderName = _senderName;
 @synthesize date = _date;
 @synthesize snippet = _snippet;
@@ -52,6 +53,7 @@
     [_messageThreadID release];
     [_messageTopicKind release];
     [_chatTitle release];
+    [_avatarLocalPath release];
     [_senderName release];
     [_date release];
     [_snippet release];

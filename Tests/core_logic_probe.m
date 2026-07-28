@@ -326,6 +326,22 @@ static void TGTestMessageItemsAndLayout(void) {
     [document setDownloadFileSize:[NSNumber numberWithLongLong:2048]];
     TGAssertTrue(TGMessageItemIsNonVisualDocument(document), @"document message should be detected as a non-visual document");
     TGAssertTrue(TGDocumentBubbleHeightForItem(document) >= 58.0, @"document bubble height should be safe");
+    CGFloat documentBlockHeight = TGMessageBubbleHeightForItem(document, 360.0, NO);
+    NSRect documentBlockRect = TGMessageBubbleRectForItem(document,
+                                                         NSMakeRect(0.0, 0.0, 360.0, documentBlockHeight),
+                                                         NO);
+    TGAssertTrue(documentBlockHeight >= 82.0, @"block document rows should reserve enough room for their controls");
+    TGAssertTrue(NSMaxY(documentBlockRect) <= documentBlockHeight,
+                 @"block document geometry should stay inside its table row");
+
+    TGSetChatMessagesAsBlocksEnabled(NO);
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeVeryLarge);
+    TGAssertTrue(TGMessageUsesSeparateMetadataFooter(),
+                 @"large message text should use a separate footer for time and delivery checks");
+    CGFloat largeTextHeight = TGMessageBubbleHeightForItem(textItem, 360.0, NO);
+    TGAssertTrue(largeTextHeight > normalHeight,
+                 @"large message text should increase the row height instead of clipping metadata");
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
 
     TGMessageItem *photoA = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
                                                          messageID:[NSNumber numberWithInt:4]

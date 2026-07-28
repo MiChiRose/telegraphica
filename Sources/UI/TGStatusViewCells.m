@@ -449,6 +449,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    BOOL separateMetadataFooter = TGMessageUsesSeparateMetadataFooter();
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageMetaFont(), NSFontAttributeName,
                                     TGClassicTimeTextColor(), NSForegroundColorAttributeName,
@@ -457,7 +458,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if ([messageText length] > 0) {
         NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
-        if ([timeString length] > 0) {
+        if ([timeString length] > 0 && !separateMetadataFooter) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
@@ -495,6 +496,13 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             bubbleWidth = photoBubbleWidth;
         }
     }
+    if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
+        NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
+        CGFloat footerWidth = ceil(timeSize.width) + TGOutgoingStatusDotsWidthForItem(item) + 29.0;
+        if (footerWidth > bubbleWidth) {
+            bubbleWidth = footerWidth;
+        }
+    }
     if (bubbleWidth < 96.0) {
         bubbleWidth = 96.0;
     }
@@ -518,6 +526,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
     if (pollContent) {
         bubbleHeight = TGPollBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
+        bubbleHeight += 17.0;
     }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
@@ -756,16 +767,18 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 
     TGDrawMessageCommentBarForItem(item, bubbleRect, outgoing, flipped);
 
-    if ([timeString length] > 0 && [messageText length] == 0 && !nonVisualPlayable) {
+    if ([timeString length] > 0 && (([messageText length] == 0 && !nonVisualPlayable) || separateMetadataFooter)) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
         CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
-        CGFloat timeY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionBandHeight - 14.0)
-                                                : (NSMinY(bubbleRect) + 4.0 + reactionBandHeight);
+        CGFloat metaHeight = MAX(12.0, ceil(timeSize.height) + 2.0);
+        CGFloat timeY = [controlView isFlipped]
+            ? (NSMaxY(bubbleRect) - commentBarHeight - reactionBandHeight - metaHeight - 4.0)
+            : (NSMinY(bubbleRect) + 4.0 + commentBarHeight + reactionBandHeight);
         NSRect timeRect = NSMakeRect(NSMaxX(bubbleRect) - timeSize.width - statusWidth - statusGap - 12.0,
                                      timeY,
                                      timeSize.width,
-                                     10.0);
+                                     metaHeight);
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
         TGDrawOutgoingStatusDotsForItem(item, timeRect, [controlView isFlipped]);
     }
@@ -862,10 +875,11 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
     CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
     CGFloat timeRightPadding = 12.0;
+    CGFloat metaHeight = MAX(12.0, ceil(timeSize.height) + 2.0);
     NSRect timeRect = NSMakeRect(NSMaxX(rowRect) - timeRightPadding - timeSize.width - statusWidth - statusGap,
-                                 flipped ? (NSMinY(rowRect) + 8.0) : (NSMaxY(rowRect) - 18.0),
+                                 flipped ? (NSMinY(rowRect) + 8.0) : (NSMaxY(rowRect) - metaHeight - 6.0),
                                  timeSize.width,
-                                 12.0);
+                                 metaHeight);
     if ([timeString length] > 0) {
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
         TGDrawOutgoingStatusDotsForItem(item, timeRect, flipped);
@@ -876,10 +890,8 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if ([timeString length] == 0) {
         textRight = NSMaxX(rowRect) - 12.0;
     }
-    CGFloat textWidth = textRight - textX;
-    if (textWidth < 120.0) {
-        textWidth = MAX(120.0, NSMaxX(rowRect) - textX - 12.0);
-    }
+    CGFloat maximumTextRight = NSMaxX(rowRect) - 12.0;
+    CGFloat textWidth = MAX(1.0, MIN(textRight, maximumTextRight) - textX);
 
     NSString *senderTitle = nil;
     if (self.showSenderDetails && [[item senderDisplayName] length] > 0 && !outgoing) {
@@ -971,18 +983,21 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             textRect = mediaRect;
         }
     } else if (TGMessageItemIsPollContent(item)) {
+        CGFloat contentWidth = MAX(1.0, NSMaxX(rowRect) - textX - 14.0);
         NSRect pollRect = NSMakeRect(textX,
                                      flipped ? textY : (textY - TGPollBubbleHeightForItem(item)),
-                                     MIN(TGPollBubbleWidthForItem(item, NSWidth(rowRect) - textX - 58.0), NSWidth(rowRect) - textX - 58.0),
+                                     MIN(TGPollBubbleWidthForItem(item, contentWidth), contentWidth),
                                      TGPollBubbleHeightForItem(item));
         TGDrawPollContentForItem(item, pollRect, outgoing, flipped);
         textRect = pollRect;
     } else if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-        NSRect playableRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(260.0, NSWidth(rowRect) - textX - 58.0), 50.0);
+        CGFloat contentWidth = MAX(1.0, NSMaxX(rowRect) - textX - 14.0);
+        NSRect playableRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(260.0, contentWidth), 50.0);
         TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
         textRect = playableRect;
     } else if (TGMessageItemIsNonVisualDocument(item)) {
-        NSRect documentRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(300.0, NSWidth(rowRect) - textX - 58.0), 50.0);
+        CGFloat contentWidth = MAX(1.0, NSMaxX(rowRect) - textX - 14.0);
+        NSRect documentRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(300.0, contentWidth), 50.0);
         TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
         textRect = documentRect;
     } else {

@@ -402,7 +402,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
     BOOL highlighted = [self isHighlighted];
     BOOL enabled = [self isEnabled];
-    CGFloat alpha = enabled ? 1.0 : 0.46;
+    CGFloat alpha = enabled ? 1.0 : 0.34;
     NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
     NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:9.0 yRadius:9.0];
     TGThemeDrawEnamelButtonInPath(path,
@@ -411,8 +411,8 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                  YES,
                                  enabled,
                                  [controlView isFlipped]);
-    [TGClassicNavigationSelectedStrokeColor(0.92 * alpha) set];
-    [path setLineWidth:1.0];
+    [TGClassicNavigationSelectedStrokeColor(enabled ? 1.0 : 0.40) set];
+    [path setLineWidth:(enabled ? 1.25 : 1.0)];
     [path stroke];
 
     NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
@@ -420,7 +420,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
-                                TGClassicNavigationTextColor(alpha), NSForegroundColorAttributeName,
+                                (enabled ? TGClassicHeaderTextColor(1.0) : TGClassicNavigationTextColor(alpha)), NSForegroundColorAttributeName,
                                 paragraph, NSParagraphStyleAttributeName,
                                 nil];
     NSString *title = [self title] ? [self title] : @"";
@@ -634,16 +634,17 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
     (void)controlView;
     BOOL highlighted = [self isHighlighted];
+    BOOL selected = ([self state] == NSOnState);
     BOOL enabled = [self isEnabled];
     CGFloat alpha = enabled ? 1.0 : 0.52;
     NSRect buttonRect = NSInsetRect(cellFrame, 1.0, 1.0);
     NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:5.0 yRadius:5.0];
 
     if (TGThemeIsSkeuomorphicBlue()) {
-        TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, NO, enabled, [controlView isFlipped]);
+        TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, selected, enabled, [controlView isFlipped]);
     } else {
-        NSColor *topColor = highlighted ? TGClassicNavigationHighlightedColor(alpha) : TGClassicTablePaperColor();
-        NSColor *bottomColor = highlighted ? TGClassicNavigationNormalColor(alpha) : TGClassicPanelBottomColor();
+        NSColor *topColor = (highlighted || selected) ? TGClassicNavigationHighlightedColor(alpha) : TGClassicTablePaperColor();
+        NSColor *bottomColor = selected ? TGClassicNavigationSelectedColor(alpha) : (highlighted ? TGClassicNavigationNormalColor(alpha) : TGClassicPanelBottomColor());
         NSGradient *backgroundGradient = [[[NSGradient alloc] initWithStartingColor:topColor
                                                                         endingColor:bottomColor] autorelease];
         [backgroundGradient drawInBezierPath:buttonPath angle:90.0];

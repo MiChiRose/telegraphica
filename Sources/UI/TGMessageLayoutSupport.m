@@ -328,12 +328,17 @@ NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *base
         }
         [attributed addAttribute:NSForegroundColorAttributeName value:TGClassicLinkColor() range:[result range]];
         [attributed addAttribute:NSUnderlineStyleAttributeName value:[NSNumber numberWithInteger:NSUnderlineStyleSingle] range:[result range]];
+        [attributed addAttribute:NSLinkAttributeName value:[result URL] range:[result range]];
     }
     return attributed;
 }
 
 CGFloat TGMessageExtraBlockVerticalPadding(void) {
     return 0.0;
+}
+
+BOOL TGMessageUsesSeparateMetadataFooter(void) {
+    return TGChatMessageBodyFontSize() >= 16.0;
 }
 
 NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -1415,10 +1420,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         return 48.0;
     }
     if (TGChatMessagesAsBlocksEnabled()) {
-        CGFloat textWidth = availableWidth - 126.0;
-        if (textWidth < 150.0) {
-            textWidth = 150.0;
-        }
+        CGFloat textWidth = MAX(80.0, availableWidth - 150.0);
         NSString *text = TGDisplayTextForMessageItem(item);
         if ([text length] == 0) {
             if (TGMessageItemIsPollContent(item)) {
@@ -1453,9 +1455,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             mediaHeight = TGPollBubbleHeightForItem(item) - 18.0;
         }
         CGFloat contentHeight = MAX(textHeight + titleHeight + contextHeight, mediaHeight + titleHeight + contextHeight);
-        CGFloat rowHeight = contentHeight + 17.0;
+        CGFloat rowHeight = contentHeight + 30.0;
         if (TGMessageItemIsNonVisualPlayableMedia(item) || TGMessageItemIsNonVisualDocument(item)) {
-            rowHeight = MAX(rowHeight, 70.0);
+            rowHeight = MAX(rowHeight, 82.0);
         }
         if (TGMessageItemHasCommentThread(item)) {
             rowHeight += 24.0;
@@ -1481,10 +1483,11 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
                                     TGChatMessageMetaFont(), NSFontAttributeName,
                                     nil];
     CGFloat textHeight = 0.0;
+    BOOL separateMetadataFooter = TGMessageUsesSeparateMetadataFooter();
     if ([text length] > 0) {
         NSMutableAttributedString *composedText = [[[NSMutableAttributedString alloc] initWithString:text attributes:attributes] autorelease];
         NSString *timeString = TGShortTimeStringFromDateValue([item date]);
-        if ([timeString length] > 0) {
+        if ([timeString length] > 0 && !separateMetadataFooter) {
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
                                                                                   attributes:timeAttributes] autorelease];
             [composedText appendAttributedString:timeSuffixText];
@@ -1513,6 +1516,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
         height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + contextHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
+    }
+    if ([text length] > 0 && separateMetadataFooter && [[item date] integerValue] > 0) {
+        height += 17.0;
     }
     if (height < 42.0) {
         height = 42.0;
@@ -1543,6 +1549,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+    BOOL separateMetadataFooter = TGMessageUsesSeparateMetadataFooter();
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageMetaFont(), NSFontAttributeName,
                                     TGClassicTimeTextColor(), NSForegroundColorAttributeName,
@@ -1551,7 +1558,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     if ([messageText length] > 0) {
         NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
-        if ([timeString length] > 0) {
+        if ([timeString length] > 0 && !separateMetadataFooter) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
@@ -1591,6 +1598,13 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             bubbleWidth = photoBubbleWidth;
         }
     }
+    if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
+        NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
+        CGFloat footerWidth = ceil(timeSize.width) + TGOutgoingStatusDotsWidthForItem(item) + 29.0;
+        if (footerWidth > bubbleWidth) {
+            bubbleWidth = footerWidth;
+        }
+    }
     if (bubbleWidth < 96.0) {
         bubbleWidth = 96.0;
     }
@@ -1615,6 +1629,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
         if (NSHeight(measuredRect) > 0.0) {
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
+    }
+    if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
+        bubbleHeight += 17.0;
     }
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;

@@ -1047,7 +1047,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 560, 500);
+    NSRect frame = NSMakeRect(0, 0, 560, 540);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -1060,14 +1060,18 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 134, 18)
+    TGStickerPickerPanelView *controlsPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 430, 536, 96)] autorelease];
+    [controlsPanel setAutoresizingMask:NSViewWidthSizable];
+    [contentView addSubview:controlsPanel];
+
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(28, 496, 220, 18)
                                                text:TGLoc(@"stickers.recent")
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(166, 458, 116, 30)] autorelease];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(260, 489, 116, 30)] autorelease];
     [recentButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.recent.tab")] autorelease]];
     [recentButton setTitle:TGLoc(@"stickers.recent.tab")];
     [recentButton setImage:TGTemplateIconAssetImage(@"history", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1079,8 +1083,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [recentButton setToolTip:TGLoc(@"stickers.recent.tab")];
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
+    [recentButton setState:NSOnState];
 
-    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(292, 458, 124, 30)] autorelease];
+    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(384, 489, 142, 30)] autorelease];
     [favoriteButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.favorites.tab")] autorelease]];
     [favoriteButton setTitle:TGLoc(@"stickers.favorites.tab")];
     [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1093,10 +1098,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
-    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(20, 428, 410, 28)] autorelease];
+    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(24, 444, 448, 30)] autorelease];
     [contentView addSubview:stickerSearchBackground];
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(30, 434, 390, 18)] autorelease];
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(36, 450, 424, 18)] autorelease];
     [self applyComposerTextFieldStyle:searchField];
     if ([[searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
         [[searchField cell] setSearchButtonCell:nil];
@@ -1111,7 +1116,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:searchField];
     self.stickerPickerSearchField = searchField;
 
-    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(448, 427, 44, 30)] autorelease];
+    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 444, 42, 30)] autorelease];
     [removeSetButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:@""] autorelease]];
     [removeSetButton setTitle:@""];
     [removeSetButton setImage:TGTemplateIconAssetImage(@"folder-remove", NSMakeSize(17.0, 17.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1123,11 +1128,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [removeSetButton setToolTip:TGLoc(@"stickers.removeSet")];
     [contentView addSubview:removeSetButton];
 
-    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 352, 536, 66)] autorelease];
+    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 354, 536, 66)] autorelease];
     [railPanel setAutoresizingMask:NSViewWidthSizable];
     [contentView addSubview:railPanel];
 
-    NSScrollView *setScrollView = [[[TGStickerSetRailScrollView alloc] initWithFrame:NSMakeRect(20, 360, 520, 50)] autorelease];
+    NSScrollView *setScrollView = [[[TGStickerSetRailScrollView alloc] initWithFrame:NSMakeRect(20, 362, 520, 50)] autorelease];
     [setScrollView setBorderType:NSNoBorder];
     [setScrollView setDrawsBackground:NO];
     [setScrollView setHasVerticalScroller:NO];
@@ -1163,7 +1168,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerPlaybackCoordinator = nil;
     self.stickerPickerSetCache = [NSMutableDictionary dictionary];
     self.stickerPickerRailPreviewState = [NSMutableDictionary dictionary];
+    self.stickerPickerMode = 0;
     self.stickerPickerWindow = window;
+}
+
+- (void)updateStickerPickerSelectionState {
+    [self.stickerPickerRecentButton setState:(self.stickerPickerMode == 0 ? NSOnState : NSOffState)];
+    [self.stickerPickerFavoriteButton setState:(self.stickerPickerMode == 1 ? NSOnState : NSOffState)];
+    [self.stickerPickerRecentButton setNeedsDisplay:YES];
+    [self.stickerPickerFavoriteButton setNeedsDisplay:YES];
+    [self rebuildStickerPickerSetRail];
 }
 
 - (void)updateStickerPickerRailThumbnailForSetID:(NSNumber *)setID withItem:(NSDictionary *)item {
@@ -1334,17 +1348,21 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)selectRecentStickerPickerTab:(id)sender {
     (void)sender;
+    self.stickerPickerMode = 0;
     self.stickerPickerSelectedSetID = nil;
     [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self updateStickerPickerSelectionState];
     [self reloadStickerPickerItems];
 }
 
 - (void)selectFavoriteStickerPickerTab:(id)sender {
     (void)sender;
+    self.stickerPickerMode = 1;
     self.stickerPickerSelectedSetID = nil;
     [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self updateStickerPickerSelectionState];
     [self reloadFavoriteStickerPickerItems];
 }
 
@@ -1352,11 +1370,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     (void)sender;
     NSString *query = [[self.stickerPickerSearchField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if ([query length] == 0) {
+        self.stickerPickerMode = 0;
+        [self updateStickerPickerSelectionState];
         [self reloadStickerPickerItems];
         return;
     }
+    self.stickerPickerMode = 2;
     self.stickerPickerSelectedSetID = nil;
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self updateStickerPickerSelectionState];
     [self reloadStickerPickerItemsForEmoji:query];
 }
 
@@ -1371,9 +1393,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
     self.stickerPickerSelectedSetID = setID;
+    self.stickerPickerMode = 3;
     [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] setObject:[setID stringValue] forKey:@"TelegraphicaStickerPickerLastSetID"];
     [[NSUserDefaults standardUserDefaults] synchronize];
+    [self updateStickerPickerSelectionState];
     [self reloadStickerPickerItemsForSet:(NSDictionary *)represented];
 }
 
@@ -1500,6 +1524,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                           (NSInteger)index,
                                                           self,
                                                           @selector(selectStickerSetFromPickerButton:));
+        NSNumber *buttonSetID = [set objectForKey:@"id"];
+        BOOL selected = ([buttonSetID respondsToSelector:@selector(longLongValue)] &&
+                         [self.stickerPickerSelectedSetID respondsToSelector:@selector(longLongValue)] &&
+                         [buttonSetID longLongValue] == [self.stickerPickerSelectedSetID longLongValue]);
+        [button setState:(selected ? NSOnState : NSOffState)];
         NSString *tooltip = [set objectForKey:@"title"];
         if ([tooltip isKindOfClass:[NSString class]] && [tooltip length] > 0) {
             [button setToolTip:tooltip];
