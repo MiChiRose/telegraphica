@@ -51,7 +51,8 @@ done
 
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "== Whitespace =="
-    git diff --check
+    # Unified patch payloads intentionally contain context whitespace.
+    git diff --check -- . ':(exclude)Vendor/patches/*.patch'
 fi
 
 echo "== Mock TDLib event reducer =="

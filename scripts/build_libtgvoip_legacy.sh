@@ -42,14 +42,16 @@ XCODEBUILD="$(xcrun -f xcodebuild)"
 "$XCODEBUILD" \
     -project "$WORK_DIR/libtgvoip_osx.xcodeproj" \
     -target libtgvoip \
-    -configuration ReleaseHockeyapp \
+    -configuration Debug \
     -sdk "$SDK_NAME" \
     ARCHS="$ARCH" \
     VALID_ARCHS="$ARCH" \
     ONLY_ACTIVE_ARCH=YES \
     MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
     SDKROOT="$SDK_PATH" \
-    EXCLUDED_SOURCE_FILE_NAMES="TGVVideoRenderer.mm" \
+    CLANG_CXX_LANGUAGE_STANDARD="gnu++11" \
+    GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) TGVOIP_USE_CUSTOM_CRYPTO TARGET_OSX=1" \
+    EXCLUDED_SOURCE_FILE_NAMES="TGVVideoRenderer.mm TGVVideoSource.mm VideoToolboxEncoderSource.mm SampleBufferDisplayLayerRenderer.mm" \
     HEADER_SEARCH_PATHS="$WORK_DIR $WORK_DIR/webrtc_dsp $OPUS_PREFIX/include $OPUS_PREFIX/include/opus" \
     LIBRARY_SEARCH_PATHS="$OPUS_PREFIX/lib" \
     CODE_SIGNING_ALLOWED=NO \
@@ -57,7 +59,7 @@ XCODEBUILD="$(xcrun -f xcodebuild)"
     CODE_SIGN_IDENTITY= \
     build
 
-FRAMEWORK_BINARY="$WORK_DIR/build/ReleaseHockeyapp/libtgvoip.framework/Versions/A/libtgvoip"
+FRAMEWORK_BINARY="$WORK_DIR/build/Debug/libtgvoip.framework/Versions/A/libtgvoip"
 if [ ! -f "$FRAMEWORK_BINARY" ]; then
     echo "libtgvoip framework binary was not produced."
     exit 1
@@ -66,9 +68,10 @@ fi
 ditto "$FRAMEWORK_BINARY" "$OUTPUT_DIR/libtgvoip.a"
 ditto "$WORK_DIR/TgVoip.h" "$OUTPUT_DIR/TgVoip.h"
 
-if ! file "$OUTPUT_DIR/libtgvoip.a" | grep -q "$ARCH"; then
+if ! lipo -info "$OUTPUT_DIR/libtgvoip.a" 2>/dev/null | grep -q "$ARCH"; then
     echo "libtgvoip archive does not contain $ARCH."
     file "$OUTPUT_DIR/libtgvoip.a"
+    lipo -info "$OUTPUT_DIR/libtgvoip.a" 2>/dev/null || true
     exit 1
 fi
 
