@@ -148,7 +148,9 @@ def main() -> None:
             manifest = plistlib.load(manifest_file)
         module_identifier = str(manifest.get("identifier", "")).strip()
         module_version = str(manifest.get("version", "")).strip()
-        if module_identifier != metadata["id"] or not module_version:
+        minimum_app_version = str(manifest.get("minimum_app_version", "")).strip()
+        if (module_identifier != metadata["id"] or not module_version or
+                not minimum_app_version):
             raise SystemExit(f"Invalid Workshop manifest identity: {manifest_path}")
 
         package_name = f"{module_identifier}-{module_version}.zip"
@@ -166,7 +168,7 @@ def main() -> None:
             "description": {"en": metadata["en_description"], "ru": metadata["ru_description"]},
             "version": module_version,
             "api_version": 1,
-            "minimum_app_version": "0.5.1",
+            "minimum_app_version": minimum_app_version,
             "minimum_os_version": "10.9",
             "architectures": ["x86_64"],
             "category": metadata["category"],
@@ -182,8 +184,8 @@ def main() -> None:
             "download_url": f"{args.base_url.rstrip('/')}/{package_name}",
             "icon_url": f"{args.base_url.rstrip('/')}/icons/{module_name.lower()}.png",
             "changelog": {
-                "en": "Initial Workshop release.",
-                "ru": "Первый выпуск модуля для Мастерской.",
+                "en": "Compatibility update for Telegraphica 0.5.4 with refreshed Workshop presentation.",
+                "ru": "Обновление совместимости с Telegraphica 0.5.4 и обновлённым оформлением Мастерской.",
             },
             "permissions": metadata.get("permissions", ["module-data", "host-notifications"]),
         })

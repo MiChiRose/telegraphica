@@ -9,5 +9,5 @@
 <key>minimum_os_version</key><string>10.9</string>
 <key>permissions</key><array><string>module-data</string><string>host-diagnostics</string></array>
 <key>principal_class</key><string>TGDiagnosticCenterModule</string>
-<key>version</key><string>1.0.0</string>
+<key>version</key><string>1.0.1</string>
 </dict></plist>
