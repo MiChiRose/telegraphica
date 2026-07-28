@@ -697,6 +697,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) CGFloat mediaPreviewMinimumZoomScale;
 @property (nonatomic, assign) BOOL mediaPlaybackPlaying;
 @property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
+@property (nonatomic, assign) BOOL mediaPlaybackVideoNote;
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
 @property (nonatomic, assign) NSUInteger mediaPlaybackPreparationGeneration;
 @property (nonatomic, retain) NSOperationQueue *mediaPlaybackPreparationQueue;
@@ -1205,6 +1206,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPreviewMinimumZoomScale = _mediaPreviewMinimumZoomScale;
 @synthesize mediaPlaybackPlaying = _mediaPlaybackPlaying;
 @synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
+@synthesize mediaPlaybackVideoNote = _mediaPlaybackVideoNote;
 @synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
 @synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
