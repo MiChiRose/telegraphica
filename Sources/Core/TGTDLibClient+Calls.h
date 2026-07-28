@@ -14,5 +14,8 @@
                   connectionID:(NSNumber *)connectionID
                        timeout:(NSTimeInterval)timeout
                          error:(NSError **)error;
+- (NSArray *)recentAudioCallSummariesWithLimit:(NSUInteger)limit
+                                        timeout:(NSTimeInterval)timeout
+                                          error:(NSError **)error;
 
 @end

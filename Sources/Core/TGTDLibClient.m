@@ -3835,6 +3835,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [info setObject:[NSNumber numberWithBool:YES] forKey:@"notifications_muted"];
     }
 
+    NSDictionary *chatType = [[chatResponse objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+        ? [chatResponse objectForKey:@"type"] : nil;
+    NSString *typeSummary = [self chatTypeSummaryForChatTypeObject:chatType];
+    if ([typeSummary length] > 0) {
+        [info setObject:typeSummary forKey:@"type_summary"];
+    }
+    id privateUserID = [chatType objectForKey:@"user_id"];
+    if ([[chatType objectForKey:@"@type"] isEqualToString:@"chatTypePrivate"] &&
+        [privateUserID respondsToSelector:@selector(longLongValue)]) {
+        [info setObject:[NSNumber numberWithLongLong:[privateUserID longLongValue]] forKey:@"user_id"];
+    }
+
     return ([info count] > 0) ? info : nil;
 }
 

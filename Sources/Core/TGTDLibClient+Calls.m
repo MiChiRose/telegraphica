@@ -28,6 +28,16 @@ static NSNumber *TGPositiveCallIdentifier(id value) {
     return identifier > 0 ? [NSNumber numberWithInteger:identifier] : nil;
 }
 
+static NSNumber *TGUserIdentifierFromSender(id sender) {
+    if (![sender isKindOfClass:[NSDictionary class]] ||
+        ![[sender objectForKey:@"@type"] isEqualToString:@"messageSenderUser"]) {
+        return nil;
+    }
+    id userID = [sender objectForKey:@"user_id"];
+    return [userID respondsToSelector:@selector(longLongValue)]
+        ? [NSNumber numberWithLongLong:[userID longLongValue]] : nil;
+}
+
 @implementation TGTDLibClient (Calls)
 
 - (NSNumber *)createAudioCallToUserID:(NSNumber *)userID
@@ -124,6 +134,105 @@ static NSNumber *TGPositiveCallIdentifier(id value) {
         *error = [self errorWithDescription:@"TDLib did not discard the audio call." code:438];
     }
     return NO;
+}
+
+- (NSArray *)recentAudioCallSummariesWithLimit:(NSUInteger)limit
+                                        timeout:(NSTimeInterval)timeout
+                                          error:(NSError **)error {
+    NSUInteger safeLimit = MAX(1U, MIN(100U, limit));
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"searchCallMessages", @"@type",
+                             @"", @"offset",
+                             [NSNumber numberWithUnsignedInteger:safeLimit], @"limit",
+                             [NSNumber numberWithBool:NO], @"only_missed",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-recent-audio-calls"
+                                                            timeout:timeout
+                                                          errorCode:439
+                                                              error:error];
+    NSArray *messages = [[response objectForKey:@"messages"] isKindOfClass:[NSArray class]]
+        ? [response objectForKey:@"messages"] : nil;
+    if (!messages) {
+        if (error && response && !*error) {
+            *error = [self errorWithDescription:@"TDLib did not return recent calls." code:440];
+        }
+        return nil;
+    }
+
+    NSMutableArray *summaries = [NSMutableArray array];
+    NSMutableDictionary *profiles = [NSMutableDictionary dictionary];
+    NSUInteger index = 0;
+    for (index = 0; index < [messages count] && [summaries count] < safeLimit; index++) {
+        NSDictionary *message = [[messages objectAtIndex:index] isKindOfClass:[NSDictionary class]]
+            ? [messages objectAtIndex:index] : nil;
+        NSDictionary *content = [[message objectForKey:@"content"] isKindOfClass:[NSDictionary class]]
+            ? [message objectForKey:@"content"] : nil;
+        if (!message || ![[content objectForKey:@"@type"] isEqualToString:@"messageCall"] ||
+            [[content objectForKey:@"is_video"] boolValue]) {
+            continue;
+        }
+
+        BOOL outgoing = [[message objectForKey:@"is_outgoing"] boolValue];
+        NSNumber *userID = outgoing ? nil : TGUserIdentifierFromSender([message objectForKey:@"sender_id"]);
+        if (!userID) {
+            id chatID = [message objectForKey:@"chat_id"];
+            if ([chatID respondsToSelector:@selector(longLongValue)]) {
+                NSDictionary *chatRequest = [NSDictionary dictionaryWithObjectsAndKeys:
+                                             @"getChat", @"@type",
+                                             [NSNumber numberWithLongLong:[chatID longLongValue]], @"chat_id",
+                                             nil];
+                NSDictionary *chat = [self sendTDLibRequestAndWaitForExtra:chatRequest
+                                                                extraPrefix:@"telegraphica-call-chat"
+                                                                    timeout:MIN(timeout, 1.0)
+                                                                  errorCode:441
+                                                                      error:NULL];
+                NSDictionary *chatType = [[chat objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+                    ? [chat objectForKey:@"type"] : nil;
+                id privateUserID = [chatType objectForKey:@"user_id"];
+                if ([[chatType objectForKey:@"@type"] isEqualToString:@"chatTypePrivate"] &&
+                    [privateUserID respondsToSelector:@selector(longLongValue)]) {
+                    userID = [NSNumber numberWithLongLong:[privateUserID longLongValue]];
+                }
+            }
+        }
+        if (!userID) {
+            continue;
+        }
+
+        NSDictionary *profile = [profiles objectForKey:userID];
+        if (!profile) {
+            profile = [self userProfileSummaryForUserID:userID timeout:MIN(timeout, 1.8) error:NULL];
+            if (profile) {
+                [profiles setObject:profile forKey:userID];
+            }
+        }
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:userID forKey:@"user_id"];
+        [summary setObject:[profile objectForKey:@"display_name"] ?: [NSString stringWithFormat:@"User %@", userID]
+                    forKey:@"display_name"];
+        NSString *avatarPath = [profile objectForKey:@"avatar_local_path"];
+        if ([avatarPath length] > 0) {
+            [summary setObject:avatarPath forKey:@"avatar_local_path"];
+        }
+        [summary setObject:[NSNumber numberWithBool:outgoing] forKey:@"is_outgoing"];
+        id date = [message objectForKey:@"date"];
+        if ([date respondsToSelector:@selector(longLongValue)]) {
+            [summary setObject:[NSNumber numberWithLongLong:[date longLongValue]] forKey:@"date"];
+        }
+        id duration = [content objectForKey:@"duration"];
+        if ([duration respondsToSelector:@selector(unsignedIntegerValue)]) {
+            [summary setObject:[NSNumber numberWithUnsignedInteger:[duration unsignedIntegerValue]] forKey:@"duration"];
+        }
+        NSDictionary *discardReason = [[content objectForKey:@"discard_reason"] isKindOfClass:[NSDictionary class]]
+            ? [content objectForKey:@"discard_reason"] : nil;
+        NSString *discardType = [[discardReason objectForKey:@"@type"] description];
+        if ([discardType length] > 0) {
+            [summary setObject:discardType forKey:@"discard_reason"];
+        }
+        [summaries addObject:summary];
+    }
+    return summaries;
 }
 
 @end
