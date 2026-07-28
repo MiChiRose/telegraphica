@@ -47,7 +47,7 @@
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
-    NSAttributedString *selectableText = TGAttributedMessageString(messageText, textAttributes);
+    NSAttributedString *selectableText = TGAttributedMessageStringForItem(item, messageText, textAttributes);
     NSRect textRect = NSZeroRect;
 
     if (TGChatMessagesAsBlocksEnabled()) {
@@ -210,7 +210,7 @@
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
         if ([timeString length] > 0) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
@@ -447,7 +447,7 @@
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
         if ([timeString length] > 0) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];

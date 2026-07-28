@@ -181,18 +181,21 @@ static NSString *TGMediaCenterDateStringForItem(TGMessageItem *item) {
 
 static NSImage *TGMediaCenterThumbnailForItem(TGMessageItem *item) {
     NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
-    NSData *miniData = media ? TGMediaItemMiniThumbnailData(media) : nil;
-    if ([miniData length] > 0) {
-        NSImage *miniImage = [[[NSImage alloc] initWithData:miniData] autorelease];
-        if (miniImage) {
-            return miniImage;
+    NSString *path = TGMediaCenterLocalPathForItem(item);
+    if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        NSImage *image = TGImageWithCorrectOrientationFromFile(path);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+        }
+        if (image) {
+            return image;
         }
     }
-    NSString *path = TGMediaCenterLocalPathForItem(item);
-    if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        return nil;
+    NSData *miniData = media ? TGMediaItemMiniThumbnailData(media) : nil;
+    if ([miniData length] > 0) {
+        return [[[NSImage alloc] initWithData:miniData] autorelease];
     }
-    return TGImageWithCorrectOrientationFromFile(path);
+    return nil;
 }
 
 static NSComparisonResult TGMediaCenterCompareItems(TGMessageItem *left, TGMessageItem *right, NSInteger sortIndex) {
@@ -258,6 +261,100 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         }
     }
     return TGMediaCenterThumbnailForItem(item);
+}
+
+- (NSString *)mediaCenterHighQualityThumbnailPathForItem:(TGMessageItem *)item {
+    NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
+    NSString *fullPath = media ? TGMediaItemFullLocalPath(media) : nil;
+    if ([fullPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:fullPath]) {
+        return fullPath;
+    }
+    NSNumber *fileID = TGMediaCenterFileIDForItem(item);
+    NSString *resolvedPath = [fileID respondsToSelector:@selector(integerValue)]
+        ? [self.mediaCenterThumbnailPathsByFileID objectForKey:fileID] : nil;
+    if ([resolvedPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:resolvedPath]) {
+        return resolvedPath;
+    }
+    return nil;
+}
+
+- (NSImage *)mediaCenterThumbnailForItem:(TGMessageItem *)item {
+    NSString *highQualityPath = [self mediaCenterHighQualityThumbnailPathForItem:item];
+    if ([highQualityPath length] > 0) {
+        NSImage *image = TGImageWithCorrectOrientationFromFile(highQualityPath);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:highQualityPath] autorelease];
+        }
+        if (image) {
+            return image;
+        }
+    }
+    return TGMediaCenterThumbnailForItem(item);
+}
+
+- (BOOL)mediaCenterThumbnailIsLoadingForItem:(TGMessageItem *)item {
+    NSNumber *fileID = TGMediaCenterFileIDForItem(item);
+    return ([fileID respondsToSelector:@selector(integerValue)] &&
+            [self.mediaCenterThumbnailLoadingFileIDs containsObject:fileID]);
+}
+
+- (void)ensureMediaCenterHighQualityThumbnailForItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        [self mediaCenterHighQualityThumbnailPathForItem:item]) {
+        return;
+    }
+    NSString *contentType = [item contentType];
+    BOOL shouldLoad = ([contentType isEqualToString:@"messagePhoto"] ||
+                       ([contentType isEqualToString:@"messageDocument"] && [item isVisualMediaMessage]) ||
+                       [contentType isEqualToString:@"messageSticker"]);
+    NSNumber *fileID = TGMediaCenterFileIDForItem(item);
+    if (!shouldLoad ||
+        ![fileID respondsToSelector:@selector(integerValue)] ||
+        [fileID integerValue] <= 0 ||
+        [self.mediaCenterThumbnailAttemptedFileIDs containsObject:fileID]) {
+        return;
+    }
+
+    NSNumber *fileIDCopy = [fileID retain];
+    TGTDLibClient *client = [self.client retain];
+    NSUInteger generation = self.mediaCenterGeneration;
+    [self.mediaCenterThumbnailAttemptedFileIDs addObject:fileIDCopy];
+    [self.mediaCenterThumbnailLoadingFileIDs addObject:fileIDCopy];
+    [self.mediaCenterThumbnailQueue addOperationWithBlock:^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        NSString *path = [[client downloadedLocalPathForFileID:fileIDCopy timeout:24.0 error:&error] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+                [self.mediaCenterThumbnailPathsByFileID setObject:path forKey:fileIDCopy];
+            }
+            [self.mediaCenterThumbnailLoadingFileIDs removeObject:fileIDCopy];
+            if (self.mediaCenterVisible && generation == self.mediaCenterGeneration) {
+                [self rebuildMediaCenterRowsPreservingScroll:YES];
+            }
+            [path release];
+            [client release];
+            [fileIDCopy release];
+        });
+        [pool drain];
+    }];
+}
+
+- (void)addMediaCenterThumbnailSpinnerForItem:(TGMessageItem *)item
+                                       toView:(NSView *)view
+                                        frame:(NSRect)frame {
+    if (![self mediaCenterThumbnailIsLoadingForItem:item]) {
+        return;
+    }
+    NSProgressIndicator *spinner = [[[NSProgressIndicator alloc] initWithFrame:
+                                     NSMakeRect(NSMidX(frame) - 9.0,
+                                                NSMidY(frame) - 9.0,
+                                                18.0,
+                                                18.0)] autorelease];
+    [spinner setStyle:NSProgressIndicatorSpinningStyle];
+    [spinner setDisplayedWhenStopped:NO];
+    [spinner startAnimation:nil];
+    [view addSubview:spinner];
 }
 
 - (NSString *)mediaCenterSavedPathForItem:(TGMessageItem *)item {
@@ -679,7 +776,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [self.mediaCenterResultsView addSubview:tile];
 
         NSRect previewRect = NSMakeRect(8.0, 8.0, tileWidth - 16.0, 86.0);
-        NSImage *thumbnail = TGMediaCenterThumbnailForItem(item);
+        [self ensureMediaCenterHighQualityThumbnailForItem:item];
+        NSImage *thumbnail = [self mediaCenterThumbnailForItem:item];
         if (thumbnail) {
             NSImageView *imageView = [[[NSImageView alloc] initWithFrame:previewRect] autorelease];
             [imageView setImage:thumbnail];
@@ -693,6 +791,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
             [typeField setAlignment:NSCenterTextAlignment];
             [tile addSubview:typeField];
         }
+        [self addMediaCenterThumbnailSpinnerForItem:item toView:tile frame:previewRect];
 
         NSString *titleText = TGMediaCenterTitleForItem(item);
         NSTextField *title = [self labelWithFrame:NSMakeRect(8.0, 99.0, tileWidth - 16.0, 18.0)
@@ -736,7 +835,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         TGGroupedCardView *row = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(gap, y, width - gap * 2.0, rowHeight)] autorelease];
         [self.mediaCenterResultsView addSubview:row];
 
-        NSImage *thumbnail = TGMediaCenterThumbnailForItem(item);
+        [self ensureMediaCenterHighQualityThumbnailForItem:item];
+        NSImage *thumbnail = [self mediaCenterThumbnailForItem:item];
         if (thumbnail) {
             NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(12.0, 12.0, 50.0, 50.0)] autorelease];
             [imageView setImage:thumbnail];
@@ -751,6 +851,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
             [badgeText setAlignment:NSCenterTextAlignment];
             [badge addSubview:badgeText];
         }
+        [self addMediaCenterThumbnailSpinnerForItem:item
+                                            toView:row
+                                             frame:NSMakeRect(12.0, 12.0, 50.0, 50.0)];
 
         NSTextField *title = [self labelWithFrame:NSMakeRect(76.0, 16.0, NSWidth([row bounds]) - 94.0, 22.0)
                                              text:TGMediaCenterTitleForItem(item)

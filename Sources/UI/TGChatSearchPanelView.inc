@@ -236,9 +236,9 @@
     NSRect bounds = [self bounds];
     CGFloat inset = 18.0;
     [_titleField setFrame:NSMakeRect(inset + 6.0, 18.0, MAX(80.0, NSWidth(bounds) - (inset * 2.0) - 12.0), 22.0)];
-    [_searchField setFrame:NSMakeRect(inset + 38.0, 67.0, MAX(92.0, NSWidth(bounds) - (inset * 2.0) - 50.0), 21.0)];
-    [_statusField setFrame:NSMakeRect(inset + 12.0, 101.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 24.0), 18.0)];
-    [_scrollView setFrame:NSMakeRect(inset + 10.0, 138.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 20.0), MAX(80.0, NSHeight(bounds) - 162.0))];
+    [_searchField setFrame:NSMakeRect(inset + 48.0, 67.0, MAX(92.0, NSWidth(bounds) - (inset * 2.0) - 62.0), 21.0)];
+    [_statusField setFrame:NSMakeRect(inset + 16.0, 101.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 32.0), 18.0)];
+    [_scrollView setFrame:NSMakeRect(inset + 12.0, 138.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 24.0), MAX(80.0, NSHeight(bounds) - 162.0))];
 
     CGFloat tableWidth = NSWidth([[_scrollView contentView] bounds]);
     NSArray *columns = [_tableView tableColumns];
@@ -260,7 +260,7 @@
     [shellPath setLineWidth:1.0];
     [shellPath stroke];
 
-    NSRect searchCardRect = NSMakeRect(16.0, 50.0, MAX(120.0, NSWidth(bounds) - 32.0), 74.0);
+    NSRect searchCardRect = NSMakeRect(22.0, 50.0, MAX(120.0, NSWidth(bounds) - 44.0), 74.0);
     NSBezierPath *searchCardPath = [NSBezierPath bezierPathWithRoundedRect:searchCardRect xRadius:10.0 yRadius:10.0];
     TGThemeDrawGroupedCardInPath(searchCardPath, searchCardRect, [self isFlipped]);
     [TGClassicTableGridColor() set];

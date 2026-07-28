@@ -97,6 +97,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize canBeDeletedForAllUsers = _canBeDeletedForAllUsers;
 @synthesize editDate = _editDate;
 @synthesize editableText = _editableText;
+@synthesize formattedEntities = _formattedEntities;
 @synthesize canGetMessageThread = _canGetMessageThread;
 @synthesize messageThreadReplyCount = _messageThreadReplyCount;
 @synthesize retryMessageThreadID = _retryMessageThreadID;
@@ -376,6 +377,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setCanBeDeletedForAllUsers:_canBeDeletedForAllUsers];
     [copy setEditDate:_editDate];
     [copy setEditableText:_editableText];
+    [copy setFormattedEntities:_formattedEntities];
     [copy setCanGetMessageThread:_canGetMessageThread];
     [copy setMessageThreadReplyCount:_messageThreadReplyCount];
     [copy setRetryMessageThreadID:_retryMessageThreadID];
@@ -446,6 +448,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_forwardSourceDisplayName release];
     [_editDate release];
     [_editableText release];
+    [_formattedEntities release];
     [_messageThreadReplyCount release];
     [_retryMessageThreadID release];
     [_retryMessageTopicKind release];

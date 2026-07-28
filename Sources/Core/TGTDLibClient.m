@@ -6686,9 +6686,16 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             [item setForwardSourceDisplayName:forwardSource];
         }
         if ([contentType isEqualToString:@"messageText"] && [contentObject isKindOfClass:[NSDictionary class]]) {
-            NSString *editableText = [self textFromFormattedTextObject:[(NSDictionary *)contentObject objectForKey:@"text"]];
+            id formattedTextObject = [(NSDictionary *)contentObject objectForKey:@"text"];
+            NSString *editableText = [self textFromFormattedTextObject:formattedTextObject];
             if ([editableText length] > 0) {
                 [item setEditableText:editableText];
+            }
+            if ([formattedTextObject isKindOfClass:[NSDictionary class]]) {
+                id entities = [(NSDictionary *)formattedTextObject objectForKey:@"entities"];
+                if ([entities isKindOfClass:[NSArray class]]) {
+                    [item setFormattedEntities:entities];
+                }
             }
         }
         NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(message);

@@ -270,7 +270,7 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                  NSMidY(buttonRect) - 10.5,
                                  21.0,
                                  21.0);
-    TGDrawTemplateIconAsset(@"upload", iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
+    TGDrawTemplateIconAsset(@"attach", iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
 @end

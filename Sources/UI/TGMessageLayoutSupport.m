@@ -333,6 +333,101 @@ NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *base
     return attributed;
 }
 
+static NSFont *TGFontByAddingTrait(NSFont *font, NSFontTraitMask trait) {
+    NSFont *baseFont = font ? font : TGChatMessageBodyFont();
+    NSFont *converted = [[NSFontManager sharedFontManager] convertFont:baseFont toHaveTrait:trait];
+    return converted ? converted : baseFont;
+}
+
+NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
+                                                     NSString *text,
+                                                     NSDictionary *baseAttributes) {
+    NSMutableAttributedString *attributed = [[TGAttributedMessageString(text, baseAttributes) mutableCopy] autorelease];
+    NSArray *entities = [item formattedEntities];
+    if (![entities isKindOfClass:[NSArray class]] || [entities count] == 0 || [text length] == 0) {
+        return attributed;
+    }
+
+    NSFont *baseFont = [baseAttributes objectForKey:NSFontAttributeName];
+    if (!baseFont) {
+        baseFont = TGChatMessageBodyFont();
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [entities count]; index++) {
+        id entityObject = [entities objectAtIndex:index];
+        if (![entityObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *entity = (NSDictionary *)entityObject;
+        id offsetObject = [entity objectForKey:@"offset"];
+        id lengthObject = [entity objectForKey:@"length"];
+        if (![offsetObject respondsToSelector:@selector(integerValue)] ||
+            ![lengthObject respondsToSelector:@selector(integerValue)]) {
+            continue;
+        }
+        NSInteger offset = [offsetObject integerValue];
+        NSInteger length = [lengthObject integerValue];
+        if (offset < 0 || length <= 0 || (NSUInteger)offset >= [text length]) {
+            continue;
+        }
+        NSRange range = NSMakeRange((NSUInteger)offset,
+                                    MIN((NSUInteger)length, [text length] - (NSUInteger)offset));
+        NSDictionary *type = [[entity objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+            ? [entity objectForKey:@"type"] : nil;
+        NSString *typeName = [[type objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [type objectForKey:@"@type"] : @"";
+        if ([typeName isEqualToString:@"textEntityTypeBold"]) {
+            [attributed addAttribute:NSFontAttributeName value:TGFontByAddingTrait(baseFont, NSBoldFontMask) range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeItalic"]) {
+            [attributed addAttribute:NSFontAttributeName value:TGFontByAddingTrait(baseFont, NSItalicFontMask) range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeUnderline"]) {
+            [attributed addAttribute:NSUnderlineStyleAttributeName
+                               value:[NSNumber numberWithInteger:NSUnderlineStyleSingle]
+                               range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeStrikethrough"]) {
+            [attributed addAttribute:NSStrikethroughStyleAttributeName
+                               value:[NSNumber numberWithInteger:NSUnderlineStyleSingle]
+                               range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeCode"] ||
+                   [typeName isEqualToString:@"textEntityTypePre"] ||
+                   [typeName isEqualToString:@"textEntityTypePreCode"]) {
+            [attributed addAttribute:NSFontAttributeName
+                               value:[NSFont userFixedPitchFontOfSize:[baseFont pointSize]]
+                               range:range];
+            [attributed addAttribute:NSBackgroundColorAttributeName
+                               value:[TGClassicTableGridColor() colorWithAlphaComponent:0.22]
+                               range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeSpoiler"]) {
+            [attributed addAttribute:NSBackgroundColorAttributeName
+                               value:[TGClassicMutedInkColor() colorWithAlphaComponent:0.28]
+                               range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeBlockQuote"] ||
+                   [typeName isEqualToString:@"textEntityTypeExpandableBlockQuote"]) {
+            NSMutableParagraphStyle *quoteParagraph = [[TGMessageTextParagraphStyle() mutableCopy] autorelease];
+            [quoteParagraph setFirstLineHeadIndent:12.0];
+            [quoteParagraph setHeadIndent:12.0];
+            [quoteParagraph setParagraphSpacingBefore:4.0];
+            [quoteParagraph setParagraphSpacing:8.0];
+            [attributed addAttribute:NSParagraphStyleAttributeName value:quoteParagraph range:range];
+            [attributed addAttribute:NSBackgroundColorAttributeName
+                               value:[TGClassicSelectedRowColor() colorWithAlphaComponent:0.18]
+                               range:range];
+        } else if ([typeName isEqualToString:@"textEntityTypeTextUrl"]) {
+            NSString *urlString = [[type objectForKey:@"url"] isKindOfClass:[NSString class]]
+                ? [type objectForKey:@"url"] : nil;
+            NSURL *url = [urlString length] > 0 ? [NSURL URLWithString:urlString] : nil;
+            if (url) {
+                [attributed addAttribute:NSLinkAttributeName value:url range:range];
+                [attributed addAttribute:NSForegroundColorAttributeName value:TGClassicLinkColor() range:range];
+                [attributed addAttribute:NSUnderlineStyleAttributeName
+                                   value:[NSNumber numberWithInteger:NSUnderlineStyleSingle]
+                                   range:range];
+            }
+        }
+    }
+    return attributed;
+}
+
 CGFloat TGMessageExtraBlockVerticalPadding(void) {
     return 0.0;
 }
@@ -1440,9 +1535,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
                                     nil];
         CGFloat textHeight = 16.0;
         if ([text length] > 0) {
-            NSRect measuredRect = [text boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
-                                                     options:NSStringDrawingUsesLineFragmentOrigin
-                                                  attributes:attributes];
+            NSAttributedString *attributedText = TGAttributedMessageStringForItem(item, text, attributes);
+            NSRect measuredRect = [attributedText boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
+                                                               options:NSStringDrawingUsesLineFragmentOrigin];
             textHeight = ceil(NSHeight(measuredRect));
         }
         CGFloat titleHeight = (showSenderDetails || [item outgoing]) ? 15.0 : 0.0;
@@ -1485,7 +1580,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     CGFloat textHeight = 0.0;
     BOOL separateMetadataFooter = TGMessageUsesSeparateMetadataFooter();
     if ([text length] > 0) {
-        NSMutableAttributedString *composedText = [[[NSMutableAttributedString alloc] initWithString:text attributes:attributes] autorelease];
+        NSMutableAttributedString *composedText = [[TGAttributedMessageStringForItem(item, text, attributes) mutableCopy] autorelease];
         NSString *timeString = TGShortTimeStringFromDateValue([item date]);
         if ([timeString length] > 0 && !separateMetadataFooter) {
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
@@ -1556,7 +1651,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
         if ([timeString length] > 0 && !separateMetadataFooter) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];

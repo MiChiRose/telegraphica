@@ -3,6 +3,10 @@
 "tdlib_not_checked" = "TDLib status: not checked";
 "save" = "Сохранить";
 "diagnostics.copyAll" = "Копировать всё";
+"edit.cut" = "Вырезать";
+"edit.copy" = "Копировать";
+"edit.paste" = "Вставить";
+"edit.selectAll" = "Выбрать всё";
 "share.location.manualHint" = "Выберите точку на карте или используйте текущую геопозицию.";
 "cancel" = "Отмена";
 "profile.edit.title" = "Редактировать профиль";

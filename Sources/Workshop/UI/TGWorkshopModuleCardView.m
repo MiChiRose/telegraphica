@@ -50,7 +50,7 @@ static NSButton *TGWorkshopDestructiveCardButton(NSRect frame) {
 }
 
 static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
-    if ([identifier hasSuffix:@".solitaire"]) return @"solitaire";
+    if ([identifier hasSuffix:@".solitaire"]) return @"cards";
     if ([identifier hasSuffix:@".checkers"]) return @"checkers";
     if ([identifier hasSuffix:@".minesweeper"]) return @"minesweeper";
     if ([identifier hasSuffix:@".tictactoe"]) return @"frame";
