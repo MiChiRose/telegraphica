@@ -273,17 +273,19 @@ static TGWorkshopCatalogEntry *TGWorkshopInstalledFallbackEntry(NSString *identi
     [_delegate workshopCoordinatorDidReload];
 }
 
-- (void)removeEntry:(TGWorkshopCatalogEntry *)entry removeData:(BOOL)removeData {
+- (BOOL)removeEntry:(TGWorkshopCatalogEntry *)entry removeData:(BOOL)removeData {
     NSString *identifier = [entry moduleIdentifier];
     if ([identifier isEqualToString:_activeModuleIdentifier]) {
         [self closeActiveModule];
     }
     NSError *error = nil;
-    if (![_installer markModuleForRemoval:identifier removeData:removeData error:&error] ||
-        ![_installer processPendingRemovals:&error]) {
+    BOOL removed = ([_installer markModuleForRemoval:identifier removeData:removeData error:&error] &&
+                    [_installer processPendingRemovals:&error]);
+    if (!removed) {
         [_delegate workshopCoordinatorDidFailWithError:error moduleIdentifier:identifier];
     }
     [_delegate workshopCoordinatorDidReload];
+    return removed;
 }
 
 - (void)dealloc {
