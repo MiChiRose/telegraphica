@@ -588,11 +588,17 @@ def check_call_transport_stability_contract(errors):
         'self.speakerMuted ? @"headphones-off" : @"headphones"',
         'self.microphoneMuted ? @"microphone-off" : @"microphone"',
         '[NSSound soundNamed:@"Marimba"]',
-        '[NSSound soundNamed:@"Funk"]',
+        'Ringtones/Marimba.m4r',
+        'Application Support/Telegraphica/Sounds/Marimba.m4r',
+        '~/Library/Sounds/Marimba.m4r',
     ]:
         if fragment not in window_text:
             errors.append("%s: call presentation contract is missing `%s`" %
                           (window_rel, fragment))
+    for forbidden_fallback in ['soundNamed:@"Funk"', 'soundNamed:@"Pop"']:
+        if forbidden_fallback in window_text:
+            errors.append("%s: non-Marimba ringtone fallback must not masquerade as Marimba `%s`" %
+                          (window_rel, forbidden_fallback))
 
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     history_text = read_text(os.path.join(ROOT, history_rel))
@@ -602,6 +608,15 @@ def check_call_transport_stability_contract(errors):
     for fragment in ['@"call-in"', '@"call-out"', '@"call-miss"']:
         if fragment not in history_text:
             errors.append("%s: call history direction icon is missing `%s`" %
+                          (history_rel, fragment))
+    for fragment in [
+        "NSHeight(frame) - 69.0",
+        "NSHeight(frame) - 104.0",
+        "NSHeight(frame) - 136.0",
+        "NSHeight(frame) - 230.0",
+    ]:
+        if fragment not in history_text:
+            errors.append("%s: compact call-history layout is missing `%s`" %
                           (history_rel, fragment))
     for icon_name in [
         "call-cancel.png",

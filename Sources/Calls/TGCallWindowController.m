@@ -255,11 +255,22 @@
     }
     NSSound *sound = [NSSound soundNamed:@"Marimba"];
     if (!sound) {
-        NSArray *paths = [NSArray arrayWithObjects:
-                          [@"~/Library/Sounds/Marimba.aiff" stringByExpandingTildeInPath],
-                          @"/Library/Sounds/Marimba.aiff",
-                          @"/System/Library/Sounds/Marimba.aiff",
-                          nil];
+        NSMutableArray *paths = [NSMutableArray array];
+        NSString *bundledPath = [[NSBundle mainBundle] pathForResource:@"Marimba"
+                                                                ofType:@"m4r"
+                                                           inDirectory:@"Sounds"];
+        if ([bundledPath length] > 0) {
+            [paths addObject:bundledPath];
+        }
+        [paths addObjectsFromArray:[NSArray arrayWithObjects:
+                                    [@"~/Library/Application Support/Telegraphica/Sounds/Marimba.m4r" stringByExpandingTildeInPath],
+                                    [@"~/Library/Sounds/Marimba.m4r" stringByExpandingTildeInPath],
+                                    [@"~/Library/Sounds/Marimba.aiff" stringByExpandingTildeInPath],
+                                    @"/Library/Sounds/Marimba.m4r",
+                                    @"/Library/Sounds/Marimba.aiff",
+                                    @"/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Marimba.m4r",
+                                    @"/System/Library/Sounds/Marimba.aiff",
+                                    nil]];
         for (NSString *path in paths) {
             if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
                 sound = [[[NSSound alloc] initWithContentsOfFile:path byReference:YES] autorelease];
@@ -268,12 +279,6 @@
                 }
             }
         }
-    }
-    if (!sound) {
-        sound = [NSSound soundNamed:@"Funk"];
-    }
-    if (!sound) {
-        sound = [NSSound soundNamed:@"Pop"];
     }
     self.ringSound = sound;
     [self.ringSound setLoops:YES];
