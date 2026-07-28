@@ -1,6 +1,7 @@
 #import "TGCallAudioEngine.h"
 
 #import "../Services/TGBase64Compatibility.h"
+#import "../Services/TGLogger.h"
 
 #ifndef TELEGRAPHICA_HAS_TGVOIP
 #define TELEGRAPHICA_HAS_TGVOIP 0
@@ -18,6 +19,32 @@
 #endif
 
 static NSString * const TGCallAudioEngineErrorDomain = @"TelegraphicaCallAudioEngine";
+
+static NSString *TGCallTransportLogPath(void) {
+    if (![TGLogger diagnosticsEnabled]) {
+        return nil;
+    }
+    NSArray *supportDirectories = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                                                      NSUserDomainMask,
+                                                                      YES);
+    NSString *supportDirectory = [supportDirectories count] > 0
+        ? [supportDirectories objectAtIndex:0] : nil;
+    if (![supportDirectory length]) {
+        return nil;
+    }
+    NSString *logsDirectory = [[supportDirectory stringByAppendingPathComponent:@"Telegraphica"]
+        stringByAppendingPathComponent:@"Logs"];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if (![fileManager createDirectoryAtPath:logsDirectory
+                withIntermediateDirectories:YES
+                                 attributes:nil
+                                      error:NULL]) {
+        return nil;
+    }
+    NSString *logPath = [logsDirectory stringByAppendingPathComponent:@"libtgvoip-current.log"];
+    [fileManager removeItemAtPath:logPath error:NULL];
+    return logPath;
+}
 
 @interface TGCallAudioEngine ()
 - (void)deliverStateNumber:(NSNumber *)stateNumber;
@@ -273,6 +300,10 @@ static TgVoipEndpointType TGEndpointTypeForServer(NSDictionary *server) {
     config.enableNS = true;
     config.enableAGC = true;
     config.enableVolumeControl = true;
+    NSString *transportLogPath = TGCallTransportLogPath();
+    if ([transportLogPath length]) {
+        config.logPath = [transportLogPath fileSystemRepresentation];
+    }
     NSDictionary *remoteProtocol = [[state objectForKey:@"protocol"] isKindOfClass:[NSDictionary class]]
         ? [state objectForKey:@"protocol"] : nil;
     NSInteger remoteMaxLayer = [[remoteProtocol objectForKey:@"max_layer"] respondsToSelector:@selector(integerValue)]
@@ -366,7 +397,12 @@ static TgVoipEndpointType TGEndpointTypeForServer(NSDictionary *server) {
         voip->setOnSignalBarsUpdated(std::function<void(int)>());
         long long relayID = voip->getPreferredRelayId();
         TgVoipFinalState finalState = voip->stop();
-        (void)finalState;
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+            @"Audio call: transport stopped; Wi-Fi sent=%llu received=%llu, mobile sent=%llu received=%llu.",
+            (unsigned long long)finalState.trafficStats.bytesSentWifi,
+            (unsigned long long)finalState.trafficStats.bytesReceivedWifi,
+            (unsigned long long)finalState.trafficStats.bytesSentMobile,
+            (unsigned long long)finalState.trafficStats.bytesReceivedMobile]];
         [_preferredRelayID release];
         _preferredRelayID = [[NSNumber alloc] initWithLongLong:relayID];
         delete voip;
