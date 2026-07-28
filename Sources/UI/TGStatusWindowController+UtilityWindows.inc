@@ -78,6 +78,16 @@ static NSString *TGActiveSessionIconName(NSDictionary *session) {
         }
     }
     NSString *description = [[parts componentsJoinedByString:@" "] lowercaseString];
+    if ([description rangeOfString:@"firefox"].location != NSNotFound) {
+        return @"firefox";
+    }
+    if ([description rangeOfString:@"chrome"].location != NSNotFound ||
+        [description rangeOfString:@"chromium"].location != NSNotFound) {
+        return @"google-chrome";
+    }
+    if ([description rangeOfString:@"opera"].location != NSNotFound) {
+        return @"opera";
+    }
     if ([description rangeOfString:@"android"].location != NSNotFound) {
         return @"android";
     }
@@ -421,6 +431,8 @@ static NSString *TGActiveSessionIconName(NSDictionary *session) {
         [sessionsTable setUsesAlternatingRowBackgroundColors:NO];
         [sessionsTable setBackgroundColor:[NSColor clearColor]];
         [sessionsTable setGridStyleMask:NSTableViewGridNone];
+        [sessionsTable setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+        [sessionsTable setFocusRingType:NSFocusRingTypeNone];
         [sessionsTable setDelegate:self];
         [sessionsTable setDataSource:self];
         NSTableColumn *sessionColumn = [[[NSTableColumn alloc] initWithIdentifier:@"active_session"] autorelease];
@@ -732,8 +744,9 @@ static NSString *TGActiveSessionIconName(NSDictionary *session) {
         [textView setEditable:NO];
         [textView setSelectable:YES];
         [textView setFont:[NSFont userFixedPitchFontOfSize:11.0]];
-        [textView setTextColor:TGClassicMutedInkColor()];
-        [textView setBackgroundColor:TGClassicTablePaperColor()];
+        [textView setDrawsBackground:YES];
+        [textView setTextColor:[NSColor blackColor]];
+        [textView setBackgroundColor:[NSColor whiteColor]];
         [scrollView setDocumentView:textView];
         [contentView addSubview:scrollView];
         self.logsWindowDetailsView = textView;

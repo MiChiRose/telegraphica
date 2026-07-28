@@ -826,6 +826,15 @@
     }
 }
 
+- (void)controlTextDidBeginEditing:(NSNotification *)notification {
+    if ([notification object] == self.sendTextField) {
+        NSText *editor = [self.sendTextField currentEditor];
+        if ([editor isKindOfClass:[NSTextView class]]) {
+            [(NSTextView *)editor setMenu:[self composerTextContextMenu]];
+        }
+    }
+}
+
 - (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector {
     if (control == self.searchTextField &&
         [self control:control textView:textView doSearchCommandBySelector:commandSelector]) {

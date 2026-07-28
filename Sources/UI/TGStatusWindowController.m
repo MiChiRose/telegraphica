@@ -367,6 +367,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableSet *mediaCenterSeenKeys;
 @property (nonatomic, retain) NSMutableSet *mediaCenterDownloadingFileIDs;
 @property (nonatomic, retain) NSMutableDictionary *mediaCenterSavedPathsByFileID;
+@property (nonatomic, retain) NSMutableSet *mediaCenterThumbnailLoadingFileIDs;
+@property (nonatomic, retain) NSMutableSet *mediaCenterThumbnailAttemptedFileIDs;
+@property (nonatomic, retain) NSMutableDictionary *mediaCenterThumbnailPathsByFileID;
+@property (nonatomic, retain) NSOperationQueue *mediaCenterThumbnailQueue;
 @property (nonatomic, assign) NSUInteger mediaCenterGeneration;
 @property (nonatomic, assign) BOOL mediaCenterLoadingMore;
 @property (nonatomic, assign) BOOL mediaCenterExhausted;
@@ -849,6 +853,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaCenterSeenKeys = _mediaCenterSeenKeys;
 @synthesize mediaCenterDownloadingFileIDs = _mediaCenterDownloadingFileIDs;
 @synthesize mediaCenterSavedPathsByFileID = _mediaCenterSavedPathsByFileID;
+@synthesize mediaCenterThumbnailLoadingFileIDs = _mediaCenterThumbnailLoadingFileIDs;
+@synthesize mediaCenterThumbnailAttemptedFileIDs = _mediaCenterThumbnailAttemptedFileIDs;
+@synthesize mediaCenterThumbnailPathsByFileID = _mediaCenterThumbnailPathsByFileID;
+@synthesize mediaCenterThumbnailQueue = _mediaCenterThumbnailQueue;
 @synthesize mediaCenterGeneration = _mediaCenterGeneration;
 @synthesize mediaCenterLoadingMore = _mediaCenterLoadingMore;
 @synthesize mediaCenterExhausted = _mediaCenterExhausted;
@@ -1229,6 +1237,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.mediaCenterItems = [NSMutableArray array];
         self.mediaCenterDownloadingFileIDs = [NSMutableSet set];
         self.mediaCenterSavedPathsByFileID = [NSMutableDictionary dictionary];
+        self.mediaCenterThumbnailLoadingFileIDs = [NSMutableSet set];
+        self.mediaCenterThumbnailAttemptedFileIDs = [NSMutableSet set];
+        self.mediaCenterThumbnailPathsByFileID = [NSMutableDictionary dictionary];
+        self.mediaCenterThumbnailQueue = [[[NSOperationQueue alloc] init] autorelease];
+        [self.mediaCenterThumbnailQueue setMaxConcurrentOperationCount:3];
         self.mediaCenterPaginationAnchorsByFilter = [NSMutableDictionary dictionary];
         self.mediaCenterExhaustedFilterIdentifiers = [NSMutableSet set];
         self.mediaCenterSeenKeys = [NSMutableSet set];
@@ -4330,6 +4343,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaCenterSeenKeys release];
     [_mediaCenterDownloadingFileIDs release];
     [_mediaCenterSavedPathsByFileID release];
+    [_mediaCenterThumbnailLoadingFileIDs release];
+    [_mediaCenterThumbnailAttemptedFileIDs release];
+    [_mediaCenterThumbnailPathsByFileID release];
+    [_mediaCenterThumbnailQueue cancelAllOperations];
+    [_mediaCenterThumbnailQueue release];
     [_pinnedMessagePanelView release];
     [_pinnedMessageStripeField release];
     [_pinnedMessageLabelField release];

@@ -3,6 +3,10 @@
 "tdlib_not_checked" = "TDLib status: not checked";
 "save" = "Save";
 "diagnostics.copyAll" = "Copy all";
+"edit.cut" = "Cut";
+"edit.copy" = "Copy";
+"edit.paste" = "Paste";
+"edit.selectAll" = "Select all";
 "share.location.manualHint" = "Choose a point on the map or use your current location.";
 "cancel" = "Cancel";
 "profile.edit.title" = "Edit Profile";

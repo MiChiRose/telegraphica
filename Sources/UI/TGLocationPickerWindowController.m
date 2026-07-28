@@ -155,20 +155,20 @@
     TGUtilityPanelView *pickerCard = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(16.0, 24.0, 608.0, 442.0)] autorelease];
     [root addSubview:pickerCard];
 
-    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(24.0, height - 116.0, 156.0, 32.0)
+    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(24.0, height - 124.0, 156.0, 32.0)
                                                  title:TGLoc(@"share.location.mine")
                                                 action:@selector(currentLocationPressed:)
                                                primary:NO];
     [root addSubview:self.currentLocationButton];
 
-    [root addSubview:[self labelWithFrame:NSMakeRect(194.0, height - 109.0, 410.0, 18.0)
+    [root addSubview:[self labelWithFrame:NSMakeRect(194.0, height - 117.0, 410.0, 18.0)
                                      text:TGLoc(@"share.location.manualHint")
                                      font:[NSFont systemFontOfSize:11.0]
                                     color:TGClassicCardMutedInkColor()]];
 
-    TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 102.0, 592.0, 318.0)] autorelease];
+    TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 102.0, 592.0, 310.0)] autorelease];
     [root addSubview:mapCard];
-    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 108.0, 580.0, 306.0)] autorelease];
+    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 108.0, 580.0, 298.0)] autorelease];
     [self.mapImageView setCoordinateTarget:self];
     [self.mapImageView setCoordinateAction:@selector(mapCoordinateChosen:)];
     [self.mapImageView setZoom:self.mapZoom];

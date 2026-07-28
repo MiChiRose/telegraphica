@@ -468,7 +468,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
         if ([timeString length] > 0 && !separateMetadataFooter) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
@@ -963,7 +963,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                     messageTextIsPlaceholder ? TGClassicMutedInkColor() : TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
-    NSAttributedString *attributedText = TGAttributedMessageString(messageText, textAttributes);
+    NSAttributedString *attributedText = TGAttributedMessageStringForItem(item, messageText, textAttributes);
     NSRect textRect = NSZeroRect;
     if ([item isVisualMediaMessage]) {
         NSRect mediaRect = TGListMessageMediaRectForItem(item, cellFrame, self.showSenderDetails);

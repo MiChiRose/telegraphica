@@ -309,6 +309,29 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue(normalHeight >= 42.0, @"text bubble should have a minimum safe height");
     TGAssertTrue(!NSIsEmptyRect(TGMessageBubbleRectForItem(textItem, NSMakeRect(0, 0, 640, normalHeight), NO)), @"text bubble rect should be non-empty");
     TGAssertTrue([[TGAttributedMessageString([textItem preview], nil) string] isEqualToString:[textItem preview]], @"attributed text should preserve paragraph text");
+    NSDictionary *strikeType = [NSDictionary dictionaryWithObjectsAndKeys:
+                                @"textEntityTypeStrikethrough", @"@type",
+                                nil];
+    NSDictionary *quoteType = [NSDictionary dictionaryWithObjectsAndKeys:
+                               @"textEntityTypeBlockQuote", @"@type",
+                               nil];
+    NSDictionary *strikeEntity = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  [NSNumber numberWithInteger:0], @"offset",
+                                  [NSNumber numberWithInteger:5], @"length",
+                                  strikeType, @"type",
+                                  nil];
+    NSDictionary *quoteEntity = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 [NSNumber numberWithInteger:7], @"offset",
+                                 [NSNumber numberWithInteger:5], @"length",
+                                 quoteType, @"type",
+                                 nil];
+    [textItem setFormattedEntities:[NSArray arrayWithObjects:strikeEntity, quoteEntity, nil]];
+    NSAttributedString *formattedText = TGAttributedMessageStringForItem(textItem, [textItem preview], nil);
+    TGAssertTrue([[formattedText attribute:NSStrikethroughStyleAttributeName atIndex:1 effectiveRange:NULL] integerValue] == NSUnderlineStyleSingle,
+                 @"TDLib strikethrough entities should reach message rendering");
+    NSParagraphStyle *quoteParagraph = [formattedText attribute:NSParagraphStyleAttributeName atIndex:8 effectiveRange:NULL];
+    TGAssertTrue([quoteParagraph headIndent] >= 12.0,
+                 @"TDLib block quote entities should receive visible quote indentation");
 
     TGSetChatMessagesAsBlocksEnabled(YES);
     CGFloat blockHeight = TGMessageBubbleHeightForItem(textItem, 640.0, NO);
