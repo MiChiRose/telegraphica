@@ -330,8 +330,11 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue([[formattedText attribute:NSStrikethroughStyleAttributeName atIndex:1 effectiveRange:NULL] integerValue] == NSUnderlineStyleSingle,
                  @"TDLib strikethrough entities should reach message rendering");
     NSParagraphStyle *quoteParagraph = [formattedText attribute:NSParagraphStyleAttributeName atIndex:8 effectiveRange:NULL];
-    TGAssertTrue([quoteParagraph headIndent] >= 12.0,
-                 @"TDLib block quote entities should receive visible quote indentation");
+    TGAssertTrue([[quoteParagraph textBlocks] count] == 1,
+                 @"TDLib block quote entities should receive a visible quote block");
+    NSTextBlock *quoteBlock = [[quoteParagraph textBlocks] objectAtIndex:0];
+    TGAssertTrue([quoteBlock widthForLayer:NSTextBlockBorder edge:NSMinXEdge] >= 3.0,
+                 @"TDLib block quote entities should render a visible leading bar");
 
     TGSetChatMessagesAsBlocksEnabled(YES);
     CGFloat blockHeight = TGMessageBubbleHeightForItem(textItem, 640.0, NO);

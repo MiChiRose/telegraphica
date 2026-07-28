@@ -404,14 +404,29 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
         } else if ([typeName isEqualToString:@"textEntityTypeBlockQuote"] ||
                    [typeName isEqualToString:@"textEntityTypeExpandableBlockQuote"]) {
             NSMutableParagraphStyle *quoteParagraph = [[TGMessageTextParagraphStyle() mutableCopy] autorelease];
-            [quoteParagraph setFirstLineHeadIndent:12.0];
-            [quoteParagraph setHeadIndent:12.0];
             [quoteParagraph setParagraphSpacingBefore:4.0];
             [quoteParagraph setParagraphSpacing:8.0];
+            NSTextBlock *quoteBlock = [[[NSTextBlock alloc] init] autorelease];
+            [quoteBlock setBackgroundColor:[TGClassicSelectedRowColor() colorWithAlphaComponent:0.12]];
+            [quoteBlock setBorderColor:TGClassicLinkColor() forEdge:NSMinXEdge];
+            [quoteBlock setWidth:3.0
+                            type:NSTextBlockAbsoluteValueType
+                        forLayer:NSTextBlockBorder
+                            edge:NSMinXEdge];
+            [quoteBlock setWidth:8.0
+                            type:NSTextBlockAbsoluteValueType
+                        forLayer:NSTextBlockPadding
+                            edge:NSMinXEdge];
+            [quoteBlock setWidth:4.0
+                            type:NSTextBlockAbsoluteValueType
+                        forLayer:NSTextBlockPadding
+                            edge:NSMinYEdge];
+            [quoteBlock setWidth:4.0
+                            type:NSTextBlockAbsoluteValueType
+                        forLayer:NSTextBlockPadding
+                            edge:NSMaxYEdge];
+            [quoteParagraph setTextBlocks:[NSArray arrayWithObject:quoteBlock]];
             [attributed addAttribute:NSParagraphStyleAttributeName value:quoteParagraph range:range];
-            [attributed addAttribute:NSBackgroundColorAttributeName
-                               value:[TGClassicSelectedRowColor() colorWithAlphaComponent:0.18]
-                               range:range];
         } else if ([typeName isEqualToString:@"textEntityTypeTextUrl"]) {
             NSString *urlString = [[type objectForKey:@"url"] isKindOfClass:[NSString class]]
                 ? [type objectForKey:@"url"] : nil;

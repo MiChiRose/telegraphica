@@ -570,6 +570,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSDictionary *activeSessionsSummary;
 @property (nonatomic, assign) NSUInteger activeSessionsRequestGeneration;
 @property (nonatomic, retain) NSWindow *mediaPreviewWindow;
+@property (nonatomic, retain) NSView *mediaPreviewPanelView;
+@property (nonatomic, retain) NSView *mediaPreviewSurfaceView;
+@property (nonatomic, retain) NSView *mediaPreviewToolbarView;
 @property (nonatomic, retain) NSScrollView *mediaPreviewScrollView;
 @property (nonatomic, retain) NSImageView *mediaPreviewImageView;
 @property (nonatomic, retain) NSButton *mediaPreviewZoomOutButton;
@@ -1051,6 +1054,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize activeSessionsSummary = _activeSessionsSummary;
 @synthesize activeSessionsRequestGeneration = _activeSessionsRequestGeneration;
 @synthesize mediaPreviewWindow = _mediaPreviewWindow;
+@synthesize mediaPreviewPanelView = _mediaPreviewPanelView;
+@synthesize mediaPreviewSurfaceView = _mediaPreviewSurfaceView;
+@synthesize mediaPreviewToolbarView = _mediaPreviewToolbarView;
 @synthesize mediaPreviewScrollView = _mediaPreviewScrollView;
 @synthesize mediaPreviewImageView = _mediaPreviewImageView;
 @synthesize mediaPreviewZoomOutButton = _mediaPreviewZoomOutButton;
@@ -4604,6 +4610,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_activeSessionsCloseButton release];
     [_activeSessionsSummary release];
     [_mediaPreviewWindow release];
+    [_mediaPreviewPanelView release];
+    [_mediaPreviewSurfaceView release];
+    [_mediaPreviewToolbarView release];
     [_mediaPreviewScrollView release];
     [_mediaPreviewImageView release];
     [_mediaPreviewZoomOutButton release];

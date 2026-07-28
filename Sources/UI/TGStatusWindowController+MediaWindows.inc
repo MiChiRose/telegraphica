@@ -2152,18 +2152,32 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     NSView *contentView = [self.mediaPreviewWindow contentView];
     NSRect bounds = [contentView bounds];
-    CGFloat bottomBarHeight = 58.0;
-    [self.mediaPreviewScrollView setFrame:NSMakeRect(16.0,
-                                                     bottomBarHeight,
-                                                     MAX(120.0, NSWidth(bounds) - 32.0),
-                                                     MAX(80.0, NSHeight(bounds) - bottomBarHeight - 16.0))];
+    NSView *panelView = self.mediaPreviewPanelView;
+    NSView *surfaceView = self.mediaPreviewSurfaceView;
+    NSView *toolbarView = self.mediaPreviewToolbarView;
+    [panelView setFrame:NSMakeRect(12.0,
+                                   12.0,
+                                   MAX(120.0, NSWidth(bounds) - 24.0),
+                                   MAX(100.0, NSHeight(bounds) - 24.0))];
+    [surfaceView setFrame:NSMakeRect(24.0,
+                                     64.0,
+                                     MAX(96.0, NSWidth(bounds) - 48.0),
+                                     MAX(76.0, NSHeight(bounds) - 80.0))];
+    [toolbarView setFrame:NSMakeRect(24.0,
+                                     18.0,
+                                     MAX(96.0, NSWidth(bounds) - 48.0),
+                                     38.0)];
+    [self.mediaPreviewScrollView setFrame:NSMakeRect(30.0,
+                                                     70.0,
+                                                     MAX(84.0, NSWidth(bounds) - 60.0),
+                                                     MAX(64.0, NSHeight(bounds) - 92.0))];
 
     CGFloat buttonSide = 34.0;
     CGFloat fitWidth = 74.0;
     CGFloat gap = 10.0;
     CGFloat controlsWidth = buttonSide + gap + fitWidth + gap + buttonSide;
     CGFloat startX = floor((NSWidth(bounds) - controlsWidth) / 2.0);
-    CGFloat y = 18.0;
+    CGFloat y = 22.0;
     [self.mediaPreviewZoomOutButton setFrame:NSMakeRect(startX, y, buttonSide, 30.0)];
     [self.mediaPreviewFitButton setFrame:NSMakeRect(startX + buttonSide + gap, y, fitWidth, 30.0)];
     [self.mediaPreviewZoomInButton setFrame:NSMakeRect(startX + buttonSide + gap + fitWidth + gap, y, buttonSide, 30.0)];
@@ -2193,8 +2207,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         maxWindowHeight = 260.0;
     }
 
-    CGFloat chromeWidth = 32.0;
-    CGFloat chromeHeight = 74.0;
+    CGFloat chromeWidth = 60.0;
+    CGFloat chromeHeight = 92.0;
     CGFloat availableImageWidth = MAX(160.0, maxWindowWidth - chromeWidth);
     CGFloat availableImageHeight = MAX(120.0, maxWindowHeight - chromeHeight);
     CGFloat scaleX = availableImageWidth / imageSize.width;
@@ -2237,7 +2251,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
-    [window setTitle:@""];
+    [window setTitle:TGLoc(@"media.center.preview")];
     [window setMinSize:NSMakeSize(240, 220)];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
@@ -2246,7 +2260,23 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    TGMediaPreviewScrollView *scrollView = [[[TGMediaPreviewScrollView alloc] initWithFrame:NSMakeRect(16, 58, 488, 346)] autorelease];
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 12, 496, 396)] autorelease];
+    [panelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:panelView];
+    self.mediaPreviewPanelView = panelView;
+
+    TGScrollSurfaceView *imageSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 64, 472, 340)] autorelease];
+    [imageSurface setDrawsInterior:NO];
+    [imageSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:imageSurface];
+    self.mediaPreviewSurfaceView = imageSurface;
+
+    TGGroupedCardView *toolbarView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 18, 472, 38)] autorelease];
+    [toolbarView setAutoresizingMask:NSViewWidthSizable];
+    [contentView addSubview:toolbarView];
+    self.mediaPreviewToolbarView = toolbarView;
+
+    TGMediaPreviewScrollView *scrollView = [[[TGMediaPreviewScrollView alloc] initWithFrame:NSMakeRect(30, 70, 460, 328)] autorelease];
     [scrollView setMagnificationTarget:self];
     [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [scrollView setBorderType:NSNoBorder];
@@ -2415,7 +2445,12 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     self.mediaPreviewMinimumZoomScale = 0.0;
     [self.mediaPreviewImageView setImage:image];
     [self.mediaPreviewImageView setAnimates:YES];
-    [self.mediaPreviewWindow setTitle:@""];
+    NSString *previewTitle = TGLoc(@"media.center.preview");
+    NSString *fileName = [path lastPathComponent];
+    if ([fileName length] > 0) {
+        previewTitle = [NSString stringWithFormat:@"%@ — %@", previewTitle, fileName];
+    }
+    [self.mediaPreviewWindow setTitle:previewTitle];
     [self resizeMediaPreviewWindowForImage:image];
     [self fitMediaPreview:nil];
     [self.mediaPreviewWindow center];
