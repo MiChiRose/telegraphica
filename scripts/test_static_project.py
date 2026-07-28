@@ -547,6 +547,7 @@ def check_additional_message_types_contract(errors):
     calls_text = read_text(os.path.join(ROOT, calls_rel))
     for fragment in ['@"createCall"', '@"acceptCall"', '@"discardCall"',
                      '@"2.4.4"', '@"min_layer"', '@"max_layer"',
+                     '[NSNumber numberWithInteger:92], @"max_layer"',
                      '[NSNumber numberWithBool:NO], @"is_video"']:
         if fragment not in calls_text:
             errors.append("%s: free audio-call signaling is missing `%s`" %
@@ -567,6 +568,8 @@ def check_call_transport_stability_contract(errors):
         "voip->setOnStateUpdated(std::function<void(TgVoipState)>());",
         "voip->setOnSignalBarsUpdated(std::function<void(int)>());",
         "voip)->setOutputVolume(muted ? 0.0f : 1.0f)",
+        "TgVoip::getConnectionMaxLayer()",
+        '[remoteProtocol objectForKey:@"max_layer"]',
     ]:
         if fragment not in audio_text:
             errors.append("%s: libtgvoip call-audio contract is missing `%s`" %
@@ -591,6 +594,7 @@ def check_call_transport_stability_contract(errors):
         'Ringtones/Marimba.m4r',
         'Application Support/Telegraphica/Sounds/Marimba.m4r',
         '~/Library/Sounds/Marimba.m4r',
+        "if (state == TGCallPresentationStateIncoming)",
     ]:
         if fragment not in window_text:
             errors.append("%s: call presentation contract is missing `%s`" %
@@ -599,6 +603,20 @@ def check_call_transport_stability_contract(errors):
         if forbidden_fallback in window_text:
             errors.append("%s: non-Marimba ringtone fallback must not masquerade as Marimba `%s`" %
                           (window_rel, forbidden_fallback))
+    if "state == TGCallPresentationStateCalling || state == TGCallPresentationStateIncoming" in window_text:
+        errors.append("%s: outgoing calls must not play the incoming Marimba ringtone" % window_rel)
+
+    coordinator_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.m")
+    coordinator_text = read_text(os.path.join(ROOT, coordinator_rel))
+    for fragment in [
+        "callNegotiationDidTimeout",
+        'TGLoc(@"calls.negotiationTimeout")',
+        "Audio call: TDLib state",
+        "Audio call: media transport established.",
+    ]:
+        if fragment not in coordinator_text:
+            errors.append("%s: call negotiation diagnostics are missing `%s`" %
+                          (coordinator_rel, fragment))
 
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     history_text = read_text(os.path.join(ROOT, history_rel))

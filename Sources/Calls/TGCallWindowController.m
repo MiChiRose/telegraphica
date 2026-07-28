@@ -352,7 +352,7 @@
     }
     [self.statusField setStringValue:status];
 
-    if (state == TGCallPresentationStateCalling || state == TGCallPresentationStateIncoming) {
+    if (state == TGCallPresentationStateIncoming) {
         [self startRinging];
     } else {
         [self stopRinging];

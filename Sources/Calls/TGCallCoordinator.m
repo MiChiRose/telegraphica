@@ -4,6 +4,7 @@
 #import "TGCallWindowController.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+Calls.h"
+#import "../Services/TGLogger.h"
 #import "../UI/TGLocalization.h"
 #include <math.h>
 
@@ -18,6 +19,7 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
 @property (nonatomic, assign) BOOL mockCall;
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL finishing;
+@property (nonatomic, copy) NSString *activeCallStateType;
 @end
 
 @implementation TGCallCoordinator
@@ -30,6 +32,7 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
 @synthesize mockCall = _mockCall;
 @synthesize outgoing = _outgoing;
 @synthesize finishing = _finishing;
+@synthesize activeCallStateType = _activeCallStateType;
 
 - (id)initWithClient:(TGTDLibClient *)client {
     self = [super init];
@@ -90,7 +93,10 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
             if (self.activeProfile == retainedProfile && !self.finishing) {
                 if (callID) {
                     self.activeCallID = callID;
+                    [[TGLogger sharedLogger] log:@"Audio call: outgoing signaling request accepted by TDLib."];
                 } else {
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Audio call: outgoing signaling failed: %@",
+                                                  failure ? failure : @"unknown error"]];
                     [self.callWindowController setPresentationState:TGCallPresentationStateFailed detail:failure];
                     [self finishCallAfterDelay:4.0];
                 }
@@ -138,6 +144,9 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
     NSDictionary *state = [[call objectForKey:@"state"] isKindOfClass:[NSDictionary class]]
         ? [call objectForKey:@"state"] : nil;
     NSString *stateType = [state objectForKey:@"@type"];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Audio call: TDLib state %@ (%@).",
+                                  stateType ? stateType : @"unknown",
+                                  outgoing ? @"outgoing" : @"incoming"]];
     if (!self.callWindowController && !outgoing &&
         ([stateType isEqualToString:@"callStatePending"] ||
          [stateType isEqualToString:@"callStateExchangingKeys"])) {
@@ -176,17 +185,31 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
     if (!self.activeCallID) {
         self.activeCallID = callID;
     }
+    self.activeCallStateType = stateType;
     if ([stateType isEqualToString:@"callStateExchangingKeys"]) {
         [self.callWindowController setPresentationState:TGCallPresentationStateConnecting detail:nil];
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(callNegotiationDidTimeout)
+                                                   object:nil];
+        [self performSelector:@selector(callNegotiationDidTimeout)
+                   withObject:nil
+                   afterDelay:30.0];
     } else if ([stateType isEqualToString:@"callStateReady"]) {
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(callNegotiationDidTimeout)
+                                                   object:nil];
         if (!self.audioEngine) {
             self.audioEngine = [[[TGCallAudioEngine alloc] init] autorelease];
             [self.audioEngine setDelegate:self];
             NSError *transportError = nil;
             if (![self.audioEngine startWithCall:call error:&transportError]) {
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Audio call: transport start failed: %@",
+                                              [transportError localizedDescription]]];
                 [self.callWindowController setPresentationState:TGCallPresentationStateFailed
                                                           detail:[transportError localizedDescription]];
                 [self finishRealCallDisconnected:YES];
+            } else {
+                [[TGLogger sharedLogger] log:@"Audio call: transport started; waiting for media connection."];
             }
         }
     } else if ([stateType isEqualToString:@"callStateDiscarded"]) {
@@ -199,13 +222,27 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
     }
 }
 
+- (void)callNegotiationDidTimeout {
+    if (self.finishing || self.mockCall || !self.callWindowController ||
+        ![self.activeCallStateType isEqualToString:@"callStateExchangingKeys"]) {
+        return;
+    }
+    [[TGLogger sharedLogger] log:@"Audio call: key exchange timed out before transport became ready."];
+    [self.callWindowController setPresentationState:TGCallPresentationStateFailed
+                                              detail:TGLoc(@"calls.negotiationTimeout")];
+    [self finishRealCallDisconnected:YES];
+}
+
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeState:(TGCallAudioEngineState)state {
     (void)engine;
     if (state == TGCallAudioEngineStateEstablished) {
+        [[TGLogger sharedLogger] log:@"Audio call: media transport established."];
         [self.callWindowController setPresentationState:TGCallPresentationStateConnected detail:nil];
     } else if (state == TGCallAudioEngineStateReconnecting) {
+        [[TGLogger sharedLogger] log:@"Audio call: media transport reconnecting."];
         [self.callWindowController setPresentationState:TGCallPresentationStateReconnecting detail:nil];
     } else if (state == TGCallAudioEngineStateFailed) {
+        [[TGLogger sharedLogger] log:@"Audio call: media transport failed."];
         [self.callWindowController setPresentationState:TGCallPresentationStateFailed detail:nil];
         [self finishRealCallDisconnected:YES];
     }
@@ -232,8 +269,12 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
         NSString *failure = [[error localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!accepted && self.callWindowController == controller) {
+                [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Audio call: accept request failed: %@",
+                                              failure ? failure : @"unknown error"]];
                 [controller setPresentationState:TGCallPresentationStateFailed detail:failure];
                 [self finishCallAfterDelay:4.0];
+            } else if (accepted) {
+                [[TGLogger sharedLogger] log:@"Audio call: accept request acknowledged by TDLib."];
             }
             [failure release];
             [client release];
@@ -304,6 +345,7 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
     self.callWindowController = nil;
     self.activeCallID = nil;
     self.activeProfile = nil;
+    self.activeCallStateType = nil;
     self.mockCall = NO;
     self.finishing = NO;
     [[NSNotificationCenter defaultCenter] postNotificationName:TGCallCoordinatorDidFinishCallNotification
@@ -319,6 +361,7 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
     [_audioEngine release];
     [_activeCallID release];
     [_activeProfile release];
+    [_activeCallStateType release];
     [super dealloc];
 }
 
