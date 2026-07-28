@@ -147,6 +147,7 @@
 @property (nonatomic, retain) NSButton *mockIncomingButton;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTableView *tableView;
+@property (nonatomic, retain) NSScrollView *historyScrollView;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
 @end
 
@@ -166,6 +167,7 @@
 @synthesize mockIncomingButton = _mockIncomingButton;
 @synthesize statusField = _statusField;
 @synthesize tableView = _tableView;
+@synthesize historyScrollView = _historyScrollView;
 @synthesize spinner = _spinner;
 
 - (NSTextField *)labelWithFrame:(NSRect)frame text:(NSString *)text font:(NSFont *)font {
@@ -212,45 +214,46 @@
         [self.cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self addSubview:self.cardView];
 
-        NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 69.0, 180.0, 20.0)
+        NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 63.0, 180.0, 20.0)
                                                     text:@""
                                                     font:[NSFont boldSystemFontOfSize:12.0]];
         [newCallLabel setTag:601];
         [newCallLabel setAutoresizingMask:NSViewMinYMargin];
         [self addSubview:newCallLabel];
 
-        self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30.0, NSHeight(frame) - 104.0, MAX(220.0, NSWidth(frame) - 292.0), 28.0)
+        self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30.0, NSHeight(frame) - 98.0, MAX(220.0, NSWidth(frame) - 292.0), 28.0)
                                                              pullsDown:NO] autorelease];
         [self.contactPopUpButton setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
         [self addSubview:self.contactPopUpButton];
 
-        self.startCallButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 248.0, NSHeight(frame) - 104.0, 128.0, 28.0)
+        self.startCallButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 248.0, NSHeight(frame) - 98.0, 128.0, 28.0)
                                                    title:@""
                                                   action:@selector(startCallPressed:)
                                                  primary:YES];
         [self.startCallButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         [self addSubview:self.startCallButton];
 
-        self.refreshButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 112.0, NSHeight(frame) - 104.0, 82.0, 28.0)
+        self.refreshButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 112.0, NSHeight(frame) - 98.0, 82.0, 28.0)
                                                  title:@""
                                                 action:@selector(refreshPressed:)
                                                primary:NO];
         [self.refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         [self addSubview:self.refreshButton];
 
-        NSTextField *recentLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 136.0, 220.0, 20.0)
+        NSTextField *recentLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 130.0, 220.0, 20.0)
                                                    text:@""
                                                    font:[NSFont boldSystemFontOfSize:12.0]];
         [recentLabel setTag:602];
         [recentLabel setAutoresizingMask:NSViewMinYMargin];
         [self addSubview:recentLabel];
 
-        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30.0, 86.0, NSWidth(frame) - 60.0, NSHeight(frame) - 230.0)] autorelease];
+        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30.0, 86.0, NSWidth(frame) - 60.0, NSHeight(frame) - 222.0)] autorelease];
         [scrollView setBorderType:NSNoBorder];
         [scrollView setDrawsBackground:NO];
         [scrollView setHasVerticalScroller:YES];
         [scrollView setAutohidesScrollers:YES];
         [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        self.historyScrollView = scrollView;
         self.tableView = [[[NSTableView alloc] initWithFrame:[scrollView bounds]] autorelease];
         NSTableColumn *column = [[[NSTableColumn alloc] initWithIdentifier:@"call"] autorelease];
         [column setWidth:NSWidth([scrollView bounds])];
@@ -317,6 +320,26 @@
                                        14.0,
                                        MAX(280.0, NSWidth(bounds) - 28.0),
                                        MAX(150.0, NSHeight(bounds) - 68.0))];
+    NSTextField *newCallLabel = (NSTextField *)[self viewWithTag:601];
+    NSTextField *recentLabel = (NSTextField *)[self viewWithTag:602];
+    [newCallLabel setFrame:NSMakeRect(30.0, NSHeight(bounds) - 63.0, 180.0, 20.0)];
+    [self.contactPopUpButton setFrame:NSMakeRect(30.0,
+                                                 NSHeight(bounds) - 98.0,
+                                                 MAX(220.0, NSWidth(bounds) - 292.0),
+                                                 28.0)];
+    [self.startCallButton setFrame:NSMakeRect(NSWidth(bounds) - 248.0,
+                                              NSHeight(bounds) - 98.0,
+                                              128.0,
+                                              28.0)];
+    [self.refreshButton setFrame:NSMakeRect(NSWidth(bounds) - 112.0,
+                                            NSHeight(bounds) - 98.0,
+                                            82.0,
+                                            28.0)];
+    [recentLabel setFrame:NSMakeRect(30.0, NSHeight(bounds) - 130.0, 220.0, 20.0)];
+    [self.historyScrollView setFrame:NSMakeRect(30.0,
+                                                86.0,
+                                                MAX(220.0, NSWidth(bounds) - 60.0),
+                                                MAX(80.0, NSHeight(bounds) - 222.0))];
 }
 
 - (id)tableView:(NSTableView *)tableView
@@ -441,6 +464,7 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [_mockIncomingButton release];
     [_statusField release];
     [_tableView release];
+    [_historyScrollView release];
     [_spinner release];
     [super dealloc];
 }

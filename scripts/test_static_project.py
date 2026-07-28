@@ -646,10 +646,11 @@ def check_call_transport_stability_contract(errors):
             errors.append("%s: call history direction icon is missing `%s`" %
                           (history_rel, fragment))
     for fragment in [
-        "NSHeight(frame) - 69.0",
-        "NSHeight(frame) - 104.0",
-        "NSHeight(frame) - 136.0",
-        "NSHeight(frame) - 230.0",
+        "NSHeight(frame) - 63.0",
+        "NSHeight(frame) - 98.0",
+        "NSHeight(frame) - 130.0",
+        "NSHeight(frame) - 222.0",
+        "historyScrollView",
     ]:
         if fragment not in history_text:
             errors.append("%s: compact call-history layout is missing `%s`" %
@@ -1192,11 +1193,22 @@ def check_chat_history_deletion_contract(errors):
     for fragment in [
         'TGLoc(@"chat.clearHistory")',
         "@selector(clearChatHistoryFromMenu:)",
+        'TGLoc(@"chat.delete")',
+        "@selector(deletePrivateChatFromMenu:)",
         'TGTemplateIconAssetImage(@"trash"',
     ]:
         if fragment not in menus_text:
             errors.append("%s: clear-history menu is missing `%s`" %
                           (menus_rel, fragment))
+    for fragment in [
+        "deletePrivateChatFromMenu:",
+        "removeFromChatList:YES",
+        'TGLoc(@"chat.deleteConfirmTitle")',
+        'TGLoc(@"chat.deleteConfirm")',
+    ]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: private-chat removal flow is missing `%s`" %
+                          (lifecycle_rel, fragment))
 
 
 def check_hourly_update_check_contract(errors):

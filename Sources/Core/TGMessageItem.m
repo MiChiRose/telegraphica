@@ -119,6 +119,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize pollVoteState = _pollVoteState;
 @synthesize pollVoteMessage = _pollVoteMessage;
 @synthesize replyMarkup = _replyMarkup;
+@synthesize callDuration = _callDuration;
+@synthesize callDiscardReason = _callDiscardReason;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -189,6 +191,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 
 - (BOOL)isPollMessage {
     return [self.contentType isEqualToString:@"messagePoll"];
+}
+
+- (BOOL)isCallMessage {
+    return [self.contentType isEqualToString:@"messageCall"];
 }
 
 - (BOOL)isPlayableMediaMessage {
@@ -399,6 +405,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setPollVoteState:_pollVoteState];
     [copy setPollVoteMessage:_pollVoteMessage];
     [copy setReplyMarkup:_replyMarkup];
+    [copy setCallDuration:_callDuration];
+    [copy setCallDiscardReason:_callDiscardReason];
     return copy;
 }
 
@@ -465,6 +473,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_pollVoteState release];
     [_pollVoteMessage release];
     [_replyMarkup release];
+    [_callDuration release];
+    [_callDiscardReason release];
     [super dealloc];
 }
 

@@ -6755,6 +6755,20 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                             outgoing:outgoing
                                                              preview:preview] autorelease];
         [item setContentType:contentType];
+        if ([contentType isEqualToString:@"messageCall"] &&
+            [contentObject isKindOfClass:[NSDictionary class]]) {
+            id duration = [(NSDictionary *)contentObject objectForKey:@"duration"];
+            if ([duration respondsToSelector:@selector(unsignedIntegerValue)]) {
+                [item setCallDuration:[NSNumber numberWithUnsignedInteger:[duration unsignedIntegerValue]]];
+            }
+            NSDictionary *discardReason = [[(NSDictionary *)contentObject objectForKey:@"discard_reason"]
+                isKindOfClass:[NSDictionary class]]
+                ? [(NSDictionary *)contentObject objectForKey:@"discard_reason"] : nil;
+            NSString *discardType = [[discardReason objectForKey:@"@type"] description];
+            if ([discardType length] > 0) {
+                [item setCallDiscardReason:discardType];
+            }
+        }
         id replyMarkup = [message objectForKey:@"reply_markup"];
         if ([replyMarkup isKindOfClass:[NSDictionary class]]) {
             [item setReplyMarkup:replyMarkup];
