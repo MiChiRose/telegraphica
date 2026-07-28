@@ -991,6 +991,27 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return summary;
     }
 
+    if ([type isEqualToString:@"updateFile"]) {
+        id fileObject = [dictionary objectForKey:@"file"];
+        if (![fileObject isKindOfClass:[NSDictionary class]]) {
+            return nil;
+        }
+        NSNumber *fileID = [self fileIDFromFileObject:fileObject];
+        if (!fileID) {
+            return nil;
+        }
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"file_update" forKey:@"kind"];
+        [summary setObject:fileID forKey:@"file_id"];
+        id localObject = [(NSDictionary *)fileObject objectForKey:@"local"];
+        id completedObject = [localObject isKindOfClass:[NSDictionary class]]
+            ? [(NSDictionary *)localObject objectForKey:@"is_downloading_completed"] : nil;
+        [summary setObject:[NSNumber numberWithBool:([completedObject respondsToSelector:@selector(boolValue)] &&
+                                                     [completedObject boolValue])]
+                    forKey:@"completed"];
+        return summary;
+    }
+
     if ([type isEqualToString:@"updateChatAction"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"chat_action" forKey:@"kind"];
@@ -5054,6 +5075,69 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self multilineTrimmedString:(NSString *)text maximumLength:4060];
 }
 
+- (NSArray *)entitiesFromFormattedTextObject:(id)object alignedToDisplayText:(NSString *)displayText {
+    if (![object isKindOfClass:[NSDictionary class]] || [displayText length] == 0) {
+        return [NSArray array];
+    }
+    NSString *rawText = [[(NSDictionary *)object objectForKey:@"text"] isKindOfClass:[NSString class]]
+        ? [(NSDictionary *)object objectForKey:@"text"] : nil;
+    NSArray *entities = [[(NSDictionary *)object objectForKey:@"entities"] isKindOfClass:[NSArray class]]
+        ? [(NSDictionary *)object objectForKey:@"entities"] : nil;
+    if ([rawText length] == 0 || [entities count] == 0) {
+        return [NSArray array];
+    }
+
+    NSRange displayRange = [rawText rangeOfString:displayText];
+    if (displayRange.location == NSNotFound && [displayText hasSuffix:@"..."] && [displayText length] > 3) {
+        NSString *visiblePrefix = [displayText substringToIndex:[displayText length] - 3];
+        NSRange prefixRange = [rawText rangeOfString:visiblePrefix];
+        if (prefixRange.location != NSNotFound) {
+            displayRange = NSMakeRange(prefixRange.location,
+                                       MIN([displayText length], [rawText length] - prefixRange.location));
+        }
+    }
+    if (displayRange.location == NSNotFound) {
+        displayRange = NSMakeRange(0, MIN([displayText length], [rawText length]));
+    }
+
+    NSMutableArray *alignedEntities = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [entities count]; index++) {
+        id entityObject = [entities objectAtIndex:index];
+        if (![entityObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *entity = (NSDictionary *)entityObject;
+        id offsetObject = [entity objectForKey:@"offset"];
+        id lengthObject = [entity objectForKey:@"length"];
+        if (![offsetObject respondsToSelector:@selector(integerValue)] ||
+            ![lengthObject respondsToSelector:@selector(integerValue)]) {
+            continue;
+        }
+        NSInteger rawOffset = [offsetObject integerValue];
+        NSInteger rawLength = [lengthObject integerValue];
+        if (rawOffset < 0 || rawLength <= 0 || (NSUInteger)rawOffset >= [rawText length]) {
+            continue;
+        }
+        NSUInteger boundedLength = MIN((NSUInteger)rawLength, [rawText length] - (NSUInteger)rawOffset);
+        NSRange rawEntityRange = NSMakeRange((NSUInteger)rawOffset, boundedLength);
+        NSRange intersection = NSIntersectionRange(rawEntityRange, displayRange);
+        if (intersection.length == 0 || intersection.location == NSNotFound) {
+            continue;
+        }
+        NSUInteger alignedOffset = intersection.location - displayRange.location;
+        if (alignedOffset >= [displayText length]) {
+            continue;
+        }
+        NSUInteger alignedLength = MIN(intersection.length, [displayText length] - alignedOffset);
+        NSMutableDictionary *alignedEntity = [NSMutableDictionary dictionaryWithDictionary:entity];
+        [alignedEntity setObject:[NSNumber numberWithUnsignedInteger:alignedOffset] forKey:@"offset"];
+        [alignedEntity setObject:[NSNumber numberWithUnsignedInteger:alignedLength] forKey:@"length"];
+        [alignedEntities addObject:alignedEntity];
+    }
+    return alignedEntities;
+}
+
 - (NSNumber *)fileIDFromFileObject:(id)fileObject {
     if (![fileObject isKindOfClass:[NSDictionary class]]) {
         return nil;
@@ -5830,6 +5914,11 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([videoNoteObject isKindOfClass:[NSDictionary class]]) {
             container = (NSDictionary *)videoNoteObject;
         }
+    } else if ([type isEqualToString:@"messageSticker"]) {
+        id stickerObject = [content objectForKey:@"sticker"];
+        if ([stickerObject isKindOfClass:[NSDictionary class]]) {
+            container = (NSDictionary *)stickerObject;
+        }
     }
 
     if (![container isKindOfClass:[NSDictionary class]]) {
@@ -5852,6 +5941,27 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     id fileNameObject = [container objectForKey:@"file_name"];
     if ([fileNameObject isKindOfClass:[NSString class]] && [(NSString *)fileNameObject length] > 0) {
         [info setObject:fileNameObject forKey:@"file_name"];
+    } else if ([type isEqualToString:@"messageSticker"]) {
+        NSDictionary *formatObject = [[container objectForKey:@"format"] isKindOfClass:[NSDictionary class]]
+            ? [container objectForKey:@"format"] : nil;
+        NSString *formatType = [[formatObject objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [formatObject objectForKey:@"@type"] : @"";
+        if ([formatType length] == 0) {
+            id isAnimatedObject = [container objectForKey:@"is_animated"];
+            id isVideoObject = [container objectForKey:@"is_video"];
+            if ([isVideoObject respondsToSelector:@selector(boolValue)] && [isVideoObject boolValue]) {
+                formatType = @"stickerFormatWebm";
+            } else if ([isAnimatedObject respondsToSelector:@selector(boolValue)] && [isAnimatedObject boolValue]) {
+                formatType = @"stickerFormatTgs";
+            }
+        }
+        NSString *extension = @"webp";
+        if ([formatType isEqualToString:@"stickerFormatTgs"]) {
+            extension = @"tgs";
+        } else if ([formatType isEqualToString:@"stickerFormatWebm"]) {
+            extension = @"webm";
+        }
+        [info setObject:[@"sticker." stringByAppendingString:extension] forKey:@"file_name"];
     }
     id mimeTypeObject = [container objectForKey:@"mime_type"];
     if ([mimeTypeObject isKindOfClass:[NSString class]] && [(NSString *)mimeTypeObject length] > 0) {
@@ -6638,10 +6748,21 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([forwardSource length] > 0) {
             [item setForwardSourceDisplayName:forwardSource];
         }
-        if ([contentType isEqualToString:@"messageText"] && [contentObject isKindOfClass:[NSDictionary class]]) {
-            NSString *editableText = [self textFromFormattedTextObject:[(NSDictionary *)contentObject objectForKey:@"text"]];
-            if ([editableText length] > 0) {
-                [item setEditableText:editableText];
+        if ([contentObject isKindOfClass:[NSDictionary class]]) {
+            id formattedTextObject = nil;
+            if ([contentType isEqualToString:@"messageText"]) {
+                formattedTextObject = [(NSDictionary *)contentObject objectForKey:@"text"];
+            } else {
+                formattedTextObject = [(NSDictionary *)contentObject objectForKey:@"caption"];
+            }
+            NSString *formattedDisplayText = [self textFromFormattedTextObject:formattedTextObject];
+            if ([contentType isEqualToString:@"messageText"] && [formattedDisplayText length] > 0) {
+                [item setEditableText:formattedDisplayText];
+            }
+            NSArray *entities = [self entitiesFromFormattedTextObject:formattedTextObject
+                                                  alignedToDisplayText:formattedDisplayText];
+            if ([entities count] > 0) {
+                [item setFormattedEntities:entities];
             }
         }
         NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(message);

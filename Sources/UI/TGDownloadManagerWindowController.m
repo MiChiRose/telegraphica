@@ -2,11 +2,64 @@
 
 #import "../Media/TGMediaFileActions.h"
 #import "../Services/TGDownloadManager.h"
+#import "TGIconAssets.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
+
+@interface TGDownloadListCell : TGRepresentedObjectCell
+@end
+
+@implementation TGDownloadListCell
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    NSDictionary *item = [self.representedObject isKindOfClass:[NSDictionary class]]
+        ? (NSDictionary *)self.representedObject : nil;
+    if (!item) {
+        return;
+    }
+    BOOL selected = [self isHighlighted];
+    NSRect cardRect = NSInsetRect(cellFrame, 3.0, 3.0);
+    NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect xRadius:10.0 yRadius:10.0];
+    if (selected) {
+        [TGClassicSelectedRowColor() set];
+        [cardPath fill];
+    } else {
+        TGThemeDrawGroupedCardInPath(cardPath, cardRect, [controlView isFlipped]);
+    }
+    [TGClassicTableGridColor() set];
+    [cardPath setLineWidth:1.0];
+    [cardPath stroke];
+
+    NSColor *titleColor = selected ? TGClassicSelectedRowTextColor() : TGClassicCardInkColor();
+    NSColor *detailColor = selected ? [TGClassicSelectedRowTextColor() colorWithAlphaComponent:0.76]
+                                    : TGClassicCardMutedInkColor();
+    NSRect iconRect = NSMakeRect(NSMinX(cardRect) + 10.0, NSMinY(cardRect) + 11.0, 28.0, 28.0);
+    TGDrawTemplateIconAsset(@"document", iconRect, titleColor, 0.9, [controlView isFlipped]);
+
+    CGFloat textX = NSMaxX(iconRect) + 10.0;
+    CGFloat textWidth = MAX(0.0, NSMaxX(cardRect) - textX - 12.0);
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByTruncatingMiddle];
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                     titleColor, NSForegroundColorAttributeName,
+                                     paragraph, NSParagraphStyleAttributeName,
+                                     nil];
+    NSDictionary *detailAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                      detailColor, NSForegroundColorAttributeName,
+                                      paragraph, NSParagraphStyleAttributeName,
+                                      nil];
+    [[item objectForKey:@"title"] drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 8.0, textWidth, 16.0)
+                              withAttributes:titleAttributes];
+    [[item objectForKey:@"detail"] drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 29.0, textWidth, 14.0)
+                               withAttributes:detailAttributes];
+}
+
+@end
 
 @interface TGDownloadManagerWindowController () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, retain) NSTableView *tableView;
@@ -90,6 +143,10 @@
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
 
+    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 48, 656, 376)] autorelease];
+    [panel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:panel];
+
     NSTextField *title = [self labelWithFrame:NSMakeRect(24, 452, 500, 26)
                                          font:[NSFont boldSystemFontOfSize:20.0]
                                         color:TGClassicHeaderTextColor(1.0)];
@@ -106,6 +163,9 @@
     TGGroupedCardView *card = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 62, 640, 350)] autorelease];
     [card setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [root addSubview:card];
+    TGScrollSurfaceView *tableSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(28, 118, 624, 286)] autorelease];
+    [tableSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:tableSurface];
     NSScrollView *scroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(32, 122, 616, 278)] autorelease];
     [scroll setHasVerticalScroller:YES];
     [scroll setBorderType:NSNoBorder];
@@ -116,8 +176,12 @@
     [column setWidth:604.0];
     [column setResizingMask:NSTableColumnAutoresizingMask];
     [self.tableView addTableColumn:column];
+    [column setDataCell:[[[TGDownloadListCell alloc] initTextCell:@""] autorelease]];
     [self.tableView setHeaderView:nil];
-    [self.tableView setRowHeight:44.0];
+    [self.tableView setRowHeight:58.0];
+    [self.tableView setIntercellSpacing:NSMakeSize(0.0, 0.0)];
+    [self.tableView setGridStyleMask:NSTableViewGridNone];
+    [self.tableView setBackgroundColor:[NSColor clearColor]];
     [self.tableView setAllowsEmptySelection:YES];
     [self.tableView setDelegate:self];
     [self.tableView setDataSource:self];
@@ -180,7 +244,20 @@
     } else {
         detail = [NSString stringWithFormat:@"%@ · %@", stateText, detail];
     }
-    return [NSString stringWithFormat:@"%@\n%@", [item objectForKey:@"file_name"], detail];
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            ([item objectForKey:@"file_name"] ? [item objectForKey:@"file_name"] : @""), @"title",
+            (detail ? detail : @""), @"detail",
+            nil];
+}
+
+- (void)tableView:(NSTableView *)tableView
+   willDisplayCell:(id)cell
+    forTableColumn:(NSTableColumn *)tableColumn
+               row:(NSInteger)row {
+    (void)tableColumn;
+    if (tableView == self.tableView && [cell isKindOfClass:[TGDownloadListCell class]]) {
+        [(TGDownloadListCell *)cell setHighlighted:[tableView isRowSelected:row]];
+    }
 }
 
 - (NSDictionary *)selectedDownload {

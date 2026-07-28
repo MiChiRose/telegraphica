@@ -382,6 +382,31 @@ def check_composer_formatting_contract(errors):
         errors.append("%s: formatting control markers must not sync into Telegram drafts" % draft_rel)
 
 
+def check_text_interaction_contract(errors):
+    navigation_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SearchNavigation.inc")
+    navigation_text = read_text(os.path.join(ROOT, navigation_rel))
+    for fragment in [
+        "routeTextEditingKeyEquivalent:",
+        "shortcutFlags != NSCommandKeyMask",
+        "[NSApp sendAction:action to:textView from:self]",
+    ]:
+        if fragment not in navigation_text:
+            errors.append("%s: exact text shortcut routing is missing `%s`" %
+                          (navigation_rel, fragment))
+
+    components_rel = os.path.join("Sources", "UI", "TGStatusViewComponents.m")
+    components_text = read_text(os.path.join(ROOT, components_rel))
+    for fragment in [
+        "clearSelectableMessageText",
+        "selectableTextDescriptorAtPoint:",
+        "[textView setSelectable:YES]",
+        "selectedRange].length > 0",
+    ]:
+        if fragment not in components_text:
+            errors.append("%s: selectable message text support is missing `%s`" %
+                          (components_rel, fragment))
+
+
 def check_additional_message_types_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
@@ -428,6 +453,9 @@ def check_additional_message_types_contract(errors):
                      "self.mapGeneration++;",
                      "setShowsUserLocation:NO",
                      "setDelegate:nil",
+                     "TGLocationSearchService",
+                     "searchPressed:",
+                     "[self.searchService cancel]",
                      "mapUnavailable"]:
         if fragment not in location_picker_text:
             errors.append("%s: location picker regression guard is missing `%s`" %
@@ -437,13 +465,26 @@ def check_additional_message_types_contract(errors):
                       location_picker_rel)
     for fragment in ["MKLocalSearchRequest",
                      "MKLocalSearch",
-                     "CLGeocoder",
-                     "searchPressed:",
-                     "searchField",
-                     "searchButton"]:
+                     "CLGeocoder"]:
         if fragment in location_picker_text:
-            errors.append("%s: disabled legacy location search leaked `%s`" %
+            errors.append("%s: MapKit search lifecycle must stay in the focused service, found `%s`" %
                           (location_picker_rel, fragment))
+
+    location_search_rel = os.path.join("Sources", "UI", "TGLocationSearchService.m")
+    location_search_text = read_text(os.path.join(ROOT, location_search_rel))
+    for fragment in ["TGLocationSearchOperation",
+                     "MKLocalSearchRequest",
+                     "startWithCompletionHandler:",
+                     "[operation cancel]",
+                     "self.completion = nil",
+                     "[self.activeSearch cancel]",
+                     "NSClassFromString(@\"MKLocalSearch\")"]:
+        if fragment not in location_search_text:
+            errors.append("%s: lifecycle-safe location search is missing `%s`" %
+                          (location_search_rel, fragment))
+    if "CLGeocoder" in location_search_text:
+        errors.append("%s: nested CLGeocoder fallback must not bypass search cancellation" %
+                      location_search_rel)
 
     static_map_rel = os.path.join("Sources", "UI", "TGLocationStaticMapView.m")
     static_map_text = read_text(os.path.join(ROOT, static_map_rel))
@@ -993,6 +1034,91 @@ def check_chat_archive_contract(errors):
         errors.append("Sources/Resources/Icons/archive.png: required existing archive icon is missing")
 
 
+def check_chat_history_deletion_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatHistory.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        '@"deleteChatHistory", @"@type"',
+        '@"chat_id"',
+        '@"remove_from_chat_list"',
+        '@"revoke"',
+        'isEqualToString:@"ok"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: chat history deletion request is missing `%s`" %
+                          (client_rel, fragment))
+
+    lifecycle_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatLifecycle.inc")
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    for fragment in [
+        "clearChatHistoryFromMenu:",
+        "NSCriticalAlertStyle",
+        'TGLoc(@"chat.clearHistoryConfirmTitle")',
+        "removeFromChatList:NO",
+        "revoke:NO",
+        "[self.messageItems removeAllObjects]",
+    ]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: safe clear-history flow is missing `%s`" %
+                          (lifecycle_rel, fragment))
+
+    menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    menus_text = read_text(os.path.join(ROOT, menus_rel))
+    for fragment in [
+        'TGLoc(@"chat.clearHistory")',
+        "@selector(clearChatHistoryFromMenu:)",
+        'TGTemplateIconAssetImage(@"trash"',
+    ]:
+        if fragment not in menus_text:
+            errors.append("%s: clear-history menu is missing `%s`" %
+                          (menus_rel, fragment))
+
+
+def check_hourly_update_check_contract(errors):
+    scheduler_rel = os.path.join("Sources", "Services", "TGUpdateCheckScheduler.m")
+    scheduler_text = read_text(os.path.join(ROOT, scheduler_rel))
+    for fragment in [
+        "timerWithTimeInterval:_interval",
+        "NSRunLoopCommonModes",
+        "startWithInitialDelay:",
+        "resetCountdown",
+        "[self.timer invalidate]",
+    ]:
+        if fragment not in scheduler_text:
+            errors.append("%s: background update scheduler is missing `%s`" %
+                          (scheduler_rel, fragment))
+
+    controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    for fragment in [
+        "TGBackgroundUpdateCheckInterval = (60.0 * 60.0)",
+        "TGUpdateCheckScheduler",
+        "initialUpdateCheckDelay",
+        "startWithInitialDelay:initialUpdateCheckDelay",
+        "updateCheckInFlight",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: hourly update-check wiring is missing `%s`" %
+                          (controller_rel, fragment))
+
+    notifications_rel = os.path.join("Sources", "UI", "TGStatusWindowController+Notifications.inc")
+    notifications_text = read_text(os.path.join(ROOT, notifications_rel))
+    for fragment in [
+        "if (self.updateCheckInFlight)",
+        "(now - last) < TGBackgroundUpdateCheckInterval",
+        "[self.updateCheckScheduler resetCountdown]",
+        "self.updateCheckInFlight = NO",
+        'NSString *badgeText = self.updateAvailable ? @"1" : nil',
+        "setBadgeText:badgeText",
+    ]:
+        if fragment not in notifications_text:
+            errors.append("%s: hourly update-check behavior is missing `%s`" %
+                          (notifications_rel, fragment))
+    if "(24.0 * 60.0 * 60.0)" in notifications_text:
+        errors.append("%s: automatic update checks must no longer use the old 24-hour throttle" %
+                      notifications_rel)
+
+
 def check_chat_folder_management_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatFolders.m")
     controller_rel = os.path.join("Sources", "UI", "TGChatFolderManagementWindowController.m")
@@ -1083,11 +1209,14 @@ def main():
     check_no_local_runtime_data(errors)
     check_conversation_creation_contract(errors)
     check_composer_formatting_contract(errors)
+    check_text_interaction_contract(errors)
     check_additional_message_types_contract(errors)
     check_media_file_management_contract(errors)
     check_primary_navigation_contract(errors)
     check_retro_console_contract(errors)
     check_chat_archive_contract(errors)
+    check_chat_history_deletion_contract(errors)
+    check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
     if errors:
         print("Static project tests failed:")

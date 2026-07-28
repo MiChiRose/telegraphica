@@ -773,21 +773,28 @@
 }
 
 - (void)checkForUpdatesManual:(BOOL)manual {
+    if (self.updateCheckInFlight) {
+        return;
+    }
+
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     if (!manual) {
-        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         NSTimeInterval last = [[NSUserDefaults standardUserDefaults] doubleForKey:TGLastUpdateCheckDefaultsKey];
-        if (last > 0.0 && (now - last) < (24.0 * 60.0 * 60.0)) {
+        if (last > 0.0 && now >= last &&
+            (now - last) < TGBackgroundUpdateCheckInterval) {
             return;
         }
-        [[NSUserDefaults standardUserDefaults] setDouble:now forKey:TGLastUpdateCheckDefaultsKey];
-        [[NSUserDefaults standardUserDefaults] synchronize];
     }
+    self.updateCheckInFlight = YES;
+    [[NSUserDefaults standardUserDefaults] setDouble:now forKey:TGLastUpdateCheckDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self.updateCheckScheduler resetCountdown];
+    [self.settingsCheckUpdatesButton setEnabled:NO];
 
     NSString *previousStatus = nil;
     if (manual) {
         previousStatus = [[self.statusField stringValue] copy];
         [self.statusField setStringValue:@"Checking for updates..."];
-        [self.settingsCheckUpdatesButton setEnabled:NO];
     }
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -802,9 +809,10 @@
                                           TGUpdateDownloadFileNameFromInfo(releaseInfo)]];
         }
         dispatch_async(dispatch_get_main_queue(), ^{
+            self.updateCheckInFlight = NO;
+            [self.settingsCheckUpdatesButton setEnabled:YES];
             if (manual) {
                 [self.statusField setStringValue:([previousStatus length] > 0 ? previousStatus : @"")];
-                [self.settingsCheckUpdatesButton setEnabled:YES];
             }
             [self showUpdateCheckResult:releaseInfo errorMessage:errorMessage manual:manual];
             [releaseInfo release];
@@ -970,12 +978,13 @@
     if ([avatarPath length] == 0) {
         return nil;
     }
-    NSImage *avatarImage = TGImageWithCorrectOrientationFromFile(avatarPath);
+    NSImage *avatarImage = TGImageThumbnailFromFile(avatarPath, 128);
     if (!avatarImage) {
         return nil;
     }
-    [avatarImage setSize:NSMakeSize(64.0, 64.0)];
-    return avatarImage;
+    NSImage *notificationImage = [[avatarImage copy] autorelease];
+    [notificationImage setSize:NSMakeSize(64.0, 64.0)];
+    return notificationImage;
 }
 
 - (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {

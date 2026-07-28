@@ -160,16 +160,10 @@
         return;
     }
     if (tableView == self.activeSessionsTableView) {
-        BOOL selected = [tableView isRowSelected:row];
-        [textCell setFont:[NSFont systemFontOfSize:12.0]];
-        [textCell setTextColor:(selected ? TGClassicSelectedRowTextColor() : TGClassicInkColor())];
-        [textCell setDrawsBackground:selected];
-        if (selected) {
-            [textCell setBackgroundColor:TGClassicSelectedRowColor()];
+        if ([textCell isKindOfClass:[TGActiveSessionCell class]]) {
+            [textCell setHighlighted:[tableView isRowSelected:row]];
+            return;
         }
-        [textCell setLineBreakMode:NSLineBreakByTruncatingTail];
-        [textCell setWraps:YES];
-        [textCell setAlignment:NSLeftTextAlignment];
         return;
     }
     if (tableView == self.chatTableView && [identifier isEqual:@"chat"] && [cell isKindOfClass:[TGChatListCell class]]) {
@@ -248,7 +242,19 @@
             return @"";
         }
         NSDictionary *session = (NSDictionary *)candidate;
-        return TGActiveSessionTableTitle(session, TGLoc(@"settings.sessions.unknownDevice"), TGLanguageCode());
+        NSString *combinedTitle = TGActiveSessionTableTitle(session,
+                                                            TGLoc(@"settings.sessions.unknownDevice"),
+                                                            TGLanguageCode());
+        NSArray *lines = [combinedTitle componentsSeparatedByString:@"\n"];
+        NSString *title = [lines count] > 0 ? [lines objectAtIndex:0] : combinedTitle;
+        NSString *detail = [lines count] > 1
+            ? [[lines subarrayWithRange:NSMakeRange(1, [lines count] - 1)] componentsJoinedByString:@" "]
+            : @"";
+        return [NSDictionary dictionaryWithObjectsAndKeys:
+                (title ? title : @""), @"title",
+                (detail ? detail : @""), @"detail",
+                TGActiveSessionIconName(session), @"icon_name",
+                nil];
     }
     if (tableView == self.searchResultsTableView) {
         if (row < 0 || (NSUInteger)row >= [self.searchResultItems count]) {
@@ -402,6 +408,9 @@
                           (previousTopicKind && newTopicKind && [previousTopicKind isEqualToString:newTopicKind]));
     BOOL selectionChanged = !(sameChat && sameThread && sameTopicKind);
     if (selectionChanged) {
+        if (self.mediaCenterVisible) {
+            [self closeMediaCenter:nil];
+        }
         self.chatNavigationClosed = NO;
         if (![self isForumTopicAutoOpenSuppressedForChatID:newChatID]) {
             self.suppressedForumTopicAutoOpenChatID = nil;
@@ -444,7 +453,11 @@
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
     }
-    [self updateAuthControlsForState:self.currentAuthState];
+    if (selectionChanged) {
+        [self updateAuthControlsForState:self.currentAuthState];
+    } else {
+        [self updateSendControls];
+    }
     if (selectionChanged) {
         [self refreshBotComposerForSelectedChat];
     }
@@ -552,7 +565,10 @@
 
     if (selectedIndex != NSNotFound) {
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
+        BOOL previousSuppressSelectionHandling = self.suppressChatSelectionHandling;
+        self.suppressChatSelectionHandling = YES;
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
+        self.suppressChatSelectionHandling = previousSuppressSelectionHandling;
         [self.chatTableView scrollRowToVisible:selectedIndex];
         [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
                                                                          object:self.chatTableView]];
@@ -589,7 +605,10 @@
 
     if ([items count] > 0 && [self.currentAuthState isEqualToString:@"ready"]) {
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:0];
+        BOOL previousSuppressSelectionHandling = self.suppressChatSelectionHandling;
+        self.suppressChatSelectionHandling = YES;
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
+        self.suppressChatSelectionHandling = previousSuppressSelectionHandling;
         [self.chatTableView scrollRowToVisible:0];
         [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
                                                                          object:self.chatTableView]];

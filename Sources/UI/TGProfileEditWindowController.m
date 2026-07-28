@@ -1,5 +1,6 @@
 #import "TGProfileEditWindowController.h"
 #import "TGStatusButtonCells.h"
+#import "TGStatusViewCells.h"
 #import "TGTheme.h"
 #import "TGLocalization.h"
 
@@ -110,9 +111,12 @@ static NSString *TGPreparedProfilePhotoPath(NSString *sourcePath, NSError **erro
         TGProfileEditBackgroundView *contentView = [[[TGProfileEditBackgroundView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 470.0, 450.0)] autorelease];
         [window setContentView:contentView];
 
+        TGGroupedCardView *editorCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20.0, 18.0, 430.0, 374.0)] autorelease];
+        [contentView addSubview:editorCard];
+
         NSTextField *titleField = TGProfileEditLabel(TGLoc(@"profile.edit.title"), NSMakeRect(28.0, 404.0, 414.0, 24.0));
         [titleField setFont:[NSFont boldSystemFontOfSize:18.0]];
-        [titleField setTextColor:TGClassicInkColor()];
+        [titleField setTextColor:TGClassicHeaderTextColor(1.0)];
         [contentView addSubview:titleField];
 
         [contentView addSubview:TGProfileEditLabel(TGLoc(@"profile.edit.photo"), NSMakeRect(30.0, 363.0, 188.0, 18.0))];

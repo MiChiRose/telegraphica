@@ -437,9 +437,11 @@
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
     }
 
-    [self updateOutgoingReadStateForVisibleMessages];
-    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
-    [self.messageTableView reloadData];
+    if (added > 0) {
+        [self updateOutgoingReadStateForVisibleMessages];
+        [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+        [self.messageTableView reloadData];
+    }
     if (added > 0) {
         if (preserveVisiblePosition) {
             NSUInteger targetRow = (NSUInteger)firstVisibleRow + added;
@@ -637,7 +639,7 @@
         return;
     }
 
-    [self refreshInlineMediaPlayback];
+    [self scheduleInlineMediaPlaybackRefreshAfterDelay:0.03];
     [self updateMessageJumpToNewestButtonVisibility];
     [self scheduleVisibleMessageItemsRead];
 
@@ -719,10 +721,9 @@
             }
 
             self.backgroundMessageRefreshInFlight = NO;
-            if ([authorizationState length] > 0) {
+            if ([authorizationState length] > 0 &&
+                ![authorizationState isEqualToString:self.currentAuthState]) {
                 [self updateAuthControlsForState:authorizationState];
-            } else {
-                [self updateAuthControlsForState:self.currentAuthState];
             }
 
             if (selectionStillCurrent &&
@@ -1215,7 +1216,8 @@
                 }
                 [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
             }
-            if ([authorizationState length] > 0) {
+            if ([authorizationState length] > 0 &&
+                ![authorizationState isEqualToString:self.currentAuthState]) {
                 [self updateAuthControlsForState:authorizationState];
             }
             if (interactive) {
@@ -1393,7 +1395,8 @@
                 [self.messageLoadingSpinner stopAnimation:self];
                 [self updateVisibleSection];
             }
-            if ([authorizationState length] > 0) {
+            if ([authorizationState length] > 0 &&
+                ![authorizationState isEqualToString:self.currentAuthState]) {
                 [self updateAuthControlsForState:authorizationState];
             }
             if (shouldPrefillOlderMessages) {
@@ -1493,7 +1496,8 @@
                 }
                 [[TGLogger sharedLogger] log:@"TDLib older message preview load failed."];
             }
-            if ([authorizationState length] > 0) {
+            if ([authorizationState length] > 0 &&
+                ![authorizationState isEqualToString:self.currentAuthState]) {
                 [self updateAuthControlsForState:authorizationState];
             }
             [self setControlsBusy:NO];
@@ -1574,6 +1578,22 @@
             NSString *state = [summary objectForKey:@"state"];
             if ([state length] > 0) {
                 latestAuthorizationState = state;
+            }
+            continue;
+        }
+
+        if ([kind isEqualToString:@"file_update"] && [[summary objectForKey:@"completed"] boolValue]) {
+            NSNumber *fileID = [summary objectForKey:@"file_id"];
+            NSUInteger messageIndex = 0;
+            for (messageIndex = 0; messageIndex < [self.messageItems count]; messageIndex++) {
+                TGMessageItem *messageItem = [self.messageItems objectAtIndex:messageIndex];
+                NSNumber *messageFileID = [messageItem mediaFileID];
+                if ([fileID respondsToSelector:@selector(longLongValue)] &&
+                    [messageFileID respondsToSelector:@selector(longLongValue)] &&
+                    [fileID longLongValue] == [messageFileID longLongValue]) {
+                    needsMessageRefresh = YES;
+                    break;
+                }
             }
             continue;
         }

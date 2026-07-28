@@ -13,6 +13,153 @@
     return [self.messageTableView frameOfCellAtColumn:(NSInteger)columnIndex row:row];
 }
 
+- (NSDictionary *)messageTableView:(TGMessageTableView *)tableView selectableTextDescriptorAtPoint:(NSPoint)tablePoint {
+    if (tableView != self.messageTableView) {
+        return nil;
+    }
+    NSInteger row = [tableView rowAtPoint:tablePoint];
+    if (row < 0 || (NSUInteger)row >= [self.messageItems count]) {
+        return nil;
+    }
+    id candidate = [self.messageItems objectAtIndex:(NSUInteger)row];
+    if (![candidate isKindOfClass:[TGMessageItem class]]) {
+        return nil;
+    }
+    TGMessageItem *item = (TGMessageItem *)candidate;
+    NSString *messageText = TGDisplayTextForMessageItem(item);
+    if ([messageText length] == 0 ||
+        [item isStickerMessage] ||
+        TGMessageItemIsNonVisualPlayableMedia(item) ||
+        TGMessageItemIsNonVisualDocument(item) ||
+        TGMessageItemIsPollContent(item)) {
+        return nil;
+    }
+
+    NSRect cellFrame = [self messageBubbleCellFrameForRow:row];
+    if (NSIsEmptyRect(cellFrame)) {
+        return nil;
+    }
+    BOOL flipped = [tableView isFlipped];
+    BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
+    NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    TGChatMessageBodyFont(), NSFontAttributeName,
+                                    TGClassicInkColor(), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+    NSAttributedString *selectableText = TGAttributedMessageStringForItem(item, messageText, textAttributes);
+    NSRect textRect = NSZeroRect;
+
+    if (TGChatMessagesAsBlocksEnabled()) {
+        NSRect rowRect = NSInsetRect(cellFrame, 6.0, 2.0);
+        CGFloat left = NSMinX(rowRect) + 12.0;
+        NSRect iconRect = NSMakeRect(left, NSMinY(rowRect) + 7.0, 28.0, 28.0);
+        if (NSHeight(rowRect) <= 48.0) {
+            iconRect.origin.y = NSMinY(rowRect) + floor((NSHeight(rowRect) - 28.0) / 2.0);
+        }
+        NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+        NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        TGChatMessageMetaFont(), NSFontAttributeName,
+                                        TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                        nil];
+        NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
+        CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
+        CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
+        NSRect timeRect = NSMakeRect(NSMaxX(rowRect) - 12.0 - timeSize.width - statusWidth - statusGap,
+                                     flipped ? (NSMinY(rowRect) + 8.0) : (NSMaxY(rowRect) - MAX(12.0, ceil(timeSize.height) + 2.0) - 6.0),
+                                     timeSize.width,
+                                     MAX(12.0, ceil(timeSize.height) + 2.0));
+        CGFloat textX = NSMaxX(iconRect) + 10.0;
+        CGFloat textRight = ([timeString length] > 0) ? (NSMinX(timeRect) - 10.0) : (NSMaxX(rowRect) - 12.0);
+        CGFloat textWidth = MAX(1.0, MIN(textRight, NSMaxX(rowRect) - 12.0) - textX);
+        CGFloat textY = flipped ? (NSMinY(rowRect) + 7.0) : (NSMaxY(rowRect) - 7.0);
+        NSString *senderTitle = nil;
+        if (showSenderDetails && [[item senderDisplayName] length] > 0 && ![item outgoing]) {
+            senderTitle = [item senderDisplayName];
+        } else if ([item outgoing]) {
+            senderTitle = TGLoc(@"message.you");
+            if ([senderTitle isEqualToString:@"message.you"]) {
+                senderTitle = @"You";
+            }
+        }
+        if ([senderTitle length] > 0) {
+            textY += flipped ? 15.0 : -15.0;
+        }
+        if (TGMessageContextHeaderHeightForItem(item) > 0.0) {
+            textY += flipped ? 15.0 : -15.0;
+        }
+        if ([item isVisualMediaMessage]) {
+            NSRect mediaRect = TGListMessageMediaRectForItem(item, cellFrame, showSenderDetails);
+            CGFloat captionWidth = MIN(textWidth, NSWidth(rowRect) - textX - 14.0);
+            NSRect measuredRect = [selectableText boundingRectWithSize:NSMakeSize(captionWidth, 12000.0)
+                                                               options:NSStringDrawingUsesLineFragmentOrigin];
+            CGFloat textHeight = MAX(15.0, ceil(NSHeight(measuredRect)));
+            textRect = NSMakeRect(textX, NSMaxY(mediaRect) + 6.0, captionWidth, textHeight + 2.0);
+        } else {
+            NSRect measuredRect = [selectableText boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
+                                                               options:NSStringDrawingUsesLineFragmentOrigin];
+            CGFloat textHeight = MAX(15.0, ceil(NSHeight(measuredRect)));
+            textRect = NSMakeRect(textX,
+                                  flipped ? textY : (textY - textHeight),
+                                  textWidth,
+                                  textHeight + 2.0);
+        }
+    } else {
+        NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
+        if (NSIsEmptyRect(bubbleRect)) {
+            return nil;
+        }
+        NSMutableAttributedString *measuredText = [[selectableText mutableCopy] autorelease];
+        if (!TGMessageUsesSeparateMetadataFooter()) {
+            NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+            if ([timeString length] > 0) {
+                NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                                TGChatMessageMetaFont(), NSFontAttributeName,
+                                                TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                                nil];
+                [measuredText appendAttributedString:[[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
+                                                                                       attributes:timeAttributes] autorelease]];
+                NSAttributedString *statusSuffix = TGOutgoingStatusInlineAttributedStringForItem(item);
+                if ([statusSuffix length] > 0) {
+                    [measuredText appendAttributedString:statusSuffix];
+                }
+            }
+        }
+        NSRect measuredRect = [measuredText boundingRectWithSize:NSMakeSize(NSWidth(bubbleRect) - 24.0, 12000.0)
+                                                         options:NSStringDrawingUsesLineFragmentOrigin];
+        CGFloat textHeight = ceil(NSHeight(measuredRect));
+        CGFloat contentTop = flipped ? (NSMinY(bubbleRect) + 9.0) : (NSMaxY(bubbleRect) - 9.0);
+        contentTop += flipped ? TGMessageSenderHeaderHeightForItem(item, showSenderDetails)
+                              : -TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+        contentTop += flipped ? TGMessageContextHeaderHeightForItem(item)
+                              : -TGMessageContextHeaderHeightForItem(item);
+        if (!flipped) {
+            contentTop -= TGReactionBandHeightForMessageItem(item);
+        }
+        if ([item isVisualMediaMessage]) {
+            NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, NSWidth(bubbleRect) - 16.0);
+            NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
+                                          flipped ? contentTop : (contentTop - photoSize.height),
+                                          photoSize.width,
+                                          photoSize.height);
+            contentTop = flipped ? (NSMaxY(imageRect) + 8.0) : (NSMinY(imageRect) - 8.0);
+        }
+        textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                              flipped ? contentTop : (contentTop - textHeight),
+                              NSWidth(bubbleRect) - 24.0,
+                              textHeight + 2.0);
+    }
+
+    if (NSIsEmptyRect(textRect) || !NSPointInRect(tablePoint, textRect)) {
+        return nil;
+    }
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            [NSValue valueWithRect:textRect], @"frame",
+            selectableText, @"attributed_text",
+            [NSNumber numberWithInteger:row], @"row",
+            nil];
+}
+
 - (NSArray *)mediaLayoutEntriesForItem:(TGMessageItem *)item inCellFrame:(NSRect)cellFrame {
     if (![item isKindOfClass:[TGMessageItem class]] || ![item isVisualMediaMessage] || NSIsEmptyRect(cellFrame)) {
         return [NSArray array];
@@ -63,7 +210,7 @@
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
         if ([timeString length] > 0) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
@@ -300,7 +447,7 @@
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageString(messageText, textAttributes) mutableCopy] autorelease];
+        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
         if ([timeString length] > 0) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];

@@ -2,6 +2,7 @@
 
 #import <MapKit/MapKit.h>
 #import "../Core/TGTDLibClient+MapThumbnail.h"
+#import "TGLocationSearchService.h"
 #import "TGLocationStaticMapView.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
@@ -14,12 +15,16 @@
 @property (nonatomic, assign) BOOL mapServicesAvailable;
 @property (nonatomic, assign) BOOL waitingForUserLocation;
 @property (nonatomic, assign) BOOL hasSelection;
+@property (nonatomic, assign) BOOL closing;
 @property (nonatomic, assign) NSUInteger mapGeneration;
 @property (nonatomic, assign) NSInteger mapZoom;
 @property (nonatomic, assign) CLLocationCoordinate2D selectedCoordinate;
 @property (nonatomic, retain) MKMapView *locationServiceMapView;
+@property (nonatomic, retain) TGLocationSearchService *searchService;
 @property (nonatomic, retain) TGLocationStaticMapView *mapImageView;
+@property (nonatomic, retain) NSTextField *searchField;
 @property (nonatomic, retain) NSTextField *statusField;
+@property (nonatomic, retain) NSButton *searchButton;
 @property (nonatomic, retain) NSButton *currentLocationButton;
 @property (nonatomic, retain) NSButton *sendButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -32,12 +37,16 @@
 @synthesize mapServicesAvailable = _mapServicesAvailable;
 @synthesize waitingForUserLocation = _waitingForUserLocation;
 @synthesize hasSelection = _hasSelection;
+@synthesize closing = _closing;
 @synthesize mapGeneration = _mapGeneration;
 @synthesize mapZoom = _mapZoom;
 @synthesize selectedCoordinate = _selectedCoordinate;
 @synthesize locationServiceMapView = _locationServiceMapView;
+@synthesize searchService = _searchService;
 @synthesize mapImageView = _mapImageView;
+@synthesize searchField = _searchField;
 @synthesize statusField = _statusField;
+@synthesize searchButton = _searchButton;
 @synthesize currentLocationButton = _currentLocationButton;
 @synthesize sendButton = _sendButton;
 @synthesize spinner = _spinner;
@@ -52,6 +61,7 @@
     if (self) {
         self.client = client;
         self.mapZoom = 15;
+        self.searchService = nil;
         self.mapServicesAvailable = (NSClassFromString(@"MKMapView") != Nil &&
                                      NSClassFromString(@"MKPinAnnotationView") != Nil);
         [[self window] setTitle:TGLoc(@"share.location.title")];
@@ -64,10 +74,14 @@
 
 - (void)dealloc {
     [_locationServiceMapView setDelegate:nil];
+    [_searchService cancel];
     [_client release];
     [_locationServiceMapView release];
+    [_searchService release];
     [_mapImageView release];
+    [_searchField release];
     [_statusField release];
+    [_searchButton release];
     [_currentLocationButton release];
     [_sendButton release];
     [_spinner release];
@@ -138,15 +152,23 @@
                                      font:[NSFont systemFontOfSize:11.0]
                                     color:TGClassicHeaderDetailTextColor(0.9)]];
 
-    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(500.0, height - 116.0, 116.0, 30.0)
+    TGUtilityPanelView *pickerCard = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(16.0, 24.0, 608.0, 442.0)] autorelease];
+    [root addSubview:pickerCard];
+
+    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(24.0, height - 124.0, 156.0, 32.0)
                                                  title:TGLoc(@"share.location.mine")
                                                 action:@selector(currentLocationPressed:)
                                                primary:NO];
     [root addSubview:self.currentLocationButton];
 
-    TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 116.0, 592.0, 306.0)] autorelease];
+    [root addSubview:[self labelWithFrame:NSMakeRect(194.0, height - 117.0, 410.0, 18.0)
+                                     text:TGLoc(@"share.location.manualHint")
+                                     font:[NSFont systemFontOfSize:11.0]
+                                    color:TGClassicCardMutedInkColor()]];
+
+    TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 102.0, 592.0, 310.0)] autorelease];
     [root addSubview:mapCard];
-    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 122.0, 580.0, 294.0)] autorelease];
+    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 108.0, 580.0, 298.0)] autorelease];
     [self.mapImageView setCoordinateTarget:self];
     [self.mapImageView setCoordinateAction:@selector(mapCoordinateChosen:)];
     [self.mapImageView setZoom:self.mapZoom];
@@ -163,30 +185,29 @@
     } else {
         [self.currentLocationButton setEnabled:NO];
     }
-
-    [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 382.0, 28.0, 28.0)
+    [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 376.0, 28.0, 28.0)
                                       title:@"−"
                                      action:@selector(zoomOutPressed:)
                                     primary:NO]];
-    [root addSubview:[self buttonWithFrame:NSMakeRect(578.0, 382.0, 28.0, 28.0)
+    [root addSubview:[self buttonWithFrame:NSMakeRect(578.0, 376.0, 28.0, 28.0)
                                       title:@"+"
                                      action:@selector(zoomInPressed:)
                                     primary:NO]];
 
-    self.statusField = [self labelWithFrame:NSMakeRect(24.0, 91.0, 390.0, 18.0)
+    self.statusField = [self labelWithFrame:NSMakeRect(24.0, 78.0, 390.0, 18.0)
                                        text:TGLoc(@"share.location.ready")
                                        font:[NSFont systemFontOfSize:10.0]
-                                      color:TGClassicHeaderDetailTextColor(0.92)];
+                                      color:TGClassicCardMutedInkColor()];
     [root addSubview:self.statusField];
-    self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(420.0, 91.0, 16.0, 16.0)] autorelease];
+    self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(420.0, 78.0, 16.0, 16.0)] autorelease];
     [self.spinner setStyle:NSProgressIndicatorSpinningStyle];
     [self.spinner setDisplayedWhenStopped:NO];
     [root addSubview:self.spinner];
-    [root addSubview:[self buttonWithFrame:NSMakeRect(428.0, 38.0, 88.0, 32.0)
+    [root addSubview:[self buttonWithFrame:NSMakeRect(386.0, 38.0, 110.0, 32.0)
                                       title:TGLoc(@"cancel")
                                      action:@selector(cancelPressed:)
                                     primary:NO]];
-    self.sendButton = [self buttonWithFrame:NSMakeRect(526.0, 38.0, 90.0, 32.0)
+    self.sendButton = [self buttonWithFrame:NSMakeRect(506.0, 38.0, 110.0, 32.0)
                                       title:TGLoc(@"send")
                                      action:@selector(sendPressed:)
                                     primary:YES];
@@ -253,6 +274,8 @@
 }
 
 - (void)mapCoordinateChosen:(NSDictionary *)coordinate {
+    [self.searchService cancel];
+    [self.searchButton setEnabled:[self.searchService isAvailable]];
     CLLocationCoordinate2D selected = CLLocationCoordinate2DMake([[coordinate objectForKey:@"latitude"] doubleValue],
                                                                  [[coordinate objectForKey:@"longitude"] doubleValue]);
     id zoom = [coordinate objectForKey:@"zoom"];
@@ -290,6 +313,8 @@
 
 - (void)currentLocationPressed:(id)sender {
     (void)sender;
+    [self.searchService cancel];
+    [self.searchButton setEnabled:[self.searchService isAvailable]];
     self.waitingForUserLocation = YES;
     [self.statusField setStringValue:TGLoc(@"share.location.locating")];
     [self.spinner startAnimation:nil];
@@ -297,10 +322,52 @@
     [self.locationServiceMapView setShowsUserLocation:YES];
 }
 
+- (void)searchPressed:(id)sender {
+    (void)sender;
+    NSString *query = [[self.searchField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([query length] == 0 || ![self.searchService isAvailable] || self.closing) {
+        NSBeep();
+        return;
+    }
+
+    [self.searchButton setEnabled:NO];
+    [self.spinner startAnimation:nil];
+    [self.statusField setStringValue:TGLoc(@"share.location.searching")];
+    TGLocationPickerWindowController *controller = self;
+    [self.searchService searchForQuery:query
+                       centerLatitude:self.selectedCoordinate.latitude
+                      centerLongitude:self.selectedCoordinate.longitude
+                           completion:^(NSArray *results, NSError *error) {
+        if (controller.closing) {
+            return;
+        }
+        [controller.spinner stopAnimation:nil];
+        [controller.searchButton setEnabled:[controller.searchService isAvailable]];
+        NSDictionary *result = ([results count] > 0 && [[results objectAtIndex:0] isKindOfClass:[NSDictionary class]])
+            ? [results objectAtIndex:0] : nil;
+        if (!result) {
+            [controller.statusField setStringValue:[error localizedDescription] ?: TGLoc(@"share.location.notFound")];
+            return;
+        }
+        CLLocationCoordinate2D coordinate = CLLocationCoordinate2DMake(
+            [[result objectForKey:@"latitude"] doubleValue],
+            [[result objectForKey:@"longitude"] doubleValue]);
+        [controller setSelectedCoordinate:coordinate reloadMap:YES];
+    }];
+}
+
 - (void)prepareForClosing {
+    self.closing = YES;
     self.mapGeneration++;
     self.waitingForUserLocation = NO;
+    [self.searchService cancel];
     [self.spinner stopAnimation:nil];
+    [self.searchButton setEnabled:NO];
+    [self.searchField setTarget:nil];
+    [self.searchField setAction:NULL];
+    [self.searchButton setTarget:nil];
+    [self.searchButton setAction:NULL];
     [self.locationServiceMapView setShowsUserLocation:NO];
     [self.locationServiceMapView setDelegate:nil];
     [self.mapImageView setCoordinateTarget:nil];
@@ -341,6 +408,7 @@
 
 - (NSDictionary *)runModal {
     self.result = nil;
+    self.closing = NO;
     [[self window] center];
     [NSApp runModalForWindow:[self window]];
     return self.result;

@@ -720,12 +720,66 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     return YES;
 }
 
+- (BOOL)routeTextEditingKeyEquivalent:(NSEvent *)event {
+    NSUInteger shortcutFlags = ([event modifierFlags] &
+                                (NSCommandKeyMask | NSShiftKeyMask | NSAlternateKeyMask | NSControlKeyMask));
+    if ([event type] != NSKeyDown || shortcutFlags != NSCommandKeyMask) {
+        return NO;
+    }
+    NSResponder *firstResponder = [[self window] firstResponder];
+    if (![firstResponder isKindOfClass:[NSTextView class]]) {
+        return NO;
+    }
+    NSTextView *textView = (NSTextView *)firstResponder;
+    NSString *characters = [[event charactersIgnoringModifiers] lowercaseString];
+    SEL action = NULL;
+    if ([characters isEqualToString:@"c"]) {
+        action = @selector(copy:);
+    } else if ([characters isEqualToString:@"a"]) {
+        action = @selector(selectAll:);
+    } else if ([characters isEqualToString:@"x"] && [textView isEditable]) {
+        action = @selector(cut:);
+    } else if ([characters isEqualToString:@"v"] && [textView isEditable]) {
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        NSArray *types = [pasteboard types];
+        BOOL hasExplicitAttachment = ([types containsObject:NSFilenamesPboardType] ||
+                                      [types containsObject:NSTIFFPboardType] ||
+                                      [types containsObject:@"public.png"]);
+        NSString *plainText = [pasteboard stringForType:NSStringPboardType];
+        if (hasExplicitAttachment || ![plainText isKindOfClass:[NSString class]]) {
+            return NO;
+        }
+        action = @selector(paste:);
+    }
+    if (!action || ![textView respondsToSelector:action]) {
+        return NO;
+    }
+    if (action == @selector(copy:) && ![textView isEditable]) {
+        NSRange selectedRange = [textView selectedRange];
+        NSString *string = [textView string];
+        if (selectedRange.location == NSNotFound ||
+            selectedRange.length == 0 ||
+            NSMaxRange(selectedRange) > [string length]) {
+            return NO;
+        }
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+        [pasteboard setString:[string substringWithRange:selectedRange] forType:NSStringPboardType];
+        return YES;
+    }
+    [NSApp sendAction:action to:textView from:self];
+    return YES;
+}
+
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
     if ([event type] == NSKeyDown &&
         (([event modifierFlags] & (NSCommandKeyMask | NSAlternateKeyMask | NSControlKeyMask)) == 0) &&
         [[event charactersIgnoringModifiers] length] > 0 &&
         [[event charactersIgnoringModifiers] characterAtIndex:0] == 27) {
         [self closeCurrentChatNavigation:event];
+        return YES;
+    }
+    if ([self routeTextEditingKeyEquivalent:event]) {
         return YES;
     }
     if ([event type] == NSKeyDown &&

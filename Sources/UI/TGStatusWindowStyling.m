@@ -56,10 +56,12 @@
 }
 
 - (void)applyUtilityButtonStyle:(NSButton *)button {
+    NSImage *image = [button image];
+    NSCellImagePosition imagePosition = [button imagePosition];
     [button setButtonType:NSMomentaryPushInButton];
     [button setBezelStyle:NSRoundedBezelStyle];
     [button setBordered:YES];
-    [button setImagePosition:NSNoImage];
+    [button setImagePosition:image ? ((imagePosition == NSNoImage) ? NSImageLeft : imagePosition) : NSNoImage];
     [button setFocusRingType:NSFocusRingTypeExterior];
     [button setFont:[NSFont systemFontOfSize:12.0]];
 }

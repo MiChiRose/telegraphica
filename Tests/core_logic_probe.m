@@ -29,6 +29,18 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     return nil;
 }
 
+NSImage *TGImageThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
+    (void)path;
+    (void)maximumPixelSize;
+    return nil;
+}
+
+NSImage *TGImageThumbnailFromData(NSData *data, NSUInteger maximumPixelSize) {
+    (void)data;
+    (void)maximumPixelSize;
+    return nil;
+}
+
 NSImage *TGIconAssetImageNamed(NSString *name) {
     (void)name;
     return nil;
@@ -108,6 +120,10 @@ static void TGTestThemes(void) {
     TGSetActiveThemeIdentifier(TGThemeIdentifierFrutigerAeroDream);
     TGAssertEqualObjects(TGCurrentThemeIdentifier(), TGThemeIdentifierFrutigerAeroDream, @"active theme should switch to a valid identifier");
     TGAssertTrue(TGThemeIsFrutigerAeroDream(), @"Frutiger Aero Dream helper should match active theme");
+    NSColor *aeroPanelColor = [[TGClassicPanelBottomColor() retain] autorelease];
+    TGSetActiveThemeIdentifier(TGThemeIdentifierSkeuomorphicBlue);
+    NSColor *skeuomorphicPanelColor = [[TGClassicPanelBottomColor() retain] autorelease];
+    TGAssertTrue(![aeroPanelColor isEqual:skeuomorphicPanelColor], @"theme palette cache should invalidate when the active theme changes");
     TGSetActiveThemeIdentifier(@"missing-theme");
     TGAssertEqualObjects(TGCurrentThemeIdentifier(), TGThemeIdentifierVKBlue, @"invalid active theme should fall back to VK Blue");
 
@@ -206,6 +222,7 @@ static void TGTestResourcePolicy(void) {
     TGResourcePolicySetEconomyModeEnabled(NO);
     TGResourcePolicySetMaxAutoDownloadBytes(20LL * 1024LL * 1024LL);
     TGAssertTrue(TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 1024), @"known media with a declared safe size should auto-download");
+    TGAssertTrue(TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageSticker", 1024), @"an individual sticker with a declared safe size should auto-download");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 0), @"missing media size should fail closed");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(nil, 1024), @"missing message type should fail closed");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 21LL * 1024LL * 1024LL), @"oversized media should not auto-download");
@@ -308,6 +325,32 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue(normalHeight >= 42.0, @"text bubble should have a minimum safe height");
     TGAssertTrue(!NSIsEmptyRect(TGMessageBubbleRectForItem(textItem, NSMakeRect(0, 0, 640, normalHeight), NO)), @"text bubble rect should be non-empty");
     TGAssertTrue([[TGAttributedMessageString([textItem preview], nil) string] isEqualToString:[textItem preview]], @"attributed text should preserve paragraph text");
+    NSDictionary *strikeType = [NSDictionary dictionaryWithObjectsAndKeys:
+                                @"textEntityTypeStrikethrough", @"@type",
+                                nil];
+    NSDictionary *quoteType = [NSDictionary dictionaryWithObjectsAndKeys:
+                               @"textEntityTypeBlockQuote", @"@type",
+                               nil];
+    NSDictionary *strikeEntity = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  [NSNumber numberWithInteger:0], @"offset",
+                                  [NSNumber numberWithInteger:5], @"length",
+                                  strikeType, @"type",
+                                  nil];
+    NSDictionary *quoteEntity = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 [NSNumber numberWithInteger:7], @"offset",
+                                 [NSNumber numberWithInteger:5], @"length",
+                                 quoteType, @"type",
+                                 nil];
+    [textItem setFormattedEntities:[NSArray arrayWithObjects:strikeEntity, quoteEntity, nil]];
+    NSAttributedString *formattedText = TGAttributedMessageStringForItem(textItem, [textItem preview], nil);
+    TGAssertTrue([[formattedText attribute:NSStrikethroughStyleAttributeName atIndex:1 effectiveRange:NULL] integerValue] == NSUnderlineStyleSingle,
+                 @"TDLib strikethrough entities should reach message rendering");
+    NSParagraphStyle *quoteParagraph = [formattedText attribute:NSParagraphStyleAttributeName atIndex:8 effectiveRange:NULL];
+    TGAssertTrue([[quoteParagraph textBlocks] count] == 1,
+                 @"TDLib block quote entities should receive a visible quote block");
+    NSTextBlock *quoteBlock = [[quoteParagraph textBlocks] objectAtIndex:0];
+    TGAssertTrue([quoteBlock widthForLayer:NSTextBlockBorder edge:NSMinXEdge] >= 3.0,
+                 @"TDLib block quote entities should render a visible leading bar");
 
     TGSetChatMessagesAsBlocksEnabled(YES);
     CGFloat blockHeight = TGMessageBubbleHeightForItem(textItem, 640.0, NO);
@@ -325,6 +368,22 @@ static void TGTestMessageItemsAndLayout(void) {
     [document setDownloadFileSize:[NSNumber numberWithLongLong:2048]];
     TGAssertTrue(TGMessageItemIsNonVisualDocument(document), @"document message should be detected as a non-visual document");
     TGAssertTrue(TGDocumentBubbleHeightForItem(document) >= 58.0, @"document bubble height should be safe");
+    CGFloat documentBlockHeight = TGMessageBubbleHeightForItem(document, 360.0, NO);
+    NSRect documentBlockRect = TGMessageBubbleRectForItem(document,
+                                                         NSMakeRect(0.0, 0.0, 360.0, documentBlockHeight),
+                                                         NO);
+    TGAssertTrue(documentBlockHeight >= 82.0, @"block document rows should reserve enough room for their controls");
+    TGAssertTrue(NSMaxY(documentBlockRect) <= documentBlockHeight,
+                 @"block document geometry should stay inside its table row");
+
+    TGSetChatMessagesAsBlocksEnabled(NO);
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeVeryLarge);
+    TGAssertTrue(TGMessageUsesSeparateMetadataFooter(),
+                 @"large message text should use a separate footer for time and delivery checks");
+    CGFloat largeTextHeight = TGMessageBubbleHeightForItem(textItem, 360.0, NO);
+    TGAssertTrue(largeTextHeight > normalHeight,
+                 @"large message text should increase the row height instead of clipping metadata");
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
 
     TGMessageItem *photoA = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
                                                          messageID:[NSNumber numberWithInt:4]

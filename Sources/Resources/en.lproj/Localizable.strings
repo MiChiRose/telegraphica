@@ -2,6 +2,12 @@
 "core_spike" = "Telegraphica core spike";
 "tdlib_not_checked" = "TDLib status: not checked";
 "save" = "Save";
+"diagnostics.copyAll" = "Copy all";
+"edit.cut" = "Cut";
+"edit.copy" = "Copy";
+"edit.paste" = "Paste";
+"edit.selectAll" = "Select all";
+"share.location.manualHint" = "Choose a point on the map or use your current location.";
 "cancel" = "Cancel";
 "profile.edit.title" = "Edit Profile";
 "profile.edit.firstName" = "First name";
@@ -183,3 +189,9 @@
 "bot.personalData.manualOnly" = "Telegraphica never shares phone numbers or location from a bot button. Send that information manually if you choose.";
 "bot.webApp.officialOnly" = "Telegram Mini Apps aren't run on this legacy Mac. Use the official Telegram client.";
 "bot.paid.officialOnly" = "Paid Telegram actions are disabled in Telegraphica. Use the official Telegram client if you decide to purchase this feature.";
+"chat.clearHistory" = "Clear History";
+"chat.clearHistoryConfirmTitle" = "Clear history for “%@”?";
+"chat.clearHistoryConfirm" = "All messages in this chat will be removed from your Telegram history. This cannot be undone.";
+"chat.clearingHistory" = "Clearing history…";
+"chat.historyCleared" = "Chat history cleared";
+"chat.clearHistoryFailed" = "Could not clear chat history";

@@ -68,6 +68,61 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     return [NSString stringWithFormat:@"%@\n%@", title, [details componentsJoinedByString:@" · "]];
 }
 
+static NSString *TGActiveSessionIconName(NSDictionary *session) {
+    NSMutableArray *parts = [NSMutableArray array];
+    NSArray *keys = [NSArray arrayWithObjects:@"device_model", @"platform", @"system_version", @"application_name", nil];
+    for (NSString *key in keys) {
+        NSString *value = [session objectForKey:key];
+        if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
+            [parts addObject:value];
+        }
+    }
+    NSString *description = [[parts componentsJoinedByString:@" "] lowercaseString];
+    if ([description rangeOfString:@"firefox"].location != NSNotFound) {
+        return @"firefox";
+    }
+    if ([description rangeOfString:@"chrome"].location != NSNotFound ||
+        [description rangeOfString:@"chromium"].location != NSNotFound) {
+        return @"google-chrome";
+    }
+    if ([description rangeOfString:@"opera"].location != NSNotFound) {
+        return @"opera";
+    }
+    if ([description rangeOfString:@"android"].location != NSNotFound) {
+        return @"android";
+    }
+    if ([description rangeOfString:@"windows"].location != NSNotFound) {
+        return @"windows";
+    }
+    if ([description rangeOfString:@"watch"].location != NSNotFound) {
+        return @"smartwatch";
+    }
+    if ([description rangeOfString:@"ipad"].location != NSNotFound ||
+        [description rangeOfString:@"tablet"].location != NSNotFound) {
+        return @"tablet";
+    }
+    if ([description rangeOfString:@"imac"].location != NSNotFound ||
+        [description rangeOfString:@"all-in-one"].location != NSNotFound) {
+        return @"monoblock";
+    }
+    if ([description rangeOfString:@"macbook"].location != NSNotFound ||
+        [description rangeOfString:@"laptop"].location != NSNotFound ||
+        [description rangeOfString:@"notebook"].location != NSNotFound) {
+        return @"laptop";
+    }
+    if ([description rangeOfString:@"iphone"].location != NSNotFound ||
+        [description rangeOfString:@"ios"].location != NSNotFound ||
+        [description rangeOfString:@"mac"].location != NSNotFound ||
+        [description rangeOfString:@"apple"].location != NSNotFound) {
+        return @"apple";
+    }
+    if ([description rangeOfString:@"phone"].location != NSNotFound ||
+        [description rangeOfString:@"mobile"].location != NSNotFound) {
+        return @"smartphone";
+    }
+    return @"display";
+}
+
 - (void)showDownloadManagerWindow:(id)sender {
     (void)sender;
     if (!self.downloadManagerWindowController) {
@@ -109,22 +164,11 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
 }
 
 - (void)openSelectedChatProfile:(id)sender {
-    (void)sender;
     if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
         NSBeep();
         return;
     }
-    if (self.chatInfoWindowController) {
-        [[self.chatInfoWindowController window] close];
-        self.chatInfoWindowController = nil;
-    }
-    self.chatInfoWindowController = [[[TGChatInfoWindowController alloc] initWithClient:self.client
-                                                                                chatID:self.selectedChatID
-                                                                                 title:self.selectedChatTitle] autorelease];
-    [[self.chatInfoWindowController window] center];
-    [self.chatInfoWindowController showWindow:self];
-    [[self.chatInfoWindowController window] makeKeyAndOrderFront:self];
-    [self.chatInfoWindowController reloadChatInfo];
+    [self openMediaCenter:sender];
 }
 
 - (void)renderActiveSessionsSummary:(NSDictionary *)summary errorMessage:(NSString *)errorMessage {
@@ -361,6 +405,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [window setContentView:contentView];
 
+        TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 52, 596, 380)] autorelease];
+        [panelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [contentView addSubview:panelView];
+
         NSTextField *statusField = [self labelWithFrame:NSMakeRect(24, 438, 440, 20)
                                                     text:TGLoc(@"settings.sessions.loading")
                                                     font:[NSFont systemFontOfSize:12.0]];
@@ -382,18 +430,15 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [sessionsTable setAllowsEmptySelection:NO];
         [sessionsTable setUsesAlternatingRowBackgroundColors:NO];
         [sessionsTable setBackgroundColor:[NSColor clearColor]];
-        [sessionsTable setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
-        [sessionsTable setGridColor:TGClassicTableGridColor()];
+        [sessionsTable setGridStyleMask:NSTableViewGridNone];
+        [sessionsTable setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
+        [sessionsTable setFocusRingType:NSFocusRingTypeNone];
         [sessionsTable setDelegate:self];
         [sessionsTable setDataSource:self];
         NSTableColumn *sessionColumn = [[[NSTableColumn alloc] initWithIdentifier:@"active_session"] autorelease];
         [sessionColumn setWidth:NSWidth([[scrollView contentView] bounds])];
         [sessionColumn setResizingMask:NSTableColumnAutoresizingMask];
-        NSTextFieldCell *sessionCell = [[[NSTextFieldCell alloc] initTextCell:@""] autorelease];
-        [sessionCell setFont:[NSFont systemFontOfSize:12.0]];
-        [sessionCell setLineBreakMode:NSLineBreakByTruncatingTail];
-        [sessionCell setWraps:YES];
-        [sessionCell setScrollable:NO];
+        TGActiveSessionCell *sessionCell = [[[TGActiveSessionCell alloc] initTextCell:@""] autorelease];
         [sessionColumn setDataCell:sessionCell];
         [sessionsTable addTableColumn:sessionColumn];
         [scrollView setDocumentView:sessionsTable];
@@ -656,6 +701,18 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
     [self.storageUsageWindowController showWindow:sender];
 }
 
+- (void)copyDiagnosticLogs:(id)sender {
+    (void)sender;
+    NSString *logs = [self.logsWindowDetailsView string];
+    if (![logs isKindOfClass:[NSString class]] || [logs length] == 0) {
+        NSBeep();
+        return;
+    }
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pasteboard setString:logs forType:NSStringPboardType];
+}
+
 - (void)showLogsWindow:(id)sender {
     (void)sender;
     if (!self.logsWindow) {
@@ -671,6 +728,10 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [window setContentView:contentView];
 
+        TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 52, 636, 366)] autorelease];
+        [panelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+        [contentView addSubview:panelView];
+
         TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 58, 624, 354)] autorelease];
         [cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [contentView addSubview:cardView];
@@ -683,8 +744,9 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
         [textView setEditable:NO];
         [textView setSelectable:YES];
         [textView setFont:[NSFont userFixedPitchFontOfSize:11.0]];
-        [textView setTextColor:TGClassicMutedInkColor()];
-        [textView setBackgroundColor:TGClassicTablePaperColor()];
+        [textView setDrawsBackground:YES];
+        [textView setTextColor:[NSColor blackColor]];
+        [textView setBackgroundColor:[NSColor whiteColor]];
         [scrollView setDocumentView:textView];
         [contentView addSubview:scrollView];
         self.logsWindowDetailsView = textView;
@@ -694,6 +756,14 @@ static NSString *TGActiveSessionTableTitle(NSDictionary *session, NSString *unkn
                                                   font:[NSFont boldSystemFontOfSize:13.0]];
         [titleField setAutoresizingMask:NSViewMinYMargin];
         [contentView addSubview:titleField];
+
+        NSButton *copyButton = [[[NSButton alloc] initWithFrame:NSMakeRect(258, 18, 120, 30)] autorelease];
+        [copyButton setTitle:TGLoc(@"diagnostics.copyAll")];
+        [copyButton setTarget:self];
+        [copyButton setAction:@selector(copyDiagnosticLogs:)];
+        [self applyUtilityButtonStyle:copyButton];
+        [copyButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+        [contentView addSubview:copyButton];
 
         NSButton *checkButton = [[[NSButton alloc] initWithFrame:NSMakeRect(390, 18, 120, 30)] autorelease];
         [checkButton setTitle:@"Check"];

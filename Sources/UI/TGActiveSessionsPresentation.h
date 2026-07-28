@@ -4,6 +4,9 @@ typedef NSString * (^TGActiveSessionsLocalizationBlock)(NSString *key);
 
 @interface TGActiveSessionsPresentation : NSObject
 
++ (NSString *)dateTextForTimestamp:(id)timestamp
+                      languageCode:(NSString *)languageCode;
+
 + (NSString *)statusTextForSummary:(NSDictionary *)summary
                           localize:(TGActiveSessionsLocalizationBlock)localize;
 

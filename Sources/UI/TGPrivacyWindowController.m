@@ -3,10 +3,62 @@
 #import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+Privacy.h"
 #import "TGLocalization.h"
+#import "TGMessageLayoutSupport.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
+
+@interface TGBlockedSenderCell : TGRepresentedObjectCell
+@end
+
+@implementation TGBlockedSenderCell
+
+- (void)drawInteriorWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    NSDictionary *summary = [[self representedObject] isKindOfClass:[NSDictionary class]]
+        ? [self representedObject]
+        : nil;
+    if (!summary) {
+        return;
+    }
+
+    BOOL selected = [self isHighlighted];
+    BOOL flipped = [controlView isFlipped];
+    NSString *title = [summary objectForKey:@"title"];
+    if ([title length] == 0) {
+        title = TGLoc(@"chat.untitled");
+    }
+    NSRect avatarRect = NSMakeRect(NSMinX(cellFrame) + 10.0,
+                                   NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 36.0) / 2.0),
+                                   36.0,
+                                   36.0);
+    TGDrawAvatarInRect([summary objectForKey:@"avatar_local_path"], title, avatarRect, selected, flipped);
+
+    CGFloat textX = NSMaxX(avatarRect) + 11.0;
+    CGFloat textWidth = MAX(40.0, NSMaxX(cellFrame) - textX - 12.0);
+    NSColor *ink = selected ? TGClassicHeaderTextColor(1.0) : TGClassicCardInkColor();
+    NSColor *muted = selected ? TGClassicHeaderDetailTextColor(0.94) : TGClassicCardMutedInkColor();
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:12.5], NSFontAttributeName,
+                                     ink, NSForegroundColorAttributeName,
+                                     nil];
+    NSDictionary *detailAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      [NSFont systemFontOfSize:10.5], NSFontAttributeName,
+                                      muted, NSForegroundColorAttributeName,
+                                      nil];
+    [title drawInRect:NSMakeRect(textX, NSMinY(cellFrame) + 7.0, textWidth, 17.0)
+       withAttributes:titleAttributes];
+    NSString *username = [summary objectForKey:@"username"];
+    NSString *detail = [username length] > 0
+        ? [NSString stringWithFormat:@"@%@", username]
+        : @"";
+    if ([detail length] > 0) {
+        [detail drawInRect:NSMakeRect(textX, NSMinY(cellFrame) + 25.0, textWidth, 15.0)
+            withAttributes:detailAttributes];
+    }
+}
+
+@end
 
 @interface TGPrivacyWindowController () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, retain) TGTDLibClient *client;
@@ -117,6 +169,10 @@
     TGUtilityWindowView *root = [[[TGUtilityWindowView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
+
+    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 42, 736, 520)] autorelease];
+    [panel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:panel];
 
     NSTextField *title = [self labelWithFrame:NSMakeRect(24, 570, 560, 28)
                                          font:[NSFont boldSystemFontOfSize:20.0]
@@ -248,6 +304,9 @@
     [blockedTitle setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:blockedTitle];
 
+    TGScrollSurfaceView *blockedSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(30, 112, 700, 242)] autorelease];
+    [blockedSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:blockedSurface];
     NSScrollView *scroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(34, 116, 692, 234)] autorelease];
     [scroll setHasVerticalScroller:YES];
     [scroll setBorderType:NSNoBorder];
@@ -257,9 +316,12 @@
     NSTableColumn *column = [[[NSTableColumn alloc] initWithIdentifier:@"sender"] autorelease];
     [column setWidth:680.0];
     [column setResizingMask:NSTableColumnAutoresizingMask];
+    [column setDataCell:[[[TGBlockedSenderCell alloc] initTextCell:@""] autorelease]];
     [self.blockedTableView addTableColumn:column];
     [self.blockedTableView setHeaderView:nil];
-    [self.blockedTableView setRowHeight:30.0];
+    [self.blockedTableView setRowHeight:48.0];
+    [self.blockedTableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
+    [self.blockedTableView setBackgroundColor:[NSColor clearColor]];
     [self.blockedTableView setAllowsEmptySelection:YES];
     [self.blockedTableView setDelegate:self];
     [self.blockedTableView setDataSource:self];
@@ -306,10 +368,9 @@
     (void)tableView;
     (void)column;
     if (row < 0 || (NSUInteger)row >= [self.blockedSenders count]) {
-        return @"";
+        return nil;
     }
-    NSString *title = [[self.blockedSenders objectAtIndex:(NSUInteger)row] objectForKey:@"title"];
-    return [title length] > 0 ? title : TGLoc(@"chat.untitled");
+    return [self.blockedSenders objectAtIndex:(NSUInteger)row];
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {

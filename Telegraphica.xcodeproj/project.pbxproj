@@ -98,6 +98,9 @@
 		111111111111111111111191 /* TGTDLibClient+MapThumbnail.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */; };
 		111111111111111111111194 /* TGLocationStaticMapView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111392 /* TGLocationStaticMapView.m */; };
 		111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111394 /* TGTDLibClient+LocationMessages.m */; };
+		111111111111111111111196 /* TGLocationSearchService.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111396 /* TGLocationSearchService.m */; };
+		111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111398 /* TGTDLibClient+ChatHistory.m */; };
+		111111111111111111111198 /* TGUpdateCheckScheduler.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111410 /* TGUpdateCheckScheduler.m */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
@@ -304,6 +307,12 @@
 		111111111111111111111392 /* TGLocationStaticMapView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationStaticMapView.m; sourceTree = "<group>"; };
 		111111111111111111111393 /* TGTDLibClient+LocationMessages.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+LocationMessages.h"; sourceTree = "<group>"; };
 		111111111111111111111394 /* TGTDLibClient+LocationMessages.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+LocationMessages.m"; sourceTree = "<group>"; };
+		111111111111111111111395 /* TGLocationSearchService.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocationSearchService.h; sourceTree = "<group>"; };
+		111111111111111111111396 /* TGLocationSearchService.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationSearchService.m; sourceTree = "<group>"; };
+		111111111111111111111397 /* TGTDLibClient+ChatHistory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+ChatHistory.h"; sourceTree = "<group>"; };
+		111111111111111111111398 /* TGTDLibClient+ChatHistory.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ChatHistory.m"; sourceTree = "<group>"; };
+		111111111111111111111409 /* TGUpdateCheckScheduler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGUpdateCheckScheduler.h; sourceTree = "<group>"; };
+		111111111111111111111410 /* TGUpdateCheckScheduler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGUpdateCheckScheduler.m; sourceTree = "<group>"; };
 		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
@@ -425,6 +434,8 @@
 				111111111111111111111386 /* TGTDLibClient+MapThumbnail.m */,
 				111111111111111111111393 /* TGTDLibClient+LocationMessages.h */,
 				111111111111111111111394 /* TGTDLibClient+LocationMessages.m */,
+				111111111111111111111397 /* TGTDLibClient+ChatHistory.h */,
+				111111111111111111111398 /* TGTDLibClient+ChatHistory.m */,
 				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
 				111111111111111111111291 /* TGTDLibBundledCredentialsGenerated.m */,
 				111111111111111111111212 /* TGChatItem.h */,
@@ -454,6 +465,8 @@
 				111111111111111111111352 /* TGDownloadManager.m */,
 				111111111111111111111280 /* TGResourcePolicy.h */,
 				111111111111111111111281 /* TGResourcePolicy.m */,
+				111111111111111111111409 /* TGUpdateCheckScheduler.h */,
+				111111111111111111111410 /* TGUpdateCheckScheduler.m */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -517,6 +530,8 @@
 				111111111111111111111378 /* TGLocationPickerWindowController.m */,
 				111111111111111111111391 /* TGLocationStaticMapView.h */,
 				111111111111111111111392 /* TGLocationStaticMapView.m */,
+				111111111111111111111395 /* TGLocationSearchService.h */,
+				111111111111111111111396 /* TGLocationSearchService.m */,
 				111111111111111111111379 /* TGSavedMessagesCell.h */,
 				111111111111111111111380 /* TGSavedMessagesCell.m */,
 				111111111111111111111383 /* TGBotCommandPanelView.h */,
@@ -793,6 +808,9 @@
 				111111111111111111111191 /* TGTDLibClient+MapThumbnail.m in Sources */,
 				111111111111111111111194 /* TGLocationStaticMapView.m in Sources */,
 				111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */,
+				111111111111111111111196 /* TGLocationSearchService.m in Sources */,
+				111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */,
+				111111111111111111111198 /* TGUpdateCheckScheduler.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

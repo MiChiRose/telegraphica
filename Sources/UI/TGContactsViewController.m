@@ -82,6 +82,7 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) NSSearchField *searchField;
+@property (nonatomic, retain) TGGroupedCardView *listCardView;
 @property (nonatomic, retain) NSScrollView *scrollView;
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSTextField *statusField;
@@ -109,6 +110,7 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
 @synthesize client = _client;
 @synthesize titleField = _titleField;
 @synthesize searchField = _searchField;
+@synthesize listCardView = _listCardView;
 @synthesize scrollView = _scrollView;
 @synthesize tableView = _tableView;
 @synthesize statusField = _statusField;
@@ -184,9 +186,13 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
     [self.searchField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.searchField];
 
-    self.scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(18, 52, 684, 416)] autorelease];
+    self.listCardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 52, 684, 416)] autorelease];
+    [root addSubview:self.listCardView];
+
+    self.scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(24, 58, 672, 404)] autorelease];
     [self.scrollView setHasVerticalScroller:YES];
-    [self.scrollView setBorderType:NSBezelBorder];
+    [self.scrollView setBorderType:NSNoBorder];
+    [self.scrollView setDrawsBackground:NO];
     [self.scrollView setAutohidesScrollers:YES];
     [self.scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     self.tableView = [[[NSTableView alloc] initWithFrame:[[self.scrollView contentView] bounds]] autorelease];
@@ -195,6 +201,7 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
     [self.tableView setHeaderView:nil];
     [self.tableView setRowHeight:50.0];
     [self.tableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
+    [self.tableView setBackgroundColor:[NSColor clearColor]];
     [self.tableView setAllowsMultipleSelection:NO];
     [self.tableView setTarget:self];
     [self.tableView setDoubleAction:@selector(openSelectedContact:)];
@@ -276,10 +283,12 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
     CGFloat listWidth = showsProfile ? (width - (margin * 3.0) - profileWidth) : (width - (margin * 2.0));
     [self.searchField setFrame:NSMakeRect(margin, searchY, MAX(120.0, listWidth), 28.0)];
     [self.profileView setHidden:!showsProfile];
-    [self.scrollView setFrame:NSMakeRect(margin,
-                                         footerHeight,
-                                         MAX(120.0, listWidth),
-                                         MAX(80.0, tableTop - footerHeight))];
+    NSRect listCardFrame = NSMakeRect(margin,
+                                      footerHeight,
+                                      MAX(120.0, listWidth),
+                                      MAX(80.0, tableTop - footerHeight));
+    [self.listCardView setFrame:listCardFrame];
+    [self.scrollView setFrame:NSInsetRect(listCardFrame, 7.0, 7.0)];
     if (showsProfile) {
         [self.profileView setFrame:NSMakeRect(margin * 2.0 + listWidth,
                                               footerHeight,
@@ -336,6 +345,7 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
     [_client release];
     [_titleField release];
     [_searchField release];
+    [_listCardView release];
     [_scrollView release];
     [_tableView release];
     [_statusField release];
@@ -371,6 +381,7 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
     [self.titleField setTextColor:TGClassicNavigationTextColor(1.0)];
     [self.statusField setTextColor:TGClassicMutedInkColor()];
     [self.profileView refreshThemeAppearance];
+    [self.listCardView setNeedsDisplay:YES];
     [self.openButton setNeedsDisplay:YES];
     [self.actionButton setNeedsDisplay:YES];
     [[self view] setNeedsDisplay:YES];

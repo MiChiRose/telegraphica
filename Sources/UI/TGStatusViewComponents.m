@@ -1,9 +1,46 @@
 #import "TGStatusViewComponents.h"
+#import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGTheme.h"
 #include <math.h>
 
 static CGFloat const TGPanelCornerRadius = 8.0;
+
+@interface TGMessageSelectionTextView : NSTextView
+@end
+
+@implementation TGMessageSelectionTextView
+
+- (void)copy:(id)sender {
+    (void)sender;
+    NSRange selectedRange = [self selectedRange];
+    NSString *string = [self string];
+    if (selectedRange.location == NSNotFound ||
+        selectedRange.length == 0 ||
+        NSMaxRange(selectedRange) > [string length]) {
+        NSBeep();
+        return;
+    }
+    NSString *selection = [string substringWithRange:selectedRange];
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pasteboard setString:selection forType:NSStringPboardType];
+}
+
+- (BOOL)performKeyEquivalent:(NSEvent *)event {
+    NSUInteger shortcutFlags = ([event modifierFlags] &
+                                (NSCommandKeyMask | NSShiftKeyMask | NSAlternateKeyMask | NSControlKeyMask));
+    NSString *characters = [[event charactersIgnoringModifiers] lowercaseString];
+    if ([event type] == NSKeyDown &&
+        shortcutFlags == NSCommandKeyMask &&
+        [characters isEqualToString:@"c"]) {
+        [self copy:self];
+        return YES;
+    }
+    return [super performKeyEquivalent:event];
+}
+
+@end
 
 @implementation TGChromeView
 
@@ -196,6 +233,84 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @synthesize dropOverlayTarget = _dropOverlayTarget;
 
+- (void)clearSelectableMessageText {
+    if (_selectableTextView) {
+        if ([[self window] firstResponder] == _selectableTextView) {
+            [[self window] makeFirstResponder:self];
+        }
+        [_selectableTextView removeFromSuperview];
+        [_selectableTextView release];
+        _selectableTextView = nil;
+    }
+}
+
+- (void)reloadData {
+    [self clearSelectableMessageText];
+    [super reloadData];
+}
+
+- (void)noteHeightOfRowsWithIndexesChanged:(NSIndexSet *)indexSet {
+    [self clearSelectableMessageText];
+    [super noteHeightOfRowsWithIndexesChanged:indexSet];
+}
+
+- (void)mouseDown:(NSEvent *)event {
+    NSPoint tablePoint = [self convertPoint:[event locationInWindow] fromView:nil];
+    NSDictionary *descriptor = nil;
+    if (_dropOverlayTarget &&
+        [_dropOverlayTarget respondsToSelector:@selector(messageTableView:selectableTextDescriptorAtPoint:)]) {
+        descriptor = [(id<TGMessageTextSelectionDelegate>)_dropOverlayTarget messageTableView:self
+                                                              selectableTextDescriptorAtPoint:tablePoint];
+    }
+    NSValue *frameValue = [descriptor objectForKey:@"frame"];
+    NSAttributedString *attributedText = [descriptor objectForKey:@"attributed_text"];
+    NSNumber *rowValue = [descriptor objectForKey:@"row"];
+    if (![frameValue isKindOfClass:[NSValue class]] ||
+        ![attributedText isKindOfClass:[NSAttributedString class]] ||
+        [attributedText length] == 0) {
+        [self clearSelectableMessageText];
+        [super mouseDown:event];
+        return;
+    }
+
+    [self clearSelectableMessageText];
+    if ([rowValue respondsToSelector:@selector(integerValue)]) {
+        NSInteger row = [rowValue integerValue];
+        if (row >= 0 && row < [self numberOfRows]) {
+            [self selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row] byExtendingSelection:NO];
+        }
+    }
+
+    NSRect textFrame = [frameValue rectValue];
+    TGMessageSelectionTextView *textView = [[TGMessageSelectionTextView alloc] initWithFrame:textFrame];
+    [textView setEditable:NO];
+    [textView setSelectable:YES];
+    [textView setRichText:YES];
+    [textView setImportsGraphics:NO];
+    [textView setDrawsBackground:NO];
+    [textView setFocusRingType:NSFocusRingTypeNone];
+    [textView setTextContainerInset:NSZeroSize];
+    [[textView textContainer] setLineFragmentPadding:0.0];
+    NSMutableAttributedString *overlayText = [[attributedText mutableCopy] autorelease];
+    if ([overlayText length] > 0) {
+        [overlayText addAttribute:NSForegroundColorAttributeName
+                           value:[NSColor clearColor]
+                           range:NSMakeRange(0, [overlayText length])];
+        [overlayText addAttribute:NSUnderlineStyleAttributeName
+                           value:[NSNumber numberWithInteger:NSUnderlineStyleNone]
+                           range:NSMakeRange(0, [overlayText length])];
+    }
+    [[textView textStorage] setAttributedString:overlayText];
+    [textView setSelectedTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                        TGClassicNavigationSelectedColor(0.64), NSBackgroundColorAttributeName,
+                                        TGClassicSelectedRowTextColor(), NSForegroundColorAttributeName,
+                                        nil]];
+    [self addSubview:textView];
+    _selectableTextView = textView;
+    [[self window] makeFirstResponder:textView];
+    [textView mouseDown:event];
+}
+
 - (void)notifyDropOverlayTarget {
     SEL selector = NSSelectorFromString(@"messageTableViewDragDidEnd:");
     if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
@@ -215,6 +330,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 }
 
 - (void)copy:(id)sender {
+    if (_selectableTextView && [[self window] firstResponder] == _selectableTextView &&
+        [_selectableTextView selectedRange].length > 0) {
+        [(TGMessageSelectionTextView *)_selectableTextView copy:sender];
+        return;
+    }
     SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
     if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
         [_dropOverlayTarget performSelector:selector withObject:sender ? sender : self];
@@ -236,6 +356,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
             }
         }
         if ([characters isEqualToString:@"c"] || [characters isEqualToString:@"C"]) {
+            if (_selectableTextView && [[self window] firstResponder] == _selectableTextView &&
+                [_selectableTextView selectedRange].length > 0) {
+                [(TGMessageSelectionTextView *)_selectableTextView copy:self];
+                return YES;
+            }
             SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
             if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
                 [_dropOverlayTarget performSelector:selector withObject:self];
@@ -244,6 +369,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
         }
     }
     return [super performKeyEquivalent:event];
+}
+
+- (void)dealloc {
+    [self clearSelectableMessageText];
+    [super dealloc];
 }
 
 - (void)draggingExited:(id <NSDraggingInfo>)sender {
@@ -263,6 +393,79 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
     TGThemeDrawWindowBackgroundInRect([self bounds], [self isFlipped]);
+}
+
+@end
+
+@implementation TGUtilityPanelView
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect panelRect = NSInsetRect([self bounds], 0.5, 0.5);
+    NSBezierPath *panelPath = [NSBezierPath bezierPathWithRoundedRect:panelRect
+                                                              xRadius:16.0
+                                                              yRadius:16.0];
+    TGThemeDrawPanelBackgroundInPath(panelPath, panelRect, [self isFlipped]);
+    [TGClassicPanelStrokeColor() set];
+    [panelPath setLineWidth:1.0];
+    [panelPath stroke];
+}
+
+@end
+
+@implementation TGActiveSessionCell
+
+@synthesize sessionPresentation = _sessionPresentation;
+
+- (id)copyWithZone:(NSZone *)zone {
+    TGActiveSessionCell *cell = [super copyWithZone:zone];
+    cell->_sessionPresentation = nil;
+    [cell setSessionPresentation:self.sessionPresentation];
+    return cell;
+}
+
+- (void)setObjectValue:(id)value {
+    self.sessionPresentation = [value isKindOfClass:[NSDictionary class]] ? value : nil;
+    [super setObjectValue:@""];
+}
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
+    NSRect cardRect = NSInsetRect(cellFrame, 3.0, 3.0);
+    NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect xRadius:10.0 yRadius:10.0];
+    TGThemeDrawGroupedCardInPath(cardPath, cardRect, [controlView isFlipped]);
+    [TGClassicTableGridColor() set];
+    [cardPath setLineWidth:1.0];
+    [cardPath stroke];
+
+    NSColor *titleColor = TGClassicCardInkColor();
+    NSColor *detailColor = TGClassicCardMutedInkColor();
+    NSString *title = [self.sessionPresentation objectForKey:@"title"];
+    NSString *detail = [self.sessionPresentation objectForKey:@"detail"];
+    NSString *iconName = [self.sessionPresentation objectForKey:@"icon_name"];
+    NSRect iconSlot = NSMakeRect(NSMinX(cardRect) + 10.0, NSMinY(cardRect) + 9.0, 30.0, 30.0);
+    if ([iconName length] > 0) {
+        TGDrawTemplateIconAsset(iconName, iconSlot, titleColor, 0.92, [controlView isFlipped]);
+    }
+
+    CGFloat textX = NSMaxX(iconSlot) + 10.0;
+    CGFloat textWidth = MAX(0.0, NSMaxX(cardRect) - textX - 10.0);
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
+                                     titleColor, NSForegroundColorAttributeName,
+                                     nil];
+    NSDictionary *detailAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      [NSFont systemFontOfSize:10.0], NSFontAttributeName,
+                                      detailColor, NSForegroundColorAttributeName,
+                                      nil];
+    [(title ? title : @"") drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 8.0, textWidth, 16.0)
+                       withAttributes:titleAttributes];
+    [(detail ? detail : @"") drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 27.0, textWidth, 14.0)
+                         withAttributes:detailAttributes];
+}
+
+- (void)dealloc {
+    [_sessionPresentation release];
+    [super dealloc];
 }
 
 @end

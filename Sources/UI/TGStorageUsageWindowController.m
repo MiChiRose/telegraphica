@@ -6,6 +6,7 @@
 #import "TGIconAssets.h"
 #import "TGIconDrawing.h"
 #import "TGLocalization.h"
+#import "TGStatusViewComponents.h"
 #import "TGTheme.h"
 #import "TGTransparentSpinnerView.h"
 #include <math.h>
@@ -15,7 +16,7 @@ static NSColor *TGStorageAccentBlue(void) {
 }
 
 static NSColor *TGStorageCardColor(void) {
-    return [NSColor colorWithCalibratedWhite:1.0 alpha:0.92];
+    return TGClassicTablePaperColor();
 }
 
 static NSColor *TGStorageSoftBackgroundColor(void) {
@@ -60,18 +61,11 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     CGFloat alpha = enabled ? 1.0 : 0.48;
     NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
     NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:10.0 yRadius:10.0];
-    NSColor *topColor = highlighted ? TGColorFromHex(0x1988e5) : TGColorFromHex(0x32a8ff);
-    NSColor *bottomColor = highlighted ? TGColorFromHex(0x1378cb) : TGColorFromHex(0x168eea);
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[topColor colorWithAlphaComponent:alpha]
-                                                          endingColor:[bottomColor colorWithAlphaComponent:alpha]] autorelease];
-    [gradient drawInBezierPath:path angle:90.0];
-    [[TGColorFromHex(0x0d74c7) colorWithAlphaComponent:alpha] set];
-    [path setLineWidth:1.0];
-    [path stroke];
+    TGThemeDrawEnamelButtonInPath(path, buttonRect, highlighted, NO, enabled, [controlView isFlipped]);
 
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 [NSFont boldSystemFontOfSize:14.0], NSFontAttributeName,
-                                [NSColor colorWithCalibratedWhite:1.0 alpha:alpha], NSForegroundColorAttributeName,
+                                TGClassicNavigationTextColor(alpha), NSForegroundColorAttributeName,
                                 nil];
     NSString *title = [self title] ? [self title] : @"";
     NSSize size = [title sizeWithAttributes:attributes];
@@ -95,14 +89,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     CGFloat alpha = enabled ? 1.0 : 0.48;
     NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
     NSBezierPath *buttonPath = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:8.0 yRadius:8.0];
-    NSColor *topColor = highlighted ? TGColorFromHex(0x315f8f) : TGColorFromHex(0x446f9e);
-    NSColor *bottomColor = highlighted ? TGColorFromHex(0x183756) : TGColorFromHex(0x203f62);
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:[topColor colorWithAlphaComponent:alpha]
-                                                          endingColor:[bottomColor colorWithAlphaComponent:alpha]] autorelease];
-    [gradient drawInBezierPath:buttonPath angle:90.0];
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.34 * alpha] set];
-    [buttonPath setLineWidth:1.0];
-    [buttonPath stroke];
+    TGThemeDrawEnamelButtonInPath(buttonPath, buttonRect, highlighted, NO, enabled, [controlView isFlipped]);
 
     NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
                                  NSMidY(buttonRect) - 9.0,
@@ -110,7 +97,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
                                  18.0);
     TGDrawTemplateIconAsset(@"refresh",
                             iconRect,
-                            [NSColor colorWithCalibratedWhite:1.0 alpha:0.92 * alpha],
+                            TGClassicNavigationTextColor(0.92 * alpha),
                             1.0,
                             [controlView isFlipped]);
 }
@@ -384,14 +371,18 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [window center];
     [self setWindow:window];
 
-    NSView *contentView = [window contentView];
-    [contentView setWantsLayer:YES];
-    [[contentView layer] setBackgroundColor:[TGStorageSoftBackgroundColor() CGColor]];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:[[window contentView] bounds]] autorelease];
+    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [window setContentView:contentView];
+
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(18, 54, 604, 440)] autorelease];
+    [contentView addSubview:panelView];
 
     self.titleField = [self labelWithFrame:NSMakeRect(34, 506, 572, 30)
                                       font:[NSFont boldSystemFontOfSize:20.0]];
     [self.titleField setStringValue:TGLoc(@"storage.title")];
     [self.titleField setAlignment:NSCenterTextAlignment];
+    [self.titleField setTextColor:TGClassicHeaderTextColor(1.0)];
     [contentView addSubview:self.titleField];
 
     self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(28, 500, 34, 32)] autorelease];

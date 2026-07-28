@@ -164,25 +164,33 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [window setTitle:@"Send photo"];
     [window setReleasedWhenClosed:NO];
 
-    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
+
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 16, 496, 502)] autorelease];
+    [panelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:panelView];
+    TGGroupedCardView *previewCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24, 66, 472, 442)] autorelease];
+    [previewCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:previewCard];
 
     NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 518, 472, 24)
                                               text:@"1 media"
                                               font:[NSFont boldSystemFontOfSize:16.0]];
     [titleField setAlignment:NSCenterTextAlignment];
+    [titleField setTextColor:TGClassicHeaderTextColor(1.0)];
     [contentView addSubview:titleField];
     self.photoSendTitleField = titleField;
 
-    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(44, 204, 432, 296)] autorelease];
+    NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(36, 204, 448, 296)] autorelease];
     [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
-    [imageView setImageFrameStyle:NSImageFrameGrayBezel];
+    [imageView setImageFrameStyle:NSImageFrameNone];
     [imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:imageView];
     self.photoSendPreviewImageView = imageView;
 
-    NSTextField *metaField = [self labelWithFrame:NSMakeRect(44, 188, 432, 16)
+    NSTextField *metaField = [self labelWithFrame:NSMakeRect(36, 188, 448, 16)
                                              text:@""
                                              font:[NSFont systemFontOfSize:11.0]];
     [self applyMutedLabelStyle:metaField];
@@ -192,25 +200,27 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:metaField];
     self.photoSendMetaField = metaField;
 
-    NSScrollView *queueScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(44, 112, 432, 70)] autorelease];
-    [queueScrollView setBorderType:NSBezelBorder];
+    TGScrollSurfaceView *queueSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(36, 108, 448, 78)] autorelease];
+    [queueSurface setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:queueSurface];
+    NSScrollView *queueScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(40, 112, 440, 70)] autorelease];
+    [queueScrollView setBorderType:NSNoBorder];
     [queueScrollView setHasVerticalScroller:YES];
     [queueScrollView setAutohidesScrollers:YES];
-    [queueScrollView setDrawsBackground:YES];
-    [queueScrollView setBackgroundColor:[NSColor colorWithCalibratedWhite:0.985 alpha:1.0]];
+    [queueScrollView setDrawsBackground:NO];
     [queueScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    NSView *queueContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 428, 70)] autorelease];
+    NSView *queueContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 436, 70)] autorelease];
     [queueScrollView setDocumentView:queueContentView];
     [contentView addSubview:queueScrollView];
     self.photoSendQueueScrollView = queueScrollView;
     self.photoSendQueueContentView = queueContentView;
 
-    TGComposerInputBackgroundView *captionBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(44, 76, 432, 30)] autorelease];
+    TGComposerInputBackgroundView *captionBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(36, 76, 448, 30)] autorelease];
     [captionBackground setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:captionBackground];
     self.photoSendCaptionBackgroundView = captionBackground;
 
-    NSTextField *captionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(53, 83, 414, 18)] autorelease];
+    NSTextField *captionField = [[[NSTextField alloc] initWithFrame:NSMakeRect(45, 83, 430, 18)] autorelease];
     [self applyComposerTextFieldStyle:captionField];
     [[captionField cell] setPlaceholderString:TGLoc(@"caption.placeholder")];
     [captionField setDelegate:(id)self];
@@ -218,7 +228,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:captionField];
     self.photoSendCaptionField = captionField;
 
-    NSTextField *errorField = [self labelWithFrame:NSMakeRect(44, 58, 432, 16)
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(36, 58, 448, 16)
                                               text:@""
                                               font:[NSFont systemFontOfSize:11.0]];
     [errorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
@@ -232,6 +242,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [cancelButton setTitle:TGLoc(@"cancel")];
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelPendingPhotoSend:)];
+    [cancelButton setKeyEquivalent:[NSString stringWithFormat:@"%C", (unichar)27]];
+    [cancelButton setKeyEquivalentModifierMask:0];
     [cancelButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:cancelButton];
 
@@ -239,6 +251,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [sendButton setTitle:TGLoc(@"send")];
     [sendButton setTarget:self];
     [sendButton setAction:@selector(sendPendingPhotoPreview:)];
+    [sendButton setKeyEquivalent:@"\r"];
+    [sendButton setKeyEquivalentModifierMask:0];
     [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
     [sendButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:sendButton];
@@ -271,7 +285,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSSize canvasSize = NSMakeSize(432.0, 376.0);
     NSImage *canvas = [[[NSImage alloc] initWithSize:canvasSize] autorelease];
     [canvas lockFocus];
-    [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
+    [TGClassicTablePaperColor() set];
     NSRectFill(NSMakeRect(0.0, 0.0, canvasSize.width, canvasSize.height));
 
     TGAttachmentDescriptor *firstDescriptor = [descriptors objectAtIndex:0];
@@ -327,8 +341,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
     NSArray *queueItems = self.pendingAttachmentQueueItems;
     CGFloat rowHeight = 24.0;
+    CGFloat contentWidth = MAX(360.0, NSWidth([[self.photoSendQueueScrollView contentView] bounds]));
     CGFloat contentHeight = MAX(72.0, (CGFloat)[queueItems count] * rowHeight);
-    [queueView setFrame:NSMakeRect(0.0, 0.0, 428.0, contentHeight)];
+    [queueView setFrame:NSMakeRect(0.0, 0.0, contentWidth, contentHeight)];
 
     NSUInteger index = 0;
     for (index = 0; index < [queueItems count]; index++) {
@@ -340,13 +355,18 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         TGAttachmentDescriptor *descriptor = item.descriptor;
         CGFloat y = contentHeight - rowHeight - (CGFloat)index * rowHeight;
 
-        NSTextField *nameField = [self labelWithFrame:NSMakeRect(8.0, y + 4.0, 238.0, 16.0)
+        CGFloat sizeWidth = 76.0;
+        CGFloat stateWidth = 86.0;
+        CGFloat sizeX = contentWidth - sizeWidth - 8.0;
+        CGFloat stateX = sizeX - stateWidth - 8.0;
+        CGFloat nameWidth = MAX(90.0, stateX - 16.0);
+        NSTextField *nameField = [self labelWithFrame:NSMakeRect(8.0, y + 4.0, nameWidth, 16.0)
                                                  text:([descriptor.fileName length] > 0 ? descriptor.fileName : @"File")
                                                  font:[NSFont systemFontOfSize:11.0]];
         [[nameField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
         [queueView addSubview:nameField];
 
-        NSTextField *stateField = [self labelWithFrame:NSMakeRect(252.0, y + 4.0, 86.0, 16.0)
+        NSTextField *stateField = [self labelWithFrame:NSMakeRect(stateX, y + 4.0, stateWidth, 16.0)
                                                   text:TGAttachmentQueueStateText(item.transferState.state)
                                                   font:[NSFont boldSystemFontOfSize:11.0]];
         if (item.transferState.state == TGFileTransferStateFailed) {
@@ -358,7 +378,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         }
         [queueView addSubview:stateField];
 
-        NSTextField *sizeField = [self labelWithFrame:NSMakeRect(342.0, y + 4.0, 76.0, 16.0)
+        NSTextField *sizeField = [self labelWithFrame:NSMakeRect(sizeX, y + 4.0, sizeWidth, 16.0)
                                                  text:[descriptor readableSize]
                                                  font:[NSFont systemFontOfSize:11.0]];
         [self applyMutedLabelStyle:sizeField];
@@ -1047,7 +1067,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 560, 500);
+    NSRect frame = NSMakeRect(0, 0, 560, 540);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -1060,14 +1080,18 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    NSTextField *statusField = [self labelWithFrame:NSMakeRect(20, 466, 134, 18)
+    TGStickerPickerPanelView *controlsPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 430, 536, 96)] autorelease];
+    [controlsPanel setAutoresizingMask:NSViewWidthSizable];
+    [contentView addSubview:controlsPanel];
+
+    NSTextField *statusField = [self labelWithFrame:NSMakeRect(28, 496, 220, 18)
                                                text:TGLoc(@"stickers.recent")
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
     [contentView addSubview:statusField];
     self.stickerPickerStatusField = statusField;
 
-    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(166, 458, 116, 30)] autorelease];
+    NSButton *recentButton = [[[NSButton alloc] initWithFrame:NSMakeRect(260, 489, 116, 30)] autorelease];
     [recentButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.recent.tab")] autorelease]];
     [recentButton setTitle:TGLoc(@"stickers.recent.tab")];
     [recentButton setImage:TGTemplateIconAssetImage(@"history", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1079,8 +1103,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [recentButton setToolTip:TGLoc(@"stickers.recent.tab")];
     [contentView addSubview:recentButton];
     self.stickerPickerRecentButton = recentButton;
+    [recentButton setState:NSOnState];
 
-    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(292, 458, 124, 30)] autorelease];
+    NSButton *favoriteButton = [[[NSButton alloc] initWithFrame:NSMakeRect(384, 489, 142, 30)] autorelease];
     [favoriteButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:TGLoc(@"stickers.favorites.tab")] autorelease]];
     [favoriteButton setTitle:TGLoc(@"stickers.favorites.tab")];
     [favoriteButton setImage:TGTemplateIconAssetImage(@"heart", NSMakeSize(14.0, 14.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1093,10 +1118,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:favoriteButton];
     self.stickerPickerFavoriteButton = favoriteButton;
 
-    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(20, 428, 410, 28)] autorelease];
+    TGComposerInputBackgroundView *stickerSearchBackground = [[[TGComposerInputBackgroundView alloc] initWithFrame:NSMakeRect(24, 444, 448, 30)] autorelease];
     [contentView addSubview:stickerSearchBackground];
 
-    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(30, 434, 390, 18)] autorelease];
+    NSSearchField *searchField = [[[NSSearchField alloc] initWithFrame:NSMakeRect(36, 450, 424, 18)] autorelease];
     [self applyComposerTextFieldStyle:searchField];
     if ([[searchField cell] respondsToSelector:@selector(setSearchButtonCell:)]) {
         [[searchField cell] setSearchButtonCell:nil];
@@ -1111,7 +1136,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:searchField];
     self.stickerPickerSearchField = searchField;
 
-    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(448, 427, 44, 30)] autorelease];
+    NSButton *removeSetButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 444, 42, 30)] autorelease];
     [removeSetButton setCell:[[[TGStickerPickerTabButtonCell alloc] initTextCell:@""] autorelease]];
     [removeSetButton setTitle:@""];
     [removeSetButton setImage:TGTemplateIconAssetImage(@"folder-remove", NSMakeSize(17.0, 17.0), TGClassicHeaderTextColor(0.96), 1.0)];
@@ -1123,11 +1148,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [removeSetButton setToolTip:TGLoc(@"stickers.removeSet")];
     [contentView addSubview:removeSetButton];
 
-    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 352, 536, 66)] autorelease];
+    TGStickerPickerPanelView *railPanel = [[[TGStickerPickerPanelView alloc] initWithFrame:NSMakeRect(12, 354, 536, 66)] autorelease];
     [railPanel setAutoresizingMask:NSViewWidthSizable];
     [contentView addSubview:railPanel];
 
-    NSScrollView *setScrollView = [[[TGStickerSetRailScrollView alloc] initWithFrame:NSMakeRect(20, 360, 520, 50)] autorelease];
+    NSScrollView *setScrollView = [[[TGStickerSetRailScrollView alloc] initWithFrame:NSMakeRect(20, 362, 520, 50)] autorelease];
     [setScrollView setBorderType:NSNoBorder];
     [setScrollView setDrawsBackground:NO];
     [setScrollView setHasVerticalScroller:NO];
@@ -1163,7 +1188,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerPlaybackCoordinator = nil;
     self.stickerPickerSetCache = [NSMutableDictionary dictionary];
     self.stickerPickerRailPreviewState = [NSMutableDictionary dictionary];
+    self.stickerPickerMode = 0;
     self.stickerPickerWindow = window;
+}
+
+- (void)updateStickerPickerSelectionState {
+    [self.stickerPickerRecentButton setState:(self.stickerPickerMode == 0 ? NSOnState : NSOffState)];
+    [self.stickerPickerFavoriteButton setState:(self.stickerPickerMode == 1 ? NSOnState : NSOffState)];
+    [self.stickerPickerRecentButton setNeedsDisplay:YES];
+    [self.stickerPickerFavoriteButton setNeedsDisplay:YES];
+    [self rebuildStickerPickerSetRail];
 }
 
 - (void)updateStickerPickerRailThumbnailForSetID:(NSNumber *)setID withItem:(NSDictionary *)item {
@@ -1334,17 +1368,21 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
 - (void)selectRecentStickerPickerTab:(id)sender {
     (void)sender;
+    self.stickerPickerMode = 0;
     self.stickerPickerSelectedSetID = nil;
     [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self updateStickerPickerSelectionState];
     [self reloadStickerPickerItems];
 }
 
 - (void)selectFavoriteStickerPickerTab:(id)sender {
     (void)sender;
+    self.stickerPickerMode = 1;
     self.stickerPickerSelectedSetID = nil;
     [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self updateStickerPickerSelectionState];
     [self reloadFavoriteStickerPickerItems];
 }
 
@@ -1352,11 +1390,15 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     (void)sender;
     NSString *query = [[self.stickerPickerSearchField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if ([query length] == 0) {
+        self.stickerPickerMode = 0;
+        [self updateStickerPickerSelectionState];
         [self reloadStickerPickerItems];
         return;
     }
+    self.stickerPickerMode = 2;
     self.stickerPickerSelectedSetID = nil;
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TelegraphicaStickerPickerLastSetID"];
+    [self updateStickerPickerSelectionState];
     [self reloadStickerPickerItemsForEmoji:query];
 }
 
@@ -1371,9 +1413,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
     self.stickerPickerSelectedSetID = setID;
+    self.stickerPickerMode = 3;
     [self.stickerPickerSearchField setStringValue:@""];
     [[NSUserDefaults standardUserDefaults] setObject:[setID stringValue] forKey:@"TelegraphicaStickerPickerLastSetID"];
     [[NSUserDefaults standardUserDefaults] synchronize];
+    [self updateStickerPickerSelectionState];
     [self reloadStickerPickerItemsForSet:(NSDictionary *)represented];
 }
 
@@ -1500,6 +1544,11 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                           (NSInteger)index,
                                                           self,
                                                           @selector(selectStickerSetFromPickerButton:));
+        NSNumber *buttonSetID = [set objectForKey:@"id"];
+        BOOL selected = ([buttonSetID respondsToSelector:@selector(longLongValue)] &&
+                         [self.stickerPickerSelectedSetID respondsToSelector:@selector(longLongValue)] &&
+                         [buttonSetID longLongValue] == [self.stickerPickerSelectedSetID longLongValue]);
+        [button setState:(selected ? NSOnState : NSOffState)];
         NSString *tooltip = [set objectForKey:@"title"];
         if ([tooltip isKindOfClass:[NSString class]] && [tooltip length] > 0) {
             [button setToolTip:tooltip];
@@ -2086,7 +2135,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 380, 148);
+    NSRect frame = NSMakeRect(0, 0, 420, 190);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -2094,17 +2143,23 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [window setTitle:@"Voice message"];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
-    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
     [window setContentView:contentView];
 
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20, 104, 340, 22)
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(10, 10, 400, 170)] autorelease];
+    [contentView addSubview:panelView];
+    TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 18, 384, 154)] autorelease];
+    [contentView addSubview:cardView];
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(30, 146, 360, 22)
                                               text:@"Voice message ready"
                                               font:[NSFont boldSystemFontOfSize:15.0]];
     [titleField setAlignment:NSCenterTextAlignment];
+    [titleField setTextColor:TGClassicCardInkColor()];
     [contentView addSubview:titleField];
     self.voicePreviewTitleField = titleField;
 
-    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 48, 48, 48)] autorelease];
+    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(30, 76, 48, 48)] autorelease];
     [playButton setTitle:@"Play"];
     [playButton setCell:[[[TGMediaPlaybackButtonCell alloc] initTextCell:@"Play"] autorelease]];
     [playButton setBordered:NO];
@@ -2114,7 +2169,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:playButton];
     self.voicePreviewPlayButton = playButton;
 
-    NSButton *stopButton = [[[NSButton alloc] initWithFrame:NSMakeRect(144, 54, 92, 30)] autorelease];
+    NSButton *stopButton = [[[NSButton alloc] initWithFrame:NSMakeRect(134, 78, 152, 34)] autorelease];
     [stopButton setTitle:@"Stop"];
     [stopButton setTarget:self];
     [stopButton setAction:@selector(toggleVoiceRecording:)];
@@ -2123,7 +2178,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:stopButton];
     self.voicePreviewStopButton = stopButton;
 
-    NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(104, 61, 164, 22)] autorelease];
+    NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(92, 94, 208, 22)] autorelease];
     [progressSlider setMinValue:0.0];
     [progressSlider setMaxValue:1.0];
     [progressSlider setDoubleValue:0.0];
@@ -2134,7 +2189,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:progressSlider];
     self.voicePreviewProgressSlider = progressSlider;
 
-    NSTextField *timeField = [self labelWithFrame:NSMakeRect(276, 60, 82, 20)
+    NSTextField *timeField = [self labelWithFrame:NSMakeRect(308, 94, 82, 20)
                                              text:@"0:00 / 0:00"
                                              font:[NSFont systemFontOfSize:11.0]];
     [timeField setAlignment:NSRightTextAlignment];
@@ -2142,22 +2197,26 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:timeField];
     self.voicePreviewTimeField = timeField;
 
-    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(158, 20, 92, 28)];
+    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(172, 34, 102, 30)];
     [cancelButton setTitle:TGLoc(@"cancel")];
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelVoicePreview:)];
+    [cancelButton setKeyEquivalent:[NSString stringWithFormat:@"%C", (unichar)27]];
+    [cancelButton setKeyEquivalentModifierMask:0];
     [contentView addSubview:cancelButton];
     self.voicePreviewCancelButton = cancelButton;
 
-    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(266, 20, 92, 28)] autorelease];
+    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(288, 34, 102, 30)] autorelease];
     [sendButton setTitle:TGLoc(@"send")];
     [sendButton setTarget:self];
     [sendButton setAction:@selector(sendVoicePreview:)];
+    [sendButton setKeyEquivalent:@"\r"];
+    [sendButton setKeyEquivalentModifierMask:0];
     [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
     [contentView addSubview:sendButton];
     self.voicePreviewSendButton = sendButton;
 
-    NSTextField *errorField = [self labelWithFrame:NSMakeRect(20, 88, 340, 14)
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(30, 124, 360, 16)
                                               text:@""
                                               font:[NSFont systemFontOfSize:11.0]];
     [errorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
@@ -2173,7 +2232,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 - (void)configureVoicePreviewWindowForRecording {
     [self ensureVoicePreviewWindow];
     [self.voicePreviewTitleField setStringValue:TGLoc(@"voice.recording")];
-    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [self.voicePreviewTitleField setTextColor:TGClassicCardInkColor()];
     [self.voicePreviewErrorField setStringValue:@"Press Stop when you finish recording."];
     [self.voicePreviewErrorField setHidden:NO];
     [self.voicePreviewPlayButton setHidden:YES];
@@ -2190,7 +2249,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 - (void)configureVoicePreviewWindowForReadyDuration:(NSTimeInterval)duration {
     [self ensureVoicePreviewWindow];
     [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
-    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedWhite:0.08 alpha:1.0]];
+    [self.voicePreviewTitleField setTextColor:TGClassicCardInkColor()];
     [self.voicePreviewPlayButton setTitle:@"Play"];
     [self.voicePreviewPlayButton setHidden:NO];
     [self.voicePreviewStopButton setHidden:YES];
@@ -2832,11 +2891,6 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                  keyEquivalent:@""] autorelease];
     [attachItem setTarget:self];
     [menu addItem:attachItem];
-    NSMenuItem *contactItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.contact.menu")
-                                                         action:@selector(shareContactFromComposerMenu:)
-                                                  keyEquivalent:@""] autorelease];
-    [contactItem setTarget:self];
-    [menu addItem:contactItem];
     NSMenuItem *locationItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.location.menu")
                                                           action:@selector(shareLocationFromComposerMenu:)
                                                    keyEquivalent:@""] autorelease];
@@ -2847,16 +2901,6 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                 keyEquivalent:@""] autorelease];
     [venueItem setTarget:self];
     [menu addItem:venueItem];
-    NSMenuItem *liveLocationItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.liveLocation.menu")
-                                                              action:@selector(shareLiveLocationFromComposerMenu:)
-                                                       keyEquivalent:@""] autorelease];
-    [liveLocationItem setTarget:self];
-    [menu addItem:liveLocationItem];
-    NSMenuItem *videoNoteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.videoNote.menu")
-                                                           action:@selector(sendVideoNoteFromComposerMenu:)
-                                                    keyEquivalent:@""] autorelease];
-    [videoNoteItem setTarget:self];
-    [menu addItem:videoNoteItem];
     NSMenuItem *diceItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"share.dice.menu")
                                                       action:nil
                                                keyEquivalent:@""] autorelease];
@@ -2874,6 +2918,33 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [diceItem setSubmenu:diceMenu];
     [menu addItem:diceItem];
     [menu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"poll.create.menu")
+                                                      action:@selector(createPollFromComposerMenu:)
+                                               keyEquivalent:@""] autorelease];
+    [pollItem setTarget:self];
+    [menu addItem:pollItem];
+    [menu popUpMenuPositioningItem:nil
+                        atLocation:NSMakePoint(0.0, NSHeight([self.attachPhotoButton bounds]) + 2.0)
+                            inView:self.attachPhotoButton];
+}
+
+- (NSMenu *)composerTextContextMenu {
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+    NSArray *standardItems = [NSArray arrayWithObjects:
+                              [NSArray arrayWithObjects:TGLoc(@"edit.cut"), NSStringFromSelector(@selector(cut:)), nil],
+                              [NSArray arrayWithObjects:TGLoc(@"edit.copy"), NSStringFromSelector(@selector(copy:)), nil],
+                              [NSArray arrayWithObjects:TGLoc(@"edit.paste"), NSStringFromSelector(@selector(paste:)), nil],
+                              nil];
+    NSArray *standardItem = nil;
+    for (standardItem in standardItems) {
+        NSMenuItem *item = [[[NSMenuItem alloc] initWithTitle:[standardItem objectAtIndex:0]
+                                                       action:NSSelectorFromString([standardItem objectAtIndex:1])
+                                                keyEquivalent:@""] autorelease];
+        [item setTarget:nil];
+        [menu addItem:item];
+    }
+    [menu addItem:[NSMenuItem separatorItem]];
+
     NSMenuItem *formatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format")
                                                         action:nil
                                                  keyEquivalent:@""] autorelease];
@@ -2897,14 +2968,13 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     }
     [formatItem setSubmenu:formatMenu];
     [menu addItem:formatItem];
-    NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"poll.create.menu")
-                                                      action:@selector(createPollFromComposerMenu:)
-                                               keyEquivalent:@""] autorelease];
-    [pollItem setTarget:self];
-    [menu addItem:pollItem];
-    [menu popUpMenuPositioningItem:nil
-                        atLocation:NSMakePoint(0.0, NSHeight([self.attachPhotoButton bounds]) + 2.0)
-                            inView:self.attachPhotoButton];
+    [menu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *selectAllItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"edit.selectAll")
+                                                            action:@selector(selectAll:)
+                                                     keyEquivalent:@""] autorelease];
+    [selectAllItem setTarget:nil];
+    [menu addItem:selectAllItem];
+    return menu;
 }
 
 - (void)applyComposerFormatting:(id)sender {

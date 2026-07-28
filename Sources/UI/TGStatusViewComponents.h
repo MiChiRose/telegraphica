@@ -9,13 +9,30 @@
 @interface TGNotificationDotView : NSView
 @end
 
+@class TGMessageTableView;
+
+@protocol TGMessageTextSelectionDelegate <NSObject>
+- (NSDictionary *)messageTableView:(TGMessageTableView *)tableView selectableTextDescriptorAtPoint:(NSPoint)point;
+@end
+
 @interface TGMessageTableView : NSTableView {
     id _dropOverlayTarget;
+    NSTextView *_selectableTextView;
 }
 @property (nonatomic, assign) id dropOverlayTarget;
+- (void)clearSelectableMessageText;
 @end
 
 @interface TGUtilityWindowView : NSView
+@end
+
+@interface TGUtilityPanelView : NSView
+@end
+
+@interface TGActiveSessionCell : NSTextFieldCell {
+    NSDictionary *_sessionPresentation;
+}
+@property (nonatomic, retain) NSDictionary *sessionPresentation;
 @end
 
 @protocol TGSidebarResizeHandleDelegate;
