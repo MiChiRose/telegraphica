@@ -33,6 +33,7 @@ typedef NS_ENUM(NSInteger, TGCallAudioEngineState) {
 
 - (BOOL)startWithCall:(NSDictionary *)call error:(NSError **)error;
 - (void)setMicrophoneMuted:(BOOL)muted;
+- (void)setSpeakerMuted:(BOOL)muted;
 - (void)stop;
 
 @end

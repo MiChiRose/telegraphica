@@ -15,6 +15,7 @@ typedef NS_ENUM(NSInteger, TGCallPresentationState) {
 @protocol TGCallWindowControllerDelegate <NSObject>
 - (void)callWindowControllerDidRequestAnswer:(TGCallWindowController *)controller;
 - (void)callWindowController:(TGCallWindowController *)controller didRequestMicrophoneMuted:(BOOL)muted;
+- (void)callWindowController:(TGCallWindowController *)controller didRequestSpeakerMuted:(BOOL)muted;
 - (void)callWindowControllerDidRequestHangUp:(TGCallWindowController *)controller;
 @end
 
@@ -22,6 +23,7 @@ typedef NS_ENUM(NSInteger, TGCallPresentationState) {
 
 @property (nonatomic, assign) id<TGCallWindowControllerDelegate> delegate;
 @property (nonatomic, readonly, getter=isMicrophoneMuted) BOOL microphoneMuted;
+@property (nonatomic, readonly, getter=isSpeakerMuted) BOOL speakerMuted;
 
 - (id)initWithProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing;
 - (void)updateProfile:(NSDictionary *)profile;

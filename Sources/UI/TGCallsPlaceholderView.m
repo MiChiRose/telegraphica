@@ -94,7 +94,20 @@
     CGFloat textWidth = MAX(60.0, NSMaxX(cardRect) - textX - 92.0);
     [title drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 27.0, textWidth, 18.0)
        withAttributes:titleAttributes];
-    [[self detailText] drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 10.0, textWidth, 16.0)
+    BOOL outgoing = [[self.callSummary objectForKey:@"is_outgoing"] boolValue];
+    NSString *discardReason = [self.callSummary objectForKey:@"discard_reason"];
+    BOOL missed = ([discardReason isEqualToString:@"callDiscardReasonMissed"] ||
+                   [discardReason isEqualToString:@"callDiscardReasonDeclined"]);
+    NSString *directionIcon = missed ? @"call-miss" : (outgoing ? @"call-out" : @"call-in");
+    NSColor *directionColor = missed
+        ? [NSColor colorWithCalibratedRed:0.84 green:0.18 blue:0.18 alpha:1.0]
+        : TGClassicCardMutedInkColor();
+    TGDrawTemplateIconAsset(directionIcon,
+                            NSMakeRect(textX, NSMinY(cardRect) + 11.0, 13.0, 13.0),
+                            directionColor,
+                            1.0,
+                            [controlView isFlipped]);
+    [[self detailText] drawInRect:NSMakeRect(textX + 18.0, NSMinY(cardRect) + 10.0, textWidth - 18.0, 16.0)
                     withAttributes:detailAttributes];
 
     NSNumber *dateValue = [self.callSummary objectForKey:@"date"];
