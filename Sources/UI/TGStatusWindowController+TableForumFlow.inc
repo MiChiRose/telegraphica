@@ -453,7 +453,11 @@
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
     }
-    [self updateAuthControlsForState:self.currentAuthState];
+    if (selectionChanged) {
+        [self updateAuthControlsForState:self.currentAuthState];
+    } else {
+        [self updateSendControls];
+    }
     if (selectionChanged) {
         [self refreshBotComposerForSelectedChat];
     }
@@ -561,7 +565,10 @@
 
     if (selectedIndex != NSNotFound) {
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:selectedIndex];
+        BOOL previousSuppressSelectionHandling = self.suppressChatSelectionHandling;
+        self.suppressChatSelectionHandling = YES;
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
+        self.suppressChatSelectionHandling = previousSuppressSelectionHandling;
         [self.chatTableView scrollRowToVisible:selectedIndex];
         [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
                                                                          object:self.chatTableView]];
@@ -598,7 +605,10 @@
 
     if ([items count] > 0 && [self.currentAuthState isEqualToString:@"ready"]) {
         NSIndexSet *selection = [NSIndexSet indexSetWithIndex:0];
+        BOOL previousSuppressSelectionHandling = self.suppressChatSelectionHandling;
+        self.suppressChatSelectionHandling = YES;
         [self.chatTableView selectRowIndexes:selection byExtendingSelection:NO];
+        self.suppressChatSelectionHandling = previousSuppressSelectionHandling;
         [self.chatTableView scrollRowToVisible:0];
         [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
                                                                          object:self.chatTableView]];
