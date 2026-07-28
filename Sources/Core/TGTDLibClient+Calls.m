@@ -15,7 +15,7 @@ static NSDictionary *TGCallProtocolDescriptor(void) {
             [NSNumber numberWithBool:YES], @"udp_p2p",
             [NSNumber numberWithBool:YES], @"udp_reflector",
             [NSNumber numberWithInteger:65], @"min_layer",
-            [NSNumber numberWithInteger:65], @"max_layer",
+            [NSNumber numberWithInteger:92], @"max_layer",
             [NSArray arrayWithObject:@"2.4.4"], @"library_versions",
             nil];
 }

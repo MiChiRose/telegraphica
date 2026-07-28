@@ -273,7 +273,14 @@ static TgVoipEndpointType TGEndpointTypeForServer(NSDictionary *server) {
     config.enableNS = true;
     config.enableAGC = true;
     config.enableVolumeControl = true;
-    config.maxApiLayer = 65;
+    NSDictionary *remoteProtocol = [[state objectForKey:@"protocol"] isKindOfClass:[NSDictionary class]]
+        ? [state objectForKey:@"protocol"] : nil;
+    NSInteger remoteMaxLayer = [[remoteProtocol objectForKey:@"max_layer"] respondsToSelector:@selector(integerValue)]
+        ? [[remoteProtocol objectForKey:@"max_layer"] integerValue] : 0;
+    NSInteger localMaxLayer = (NSInteger)TgVoip::getConnectionMaxLayer();
+    config.maxApiLayer = (int)(remoteMaxLayer > 0
+        ? MIN(remoteMaxLayer, localMaxLayer)
+        : localMaxLayer);
 
     TgVoipEncryptionKey encryptionKey;
     const uint8_t *keyBytes = (const uint8_t *)[keyData bytes];
