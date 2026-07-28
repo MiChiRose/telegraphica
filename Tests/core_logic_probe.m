@@ -120,6 +120,10 @@ static void TGTestThemes(void) {
     TGSetActiveThemeIdentifier(TGThemeIdentifierFrutigerAeroDream);
     TGAssertEqualObjects(TGCurrentThemeIdentifier(), TGThemeIdentifierFrutigerAeroDream, @"active theme should switch to a valid identifier");
     TGAssertTrue(TGThemeIsFrutigerAeroDream(), @"Frutiger Aero Dream helper should match active theme");
+    NSColor *aeroPanelColor = [[TGClassicPanelBottomColor() retain] autorelease];
+    TGSetActiveThemeIdentifier(TGThemeIdentifierSkeuomorphicBlue);
+    NSColor *skeuomorphicPanelColor = [[TGClassicPanelBottomColor() retain] autorelease];
+    TGAssertTrue(![aeroPanelColor isEqual:skeuomorphicPanelColor], @"theme palette cache should invalidate when the active theme changes");
     TGSetActiveThemeIdentifier(@"missing-theme");
     TGAssertEqualObjects(TGCurrentThemeIdentifier(), TGThemeIdentifierVKBlue, @"invalid active theme should fall back to VK Blue");
 

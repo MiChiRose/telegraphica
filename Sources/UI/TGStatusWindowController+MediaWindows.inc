@@ -1736,14 +1736,34 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [self.mediaPlaybackCloseButton setFrame:NSMakeRect(318.0, 18.0, 88.0, 28.0)];
     } else {
         [self.mediaPlaybackWindow setMinSize:NSMakeSize(360.0, 260.0)];
-        [self.mediaPlaybackWindow setContentSize:NSMakeSize(520.0, 360.0)];
+        CGFloat contentWidth = 520.0;
+        CGFloat contentHeight = 360.0;
+        if (self.mediaPlaybackVideoNote) {
+            NSScreen *screen = [self.mediaPlaybackWindow screen];
+            if (!screen) {
+                screen = [NSScreen mainScreen];
+            }
+            NSRect visibleFrame = [screen visibleFrame];
+            CGFloat maximumWidth = MAX(360.0, floor(NSWidth(visibleFrame) * 0.88));
+            CGFloat maximumHeight = MAX(260.0, floor(NSHeight(visibleFrame) * 0.88));
+            contentWidth = MIN(1040.0, maximumWidth);
+            contentHeight = MIN(720.0, maximumHeight);
+        }
+        [self.mediaPlaybackWindow setContentSize:NSMakeSize(contentWidth, contentHeight)];
+        NSRect contentBounds = [[self.mediaPlaybackWindow contentView] bounds];
         [self.mediaPlaybackContainerView setHidden:NO];
-        [self.mediaPlaybackContainerView setFrame:NSMakeRect(24.0, 64.0, 472.0, 272.0)];
+        [self.mediaPlaybackContainerView setFrame:NSMakeRect(24.0,
+                                                             64.0,
+                                                             MAX(120.0, NSWidth(contentBounds) - 48.0),
+                                                             MAX(120.0, NSHeight(contentBounds) - 88.0))];
         [self.mediaPlaybackTitleField setHidden:YES];
         [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(24.0, 18.0, 42.0, 30.0)];
         [self.mediaPlaybackProgressSlider setHidden:YES];
         [self.mediaPlaybackTimeField setHidden:YES];
-        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(376.0, 18.0, 120.0, 30.0)];
+        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(NSWidth(contentBounds) - 144.0,
+                                                           18.0,
+                                                           120.0,
+                                                           30.0)];
     }
 }
 
@@ -1832,9 +1852,10 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     return NO;
 }
 
-- (BOOL)openPreparedPlayableMediaAtPath:(NSString *)playablePath title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {
+- (BOOL)openPreparedPlayableMediaAtPath:(NSString *)playablePath title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly videoNote:(BOOL)videoNote {
     [self ensureMediaPlaybackWindow];
     [self resetMediaPlaybackState];
+    self.mediaPlaybackVideoNote = videoNote;
     [self layoutMediaPlaybackWindowForAudioOnly:audioOnly title:title];
     self.mediaPlaybackKnownDuration = ([duration respondsToSelector:@selector(doubleValue)] && [duration doubleValue] > 0.0) ? [duration doubleValue] : 0.0;
 
@@ -1934,10 +1955,11 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [self openPreparedPlayableMediaAtPath:playablePath
                                     title:[result objectForKey:@"title"]
                                  duration:[result objectForKey:@"duration"]
-                                audioOnly:YES];
+                                audioOnly:YES
+                                videoNote:NO];
 }
 
-- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly mimeType:(NSString *)mimeType {
+- (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly mimeType:(NSString *)mimeType videoNote:(BOOL)videoNote {
     if ([path length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
         [self appendDetail:@"Playable media file is not available yet."];
         return NO;
@@ -1966,11 +1988,20 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         TGMediaPlaybackMimeLooksUnsupportedOnMavericks(mimeType, audioOnly)) {
         return [self showUnsupportedMavericksVoicePlaybackForPath:path mimeType:mimeType];
     }
-    return [self openPreparedPlayableMediaAtPath:path title:title duration:duration audioOnly:audioOnly];
+    return [self openPreparedPlayableMediaAtPath:path
+                                           title:title
+                                        duration:duration
+                                       audioOnly:audioOnly
+                                       videoNote:videoNote];
 }
 
 - (BOOL)openPlayableMediaAtPath:(NSString *)path title:(NSString *)title duration:(NSNumber *)duration audioOnly:(BOOL)audioOnly {
-    return [self openPlayableMediaAtPath:path title:title duration:duration audioOnly:audioOnly mimeType:nil];
+    return [self openPlayableMediaAtPath:path
+                                  title:title
+                               duration:duration
+                              audioOnly:audioOnly
+                                mimeType:nil
+                               videoNote:NO];
 }
 
 - (NSString *)titleForMediaItem:(NSDictionary *)mediaItem {
@@ -2012,11 +2043,13 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         path = TGMediaItemLocalPath(mediaItem);
     }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        BOOL videoNote = [[mediaItem objectForKey:@"content_type"] isEqualToString:@"messageVideoNote"];
         [self openPlayableMediaAtPath:path
                                 title:[self titleForMediaItem:mediaItem]
                              duration:[mediaItem objectForKey:@"duration"]
                             audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)
-                              mimeType:[mediaItem objectForKey:@"mime_type"]];
+                              mimeType:[mediaItem objectForKey:@"mime_type"]
+                             videoNote:videoNote];
         return;
     }
 
@@ -2028,6 +2061,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     NSNumber *fileIDCopy = [fileID retain];
     NSString *titleCopy = [[self titleForMediaItem:mediaItem] copy];
+    BOOL videoNote = [[mediaItem objectForKey:@"content_type"] isEqualToString:@"messageVideoNote"];
     TGTDLibClient *client = [self.client retain];
     [self.statusField setStringValue:@"Loading media..."];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -2043,7 +2077,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
                                         title:titleCopy
                                      duration:[mediaItem objectForKey:@"duration"]
                                     audioOnly:TGMediaItemIsAudioOnlyPlayable(mediaItem)
-                                      mimeType:[mediaItem objectForKey:@"mime_type"]];
+                                      mimeType:[mediaItem objectForKey:@"mime_type"]
+                                     videoNote:videoNote];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {
@@ -2089,7 +2124,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
                                 title:TGPlayableMediaTitleForMessageItem(item)
                              duration:duration
                             audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)
-                              mimeType:mimeType];
+                              mimeType:mimeType
+                             videoNote:[item isVideoNoteMessage]];
         return;
     }
 
@@ -2125,7 +2161,8 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
                                         title:titleCopy
                                      duration:duration
                                     audioOnly:TGMessageItemIsAudioOnlyPlayableMedia(item)
-                                      mimeType:mimeType];
+                                      mimeType:mimeType
+                                     videoNote:[item isVideoNoteMessage]];
             } else {
                 NSString *message = ([downloadErrorMessage length] > 0) ? downloadErrorMessage : @"TDLib did not return a playable media file yet.";
                 if (TGStatusErrorLooksOffline(message)) {

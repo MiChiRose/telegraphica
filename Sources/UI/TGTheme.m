@@ -74,6 +74,17 @@ typedef struct {
 } TGThemePalette;
 
 static NSString *TGActiveThemeIdentifier = nil;
+static NSString *TGPaletteCacheIdentifier = nil;
+static TGThemePalette TGPaletteCache;
+static BOOL TGPaletteCacheValid = NO;
+static NSMutableDictionary *TGGradientCache = nil;
+
+static void TGResetThemeRenderCaches(void) {
+    [TGPaletteCacheIdentifier release];
+    TGPaletteCacheIdentifier = nil;
+    TGPaletteCacheValid = NO;
+    [TGGradientCache removeAllObjects];
+}
 
 static TGRGBColor TGRGBMake(NSUInteger hex) {
     TGRGBColor color;
@@ -389,6 +400,7 @@ void TGSetActiveThemeIdentifier(NSString *identifier) {
     if (TGActiveThemeIdentifier && [TGActiveThemeIdentifier isEqualToString:validIdentifier]) return;
     [TGActiveThemeIdentifier release];
     TGActiveThemeIdentifier = [validIdentifier copy];
+    TGResetThemeRenderCaches();
 }
 
 NSString *TGCurrentThemeIdentifier(void) {
@@ -453,7 +465,31 @@ static BOOL TGThemeUsesDarkLayeredCards(void) {
 }
 
 static TGThemePalette TGCurrentThemePalette(void) {
-    return TGThemePaletteForIdentifier(TGCurrentThemeIdentifier());
+    NSString *identifier = TGCurrentThemeIdentifier();
+    if (!TGPaletteCacheValid || ![TGPaletteCacheIdentifier isEqualToString:identifier]) {
+        [TGPaletteCacheIdentifier release];
+        TGPaletteCacheIdentifier = [identifier copy];
+        TGPaletteCache = TGThemePaletteForIdentifier(identifier);
+        TGPaletteCacheValid = YES;
+    }
+    return TGPaletteCache;
+}
+
+static NSGradient *TGThemeCachedGradient(NSString *component,
+                                         NSColor *startingColor,
+                                         NSColor *endingColor) {
+    if (!TGGradientCache) {
+        TGGradientCache = [[NSMutableDictionary alloc] init];
+    }
+    NSGradient *gradient = [TGGradientCache objectForKey:component];
+    if (!gradient) {
+        gradient = [[[NSGradient alloc] initWithStartingColor:startingColor
+                                                  endingColor:endingColor] autorelease];
+        if (gradient && component) {
+            [TGGradientCache setObject:gradient forKey:component];
+        }
+    }
+    return gradient;
 }
 
 #define TG_THEME_COLOR_FUNCTION(name, field) \
@@ -912,7 +948,15 @@ static TGSkeuomorphicPattern TGThemeCurrentExperimentalPattern(void) {
 
 static void TGThemeDrawPatternInClippedRect(NSRect rect, TGSkeuomorphicPattern pattern, CGFloat alpha) {
     (void)alpha;
-    NSColor *patternColor = [NSColor colorWithPatternImage:TGSkeuomorphicPatternImage(pattern)];
+    static NSColor *patternColors[12] = { nil };
+    NSUInteger patternIndex = (NSUInteger)pattern;
+    if (patternIndex >= 12) {
+        patternIndex = 0;
+    }
+    if (!patternColors[patternIndex]) {
+        patternColors[patternIndex] = [[NSColor colorWithPatternImage:TGSkeuomorphicPatternImage(pattern)] retain];
+    }
+    NSColor *patternColor = patternColors[patternIndex];
     [patternColor set];
     NSRectFillUsingOperation(rect, NSCompositeSourceOver);
 }
@@ -985,8 +1029,9 @@ void TGThemeDrawWindowBackgroundInRect(NSRect rect, BOOL flipped) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x69c8e1)
                                                   endingColor:TGColorFromHex(0xd8f6ee)] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3b5161)
-                                                  endingColor:TGColorFromHex(0x223747)] autorelease];
+        gradient = TGThemeCachedGradient(@"skeuomorphic-window",
+                                         TGColorFromHex(0x3b5161),
+                                         TGColorFromHex(0x223747));
     }
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternCanvas, 0.35);
@@ -1035,8 +1080,9 @@ void TGThemeDrawPanelBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flip
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf8ffff)
                                                   endingColor:TGColorFromHex(0xcfeef2)] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xe6edf0)
-                                                  endingColor:TGColorFromHex(0xc5d2d9)] autorelease];
+        gradient = TGThemeCachedGradient(@"skeuomorphic-panel",
+                                         TGColorFromHex(0xe6edf0),
+                                         TGColorFromHex(0xc5d2d9));
     }
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternEnamel), 0.28);
@@ -1093,8 +1139,9 @@ void TGThemeDrawRailBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL flipp
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x2c9fca)
                                                   endingColor:TGColorFromHex(0x16455e)] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x3a4d59)
-                                                  endingColor:TGColorFromHex(0x223644)] autorelease];
+        gradient = TGThemeCachedGradient(@"skeuomorphic-rail",
+                                         TGColorFromHex(0x3a4d59),
+                                         TGColorFromHex(0x223644));
     }
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternCanvas), 0.35);
@@ -1147,8 +1194,9 @@ void TGThemeDrawHeaderBackgroundInRect(NSRect rect, BOOL flipped) {
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x63c7e8)
                                                   endingColor:TGColorFromHex(0x207eaa)] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0x4d789c)
-                                                  endingColor:TGColorFromHex(0x29465e)] autorelease];
+        gradient = TGThemeCachedGradient(@"skeuomorphic-header",
+                                         TGColorFromHex(0x4d789c),
+                                         TGColorFromHex(0x29465e));
     }
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternCanvas), 0.32);
@@ -1202,8 +1250,9 @@ void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL f
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xe8fbff)
                                                   endingColor:TGColorFromHex(0xf7fff8)] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xd8d7ce)
-                                                  endingColor:TGColorFromHex(0xf4f0e6)] autorelease];
+        gradient = TGThemeCachedGradient(@"skeuomorphic-recessed",
+                                         TGColorFromHex(0xd8d7ce),
+                                         TGColorFromHex(0xf4f0e6));
     }
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternPaper), 0.30);
@@ -1256,8 +1305,9 @@ void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped)
         gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xffffff)
                                                   endingColor:TGColorFromHex(0xdff7f4)] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:TGColorFromHex(0xf7f3e9)
-                                                  endingColor:TGColorFromHex(0xe7dfcf)] autorelease];
+        gradient = TGThemeCachedGradient(@"skeuomorphic-card",
+                                         TGColorFromHex(0xf7f3e9),
+                                         TGColorFromHex(0xe7dfcf));
     }
     [gradient drawInRect:rect angle:90.0];
     TGThemeDrawPatternInClippedRect(rect, TGThemeIsExperimental2000s() ? TGThemeCurrentExperimentalPattern() : (TGThemeIsFrutigerAero() ? TGThemeCurrentAeroPattern() : TGSkeuomorphicPatternPaper), 0.25);
@@ -1372,7 +1422,14 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     }
     [NSGraphicsContext saveGraphicsState];
     [path addClip];
-    NSGradient *gradient = [[[NSGradient alloc] initWithStartingColor:top endingColor:bottom] autorelease];
+    NSUInteger gradientState = (highlighted ? 1U : 0U) |
+                               (selected ? 2U : 0U) |
+                               (enabled ? 4U : 0U);
+    static NSString *gradientKeys[8] = {
+        @"enamel-0", @"enamel-1", @"enamel-2", @"enamel-3",
+        @"enamel-4", @"enamel-5", @"enamel-6", @"enamel-7"
+    };
+    NSGradient *gradient = TGThemeCachedGradient(gradientKeys[gradientState], top, bottom);
     [gradient drawInRect:rect angle:90.0];
     if (TGThemeIsVisualWorld()) {
         TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, 0.16);
@@ -1420,8 +1477,9 @@ void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoi
         gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xd8f8ff) : TGColorFromHex(0xffffff))
                                                   endingColor:(outgoing ? TGColorFromHex(0xa9e7f2) : TGColorFromHex(0xe8fbf5))] autorelease];
     } else {
-        gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGColorFromHex(0xe5eef4) : TGColorFromHex(0xfffbf2))
-                                                  endingColor:(outgoing ? TGColorFromHex(0xc7dcea) : TGColorFromHex(0xeee5d5))] autorelease];
+        gradient = TGThemeCachedGradient(outgoing ? @"skeuomorphic-message-outgoing" : @"skeuomorphic-message-incoming",
+                                         outgoing ? TGColorFromHex(0xe5eef4) : TGColorFromHex(0xfffbf2),
+                                         outgoing ? TGColorFromHex(0xc7dcea) : TGColorFromHex(0xeee5d5));
     }
     [gradient drawInRect:rect angle:90.0];
     if (TGThemeIsVisualWorld()) {
