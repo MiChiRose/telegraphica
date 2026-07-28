@@ -754,6 +754,19 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     if (!action || ![textView respondsToSelector:action]) {
         return NO;
     }
+    if (action == @selector(copy:) && ![textView isEditable]) {
+        NSRange selectedRange = [textView selectedRange];
+        NSString *string = [textView string];
+        if (selectedRange.location == NSNotFound ||
+            selectedRange.length == 0 ||
+            NSMaxRange(selectedRange) > [string length]) {
+            return NO;
+        }
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+        [pasteboard setString:[string substringWithRange:selectedRange] forType:NSStringPboardType];
+        return YES;
+    }
     [NSApp sendAction:action to:textView from:self];
     return YES;
 }

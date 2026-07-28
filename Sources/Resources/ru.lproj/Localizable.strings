@@ -2,6 +2,8 @@
 "core_spike" = "Telegraphica core spike";
 "tdlib_not_checked" = "TDLib status: not checked";
 "save" = "Сохранить";
+"diagnostics.copyAll" = "Копировать всё";
+"share.location.manualHint" = "Выберите точку на карте или используйте текущую геопозицию.";
 "cancel" = "Отмена";
 "profile.edit.title" = "Редактировать профиль";
 "profile.edit.firstName" = "Имя";

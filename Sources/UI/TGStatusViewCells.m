@@ -158,7 +158,10 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
     CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
     CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
-    CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) + ([item isPinned] ? (pinIconWidth + 4.0) : 0.0);
+    CGFloat botIconWidth = [item isBot] ? 15.0 : 0.0;
+    CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) +
+                                ([item isPinned] ? (pinIconWidth + 4.0) : 0.0) +
+                                ([item isBot] ? (botIconWidth + 4.0) : 0.0);
     CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
     if (titleAvailableWidth < 40.0) {
         titleAvailableWidth = 40.0;
@@ -169,6 +172,15 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                   16.0);
     [displayTitle drawInRect:titleRect withAttributes:titleAttributes];
     CGFloat iconX = titleRight - trailingIconWidth;
+    if ([item isBot]) {
+        NSRect botRect = NSMakeRect(iconX,
+                                    NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
+                                    15.0,
+                                    15.0);
+        NSColor *botColor = selected ? TGClassicSelectedRowTextColor() : [TGClassicLinkColor() colorWithAlphaComponent:0.9];
+        TGDrawTemplateIconAsset(@"robot", botRect, botColor, 1.0, [controlView isFlipped]);
+        iconX = NSMaxX(botRect) + 4.0;
+    }
     if ([item isPinned]) {
         NSRect pinRect = NSMakeRect(iconX,
                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 12.0) / 2.0),
@@ -337,7 +349,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                              yRadius:14.0];
     if (self.drawsInterior) {
         TGThemeDrawGroupedCardInPath(cardPath, cardRect, [self isFlipped]);
-        [[NSColor colorWithCalibratedWhite:0.78 alpha:0.62] set];
+        [TGClassicTableGridColor() set];
         [cardPath setLineWidth:1.0];
         [cardPath stroke];
     }

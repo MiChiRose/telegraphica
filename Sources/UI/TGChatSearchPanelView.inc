@@ -11,6 +11,18 @@
     (void)clipRect;
 }
 
+- (void)drawRow:(NSInteger)row clipRect:(NSRect)clipRect {
+    NSRect rowRect = NSInsetRect([self rectOfRow:row], 4.0, 3.0);
+    if (NSIntersectsRect(rowRect, clipRect)) {
+        NSBezierPath *rowPath = [NSBezierPath bezierPathWithRoundedRect:rowRect xRadius:7.0 yRadius:7.0];
+        TGThemeDrawGroupedCardInPath(rowPath, rowRect, [self isFlipped]);
+        [TGClassicTableGridColor() set];
+        [rowPath setLineWidth:1.0];
+        [rowPath stroke];
+    }
+    [super drawRow:row clipRect:clipRect];
+}
+
 - (void)highlightSelectionInClipRect:(NSRect)clipRect {
     NSInteger selectedRow = [self selectedRow];
     if (selectedRow < 0 || selectedRow >= [self numberOfRows]) {
@@ -164,8 +176,7 @@
         [_tableView setAllowsEmptySelection:YES];
         [_tableView setBackgroundColor:[NSColor clearColor]];
         [_tableView setUsesAlternatingRowBackgroundColors:NO];
-        [_tableView setGridStyleMask:NSTableViewSolidHorizontalGridLineMask];
-        [_tableView setGridColor:[NSColor colorWithCalibratedWhite:1.0 alpha:0.38]];
+        [_tableView setGridStyleMask:NSTableViewGridNone];
         [_tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
         [_tableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
 
@@ -252,7 +263,7 @@
     NSRect searchCardRect = NSMakeRect(16.0, 50.0, MAX(120.0, NSWidth(bounds) - 32.0), 74.0);
     NSBezierPath *searchCardPath = [NSBezierPath bezierPathWithRoundedRect:searchCardRect xRadius:10.0 yRadius:10.0];
     TGThemeDrawGroupedCardInPath(searchCardPath, searchCardRect, [self isFlipped]);
-    [[NSColor colorWithCalibratedWhite:1.0 alpha:0.28] set];
+    [TGClassicTableGridColor() set];
     [searchCardPath setLineWidth:1.0];
     [searchCardPath stroke];
 

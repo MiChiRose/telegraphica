@@ -164,20 +164,28 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [window setTitle:@"Send photo"];
     [window setReleasedWhenClosed:NO];
 
-    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
+
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 16, 496, 502)] autorelease];
+    [panelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:panelView];
+    TGGroupedCardView *previewCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(28, 66, 464, 442)] autorelease];
+    [previewCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:previewCard];
 
     NSTextField *titleField = [self labelWithFrame:NSMakeRect(24, 518, 472, 24)
                                               text:@"1 media"
                                               font:[NSFont boldSystemFontOfSize:16.0]];
     [titleField setAlignment:NSCenterTextAlignment];
+    [titleField setTextColor:TGClassicHeaderTextColor(1.0)];
     [contentView addSubview:titleField];
     self.photoSendTitleField = titleField;
 
     NSImageView *imageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(44, 204, 432, 296)] autorelease];
     [imageView setImageScaling:NSImageScaleProportionallyUpOrDown];
-    [imageView setImageFrameStyle:NSImageFrameGrayBezel];
+    [imageView setImageFrameStyle:NSImageFrameNone];
     [imageView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [contentView addSubview:imageView];
     self.photoSendPreviewImageView = imageView;
@@ -192,12 +200,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:metaField];
     self.photoSendMetaField = metaField;
 
+    TGScrollSurfaceView *queueSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(40, 108, 440, 78)] autorelease];
+    [queueSurface setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [contentView addSubview:queueSurface];
     NSScrollView *queueScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(44, 112, 432, 70)] autorelease];
-    [queueScrollView setBorderType:NSBezelBorder];
+    [queueScrollView setBorderType:NSNoBorder];
     [queueScrollView setHasVerticalScroller:YES];
     [queueScrollView setAutohidesScrollers:YES];
-    [queueScrollView setDrawsBackground:YES];
-    [queueScrollView setBackgroundColor:[NSColor colorWithCalibratedWhite:0.985 alpha:1.0]];
+    [queueScrollView setDrawsBackground:NO];
     [queueScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     NSView *queueContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 428, 70)] autorelease];
     [queueScrollView setDocumentView:queueContentView];
@@ -232,6 +242,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [cancelButton setTitle:TGLoc(@"cancel")];
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelPendingPhotoSend:)];
+    [cancelButton setKeyEquivalent:[NSString stringWithFormat:@"%C", (unichar)27]];
+    [cancelButton setKeyEquivalentModifierMask:0];
     [cancelButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:cancelButton];
 
@@ -239,6 +251,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [sendButton setTitle:TGLoc(@"send")];
     [sendButton setTarget:self];
     [sendButton setAction:@selector(sendPendingPhotoPreview:)];
+    [sendButton setKeyEquivalent:@"\r"];
+    [sendButton setKeyEquivalentModifierMask:0];
     [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
     [sendButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:sendButton];
@@ -271,7 +285,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSSize canvasSize = NSMakeSize(432.0, 376.0);
     NSImage *canvas = [[[NSImage alloc] initWithSize:canvasSize] autorelease];
     [canvas lockFocus];
-    [[NSColor colorWithCalibratedWhite:0.985 alpha:1.0] set];
+    [TGClassicTablePaperColor() set];
     NSRectFill(NSMakeRect(0.0, 0.0, canvasSize.width, canvasSize.height));
 
     TGAttachmentDescriptor *firstDescriptor = [descriptors objectAtIndex:0];
@@ -2115,7 +2129,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 380, 148);
+    NSRect frame = NSMakeRect(0, 0, 420, 190);
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                       backing:NSBackingStoreBuffered
@@ -2123,17 +2137,23 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [window setTitle:@"Voice message"];
     [window setReleasedWhenClosed:NO];
     [window setDelegate:self];
-    NSView *contentView = [[[NSView alloc] initWithFrame:frame] autorelease];
+    TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
     [window setContentView:contentView];
 
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(20, 104, 340, 22)
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(10, 10, 400, 170)] autorelease];
+    [contentView addSubview:panelView];
+    TGGroupedCardView *cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(18, 18, 384, 154)] autorelease];
+    [contentView addSubview:cardView];
+
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(30, 146, 360, 22)
                                               text:@"Voice message ready"
                                               font:[NSFont boldSystemFontOfSize:15.0]];
     [titleField setAlignment:NSCenterTextAlignment];
+    [titleField setTextColor:TGClassicCardInkColor()];
     [contentView addSubview:titleField];
     self.voicePreviewTitleField = titleField;
 
-    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(22, 48, 48, 48)] autorelease];
+    NSButton *playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(30, 76, 48, 48)] autorelease];
     [playButton setTitle:@"Play"];
     [playButton setCell:[[[TGMediaPlaybackButtonCell alloc] initTextCell:@"Play"] autorelease]];
     [playButton setBordered:NO];
@@ -2143,7 +2163,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:playButton];
     self.voicePreviewPlayButton = playButton;
 
-    NSButton *stopButton = [[[NSButton alloc] initWithFrame:NSMakeRect(144, 54, 92, 30)] autorelease];
+    NSButton *stopButton = [[[NSButton alloc] initWithFrame:NSMakeRect(134, 78, 152, 34)] autorelease];
     [stopButton setTitle:@"Stop"];
     [stopButton setTarget:self];
     [stopButton setAction:@selector(toggleVoiceRecording:)];
@@ -2152,7 +2172,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:stopButton];
     self.voicePreviewStopButton = stopButton;
 
-    NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(104, 61, 164, 22)] autorelease];
+    NSSlider *progressSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(92, 94, 208, 22)] autorelease];
     [progressSlider setMinValue:0.0];
     [progressSlider setMaxValue:1.0];
     [progressSlider setDoubleValue:0.0];
@@ -2163,7 +2183,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:progressSlider];
     self.voicePreviewProgressSlider = progressSlider;
 
-    NSTextField *timeField = [self labelWithFrame:NSMakeRect(276, 60, 82, 20)
+    NSTextField *timeField = [self labelWithFrame:NSMakeRect(308, 94, 82, 20)
                                              text:@"0:00 / 0:00"
                                              font:[NSFont systemFontOfSize:11.0]];
     [timeField setAlignment:NSRightTextAlignment];
@@ -2171,22 +2191,26 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:timeField];
     self.voicePreviewTimeField = timeField;
 
-    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(158, 20, 92, 28)];
+    NSButton *cancelButton = [self modalCloseButtonWithFrame:NSMakeRect(172, 34, 102, 30)];
     [cancelButton setTitle:TGLoc(@"cancel")];
     [cancelButton setTarget:self];
     [cancelButton setAction:@selector(cancelVoicePreview:)];
+    [cancelButton setKeyEquivalent:[NSString stringWithFormat:@"%C", (unichar)27]];
+    [cancelButton setKeyEquivalentModifierMask:0];
     [contentView addSubview:cancelButton];
     self.voicePreviewCancelButton = cancelButton;
 
-    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(266, 20, 92, 28)] autorelease];
+    NSButton *sendButton = [[[NSButton alloc] initWithFrame:NSMakeRect(288, 34, 102, 30)] autorelease];
     [sendButton setTitle:TGLoc(@"send")];
     [sendButton setTarget:self];
     [sendButton setAction:@selector(sendVoicePreview:)];
+    [sendButton setKeyEquivalent:@"\r"];
+    [sendButton setKeyEquivalentModifierMask:0];
     [self applySkeuomorphicButtonStyle:sendButton isPrimary:YES];
     [contentView addSubview:sendButton];
     self.voicePreviewSendButton = sendButton;
 
-    NSTextField *errorField = [self labelWithFrame:NSMakeRect(20, 88, 340, 14)
+    NSTextField *errorField = [self labelWithFrame:NSMakeRect(30, 124, 360, 16)
                                               text:@""
                                               font:[NSFont systemFontOfSize:11.0]];
     [errorField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
@@ -2202,7 +2226,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 - (void)configureVoicePreviewWindowForRecording {
     [self ensureVoicePreviewWindow];
     [self.voicePreviewTitleField setStringValue:TGLoc(@"voice.recording")];
-    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedRed:0.760 green:0.160 blue:0.130 alpha:1.0]];
+    [self.voicePreviewTitleField setTextColor:TGClassicCardInkColor()];
     [self.voicePreviewErrorField setStringValue:@"Press Stop when you finish recording."];
     [self.voicePreviewErrorField setHidden:NO];
     [self.voicePreviewPlayButton setHidden:YES];
@@ -2219,7 +2243,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 - (void)configureVoicePreviewWindowForReadyDuration:(NSTimeInterval)duration {
     [self ensureVoicePreviewWindow];
     [self.voicePreviewTitleField setStringValue:[NSString stringWithFormat:@"Voice message %.0fs", duration]];
-    [self.voicePreviewTitleField setTextColor:[NSColor colorWithCalibratedWhite:0.08 alpha:1.0]];
+    [self.voicePreviewTitleField setTextColor:TGClassicCardInkColor()];
     [self.voicePreviewPlayButton setTitle:@"Play"];
     [self.voicePreviewPlayButton setHidden:NO];
     [self.voicePreviewStopButton setHidden:YES];

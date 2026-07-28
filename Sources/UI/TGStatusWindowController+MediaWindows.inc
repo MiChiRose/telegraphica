@@ -1368,12 +1368,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [self closeMediaCenterInlinePreview:nil];
         return;
     }
-    NSString *path = TGMediaCenterLocalPathForItem(item);
-    BOOL preferAnimated = ([[item contentType] isEqualToString:@"messageAnimation"]);
-    if ([path length] == 0 || ![self openMediaPreviewAtPath:path preferAnimated:preferAnimated]) {
+    NSDictionary *mediaItem = TGMediaCenterFirstMediaDictionaryForItem(item);
+    if (![mediaItem isKindOfClass:[NSDictionary class]] || !TGMediaItemSupportsPreview(mediaItem)) {
         [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.previewUnavailable")];
         return;
     }
+    [self openMediaPreviewForMediaItem:mediaItem];
     [self closeMediaCenterInlinePreview:nil];
 }
 
@@ -1456,10 +1456,18 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 10, 496, 338)] autorelease];
+    [panelView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:panelView];
+    TGGroupedCardView *playbackCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 56, 480, 282)] autorelease];
+    [playbackCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [contentView addSubview:playbackCard];
+
     NSTextField *titleField = [self labelWithFrame:NSMakeRect(88, 88, 284, 18)
                                               text:@"Voice message"
                                               font:[NSFont boldSystemFontOfSize:12.0]];
     [titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [titleField setTextColor:TGClassicCardInkColor()];
     [contentView addSubview:titleField];
     self.mediaPlaybackTitleField = titleField;
 
@@ -2141,8 +2149,9 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [scrollView setBorderType:NSNoBorder];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setHasHorizontalScroller:YES];
-    [[scrollView contentView] setDrawsBackground:YES];
-    [[scrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
+    [scrollView setDrawsBackground:NO];
+    [[scrollView contentView] setDrawsBackground:NO];
+    [[scrollView contentView] setBackgroundColor:[NSColor clearColor]];
 
     TGMediaPreviewImageView *imageView = [[[TGMediaPreviewImageView alloc] initWithFrame:NSMakeRect(0, 0, 100, 100)] autorelease];
     [imageView setMagnificationTarget:self];

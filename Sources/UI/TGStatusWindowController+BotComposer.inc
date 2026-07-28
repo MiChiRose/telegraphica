@@ -145,6 +145,14 @@
                              [self.selectedChatID longLongValue] == [chatID longLongValue]);
             if (generation == self.botComposerGeneration && sameChat) {
                 self.selectedBotUserID = isBot ? userID : nil;
+                for (id candidate in self.chatItems) {
+                    if ([candidate isKindOfClass:[TGChatItem class]] &&
+                        [[candidate chatID] respondsToSelector:@selector(longLongValue)] &&
+                        [[candidate chatID] longLongValue] == [chatID longLongValue]) {
+                        [(TGChatItem *)candidate setBot:isBot];
+                    }
+                }
+                [self.chatTableView reloadData];
                 [self refreshBotReplyMarkupFromMessages];
             }
             [userID release];
