@@ -2,6 +2,7 @@
 
 #import <MapKit/MapKit.h>
 #import "../Core/TGTDLibClient+MapThumbnail.h"
+#import "TGLocationSearchService.h"
 #import "TGLocationStaticMapView.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
@@ -14,12 +15,16 @@
 @property (nonatomic, assign) BOOL mapServicesAvailable;
 @property (nonatomic, assign) BOOL waitingForUserLocation;
 @property (nonatomic, assign) BOOL hasSelection;
+@property (nonatomic, assign) BOOL closing;
 @property (nonatomic, assign) NSUInteger mapGeneration;
 @property (nonatomic, assign) NSInteger mapZoom;
 @property (nonatomic, assign) CLLocationCoordinate2D selectedCoordinate;
 @property (nonatomic, retain) MKMapView *locationServiceMapView;
+@property (nonatomic, retain) TGLocationSearchService *searchService;
 @property (nonatomic, retain) TGLocationStaticMapView *mapImageView;
+@property (nonatomic, retain) NSTextField *searchField;
 @property (nonatomic, retain) NSTextField *statusField;
+@property (nonatomic, retain) NSButton *searchButton;
 @property (nonatomic, retain) NSButton *currentLocationButton;
 @property (nonatomic, retain) NSButton *sendButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -32,12 +37,16 @@
 @synthesize mapServicesAvailable = _mapServicesAvailable;
 @synthesize waitingForUserLocation = _waitingForUserLocation;
 @synthesize hasSelection = _hasSelection;
+@synthesize closing = _closing;
 @synthesize mapGeneration = _mapGeneration;
 @synthesize mapZoom = _mapZoom;
 @synthesize selectedCoordinate = _selectedCoordinate;
 @synthesize locationServiceMapView = _locationServiceMapView;
+@synthesize searchService = _searchService;
 @synthesize mapImageView = _mapImageView;
+@synthesize searchField = _searchField;
 @synthesize statusField = _statusField;
+@synthesize searchButton = _searchButton;
 @synthesize currentLocationButton = _currentLocationButton;
 @synthesize sendButton = _sendButton;
 @synthesize spinner = _spinner;
@@ -52,6 +61,7 @@
     if (self) {
         self.client = client;
         self.mapZoom = 15;
+        self.searchService = [[[TGLocationSearchService alloc] init] autorelease];
         self.mapServicesAvailable = (NSClassFromString(@"MKMapView") != Nil &&
                                      NSClassFromString(@"MKPinAnnotationView") != Nil);
         [[self window] setTitle:TGLoc(@"share.location.title")];
@@ -64,10 +74,14 @@
 
 - (void)dealloc {
     [_locationServiceMapView setDelegate:nil];
+    [_searchService cancel];
     [_client release];
     [_locationServiceMapView release];
+    [_searchService release];
     [_mapImageView release];
+    [_searchField release];
     [_statusField release];
+    [_searchButton release];
     [_currentLocationButton release];
     [_sendButton release];
     [_spinner release];
@@ -138,7 +152,17 @@
                                      font:[NSFont systemFontOfSize:11.0]
                                     color:TGClassicHeaderDetailTextColor(0.9)]];
 
-    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(500.0, height - 116.0, 116.0, 30.0)
+    self.searchField = [[[NSTextField alloc] initWithFrame:NSMakeRect(24.0, height - 112.0, 408.0, 24.0)] autorelease];
+    [[self.searchField cell] setPlaceholderString:TGLoc(@"share.location.searchPlaceholder")];
+    [self.searchField setTarget:self];
+    [self.searchField setAction:@selector(searchPressed:)];
+    [root addSubview:self.searchField];
+    self.searchButton = [self buttonWithFrame:NSMakeRect(440.0, height - 116.0, 76.0, 30.0)
+                                        title:TGLoc(@"share.location.search")
+                                       action:@selector(searchPressed:)
+                                      primary:NO];
+    [root addSubview:self.searchButton];
+    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(524.0, height - 116.0, 92.0, 30.0)
                                                  title:TGLoc(@"share.location.mine")
                                                 action:@selector(currentLocationPressed:)
                                                primary:NO];
@@ -163,6 +187,9 @@
     } else {
         [self.currentLocationButton setEnabled:NO];
     }
+    BOOL searchAvailable = [self.searchService isAvailable];
+    [self.searchField setEnabled:searchAvailable];
+    [self.searchButton setEnabled:searchAvailable];
 
     [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 382.0, 28.0, 28.0)
                                       title:@"−"
@@ -253,6 +280,8 @@
 }
 
 - (void)mapCoordinateChosen:(NSDictionary *)coordinate {
+    [self.searchService cancel];
+    [self.searchButton setEnabled:[self.searchService isAvailable]];
     CLLocationCoordinate2D selected = CLLocationCoordinate2DMake([[coordinate objectForKey:@"latitude"] doubleValue],
                                                                  [[coordinate objectForKey:@"longitude"] doubleValue]);
     id zoom = [coordinate objectForKey:@"zoom"];
@@ -290,6 +319,8 @@
 
 - (void)currentLocationPressed:(id)sender {
     (void)sender;
+    [self.searchService cancel];
+    [self.searchButton setEnabled:[self.searchService isAvailable]];
     self.waitingForUserLocation = YES;
     [self.statusField setStringValue:TGLoc(@"share.location.locating")];
     [self.spinner startAnimation:nil];
@@ -297,10 +328,52 @@
     [self.locationServiceMapView setShowsUserLocation:YES];
 }
 
+- (void)searchPressed:(id)sender {
+    (void)sender;
+    NSString *query = [[self.searchField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([query length] == 0 || ![self.searchService isAvailable] || self.closing) {
+        NSBeep();
+        return;
+    }
+
+    [self.searchButton setEnabled:NO];
+    [self.spinner startAnimation:nil];
+    [self.statusField setStringValue:TGLoc(@"share.location.searching")];
+    TGLocationPickerWindowController *controller = self;
+    [self.searchService searchForQuery:query
+                       centerLatitude:self.selectedCoordinate.latitude
+                      centerLongitude:self.selectedCoordinate.longitude
+                           completion:^(NSArray *results, NSError *error) {
+        if (controller.closing) {
+            return;
+        }
+        [controller.spinner stopAnimation:nil];
+        [controller.searchButton setEnabled:[controller.searchService isAvailable]];
+        NSDictionary *result = ([results count] > 0 && [[results objectAtIndex:0] isKindOfClass:[NSDictionary class]])
+            ? [results objectAtIndex:0] : nil;
+        if (!result) {
+            [controller.statusField setStringValue:[error localizedDescription] ?: TGLoc(@"share.location.notFound")];
+            return;
+        }
+        CLLocationCoordinate2D coordinate = CLLocationCoordinate2DMake(
+            [[result objectForKey:@"latitude"] doubleValue],
+            [[result objectForKey:@"longitude"] doubleValue]);
+        [controller setSelectedCoordinate:coordinate reloadMap:YES];
+    }];
+}
+
 - (void)prepareForClosing {
+    self.closing = YES;
     self.mapGeneration++;
     self.waitingForUserLocation = NO;
+    [self.searchService cancel];
     [self.spinner stopAnimation:nil];
+    [self.searchButton setEnabled:NO];
+    [self.searchField setTarget:nil];
+    [self.searchField setAction:NULL];
+    [self.searchButton setTarget:nil];
+    [self.searchButton setAction:NULL];
     [self.locationServiceMapView setShowsUserLocation:NO];
     [self.locationServiceMapView setDelegate:nil];
     [self.mapImageView setCoordinateTarget:nil];
@@ -341,6 +414,7 @@
 
 - (NSDictionary *)runModal {
     self.result = nil;
+    self.closing = NO;
     [[self window] center];
     [NSApp runModalForWindow:[self window]];
     return self.result;

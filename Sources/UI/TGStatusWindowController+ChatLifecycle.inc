@@ -217,3 +217,70 @@
         [pool drain];
     });
 }
+
+- (void)clearChatHistoryFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        [item isForumTopic] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    NSString *title = [[item title] length] > 0 ? [item title] : TGLoc(@"chats");
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setAlertStyle:NSCriticalAlertStyle];
+    [alert setMessageText:[NSString stringWithFormat:TGLoc(@"chat.clearHistoryConfirmTitle"), title]];
+    [alert setInformativeText:TGLoc(@"chat.clearHistoryConfirm")];
+    [alert addButtonWithTitle:TGLoc(@"chat.clearHistory")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSString *titleCopy = [title copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:TGLoc(@"chat.clearingHistory")];
+    [self appendDetail:[NSString stringWithFormat:@"Clearing history for %@...", titleCopy]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *clearError = nil;
+        BOOL succeeded = [client deleteChatHistoryForChatID:chatID
+                                        removeFromChatList:NO
+                                                     revoke:NO
+                                                    timeout:10.0
+                                                      error:&clearError];
+        NSString *errorMessage = [[clearError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:TGLoc(@"chat.historyCleared")];
+                [self appendDetail:[NSString stringWithFormat:@"Cleared history for %@.", titleCopy]];
+                if (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
+                    self.messageLoadingGeneration++;
+                    self.pendingLiveMessageRefresh = NO;
+                    self.messageItemsRepresentFocusedContext = NO;
+                    [self.messageItems removeAllObjects];
+                    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+                    [self.messageTableView reloadData];
+                    self.olderMessagesExhausted = YES;
+                    self.autoOlderMessagesLoadArmed = NO;
+                    self.forceMessageScrollToNewest = NO;
+                    [self refreshBotReplyMarkupFromMessages];
+                    [self updateMessageJumpToNewestButtonVisibility];
+                }
+                [self reloadChatsInteractive:NO preserveSelection:YES];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"chat.clearHistoryFailed")];
+                [self appendDetail:[NSString stringWithFormat:@"Clear chat history failed: %@",
+                                    [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [chatID release];
+            [titleCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
