@@ -124,6 +124,7 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
 - (void)connectMockCall {
     if (self.mockCall && !self.finishing && self.callWindowController) {
         [self.callWindowController setPresentationState:TGCallPresentationStateConnected detail:nil];
+        [self.callWindowController updateSignalBars:5U];
     }
 }
 
@@ -212,12 +213,13 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
 
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeSignalBars:(NSUInteger)signalBars {
     (void)engine;
-    (void)signalBars;
+    [self.callWindowController updateSignalBars:signalBars];
 }
 
 - (void)callWindowControllerDidRequestAnswer:(TGCallWindowController *)controller {
     if (self.mockCall) {
         [controller setPresentationState:TGCallPresentationStateConnected detail:nil];
+        [controller updateSignalBars:5U];
         return;
     }
     NSNumber *callID = [self.activeCallID retain];

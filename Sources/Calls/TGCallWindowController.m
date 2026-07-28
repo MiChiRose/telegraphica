@@ -16,7 +16,11 @@
 
 - (id)copyWithZone:(NSZone *)zone {
     TGCallActionButtonCell *cell = [super copyWithZone:zone];
-    cell.actionColor = self.actionColor;
+    /*
+     * Legacy NSCell copies subclass ivars without retaining them.  Retain the
+     * bit-copied color directly so both the prototype and rendered copy own it.
+     */
+    cell->_actionColor = [_actionColor retain];
     return cell;
 }
 
@@ -60,6 +64,7 @@
 @property (nonatomic, retain) NSSound *ringSound;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextField *timerField;
+@property (nonatomic, retain) NSTextField *qualityField;
 @property (nonatomic, retain) TGProfileAvatarView *avatarView;
 @property (nonatomic, retain) NSTextField *nameField;
 @property (nonatomic, retain) NSButton *answerButton;
@@ -81,6 +86,7 @@
 @synthesize ringSound = _ringSound;
 @synthesize statusField = _statusField;
 @synthesize timerField = _timerField;
+@synthesize qualityField = _qualityField;
 @synthesize avatarView = _avatarView;
 @synthesize nameField = _nameField;
 @synthesize answerButton = _answerButton;
@@ -160,6 +166,12 @@
                                           font:[NSFont boldSystemFontOfSize:16.0]
                                          color:TGClassicCardInkColor()];
         [root addSubview:self.timerField];
+        self.qualityField = [self labelWithFrame:NSMakeRect(40.0, 163.0, 340.0, 18.0)
+                                            text:@""
+                                            font:[NSFont systemFontOfSize:10.5]
+                                           color:TGClassicCardMutedInkColor()];
+        [self.qualityField setHidden:YES];
+        [root addSubview:self.qualityField];
 
         self.answerButton = [self actionButtonWithFrame:NSMakeRect(102.0, 78.0, 64.0, 64.0)
                                               iconName:@"call-receive"
@@ -243,6 +255,12 @@
                                      (unsigned long)(elapsed % 60U)]];
 }
 
+- (void)updateSignalBars:(NSUInteger)signalBars {
+    NSUInteger safeBars = MIN(5U, signalBars);
+    [self.qualityField setStringValue:[NSString stringWithFormat:TGLoc(@"calls.quality"),
+                                       (unsigned long)safeBars]];
+}
+
 - (void)setPresentationState:(TGCallPresentationState)state detail:(NSString *)detail {
     BOOL incoming = (state == TGCallPresentationStateIncoming);
     BOOL connected = (state == TGCallPresentationStateConnected ||
@@ -254,6 +272,7 @@
     [self.muteButton setHidden:!connected];
     [self.muteLabel setHidden:!connected];
     [self.hangupButton setHidden:ended];
+    [self.qualityField setHidden:!connected];
 
     NSString *status = detail;
     if ([status length] == 0) {
@@ -342,6 +361,7 @@
     [_ringSound release];
     [_statusField release];
     [_timerField release];
+    [_qualityField release];
     [_avatarView release];
     [_nameField release];
     [_answerButton release];
