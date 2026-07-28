@@ -1454,6 +1454,9 @@
     self.mediaPreviewZoomScale = 1.0;
     [self.mediaPreviewImageView setImage:nil];
     [closingWindow setDelegate:nil];
+    self.mediaPreviewPanelView = nil;
+    self.mediaPreviewSurfaceView = nil;
+    self.mediaPreviewToolbarView = nil;
     self.mediaPreviewImageView = nil;
     self.mediaPreviewScrollView = nil;
     self.mediaPreviewZoomOutButton = nil;

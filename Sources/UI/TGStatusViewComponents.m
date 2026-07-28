@@ -430,22 +430,15 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 }
 
 - (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    BOOL highlighted = [self isHighlighted];
     NSRect cardRect = NSInsetRect(cellFrame, 3.0, 3.0);
     NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect xRadius:10.0 yRadius:10.0];
-    if (highlighted) {
-        [TGClassicSelectedRowColor() set];
-        [cardPath fill];
-    } else {
-        TGThemeDrawGroupedCardInPath(cardPath, cardRect, [controlView isFlipped]);
-    }
+    TGThemeDrawGroupedCardInPath(cardPath, cardRect, [controlView isFlipped]);
     [TGClassicTableGridColor() set];
     [cardPath setLineWidth:1.0];
     [cardPath stroke];
 
-    NSColor *titleColor = highlighted ? TGClassicSelectedRowTextColor() : TGClassicCardInkColor();
-    NSColor *detailColor = highlighted ? [TGClassicSelectedRowTextColor() colorWithAlphaComponent:0.76]
-                                       : TGClassicCardMutedInkColor();
+    NSColor *titleColor = TGClassicCardInkColor();
+    NSColor *detailColor = TGClassicCardMutedInkColor();
     NSString *title = [self.sessionPresentation objectForKey:@"title"];
     NSString *detail = [self.sessionPresentation objectForKey:@"detail"];
     NSString *iconName = [self.sessionPresentation objectForKey:@"icon_name"];

@@ -200,16 +200,16 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [contentView addSubview:metaField];
     self.photoSendMetaField = metaField;
 
-    TGScrollSurfaceView *queueSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(32, 108, 456, 78)] autorelease];
+    TGScrollSurfaceView *queueSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(36, 108, 448, 78)] autorelease];
     [queueSurface setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:queueSurface];
-    NSScrollView *queueScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(36, 112, 448, 70)] autorelease];
+    NSScrollView *queueScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(40, 112, 440, 70)] autorelease];
     [queueScrollView setBorderType:NSNoBorder];
     [queueScrollView setHasVerticalScroller:YES];
     [queueScrollView setAutohidesScrollers:YES];
     [queueScrollView setDrawsBackground:NO];
     [queueScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
-    NSView *queueContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 444, 70)] autorelease];
+    NSView *queueContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 436, 70)] autorelease];
     [queueScrollView setDocumentView:queueContentView];
     [contentView addSubview:queueScrollView];
     self.photoSendQueueScrollView = queueScrollView;
@@ -341,8 +341,9 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 
     NSArray *queueItems = self.pendingAttachmentQueueItems;
     CGFloat rowHeight = 24.0;
+    CGFloat contentWidth = MAX(360.0, NSWidth([[self.photoSendQueueScrollView contentView] bounds]));
     CGFloat contentHeight = MAX(72.0, (CGFloat)[queueItems count] * rowHeight);
-    [queueView setFrame:NSMakeRect(0.0, 0.0, 428.0, contentHeight)];
+    [queueView setFrame:NSMakeRect(0.0, 0.0, contentWidth, contentHeight)];
 
     NSUInteger index = 0;
     for (index = 0; index < [queueItems count]; index++) {
@@ -354,13 +355,18 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         TGAttachmentDescriptor *descriptor = item.descriptor;
         CGFloat y = contentHeight - rowHeight - (CGFloat)index * rowHeight;
 
-        NSTextField *nameField = [self labelWithFrame:NSMakeRect(8.0, y + 4.0, 238.0, 16.0)
+        CGFloat sizeWidth = 76.0;
+        CGFloat stateWidth = 86.0;
+        CGFloat sizeX = contentWidth - sizeWidth - 8.0;
+        CGFloat stateX = sizeX - stateWidth - 8.0;
+        CGFloat nameWidth = MAX(90.0, stateX - 16.0);
+        NSTextField *nameField = [self labelWithFrame:NSMakeRect(8.0, y + 4.0, nameWidth, 16.0)
                                                  text:([descriptor.fileName length] > 0 ? descriptor.fileName : @"File")
                                                  font:[NSFont systemFontOfSize:11.0]];
         [[nameField cell] setLineBreakMode:NSLineBreakByTruncatingMiddle];
         [queueView addSubview:nameField];
 
-        NSTextField *stateField = [self labelWithFrame:NSMakeRect(252.0, y + 4.0, 86.0, 16.0)
+        NSTextField *stateField = [self labelWithFrame:NSMakeRect(stateX, y + 4.0, stateWidth, 16.0)
                                                   text:TGAttachmentQueueStateText(item.transferState.state)
                                                   font:[NSFont boldSystemFontOfSize:11.0]];
         if (item.transferState.state == TGFileTransferStateFailed) {
@@ -372,7 +378,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         }
         [queueView addSubview:stateField];
 
-        NSTextField *sizeField = [self labelWithFrame:NSMakeRect(342.0, y + 4.0, 76.0, 16.0)
+        NSTextField *sizeField = [self labelWithFrame:NSMakeRect(sizeX, y + 4.0, sizeWidth, 16.0)
                                                  text:[descriptor readableSize]
                                                  font:[NSFont systemFontOfSize:11.0]];
         [self applyMutedLabelStyle:sizeField];
