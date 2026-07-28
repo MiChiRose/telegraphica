@@ -26,6 +26,15 @@
 @interface TGUtilityWindowView : NSView
 @end
 
+@interface TGUtilityPanelView : NSView
+@end
+
+@interface TGActiveSessionCell : NSTextFieldCell {
+    NSDictionary *_sessionPresentation;
+}
+@property (nonatomic, retain) NSDictionary *sessionPresentation;
+@end
+
 @protocol TGSidebarResizeHandleDelegate;
 
 @interface TGSidebarResizeHandleView : NSView {

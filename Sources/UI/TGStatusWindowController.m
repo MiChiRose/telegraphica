@@ -1837,6 +1837,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
     [self.settingsDownloadFolderButton setNeedsDisplay:YES];
+    [self.settingsStorageUsageButton setImage:TGTemplateIconAssetImage(@"pressure",
+                                                                       NSMakeSize(16.0, 16.0),
+                                                                       TGClassicHeaderTextColor(0.96),
+                                                                       1.0)];
     [self.settingsStorageUsageButton setNeedsDisplay:YES];
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
     [self.settingsActiveSessionsButton setNeedsDisplay:YES];
@@ -3430,6 +3434,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsStorageUsageButton setTitle:@"Storage usage"];
     [self.settingsStorageUsageButton setTarget:self];
     [self.settingsStorageUsageButton setAction:@selector(showStorageUsageWindow:)];
+    [self.settingsStorageUsageButton setImage:TGTemplateIconAssetImage(@"pressure",
+                                                                       NSMakeSize(16.0, 16.0),
+                                                                       TGClassicHeaderTextColor(0.96),
+                                                                       1.0)];
+    [self.settingsStorageUsageButton setImagePosition:NSImageLeft];
     [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];

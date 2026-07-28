@@ -251,6 +251,10 @@
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
 
+    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 44, 756, 530)] autorelease];
+    [panel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:panel];
+
     NSTextField *title = [self labelWithFrame:NSMakeRect(24, 594, 430, 26)
                                          font:[NSFont boldSystemFontOfSize:20.0]
                                         color:TGClassicHeaderTextColor(1.0)];
@@ -304,12 +308,14 @@
     [folderLabel setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:folderLabel];
 
+    TGScrollSurfaceView *folderSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(24, 60, 202, 470)] autorelease];
+    [folderSurface setAutoresizingMask:NSViewHeightSizable];
+    [root addSubview:folderSurface];
     NSScrollView *folderScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(28, 64, 194, 462)] autorelease];
     [folderScroll setHasVerticalScroller:YES];
     [folderScroll setAutohidesScrollers:YES];
     [folderScroll setBorderType:NSNoBorder];
-    [folderScroll setDrawsBackground:YES];
-    [folderScroll setBackgroundColor:TGClassicTablePaperColor()];
+    [folderScroll setDrawsBackground:NO];
     [folderScroll setAutoresizingMask:NSViewHeightSizable];
     self.folderTableView = [[[NSTableView alloc] initWithFrame:[[folderScroll contentView] bounds]] autorelease];
     [self.folderTableView setDataSource:self];
@@ -317,7 +323,7 @@
     [self.folderTableView setHeaderView:nil];
     [self.folderTableView setRowHeight:42.0];
     [self.folderTableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
-    [self.folderTableView setBackgroundColor:TGClassicTablePaperColor()];
+    [self.folderTableView setBackgroundColor:[NSColor clearColor]];
     [self.folderTableView setAllowsEmptySelection:NO];
     [self.folderTableView setAllowsMultipleSelection:NO];
     [self.folderTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
@@ -404,12 +410,14 @@
     [self.chatSearchField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.chatSearchField];
 
+    TGScrollSurfaceView *chatSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(248, 100, 504, 232)] autorelease];
+    [chatSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:chatSurface];
     NSScrollView *chatScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(252, 104, 496, 224)] autorelease];
     [chatScroll setHasVerticalScroller:YES];
     [chatScroll setAutohidesScrollers:YES];
     [chatScroll setBorderType:NSNoBorder];
-    [chatScroll setDrawsBackground:YES];
-    [chatScroll setBackgroundColor:TGClassicTablePaperColor()];
+    [chatScroll setDrawsBackground:NO];
     [chatScroll setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     self.chatTableView = [[[NSTableView alloc] initWithFrame:[[chatScroll contentView] bounds]] autorelease];
     [self.chatTableView setDataSource:self];
@@ -417,7 +425,7 @@
     [self.chatTableView setHeaderView:nil];
     [self.chatTableView setRowHeight:38.0];
     [self.chatTableView setIntercellSpacing:NSMakeSize(0.0, 1.0)];
-    [self.chatTableView setBackgroundColor:TGClassicTablePaperColor()];
+    [self.chatTableView setBackgroundColor:[NSColor clearColor]];
     [self.chatTableView setAllowsMultipleSelection:NO];
     NSTableColumn *includeColumn = [[[NSTableColumn alloc] initWithIdentifier:@"included"] autorelease];
     [includeColumn setWidth:30.0];

@@ -61,7 +61,7 @@
     if (self) {
         self.client = client;
         self.mapZoom = 15;
-        self.searchService = [[[TGLocationSearchService alloc] init] autorelease];
+        self.searchService = nil;
         self.mapServicesAvailable = (NSClassFromString(@"MKMapView") != Nil &&
                                      NSClassFromString(@"MKPinAnnotationView") != Nil);
         [[self window] setTitle:TGLoc(@"share.location.title")];
@@ -152,28 +152,23 @@
                                      font:[NSFont systemFontOfSize:11.0]
                                     color:TGClassicHeaderDetailTextColor(0.9)]];
 
-    TGGroupedCardView *pickerCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(16.0, 24.0, 608.0, 426.0)] autorelease];
+    TGUtilityPanelView *pickerCard = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(16.0, 24.0, 608.0, 442.0)] autorelease];
     [root addSubview:pickerCard];
 
-    self.searchField = [[[NSTextField alloc] initWithFrame:NSMakeRect(24.0, height - 112.0, 408.0, 24.0)] autorelease];
-    [[self.searchField cell] setPlaceholderString:TGLoc(@"share.location.searchPlaceholder")];
-    [self.searchField setTarget:self];
-    [self.searchField setAction:@selector(searchPressed:)];
-    [root addSubview:self.searchField];
-    self.searchButton = [self buttonWithFrame:NSMakeRect(440.0, height - 116.0, 76.0, 30.0)
-                                        title:TGLoc(@"share.location.search")
-                                       action:@selector(searchPressed:)
-                                      primary:NO];
-    [root addSubview:self.searchButton];
-    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(524.0, height - 116.0, 92.0, 30.0)
+    self.currentLocationButton = [self buttonWithFrame:NSMakeRect(24.0, height - 116.0, 156.0, 32.0)
                                                  title:TGLoc(@"share.location.mine")
                                                 action:@selector(currentLocationPressed:)
                                                primary:NO];
     [root addSubview:self.currentLocationButton];
 
-    TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 116.0, 592.0, 306.0)] autorelease];
+    [root addSubview:[self labelWithFrame:NSMakeRect(194.0, height - 109.0, 410.0, 18.0)
+                                     text:TGLoc(@"share.location.manualHint")
+                                     font:[NSFont systemFontOfSize:11.0]
+                                    color:TGClassicCardMutedInkColor()]];
+
+    TGGroupedCardView *mapCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(24.0, 102.0, 592.0, 318.0)] autorelease];
     [root addSubview:mapCard];
-    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 122.0, 580.0, 294.0)] autorelease];
+    self.mapImageView = [[[TGLocationStaticMapView alloc] initWithFrame:NSMakeRect(30.0, 108.0, 580.0, 306.0)] autorelease];
     [self.mapImageView setCoordinateTarget:self];
     [self.mapImageView setCoordinateAction:@selector(mapCoordinateChosen:)];
     [self.mapImageView setZoom:self.mapZoom];
@@ -190,33 +185,29 @@
     } else {
         [self.currentLocationButton setEnabled:NO];
     }
-    BOOL searchAvailable = [self.searchService isAvailable];
-    [self.searchField setEnabled:searchAvailable];
-    [self.searchButton setEnabled:searchAvailable];
-
-    [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 382.0, 28.0, 28.0)
+    [root addSubview:[self buttonWithFrame:NSMakeRect(548.0, 376.0, 28.0, 28.0)
                                       title:@"−"
                                      action:@selector(zoomOutPressed:)
                                     primary:NO]];
-    [root addSubview:[self buttonWithFrame:NSMakeRect(578.0, 382.0, 28.0, 28.0)
+    [root addSubview:[self buttonWithFrame:NSMakeRect(578.0, 376.0, 28.0, 28.0)
                                       title:@"+"
                                      action:@selector(zoomInPressed:)
                                     primary:NO]];
 
-    self.statusField = [self labelWithFrame:NSMakeRect(24.0, 91.0, 390.0, 18.0)
+    self.statusField = [self labelWithFrame:NSMakeRect(24.0, 78.0, 390.0, 18.0)
                                        text:TGLoc(@"share.location.ready")
                                        font:[NSFont systemFontOfSize:10.0]
                                       color:TGClassicCardMutedInkColor()];
     [root addSubview:self.statusField];
-    self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(420.0, 91.0, 16.0, 16.0)] autorelease];
+    self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(420.0, 78.0, 16.0, 16.0)] autorelease];
     [self.spinner setStyle:NSProgressIndicatorSpinningStyle];
     [self.spinner setDisplayedWhenStopped:NO];
     [root addSubview:self.spinner];
-    [root addSubview:[self buttonWithFrame:NSMakeRect(428.0, 38.0, 88.0, 32.0)
+    [root addSubview:[self buttonWithFrame:NSMakeRect(386.0, 38.0, 110.0, 32.0)
                                       title:TGLoc(@"cancel")
                                      action:@selector(cancelPressed:)
                                     primary:NO]];
-    self.sendButton = [self buttonWithFrame:NSMakeRect(526.0, 38.0, 90.0, 32.0)
+    self.sendButton = [self buttonWithFrame:NSMakeRect(506.0, 38.0, 110.0, 32.0)
                                       title:TGLoc(@"send")
                                      action:@selector(sendPressed:)
                                     primary:YES];

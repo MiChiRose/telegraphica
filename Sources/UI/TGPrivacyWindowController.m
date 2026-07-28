@@ -170,6 +170,10 @@
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
 
+    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 42, 736, 520)] autorelease];
+    [panel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:panel];
+
     NSTextField *title = [self labelWithFrame:NSMakeRect(24, 570, 560, 28)
                                          font:[NSFont boldSystemFontOfSize:20.0]
                                         color:TGClassicHeaderTextColor(1.0)];
@@ -300,6 +304,9 @@
     [blockedTitle setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:blockedTitle];
 
+    TGScrollSurfaceView *blockedSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(30, 112, 700, 242)] autorelease];
+    [blockedSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [root addSubview:blockedSurface];
     NSScrollView *scroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(34, 116, 692, 234)] autorelease];
     [scroll setHasVerticalScroller:YES];
     [scroll setBorderType:NSNoBorder];
