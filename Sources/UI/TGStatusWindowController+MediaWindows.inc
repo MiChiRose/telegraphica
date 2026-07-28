@@ -395,8 +395,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     CGFloat tabY = height - 242.0;
     CGFloat tabWidth = width - 104.0;
     CGFloat buttonWidth = floor((tabWidth - gap * (CGFloat)(count - 1)) / (CGFloat)count);
-    if (buttonWidth < 70.0) {
-        buttonWidth = 70.0;
+    if (buttonWidth < 44.0) {
+        buttonWidth = 44.0;
     }
     CGFloat rowWidth = (buttonWidth * (CGFloat)count) + (gap * (CGFloat)(count - 1));
     CGFloat startX = floor((width - rowWidth) / 2.0);
@@ -472,46 +472,47 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 }
 
 - (void)ensureMediaCenterWindow {
-    if (self.mediaCenterWindow) {
+    if (self.mediaCenterPanelView) {
         return;
     }
 
-    NSRect frame = NSMakeRect(0, 0, 840, 680);
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
-                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
-                                                      backing:NSBackingStoreBuffered
-                                                        defer:NO] autorelease];
-    [window setTitle:TGLoc(@"media.center.windowTitle")];
-    [window setMinSize:NSMakeSize(820.0, 520.0)];
-    [window setReleasedWhenClosed:NO];
-    [window setDelegate:self];
-
+    NSRect frame = [self.conversationPanelView frame];
     TGUtilityWindowView *contentView = [[[TGUtilityWindowView alloc] initWithFrame:frame] autorelease];
-    [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [window setContentView:contentView];
+    [[[self window] contentView] addSubview:contentView positioned:NSWindowAbove relativeTo:nil];
+    self.mediaCenterPanelView = contentView;
 
-    TGGroupedCardView *contentCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(28.0, 18.0, NSWidth(frame) - 56.0, NSHeight(frame) - 48.0)] autorelease];
-    [contentCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    TGGroupedCardView *contentCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(12.0, 12.0, NSWidth(frame) - 24.0, NSHeight(frame) - 24.0)] autorelease];
     [contentView addSubview:contentCard];
     self.mediaCenterContentCardView = contentCard;
 
+    NSButton *backButton = [[[NSButton alloc] initWithFrame:NSMakeRect(20.0, NSHeight(frame) - 52.0, 34.0, 34.0)] autorelease];
+    TGDrawerButtonCell *backCell = [[[TGDrawerButtonCell alloc] initTextCell:@""] autorelease];
+    [backCell setBackStyle:YES];
+    [backButton setCell:backCell];
+    [backButton setTitle:@""];
+    [backButton setToolTip:TGLoc(@"back")];
+    [backButton setTarget:self];
+    [backButton setAction:@selector(closeMediaCenter:)];
+    [contentView addSubview:backButton];
+    self.mediaCenterBackButton = backButton;
+
     CGFloat avatarSize = 92.0;
     TGProfileAvatarView *avatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(floor((NSWidth(frame) - avatarSize) / 2.0),
-                                                                                     548.0,
+                                                                                     NSHeight(frame) - 126.0,
                                                                                      avatarSize,
                                                                                      avatarSize)] autorelease];
     [avatarView setDisplayName:([self.selectedChatTitle length] > 0 ? self.selectedChatTitle : @"Chat")];
     [avatarView setAvatarLocalPath:self.selectedChatAvatarLocalPath];
-    [avatarView setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMaxYMargin)];
     [contentView addSubview:avatarView];
+    self.mediaCenterAvatarView = avatarView;
 
     NSString *titleText = ([self.selectedChatTitle length] > 0) ? self.selectedChatTitle : @"Selected chat";
-    NSTextField *titleField = [self labelWithFrame:NSMakeRect(80.0, 516.0, NSWidth(frame) - 160.0, 26.0)
+    NSTextField *titleField = [self labelWithFrame:NSMakeRect(80.0, NSHeight(frame) - 162.0, NSWidth(frame) - 160.0, 26.0)
                                               text:titleText
                                               font:[NSFont boldSystemFontOfSize:20.0]];
     [titleField setAlignment:NSCenterTextAlignment];
-    [titleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:titleField];
+    self.mediaCenterTitleField = titleField;
 
     NSMutableString *subtitle = [NSMutableString string];
     if ([self.selectedChatTypeSummary length] > 0) {
@@ -523,13 +524,13 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         }
         [subtitle appendFormat:@"ID %lld", [self.selectedChatID longLongValue]];
     }
-    NSTextField *subtitleField = [self labelWithFrame:NSMakeRect(80.0, 492.0, NSWidth(frame) - 160.0, 20.0)
+    NSTextField *subtitleField = [self labelWithFrame:NSMakeRect(80.0, NSHeight(frame) - 186.0, NSWidth(frame) - 160.0, 20.0)
                                                  text:([subtitle length] > 0 ? subtitle : @"Chat details")
                                                  font:[NSFont systemFontOfSize:13.0]];
     [subtitleField setAlignment:NSCenterTextAlignment];
     [self applyMutedLabelStyle:subtitleField];
-    [subtitleField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:subtitleField];
+    self.mediaCenterSubtitleField = subtitleField;
 
     NSArray *tabTitles = [NSArray arrayWithObjects:
                           TGLoc(@"media.center.tab.media"),
@@ -553,7 +554,6 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [tabButton setTag:(NSInteger)tabIndex];
         [tabButton setTarget:self];
         [tabButton setAction:@selector(selectMediaCenterTab:)];
-        [tabButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
         [contentView addSubview:tabButton];
         [tabButtons addObject:tabButton];
     }
@@ -575,7 +575,6 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [refreshButton setTarget:self];
     [refreshButton setAction:@selector(reloadMediaCenter:)];
     [self applyHeaderIconButtonStyle:refreshButton];
-    [refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:refreshButton];
     self.mediaCenterRefreshButton = refreshButton;
 
@@ -583,14 +582,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                text:TGLoc(@"media.center.chooseChat")
                                                font:[NSFont systemFontOfSize:12.0]];
     [self applyMutedLabelStyle:statusField];
-    [statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:statusField];
     self.mediaCenterStatusField = statusField;
 
     NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(36.0, 24.0, NSWidth(frame) - 72.0, 314.0)] autorelease];
     [scrollView setHasVerticalScroller:YES];
     [scrollView setBorderType:NSNoBorder];
-    [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[scrollView contentView] setDrawsBackground:NO];
     TGFlippedDocumentView *resultsView = [[[TGFlippedDocumentView alloc] initWithFrame:NSMakeRect(0.0, 0.0, NSWidth(frame) - 90.0, 80.0)] autorelease];
     [scrollView setDocumentView:resultsView];
@@ -607,22 +604,29 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [loadingSpinner setStyle:NSProgressIndicatorSpinningStyle];
     [loadingSpinner setDisplayedWhenStopped:NO];
     [loadingSpinner setHidden:YES];
-    [loadingSpinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin)];
     [contentView addSubview:loadingSpinner];
     self.mediaCenterLoadingSpinner = loadingSpinner;
-
-    self.mediaCenterWindow = window;
+    [contentView setHidden:YES];
 }
 
 - (void)layoutMediaCenterWindowSubviews {
-    if (!self.mediaCenterWindow) {
+    if (!self.mediaCenterPanelView) {
         return;
     }
-    NSView *contentView = [self.mediaCenterWindow contentView];
+    [self.mediaCenterPanelView setFrame:[self.conversationPanelView frame]];
+    NSView *contentView = self.mediaCenterPanelView;
     NSRect bounds = [contentView bounds];
     CGFloat width = NSWidth(bounds);
     CGFloat height = NSHeight(bounds);
-    [self.mediaCenterContentCardView setFrame:NSMakeRect(28.0, 18.0, width - 56.0, height - 48.0)];
+    [self.mediaCenterContentCardView setFrame:NSMakeRect(12.0, 12.0, width - 24.0, height - 24.0)];
+    [self.mediaCenterBackButton setFrame:NSMakeRect(20.0, height - 52.0, 34.0, 34.0)];
+    CGFloat avatarSize = 92.0;
+    [self.mediaCenterAvatarView setFrame:NSMakeRect(floor((width - avatarSize) / 2.0),
+                                                    height - 126.0,
+                                                    avatarSize,
+                                                    avatarSize)];
+    [self.mediaCenterTitleField setFrame:NSMakeRect(72.0, height - 162.0, width - 144.0, 26.0)];
+    [self.mediaCenterSubtitleField setFrame:NSMakeRect(72.0, height - 186.0, width - 144.0, 20.0)];
     [self layoutMediaCenterTabButtonsForWidth:width height:height];
     [self.mediaCenterStatusField setFrame:NSMakeRect(52.0, height - 274.0, width - 136.0, 18.0)];
     [self.mediaCenterRefreshButton setFrame:NSMakeRect(width - 72.0, height - 282.0, 34.0, 30.0)];
@@ -1116,7 +1120,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 }
 
 - (void)loadMoreMediaCenterIfNeeded {
-    if (!self.mediaCenterWindow || !self.mediaCenterScrollView || !self.mediaCenterResultsView) {
+    if (!self.mediaCenterPanelView || !self.mediaCenterVisible || !self.mediaCenterScrollView || !self.mediaCenterResultsView) {
         return;
     }
     if (self.mediaCenterLoading || self.mediaCenterLoadingMore || self.mediaCenterExhausted) {
@@ -1154,51 +1158,35 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                   [self.selectedChatID longLongValue],
                                   self.selectedMessageThreadID ? [self.selectedMessageThreadID description] : @"none"]];
     @try {
-        [[TGLogger sharedLogger] log:@"Media Center: ensuring window."];
-        if (self.mediaCenterWindow) {
-            [self stopObservingMediaCenterScrollView];
-            [self.mediaCenterWindow close];
-            self.mediaCenterWindow = nil;
-            self.mediaCenterSearchField = nil;
-            self.mediaCenterFilterPopUpButton = nil;
-            self.mediaCenterSortPopUpButton = nil;
-            self.mediaCenterStatusField = nil;
-            self.mediaCenterScrollView = nil;
-            self.mediaCenterResultsView = nil;
-            self.mediaCenterTabButtons = nil;
-            self.mediaCenterSelectedTabIndex = 0;
-            self.mediaCenterRefreshButton = nil;
-            self.mediaCenterLoadingSpinner = nil;
-            self.mediaCenterPreviewOverlayView = nil;
-            self.mediaCenterPreviewImageView = nil;
-            self.mediaCenterPreviewTitleField = nil;
-            self.mediaCenterPreviewCloseButton = nil;
-            [self.mediaCenterItems removeAllObjects];
-            [self resetMediaCenterPaginationState];
-        }
+        [[TGLogger sharedLogger] log:@"Media Center: ensuring inline panel."];
         [self ensureMediaCenterWindow];
-        if (!self.mediaCenterWindow) {
-            [[TGLogger sharedLogger] log:@"Media Center: failed to create window."];
+        if (!self.mediaCenterPanelView) {
+            [[TGLogger sharedLogger] log:@"Media Center: failed to create inline panel."];
             NSBeep();
             return;
         }
-        [[TGLogger sharedLogger] log:@"Media Center: laying out window."];
-        [self layoutMediaCenterWindowSubviews];
-        if ([self.mediaCenterWindow isMiniaturized]) {
-            [[TGLogger sharedLogger] log:@"Media Center: deminiaturizing window."];
-            [self.mediaCenterWindow deminiaturize:self];
+        [self.mediaCenterAvatarView setDisplayName:([self.selectedChatTitle length] > 0 ? self.selectedChatTitle : @"Chat")];
+        [self.mediaCenterAvatarView setAvatarLocalPath:self.selectedChatAvatarLocalPath];
+        [self.mediaCenterTitleField setStringValue:([self.selectedChatTitle length] > 0 ? self.selectedChatTitle : @"Selected chat")];
+        NSMutableString *subtitle = [NSMutableString string];
+        if ([self.selectedChatTypeSummary length] > 0) {
+            [subtitle appendString:self.selectedChatTypeSummary];
         }
-        [[TGLogger sharedLogger] log:@"Media Center: ordering window front."];
-        [self.mediaCenterWindow center];
-        [self.mediaCenterWindow makeKeyAndOrderFront:self];
-        [self.mediaCenterWindow orderFrontRegardless];
-        [self.mediaCenterWindow makeFirstResponder:nil];
-        [self.mediaCenterWindow displayIfNeeded];
-        [NSApp activateIgnoringOtherApps:YES];
-        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: window ordered visible=%@ key=%@ frame=%@.",
-                                      [self.mediaCenterWindow isVisible] ? @"yes" : @"no",
-                                      [self.mediaCenterWindow isKeyWindow] ? @"yes" : @"no",
-                                      NSStringFromRect([self.mediaCenterWindow frame])]];
+        if ([self.selectedChatID respondsToSelector:@selector(longLongValue)]) {
+            if ([subtitle length] > 0) {
+                [subtitle appendString:@" · "];
+            }
+            [subtitle appendFormat:@"ID %lld", [self.selectedChatID longLongValue]];
+        }
+        [self.mediaCenterSubtitleField setStringValue:([subtitle length] > 0 ? subtitle : @"Chat details")];
+        self.mediaCenterVisible = YES;
+        [self layoutMediaCenterWindowSubviews];
+        [self updateVisibleSection];
+        [[[self window] contentView] addSubview:self.mediaCenterPanelView positioned:NSWindowAbove relativeTo:nil];
+        [self.mediaCenterPanelView setHidden:NO];
+        [self.mediaCenterPanelView displayIfNeeded];
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: inline panel visible frame=%@.",
+                                      NSStringFromRect([self.mediaCenterPanelView frame])]];
     } @catch (NSException *exception) {
         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Media Center: open failed with exception %@: %@.",
                                       [exception name],
@@ -1207,6 +1195,16 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         return;
     }
     [self reloadMediaCenter:nil];
+}
+
+- (void)closeMediaCenter:(id)sender {
+    (void)sender;
+    self.mediaCenterVisible = NO;
+    self.mediaCenterGeneration = self.mediaCenterGeneration + 1;
+    [self closeMediaCenterInlinePreview:nil];
+    [self.mediaCenterPanelView setHidden:YES];
+    [self updateVisibleSection];
+    [self requestComposerRefocus];
 }
 
 - (void)downloadMediaCenterItem:(id)sender {
@@ -1395,7 +1393,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     result.snippet = TGMediaCenterTitleForItem(item);
     result.mediaType = TGMediaCenterTypeTitleForItem(item);
     result.messageItem = item;
-    [self.mediaCenterWindow close];
+    [self closeMediaCenter:nil];
     [self jumpToSearchResult:result];
 }
 

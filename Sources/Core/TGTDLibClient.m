@@ -991,6 +991,27 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return summary;
     }
 
+    if ([type isEqualToString:@"updateFile"]) {
+        id fileObject = [dictionary objectForKey:@"file"];
+        if (![fileObject isKindOfClass:[NSDictionary class]]) {
+            return nil;
+        }
+        NSNumber *fileID = [self fileIDFromFileObject:fileObject];
+        if (!fileID) {
+            return nil;
+        }
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        [summary setObject:@"file_update" forKey:@"kind"];
+        [summary setObject:fileID forKey:@"file_id"];
+        id localObject = [(NSDictionary *)fileObject objectForKey:@"local"];
+        id completedObject = [localObject isKindOfClass:[NSDictionary class]]
+            ? [(NSDictionary *)localObject objectForKey:@"is_downloading_completed"] : nil;
+        [summary setObject:[NSNumber numberWithBool:([completedObject respondsToSelector:@selector(boolValue)] &&
+                                                     [completedObject boolValue])]
+                    forKey:@"completed"];
+        return summary;
+    }
+
     if ([type isEqualToString:@"updateChatAction"]) {
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
         [summary setObject:@"chat_action" forKey:@"kind"];
@@ -5830,6 +5851,11 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([videoNoteObject isKindOfClass:[NSDictionary class]]) {
             container = (NSDictionary *)videoNoteObject;
         }
+    } else if ([type isEqualToString:@"messageSticker"]) {
+        id stickerObject = [content objectForKey:@"sticker"];
+        if ([stickerObject isKindOfClass:[NSDictionary class]]) {
+            container = (NSDictionary *)stickerObject;
+        }
     }
 
     if (![container isKindOfClass:[NSDictionary class]]) {
@@ -5852,6 +5878,27 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     id fileNameObject = [container objectForKey:@"file_name"];
     if ([fileNameObject isKindOfClass:[NSString class]] && [(NSString *)fileNameObject length] > 0) {
         [info setObject:fileNameObject forKey:@"file_name"];
+    } else if ([type isEqualToString:@"messageSticker"]) {
+        NSDictionary *formatObject = [[container objectForKey:@"format"] isKindOfClass:[NSDictionary class]]
+            ? [container objectForKey:@"format"] : nil;
+        NSString *formatType = [[formatObject objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [formatObject objectForKey:@"@type"] : @"";
+        if ([formatType length] == 0) {
+            id isAnimatedObject = [container objectForKey:@"is_animated"];
+            id isVideoObject = [container objectForKey:@"is_video"];
+            if ([isVideoObject respondsToSelector:@selector(boolValue)] && [isVideoObject boolValue]) {
+                formatType = @"stickerFormatWebm";
+            } else if ([isAnimatedObject respondsToSelector:@selector(boolValue)] && [isAnimatedObject boolValue]) {
+                formatType = @"stickerFormatTgs";
+            }
+        }
+        NSString *extension = @"webp";
+        if ([formatType isEqualToString:@"stickerFormatTgs"]) {
+            extension = @"tgs";
+        } else if ([formatType isEqualToString:@"stickerFormatWebm"]) {
+            extension = @"webm";
+        }
+        [info setObject:[@"sticker." stringByAppendingString:extension] forKey:@"file_name"];
     }
     id mimeTypeObject = [container objectForKey:@"mime_type"];
     if ([mimeTypeObject isKindOfClass:[NSString class]] && [(NSString *)mimeTypeObject length] > 0) {

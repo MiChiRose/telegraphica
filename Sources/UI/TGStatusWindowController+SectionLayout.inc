@@ -128,7 +128,9 @@
     [self showView:self.chatScrollView visible:showChats];
     [self showView:self.messagesLabel visible:NO];
     BOOL showClosedChatPlaceholder = (showChats && self.chatNavigationClosed);
-    BOOL showConversationContent = (showChats && !showClosedChatPlaceholder);
+    BOOL showMediaCenter = (showChats && !showClosedChatPlaceholder && self.mediaCenterVisible);
+    BOOL showConversationContent = (showChats && !showClosedChatPlaceholder && !showMediaCenter);
+    [self showView:self.mediaCenterPanelView visible:showMediaCenter];
     [self showView:self.loadMessagesButton visible:showConversationContent];
     [self showView:self.loadOlderMessagesButton visible:NO];
     [self showView:self.conversationSearchButton visible:showConversationContent];
@@ -1408,6 +1410,7 @@
     [self.logsCardView setFrame:NSMakeRect(logsCardX, logsCardY, logsCardWidth, logsCardHeight)];
     [self.detailsScrollView setFrame:NSMakeRect(logsCardX + 12.0, logsCardY + 12.0, logsCardWidth - 24.0, logsCardHeight - 24.0)];
     [self applyPointingHandCursorToButtonsInView:contentView];
+    [self layoutMediaCenterWindowSubviews];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -1429,6 +1432,9 @@
         return;
     }
     [self layoutContentView];
+    if (self.mediaCenterVisible) {
+        [self rebuildMediaCenterRowsPreservingScroll:YES];
+    }
     [self.messageTableView reloadData];
     [self updateVisibleSection];
     [self scheduleInlineMediaPlaybackRefresh];

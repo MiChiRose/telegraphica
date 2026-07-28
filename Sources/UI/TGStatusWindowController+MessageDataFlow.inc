@@ -1578,6 +1578,22 @@
             continue;
         }
 
+        if ([kind isEqualToString:@"file_update"] && [[summary objectForKey:@"completed"] boolValue]) {
+            NSNumber *fileID = [summary objectForKey:@"file_id"];
+            NSUInteger messageIndex = 0;
+            for (messageIndex = 0; messageIndex < [self.messageItems count]; messageIndex++) {
+                TGMessageItem *messageItem = [self.messageItems objectAtIndex:messageIndex];
+                NSNumber *messageFileID = [messageItem mediaFileID];
+                if ([fileID respondsToSelector:@selector(longLongValue)] &&
+                    [messageFileID respondsToSelector:@selector(longLongValue)] &&
+                    [fileID longLongValue] == [messageFileID longLongValue]) {
+                    needsMessageRefresh = YES;
+                    break;
+                }
+            }
+            continue;
+        }
+
         if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"] || [kind isEqualToString:@"message_update"]) {
             if (!mountainLionSafeLoginMode) {
                 needsChatRefresh = YES;

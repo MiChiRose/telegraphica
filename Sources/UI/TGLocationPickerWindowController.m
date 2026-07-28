@@ -152,6 +152,9 @@
                                      font:[NSFont systemFontOfSize:11.0]
                                     color:TGClassicHeaderDetailTextColor(0.9)]];
 
+    TGGroupedCardView *pickerCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(16.0, 24.0, 608.0, 426.0)] autorelease];
+    [root addSubview:pickerCard];
+
     self.searchField = [[[NSTextField alloc] initWithFrame:NSMakeRect(24.0, height - 112.0, 408.0, 24.0)] autorelease];
     [[self.searchField cell] setPlaceholderString:TGLoc(@"share.location.searchPlaceholder")];
     [self.searchField setTarget:self];
@@ -203,7 +206,7 @@
     self.statusField = [self labelWithFrame:NSMakeRect(24.0, 91.0, 390.0, 18.0)
                                        text:TGLoc(@"share.location.ready")
                                        font:[NSFont systemFontOfSize:10.0]
-                                      color:TGClassicHeaderDetailTextColor(0.92)];
+                                      color:TGClassicCardMutedInkColor()];
     [root addSubview:self.statusField];
     self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(420.0, 91.0, 16.0, 16.0)] autorelease];
     [self.spinner setStyle:NSProgressIndicatorSpinningStyle];
