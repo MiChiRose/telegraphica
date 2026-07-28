@@ -126,3 +126,21 @@ index 723d5c4..b4600ed 100644
  }
  
  CellularCarrierInfo DarwinSpecific::GetCarrierInfo(){
+diff --git a/os/darwin/AudioInputAudioUnit.cpp b/os/darwin/AudioInputAudioUnit.cpp
+index ce83451..498f582 100644
+--- a/os/darwin/AudioInputAudioUnit.cpp
++++ b/os/darwin/AudioInputAudioUnit.cpp
+@@ -51 +51,12 @@ void AudioInputAudioUnit::HandleBufferCallback(AudioBufferList *ioData){
+-			dst[j]=(int16_t)(src[j]*INT16_MAX);
++			// VoiceProcessingIO may yield samples just outside [-1, 1] on
++			// older OS X/CoreAudio implementations. A direct float-to-int16
++			// conversion then wraps and turns ordinary speech into loud static.
++			float sample=src[j];
++			if(sample!=sample){
++				sample=0.0f;
++			}else if(sample>1.0f){
++				sample=1.0f;
++			}else if(sample<-1.0f){
++				sample=-1.0f;
++			}
++			dst[j]=(int16_t)(sample*32767.0f);

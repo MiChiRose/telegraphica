@@ -570,10 +570,28 @@ def check_call_transport_stability_contract(errors):
         "voip)->setOutputVolume(muted ? 0.0f : 1.0f)",
         "TgVoip::getConnectionMaxLayer()",
         '[remoteProtocol objectForKey:@"max_layer"]',
+        "if (![TGLogger diagnosticsEnabled])",
+        "config.logPath = [transportLogPath fileSystemRepresentation];",
+        "finalState.trafficStats.bytesSentWifi",
+        "finalState.trafficStats.bytesReceivedWifi",
     ]:
         if fragment not in audio_text:
             errors.append("%s: libtgvoip call-audio contract is missing `%s`" %
                           (audio_rel, fragment))
+
+    libtgvoip_patch_rel = os.path.join("Vendor", "patches",
+                                      "libtgvoip-2.4.4-mavericks.patch")
+    libtgvoip_patch_text = read_text(os.path.join(ROOT, libtgvoip_patch_rel))
+    for fragment in [
+        "os/darwin/AudioInputAudioUnit.cpp",
+        "if(sample!=sample)",
+        "else if(sample>1.0f)",
+        "else if(sample<-1.0f)",
+        "sample*32767.0f",
+    ]:
+        if fragment not in libtgvoip_patch_text:
+            errors.append("%s: legacy microphone PCM protection is missing `%s`" %
+                          (libtgvoip_patch_rel, fragment))
 
     window_rel = os.path.join("Sources", "Calls", "TGCallWindowController.m")
     window_text = read_text(os.path.join(ROOT, window_rel))
