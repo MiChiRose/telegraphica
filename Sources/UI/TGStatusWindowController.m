@@ -57,6 +57,7 @@
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import "../Services/TGSystemCompatibility.h"
+#import "../Services/TGUpdateCheckScheduler.h"
 #import "../Workshop/Host/TGWorkshopCoordinator.h"
 #import "../Workshop/UI/TGWorkshopViewController.h"
 #import <AVFoundation/AVFoundation.h>
@@ -91,6 +92,7 @@ static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTyp
 static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvailableUpdateVersion";
+static NSTimeInterval const TGBackgroundUpdateCheckInterval = (60.0 * 60.0);
 static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
@@ -638,6 +640,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, copy) NSString *currentAuthState;
 @property (nonatomic, copy) NSString *activeSection;
 @property (nonatomic, retain) NSTimer *liveUpdateTimer;
+@property (nonatomic, retain) TGUpdateCheckScheduler *updateCheckScheduler;
 @property (nonatomic, assign) BOOL controlsBusy;
 @property (nonatomic, assign) BOOL authSubmissionInFlight;
 @property (nonatomic, assign) BOOL authClientRecoveryInFlight;
@@ -669,6 +672,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL messageDropOverlayVisible;
 @property (nonatomic, assign) BOOL offlineModeActive;
 @property (nonatomic, assign) BOOL updateAvailable;
+@property (nonatomic, assign) BOOL updateCheckInFlight;
 @property (nonatomic, copy) NSString *availableUpdateVersion;
 @property (nonatomic, assign) BOOL chatFilterRefreshInFlight;
 @property (nonatomic, assign) BOOL chatFilterRefreshPending;
@@ -1125,6 +1129,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize currentAuthState = _currentAuthState;
 @synthesize activeSection = _activeSection;
 @synthesize liveUpdateTimer = _liveUpdateTimer;
+@synthesize updateCheckScheduler = _updateCheckScheduler;
 @synthesize controlsBusy = _controlsBusy;
 @synthesize authSubmissionInFlight = _authSubmissionInFlight;
 @synthesize authClientRecoveryInFlight = _authClientRecoveryInFlight;
@@ -1156,6 +1161,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messageDropOverlayVisible = _messageDropOverlayVisible;
 @synthesize offlineModeActive = _offlineModeActive;
 @synthesize updateAvailable = _updateAvailable;
+@synthesize updateCheckInFlight = _updateCheckInFlight;
 @synthesize availableUpdateVersion = _availableUpdateVersion;
 @synthesize chatFilterRefreshInFlight = _chatFilterRefreshInFlight;
 @synthesize chatFilterRefreshPending = _chatFilterRefreshPending;
@@ -1266,7 +1272,21 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         }
         [self startLiveUpdateTimerIfNeeded];
         [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
-        [self performSelector:@selector(checkForUpdatesOnLaunch) withObject:nil afterDelay:3.0];
+        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+        NSTimeInterval lastUpdateCheck = [[NSUserDefaults standardUserDefaults]
+            doubleForKey:TGLastUpdateCheckDefaultsKey];
+        NSTimeInterval initialUpdateCheckDelay = 3.0;
+        if (lastUpdateCheck > 0.0 && now >= lastUpdateCheck &&
+            (now - lastUpdateCheck) < TGBackgroundUpdateCheckInterval) {
+            initialUpdateCheckDelay = MAX(3.0,
+                                          TGBackgroundUpdateCheckInterval -
+                                          (now - lastUpdateCheck));
+        }
+        self.updateCheckScheduler = [[[TGUpdateCheckScheduler alloc]
+            initWithTarget:self
+                  selector:@selector(checkForUpdatesOnLaunch)
+                  interval:TGBackgroundUpdateCheckInterval] autorelease];
+        [self.updateCheckScheduler startWithInitialDelay:initialUpdateCheckDelay];
     }
     return self;
 }
@@ -4168,9 +4188,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                              selector:@selector(reloadChatFiltersIfReady)
                                                object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                             selector:@selector(checkForUpdatesOnLaunch)
-                                               object:nil];
-    [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(refreshSelectedMessagesAfterMediaSend)
                                                object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self
@@ -4180,6 +4197,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                              selector:@selector(refreshInlineMediaPlayback)
                                                object:nil];
     [self stopLiveUpdateTimer];
+    [self.updateCheckScheduler invalidate];
     [self.inlineMediaPlaybackCoordinator invalidate];
     [self.stickerPickerPlaybackCoordinator invalidate];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -4510,6 +4528,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_currentAuthState release];
     [_activeSection release];
     [_liveUpdateTimer release];
+    [_updateCheckScheduler release];
     [_profileDisplayName release];
     [_profileFirstName release];
     [_profileLastName release];

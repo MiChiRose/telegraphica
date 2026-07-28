@@ -22,6 +22,7 @@
 
 - (void)prepareForApplicationTermination {
     [self stopLiveUpdateTimer];
+    [self.updateCheckScheduler invalidate];
     [self setControlsBusy:YES];
     [self.client shutdownWithTimeout:3.0];
 }
