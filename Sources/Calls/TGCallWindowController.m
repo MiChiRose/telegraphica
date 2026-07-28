@@ -58,6 +58,7 @@
 @property (nonatomic, retain) NSDictionary *profile;
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL microphoneMuted;
+@property (nonatomic, assign) BOOL speakerMuted;
 @property (nonatomic, assign) BOOL finished;
 @property (nonatomic, retain) NSDate *connectedAt;
 @property (nonatomic, retain) NSTimer *timer;
@@ -69,9 +70,12 @@
 @property (nonatomic, retain) NSTextField *nameField;
 @property (nonatomic, retain) NSButton *answerButton;
 @property (nonatomic, retain) NSButton *muteButton;
+@property (nonatomic, retain) NSButton *speakerButton;
 @property (nonatomic, retain) NSButton *hangupButton;
 @property (nonatomic, retain) NSTextField *muteLabel;
+@property (nonatomic, retain) NSTextField *speakerLabel;
 @property (nonatomic, retain) NSTextField *answerLabel;
+@property (nonatomic, retain) NSTextField *hangupLabel;
 @end
 
 @implementation TGCallWindowController
@@ -80,6 +84,7 @@
 @synthesize profile = _profile;
 @synthesize outgoing = _outgoing;
 @synthesize microphoneMuted = _microphoneMuted;
+@synthesize speakerMuted = _speakerMuted;
 @synthesize finished = _finished;
 @synthesize connectedAt = _connectedAt;
 @synthesize timer = _timer;
@@ -91,9 +96,12 @@
 @synthesize nameField = _nameField;
 @synthesize answerButton = _answerButton;
 @synthesize muteButton = _muteButton;
+@synthesize speakerButton = _speakerButton;
 @synthesize hangupButton = _hangupButton;
 @synthesize muteLabel = _muteLabel;
+@synthesize speakerLabel = _speakerLabel;
 @synthesize answerLabel = _answerLabel;
+@synthesize hangupLabel = _hangupLabel;
 
 - (NSTextField *)labelWithFrame:(NSRect)frame
                            text:(NSString *)text
@@ -185,30 +193,42 @@
                                           color:TGClassicCardMutedInkColor()];
         [root addSubview:self.answerLabel];
 
-        self.muteButton = [self actionButtonWithFrame:NSMakeRect(102.0, 78.0, 64.0, 64.0)
+        self.muteButton = [self actionButtonWithFrame:NSMakeRect(64.0, 78.0, 64.0, 64.0)
                                             iconName:@"microphone"
                                                color:TGClassicNavigationSelectedColor(1.0)
                                               action:@selector(mutePressed:)];
         [self.muteButton setToolTip:TGLoc(@"calls.mute")];
         [root addSubview:self.muteButton];
 
-        self.hangupButton = [self actionButtonWithFrame:NSMakeRect(254.0, 78.0, 64.0, 64.0)
-                                              iconName:@"cross"
+        self.speakerButton = [self actionButtonWithFrame:NSMakeRect(178.0, 78.0, 64.0, 64.0)
+                                               iconName:@"headphones"
+                                                  color:TGClassicNavigationSelectedColor(1.0)
+                                                 action:@selector(speakerPressed:)];
+        [self.speakerButton setToolTip:TGLoc(@"calls.speakerMute")];
+        [root addSubview:self.speakerButton];
+
+        self.hangupButton = [self actionButtonWithFrame:NSMakeRect(292.0, 78.0, 64.0, 64.0)
+                                              iconName:@"call-cancel"
                                                  color:[NSColor colorWithCalibratedRed:0.86 green:0.18 blue:0.17 alpha:1.0]
                                                 action:@selector(hangupPressed:)];
         [self.hangupButton setToolTip:TGLoc(@"calls.hangup")];
         [root addSubview:self.hangupButton];
 
-        self.muteLabel = [self labelWithFrame:NSMakeRect(70.0, 51.0, 128.0, 20.0)
+        self.muteLabel = [self labelWithFrame:NSMakeRect(32.0, 51.0, 128.0, 20.0)
                                          text:TGLoc(@"calls.mute")
                                          font:[NSFont systemFontOfSize:11.0]
                                         color:TGClassicCardMutedInkColor()];
         [root addSubview:self.muteLabel];
-        NSTextField *hangupLabel = [self labelWithFrame:NSMakeRect(222.0, 51.0, 128.0, 20.0)
-                                                   text:TGLoc(@"calls.hangup")
-                                                   font:[NSFont systemFontOfSize:11.0]
-                                                  color:TGClassicCardMutedInkColor()];
-        [root addSubview:hangupLabel];
+        self.speakerLabel = [self labelWithFrame:NSMakeRect(146.0, 51.0, 128.0, 20.0)
+                                            text:TGLoc(@"calls.speakerMute")
+                                            font:[NSFont systemFontOfSize:11.0]
+                                           color:TGClassicCardMutedInkColor()];
+        [root addSubview:self.speakerLabel];
+        self.hangupLabel = [self labelWithFrame:NSMakeRect(260.0, 51.0, 128.0, 20.0)
+                                           text:TGLoc(@"calls.hangup")
+                                           font:[NSFont systemFontOfSize:11.0]
+                                          color:TGClassicCardMutedInkColor()];
+        [root addSubview:self.hangupLabel];
 
         [self updateProfile:profile];
         [self setPresentationState:(outgoing ? TGCallPresentationStateCalling : TGCallPresentationStateIncoming)
@@ -233,9 +253,27 @@
     if (self.ringSound) {
         return;
     }
-    NSSound *sound = [NSSound soundNamed:@"Glass"];
+    NSSound *sound = [NSSound soundNamed:@"Marimba"];
     if (!sound) {
-        sound = [NSSound soundNamed:@"Ping"];
+        NSArray *paths = [NSArray arrayWithObjects:
+                          [@"~/Library/Sounds/Marimba.aiff" stringByExpandingTildeInPath],
+                          @"/Library/Sounds/Marimba.aiff",
+                          @"/System/Library/Sounds/Marimba.aiff",
+                          nil];
+        for (NSString *path in paths) {
+            if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+                sound = [[[NSSound alloc] initWithContentsOfFile:path byReference:YES] autorelease];
+                if (sound) {
+                    break;
+                }
+            }
+        }
+    }
+    if (!sound) {
+        sound = [NSSound soundNamed:@"Funk"];
+    }
+    if (!sound) {
+        sound = [NSSound soundNamed:@"Pop"];
     }
     self.ringSound = sound;
     [self.ringSound setLoops:YES];
@@ -271,8 +309,23 @@
     [self.answerLabel setHidden:!incoming];
     [self.muteButton setHidden:!connected];
     [self.muteLabel setHidden:!connected];
+    [self.speakerButton setHidden:!connected];
+    [self.speakerLabel setHidden:!connected];
     [self.hangupButton setHidden:ended];
+    [self.hangupLabel setHidden:ended];
     [self.qualityField setHidden:!connected];
+    if (incoming) {
+        [self.answerButton setFrameOrigin:NSMakePoint(102.0, 78.0)];
+        [self.answerLabel setFrameOrigin:NSMakePoint(70.0, 51.0)];
+        [self.hangupButton setFrameOrigin:NSMakePoint(254.0, 78.0)];
+        [self.hangupLabel setFrameOrigin:NSMakePoint(222.0, 51.0)];
+    } else if (connected) {
+        [self.hangupButton setFrameOrigin:NSMakePoint(292.0, 78.0)];
+        [self.hangupLabel setFrameOrigin:NSMakePoint(260.0, 51.0)];
+    } else {
+        [self.hangupButton setFrameOrigin:NSMakePoint(178.0, 78.0)];
+        [self.hangupLabel setFrameOrigin:NSMakePoint(146.0, 51.0)];
+    }
 
     NSString *status = detail;
     if ([status length] == 0) {
@@ -327,10 +380,22 @@
 - (void)mutePressed:(id)sender {
     (void)sender;
     self.microphoneMuted = !self.microphoneMuted;
-    NSString *iconName = self.microphoneMuted ? @"sound-off" : @"microphone";
+    NSString *iconName = self.microphoneMuted ? @"microphone-off" : @"microphone";
     [[self.muteButton cell] setImage:TGTemplateIconAssetImage(iconName, NSMakeSize(26.0, 26.0), [NSColor whiteColor], 1.0)];
     [self.muteLabel setStringValue:(self.microphoneMuted ? TGLoc(@"calls.unmute") : TGLoc(@"calls.mute"))];
+    [self.muteButton setToolTip:(self.microphoneMuted ? TGLoc(@"calls.unmute") : TGLoc(@"calls.mute"))];
     [self.delegate callWindowController:self didRequestMicrophoneMuted:self.microphoneMuted];
+}
+
+- (void)speakerPressed:(id)sender {
+    (void)sender;
+    self.speakerMuted = !self.speakerMuted;
+    NSString *iconName = self.speakerMuted ? @"headphones-off" : @"headphones";
+    [[self.speakerButton cell] setImage:TGTemplateIconAssetImage(iconName, NSMakeSize(26.0, 26.0), [NSColor whiteColor], 1.0)];
+    NSString *label = self.speakerMuted ? TGLoc(@"calls.speakerUnmute") : TGLoc(@"calls.speakerMute");
+    [self.speakerLabel setStringValue:label];
+    [self.speakerButton setToolTip:label];
+    [self.delegate callWindowController:self didRequestSpeakerMuted:self.speakerMuted];
 }
 
 - (void)hangupPressed:(id)sender {
@@ -366,9 +431,12 @@
     [_nameField release];
     [_answerButton release];
     [_muteButton release];
+    [_speakerButton release];
     [_hangupButton release];
     [_muteLabel release];
+    [_speakerLabel release];
     [_answerLabel release];
+    [_hangupLabel release];
     [super dealloc];
 }
 

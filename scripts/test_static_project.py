@@ -566,9 +566,10 @@ def check_call_transport_stability_contract(errors):
     for fragment in [
         "voip->setOnStateUpdated(std::function<void(TgVoipState)>());",
         "voip->setOnSignalBarsUpdated(std::function<void(int)>());",
+        "voip)->setOutputVolume(muted ? 0.0f : 1.0f)",
     ]:
         if fragment not in audio_text:
-            errors.append("%s: libtgvoip callbacks must be cleared before transport shutdown `%s`" %
+            errors.append("%s: libtgvoip call-audio contract is missing `%s`" %
                           (audio_rel, fragment))
 
     window_rel = os.path.join("Sources", "Calls", "TGCallWindowController.m")
@@ -583,9 +584,14 @@ def check_call_transport_stability_contract(errors):
         "updateSignalBars:",
         'TGLoc(@"calls.quality")',
         "[self.qualityField setHidden:!connected]",
+        'iconName:@"headphones"',
+        'self.speakerMuted ? @"headphones-off" : @"headphones"',
+        'self.microphoneMuted ? @"microphone-off" : @"microphone"',
+        '[NSSound soundNamed:@"Marimba"]',
+        '[NSSound soundNamed:@"Funk"]',
     ]:
         if fragment not in window_text:
-            errors.append("%s: call quality presentation is missing `%s`" %
+            errors.append("%s: call presentation contract is missing `%s`" %
                           (window_rel, fragment))
 
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
@@ -593,6 +599,23 @@ def check_call_transport_stability_contract(errors):
     if "cell->_callSummary = [_callSummary retain];" not in history_text:
         errors.append("%s: call history cells must own copied row summaries on legacy AppKit" %
                       history_rel)
+    for fragment in ['@"call-in"', '@"call-out"', '@"call-miss"']:
+        if fragment not in history_text:
+            errors.append("%s: call history direction icon is missing `%s`" %
+                          (history_rel, fragment))
+    for icon_name in [
+        "call-cancel.png",
+        "call-in.png",
+        "call-miss.png",
+        "call-out.png",
+        "headphones-off.png",
+        "headphones.png",
+        "microphone-off.png",
+    ]:
+        icon_path = os.path.join(ROOT, "Sources", "Resources", "Icons", icon_name)
+        if not os.path.isfile(icon_path):
+            errors.append("Sources/Resources/Icons/%s: approved call-control icon is missing" %
+                          icon_name)
 
 
 def check_media_file_management_contract(errors):

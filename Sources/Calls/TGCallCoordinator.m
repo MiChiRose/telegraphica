@@ -249,6 +249,12 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
     [self.audioEngine setMicrophoneMuted:muted];
 }
 
+- (void)callWindowController:(TGCallWindowController *)controller
+ didRequestSpeakerMuted:(BOOL)muted {
+    (void)controller;
+    [self.audioEngine setSpeakerMuted:muted];
+}
+
 - (void)callWindowControllerDidRequestHangUp:(TGCallWindowController *)controller {
     if (self.finishing) {
         return;

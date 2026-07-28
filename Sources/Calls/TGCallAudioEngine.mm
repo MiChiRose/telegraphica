@@ -341,6 +341,16 @@ static TgVoipEndpointType TGEndpointTypeForServer(NSDictionary *server) {
 #endif
 }
 
+- (void)setSpeakerMuted:(BOOL)muted {
+#if TELEGRAPHICA_HAS_TGVOIP
+    if (_voip) {
+        ((TgVoip *)_voip)->setOutputVolume(muted ? 0.0f : 1.0f);
+    }
+#else
+    (void)muted;
+#endif
+}
+
 - (void)stop {
 #if TELEGRAPHICA_HAS_TGVOIP
     if (_voip) {
