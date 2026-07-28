@@ -284,3 +284,70 @@
         [pool drain];
     });
 }
+
+- (void)deletePrivateChatFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        [item isForumTopic] ||
+        ![[item typeSummary] isEqualToString:@"Private"] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    NSString *title = [[item title] length] > 0 ? [item title] : TGLoc(@"chats");
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setAlertStyle:NSCriticalAlertStyle];
+    [alert setMessageText:[NSString stringWithFormat:TGLoc(@"chat.deleteConfirmTitle"), title]];
+    [alert setInformativeText:TGLoc(@"chat.deleteConfirm")];
+    [alert addButtonWithTitle:TGLoc(@"chat.delete")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSString *titleCopy = [title copy];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:TGLoc(@"chat.deleting")];
+    [self appendDetail:[NSString stringWithFormat:@"Removing private chat %@ from chat list...", titleCopy]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *deleteError = nil;
+        BOOL succeeded = [client deleteChatHistoryForChatID:chatID
+                                        removeFromChatList:YES
+                                                     revoke:NO
+                                                    timeout:10.0
+                                                      error:&deleteError];
+        NSString *errorMessage = [[deleteError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (succeeded) {
+                [self.statusField setStringValue:TGLoc(@"chat.deleted")];
+                [self appendDetail:[NSString stringWithFormat:@"Removed private chat %@ from chat list.", titleCopy]];
+                if (self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
+                    self.selectedChatID = nil;
+                    self.selectedMessageThreadID = nil;
+                    self.selectedMessageTopicKind = nil;
+                    self.messageLoadingGeneration++;
+                    self.pendingLiveMessageRefresh = NO;
+                    self.messageItemsRepresentFocusedContext = NO;
+                    [self.messageItems removeAllObjects];
+                    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+                    [self.messageTableView reloadData];
+                    [self refreshBotReplyMarkupFromMessages];
+                }
+                [self reloadChatsInteractive:NO preserveSelection:NO];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"chat.deleteFailed")];
+                [self appendDetail:[NSString stringWithFormat:@"Remove private chat failed: %@",
+                                    [errorMessage length] > 0 ? errorMessage : @"request failed"]];
+            }
+            [errorMessage release];
+            [chatID release];
+            [titleCopy release];
+            [client release];
+        });
+        [pool drain];
+    });
+}

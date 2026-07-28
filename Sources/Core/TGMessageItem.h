@@ -60,6 +60,8 @@
 @property (nonatomic, copy) NSString *pollVoteState;
 @property (nonatomic, copy) NSString *pollVoteMessage;
 @property (nonatomic, copy) NSDictionary *replyMarkup;
+@property (nonatomic, retain) NSNumber *callDuration;
+@property (nonatomic, copy) NSString *callDiscardReason;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -74,6 +76,7 @@
 - (BOOL)isVoiceNoteMessage;
 - (BOOL)isVideoNoteMessage;
 - (BOOL)isPollMessage;
+- (BOOL)isCallMessage;
 - (BOOL)isMediaAlbumMessage;
 - (NSArray *)visualMediaItems;
 - (void)addVisualMediaFromMessageItem:(TGMessageItem *)item;

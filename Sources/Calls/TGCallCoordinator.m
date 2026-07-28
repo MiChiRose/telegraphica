@@ -10,6 +10,15 @@
 
 NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinatorDidFinishCallNotification";
 
+static NSString *TGCallReadableFailure(NSString *message) {
+    if ([message length] > 0 &&
+        [message rangeOfString:@"CALL_PROTOCOL_COMPAT_LAYER_INVALID"
+                       options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        return TGLoc(@"calls.protocolIncompatible");
+    }
+    return [message length] > 0 ? message : TGLoc(@"calls.failed");
+}
+
 @interface TGCallCoordinator () <TGCallAudioEngineDelegate, TGCallWindowControllerDelegate>
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, retain) TGCallWindowController *callWindowController;
@@ -217,7 +226,8 @@ NSString * const TGCallCoordinatorDidFinishCallNotification = @"TGCallCoordinato
         [self finishCallAfterDelay:4.0];
     } else if ([stateType isEqualToString:@"callStateError"]) {
         NSString *message = [[[state objectForKey:@"error"] objectForKey:@"message"] description];
-        [self.callWindowController setPresentationState:TGCallPresentationStateFailed detail:message];
+        [self.callWindowController setPresentationState:TGCallPresentationStateFailed
+                                                  detail:TGCallReadableFailure(message)];
         [self finishCallAfterDelay:4.0];
     }
 }
