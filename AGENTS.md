@@ -17,8 +17,10 @@ These project rules apply to Codex work in this repository.
 
 ## Collaboration
 
-- Do not be stingy with analysis tokens; prefer careful engineering over shallow changes.
-- Use subagents aggressively when the user explicitly asks for deep or delegated project work and tools are available:
+- Treat Telegraphica as an established, viable product under active development. Do not repeat early-stage feasibility or "is it worth continuing?" audits during normal feature, bug-fix, build, or TDLib work.
+- Revisit overall feasibility only when new, concrete evidence reveals a persistent blocker that threatens the complete product lane, such as an unresolvable Telegram authorization break or an inability to run any compatible TDLib on the supported systems. First exhaust focused diagnostics and distinguish a local regression from a product-level blocker.
+- Keep analysis and verification proportional to the change. Prefer careful engineering, but do not reopen settled product decisions, reread unrelated history, rerun unchanged expensive checks, or produce long status/handoff text unless it helps the current task.
+- Use subagents when the user explicitly asks for deep or delegated project work and there is a concrete independent subtask:
   - worker agents may implement bounded tasks;
   - verifier agents should review worker output;
   - additional reviewer agents may cross-check verification when the risk is meaningful.
@@ -31,7 +33,7 @@ These project rules apply to Codex work in this repository.
 - Do not split compatibility work into separate Mountain Lion and Mavericks source trees, long-lived OS-specific branches, duplicated project files, generated source variants, app bundles, DMGs, or ZIPs. Historical `mountain-lion/*` branches are reference-only; start all new work from `develop`.
 - Keep the shared deployment target at OS X 10.8. Implement unavoidable OS differences inside the common codebase with runtime capability/version checks and focused compatibility helpers. Use conditional compilation only when an SDK or compiler difference cannot be handled at runtime.
 - Preserve the normal 10.9-10.13 feature path while providing 10.8-safe fallbacks. If a feature or optional Workshop module requires 10.9 or newer, express that through availability metadata and runtime gating instead of forking the host application or release.
-- Treat platform checks as complementary validation of the same deliverable: Xcode 5.1.1 / OS X 10.8 checks cover the minimum deployment target and fallback path; Mavericks and newer checks cover the normal path. A pass on one OS does not replace the other checks.
+- Treat platform checks as complementary validation of the same deliverable. Release candidates and changes that touch runtime gating, packaging, dependencies, or shared compatibility code should cover both the OS X 10.8 fallback and the 10.9-10.13 normal path. Ordinary feature iterations may use the relevant available legacy Mac unless the change affects the other path.
 - Use one stable old-Mac source/build folder, `~/Desktop/Telegraphica-current`, for the unified lane on every supported OS. Validation logs may be separated and labelled by OS, but they must refer to the same source revision and release candidate.
 - Produce one canonical release artifact set named for the complete range, such as `macos10.8-10.13-x86_64`. Do not publish separate `ml`, `mountain-lion`, `mavericks`, or `macos10.9` variants unless the user explicitly authorizes a temporary diagnostic build.
 - If a dependency or toolchain appears to require divergent product artifacts, stop and raise the incompatibility for a product decision instead of silently creating a second lane.
@@ -41,7 +43,15 @@ These project rules apply to Codex work in this repository.
 - Prefer the configured `telegraphica-mavericks` SSH alias for old-Mac HITL builds when it is available; do not use raw IP addresses unless the user explicitly asks.
 - After copying, building, and launching a HITL build on the old Mac, clean up obsolete Telegraphica-only transfer archives and scratch build clutter created by that run. Use narrow exact-path cleanup and do not touch user files, `~/Library/Application Support/Telegraphica`, TDLib databases, Telegram sessions, credentials, or unrelated Desktop items.
 - When reporting a successful remote HITL build that has already been launched on the old Mac, do not include a terminal command block. Instead, state what changed and give a concise checklist of what the user should verify in the already-running app.
-- When the app was not launched remotely, provide the normal complete old-Mac terminal command block for manual HITL.
+- When the user explicitly requests HITL and the app cannot be launched remotely, provide the normal complete old-Mac terminal command block for manual HITL. Do not add manual build instructions to unrelated development updates.
+
+## Verification Efficiency
+
+- Run the smallest check set that covers the changed surface. Use `./scripts/run_tests.sh` and `python3 scripts/check_legacy_compat.py` for broad source changes; use narrower checks for isolated documentation, assets, or scripts.
+- Do not rebuild TDLib, repackage releases, create transfer archives, or run old-Mac HITL for answer-only work or rule/documentation edits.
+- Do not repeat an unchanged expensive check in the same iteration unless new evidence invalidates its previous result.
+- Modern-Mac builds are supporting diagnostics, not mandatory proof for every change. Use legacy compilation/HITL when the change is OS-, SDK-, packaging-, Keychain-, authorization-, media-, or runtime-sensitive.
+- Release work begins only when the user explicitly requests a release. A normal feature request authorizes implementation and proportional verification, not release publication.
 
 ## Project Constraints
 
