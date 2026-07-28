@@ -183,3 +183,9 @@
 "bot.personalData.manualOnly" = "Telegraphica не передаёт номер телефона или геолокацию по кнопке бота. При желании отправьте эти данные вручную.";
 "bot.webApp.officialOnly" = "Telegram Mini Apps не запускаются на этом старом Mac. Используйте официальное приложение Telegram.";
 "bot.paid.officialOnly" = "Платные действия Telegram отключены в Telegraphica. Если решите приобрести функцию, используйте официальное приложение Telegram.";
+"chat.clearHistory" = "Очистить историю";
+"chat.clearHistoryConfirmTitle" = "Очистить историю «%@»?";
+"chat.clearHistoryConfirm" = "Все сообщения в этом чате будут удалены из вашей истории Telegram. Это действие нельзя отменить.";
+"chat.clearingHistory" = "Очищаем историю…";
+"chat.historyCleared" = "История чата очищена";
+"chat.clearHistoryFailed" = "Не удалось очистить историю";

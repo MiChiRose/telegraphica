@@ -428,6 +428,9 @@ def check_additional_message_types_contract(errors):
                      "self.mapGeneration++;",
                      "setShowsUserLocation:NO",
                      "setDelegate:nil",
+                     "TGLocationSearchService",
+                     "searchPressed:",
+                     "[self.searchService cancel]",
                      "mapUnavailable"]:
         if fragment not in location_picker_text:
             errors.append("%s: location picker regression guard is missing `%s`" %
@@ -437,13 +440,26 @@ def check_additional_message_types_contract(errors):
                       location_picker_rel)
     for fragment in ["MKLocalSearchRequest",
                      "MKLocalSearch",
-                     "CLGeocoder",
-                     "searchPressed:",
-                     "searchField",
-                     "searchButton"]:
+                     "CLGeocoder"]:
         if fragment in location_picker_text:
-            errors.append("%s: disabled legacy location search leaked `%s`" %
+            errors.append("%s: MapKit search lifecycle must stay in the focused service, found `%s`" %
                           (location_picker_rel, fragment))
+
+    location_search_rel = os.path.join("Sources", "UI", "TGLocationSearchService.m")
+    location_search_text = read_text(os.path.join(ROOT, location_search_rel))
+    for fragment in ["TGLocationSearchOperation",
+                     "MKLocalSearchRequest",
+                     "startWithCompletionHandler:",
+                     "[operation cancel]",
+                     "self.completion = nil",
+                     "[self.activeSearch cancel]",
+                     "NSClassFromString(@\"MKLocalSearch\")"]:
+        if fragment not in location_search_text:
+            errors.append("%s: lifecycle-safe location search is missing `%s`" %
+                          (location_search_rel, fragment))
+    if "CLGeocoder" in location_search_text:
+        errors.append("%s: nested CLGeocoder fallback must not bypass search cancellation" %
+                      location_search_rel)
 
     static_map_rel = os.path.join("Sources", "UI", "TGLocationStaticMapView.m")
     static_map_text = read_text(os.path.join(ROOT, static_map_rel))
@@ -993,6 +1009,46 @@ def check_chat_archive_contract(errors):
         errors.append("Sources/Resources/Icons/archive.png: required existing archive icon is missing")
 
 
+def check_chat_history_deletion_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatHistory.m")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    for fragment in [
+        '@"deleteChatHistory", @"@type"',
+        '@"chat_id"',
+        '@"remove_from_chat_list"',
+        '@"revoke"',
+        'isEqualToString:@"ok"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: chat history deletion request is missing `%s`" %
+                          (client_rel, fragment))
+
+    lifecycle_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ChatLifecycle.inc")
+    lifecycle_text = read_text(os.path.join(ROOT, lifecycle_rel))
+    for fragment in [
+        "clearChatHistoryFromMenu:",
+        "NSCriticalAlertStyle",
+        'TGLoc(@"chat.clearHistoryConfirmTitle")',
+        "removeFromChatList:NO",
+        "revoke:NO",
+        "[self.messageItems removeAllObjects]",
+    ]:
+        if fragment not in lifecycle_text:
+            errors.append("%s: safe clear-history flow is missing `%s`" %
+                          (lifecycle_rel, fragment))
+
+    menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    menus_text = read_text(os.path.join(ROOT, menus_rel))
+    for fragment in [
+        'TGLoc(@"chat.clearHistory")',
+        "@selector(clearChatHistoryFromMenu:)",
+        'TGTemplateIconAssetImage(@"trash"',
+    ]:
+        if fragment not in menus_text:
+            errors.append("%s: clear-history menu is missing `%s`" %
+                          (menus_rel, fragment))
+
+
 def check_chat_folder_management_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatFolders.m")
     controller_rel = os.path.join("Sources", "UI", "TGChatFolderManagementWindowController.m")
@@ -1088,6 +1144,7 @@ def main():
     check_primary_navigation_contract(errors)
     check_retro_console_contract(errors)
     check_chat_archive_contract(errors)
+    check_chat_history_deletion_contract(errors)
     check_chat_folder_management_contract(errors)
     if errors:
         print("Static project tests failed:")

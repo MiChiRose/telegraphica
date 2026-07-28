@@ -464,13 +464,31 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [muteRoot setSubmenu:muteMenu];
     [menu addItem:muteRoot];
 
+    BOOL destructiveSeparatorAdded = NO;
+    if (![item isForumTopic] && [self.currentAuthState isEqualToString:@"ready"]) {
+        [menu addItem:[NSMenuItem separatorItem]];
+        destructiveSeparatorAdded = YES;
+        NSMenuItem *clearHistoryItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.clearHistory")
+                                                                    action:@selector(clearChatHistoryFromMenu:)
+                                                             keyEquivalent:@""] autorelease];
+        [clearHistoryItem setRepresentedObject:item];
+        [clearHistoryItem setTarget:self];
+        [clearHistoryItem setImage:TGTemplateIconAssetImage(@"trash",
+                                                            NSMakeSize(16.0, 16.0),
+                                                            [NSColor redColor],
+                                                            0.90)];
+        [menu addItem:clearHistoryItem];
+    }
+
     NSString *typeSummary = [item typeSummary];
     BOOL canLeave = (![item isForumTopic] &&
                      ([typeSummary isEqualToString:@"Group"] ||
                       [typeSummary isEqualToString:@"Supergroup"] ||
                       [typeSummary isEqualToString:@"Channel"]));
     if (canLeave) {
-        [menu addItem:[NSMenuItem separatorItem]];
+        if (!destructiveSeparatorAdded) {
+            [menu addItem:[NSMenuItem separatorItem]];
+        }
         NSMenuItem *leaveItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.leave")
                                                             action:@selector(leaveChatFromMenu:)
                                                      keyEquivalent:@""] autorelease];
