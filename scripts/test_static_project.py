@@ -1074,6 +1074,51 @@ def check_chat_history_deletion_contract(errors):
                           (menus_rel, fragment))
 
 
+def check_hourly_update_check_contract(errors):
+    scheduler_rel = os.path.join("Sources", "Services", "TGUpdateCheckScheduler.m")
+    scheduler_text = read_text(os.path.join(ROOT, scheduler_rel))
+    for fragment in [
+        "timerWithTimeInterval:_interval",
+        "NSRunLoopCommonModes",
+        "startWithInitialDelay:",
+        "resetCountdown",
+        "[self.timer invalidate]",
+    ]:
+        if fragment not in scheduler_text:
+            errors.append("%s: background update scheduler is missing `%s`" %
+                          (scheduler_rel, fragment))
+
+    controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    controller_text = read_text(os.path.join(ROOT, controller_rel))
+    for fragment in [
+        "TGBackgroundUpdateCheckInterval = (60.0 * 60.0)",
+        "TGUpdateCheckScheduler",
+        "initialUpdateCheckDelay",
+        "startWithInitialDelay:initialUpdateCheckDelay",
+        "updateCheckInFlight",
+    ]:
+        if fragment not in controller_text:
+            errors.append("%s: hourly update-check wiring is missing `%s`" %
+                          (controller_rel, fragment))
+
+    notifications_rel = os.path.join("Sources", "UI", "TGStatusWindowController+Notifications.inc")
+    notifications_text = read_text(os.path.join(ROOT, notifications_rel))
+    for fragment in [
+        "if (self.updateCheckInFlight)",
+        "(now - last) < TGBackgroundUpdateCheckInterval",
+        "[self.updateCheckScheduler resetCountdown]",
+        "self.updateCheckInFlight = NO",
+        'NSString *badgeText = self.updateAvailable ? @"1" : nil',
+        "setBadgeText:badgeText",
+    ]:
+        if fragment not in notifications_text:
+            errors.append("%s: hourly update-check behavior is missing `%s`" %
+                          (notifications_rel, fragment))
+    if "(24.0 * 60.0 * 60.0)" in notifications_text:
+        errors.append("%s: automatic update checks must no longer use the old 24-hour throttle" %
+                      notifications_rel)
+
+
 def check_chat_folder_management_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ChatFolders.m")
     controller_rel = os.path.join("Sources", "UI", "TGChatFolderManagementWindowController.m")
@@ -1171,6 +1216,7 @@ def main():
     check_retro_console_contract(errors)
     check_chat_archive_contract(errors)
     check_chat_history_deletion_contract(errors)
+    check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
     if errors:
         print("Static project tests failed:")
