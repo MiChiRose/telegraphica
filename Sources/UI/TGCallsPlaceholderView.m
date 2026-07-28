@@ -20,7 +20,12 @@
 
 - (id)copyWithZone:(NSZone *)zone {
     TGCallHistoryCell *cell = [super copyWithZone:zone];
-    cell.callSummary = self.callSummary;
+    /*
+     * NSCell's legacy copy path bit-copies subclass ivars.  Using the
+     * synthesized setter here would release that unowned copied pointer
+     * before retaining it, leaving multiple cells sharing one ownership.
+     */
+    cell->_callSummary = [_callSummary retain];
     return cell;
 }
 
