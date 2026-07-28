@@ -212,40 +212,40 @@
         [self.cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self addSubview:self.cardView];
 
-        NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 91.0, 180.0, 20.0)
+        NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 69.0, 180.0, 20.0)
                                                     text:@""
                                                     font:[NSFont boldSystemFontOfSize:12.0]];
         [newCallLabel setTag:601];
         [newCallLabel setAutoresizingMask:NSViewMinYMargin];
         [self addSubview:newCallLabel];
 
-        self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30.0, NSHeight(frame) - 126.0, MAX(220.0, NSWidth(frame) - 292.0), 28.0)
+        self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30.0, NSHeight(frame) - 104.0, MAX(220.0, NSWidth(frame) - 292.0), 28.0)
                                                              pullsDown:NO] autorelease];
         [self.contactPopUpButton setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
         [self addSubview:self.contactPopUpButton];
 
-        self.startCallButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 248.0, NSHeight(frame) - 126.0, 128.0, 28.0)
+        self.startCallButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 248.0, NSHeight(frame) - 104.0, 128.0, 28.0)
                                                    title:@""
                                                   action:@selector(startCallPressed:)
                                                  primary:YES];
         [self.startCallButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         [self addSubview:self.startCallButton];
 
-        self.refreshButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 112.0, NSHeight(frame) - 126.0, 82.0, 28.0)
+        self.refreshButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 112.0, NSHeight(frame) - 104.0, 82.0, 28.0)
                                                  title:@""
                                                 action:@selector(refreshPressed:)
                                                primary:NO];
         [self.refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         [self addSubview:self.refreshButton];
 
-        NSTextField *recentLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 158.0, 220.0, 20.0)
+        NSTextField *recentLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 136.0, 220.0, 20.0)
                                                    text:@""
                                                    font:[NSFont boldSystemFontOfSize:12.0]];
         [recentLabel setTag:602];
         [recentLabel setAutoresizingMask:NSViewMinYMargin];
         [self addSubview:recentLabel];
 
-        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30.0, 86.0, NSWidth(frame) - 60.0, NSHeight(frame) - 252.0)] autorelease];
+        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30.0, 86.0, NSWidth(frame) - 60.0, NSHeight(frame) - 230.0)] autorelease];
         [scrollView setBorderType:NSNoBorder];
         [scrollView setDrawsBackground:NO];
         [scrollView setHasVerticalScroller:YES];
