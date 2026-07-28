@@ -617,6 +617,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTextField *stickerPickerStatusField;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *stickerPickerPlaybackCoordinator;
 @property (nonatomic, assign) NSUInteger stickerPickerLoadGeneration;
+@property (nonatomic, assign) NSInteger stickerPickerMode;
 @property (nonatomic, retain) AVAudioRecorder *voiceRecorder;
 @property (nonatomic, retain) AVAudioPlayer *voicePreviewPlayer;
 @property (nonatomic, copy) NSString *voiceRecordingPath;
@@ -1093,6 +1094,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize stickerPickerStatusField = _stickerPickerStatusField;
 @synthesize stickerPickerPlaybackCoordinator = _stickerPickerPlaybackCoordinator;
 @synthesize stickerPickerLoadGeneration = _stickerPickerLoadGeneration;
+@synthesize stickerPickerMode = _stickerPickerMode;
 @synthesize voiceRecorder = _voiceRecorder;
 @synthesize voicePreviewPlayer = _voicePreviewPlayer;
 @synthesize voiceRecordingPath = _voiceRecordingPath;

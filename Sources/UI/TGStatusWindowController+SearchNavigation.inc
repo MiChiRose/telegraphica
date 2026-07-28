@@ -720,12 +720,53 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     return YES;
 }
 
+- (BOOL)routeTextEditingKeyEquivalent:(NSEvent *)event {
+    NSUInteger shortcutFlags = ([event modifierFlags] &
+                                (NSCommandKeyMask | NSShiftKeyMask | NSAlternateKeyMask | NSControlKeyMask));
+    if ([event type] != NSKeyDown || shortcutFlags != NSCommandKeyMask) {
+        return NO;
+    }
+    NSResponder *firstResponder = [[self window] firstResponder];
+    if (![firstResponder isKindOfClass:[NSTextView class]]) {
+        return NO;
+    }
+    NSTextView *textView = (NSTextView *)firstResponder;
+    NSString *characters = [[event charactersIgnoringModifiers] lowercaseString];
+    SEL action = NULL;
+    if ([characters isEqualToString:@"c"]) {
+        action = @selector(copy:);
+    } else if ([characters isEqualToString:@"a"]) {
+        action = @selector(selectAll:);
+    } else if ([characters isEqualToString:@"x"] && [textView isEditable]) {
+        action = @selector(cut:);
+    } else if ([characters isEqualToString:@"v"] && [textView isEditable]) {
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        NSArray *types = [pasteboard types];
+        BOOL hasExplicitAttachment = ([types containsObject:NSFilenamesPboardType] ||
+                                      [types containsObject:NSTIFFPboardType] ||
+                                      [types containsObject:@"public.png"]);
+        NSString *plainText = [pasteboard stringForType:NSStringPboardType];
+        if (hasExplicitAttachment || ![plainText isKindOfClass:[NSString class]]) {
+            return NO;
+        }
+        action = @selector(paste:);
+    }
+    if (!action || ![textView respondsToSelector:action]) {
+        return NO;
+    }
+    [NSApp sendAction:action to:textView from:self];
+    return YES;
+}
+
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
     if ([event type] == NSKeyDown &&
         (([event modifierFlags] & (NSCommandKeyMask | NSAlternateKeyMask | NSControlKeyMask)) == 0) &&
         [[event charactersIgnoringModifiers] length] > 0 &&
         [[event charactersIgnoringModifiers] characterAtIndex:0] == 27) {
         [self closeCurrentChatNavigation:event];
+        return YES;
+    }
+    if ([self routeTextEditingKeyEquivalent:event]) {
         return YES;
     }
     if ([event type] == NSKeyDown &&

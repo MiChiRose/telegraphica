@@ -196,6 +196,75 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 @synthesize dropOverlayTarget = _dropOverlayTarget;
 
+- (void)clearSelectableMessageText {
+    if (_selectableTextView) {
+        if ([[self window] firstResponder] == _selectableTextView) {
+            [[self window] makeFirstResponder:self];
+        }
+        [_selectableTextView removeFromSuperview];
+        [_selectableTextView release];
+        _selectableTextView = nil;
+    }
+}
+
+- (void)reloadData {
+    [self clearSelectableMessageText];
+    [super reloadData];
+}
+
+- (void)noteHeightOfRowsWithIndexesChanged:(NSIndexSet *)indexSet {
+    [self clearSelectableMessageText];
+    [super noteHeightOfRowsWithIndexesChanged:indexSet];
+}
+
+- (void)mouseDown:(NSEvent *)event {
+    NSPoint tablePoint = [self convertPoint:[event locationInWindow] fromView:nil];
+    NSDictionary *descriptor = nil;
+    if (_dropOverlayTarget &&
+        [_dropOverlayTarget respondsToSelector:@selector(messageTableView:selectableTextDescriptorAtPoint:)]) {
+        descriptor = [(id<TGMessageTextSelectionDelegate>)_dropOverlayTarget messageTableView:self
+                                                              selectableTextDescriptorAtPoint:tablePoint];
+    }
+    NSValue *frameValue = [descriptor objectForKey:@"frame"];
+    NSAttributedString *attributedText = [descriptor objectForKey:@"attributed_text"];
+    NSNumber *rowValue = [descriptor objectForKey:@"row"];
+    if (![frameValue isKindOfClass:[NSValue class]] ||
+        ![attributedText isKindOfClass:[NSAttributedString class]] ||
+        [attributedText length] == 0) {
+        [self clearSelectableMessageText];
+        [super mouseDown:event];
+        return;
+    }
+
+    [self clearSelectableMessageText];
+    if ([rowValue respondsToSelector:@selector(integerValue)]) {
+        NSInteger row = [rowValue integerValue];
+        if (row >= 0 && row < [self numberOfRows]) {
+            [self selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row] byExtendingSelection:NO];
+        }
+    }
+
+    NSRect textFrame = [frameValue rectValue];
+    NSTextView *textView = [[NSTextView alloc] initWithFrame:textFrame];
+    [textView setEditable:NO];
+    [textView setSelectable:YES];
+    [textView setRichText:YES];
+    [textView setImportsGraphics:NO];
+    [textView setDrawsBackground:NO];
+    [textView setFocusRingType:NSFocusRingTypeNone];
+    [textView setTextContainerInset:NSZeroSize];
+    [[textView textContainer] setLineFragmentPadding:0.0];
+    [[textView textStorage] setAttributedString:attributedText];
+    [textView setSelectedTextAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                        TGClassicNavigationSelectedColor(0.64), NSBackgroundColorAttributeName,
+                                        TGClassicSelectedRowTextColor(), NSForegroundColorAttributeName,
+                                        nil]];
+    [self addSubview:textView];
+    _selectableTextView = textView;
+    [[self window] makeFirstResponder:textView];
+    [textView mouseDown:event];
+}
+
 - (void)notifyDropOverlayTarget {
     SEL selector = NSSelectorFromString(@"messageTableViewDragDidEnd:");
     if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
@@ -215,6 +284,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 }
 
 - (void)copy:(id)sender {
+    if (_selectableTextView && [[self window] firstResponder] == _selectableTextView &&
+        [_selectableTextView selectedRange].length > 0) {
+        [_selectableTextView copy:sender];
+        return;
+    }
     SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
     if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
         [_dropOverlayTarget performSelector:selector withObject:sender ? sender : self];
@@ -236,6 +310,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
             }
         }
         if ([characters isEqualToString:@"c"] || [characters isEqualToString:@"C"]) {
+            if (_selectableTextView && [[self window] firstResponder] == _selectableTextView &&
+                [_selectableTextView selectedRange].length > 0) {
+                [_selectableTextView copy:self];
+                return YES;
+            }
             SEL selector = NSSelectorFromString(@"messageTableViewCopy:");
             if (_dropOverlayTarget && [_dropOverlayTarget respondsToSelector:selector]) {
                 [_dropOverlayTarget performSelector:selector withObject:self];
@@ -244,6 +323,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
         }
     }
     return [super performKeyEquivalent:event];
+}
+
+- (void)dealloc {
+    [self clearSelectableMessageText];
+    [super dealloc];
 }
 
 - (void)draggingExited:(id <NSDraggingInfo>)sender {

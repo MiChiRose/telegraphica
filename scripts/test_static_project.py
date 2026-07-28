@@ -382,6 +382,31 @@ def check_composer_formatting_contract(errors):
         errors.append("%s: formatting control markers must not sync into Telegram drafts" % draft_rel)
 
 
+def check_text_interaction_contract(errors):
+    navigation_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SearchNavigation.inc")
+    navigation_text = read_text(os.path.join(ROOT, navigation_rel))
+    for fragment in [
+        "routeTextEditingKeyEquivalent:",
+        "shortcutFlags != NSCommandKeyMask",
+        "[NSApp sendAction:action to:textView from:self]",
+    ]:
+        if fragment not in navigation_text:
+            errors.append("%s: exact text shortcut routing is missing `%s`" %
+                          (navigation_rel, fragment))
+
+    components_rel = os.path.join("Sources", "UI", "TGStatusViewComponents.m")
+    components_text = read_text(os.path.join(ROOT, components_rel))
+    for fragment in [
+        "clearSelectableMessageText",
+        "selectableTextDescriptorAtPoint:",
+        "[textView setSelectable:YES]",
+        "selectedRange].length > 0",
+    ]:
+        if fragment not in components_text:
+            errors.append("%s: selectable message text support is missing `%s`" %
+                          (components_rel, fragment))
+
+
 def check_additional_message_types_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
@@ -1139,6 +1164,7 @@ def main():
     check_no_local_runtime_data(errors)
     check_conversation_creation_contract(errors)
     check_composer_formatting_contract(errors)
+    check_text_interaction_contract(errors)
     check_additional_message_types_contract(errors)
     check_media_file_management_contract(errors)
     check_primary_navigation_contract(errors)
