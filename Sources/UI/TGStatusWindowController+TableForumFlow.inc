@@ -402,6 +402,9 @@
                           (previousTopicKind && newTopicKind && [previousTopicKind isEqualToString:newTopicKind]));
     BOOL selectionChanged = !(sameChat && sameThread && sameTopicKind);
     if (selectionChanged) {
+        if (self.mediaCenterVisible) {
+            [self closeMediaCenter:nil];
+        }
         self.chatNavigationClosed = NO;
         if (![self isForumTopicAutoOpenSuppressedForChatID:newChatID]) {
             self.suppressedForumTopicAutoOpenChatID = nil;

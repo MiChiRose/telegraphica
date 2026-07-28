@@ -339,6 +339,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableArray *chatSearchWindowResultButtons;
 @property (nonatomic, assign) NSUInteger chatSearchGeneration;
 @property (nonatomic, retain) NSWindow *mediaCenterWindow;
+@property (nonatomic, retain) NSView *mediaCenterPanelView;
+@property (nonatomic, retain) NSButton *mediaCenterBackButton;
+@property (nonatomic, retain) TGProfileAvatarView *mediaCenterAvatarView;
+@property (nonatomic, retain) NSTextField *mediaCenterTitleField;
+@property (nonatomic, retain) NSTextField *mediaCenterSubtitleField;
+@property (nonatomic, assign) BOOL mediaCenterVisible;
 @property (nonatomic, retain) TGGroupedCardView *mediaCenterContentCardView;
 @property (nonatomic, retain) NSSearchField *mediaCenterSearchField;
 @property (nonatomic, retain) NSArray *mediaCenterTabButtons;
@@ -814,6 +820,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatSearchWindowResultButtons = _chatSearchWindowResultButtons;
 @synthesize chatSearchGeneration = _chatSearchGeneration;
 @synthesize mediaCenterWindow = _mediaCenterWindow;
+@synthesize mediaCenterPanelView = _mediaCenterPanelView;
+@synthesize mediaCenterBackButton = _mediaCenterBackButton;
+@synthesize mediaCenterAvatarView = _mediaCenterAvatarView;
+@synthesize mediaCenterTitleField = _mediaCenterTitleField;
+@synthesize mediaCenterSubtitleField = _mediaCenterSubtitleField;
+@synthesize mediaCenterVisible = _mediaCenterVisible;
 @synthesize mediaCenterContentCardView = _mediaCenterContentCardView;
 @synthesize mediaCenterSearchField = _mediaCenterSearchField;
 @synthesize mediaCenterTabButtons = _mediaCenterTabButtons;
@@ -1936,7 +1948,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.typingIndicatorField setHidden:([typingText length] == 0)];
     [self.selectedChatAvatarView setDisplayName:title];
     [self.selectedChatAvatarView setAvatarLocalPath:self.selectedChatAvatarLocalPath];
-    [self.selectedChatProfileButton setToolTip:(self.selectedChatID ? @"Open chat profile" : @"Select a chat")];
+    [self.selectedChatProfileButton setToolTip:(self.selectedChatID ? TGLoc(@"media.center.title") : @"Select a chat")];
     [self.selectedChatAvatarView setNeedsDisplay:YES];
 }
 
@@ -2562,7 +2574,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.selectedChatProfileButton setTransparent:YES];
     [self.selectedChatProfileButton setTarget:self];
     [self.selectedChatProfileButton setAction:@selector(openSelectedChatProfile:)];
-    [self.selectedChatProfileButton setToolTip:@"Open chat profile"];
+    [self.selectedChatProfileButton setToolTip:TGLoc(@"media.center.title")];
     [self.selectedChatProfileButton setHidden:YES];
     [contentView addSubview:self.selectedChatProfileButton];
 
@@ -4282,6 +4294,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatSearchWindowResultButtons release];
     [_mediaCenterButton release];
     [_mediaCenterWindow release];
+    [_mediaCenterPanelView release];
+    [_mediaCenterBackButton release];
+    [_mediaCenterAvatarView release];
+    [_mediaCenterTitleField release];
+    [_mediaCenterSubtitleField release];
     [_mediaCenterContentCardView release];
     [_mediaCenterSearchField release];
     [_mediaCenterTabButtons release];

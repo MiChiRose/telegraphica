@@ -206,6 +206,7 @@ static void TGTestResourcePolicy(void) {
     TGResourcePolicySetEconomyModeEnabled(NO);
     TGResourcePolicySetMaxAutoDownloadBytes(20LL * 1024LL * 1024LL);
     TGAssertTrue(TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 1024), @"known media with a declared safe size should auto-download");
+    TGAssertTrue(TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageSticker", 1024), @"an individual sticker with a declared safe size should auto-download");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 0), @"missing media size should fail closed");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(nil, 1024), @"missing message type should fail closed");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 21LL * 1024LL * 1024LL), @"oversized media should not auto-download");
