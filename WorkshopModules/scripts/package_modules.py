@@ -182,8 +182,8 @@ def main() -> None:
             "download_url": f"{args.base_url.rstrip('/')}/{package_name}",
             "icon_url": f"{args.base_url.rstrip('/')}/icons/{module_name.lower()}.png",
             "changelog": {
-                "en": "Initial Workshop release.",
-                "ru": "Первый выпуск модуля для Мастерской.",
+                "en": "Compatibility update for Telegraphica 0.5.4 with refreshed Workshop presentation.",
+                "ru": "Обновление совместимости с Telegraphica 0.5.4 и обновлённым оформлением Мастерской.",
             },
             "permissions": metadata.get("permissions", ["module-data", "host-notifications"]),
         })
