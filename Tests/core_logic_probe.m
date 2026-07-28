@@ -29,6 +29,18 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     return nil;
 }
 
+NSImage *TGImageThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
+    (void)path;
+    (void)maximumPixelSize;
+    return nil;
+}
+
+NSImage *TGImageThumbnailFromData(NSData *data, NSUInteger maximumPixelSize) {
+    (void)data;
+    (void)maximumPixelSize;
+    return nil;
+}
+
 NSImage *TGIconAssetImageNamed(NSString *name) {
     (void)name;
     return nil;

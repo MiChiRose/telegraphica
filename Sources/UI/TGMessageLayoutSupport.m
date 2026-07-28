@@ -106,8 +106,8 @@ void TGDrawImageAspectFillInRect(NSImage *image, NSRect rect, BOOL drawingInFlip
 void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected, BOOL drawingInFlippedView) {
     NSBezierPath *avatarPath = [NSBezierPath bezierPathWithOvalInRect:rect];
     NSImage *image = nil;
-    if ([imagePath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:imagePath]) {
-        image = TGImageWithCorrectOrientationFromFile(imagePath);
+    if ([imagePath length] > 0) {
+        image = TGImageThumbnailFromFile(imagePath, 128);
         if (!image) {
             image = [[[NSImage alloc] initWithContentsOfFile:imagePath] autorelease];
         }
@@ -864,8 +864,8 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
     NSBezierPath *mediaPath = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
     NSString *localPath = TGMediaItemLocalPath(mediaItem);
     NSImage *image = nil;
-    if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-        image = TGImageWithCorrectOrientationFromFile(localPath);
+    if ([localPath length] > 0) {
+        image = TGImageThumbnailFromFile(localPath, 768);
         if (!image) {
             image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
         }
@@ -874,7 +874,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
     if (!image) {
         NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(mediaItem);
         if ([miniThumbnailData length] > 0) {
-            image = [[[NSImage alloc] initWithData:miniThumbnailData] autorelease];
+            image = TGImageThumbnailFromData(miniThumbnailData, 256);
         }
     }
 

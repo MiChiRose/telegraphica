@@ -817,7 +817,15 @@
     } else if ([notification object] == self.sendTextField) {
         [self saveCurrentComposerDraft];
         [self updateSendControls];
-        [self layoutContentView];
+        CGFloat currentHeight = NSHeight([self.sendTextField frame]);
+        CGFloat desiredHeight = [self composerInputHeightForWidth:MAX(80.0, NSWidth([self.sendTextField frame]))];
+        CGFloat heightDelta = currentHeight - desiredHeight;
+        if (heightDelta < 0.0) {
+            heightDelta = -heightDelta;
+        }
+        if (heightDelta >= 1.0) {
+            [self layoutContentView];
+        }
     } else if ([notification object] == self.authTextField || [notification object] == self.authSecureField) {
         if (self.loginErrorVisible) {
             [self setLoginErrorMessage:nil];

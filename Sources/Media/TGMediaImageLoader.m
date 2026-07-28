@@ -31,6 +31,95 @@ static NSImage *TGMediaCacheImage(NSImage *image, NSString *path) {
     return image;
 }
 
+static NSImage *TGMediaThumbnailFromImageSource(CGImageSourceRef source,
+                                                 NSUInteger maximumPixelSize) {
+    if (!source || maximumPixelSize == 0) {
+        return nil;
+    }
+
+    NSDictionary *thumbnailOptions = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      (id)kCFBooleanTrue, kCGImageSourceCreateThumbnailFromImageAlways,
+                                      (id)kCFBooleanTrue, kCGImageSourceCreateThumbnailWithTransform,
+                                      (id)kCFBooleanFalse, kCGImageSourceShouldCacheImmediately,
+                                      [NSNumber numberWithUnsignedInteger:maximumPixelSize], kCGImageSourceThumbnailMaxPixelSize,
+                                      nil];
+    CGImageRef imageRef = CGImageSourceCreateThumbnailAtIndex(source,
+                                                              0,
+                                                              (CFDictionaryRef)thumbnailOptions);
+    if (!imageRef) {
+        return nil;
+    }
+
+    NSSize size = NSMakeSize((CGFloat)CGImageGetWidth(imageRef),
+                             (CGFloat)CGImageGetHeight(imageRef));
+    NSImage *image = [[[NSImage alloc] initWithCGImage:imageRef size:size] autorelease];
+    CGImageRelease(imageRef);
+    return image;
+}
+
+NSImage *TGImageThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0 || maximumPixelSize == 0) {
+        return nil;
+    }
+
+    NSString *resolvedPath = [path stringByStandardizingPath];
+    if ([resolvedPath length] == 0) {
+        return nil;
+    }
+    NSString *cacheKey = [NSString stringWithFormat:@"file-thumbnail:%lu:%@",
+                          (unsigned long)maximumPixelSize,
+                          resolvedPath];
+    NSImage *cachedImage = TGMediaCachedImage(cacheKey);
+    if (cachedImage) {
+        return cachedImage;
+    }
+
+    CFURLRef fileURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
+                                                     (CFStringRef)resolvedPath,
+                                                     kCFURLPOSIXPathStyle,
+                                                     false);
+    CGImageSourceRef source = fileURL ? CGImageSourceCreateWithURL(fileURL, NULL) : nil;
+    if (fileURL) {
+        CFRelease(fileURL);
+    }
+    if (!source) {
+        return TGMediaCacheImage(TGWebPImageFromFile(resolvedPath), cacheKey);
+    }
+
+    NSImage *image = TGMediaThumbnailFromImageSource(source, maximumPixelSize);
+    CFRelease(source);
+    if (!image) {
+        image = TGWebPImageFromFile(resolvedPath);
+    }
+    return TGMediaCacheImage(image, cacheKey);
+}
+
+NSImage *TGImageThumbnailFromData(NSData *data, NSUInteger maximumPixelSize) {
+    if (![data isKindOfClass:[NSData class]] || [data length] == 0 || maximumPixelSize == 0) {
+        return nil;
+    }
+
+    NSString *cacheKey = [NSString stringWithFormat:@"data-thumbnail:%lu:%lu:%lu",
+                          (unsigned long)maximumPixelSize,
+                          (unsigned long)[data length],
+                          (unsigned long)[data hash]];
+    NSImage *cachedImage = TGMediaCachedImage(cacheKey);
+    if (cachedImage) {
+        return cachedImage;
+    }
+
+    CGImageSourceRef source = CGImageSourceCreateWithData((CFDataRef)data, NULL);
+    NSImage *image = nil;
+    if (source) {
+        image = TGMediaThumbnailFromImageSource(source, maximumPixelSize);
+        CFRelease(source);
+    }
+    if (!image) {
+        image = [[[NSImage alloc] initWithData:data] autorelease];
+    }
+    return TGMediaCacheImage(image, cacheKey);
+}
+
 void TGMediaImageLoaderSetCacheLimitBytes(NSUInteger bytes) {
     NSCache *cache = TGMediaImageCache();
     NSUInteger limit = bytes > 0 ? bytes : (64 * 1024 * 1024);

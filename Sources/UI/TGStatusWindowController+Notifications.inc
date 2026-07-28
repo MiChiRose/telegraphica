@@ -970,12 +970,13 @@
     if ([avatarPath length] == 0) {
         return nil;
     }
-    NSImage *avatarImage = TGImageWithCorrectOrientationFromFile(avatarPath);
+    NSImage *avatarImage = TGImageThumbnailFromFile(avatarPath, 128);
     if (!avatarImage) {
         return nil;
     }
-    [avatarImage setSize:NSMakeSize(64.0, 64.0)];
-    return avatarImage;
+    NSImage *notificationImage = [[avatarImage copy] autorelease];
+    [notificationImage setSize:NSMakeSize(64.0, 64.0)];
+    return notificationImage;
 }
 
 - (void)presentNotificationForUpdateSummary:(NSDictionary *)summary {
