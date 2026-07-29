@@ -693,6 +693,9 @@ def check_call_transport_stability_contract(errors):
         if fragment not in history_text:
             errors.append("%s: compact call-history layout is missing `%s`" %
                           (history_rel, fragment))
+    if "[self.unavailableDetailField setLineBreakMode:" in history_text:
+        errors.append("%s: legacy NSTextField line breaking must be configured through its cell" %
+                      history_rel)
     for icon_name in [
         "call-cancel.png",
         "call-in.png",

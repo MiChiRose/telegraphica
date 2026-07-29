@@ -236,8 +236,8 @@
                                                       text:@""
                                                       font:[NSFont systemFontOfSize:12.0]];
         [self.unavailableDetailField setAlignment:NSCenterTextAlignment];
-        [self.unavailableDetailField setLineBreakMode:NSLineBreakByWordWrapping];
-        [self.unavailableDetailField setUsesSingleLineMode:NO];
+        [[self.unavailableDetailField cell] setLineBreakMode:NSLineBreakByWordWrapping];
+        [[self.unavailableDetailField cell] setUsesSingleLineMode:NO];
         [[self.unavailableDetailField cell] setWraps:YES];
         [self.unavailableDetailField setAutoresizingMask:
             (NSViewWidthSizable | NSViewMinYMargin | NSViewMaxYMargin)];
