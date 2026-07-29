@@ -143,7 +143,8 @@ while IFS= read -r binary_path; do
         exit 1
     fi
     binary_deployment_target="$DEPLOYMENT_TARGET"
-    if [ "$relative_path" = "Contents/Frameworks/libtdjson.dylib" ]; then
+    if [ "$relative_path" = "Contents/Frameworks/libtdjson.dylib" ] ||
+       [ "$relative_path" = "Contents/Frameworks/TelegraphicaCallTransport.dylib" ]; then
         binary_deployment_target="10.9"
     fi
     if version_gt "$minimum_os" "$binary_deployment_target"; then

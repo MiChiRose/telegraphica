@@ -12,4 +12,14 @@ static inline BOOL TGSystemIsMountainLion(void) {
     return NSAppKitVersionNumber < 1265.0;
 }
 
+/*
+ * The modern Telegram WebRTC transport is compiled as an optional 10.9+
+ * module and loaded only after this runtime check.  The host executable keeps
+ * its shared 10.8 deployment target and never asks Mountain Lion's loader to
+ * resolve symbols from the newer module.
+ */
+static inline BOOL TGSystemSupportsModernTelegramAudioCalls(void) {
+    return NSAppKitVersionNumber >= 1265.0;
+}
+
 #endif

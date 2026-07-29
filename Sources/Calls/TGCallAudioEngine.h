@@ -14,12 +14,14 @@ typedef NS_ENUM(NSInteger, TGCallAudioEngineState) {
 @protocol TGCallAudioEngineDelegate <NSObject>
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeState:(TGCallAudioEngineState)state;
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeSignalBars:(NSUInteger)signalBars;
+@optional
+- (void)callAudioEngine:(TGCallAudioEngine *)engine didEmitSignalingData:(NSData *)data;
 @end
 
 @interface TGCallAudioEngine : NSObject {
 @private
     id<TGCallAudioEngineDelegate> _delegate;
-    void *_voip;
+    void *_transport;
     BOOL _running;
     NSNumber *_preferredRelayID;
 }
@@ -30,8 +32,12 @@ typedef NS_ENUM(NSInteger, TGCallAudioEngineState) {
 
 + (BOOL)isTransportAvailable;
 + (NSString *)transportVersion;
++ (NSArray *)protocolVersions;
++ (NSInteger)maximumProtocolLayer;
++ (BOOL)isOperatingSystemSupported;
 
 - (BOOL)startWithCall:(NSDictionary *)call error:(NSError **)error;
+- (void)receiveSignalingData:(NSData *)data;
 - (void)setMicrophoneMuted:(BOOL)muted;
 - (void)setSpeakerMuted:(BOOL)muted;
 - (void)stop;

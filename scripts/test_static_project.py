@@ -546,8 +546,9 @@ def check_additional_message_types_contract(errors):
     calls_rel = os.path.join("Sources", "Core", "TGTDLibClient+Calls.m")
     calls_text = read_text(os.path.join(ROOT, calls_rel))
     for fragment in ['@"createCall"', '@"acceptCall"', '@"discardCall"',
-                     '@"2.4.4"', '@"min_layer"', '@"max_layer"',
-                     '[NSNumber numberWithInteger:92], @"max_layer"',
+                     '@"sendCallSignalingData"', '@"min_layer"', '@"max_layer"',
+                     "[TGCallAudioEngine protocolVersions]",
+                     "[TGCallAudioEngine maximumProtocolLayer]",
                      '[NSNumber numberWithBool:NO], @"is_video"']:
         if fragment not in calls_text:
             errors.append("%s: free audio-call signaling is missing `%s`" %
@@ -557,41 +558,75 @@ def check_additional_message_types_contract(errors):
 def check_call_transport_stability_contract(errors):
     audio_rel = os.path.join("Sources", "Calls", "TGCallAudioEngine.mm")
     audio_text = read_text(os.path.join(ROOT, audio_rel))
-    relay_lookup = "long long relayID = voip->getPreferredRelayId();"
-    transport_stop = "TgVoipFinalState finalState = voip->stop();"
+    relay_lookup = "int64_t relayID = api->preferredRelayID(_transport);"
+    transport_stop = "api->stop(_transport);"
     if relay_lookup not in audio_text or transport_stop not in audio_text:
         errors.append("%s: relay shutdown contract is incomplete" % audio_rel)
     elif audio_text.find(relay_lookup) > audio_text.find(transport_stop):
-        errors.append("%s: relay ID must be captured before libtgvoip stop invalidates its controller" %
+        errors.append("%s: relay ID must be captured before modern transport stop invalidates its instance" %
                       audio_rel)
     for fragment in [
-        "voip->setOnStateUpdated(std::function<void(TgVoipState)>());",
-        "voip->setOnSignalBarsUpdated(std::function<void(int)>());",
-        "voip)->setOutputVolume(muted ? 0.0f : 1.0f)",
-        "TgVoip::getConnectionMaxLayer()",
-        '[remoteProtocol objectForKey:@"max_layer"]',
-        "if (![TGLogger diagnosticsEnabled])",
-        "config.logPath = [transportLogPath fileSystemRepresentation];",
-        "finalState.trafficStats.bytesSentWifi",
-        "finalState.trafficStats.bytesReceivedWifi",
+        "TGSystemSupportsModernTelegramAudioCalls()",
+        "TelegraphicaCallTransport.dylib",
+        "TGModernCallTransportABIVersion",
+        "TGModernCallTransportReceiveSignalingData",
+        "TGModernCallTransportSetMicrophoneMuted",
+        "TGModernCallTransportSetSpeakerMuted",
+        "TGModernCallTransportPreferredRelayID",
+        "TGModernCallTransportStop",
+        "didEmitSignalingData:",
     ]:
         if fragment not in audio_text:
-            errors.append("%s: libtgvoip call-audio contract is missing `%s`" %
+            errors.append("%s: modern call-audio contract is missing `%s`" %
                           (audio_rel, fragment))
 
-    libtgvoip_patch_rel = os.path.join("Vendor", "patches",
-                                      "libtgvoip-2.4.4-mavericks.patch")
-    libtgvoip_patch_text = read_text(os.path.join(ROOT, libtgvoip_patch_rel))
+    modern_header_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.h")
+    modern_source_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.mm")
+    modern_cmake_rel = os.path.join("ModernCallTransport", "CMakeLists.txt")
+    modern_header_text = read_text(os.path.join(ROOT, modern_header_rel))
+    modern_source_text = read_text(os.path.join(ROOT, modern_source_rel))
+    modern_cmake_text = read_text(os.path.join(ROOT, modern_cmake_rel))
     for fragment in [
-        "os/darwin/AudioInputAudioUnit.cpp",
-        "if(sample!=sample)",
-        "else if(sample>1.0f)",
-        "else if(sample<-1.0f)",
-        "sample*32767.0f",
+        "TG_MODERN_CALL_TRANSPORT_ABI_VERSION",
+        "TGModernCallTransportCreate",
+        "TGModernCallTransportReceiveSignalingData",
     ]:
-        if fragment not in libtgvoip_patch_text:
-            errors.append("%s: legacy microphone PCM protection is missing `%s`" %
-                          (libtgvoip_patch_rel, fragment))
+        if fragment not in modern_header_text:
+            errors.append("%s: modern transport ABI is missing `%s`" %
+                          (modern_header_rel, fragment))
+    for fragment in [
+        '"3.0.0,2.7.7"',
+        "descriptor.signalingDataEmitted",
+        "descriptor.config.enableAEC = true",
+        "descriptor.config.enableNS = true",
+        "descriptor.config.enableAGC = true",
+    ]:
+        if fragment not in modern_source_text:
+            errors.append("%s: modern Telegram transport is missing `%s`" %
+                          (modern_source_rel, fragment))
+    for fragment in [
+        "CMAKE_OSX_DEPLOYMENT_TARGET 10.9",
+        'OUTPUT_NAME "TelegraphicaCallTransport"',
+        'PREFIX ""',
+    ]:
+        if fragment not in modern_cmake_text:
+            errors.append("%s: Mavericks transport build is missing `%s`" %
+                          (modern_cmake_rel, fragment))
+
+    build_rel = "build_legacy.sh"
+    build_text = read_text(os.path.join(ROOT, build_rel))
+    for fragment in [
+        "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH",
+        'CALL_TRANSPORT_MIN" != "10.9"',
+        "TelegraphicaCallTransport.dylib",
+        "TELEGRAPHICA_LIBTGVOIP_SOURCE is ignored",
+    ]:
+        if fragment not in build_text:
+            errors.append("%s: unified call-module packaging is missing `%s`" %
+                          (build_rel, fragment))
+    for forbidden in ["TgVoip.h", "TgVoip.cpp", "TELEGRAPHICA_HAS_TGVOIP"]:
+        if forbidden in audio_text or forbidden in build_text:
+            errors.append("legacy libtgvoip transport was reintroduced via `%s`" % forbidden)
 
     window_rel = os.path.join("Sources", "Calls", "TGCallWindowController.m")
     window_text = read_text(os.path.join(ROOT, window_rel))
@@ -631,6 +666,9 @@ def check_call_transport_stability_contract(errors):
         'TGLoc(@"calls.negotiationTimeout")',
         "Audio call: TDLib state",
         "Audio call: media transport established.",
+        "TGTDLibCallSignalingDataDidUpdateNotification",
+        "sendAudioCallSignalingData:",
+        "receiveSignalingData:",
     ]:
         if fragment not in coordinator_text:
             errors.append("%s: call negotiation diagnostics are missing `%s`" %

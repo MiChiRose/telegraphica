@@ -1,4 +1,6 @@
 #import "TGTDLibClient+Calls.h"
+#import "../Calls/TGCallAudioEngine.h"
+#import "../Services/TGBase64Compatibility.h"
 
 @interface TGTDLibClient (CallsPrivate)
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request
@@ -10,13 +12,15 @@
 @end
 
 static NSDictionary *TGCallProtocolDescriptor(void) {
+    NSArray *versions = [TGCallAudioEngine protocolVersions];
+    NSInteger maximumLayer = [TGCallAudioEngine maximumProtocolLayer];
     return [NSDictionary dictionaryWithObjectsAndKeys:
             @"callProtocol", @"@type",
             [NSNumber numberWithBool:YES], @"udp_p2p",
             [NSNumber numberWithBool:YES], @"udp_reflector",
             [NSNumber numberWithInteger:65], @"min_layer",
-            [NSNumber numberWithInteger:92], @"max_layer",
-            [NSArray arrayWithObject:@"2.4.4"], @"library_versions",
+            [NSNumber numberWithInteger:MAX(65, maximumLayer)], @"max_layer",
+            versions ? versions : [NSArray array], @"library_versions",
             nil];
 }
 
@@ -132,6 +136,37 @@ static NSNumber *TGUserIdentifierFromSender(id sender) {
     }
     if (error && response && !*error) {
         *error = [self errorWithDescription:@"TDLib did not discard the audio call." code:438];
+    }
+    return NO;
+}
+
+- (BOOL)sendAudioCallSignalingData:(NSData *)data
+                            callID:(NSNumber *)callID
+                           timeout:(NSTimeInterval)timeout
+                             error:(NSError **)error {
+    NSNumber *safeCallID = TGPositiveCallIdentifier(callID);
+    NSString *encodedData = TGBase64EncodedString(data);
+    if (!safeCallID || ![encodedData length]) {
+        if (error) {
+            *error = [self errorWithDescription:@"Call signaling data is missing." code:443];
+        }
+        return NO;
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"sendCallSignalingData", @"@type",
+                             safeCallID, @"call_id",
+                             encodedData, @"data",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-call-signaling"
+                                                            timeout:timeout
+                                                          errorCode:444
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"ok"]) {
+        return YES;
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib rejected call signaling data." code:445];
     }
     return NO;
 }
