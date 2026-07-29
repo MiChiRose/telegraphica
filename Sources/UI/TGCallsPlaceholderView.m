@@ -15,6 +15,24 @@
 @property (nonatomic, retain) NSDictionary *callSummary;
 @end
 
+@interface TGCallHistoryTableView : NSTableView
+@end
+
+@implementation TGCallHistoryTableView
+
+- (NSMenu *)menuForEvent:(NSEvent *)event {
+    NSPoint localPoint = [self convertPoint:[event locationInWindow] fromView:nil];
+    NSInteger row = [self rowAtPoint:localPoint];
+    if (row < 0) {
+        return nil;
+    }
+    [self selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
+      byExtendingSelection:NO];
+    return [super menuForEvent:event];
+}
+
+@end
+
 @implementation TGCallHistoryCell
 
 @synthesize callSummary = _callSummary;
@@ -139,6 +157,7 @@
 @property (nonatomic, retain) NSArray *contacts;
 @property (nonatomic, retain) NSArray *recentCalls;
 @property (nonatomic, assign) BOOL loading;
+@property (nonatomic, assign) BOOL deletingCall;
 @property (nonatomic, retain) NSTextField *titleField;
 @property (nonatomic, retain) TGGroupedCardView *cardView;
 @property (nonatomic, retain) NSPopUpButton *contactPopUpButton;
@@ -161,6 +180,7 @@
 @synthesize contacts = _contacts;
 @synthesize recentCalls = _recentCalls;
 @synthesize loading = _loading;
+@synthesize deletingCall = _deletingCall;
 @synthesize titleField = _titleField;
 @synthesize cardView = _cardView;
 @synthesize contactPopUpButton = _contactPopUpButton;
@@ -283,7 +303,7 @@
         [scrollView setAutohidesScrollers:YES];
         [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         self.historyScrollView = scrollView;
-        self.tableView = [[[NSTableView alloc] initWithFrame:[scrollView bounds]] autorelease];
+        self.tableView = [[[TGCallHistoryTableView alloc] initWithFrame:[scrollView bounds]] autorelease];
         NSTableColumn *column = [[[NSTableColumn alloc] initWithIdentifier:@"call"] autorelease];
         [column setWidth:NSWidth([scrollView bounds])];
         [column setDataCell:[[[TGCallHistoryCell alloc] initTextCell:@""] autorelease]];
@@ -294,6 +314,14 @@
         [self.tableView setBackgroundColor:[NSColor clearColor]];
         [self.tableView setDelegate:self];
         [self.tableView setDataSource:self];
+        NSMenu *historyMenu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+        NSMenuItem *deleteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"delete")
+                                                             action:@selector(deleteRecentCallPressed:)
+                                                      keyEquivalent:@""] autorelease];
+        [deleteItem setTarget:self];
+        [deleteItem setTag:603];
+        [historyMenu addItem:deleteItem];
+        [self.tableView setMenu:historyMenu];
         [scrollView setDocumentView:self.tableView];
         [self addSubview:scrollView];
 
@@ -394,6 +422,90 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [self refreshData];
 }
 
+- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+    if ([menuItem action] == @selector(deleteRecentCallPressed:)) {
+        NSInteger row = [self.tableView selectedRow];
+        if (self.loading || self.deletingCall ||
+            row < 0 || (NSUInteger)row >= [self.recentCalls count]) {
+            return NO;
+        }
+        NSDictionary *summary = [self.recentCalls objectAtIndex:(NSUInteger)row];
+        return ([[summary objectForKey:@"chat_id"] longLongValue] != 0LL &&
+                [[summary objectForKey:@"message_id"] longLongValue] > 0LL);
+    }
+    return YES;
+}
+
+- (void)deleteRecentCallPressed:(id)sender {
+    (void)sender;
+    NSInteger row = [self.tableView selectedRow];
+    if (self.loading || self.deletingCall ||
+        row < 0 || (NSUInteger)row >= [self.recentCalls count]) {
+        return;
+    }
+    NSDictionary *summary = [self.recentCalls objectAtIndex:(NSUInteger)row];
+    NSNumber *chatID = [summary objectForKey:@"chat_id"];
+    NSNumber *messageID = [summary objectForKey:@"message_id"];
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0LL ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [messageID longLongValue] <= 0LL) {
+        return;
+    }
+
+    self.deletingCall = YES;
+    [self.tableView setEnabled:NO];
+    [self.refreshButton setEnabled:NO];
+    [self.spinner startAnimation:nil];
+    [self.statusField setStringValue:TGLoc(@"calls.deleting")];
+
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *retainedChatID = [chatID retain];
+    NSNumber *retainedMessageID = [messageID retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *deleteError = nil;
+        NSString *result = [client deleteMessagesInChatID:retainedChatID
+                                               messageIDs:[NSArray arrayWithObject:retainedMessageID]
+                                                  revoke:NO
+                                                 timeout:8.0
+                                                   error:&deleteError];
+        BOOL deleted = ([result length] > 0);
+        NSString *failure = [[deleteError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (deleted) {
+                NSMutableArray *remaining = [NSMutableArray array];
+                for (NSDictionary *call in self.recentCalls) {
+                    BOOL sameChat = [[call objectForKey:@"chat_id"]
+                        isEqualToNumber:retainedChatID];
+                    BOOL sameMessage = [[call objectForKey:@"message_id"]
+                        isEqualToNumber:retainedMessageID];
+                    if (!sameChat || !sameMessage) {
+                        [remaining addObject:call];
+                    }
+                }
+                self.recentCalls = remaining;
+                [self.tableView reloadData];
+                [self.statusField setStringValue:
+                    [NSString stringWithFormat:TGLoc(@"calls.loaded"),
+                                               (unsigned long)[self.recentCalls count]]];
+            } else {
+                [self.statusField setStringValue:
+                    [failure length] > 0 ? failure : TGLoc(@"calls.deleteFailed")];
+            }
+            self.deletingCall = NO;
+            [self.tableView setEnabled:YES];
+            [self.refreshButton setEnabled:YES];
+            [self.spinner stopAnimation:nil];
+            [failure release];
+            [retainedMessageID release];
+            [retainedChatID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)refreshData {
     if (!self.coordinator.transportAvailable) {
         self.contacts = [NSArray array];
@@ -403,7 +515,7 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
         [self applyTransportAvailability];
         return;
     }
-    if (self.loading) {
+    if (self.loading || self.deletingCall) {
         return;
     }
     self.loading = YES;
@@ -511,6 +623,8 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [self.refreshButton setTitle:TGLoc(@"refresh")];
     [self.mockOutgoingButton setTitle:TGLoc(@"calls.demo.outgoing")];
     [self.mockIncomingButton setTitle:TGLoc(@"calls.demo.incoming")];
+    NSMenuItem *deleteItem = [[self.tableView menu] itemWithTag:603];
+    [deleteItem setTitle:TGLoc(@"delete")];
     [self applyTransportAvailability];
 }
 

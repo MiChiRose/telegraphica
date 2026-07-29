@@ -673,6 +673,9 @@ def check_call_transport_stability_contract(errors):
         if fragment not in coordinator_text:
             errors.append("%s: call negotiation diagnostics are missing `%s`" %
                           (coordinator_rel, fragment))
+    if "descriptor.config.allowTCP = true;" not in modern_source_text:
+        errors.append("%s: Telegram call transport must retain TCP relay fallback" %
+                      modern_source_rel)
 
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     history_text = read_text(os.path.join(ROOT, history_rel))
@@ -696,6 +699,23 @@ def check_call_transport_stability_contract(errors):
     if "[self.unavailableDetailField setLineBreakMode:" in history_text:
         errors.append("%s: legacy NSTextField line breaking must be configured through its cell" %
                       history_rel)
+    for fragment in [
+        "@interface TGCallHistoryTableView : NSTableView",
+        "- (NSMenu *)menuForEvent:(NSEvent *)event",
+        "@selector(deleteRecentCallPressed:)",
+        'initWithTitle:TGLoc(@"delete")',
+        "messageIDs:[NSArray arrayWithObject:retainedMessageID]",
+        "revoke:NO",
+    ]:
+        if fragment not in history_text:
+            errors.append("%s: call-history deletion contract is missing `%s`" %
+                          (history_rel, fragment))
+    calls_rel = os.path.join("Sources", "Core", "TGTDLibClient+Calls.m")
+    calls_text = read_text(os.path.join(ROOT, calls_rel))
+    for fragment in ['forKey:@"chat_id"', 'forKey:@"message_id"']:
+        if fragment not in calls_text:
+            errors.append("%s: call summaries must preserve the deletion target `%s`" %
+                          (calls_rel, fragment))
     for icon_name in [
         "call-cancel.png",
         "call-in.png",
@@ -709,6 +729,26 @@ def check_call_transport_stability_contract(errors):
         if not os.path.isfile(icon_path):
             errors.append("Sources/Resources/Icons/%s: approved call-control icon is missing" %
                           icon_name)
+
+    media_windows_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MediaWindows.inc")
+    media_windows_text = read_text(os.path.join(ROOT, media_windows_rel))
+    playback_start = media_windows_text.find("- (void)openPlayableMediaForMediaItem:")
+    playback_end = media_windows_text.find("- (void)layoutMediaPreviewWindowControls")
+    playback_text = media_windows_text[playback_start:playback_end] if (
+        playback_start >= 0 and playback_end > playback_start) else ""
+    if not playback_text:
+        errors.append("%s: playable-media method group could not be inspected" %
+                      media_windows_rel)
+    for forbidden in [
+        "path = TGMediaCenterLocalPathForItem(item);",
+        "path = TGMediaItemLocalPath(mediaItem);",
+    ]:
+        if forbidden in playback_text:
+            errors.append("%s: visual thumbnails must not be passed to AVPlayer via `%s`" %
+                          (media_windows_rel, forbidden))
+    if "path = TGMediaItemPlayableLocalPath(fallbackMedia);" not in playback_text:
+        errors.append("%s: message playback must validate its fallback local path" %
+                      media_windows_rel)
 
 
 def check_media_file_management_contract(errors):

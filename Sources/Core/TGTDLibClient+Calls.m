@@ -243,6 +243,18 @@ static NSNumber *TGUserIdentifierFromSender(id sender) {
             }
         }
         NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        id chatID = [message objectForKey:@"chat_id"];
+        id messageID = [message objectForKey:@"id"];
+        if ([chatID respondsToSelector:@selector(longLongValue)] &&
+            [chatID longLongValue] != 0LL) {
+            [summary setObject:[NSNumber numberWithLongLong:[chatID longLongValue]]
+                        forKey:@"chat_id"];
+        }
+        if ([messageID respondsToSelector:@selector(longLongValue)] &&
+            [messageID longLongValue] > 0LL) {
+            [summary setObject:[NSNumber numberWithLongLong:[messageID longLongValue]]
+                        forKey:@"message_id"];
+        }
         [summary setObject:userID forKey:@"user_id"];
         [summary setObject:[profile objectForKey:@"display_name"] ?: [NSString stringWithFormat:@"User %@", userID]
                     forKey:@"display_name"];
