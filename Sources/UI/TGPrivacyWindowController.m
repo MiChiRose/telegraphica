@@ -2,6 +2,7 @@
 
 #import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+Privacy.h"
+#import "../Services/TGPrivacyPermissions.h"
 #import "TGLocalization.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGStatusButtonCells.h"
@@ -73,6 +74,8 @@
 @property (nonatomic, retain) NSButton *blockButton;
 @property (nonatomic, retain) NSButton *unblockButton;
 @property (nonatomic, retain) NSButton *refreshButton;
+@property (nonatomic, retain) NSButton *microphonePermissionButton;
+@property (nonatomic, retain) NSButton *locationPermissionButton;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextField *ruleHintField;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
@@ -97,6 +100,8 @@
 @synthesize blockButton = _blockButton;
 @synthesize unblockButton = _unblockButton;
 @synthesize refreshButton = _refreshButton;
+@synthesize microphonePermissionButton = _microphonePermissionButton;
+@synthesize locationPermissionButton = _locationPermissionButton;
 @synthesize statusField = _statusField;
 @synthesize ruleHintField = _ruleHintField;
 @synthesize spinner = _spinner;
@@ -107,7 +112,7 @@
 @synthesize requestGeneration = _requestGeneration;
 
 - (id)initWithClient:(TGTDLibClient *)client {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 760, 620)
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 760, 700)
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
@@ -118,15 +123,21 @@
         self.blockedSenders = [NSArray array];
         self.contacts = [NSArray array];
         [[self window] setTitle:TGLoc(@"privacy.title")];
-        [[self window] setMinSize:NSMakeSize(700.0, 560.0)];
-        [[self window] setMaxSize:NSMakeSize(960.0, 800.0)];
+        [[self window] setMinSize:NSMakeSize(700.0, 640.0)];
+        [[self window] setMaxSize:NSMakeSize(960.0, 880.0)];
         [[self window] setReleasedWhenClosed:NO];
         [self buildViews];
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+               selector:@selector(privacyPermissionsDidChange:)
+                   name:TGPrivacyPermissionsDidChangeNotification
+                 object:nil];
     }
     return self;
 }
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_client release];
     [_settingPopUpButton release];
     [_rulePopUpButton release];
@@ -139,6 +150,8 @@
     [_blockButton release];
     [_unblockButton release];
     [_refreshButton release];
+    [_microphonePermissionButton release];
+    [_locationPermissionButton release];
     [_statusField release];
     [_ruleHintField release];
     [_spinner release];
@@ -170,18 +183,18 @@
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
 
-    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 42, 736, 520)] autorelease];
+    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 42, 736, 600)] autorelease];
     [panel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [root addSubview:panel];
 
-    NSTextField *title = [self labelWithFrame:NSMakeRect(24, 570, 560, 28)
+    NSTextField *title = [self labelWithFrame:NSMakeRect(24, 650, 560, 28)
                                          font:[NSFont boldSystemFontOfSize:20.0]
                                         color:TGClassicHeaderTextColor(1.0)];
     [title setStringValue:TGLoc(@"privacy.title")];
     [title setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:title];
 
-    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(648, 568, 88, 30)] autorelease];
+    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(648, 648, 88, 30)] autorelease];
     [self.refreshButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"refresh")] autorelease]];
     [self.refreshButton setTitle:TGLoc(@"refresh")];
     [self.refreshButton setTarget:self];
@@ -189,17 +202,17 @@
     [self.refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.refreshButton];
 
-    TGGroupedCardView *rulesCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 406, 350, 146)] autorelease];
+    TGGroupedCardView *rulesCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 486, 350, 146)] autorelease];
     [rulesCard setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:rulesCard];
-    NSTextField *rulesTitle = [self labelWithFrame:NSMakeRect(38, 520, 310, 18)
+    NSTextField *rulesTitle = [self labelWithFrame:NSMakeRect(38, 600, 310, 18)
                                               font:[NSFont boldSystemFontOfSize:13.0]
                                              color:TGClassicCardInkColor()];
     [rulesTitle setStringValue:TGLoc(@"privacy.rules")];
     [rulesTitle setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:rulesTitle];
 
-    self.settingPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(36, 480, 206, 28) pullsDown:NO] autorelease];
+    self.settingPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(36, 560, 206, 28) pullsDown:NO] autorelease];
     NSArray *settingTypes = [NSArray arrayWithObjects:
                              @"userPrivacySettingShowStatus",
                              @"userPrivacySettingShowProfilePhoto",
@@ -221,14 +234,14 @@
     [self.settingPopUpButton setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:self.settingPopUpButton];
 
-    self.rulePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(246, 480, 106, 28) pullsDown:NO] autorelease];
+    self.rulePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(246, 560, 106, 28) pullsDown:NO] autorelease];
     [self addPopupItem:TGLoc(@"privacy.rule.everybody") value:@"everybody" toPopup:self.rulePopUpButton];
     [self addPopupItem:TGLoc(@"privacy.rule.contacts") value:@"contacts" toPopup:self.rulePopUpButton];
     [self addPopupItem:TGLoc(@"privacy.rule.nobody") value:@"nobody" toPopup:self.rulePopUpButton];
     [self.rulePopUpButton setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.rulePopUpButton];
 
-    self.ruleHintField = [self labelWithFrame:NSMakeRect(38, 442, 314, 30)
+    self.ruleHintField = [self labelWithFrame:NSMakeRect(38, 522, 314, 30)
                                          font:[NSFont systemFontOfSize:10.0]
                                         color:TGClassicCardMutedInkColor()];
     [[self.ruleHintField cell] setWraps:YES];
@@ -237,7 +250,7 @@
     [self.ruleHintField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.ruleHintField];
 
-    self.applyRuleButton = [[[NSButton alloc] initWithFrame:NSMakeRect(218, 414, 134, 26)] autorelease];
+    self.applyRuleButton = [[[NSButton alloc] initWithFrame:NSMakeRect(218, 494, 134, 26)] autorelease];
     [self.applyRuleButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"apply")] autorelease]];
     [self.applyRuleButton setTitle:TGLoc(@"apply")];
     [self.applyRuleButton setTarget:self];
@@ -245,22 +258,22 @@
     [self.applyRuleButton setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.applyRuleButton];
 
-    TGGroupedCardView *retentionCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(382, 406, 358, 146)] autorelease];
+    TGGroupedCardView *retentionCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(382, 486, 358, 146)] autorelease];
     [retentionCard setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:retentionCard];
-    NSTextField *retentionTitle = [self labelWithFrame:NSMakeRect(400, 520, 320, 18)
+    NSTextField *retentionTitle = [self labelWithFrame:NSMakeRect(400, 600, 320, 18)
                                                   font:[NSFont boldSystemFontOfSize:13.0]
                                                  color:TGClassicCardInkColor()];
     [retentionTitle setStringValue:TGLoc(@"privacy.retention")];
     [retentionTitle setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:retentionTitle];
-    NSTextField *ttlLabel = [self labelWithFrame:NSMakeRect(400, 486, 148, 18)
+    NSTextField *ttlLabel = [self labelWithFrame:NSMakeRect(400, 566, 148, 18)
                                             font:[NSFont systemFontOfSize:11.0]
                                            color:TGClassicCardInkColor()];
     [ttlLabel setStringValue:TGLoc(@"privacy.accountTTL")];
     [ttlLabel setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:ttlLabel];
-    self.accountTTLPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(552, 480, 166, 28) pullsDown:NO] autorelease];
+    self.accountTTLPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(552, 560, 166, 28) pullsDown:NO] autorelease];
     NSArray *ttlDays = [NSArray arrayWithObjects:@30, @90, @180, @365, @548, @730, nil];
     for (index = 0; index < [ttlDays count]; index++) {
         NSNumber *days = [ttlDays objectAtIndex:index];
@@ -270,13 +283,13 @@
     }
     [self.accountTTLPopUpButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.accountTTLPopUpButton];
-    NSTextField *autoLabel = [self labelWithFrame:NSMakeRect(400, 454, 148, 18)
+    NSTextField *autoLabel = [self labelWithFrame:NSMakeRect(400, 534, 148, 18)
                                              font:[NSFont systemFontOfSize:11.0]
                                             color:TGClassicCardInkColor()];
     [autoLabel setStringValue:TGLoc(@"privacy.defaultAutoDelete")];
     [autoLabel setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:autoLabel];
-    self.autoDeletePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(552, 448, 166, 28) pullsDown:NO] autorelease];
+    self.autoDeletePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(552, 528, 166, 28) pullsDown:NO] autorelease];
     NSArray *seconds = [NSArray arrayWithObjects:@0, @86400, @604800, @2678400, @7776000, @31536000, nil];
     NSArray *timeKeys = [NSArray arrayWithObjects:@"off", @"day", @"week", @"month", @"threeMonths", @"year", nil];
     for (index = 0; index < [seconds count]; index++) {
@@ -286,13 +299,39 @@
     }
     [self.autoDeletePopUpButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.autoDeletePopUpButton];
-    self.applyRetentionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(584, 414, 134, 26)] autorelease];
+    self.applyRetentionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(584, 494, 134, 26)] autorelease];
     [self.applyRetentionButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"apply")] autorelease]];
     [self.applyRetentionButton setTitle:TGLoc(@"apply")];
     [self.applyRetentionButton setTarget:self];
     [self.applyRetentionButton setAction:@selector(applyRetentionPressed:)];
     [self.applyRetentionButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.applyRetentionButton];
+
+    TGGroupedCardView *permissionsCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 400, 720, 74)] autorelease];
+    [permissionsCard setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [root addSubview:permissionsCard];
+    NSTextField *permissionsTitle = [self labelWithFrame:NSMakeRect(38, 444, 300, 18)
+                                                     font:[NSFont boldSystemFontOfSize:13.0]
+                                                    color:TGClassicCardInkColor()];
+    [permissionsTitle setStringValue:TGLoc(@"privacy.permissions.title")];
+    [permissionsTitle setAutoresizingMask:NSViewMinYMargin];
+    [root addSubview:permissionsTitle];
+
+    self.microphonePermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(36, 410, 310, 24)] autorelease];
+    [self.microphonePermissionButton setButtonType:NSSwitchButton];
+    [self.microphonePermissionButton setTitle:TGLoc(@"privacy.permissions.microphone")];
+    [self.microphonePermissionButton setTarget:self];
+    [self.microphonePermissionButton setAction:@selector(microphonePermissionChanged:)];
+    [self.microphonePermissionButton setAutoresizingMask:NSViewMinYMargin];
+    [root addSubview:self.microphonePermissionButton];
+
+    self.locationPermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(378, 410, 340, 24)] autorelease];
+    [self.locationPermissionButton setButtonType:NSSwitchButton];
+    [self.locationPermissionButton setTitle:TGLoc(@"privacy.permissions.location")];
+    [self.locationPermissionButton setTarget:self];
+    [self.locationPermissionButton setAction:@selector(locationPermissionChanged:)];
+    [self.locationPermissionButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [root addSubview:self.locationPermissionButton];
 
     TGGroupedCardView *blockedCard = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 54, 720, 338)] autorelease];
     [blockedCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -356,7 +395,30 @@
     [self.spinner setDisplayedWhenStopped:NO];
     [self.spinner setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [root addSubview:self.spinner];
+    [self updatePrivacyPermissionControls];
     [self updateControls];
+}
+
+- (void)updatePrivacyPermissionControls {
+    [self.microphonePermissionButton setState:
+        ([TGPrivacyPermissions microphonePermissionState] == TGPrivacyPermissionStateAllowed
+            ? NSOnState : NSOffState)];
+    [self.locationPermissionButton setState:
+        ([TGPrivacyPermissions locationPermissionState] == TGPrivacyPermissionStateAllowed
+            ? NSOnState : NSOffState)];
+}
+
+- (void)privacyPermissionsDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self updatePrivacyPermissionControls];
+}
+
+- (void)microphonePermissionChanged:(id)sender {
+    [TGPrivacyPermissions setMicrophoneAllowed:([sender state] == NSOnState)];
+}
+
+- (void)locationPermissionChanged:(id)sender {
+    [TGPrivacyPermissions setLocationAllowed:([sender state] == NSOnState)];
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {

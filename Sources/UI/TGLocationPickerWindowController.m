@@ -2,6 +2,7 @@
 
 #import <MapKit/MapKit.h>
 #import "../Core/TGTDLibClient+MapThumbnail.h"
+#import "../Services/TGPrivacyPermissions.h"
 #import "TGLocationSearchService.h"
 #import "TGLocationStaticMapView.h"
 #import "TGLocalization.h"
@@ -313,6 +314,9 @@
 
 - (void)currentLocationPressed:(id)sender {
     (void)sender;
+    if (![TGPrivacyPermissions requestLocationPermission]) {
+        return;
+    }
     [self.searchService cancel];
     [self.searchButton setEnabled:[self.searchService isAvailable]];
     self.waitingForUserLocation = YES;

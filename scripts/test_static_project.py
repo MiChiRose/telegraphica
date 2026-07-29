@@ -583,9 +583,19 @@ def check_call_transport_stability_contract(errors):
     modern_header_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.h")
     modern_source_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.mm")
     modern_cmake_rel = os.path.join("ModernCallTransport", "CMakeLists.txt")
+    verified_transport_rel = os.path.join(
+        "ModernCallTransport", "VERIFIED_TRANSPORT.sha256")
     modern_header_text = read_text(os.path.join(ROOT, modern_header_rel))
     modern_source_text = read_text(os.path.join(ROOT, modern_source_rel))
     modern_cmake_text = read_text(os.path.join(ROOT, modern_cmake_rel))
+    verified_transport_text = read_text(
+        os.path.join(ROOT, verified_transport_rel))
+    expected_transport_sha = (
+        "96713ab9689d8e79c0caa7c8985e88d31fcfee2a235134e92f5c622250f9677e")
+    if expected_transport_sha not in verified_transport_text:
+        errors.append(
+            "%s: the HITL-approved audio-call transport hash changed" %
+            verified_transport_rel)
     for fragment in [
         "TG_MODERN_CALL_TRANSPORT_ABI_VERSION",
         "TGModernCallTransportCreate",
@@ -595,11 +605,14 @@ def check_call_transport_stability_contract(errors):
             errors.append("%s: modern transport ABI is missing `%s`" %
                           (modern_header_rel, fragment))
     for fragment in [
-        '"3.0.0,2.7.7"',
+        '"9.0.0,8.0.0,7.0.0,3.0.0,2.7.7"',
         "descriptor.signalingDataEmitted",
         "descriptor.config.enableAEC = true",
         "descriptor.config.enableNS = true",
         "descriptor.config.enableAGC = true",
+        "MutingAudioTransport",
+        "MutingAudioDeviceModule",
+        "audioOutputState->muted.store",
     ]:
         if fragment not in modern_source_text:
             errors.append("%s: modern Telegram transport is missing `%s`" %
@@ -608,6 +621,10 @@ def check_call_transport_stability_contract(errors):
         "CMAKE_OSX_DEPLOYMENT_TARGET 10.9",
         'OUTPUT_NAME "TelegraphicaCallTransport"',
         'PREFIX ""',
+        "webrtc::AudioProcessingBuilder audioProcessingBuilder",
+        "mediaDeps.audio_processing = audioProcessingBuilder.Create()",
+        "candidateAddress.SetResolvedIP(server_address_.address.ipaddr())",
+        "TGReflectorPortPatched.cpp",
     ]:
         if fragment not in modern_cmake_text:
             errors.append("%s: Mavericks transport build is missing `%s`" %
@@ -617,6 +634,9 @@ def check_call_transport_stability_contract(errors):
     build_text = read_text(os.path.join(ROOT, build_rel))
     for fragment in [
         "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH",
+        "ModernCallTransport/VERIFIED_TRANSPORT.sha256",
+        "TELEGRAPHICA_ALLOW_UNVERIFIED_CALL_TRANSPORT",
+        "Refusing to replace the HITL-verified audio-call transport.",
         'CALL_TRANSPORT_MIN" != "10.9"',
         "TelegraphicaCallTransport.dylib",
         "TELEGRAPHICA_LIBTGVOIP_SOURCE is ignored",
@@ -627,6 +647,18 @@ def check_call_transport_stability_contract(errors):
     for forbidden in ["TgVoip.h", "TgVoip.cpp", "TELEGRAPHICA_HAS_TGVOIP"]:
         if forbidden in audio_text or forbidden in build_text:
             errors.append("legacy libtgvoip transport was reintroduced via `%s`" % forbidden)
+
+    release_rel = os.path.join(
+        "scripts", "package_legacy_release_artifacts.sh")
+    release_text = read_text(os.path.join(ROOT, release_rel))
+    for fragment in [
+        "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH",
+        "The HITL-verified OS X 10.9+ audio-call transport was not found.",
+        "Refusing to package a public release with an unverified audio-call transport.",
+    ]:
+        if fragment not in release_text:
+            errors.append("%s: verified call transport release guard is missing `%s`" %
+                          (release_rel, fragment))
 
     window_rel = os.path.join("Sources", "Calls", "TGCallWindowController.m")
     window_text = read_text(os.path.join(ROOT, window_rel))
@@ -662,6 +694,8 @@ def check_call_transport_stability_contract(errors):
     coordinator_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.m")
     coordinator_text = read_text(os.path.join(ROOT, coordinator_rel))
     for fragment in [
+        '#import "../Services/TGPrivacyPermissions.h"',
+        "[TGPrivacyPermissions requestMicrophonePermission]",
         "callNegotiationDidTimeout",
         'TGLoc(@"calls.negotiationTimeout")',
         "Audio call: TDLib state",
@@ -677,6 +711,42 @@ def check_call_transport_stability_contract(errors):
         errors.append("%s: Telegram call transport must retain TCP relay fallback" %
                       modern_source_rel)
 
+    privacy_permissions_rel = os.path.join(
+        "Sources", "Services", "TGPrivacyPermissions.m")
+    privacy_permissions_text = read_text(
+        os.path.join(ROOT, privacy_permissions_rel))
+    for fragment in [
+        "requestMicrophonePermission",
+        "requestLocationPermission",
+        "TGPrivacyPermissionsDidChangeNotification",
+        "TelegraphicaMicrophonePermissionDecisionV2",
+        "TelegraphicaLocationPermissionDecisionV1",
+    ]:
+        if fragment not in privacy_permissions_text:
+            errors.append("%s: app permission contract is missing `%s`" %
+                          (privacy_permissions_rel, fragment))
+
+    privacy_window_rel = os.path.join(
+        "Sources", "UI", "TGPrivacyWindowController.m")
+    privacy_window_text = read_text(os.path.join(ROOT, privacy_window_rel))
+    for fragment in [
+        "microphonePermissionButton",
+        "locationPermissionButton",
+        'TGLoc(@"privacy.permissions.title")',
+        "[TGPrivacyPermissions setMicrophoneAllowed:",
+        "[TGPrivacyPermissions setLocationAllowed:",
+    ]:
+        if fragment not in privacy_window_text:
+            errors.append("%s: permission settings UI is missing `%s`" %
+                          (privacy_window_rel, fragment))
+
+    location_picker_rel = os.path.join(
+        "Sources", "UI", "TGLocationPickerWindowController.m")
+    location_picker_text = read_text(os.path.join(ROOT, location_picker_rel))
+    if "[TGPrivacyPermissions requestLocationPermission]" not in location_picker_text:
+        errors.append("%s: current-location lookup bypasses app permission" %
+                      location_picker_rel)
+
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     history_text = read_text(os.path.join(ROOT, history_rel))
     if "cell->_callSummary = [_callSummary retain];" not in history_text:
@@ -687,15 +757,27 @@ def check_call_transport_stability_contract(errors):
             errors.append("%s: call history direction icon is missing `%s`" %
                           (history_rel, fragment))
     for fragment in [
-        "NSHeight(frame) - 63.0",
-        "NSHeight(frame) - 98.0",
-        "NSHeight(frame) - 130.0",
-        "NSHeight(frame) - 222.0",
+        "NSHeight(frame) - 83.0",
+        "NSHeight(frame) - 118.0",
+        "NSHeight(frame) - 150.0",
+        "NSHeight(frame) - 202.0",
         "historyScrollView",
+        'TGLoc(@"calls.selectContact")',
+        "[self.startCallButton setEnabled:NO]",
+        "@selector(contactSelectionChanged:)",
     ]:
         if fragment not in history_text:
             errors.append("%s: compact call-history layout is missing `%s`" %
                           (history_rel, fragment))
+    for forbidden_fragment in [
+        "mockOutgoingButton",
+        "mockIncomingButton",
+        "@selector(mockOutgoingPressed:)",
+        "@selector(mockIncomingPressed:)",
+    ]:
+        if forbidden_fragment in history_text:
+            errors.append("%s: demo call controls must not be visible in the production calls screen `%s`" %
+                          (history_rel, forbidden_fragment))
     if "[self.unavailableDetailField setLineBreakMode:" in history_text:
         errors.append("%s: legacy NSTextField line breaking must be configured through its cell" %
                       history_rel)
@@ -749,6 +831,14 @@ def check_call_transport_stability_contract(errors):
     if "path = TGMediaItemPlayableLocalPath(fallbackMedia);" not in playback_text:
         errors.append("%s: message playback must validate its fallback local path" %
                       media_windows_rel)
+    for fragment in [
+        "layoutMediaPlaybackChromeForAudioOnly:",
+        "setContentSize:NSMakeSize(480.0, 170.0)",
+        "setMinSize:NSMakeSize(440.0, 178.0)",
+    ]:
+        if fragment not in media_windows_text:
+            errors.append("%s: voice playback layout is missing `%s`" %
+                          (media_windows_rel, fragment))
 
 
 def check_media_file_management_contract(errors):

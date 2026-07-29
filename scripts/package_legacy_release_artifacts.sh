@@ -29,6 +29,7 @@ USAGE
 
 TDJSON_PATH="${TELEGRAPHICA_TDJSON_PATH:-}"
 TDJSON_MOUNTAIN_LION_PATH="${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}"
+CALL_TRANSPORT_PATH="${TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH:-}"
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --tdjson)
@@ -96,6 +97,17 @@ if [ -z "$TDJSON_MOUNTAIN_LION_PATH" ] || [ ! -f "$TDJSON_MOUNTAIN_LION_PATH" ];
     exit 1
 fi
 
+if [ -z "$CALL_TRANSPORT_PATH" ] || [ ! -f "$CALL_TRANSPORT_PATH" ]; then
+    echo "The HITL-verified OS X 10.9+ audio-call transport was not found."
+    echo "Pass it through TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH."
+    exit 1
+fi
+
+if [ "${TELEGRAPHICA_ALLOW_UNVERIFIED_CALL_TRANSPORT:-0}" = "1" ]; then
+    echo "Refusing to package a public release with an unverified audio-call transport."
+    exit 1
+fi
+
 if [ -n "${PYTHON:-}" ]; then
     PYTHON_BIN="$PYTHON"
 elif command -v python3 >/dev/null 2>&1; then
@@ -116,6 +128,7 @@ MACOSX_DEPLOYMENT_TARGET=10.8 scripts/check_tdjson_legacy.sh "$TDJSON_MOUNTAIN_L
 echo "Building Telegraphica with bundled TDLib runtimes:"
 echo "  OS X 10.9+: $TDJSON_PATH"
 echo "  OS X 10.8:  $TDJSON_MOUNTAIN_LION_PATH"
+echo "  Calls 10.9+: $CALL_TRANSPORT_PATH"
 BUILD_DIST_DIR="$(mktemp -d /tmp/telegraphica-release-build.XXXXXX)"
 cleanup_build_dist() {
     rm -rf "$BUILD_DIST_DIR"
