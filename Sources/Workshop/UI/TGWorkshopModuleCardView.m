@@ -238,10 +238,10 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     [_statusField setTextColor:([_errorMessage length] > 0
                                 ? [NSColor colorWithCalibratedRed:0.78 green:0.16 blue:0.13 alpha:1.0]
                                 : TGWorkshopMutedCreamColor())];
-    [_successImageView setImage:TGWorkshopUprightTemplateIcon(@"done-mini",
-                                                              NSMakeSize(18.0, 18.0),
-                                                              TGWorkshopGoldColor(),
-                                                              1.0)];
+    [_successImageView setImage:TGTemplateIconAssetImage(@"done-mini",
+                                                         NSMakeSize(18.0, 18.0),
+                                                         TGWorkshopGoldColor(),
+                                                         1.0)];
     [self setNeedsDisplay:YES];
     [_primaryButton setNeedsDisplay:YES];
     [_removeButton setNeedsDisplay:YES];
@@ -267,7 +267,9 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     NSString *primaryTitle = TGLoc(@"workshop.install");
     if (_showingSuccess) {
         primaryTitle = TGLoc(@"workshop.installed");
-        [_statusField setStringValue:TGLoc(@"workshop.installComplete")];
+        [_statusField setStringValue:TGLoc(_showingUpdateSuccess
+                                           ? @"workshop.updateComplete"
+                                           : @"workshop.installComplete")];
     } else if ([_errorMessage length] > 0) {
         action = TGWorkshopModuleCardActionRetry;
         primaryTitle = TGLoc(@"workshop.retry");
@@ -324,10 +326,11 @@ static NSString *TGWorkshopIconNameForModuleIdentifier(NSString *identifier) {
     [_progressIndicator setDoubleValue:_progress];
 }
 
-- (void)showInstallSuccess {
+- (void)showInstallSuccessForUpdate:(BOOL)isUpdate {
     _busy = NO;
     _progress = 1.0;
     _showingSuccess = YES;
+    _showingUpdateSuccess = isUpdate;
     [self refreshLocalization];
 }
 

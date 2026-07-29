@@ -17,11 +17,11 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.5.4</string>
+	<string>0.5.5</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>5400</string>
+	<string>5500</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.8</string>
 	<key>NSHighResolutionCapable</key>
@@ -29,9 +29,11 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright 2026 Yura Menschikov. All rights reserved.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Telegraphica uses the microphone only when you record a voice message.</string>
+	<string>Telegraphica uses the microphone only during calls and voice-message recording.</string>
 	<key>NSLocationUsageDescription</key>
 	<string>Telegraphica uses your location only when you choose to send it.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Telegraphica uses your current location only after you choose “I'm here”.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>TelegraphicaCompatibilitySummary</key>

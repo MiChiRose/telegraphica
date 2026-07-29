@@ -1717,23 +1717,68 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [self updateMediaPlaybackTimelineWithCurrentTime:value duration:duration];
 }
 
+- (void)layoutMediaPlaybackChromeForAudioOnly:(BOOL)audioOnly {
+    NSView *contentView = [self.mediaPlaybackWindow contentView];
+    if (!contentView) {
+        return;
+    }
+
+    TGUtilityPanelView *panelView = nil;
+    TGGroupedCardView *playbackCard = nil;
+    for (NSView *subview in [contentView subviews]) {
+        if (!panelView && [subview isKindOfClass:[TGUtilityPanelView class]]) {
+            panelView = (TGUtilityPanelView *)subview;
+        } else if (!playbackCard && [subview isKindOfClass:[TGGroupedCardView class]]) {
+            playbackCard = (TGGroupedCardView *)subview;
+        }
+    }
+
+    NSRect bounds = [contentView bounds];
+    CGFloat width = NSWidth(bounds);
+    CGFloat height = NSHeight(bounds);
+    [panelView setFrame:NSMakeRect(12.0,
+                                   10.0,
+                                   MAX(180.0, width - 24.0),
+                                   MAX(100.0, height - 22.0))];
+
+    if (audioOnly) {
+        [playbackCard setFrame:NSMakeRect(20.0,
+                                          20.0,
+                                          MAX(164.0, width - 40.0),
+                                          MAX(84.0, height - 40.0))];
+        CGFloat controlsX = 100.0;
+        CGFloat closeWidth = 90.0;
+        CGFloat closeX = MAX(controlsX + 150.0, width - closeWidth - 24.0);
+        CGFloat sliderWidth = MAX(140.0, closeX - controlsX - 16.0);
+        [self.mediaPlaybackTitleField setFrame:NSMakeRect(controlsX,
+                                                          MAX(112.0, height - 50.0),
+                                                          MAX(150.0, width - controlsX - 28.0),
+                                                          20.0)];
+        [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(28.0, 56.0, 52.0, 52.0)];
+        [self.mediaPlaybackProgressSlider setFrame:NSMakeRect(controlsX, 86.0, sliderWidth, 22.0)];
+        [self.mediaPlaybackTimeField setFrame:NSMakeRect(controlsX, 62.0, sliderWidth, 18.0)];
+        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(closeX, 28.0, closeWidth, 30.0)];
+    } else {
+        [playbackCard setFrame:NSMakeRect(20.0,
+                                          56.0,
+                                          MAX(164.0, width - 40.0),
+                                          MAX(120.0, height - 78.0))];
+    }
+}
+
 - (void)layoutMediaPlaybackWindowForAudioOnly:(BOOL)audioOnly title:(NSString *)title {
     [self ensureMediaPlaybackWindow];
     self.mediaPlaybackAudioOnly = audioOnly;
 
     if (audioOnly) {
-        [self.mediaPlaybackWindow setMinSize:NSMakeSize(360.0, 128.0)];
-        [self.mediaPlaybackWindow setContentSize:NSMakeSize(430.0, 128.0)];
+        [self.mediaPlaybackWindow setMinSize:NSMakeSize(440.0, 178.0)];
+        [self.mediaPlaybackWindow setContentSize:NSMakeSize(480.0, 170.0)];
         [self.mediaPlaybackContainerView setHidden:YES];
         [self.mediaPlaybackTitleField setHidden:NO];
         [self.mediaPlaybackTitleField setStringValue:([title length] > 0 ? title : @"Voice message")];
-        [self.mediaPlaybackTitleField setFrame:NSMakeRect(88.0, 91.0, 260.0, 18.0)];
-        [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(22.0, 38.0, 48.0, 48.0)];
         [self.mediaPlaybackProgressSlider setHidden:NO];
-        [self.mediaPlaybackProgressSlider setFrame:NSMakeRect(88.0, 61.0, 220.0, 22.0)];
         [self.mediaPlaybackTimeField setHidden:NO];
-        [self.mediaPlaybackTimeField setFrame:NSMakeRect(88.0, 39.0, 220.0, 18.0)];
-        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(318.0, 18.0, 88.0, 28.0)];
+        [self layoutMediaPlaybackChromeForAudioOnly:YES];
     } else {
         [self.mediaPlaybackWindow setMinSize:NSMakeSize(360.0, 260.0)];
         CGFloat contentWidth = 520.0;
@@ -1751,6 +1796,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         }
         [self.mediaPlaybackWindow setContentSize:NSMakeSize(contentWidth, contentHeight)];
         NSRect contentBounds = [[self.mediaPlaybackWindow contentView] bounds];
+        [self layoutMediaPlaybackChromeForAudioOnly:NO];
         [self.mediaPlaybackContainerView setHidden:NO];
         [self.mediaPlaybackContainerView setFrame:NSMakeRect(24.0,
                                                              64.0,
@@ -2036,12 +2082,6 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     }
 
     NSString *path = TGMediaItemPlayableLocalPath(mediaItem);
-    if ([path length] == 0) {
-        path = TGMediaItemFullLocalPath(mediaItem);
-    }
-    if ([path length] == 0) {
-        path = TGMediaItemLocalPath(mediaItem);
-    }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
         BOOL videoNote = [[mediaItem objectForKey:@"content_type"] isEqualToString:@"messageVideoNote"];
         [self openPlayableMediaAtPath:path
@@ -2105,11 +2145,18 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
     NSString *path = media ? TGMediaItemPlayableLocalPath(media) : nil;
-    if ([path length] == 0 && media) {
-        path = TGMediaItemFullLocalPath(media);
-    }
     if ([path length] == 0) {
-        path = TGMediaCenterLocalPathForItem(item);
+        NSMutableDictionary *fallbackMedia = [NSMutableDictionary dictionary];
+        if ([[item mediaLocalPath] length] > 0) {
+            [fallbackMedia setObject:[item mediaLocalPath] forKey:@"local_path"];
+        }
+        if ([[item mediaMimeType] length] > 0) {
+            [fallbackMedia setObject:[item mediaMimeType] forKey:@"mime_type"];
+        }
+        if ([[item contentType] length] > 0) {
+            [fallbackMedia setObject:[item contentType] forKey:@"content_type"];
+        }
+        path = TGMediaItemPlayableLocalPath(fallbackMedia);
     }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
         NSNumber *duration = [item mediaDuration];

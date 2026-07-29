@@ -400,6 +400,26 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue([photoA isMediaAlbumMessage], @"merged visual media should become an album");
     TGAssertTrue([[photoA visualMediaItems] count] == 2, @"album should keep both media items");
 
+    TGMessageItem *callItem = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
+                                                           messageID:[NSNumber numberWithInt:7]
+                                                                date:[NSNumber numberWithInteger:1700000000]
+                                                            outgoing:YES
+                                                             preview:@"Call"] autorelease];
+    [callItem setContentType:@"messageCall"];
+    [callItem setCallDuration:[NSNumber numberWithUnsignedInteger:66U]];
+    [callItem setCallDiscardReason:@"callDiscardReasonHungUp"];
+    TGAssertTrue([callItem isCallMessage] && TGMessageItemIsCallContent(callItem),
+                 @"call messages should retain their semantic content type");
+    TGAssertTrue(TGCallBubbleHeightForItem(callItem) >= 60.0,
+                 @"call bubbles should reserve room for direction and duration");
+    TGAssertTrue(TGCallBubbleWidthForItem(callItem, 360.0) <= 360.0,
+                 @"call bubbles should respect the available width");
+    TGMessageItem *callCopy = [[callItem copy] autorelease];
+    TGAssertEqualObjects([callCopy callDuration], [callItem callDuration],
+                         @"call duration should survive message-item copying");
+    TGAssertEqualObjects([callCopy callDiscardReason], [callItem callDiscardReason],
+                         @"call discard reason should survive message-item copying");
+
     TGMessageItem *pendingPhoto = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
                                                                 messageID:[NSNumber numberWithInt:6]
                                                                      date:nil

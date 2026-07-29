@@ -2267,22 +2267,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
 }
 
 - (BOOL)ensureMicrophoneConsent {
-    if (TGUserDefaultBoolWithDefault(TGMicrophoneConsentDefaultsKey, NO)) {
-        return YES;
-    }
-
-    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
-    [alert setMessageText:TGLoc(@"voice.permission.title")];
-    [alert setInformativeText:TGLoc(@"voice.permission.message")];
-    [alert addButtonWithTitle:@"OK"];
-    [alert addButtonWithTitle:TGLoc(@"cancel")];
-    NSInteger result = [alert runModal];
-    if (result == NSAlertFirstButtonReturn) {
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:TGMicrophoneConsentDefaultsKey];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-        return YES;
-    }
-    return NO;
+    return [TGPrivacyPermissions requestMicrophonePermission];
 }
 
 - (void)toggleVoiceRecording:(id)sender {

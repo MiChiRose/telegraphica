@@ -478,6 +478,20 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                                                             [NSColor redColor],
                                                             0.90)];
         [menu addItem:clearHistoryItem];
+
+        NSString *typeSummary = [item typeSummary];
+        if ([typeSummary isEqualToString:@"Private"]) {
+            NSMenuItem *deleteChatItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.delete")
+                                                                     action:@selector(deletePrivateChatFromMenu:)
+                                                              keyEquivalent:@""] autorelease];
+            [deleteChatItem setRepresentedObject:item];
+            [deleteChatItem setTarget:self];
+            [deleteChatItem setImage:TGTemplateIconAssetImage(@"trash",
+                                                              NSMakeSize(16.0, 16.0),
+                                                              [NSColor redColor],
+                                                              0.95)];
+            [menu addItem:deleteChatItem];
+        }
     }
 
     NSString *typeSummary = [item typeSummary];

@@ -96,6 +96,7 @@ static NSImage *TGWorkshopBackImage(void) {
         _progressByIdentifier = [[NSMutableDictionary alloc] init];
         _errorsByIdentifier = [[NSMutableDictionary alloc] init];
         _installStartDatesByIdentifier = [[NSMutableDictionary alloc] init];
+        _updateActionsByIdentifier = [[NSMutableDictionary alloc] init];
     }
     return self;
 }
@@ -507,6 +508,7 @@ static NSImage *TGWorkshopBackImage(void) {
                afterDelay:0.42];
     [_installStartDatesByIdentifier removeObjectForKey:identifier];
     [_progressByIdentifier removeObjectForKey:identifier];
+    [_updateActionsByIdentifier removeObjectForKey:identifier];
 }
 
 - (void)rebuildCardsAfterAnimation:(id)unused {
@@ -608,7 +610,9 @@ static NSImage *TGWorkshopBackImage(void) {
 - (void)completeRemovalAnimation:(NSDictionary *)context {
     TGWorkshopCatalogEntry *entry = [context objectForKey:@"entry"];
     BOOL removeData = [[context objectForKey:@"removeData"] boolValue];
-    [_coordinator removeEntry:entry removeData:removeData];
+    if ([_coordinator removeEntry:entry removeData:removeData]) {
+        [_headerNoticeView showMessage:TGLoc(@"workshop.removeComplete") duration:2.8];
+    }
 }
 
 - (void)workshopModuleCardView:(TGWorkshopModuleCardView *)cardView
@@ -622,6 +626,12 @@ static NSImage *TGWorkshopBackImage(void) {
         [_errorsByIdentifier removeObjectForKey:identifier];
         [_progressByIdentifier setObject:[NSNumber numberWithDouble:0.0] forKey:identifier];
         [_installStartDatesByIdentifier setObject:[NSDate date] forKey:identifier];
+        NSDictionary *installedRecord = [_coordinator installedRecordForModuleIdentifier:identifier];
+        BOOL retryingUpdate = (action == TGWorkshopModuleCardActionRetry &&
+                               [[[installedRecord objectForKey:@"active_version"] description] length] > 0);
+        [_updateActionsByIdentifier setObject:[NSNumber numberWithBool:(action == TGWorkshopModuleCardActionUpdate ||
+                                                                       retryingUpdate)]
+                                       forKey:identifier];
         [_coordinator installOrUpdateEntry:entry];
     } else if (action == TGWorkshopModuleCardActionOpen) {
         [_coordinator openEntry:entry];
@@ -667,7 +677,7 @@ static NSImage *TGWorkshopBackImage(void) {
 
 - (void)workshopCoordinatorDidCompleteInstallationForModuleIdentifier:(NSString *)identifier {
     TGWorkshopModuleCardView *card = [self cardViewForModuleIdentifier:identifier];
-    [card showInstallSuccess];
+    [card showInstallSuccessForUpdate:[[_updateActionsByIdentifier objectForKey:identifier] boolValue]];
     NSDate *startedAt = [_installStartDatesByIdentifier objectForKey:identifier];
     NSTimeInterval elapsed = startedAt ? -[startedAt timeIntervalSinceNow] : 0.0;
     NSTimeInterval delay = MAX(0.9, 2.0 - elapsed);
@@ -740,6 +750,7 @@ static NSImage *TGWorkshopBackImage(void) {
     [_progressByIdentifier release];
     [_errorsByIdentifier release];
     [_installStartDatesByIdentifier release];
+    [_updateActionsByIdentifier release];
     [_removalConfirmationView setDelegate:nil];
     [_removalConfirmationView release];
     [_pendingRemovalEntry release];

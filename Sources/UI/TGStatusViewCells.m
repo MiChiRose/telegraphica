@@ -451,9 +451,10 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
     BOOL nonVisualPlayable = TGMessageItemIsNonVisualPlayableMedia(item);
     BOOL pollContent = TGMessageItemIsPollContent(item);
+    BOOL callContent = TGMessageItemIsCallContent(item);
     BOOL visualMediaMessage = [item isVisualMediaMessage];
     NSString *rawMessageText = TGDisplayTextForMessageItem(item);
-    NSString *messageText = ([item isStickerMessage] || nonVisualPlayable || nonVisualDocument || pollContent) ? @"" : rawMessageText;
+    NSString *messageText = ([item isStickerMessage] || nonVisualPlayable || nonVisualDocument || pollContent || callContent) ? @"" : rawMessageText;
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageBodyFont(), NSFontAttributeName,
@@ -502,6 +503,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     if (pollContent) {
         bubbleWidth = TGPollBubbleWidthForItem(item, maximumBubbleWidth);
     }
+    if (callContent) {
+        bubbleWidth = TGCallBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -538,6 +542,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
     if (pollContent) {
         bubbleHeight = TGPollBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if (callContent) {
+        bubbleHeight = TGCallBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
         bubbleHeight += 17.0;
@@ -715,6 +722,24 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         }
         pollRect.size.height -= (commentBarHeight + reactionBandHeight);
         TGDrawPollContentForItem(item, pollRect, outgoing, flipped);
+    }
+
+    if (callContent) {
+        NSRect callRect = bubbleRect;
+        if (senderHeaderHeight > 0.0) {
+            if (flipped) {
+                callRect.origin.y += senderHeaderHeight;
+            }
+            callRect.size.height -= senderHeaderHeight;
+        }
+        if (contextHeaderHeight > 0.0) {
+            if (flipped) {
+                callRect.origin.y += contextHeaderHeight;
+            }
+            callRect.size.height -= contextHeaderHeight;
+        }
+        callRect.size.height -= (commentBarHeight + reactionBandHeight);
+        TGDrawCallContentForItem(item, callRect, outgoing, flipped);
     }
 
     if (!flipped && reactionBandHeight > 0.0) {
@@ -1002,6 +1027,15 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      TGPollBubbleHeightForItem(item));
         TGDrawPollContentForItem(item, pollRect, outgoing, flipped);
         textRect = pollRect;
+    } else if (TGMessageItemIsCallContent(item)) {
+        CGFloat contentWidth = MAX(1.0, NSMaxX(rowRect) - textX - 14.0);
+        CGFloat callHeight = TGCallBubbleHeightForItem(item);
+        NSRect callRect = NSMakeRect(textX,
+                                    flipped ? textY : (textY - callHeight),
+                                    MIN(TGCallBubbleWidthForItem(item, contentWidth), contentWidth),
+                                    callHeight);
+        TGDrawCallContentForItem(item, callRect, outgoing, flipped);
+        textRect = callRect;
     } else if (TGMessageItemIsNonVisualPlayableMedia(item)) {
         CGFloat contentWidth = MAX(1.0, NSMaxX(rowRect) - textX - 14.0);
         NSRect playableRect = NSMakeRect(textX, flipped ? textY : (textY - 50.0), MIN(260.0, contentWidth), 50.0);

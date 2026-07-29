@@ -21,3 +21,17 @@ clang \
   -o "$BUILD_DIR/TGWorkshopInstallerStateTests"
 
 TELEGRAPHICA_WORKSHOP_TEST_ROOT="$TEST_ROOT" "$BUILD_DIR/TGWorkshopInstallerStateTests"
+
+clang \
+  -fno-objc-arc \
+  -fblocks \
+  -mmacosx-version-min=10.9 \
+  -framework Cocoa \
+  -I"$ROOT" \
+  "$ROOT/Tests/Workshop/TGWorkshopBundleValidatorTests.m" \
+  "$ROOT/Sources/Workshop/Security/TGWorkshopBundleValidator.m" \
+  "$ROOT/Sources/Workshop/Catalog/TGWorkshopCatalogEntry.m" \
+  "$ROOT/Sources/Workshop/Host/TGWorkshopPaths.m" \
+  -o "$BUILD_DIR/TGWorkshopBundleValidatorTests"
+
+"$BUILD_DIR/TGWorkshopBundleValidatorTests"

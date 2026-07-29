@@ -1021,6 +1021,10 @@ BOOL TGMessageItemIsPollContent(TGMessageItem *item) {
     return ([item isKindOfClass:[TGMessageItem class]] && [item isPollMessage]);
 }
 
+BOOL TGMessageItemIsCallContent(TGMessageItem *item) {
+    return ([item isKindOfClass:[TGMessageItem class]] && [item isCallMessage]);
+}
+
 BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item) {
     if (![item isKindOfClass:[TGMessageItem class]]) {
         return NO;
@@ -1173,6 +1177,16 @@ CGFloat TGPollBubbleHeightForItem(TGMessageItem *item) {
     CGFloat confirmHeight = needsConfirm ? 30.0 : 0.0;
     CGFloat height = 18.0 + questionHeight + 8.0 + ((CGFloat)optionCount * (optionHeight + 6.0)) + confirmHeight + 20.0;
     return ceil(height);
+}
+
+CGFloat TGCallBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth) {
+    (void)item;
+    return MIN(MAX(172.0, maximumWidth), 238.0);
+}
+
+CGFloat TGCallBubbleHeightForItem(TGMessageItem *item) {
+    (void)item;
+    return 70.0;
 }
 
 NSRect TGPollContentRectForBubbleRect(NSRect bubbleRect) {
@@ -1569,6 +1583,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         if (TGMessageItemIsNonVisualPlayableMedia(item) || TGMessageItemIsNonVisualDocument(item)) {
             rowHeight = MAX(rowHeight, 82.0);
         }
+        if (TGMessageItemIsCallContent(item)) {
+            rowHeight = MAX(rowHeight, 92.0);
+        }
         if (TGMessageItemHasCommentThread(item)) {
             rowHeight += 24.0;
         }
@@ -1583,7 +1600,8 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
-    NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument || TGMessageItemIsPollContent(item)) ? @"" : TGDisplayTextForMessageItem(item);
+    BOOL callContent = TGMessageItemIsCallContent(item);
+    NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument || TGMessageItemIsPollContent(item) || callContent) ? @"" : TGDisplayTextForMessageItem(item);
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 TGChatMessageBodyFont(), NSFontAttributeName,
@@ -1623,6 +1641,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     if (TGMessageItemIsPollContent(item)) {
         height = TGPollBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
+    if (callContent) {
+        height = TGCallBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
     if ([item isVisualMediaMessage]) {
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
         height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + contextHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
@@ -1647,7 +1668,8 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     }
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
-    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument || TGMessageItemIsPollContent(item)) ? @"" : TGDisplayTextForMessageItem(item);
+    BOOL callContent = TGMessageItemIsCallContent(item);
+    NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument || TGMessageItemIsPollContent(item) || callContent) ? @"" : TGDisplayTextForMessageItem(item);
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
@@ -1702,6 +1724,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     if (TGMessageItemIsPollContent(item)) {
         bubbleWidth = TGPollBubbleWidthForItem(item, maximumBubbleWidth);
     }
+    if (callContent) {
+        bubbleWidth = TGCallBubbleWidthForItem(item, maximumBubbleWidth);
+    }
     if (visualMediaMessage) {
         CGFloat photoBubbleWidth = photoSize.width + 16.0;
         if (photoBubbleWidth > bubbleWidth) {
@@ -1733,6 +1758,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     }
     if (TGMessageItemIsPollContent(item)) {
         bubbleHeight = TGPollBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if (callContent) {
+        bubbleHeight = TGCallBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
     }
     if (visualMediaMessage) {
         bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
@@ -1807,6 +1835,54 @@ void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL o
                                   : NSMakeRect(textX, NSMinY(contentRect) + 3.0, textWidth, 16.0);
     [title drawInRect:titleRect withAttributes:titleAttributes];
     [subtitle drawInRect:subtitleRect withAttributes:subtitleAttributes];
+}
+
+void TGDrawCallContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(bubbleRect)) {
+        return;
+    }
+
+    NSString *discardReason = [item callDiscardReason];
+    BOOL missed = ([discardReason isEqualToString:@"callDiscardReasonMissed"] ||
+                   [discardReason isEqualToString:@"callDiscardReasonDeclined"]);
+    NSString *iconName = missed ? @"call-miss" : (outgoing ? @"call-out" : @"call-in");
+    NSColor *accentColor = missed
+        ? [NSColor colorWithCalibratedRed:0.84 green:0.18 blue:0.18 alpha:1.0]
+        : TGClassicNavigationSelectedColor(0.96);
+
+    NSRect contentRect = NSInsetRect(bubbleRect, 12.0, 8.0);
+    contentRect.size.height = MAX(38.0, NSHeight(contentRect) - 14.0);
+    NSRect iconRect = NSMakeRect(NSMinX(contentRect),
+                                 NSMidY(contentRect) - 15.0,
+                                 30.0,
+                                 30.0);
+    TGDrawTemplateIconAsset(iconName, iconRect, accentColor, 1.0, flipped);
+
+    NSString *title = outgoing ? TGLoc(@"calls.outgoingCall") : TGLoc(@"calls.incoming");
+    NSUInteger duration = [[item callDuration] respondsToSelector:@selector(unsignedIntegerValue)]
+        ? [[item callDuration] unsignedIntegerValue] : 0U;
+    NSString *detail = nil;
+    if (duration > 0U) {
+        detail = [NSString stringWithFormat:TGLoc(@"calls.durationFormat"),
+                  TGDurationStringFromSecondsValue([NSNumber numberWithUnsignedInteger:duration])];
+    } else {
+        detail = outgoing ? TGLoc(@"calls.cancelled") : TGLoc(@"calls.missed");
+    }
+
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     TGChatMessageBoldBodyFont(), NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     nil];
+    NSDictionary *detailAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      TGChatMessageSecondaryFont(), NSFontAttributeName,
+                                      missed ? accentColor : TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                      nil];
+    CGFloat textX = NSMaxX(iconRect) + 10.0;
+    CGFloat textWidth = MAX(40.0, NSMaxX(contentRect) - textX);
+    CGFloat titleY = flipped ? (NSMinY(contentRect) + 2.0) : (NSMaxY(contentRect) - 18.0);
+    CGFloat detailY = flipped ? (titleY + 20.0) : (titleY - 20.0);
+    [title drawInRect:NSMakeRect(textX, titleY, textWidth, 18.0) withAttributes:titleAttributes];
+    [detail drawInRect:NSMakeRect(textX, detailY, textWidth, 17.0) withAttributes:detailAttributes];
 }
 
 void TGDrawPollContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {

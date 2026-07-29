@@ -407,6 +407,10 @@ if [ ! -x "$OPUS_HELPER_PATH" ]; then
     exit 1
 fi
 
+if [ -n "${TELEGRAPHICA_LIBTGVOIP_SOURCE:-}" ]; then
+    echo "TELEGRAPHICA_LIBTGVOIP_SOURCE is ignored: the incompatible legacy call engine is disabled."
+fi
+
 COMMON_SETTINGS=(
     "ARCHS=$ARCH"
     "VALID_ARCHS=$ARCH"
@@ -428,6 +432,7 @@ COMMON_SETTINGS=(
     "CODE_SIGNING_REQUIRED=NO"
     "CODE_SIGN_IDENTITY="
     "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc $PWD/Vendor/libvpx $PWD/Vendor/libvpx/third_party/libwebm $PWD/$VPX_BUILD_DIR"
+    "GCC_PREPROCESSOR_DEFINITIONS=\$(inherited)"
     "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY $VPX_STATIC_LIBRARY -lc++ -lz"
     "SYMROOT=$BUILD_ROOT"
     "OBJROOT=$BUILD_ROOT/Intermediates"
@@ -549,6 +554,62 @@ if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
     mkdir -p "$FRAMEWORKS_DIR"
     ditto "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" "$TDJSON_MOUNTAIN_LION_DEST"
     MACOSX_DEPLOYMENT_TARGET=10.8 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_MOUNTAIN_LION_DEST"
+fi
+
+if [ -n "${TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" ]; then
+        echo "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH does not point to a file: $TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"
+        exit 1
+    fi
+    VERIFIED_CALL_TRANSPORT_SHA_FILE="ModernCallTransport/VERIFIED_TRANSPORT.sha256"
+    if [ -f "$VERIFIED_CALL_TRANSPORT_SHA_FILE" ]; then
+        EXPECTED_CALL_TRANSPORT_SHA="$(
+            awk 'NF && $1 !~ /^#/ { print $1; exit }' "$VERIFIED_CALL_TRANSPORT_SHA_FILE"
+        )"
+        ACTUAL_CALL_TRANSPORT_SHA="$(
+            shasum -a 256 "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" |
+            awk '{ print $1 }'
+        )"
+        if [ -z "$EXPECTED_CALL_TRANSPORT_SHA" ]; then
+            echo "Verified call transport manifest is empty: $VERIFIED_CALL_TRANSPORT_SHA_FILE"
+            exit 1
+        fi
+        if [ "$ACTUAL_CALL_TRANSPORT_SHA" != "$EXPECTED_CALL_TRANSPORT_SHA" ] &&
+            [ "${TELEGRAPHICA_ALLOW_UNVERIFIED_CALL_TRANSPORT:-0}" != "1" ]; then
+            echo "Refusing to replace the HITL-verified audio-call transport."
+            echo "Expected SHA-256: $EXPECTED_CALL_TRANSPORT_SHA"
+            echo "Actual SHA-256:   $ACTUAL_CALL_TRANSPORT_SHA"
+            echo "Use TELEGRAPHICA_ALLOW_UNVERIFIED_CALL_TRANSPORT=1 only for an explicit call diagnostic build."
+            exit 1
+        fi
+        if [ "$ACTUAL_CALL_TRANSPORT_SHA" = "$EXPECTED_CALL_TRANSPORT_SHA" ]; then
+            echo "Verified the HITL-approved audio-call transport: $ACTUAL_CALL_TRANSPORT_SHA"
+        else
+            echo "WARNING: bundling an explicitly allowed unverified audio-call transport."
+        fi
+    fi
+    if ! binary_contains_arch "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" "$ARCH"; then
+        echo "Modern call transport does not contain $ARCH."
+        file "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"
+        exit 1
+    fi
+    CALL_TRANSPORT_MIN=$(
+        otool -l "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" |
+        awk '/LC_VERSION_MIN_MACOSX/{found=1} found && /version /{print $2; exit}'
+    )
+    if [ "$CALL_TRANSPORT_MIN" != "10.9" ]; then
+        echo "Modern call transport minimum system is ${CALL_TRANSPORT_MIN:-unknown}, expected 10.9."
+        exit 1
+    fi
+
+    FRAMEWORKS_DIR="$APP_NAME/Contents/Frameworks"
+    CALL_TRANSPORT_DEST="$FRAMEWORKS_DIR/TelegraphicaCallTransport.dylib"
+    mkdir -p "$FRAMEWORKS_DIR"
+    ditto "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" "$CALL_TRANSPORT_DEST"
+    chmod 0755 "$CALL_TRANSPORT_DEST"
+    echo "Bundled modern Telegram audio-call transport for OS X 10.9+."
+else
+    echo "Modern Telegram audio-call transport was not supplied; the Calls screen will show an unavailable state."
 fi
 
 RESOURCES_DIR="$APP_NAME/Contents/Resources"
