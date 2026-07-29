@@ -9,7 +9,11 @@ namespace {
 
 class AudioOnlyPlatform final : public PlatformInterface {
 public:
-    std::unique_ptr<webrtc::VideoEncoderFactory> makeVideoEncoderFactory() override {
+    std::unique_ptr<webrtc::VideoEncoderFactory> makeVideoEncoderFactory(
+            bool preferHardwareEncoding,
+            bool isScreencast) override {
+        (void)preferHardwareEncoding;
+        (void)isScreencast;
         return webrtc::CreateBuiltinVideoEncoderFactory();
     }
 

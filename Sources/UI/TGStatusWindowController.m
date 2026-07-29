@@ -56,6 +56,7 @@
 #import "../Services/TGLocalDataReset.h"
 #import "../Services/TGDownloadManager.h"
 #import "../Services/TGLogger.h"
+#import "../Services/TGPrivacyPermissions.h"
 #import "../Services/TGResourcePolicy.h"
 #import "../Services/TGSystemCompatibility.h"
 #import "../Services/TGUpdateCheckScheduler.h"
@@ -94,7 +95,6 @@ static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"Teleg
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvailableUpdateVersion";
 static NSTimeInterval const TGBackgroundUpdateCheckInterval = (60.0 * 60.0);
-static NSString * const TGMicrophoneConsentDefaultsKey = @"TelegraphicaMicrophoneConsent";
 static NSString * const TGProjectURLString = @"https://github.com/MiChiRose/telegraphica";
 static NSString * const TGAuthorURLString = @"https://www.instagram.com/yuramenschikov/";
 static NSString * const TGChannelURLString = @"https://t.me/macos_telegraphica";
@@ -1887,10 +1887,12 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsLogsButton setNeedsDisplay:YES];
     [self.settingsAboutButton setNeedsDisplay:YES];
     [self.settingsDownloadFolderButton setNeedsDisplay:YES];
-    [self.settingsStorageUsageButton setImage:TGTemplateIconAssetImage(@"pressure",
-                                                                       NSMakeSize(16.0, 16.0),
-                                                                       TGClassicHeaderTextColor(0.96),
-                                                                       1.0)];
+    [self.settingsChatFoldersButton setImage:nil];
+    [self.settingsChatFoldersButton setImagePosition:NSNoImage];
+    [self.settingsSavedMessagesButton setImage:nil];
+    [self.settingsSavedMessagesButton setImagePosition:NSNoImage];
+    [self.settingsStorageUsageButton setImage:nil];
+    [self.settingsStorageUsageButton setImagePosition:NSNoImage];
     [self.settingsStorageUsageButton setNeedsDisplay:YES];
     [self.settingsCheckUpdatesButton setNeedsDisplay:YES];
     [self.settingsActiveSessionsButton setNeedsDisplay:YES];
@@ -3440,8 +3442,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsChatFoldersButton setTitle:TGLoc(@"folders.manage.open")];
     [self.settingsChatFoldersButton setTarget:self];
     [self.settingsChatFoldersButton setAction:@selector(showChatFolderManagementWindow:)];
-    [self.settingsChatFoldersButton setImage:TGTemplateIconAssetImage(@"folder", NSMakeSize(16.0, 16.0), TGClassicHeaderTextColor(0.96), 1.0)];
-    [self.settingsChatFoldersButton setImagePosition:NSImageLeft];
     [self applyUtilityButtonStyle:self.settingsChatFoldersButton];
     [self.settingsChatFoldersButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.settingsChatFoldersButton];
@@ -3450,8 +3450,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsSavedMessagesButton setTitle:TGLoc(@"saved.open")];
     [self.settingsSavedMessagesButton setTarget:self];
     [self.settingsSavedMessagesButton setAction:@selector(showSavedMessagesWindow:)];
-    [self.settingsSavedMessagesButton setImage:TGTemplateIconAssetImage(@"bookmark", NSMakeSize(16.0, 16.0), TGClassicHeaderTextColor(0.96), 1.0)];
-    [self.settingsSavedMessagesButton setImagePosition:NSImageLeft];
     [self applyUtilityButtonStyle:self.settingsSavedMessagesButton];
     [self.settingsSavedMessagesButton setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [contentView addSubview:self.settingsSavedMessagesButton];
@@ -3548,11 +3546,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsStorageUsageButton setTitle:@"Storage usage"];
     [self.settingsStorageUsageButton setTarget:self];
     [self.settingsStorageUsageButton setAction:@selector(showStorageUsageWindow:)];
-    [self.settingsStorageUsageButton setImage:TGTemplateIconAssetImage(@"pressure",
-                                                                       NSMakeSize(16.0, 16.0),
-                                                                       TGClassicHeaderTextColor(0.96),
-                                                                       1.0)];
-    [self.settingsStorageUsageButton setImagePosition:NSImageLeft];
     [self applyUtilityButtonStyle:self.settingsStorageUsageButton];
     [self.settingsStorageUsageButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsStorageUsageButton];

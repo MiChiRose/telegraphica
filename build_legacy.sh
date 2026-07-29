@@ -561,6 +561,33 @@ if [ -n "${TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH:-}" ]; then
         echo "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH does not point to a file: $TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"
         exit 1
     fi
+    VERIFIED_CALL_TRANSPORT_SHA_FILE="ModernCallTransport/VERIFIED_TRANSPORT.sha256"
+    if [ -f "$VERIFIED_CALL_TRANSPORT_SHA_FILE" ]; then
+        EXPECTED_CALL_TRANSPORT_SHA="$(
+            awk 'NF && $1 !~ /^#/ { print $1; exit }' "$VERIFIED_CALL_TRANSPORT_SHA_FILE"
+        )"
+        ACTUAL_CALL_TRANSPORT_SHA="$(
+            shasum -a 256 "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" |
+            awk '{ print $1 }'
+        )"
+        if [ -z "$EXPECTED_CALL_TRANSPORT_SHA" ]; then
+            echo "Verified call transport manifest is empty: $VERIFIED_CALL_TRANSPORT_SHA_FILE"
+            exit 1
+        fi
+        if [ "$ACTUAL_CALL_TRANSPORT_SHA" != "$EXPECTED_CALL_TRANSPORT_SHA" ] &&
+            [ "${TELEGRAPHICA_ALLOW_UNVERIFIED_CALL_TRANSPORT:-0}" != "1" ]; then
+            echo "Refusing to replace the HITL-verified audio-call transport."
+            echo "Expected SHA-256: $EXPECTED_CALL_TRANSPORT_SHA"
+            echo "Actual SHA-256:   $ACTUAL_CALL_TRANSPORT_SHA"
+            echo "Use TELEGRAPHICA_ALLOW_UNVERIFIED_CALL_TRANSPORT=1 only for an explicit call diagnostic build."
+            exit 1
+        fi
+        if [ "$ACTUAL_CALL_TRANSPORT_SHA" = "$EXPECTED_CALL_TRANSPORT_SHA" ]; then
+            echo "Verified the HITL-approved audio-call transport: $ACTUAL_CALL_TRANSPORT_SHA"
+        else
+            echo "WARNING: bundling an explicitly allowed unverified audio-call transport."
+        fi
+    fi
     if ! binary_contains_arch "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" "$ARCH"; then
         echo "Modern call transport does not contain $ARCH."
         file "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"

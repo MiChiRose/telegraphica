@@ -5,6 +5,7 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+Calls.h"
 #import "../Services/TGLogger.h"
+#import "../Services/TGPrivacyPermissions.h"
 #import "../UI/TGLocalization.h"
 #include <math.h>
 
@@ -90,6 +91,9 @@ static NSString *TGCallReadableFailure(NSString *message) {
 - (void)startAudioCallToProfile:(NSDictionary *)profile {
     if (self.callWindowController) {
         [[self.callWindowController window] makeKeyAndOrderFront:nil];
+        return;
+    }
+    if (![TGPrivacyPermissions requestMicrophonePermission]) {
         return;
     }
     NSNumber *userID = [profile objectForKey:@"user_id"];
@@ -345,6 +349,9 @@ static NSString *TGCallReadableFailure(NSString *message) {
     if (self.mockCall) {
         [controller setPresentationState:TGCallPresentationStateConnected detail:nil];
         [controller updateSignalBars:5U];
+        return;
+    }
+    if (![TGPrivacyPermissions requestMicrophonePermission]) {
         return;
     }
     NSNumber *callID = [self.activeCallID retain];

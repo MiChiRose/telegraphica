@@ -163,8 +163,6 @@
 @property (nonatomic, retain) NSPopUpButton *contactPopUpButton;
 @property (nonatomic, retain) NSButton *startCallButton;
 @property (nonatomic, retain) NSButton *refreshButton;
-@property (nonatomic, retain) NSButton *mockOutgoingButton;
-@property (nonatomic, retain) NSButton *mockIncomingButton;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSScrollView *historyScrollView;
@@ -186,8 +184,6 @@
 @synthesize contactPopUpButton = _contactPopUpButton;
 @synthesize startCallButton = _startCallButton;
 @synthesize refreshButton = _refreshButton;
-@synthesize mockOutgoingButton = _mockOutgoingButton;
-@synthesize mockIncomingButton = _mockIncomingButton;
 @synthesize statusField = _statusField;
 @synthesize tableView = _tableView;
 @synthesize historyScrollView = _historyScrollView;
@@ -263,40 +259,42 @@
             (NSViewWidthSizable | NSViewMinYMargin | NSViewMaxYMargin)];
         [self addSubview:self.unavailableDetailField];
 
-        NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 63.0, 180.0, 20.0)
+        NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 83.0, 180.0, 20.0)
                                                     text:@""
                                                     font:[NSFont boldSystemFontOfSize:12.0]];
         [newCallLabel setTag:601];
         [newCallLabel setAutoresizingMask:NSViewMinYMargin];
         [self addSubview:newCallLabel];
 
-        self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30.0, NSHeight(frame) - 98.0, MAX(220.0, NSWidth(frame) - 292.0), 28.0)
+        self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(30.0, NSHeight(frame) - 118.0, MAX(220.0, NSWidth(frame) - 292.0), 28.0)
                                                              pullsDown:NO] autorelease];
         [self.contactPopUpButton setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [self.contactPopUpButton setTarget:self];
+        [self.contactPopUpButton setAction:@selector(contactSelectionChanged:)];
         [self addSubview:self.contactPopUpButton];
 
-        self.startCallButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 248.0, NSHeight(frame) - 98.0, 128.0, 28.0)
+        self.startCallButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 248.0, NSHeight(frame) - 118.0, 128.0, 28.0)
                                                    title:@""
                                                   action:@selector(startCallPressed:)
                                                  primary:YES];
         [self.startCallButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         [self addSubview:self.startCallButton];
 
-        self.refreshButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 112.0, NSHeight(frame) - 98.0, 82.0, 28.0)
+        self.refreshButton = [self textButtonWithFrame:NSMakeRect(NSWidth(frame) - 112.0, NSHeight(frame) - 118.0, 82.0, 28.0)
                                                  title:@""
                                                 action:@selector(refreshPressed:)
                                                primary:NO];
         [self.refreshButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
         [self addSubview:self.refreshButton];
 
-        NSTextField *recentLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 130.0, 220.0, 20.0)
+        NSTextField *recentLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 150.0, 220.0, 20.0)
                                                    text:@""
                                                    font:[NSFont boldSystemFontOfSize:12.0]];
         [recentLabel setTag:602];
         [recentLabel setAutoresizingMask:NSViewMinYMargin];
         [self addSubview:recentLabel];
 
-        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30.0, 86.0, NSWidth(frame) - 60.0, NSHeight(frame) - 222.0)] autorelease];
+        NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(30.0, 46.0, NSWidth(frame) - 60.0, NSHeight(frame) - 202.0)] autorelease];
         [scrollView setBorderType:NSNoBorder];
         [scrollView setDrawsBackground:NO];
         [scrollView setHasVerticalScroller:YES];
@@ -325,27 +323,14 @@
         [scrollView setDocumentView:self.tableView];
         [self addSubview:scrollView];
 
-        self.mockOutgoingButton = [self textButtonWithFrame:NSMakeRect(30.0, 40.0, 158.0, 30.0)
-                                                       title:@""
-                                                      action:@selector(mockOutgoingPressed:)
-                                                     primary:NO];
-        [self.mockOutgoingButton setAutoresizingMask:NSViewMaxXMargin];
-        [self addSubview:self.mockOutgoingButton];
-        self.mockIncomingButton = [self textButtonWithFrame:NSMakeRect(196.0, 40.0, 158.0, 30.0)
-                                                       title:@""
-                                                      action:@selector(mockIncomingPressed:)
-                                                     primary:NO];
-        [self.mockIncomingButton setAutoresizingMask:NSViewMaxXMargin];
-        [self addSubview:self.mockIncomingButton];
-
-        self.statusField = [self labelWithFrame:NSMakeRect(370.0, 45.0, MAX(180.0, NSWidth(frame) - 400.0), 18.0)
+        self.statusField = [self labelWithFrame:NSMakeRect(30.0, 20.0, MAX(180.0, NSWidth(frame) - 82.0), 18.0)
                                            text:@""
                                            font:[NSFont systemFontOfSize:10.5]];
         [self.statusField setTextColor:TGClassicCardMutedInkColor()];
         [self.statusField setAlignment:NSRightTextAlignment];
-        [self.statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxXMargin)];
+        [self.statusField setAutoresizingMask:NSViewWidthSizable];
         [self addSubview:self.statusField];
-        self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(NSWidth(frame) - 34.0, 45.0, 16.0, 16.0)] autorelease];
+        self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(NSWidth(frame) - 42.0, 20.0, 16.0, 16.0)] autorelease];
         [self.spinner setStyle:NSProgressIndicatorSpinningStyle];
         [self.spinner setDisplayedWhenStopped:NO];
         [self.spinner setAutoresizingMask:NSViewMinXMargin];
@@ -355,6 +340,7 @@
                                                  selector:@selector(callFinished:)
                                                      name:TGCallCoordinatorDidFinishCallNotification
                                                    object:coordinator];
+        [self rebuildContactMenu];
         [self refreshLocalizedText];
         [self refreshThemeAppearance];
         [self applyTransportAvailability];
@@ -380,24 +366,29 @@
                                        MAX(150.0, NSHeight(bounds) - 68.0))];
     NSTextField *newCallLabel = (NSTextField *)[self viewWithTag:601];
     NSTextField *recentLabel = (NSTextField *)[self viewWithTag:602];
-    [newCallLabel setFrame:NSMakeRect(30.0, NSHeight(bounds) - 63.0, 180.0, 20.0)];
+    [newCallLabel setFrame:NSMakeRect(30.0, NSHeight(bounds) - 83.0, 180.0, 20.0)];
     [self.contactPopUpButton setFrame:NSMakeRect(30.0,
-                                                 NSHeight(bounds) - 98.0,
+                                                 NSHeight(bounds) - 118.0,
                                                  MAX(220.0, NSWidth(bounds) - 292.0),
                                                  28.0)];
     [self.startCallButton setFrame:NSMakeRect(NSWidth(bounds) - 248.0,
-                                              NSHeight(bounds) - 98.0,
+                                              NSHeight(bounds) - 118.0,
                                               128.0,
                                               28.0)];
     [self.refreshButton setFrame:NSMakeRect(NSWidth(bounds) - 112.0,
-                                            NSHeight(bounds) - 98.0,
+                                            NSHeight(bounds) - 118.0,
                                             82.0,
                                             28.0)];
-    [recentLabel setFrame:NSMakeRect(30.0, NSHeight(bounds) - 130.0, 220.0, 20.0)];
+    [recentLabel setFrame:NSMakeRect(30.0, NSHeight(bounds) - 150.0, 220.0, 20.0)];
     [self.historyScrollView setFrame:NSMakeRect(30.0,
-                                                86.0,
+                                                46.0,
                                                 MAX(220.0, NSWidth(bounds) - 60.0),
-                                                MAX(80.0, NSHeight(bounds) - 222.0))];
+                                                MAX(80.0, NSHeight(bounds) - 202.0))];
+    [self.statusField setFrame:NSMakeRect(30.0,
+                                          20.0,
+                                          MAX(180.0, NSWidth(bounds) - 82.0),
+                                          18.0)];
+    [self.spinner setFrame:NSMakeRect(NSWidth(bounds) - 42.0, 20.0, 16.0, 16.0)];
     [self.unavailableTitleField setFrame:NSMakeRect(80.0,
                                                      NSHeight(bounds) / 2.0 + 18.0,
                                                      MAX(220.0, NSWidth(bounds) - 160.0),
@@ -420,6 +411,28 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
 - (void)refreshPressed:(id)sender {
     (void)sender;
     [self refreshData];
+}
+
+- (void)rebuildContactMenu {
+    [self.contactPopUpButton removeAllItems];
+    [self.contactPopUpButton addItemWithTitle:TGLoc(@"calls.selectContact")];
+    [[self.contactPopUpButton lastItem] setRepresentedObject:nil];
+    for (NSDictionary *contact in self.contacts) {
+        NSString *displayName = [contact objectForKey:@"display_name"];
+        [self.contactPopUpButton addItemWithTitle:
+            [displayName length] > 0 ? displayName : TGLoc(@"calls.unknown")];
+        [[self.contactPopUpButton lastItem] setRepresentedObject:contact];
+    }
+    [self.contactPopUpButton selectItemAtIndex:0];
+    [self.startCallButton setEnabled:NO];
+}
+
+- (void)contactSelectionChanged:(id)sender {
+    (void)sender;
+    NSDictionary *profile = [[self.contactPopUpButton selectedItem] representedObject];
+    [self.startCallButton setEnabled:
+        (profile != nil && self.coordinator.transportAvailable &&
+         !self.loading && !self.deletingCall)];
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
@@ -510,7 +523,7 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     if (!self.coordinator.transportAvailable) {
         self.contacts = [NSArray array];
         self.recentCalls = [NSArray array];
-        [self.contactPopUpButton removeAllItems];
+        [self rebuildContactMenu];
         [self.tableView reloadData];
         [self applyTransportAvailability];
         return;
@@ -519,6 +532,7 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
         return;
     }
     self.loading = YES;
+    [self.startCallButton setEnabled:NO];
     [self.spinner startAnimation:nil];
     [self.refreshButton setEnabled:NO];
     [self.statusField setStringValue:TGLoc(@"calls.loading")];
@@ -534,18 +548,11 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
         dispatch_async(dispatch_get_main_queue(), ^{
             self.contacts = contacts ? contacts : [NSArray array];
             self.recentCalls = calls ? calls : [NSArray array];
-            [self.contactPopUpButton removeAllItems];
-            NSUInteger index = 0;
-            for (index = 0; index < [self.contacts count]; index++) {
-                NSDictionary *contact = [self.contacts objectAtIndex:index];
-                [self.contactPopUpButton addItemWithTitle:[contact objectForKey:@"display_name"]];
-                [[self.contactPopUpButton lastItem] setRepresentedObject:contact];
-            }
+            [self rebuildContactMenu];
             [self.tableView reloadData];
             self.loading = NO;
             [self.spinner stopAnimation:nil];
             [self.refreshButton setEnabled:YES];
-            [self.startCallButton setEnabled:([self.contacts count] > 0 && self.coordinator.transportAvailable)];
             NSString *status = failure;
             if ([status length] == 0) {
                 status = self.coordinator.transportAvailable
@@ -571,8 +578,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
                              self.refreshButton,
                              [self viewWithTag:602],
                              self.historyScrollView,
-                             self.mockOutgoingButton,
-                             self.mockIncomingButton,
                              self.statusField,
                              self.spinner,
                              nil];
@@ -598,16 +603,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     }
 }
 
-- (void)mockOutgoingPressed:(id)sender {
-    (void)sender;
-    [self.coordinator startMockOutgoingCall];
-}
-
-- (void)mockIncomingPressed:(id)sender {
-    (void)sender;
-    [self.coordinator startMockIncomingCall];
-}
-
 - (void)callFinished:(NSNotification *)notification {
     (void)notification;
     [self refreshData];
@@ -621,8 +616,10 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [recentLabel setStringValue:TGLoc(@"calls.recent")];
     [self.startCallButton setTitle:TGLoc(@"calls.start")];
     [self.refreshButton setTitle:TGLoc(@"refresh")];
-    [self.mockOutgoingButton setTitle:TGLoc(@"calls.demo.outgoing")];
-    [self.mockIncomingButton setTitle:TGLoc(@"calls.demo.incoming")];
+    if ([self.contactPopUpButton numberOfItems] > 0 &&
+        [[self.contactPopUpButton itemAtIndex:0] representedObject] == nil) {
+        [[self.contactPopUpButton itemAtIndex:0] setTitle:TGLoc(@"calls.selectContact")];
+    }
     NSMenuItem *deleteItem = [[self.tableView menu] itemWithTag:603];
     [deleteItem setTitle:TGLoc(@"delete")];
     [self applyTransportAvailability];
@@ -651,8 +648,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [_contactPopUpButton release];
     [_startCallButton release];
     [_refreshButton release];
-    [_mockOutgoingButton release];
-    [_mockIncomingButton release];
     [_statusField release];
     [_tableView release];
     [_historyScrollView release];

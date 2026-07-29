@@ -4,9 +4,12 @@
 
 #include "tgcalls/Instance.h"
 #include "tgcalls/InstanceImpl.h"
+#include "tgcalls/platform/PlatformInterface.h"
+#include "tgcalls/v2/InstanceV2Impl.h"
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -17,8 +20,173 @@
 
 namespace {
 
+struct AudioOutputState {
+    std::atomic<bool> muted;
+
+    AudioOutputState() : muted(false) {
+    }
+};
+
+/*
+ * InstanceV2Impl::setOutputVolume() is intentionally empty in the tgcalls
+ * revision used by Telegraphica.  Muting the CoreAudio device itself would
+ * also mute every other application on the Mac.  Intercept the per-call
+ * playout callback instead: WebRTC still receives the unmodified render
+ * stream for echo cancellation, while only the samples handed to CoreAudio
+ * are silenced.
+ */
+class MutingAudioTransport final : public webrtc::AudioTransport {
+public:
+    explicit MutingAudioTransport(std::shared_ptr<AudioOutputState> state)
+        : _state(std::move(state)), _delegate(nullptr) {
+    }
+
+    void setDelegate(webrtc::AudioTransport *delegate) {
+        _delegate.store(delegate, std::memory_order_release);
+    }
+
+    int32_t RecordedDataIsAvailable(const void *audioSamples,
+                                    size_t nSamples,
+                                    size_t nBytesPerSample,
+                                    size_t nChannels,
+                                    uint32_t samplesPerSec,
+                                    uint32_t totalDelayMS,
+                                    int32_t clockDrift,
+                                    uint32_t currentMicLevel,
+                                    bool keyPressed,
+                                    uint32_t &newMicLevel) override {
+        webrtc::AudioTransport *delegate = currentDelegate();
+        return delegate
+            ? delegate->RecordedDataIsAvailable(
+                audioSamples,
+                nSamples,
+                nBytesPerSample,
+                nChannels,
+                samplesPerSec,
+                totalDelayMS,
+                clockDrift,
+                currentMicLevel,
+                keyPressed,
+                newMicLevel)
+            : 0;
+    }
+
+    int32_t RecordedDataIsAvailable(const void *audioSamples,
+                                    size_t nSamples,
+                                    size_t nBytesPerSample,
+                                    size_t nChannels,
+                                    uint32_t samplesPerSec,
+                                    uint32_t totalDelayMS,
+                                    int32_t clockDrift,
+                                    uint32_t currentMicLevel,
+                                    bool keyPressed,
+                                    uint32_t &newMicLevel,
+                                    int64_t estimatedCaptureTimeNS) override {
+        webrtc::AudioTransport *delegate = currentDelegate();
+        return delegate
+            ? delegate->RecordedDataIsAvailable(
+                audioSamples,
+                nSamples,
+                nBytesPerSample,
+                nChannels,
+                samplesPerSec,
+                totalDelayMS,
+                clockDrift,
+                currentMicLevel,
+                keyPressed,
+                newMicLevel,
+                estimatedCaptureTimeNS)
+            : 0;
+    }
+
+    int32_t NeedMorePlayData(size_t nSamples,
+                             size_t nBytesPerSample,
+                             size_t nChannels,
+                             uint32_t samplesPerSec,
+                             void *audioSamples,
+                             size_t &nSamplesOut,
+                             int64_t *elapsedTimeMS,
+                             int64_t *ntpTimeMS) override {
+        webrtc::AudioTransport *delegate = currentDelegate();
+        int32_t result = 0;
+        if (delegate) {
+            result = delegate->NeedMorePlayData(
+                nSamples,
+                nBytesPerSample,
+                nChannels,
+                samplesPerSec,
+                audioSamples,
+                nSamplesOut,
+                elapsedTimeMS,
+                ntpTimeMS);
+        } else {
+            nSamplesOut = 0;
+        }
+        if (_state->muted.load(std::memory_order_acquire) && audioSamples) {
+            std::memset(audioSamples, 0, nSamples * nBytesPerSample);
+        }
+        return result;
+    }
+
+    void PullRenderData(int bitsPerSample,
+                        int sampleRate,
+                        size_t numberOfChannels,
+                        size_t numberOfFrames,
+                        void *audioData,
+                        int64_t *elapsedTimeMS,
+                        int64_t *ntpTimeMS) override {
+        webrtc::AudioTransport *delegate = currentDelegate();
+        if (delegate) {
+            delegate->PullRenderData(
+                bitsPerSample,
+                sampleRate,
+                numberOfChannels,
+                numberOfFrames,
+                audioData,
+                elapsedTimeMS,
+                ntpTimeMS);
+        }
+        if (_state->muted.load(std::memory_order_acquire) && audioData) {
+            const size_t bytesPerSample = static_cast<size_t>(bitsPerSample / 8);
+            std::memset(
+                audioData,
+                0,
+                numberOfFrames * numberOfChannels * bytesPerSample);
+        }
+    }
+
+private:
+    webrtc::AudioTransport *currentDelegate() const {
+        return _delegate.load(std::memory_order_acquire);
+    }
+
+    std::shared_ptr<AudioOutputState> _state;
+    std::atomic<webrtc::AudioTransport *> _delegate;
+};
+
+class MutingAudioDeviceModule
+    : public tgcalls::DefaultWrappedAudioDeviceModule {
+public:
+    MutingAudioDeviceModule(
+            rtc::scoped_refptr<webrtc::AudioDeviceModule> implementation,
+            std::shared_ptr<AudioOutputState> state)
+        : tgcalls::DefaultWrappedAudioDeviceModule(implementation),
+          _transport(std::move(state)) {
+    }
+
+    int32_t RegisterAudioCallback(webrtc::AudioTransport *callback) override {
+        _transport.setDelegate(callback);
+        return WrappedInstance()->RegisterAudioCallback(
+            callback ? &_transport : nullptr);
+    }
+
+private:
+    MutingAudioTransport _transport;
+};
+
 struct TransportContext {
     std::unique_ptr<tgcalls::Instance> instance;
+    std::shared_ptr<AudioOutputState> audioOutputState;
     TGModernCallCallbacks callbacks;
     void *callbackContext = nullptr;
 };
@@ -36,6 +204,18 @@ NSString *StringValue(id value) {
     return [value isKindOfClass:[NSString class]] ? value : @"";
 }
 
+BOOL CustomParametersUseMtProto(NSString *parameters) {
+    if (![parameters length]) {
+        return NO;
+    }
+    NSData *data = [parameters dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *object = data
+        ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil]
+        : nil;
+    return [object isKindOfClass:[NSDictionary class]] &&
+        [[object objectForKey:@"network_use_mtproto"] boolValue];
+}
+
 NSData *Base64Data(id value) {
     NSString *string = StringValue(value);
     if (![string length]) {
@@ -51,6 +231,21 @@ std::string UTF8String(id value) {
     NSString *string = StringValue(value);
     const char *utf8 = [string UTF8String];
     return utf8 ? std::string(utf8) : std::string();
+}
+
+std::string HexString(NSData *data) {
+    if (![data length]) {
+        return std::string();
+    }
+    static const char digits[] = "0123456789abcdef";
+    const uint8_t *bytes = static_cast<const uint8_t *>([data bytes]);
+    std::string result;
+    result.reserve([data length] * 2);
+    for (NSUInteger index = 0; index < [data length]; index++) {
+        result.push_back(digits[(bytes[index] >> 4) & 0x0f]);
+        result.push_back(digits[bytes[index] & 0x0f]);
+    }
+    return result;
 }
 
 void AppendHostRtcServer(std::vector<tgcalls::RtcServer> &servers,
@@ -87,7 +282,11 @@ int StateValue(tgcalls::State state) {
 }
 
 bool VersionIsSupported(NSString *version) {
-    return [version isEqualToString:@"3.0.0"] || [version isEqualToString:@"2.7.7"];
+    return [version isEqualToString:@"9.0.0"] ||
+        [version isEqualToString:@"8.0.0"] ||
+        [version isEqualToString:@"7.0.0"] ||
+        [version isEqualToString:@"3.0.0"] ||
+        [version isEqualToString:@"2.7.7"];
 }
 
 NSString *SelectedVersion(NSDictionary *protocol) {
@@ -102,7 +301,9 @@ NSString *SelectedVersion(NSDictionary *protocol) {
     return nil;
 }
 
-const bool Registered = tgcalls::Register<tgcalls::InstanceImpl>();
+const bool RegisteredLegacy = tgcalls::Register<tgcalls::InstanceImpl>();
+const bool RegisteredV2 = tgcalls::Register<tgcalls::InstanceV2Impl>();
+const bool Registered = RegisteredLegacy && RegisteredV2;
 
 } // namespace
 
@@ -111,7 +312,7 @@ extern "C" int TGModernCallTransportABIVersion(void) {
 }
 
 extern "C" const char *TGModernCallTransportVersions(void) {
-    return "3.0.0,2.7.7";
+    return "9.0.0,8.0.0,7.0.0,3.0.0,2.7.7";
 }
 
 extern "C" int TGModernCallTransportMaxLayer(void) {
@@ -166,6 +367,7 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
                 key,
                 [[call objectForKey:@"is_outgoing"] boolValue])
         };
+        descriptor.version = UTF8String(version);
         descriptor.config.initializationTimeout = 30.0;
         descriptor.config.receiveTimeout = 20.0;
         descriptor.config.dataSaving = tgcalls::DataSaving::Never;
@@ -181,14 +383,60 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
         descriptor.config.enableAGC = true;
         descriptor.config.enableVolumeControl = true;
         descriptor.config.maxApiLayer = [[protocol objectForKey:@"max_layer"] intValue];
+        NSString *customParameters = StringValue([state objectForKey:@"custom_parameters"]);
+        /*
+         * Only use transport experiments that Telegram explicitly supplied for
+         * this call.  In particular, forcing network_use_mtproto when the field
+         * is absent makes our side treat writable ICE as an established media
+         * connection while an ordinary Telegram peer is waiting for DTLS-SRTP.
+         */
+        descriptor.config.customParameters = UTF8String(customParameters);
         descriptor.config.protocolVersion = [version isEqualToString:@"3.0.0"]
             ? tgcalls::ProtocolVersion::V1 : tgcalls::ProtocolVersion::V0;
+        descriptor.config.logPath.data = "/tmp/TelegraphicaCallTransport.log";
+        descriptor.config.statsLogPath.data = "/tmp/TelegraphicaCallTransportStats.json";
+        [[NSFileManager defaultManager] removeItemAtPath:@"/tmp/TelegraphicaCallTransport.log"
+                                                   error:nil];
+        [[NSFileManager defaultManager] removeItemAtPath:@"/tmp/TelegraphicaCallTransportStats.json"
+                                                   error:nil];
         descriptor.initialNetworkType = tgcalls::NetworkType::WiFi;
         descriptor.mediaDevicesConfig.inputVolume = 1.0f;
         descriptor.mediaDevicesConfig.outputVolume = 1.0f;
+        std::shared_ptr<AudioOutputState> audioOutputState(new AudioOutputState());
+        descriptor.createAudioDeviceModule =
+            [audioOutputState](webrtc::TaskQueueFactory *taskQueueFactory) {
+                rtc::scoped_refptr<webrtc::AudioDeviceModule> implementation =
+                    webrtc::AudioDeviceModule::Create(
+                        webrtc::AudioDeviceModule::kPlatformDefaultAudio,
+                        taskQueueFactory);
+                if (!implementation) {
+                    return rtc::scoped_refptr<webrtc::AudioDeviceModule>();
+                }
+                return rtc::scoped_refptr<webrtc::AudioDeviceModule>(
+                    rtc::make_ref_counted<MutingAudioDeviceModule>(
+                        implementation,
+                        audioOutputState));
+            };
 
+        NSUInteger udpReflectorCount = 0;
+        NSUInteger tcpReflectorCount = 0;
+        NSUInteger stunServerCount = 0;
+        NSUInteger turnServerCount = 0;
         NSArray *servers = [[state objectForKey:@"servers"] isKindOfClass:[NSArray class]]
             ? [state objectForKey:@"servers"] : nil;
+        std::vector<int64_t> reflectorIdentifiers;
+        for (id value in servers) {
+            NSDictionary *server = [value isKindOfClass:[NSDictionary class]] ? value : nil;
+            NSDictionary *type = [[server objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+                ? [server objectForKey:@"type"] : nil;
+            if ([[type objectForKey:@"@type"] isEqualToString:@"callServerTypeTelegramReflector"]) {
+                reflectorIdentifiers.push_back([[server objectForKey:@"id"] longLongValue]);
+            }
+        }
+        std::sort(reflectorIdentifiers.begin(), reflectorIdentifiers.end());
+        reflectorIdentifiers.erase(
+            std::unique(reflectorIdentifiers.begin(), reflectorIdentifiers.end()),
+            reflectorIdentifiers.end());
         for (id value in servers) {
             NSDictionary *server = [value isKindOfClass:[NSDictionary class]] ? value : nil;
             NSDictionary *type = [[server objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
@@ -208,8 +456,57 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
                 endpoint.type = [[type objectForKey:@"is_tcp"] boolValue]
                     ? tgcalls::EndpointType::TcpRelay
                     : tgcalls::EndpointType::UdpRelay;
+                if ([[type objectForKey:@"is_tcp"] boolValue]) {
+                    tcpReflectorCount++;
+                } else {
+                    udpReflectorCount++;
+                }
                 std::memcpy(endpoint.peerTag, [peerTag bytes], 16);
                 descriptor.endpoints.push_back(std::move(endpoint));
+
+                /*
+                 * Protocols 7–9 advertise synthetic reflector candidates.
+                 * They must be handled by ReflectorPort so STUN and media are
+                 * wrapped in Telegram's reflector framing; ordinary UDP sent
+                 * directly to the published 91.108.x.x relay never receives a
+                 * response.
+                 */
+                std::vector<int64_t>::const_iterator reflectorIterator =
+                    std::lower_bound(reflectorIdentifiers.begin(),
+                                     reflectorIdentifiers.end(),
+                                     [[server objectForKey:@"id"] longLongValue]);
+                uint8_t reflectorID = reflectorIterator != reflectorIdentifiers.end()
+                    ? static_cast<uint8_t>(
+                        std::distance(reflectorIdentifiers.cbegin(), reflectorIterator) + 1)
+                    : 0;
+                if (reflectorID > 0) {
+                    NSString *ipv4 = StringValue([server objectForKey:@"ip_address"]);
+                    NSString *ipv6 = StringValue([server objectForKey:@"ipv6_address"]);
+                    const bool isTCP = [[type objectForKey:@"is_tcp"] boolValue];
+                    const std::string peerTagHex = HexString(peerTag);
+                    if ([ipv4 length]) {
+                        tgcalls::RtcServer rtcServer;
+                        rtcServer.id = reflectorID;
+                        rtcServer.host = UTF8String(ipv4);
+                        rtcServer.port = port;
+                        rtcServer.login = "reflector";
+                        rtcServer.password = peerTagHex;
+                        rtcServer.isTurn = true;
+                        rtcServer.isTcp = isTCP;
+                        descriptor.rtcServers.push_back(std::move(rtcServer));
+                    }
+                    if ([ipv6 length]) {
+                        tgcalls::RtcServer rtcServer;
+                        rtcServer.id = reflectorID;
+                        rtcServer.host = UTF8String(ipv6);
+                        rtcServer.port = port;
+                        rtcServer.login = "reflector";
+                        rtcServer.password = peerTagHex;
+                        rtcServer.isTurn = true;
+                        rtcServer.isTcp = isTCP;
+                        descriptor.rtcServers.push_back(std::move(rtcServer));
+                    }
+                }
             } else if ([typeName isEqualToString:@"callServerTypeWebRTC"]) {
                 NSString *ipv4 = StringValue([server objectForKey:@"ip_address"]);
                 NSString *ipv6 = StringValue([server objectForKey:@"ipv6_address"]);
@@ -218,11 +515,15 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
                 if ([[type objectForKey:@"supports_stun"] boolValue]) {
                     AppendHostRtcServer(descriptor.rtcServers, ipv4, port, @"", @"", false);
                     AppendHostRtcServer(descriptor.rtcServers, ipv6, port, @"", @"", false);
+                    stunServerCount += ([ipv4 length] > 0 ? 1U : 0U);
+                    stunServerCount += ([ipv6 length] > 0 ? 1U : 0U);
                 }
                 if ([[type objectForKey:@"supports_turn"] boolValue] &&
                     [username length] > 0 && [password length] > 0) {
                     AppendHostRtcServer(descriptor.rtcServers, ipv4, port, username, password, true);
                     AppendHostRtcServer(descriptor.rtcServers, ipv6, port, username, password, true);
+                    turnServerCount += ([ipv4 length] > 0 ? 1U : 0U);
+                    turnServerCount += ([ipv6 length] > 0 ? 1U : 0U);
                 }
             }
         }
@@ -230,8 +531,24 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
             CopyError(@"Telegram returned no compatible call servers.", errorBuffer, errorBufferLength);
             return nullptr;
         }
+        if (callbacks.logMessage) {
+            NSString *summary = [NSString stringWithFormat:
+                @"Transport configuration: protocol=%@ p2p=%@ UDP reflectors=%lu "
+                 "TCP reflectors=%lu STUN=%lu TURN=%lu custom-parameters=%@ "
+                 "media-transport=%@.",
+                version,
+                descriptor.config.enableP2P ? @"yes" : @"no",
+                (unsigned long)udpReflectorCount,
+                (unsigned long)tcpReflectorCount,
+                (unsigned long)stunServerCount,
+                (unsigned long)turnServerCount,
+                [customParameters length] > 0 ? @"present" : @"absent",
+                CustomParametersUseMtProto(customParameters) ? @"mtproto" : @"dtls-srtp"];
+            callbacks.logMessage(context, [summary UTF8String]);
+        }
 
         std::unique_ptr<TransportContext> owner(new TransportContext());
+        owner->audioOutputState = audioOutputState;
         owner->callbacks = callbacks;
         owner->callbackContext = context;
         TransportContext *rawOwner = owner.get();
@@ -295,8 +612,8 @@ extern "C" void TGModernCallTransportSetMicrophoneMuted(void *transport, int mut
 
 extern "C" void TGModernCallTransportSetSpeakerMuted(void *transport, int muted) {
     TransportContext *owner = static_cast<TransportContext *>(transport);
-    if (owner && owner->instance) {
-        owner->instance->setOutputVolume(muted ? 0.0f : 1.0f);
+    if (owner && owner->audioOutputState) {
+        owner->audioOutputState->muted.store(muted != 0, std::memory_order_release);
     }
 }
 

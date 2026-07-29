@@ -1432,6 +1432,7 @@
         return;
     }
     if ([notification object] == self.mediaPlaybackWindow) {
+        [self layoutMediaPlaybackChromeForAudioOnly:self.mediaPlaybackAudioOnly];
         [self layoutMediaPlaybackLayer];
         return;
     }
