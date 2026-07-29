@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.8 through macOS 10.13 on Intel Macs.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.5.4-blue" alt="version v0.5.4" />
+    <img src="https://img.shields.io/badge/version-v0.5.5-blue" alt="version v0.5.5" />
     <img src="https://img.shields.io/badge/macOS-10.8--10.13-black" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -105,7 +105,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Open Beta: `v0.5.4`
+## Current Open Beta: `v0.5.5`
 
 This open beta is ready for broader legacy-Mac testing. Telegraphica is still
 young software, but the everyday loop is now useful enough for real feedback:
