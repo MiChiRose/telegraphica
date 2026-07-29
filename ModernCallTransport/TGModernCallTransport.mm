@@ -170,7 +170,12 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
         descriptor.config.receiveTimeout = 20.0;
         descriptor.config.dataSaving = tgcalls::DataSaving::Never;
         descriptor.config.enableP2P = [[state objectForKey:@"allow_p2p"] boolValue];
-        descriptor.config.allowTCP = false;
+        /*
+         * Telegram supplies both UDP and TCP reflector endpoints.  Some home,
+         * office, carrier, and VPN paths block or degrade UDP; disabling TCP
+         * left those calls permanently reconnecting after signaling succeeded.
+         */
+        descriptor.config.allowTCP = true;
         descriptor.config.enableAEC = true;
         descriptor.config.enableNS = true;
         descriptor.config.enableAGC = true;

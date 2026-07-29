@@ -2036,12 +2036,6 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     }
 
     NSString *path = TGMediaItemPlayableLocalPath(mediaItem);
-    if ([path length] == 0) {
-        path = TGMediaItemFullLocalPath(mediaItem);
-    }
-    if ([path length] == 0) {
-        path = TGMediaItemLocalPath(mediaItem);
-    }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
         BOOL videoNote = [[mediaItem objectForKey:@"content_type"] isEqualToString:@"messageVideoNote"];
         [self openPlayableMediaAtPath:path
@@ -2105,11 +2099,18 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
 
     NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
     NSString *path = media ? TGMediaItemPlayableLocalPath(media) : nil;
-    if ([path length] == 0 && media) {
-        path = TGMediaItemFullLocalPath(media);
-    }
     if ([path length] == 0) {
-        path = TGMediaCenterLocalPathForItem(item);
+        NSMutableDictionary *fallbackMedia = [NSMutableDictionary dictionary];
+        if ([[item mediaLocalPath] length] > 0) {
+            [fallbackMedia setObject:[item mediaLocalPath] forKey:@"local_path"];
+        }
+        if ([[item mediaMimeType] length] > 0) {
+            [fallbackMedia setObject:[item mediaMimeType] forKey:@"mime_type"];
+        }
+        if ([[item contentType] length] > 0) {
+            [fallbackMedia setObject:[item contentType] forKey:@"content_type"];
+        }
+        path = TGMediaItemPlayableLocalPath(fallbackMedia);
     }
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
         NSNumber *duration = [item mediaDuration];
