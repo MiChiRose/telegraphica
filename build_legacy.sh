@@ -407,23 +407,8 @@ if [ ! -x "$OPUS_HELPER_PATH" ]; then
     exit 1
 fi
 
-TGVOIP_HEADER_SEARCH_PATH=""
-TGVOIP_LINK_FLAGS=""
-TGVOIP_PREPROCESSOR_DEFINITION="TELEGRAPHICA_HAS_TGVOIP=0"
 if [ -n "${TELEGRAPHICA_LIBTGVOIP_SOURCE:-}" ]; then
-    TGVOIP_BUILD_DIR="$BUILD_ROOT/Vendor/libtgvoip"
-    scripts/build_libtgvoip_legacy.sh "$TELEGRAPHICA_LIBTGVOIP_SOURCE" "$ARCH" "$TGVOIP_BUILD_DIR" "$SDK_NAME"
-    TGVOIP_OUTPUT_DIR="$PWD/$TGVOIP_BUILD_DIR/output"
-    TGVOIP_STATIC_LIBRARY="$TGVOIP_OUTPUT_DIR/libtgvoip.a"
-    OPUS_STATIC_LIBRARY="$PWD/$OPUS_BUILD_DIR/prefix/lib/libopus.a"
-    if [ ! -f "$TGVOIP_STATIC_LIBRARY" ] || [ ! -f "$OPUS_STATIC_LIBRARY" ]; then
-        echo "The optional audio-call transport was not produced."
-        exit 1
-    fi
-    TGVOIP_HEADER_SEARCH_PATH="$TGVOIP_OUTPUT_DIR"
-    TGVOIP_LINK_FLAGS="$TGVOIP_STATIC_LIBRARY $OPUS_STATIC_LIBRARY -framework AudioToolbox -framework AudioUnit -framework CoreAudio"
-    TGVOIP_PREPROCESSOR_DEFINITION="TELEGRAPHICA_HAS_TGVOIP=1 TGVOIP_USE_CUSTOM_CRYPTO"
-    echo "Audio-call transport enabled with libtgvoip 2.4.4."
+    echo "TELEGRAPHICA_LIBTGVOIP_SOURCE is ignored: the incompatible legacy call engine is disabled."
 fi
 
 COMMON_SETTINGS=(
@@ -446,9 +431,9 @@ COMMON_SETTINGS=(
     "CODE_SIGNING_ALLOWED=NO"
     "CODE_SIGNING_REQUIRED=NO"
     "CODE_SIGN_IDENTITY="
-    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc $PWD/Vendor/libvpx $PWD/Vendor/libvpx/third_party/libwebm $PWD/$VPX_BUILD_DIR $TGVOIP_HEADER_SEARCH_PATH"
-    "GCC_PREPROCESSOR_DEFINITIONS=\$(inherited) $TGVOIP_PREPROCESSOR_DEFINITION"
-    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY $VPX_STATIC_LIBRARY $TGVOIP_LINK_FLAGS -lc++ -lz"
+    "HEADER_SEARCH_PATHS=$PWD/Vendor/libwebp/src $PWD/Vendor/rlottie/inc $PWD/Vendor/libvpx $PWD/Vendor/libvpx/third_party/libwebm $PWD/$VPX_BUILD_DIR"
+    "GCC_PREPROCESSOR_DEFINITIONS=\$(inherited)"
+    "OTHER_LDFLAGS=\$(inherited) $WEBP_STATIC_LIBRARY $RLOTTIE_STATIC_LIBRARY $VPX_STATIC_LIBRARY -lc++ -lz"
     "SYMROOT=$BUILD_ROOT"
     "OBJROOT=$BUILD_ROOT/Intermediates"
     "DSTROOT=$BUILD_ROOT/Install"
@@ -569,6 +554,35 @@ if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
     mkdir -p "$FRAMEWORKS_DIR"
     ditto "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" "$TDJSON_MOUNTAIN_LION_DEST"
     MACOSX_DEPLOYMENT_TARGET=10.8 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_MOUNTAIN_LION_DEST"
+fi
+
+if [ -n "${TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" ]; then
+        echo "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH does not point to a file: $TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"
+        exit 1
+    fi
+    if ! binary_contains_arch "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" "$ARCH"; then
+        echo "Modern call transport does not contain $ARCH."
+        file "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"
+        exit 1
+    fi
+    CALL_TRANSPORT_MIN=$(
+        otool -l "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" |
+        awk '/LC_VERSION_MIN_MACOSX/{found=1} found && /version /{print $2; exit}'
+    )
+    if [ "$CALL_TRANSPORT_MIN" != "10.9" ]; then
+        echo "Modern call transport minimum system is ${CALL_TRANSPORT_MIN:-unknown}, expected 10.9."
+        exit 1
+    fi
+
+    FRAMEWORKS_DIR="$APP_NAME/Contents/Frameworks"
+    CALL_TRANSPORT_DEST="$FRAMEWORKS_DIR/TelegraphicaCallTransport.dylib"
+    mkdir -p "$FRAMEWORKS_DIR"
+    ditto "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" "$CALL_TRANSPORT_DEST"
+    chmod 0755 "$CALL_TRANSPORT_DEST"
+    echo "Bundled modern Telegram audio-call transport for OS X 10.9+."
+else
+    echo "Modern Telegram audio-call transport was not supplied; the Calls screen will show an unavailable state."
 fi
 
 RESOURCES_DIR="$APP_NAME/Contents/Resources"

@@ -48,6 +48,7 @@ static NSUInteger const TGTDLibMainChatLoadBatchSize = 40;
 static NSUInteger const TGTDLibMainChatLoadAttemptLimit = 8;
 NSString * const TGTDLibChatFiltersDidChangeNotification = @"TGTDLibChatFiltersDidChangeNotification";
 NSString * const TGTDLibCallDidUpdateNotification = @"TGTDLibCallDidUpdateNotification";
+NSString * const TGTDLibCallSignalingDataDidUpdateNotification = @"TGTDLibCallSignalingDataDidUpdateNotification";
 
 static BOOL TGTDLibObjectIsBoolean(id object) {
     return object && CFGetTypeID((CFTypeRef)object) == CFBooleanGetTypeID();
@@ -1336,6 +1337,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                    withObject:call
                                 waitUntilDone:NO];
         }
+    } else if ([objectType isEqualToString:@"updateNewCallSignalingData"]) {
+        id callID = [dictionary objectForKey:@"call_id"];
+        NSData *data = TGDataFromBase64String([dictionary objectForKey:@"data"]);
+        if ([callID respondsToSelector:@selector(integerValue)] && [data length] > 0) {
+            NSDictionary *signaling = [NSDictionary dictionaryWithObjectsAndKeys:
+                                       [NSNumber numberWithInteger:[callID integerValue]], @"call_id",
+                                       data, @"data",
+                                       nil];
+            [self performSelectorOnMainThread:@selector(postCallSignalingNotificationOnMainThread:)
+                                   withObject:signaling
+                                waitUntilDone:NO];
+        }
     }
 }
 
@@ -1347,6 +1360,16 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [[NSNotificationCenter defaultCenter] postNotificationName:TGTDLibCallDidUpdateNotification
                                                         object:self
                                                       userInfo:userInfo];
+}
+
+- (void)postCallSignalingNotificationOnMainThread:(NSDictionary *)signaling {
+    if (![signaling isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:TGTDLibCallSignalingDataDidUpdateNotification
+                      object:self
+                    userInfo:signaling];
 }
 
 - (NSArray *)savedMessagesTopicObjectsSnapshot {

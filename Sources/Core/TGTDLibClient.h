@@ -4,6 +4,7 @@
 
 extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 extern NSString * const TGTDLibCallDidUpdateNotification;
+extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 
 @interface TGTDLibClient : NSObject
 

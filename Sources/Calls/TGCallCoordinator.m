@@ -29,6 +29,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL finishing;
 @property (nonatomic, copy) NSString *activeCallStateType;
+@property (nonatomic, retain) NSMutableArray *pendingSignalingData;
 @end
 
 @implementation TGCallCoordinator
@@ -42,6 +43,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
 @synthesize outgoing = _outgoing;
 @synthesize finishing = _finishing;
 @synthesize activeCallStateType = _activeCallStateType;
+@synthesize pendingSignalingData = _pendingSignalingData;
 
 - (id)initWithClient:(TGTDLibClient *)client {
     self = [super init];
@@ -51,6 +53,11 @@ static NSString *TGCallReadableFailure(NSString *message) {
                                                  selector:@selector(callDidUpdate:)
                                                      name:TGTDLibCallDidUpdateNotification
                                                    object:client];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(callSignalingDataDidUpdate:)
+                                                     name:TGTDLibCallSignalingDataDidUpdateNotification
+                                                   object:client];
+        self.pendingSignalingData = [NSMutableArray array];
     }
     return self;
 }
@@ -156,6 +163,26 @@ static NSString *TGCallReadableFailure(NSString *message) {
     [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Audio call: TDLib state %@ (%@).",
                                   stateType ? stateType : @"unknown",
                                   outgoing ? @"outgoing" : @"incoming"]];
+    if (!self.transportAvailable && !outgoing &&
+        ([stateType isEqualToString:@"callStatePending"] ||
+         [stateType isEqualToString:@"callStateExchangingKeys"])) {
+        [[TGLogger sharedLogger] log:@"Audio call: incoming call declined because the modern transport is unavailable."];
+        TGTDLibClient *client = [self.client retain];
+        NSNumber *declinedCallID = [callID retain];
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+            [client discardAudioCallWithID:declinedCallID
+                              disconnected:NO
+                                  duration:0
+                              connectionID:nil
+                                   timeout:8.0
+                                     error:NULL];
+            [declinedCallID release];
+            [client release];
+            [pool drain];
+        });
+        return;
+    }
     if (!self.callWindowController && !outgoing &&
         ([stateType isEqualToString:@"callStatePending"] ||
          [stateType isEqualToString:@"callStateExchangingKeys"])) {
@@ -219,6 +246,10 @@ static NSString *TGCallReadableFailure(NSString *message) {
                 [self finishRealCallDisconnected:YES];
             } else {
                 [[TGLogger sharedLogger] log:@"Audio call: transport started; waiting for media connection."];
+                for (NSData *signalingData in self.pendingSignalingData) {
+                    [self.audioEngine receiveSignalingData:signalingData];
+                }
+                [self.pendingSignalingData removeAllObjects];
             }
         }
     } else if ([stateType isEqualToString:@"callStateDiscarded"]) {
@@ -230,6 +261,23 @@ static NSString *TGCallReadableFailure(NSString *message) {
                                                   detail:TGCallReadableFailure(message)];
         [self finishCallAfterDelay:4.0];
     }
+}
+
+- (void)callSignalingDataDidUpdate:(NSNotification *)notification {
+    NSNumber *callID = [[notification userInfo] objectForKey:@"call_id"];
+    NSData *data = [[notification userInfo] objectForKey:@"data"];
+    if (![callID respondsToSelector:@selector(integerValue)] || ![data isKindOfClass:[NSData class]] ||
+        ![data length] || (self.activeCallID && ![self.activeCallID isEqualToNumber:callID])) {
+        return;
+    }
+    if (self.audioEngine && [self.audioEngine isRunning]) {
+        [self.audioEngine receiveSignalingData:data];
+    } else {
+        [self.pendingSignalingData addObject:data];
+    }
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+        @"Audio call: received %lu bytes of TDLib signaling data.",
+        (unsigned long)[data length]]];
 }
 
 - (void)callNegotiationDidTimeout {
@@ -261,6 +309,36 @@ static NSString *TGCallReadableFailure(NSString *message) {
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeSignalBars:(NSUInteger)signalBars {
     (void)engine;
     [self.callWindowController updateSignalBars:signalBars];
+}
+
+- (void)callAudioEngine:(TGCallAudioEngine *)engine didEmitSignalingData:(NSData *)data {
+    (void)engine;
+    if (![data length] || !self.activeCallID || self.finishing) {
+        return;
+    }
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *callID = [self.activeCallID retain];
+    NSData *retainedData = [data retain];
+    [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+        @"Audio call: sending %lu bytes of transport signaling through TDLib.",
+        (unsigned long)[data length]]];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        [client sendAudioCallSignalingData:retainedData
+                                   callID:callID
+                                  timeout:8.0
+                                    error:&error];
+        if (error) {
+            [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+                @"Audio call: TDLib signaling send failed: %@",
+                [error localizedDescription]]];
+        }
+        [retainedData release];
+        [callID release];
+        [client release];
+        [pool drain];
+    });
 }
 
 - (void)callWindowControllerDidRequestAnswer:(TGCallWindowController *)controller {
@@ -356,6 +434,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
     self.activeCallID = nil;
     self.activeProfile = nil;
     self.activeCallStateType = nil;
+    [self.pendingSignalingData removeAllObjects];
     self.mockCall = NO;
     self.finishing = NO;
     [[NSNotificationCenter defaultCenter] postNotificationName:TGCallCoordinatorDidFinishCallNotification
@@ -372,6 +451,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
     [_activeCallID release];
     [_activeProfile release];
     [_activeCallStateType release];
+    [_pendingSignalingData release];
     [super dealloc];
 }
 

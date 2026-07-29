@@ -1,6 +1,7 @@
 #import "TGCallsPlaceholderView.h"
 
 #import "../Calls/TGCallCoordinator.h"
+#import "../Calls/TGCallAudioEngine.h"
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+Calls.h"
 #import "TGIconAssets.h"
@@ -149,6 +150,8 @@
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSScrollView *historyScrollView;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
+@property (nonatomic, retain) NSTextField *unavailableTitleField;
+@property (nonatomic, retain) NSTextField *unavailableDetailField;
 @end
 
 @implementation TGCallsPlaceholderView
@@ -169,6 +172,8 @@
 @synthesize tableView = _tableView;
 @synthesize historyScrollView = _historyScrollView;
 @synthesize spinner = _spinner;
+@synthesize unavailableTitleField = _unavailableTitleField;
+@synthesize unavailableDetailField = _unavailableDetailField;
 
 - (NSTextField *)labelWithFrame:(NSRect)frame text:(NSString *)text font:(NSFont *)font {
     NSTextField *field = [[[NSTextField alloc] initWithFrame:frame] autorelease];
@@ -213,6 +218,30 @@
         self.cardView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(14.0, 14.0, NSWidth(frame) - 28.0, NSHeight(frame) - 68.0)] autorelease];
         [self.cardView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
         [self addSubview:self.cardView];
+
+        self.unavailableTitleField = [self labelWithFrame:NSMakeRect(80.0,
+                                                                     NSHeight(frame) / 2.0 + 18.0,
+                                                                     MAX(220.0, NSWidth(frame) - 160.0),
+                                                                     28.0)
+                                                     text:@""
+                                                     font:[NSFont boldSystemFontOfSize:18.0]];
+        [self.unavailableTitleField setAlignment:NSCenterTextAlignment];
+        [self.unavailableTitleField setAutoresizingMask:
+            (NSViewWidthSizable | NSViewMinYMargin | NSViewMaxYMargin)];
+        [self addSubview:self.unavailableTitleField];
+        self.unavailableDetailField = [self labelWithFrame:NSMakeRect(80.0,
+                                                                      NSHeight(frame) / 2.0 - 50.0,
+                                                                      MAX(220.0, NSWidth(frame) - 160.0),
+                                                                      64.0)
+                                                      text:@""
+                                                      font:[NSFont systemFontOfSize:12.0]];
+        [self.unavailableDetailField setAlignment:NSCenterTextAlignment];
+        [self.unavailableDetailField setLineBreakMode:NSLineBreakByWordWrapping];
+        [self.unavailableDetailField setUsesSingleLineMode:NO];
+        [[self.unavailableDetailField cell] setWraps:YES];
+        [self.unavailableDetailField setAutoresizingMask:
+            (NSViewWidthSizable | NSViewMinYMargin | NSViewMaxYMargin)];
+        [self addSubview:self.unavailableDetailField];
 
         NSTextField *newCallLabel = [self labelWithFrame:NSMakeRect(30.0, NSHeight(frame) - 63.0, 180.0, 20.0)
                                                     text:@""
@@ -300,6 +329,7 @@
                                                    object:coordinator];
         [self refreshLocalizedText];
         [self refreshThemeAppearance];
+        [self applyTransportAvailability];
     }
     return self;
 }
@@ -340,6 +370,14 @@
                                                 86.0,
                                                 MAX(220.0, NSWidth(bounds) - 60.0),
                                                 MAX(80.0, NSHeight(bounds) - 222.0))];
+    [self.unavailableTitleField setFrame:NSMakeRect(80.0,
+                                                     NSHeight(bounds) / 2.0 + 18.0,
+                                                     MAX(220.0, NSWidth(bounds) - 160.0),
+                                                     28.0)];
+    [self.unavailableDetailField setFrame:NSMakeRect(80.0,
+                                                      NSHeight(bounds) / 2.0 - 50.0,
+                                                      MAX(220.0, NSWidth(bounds) - 160.0),
+                                                      64.0)];
 }
 
 - (id)tableView:(NSTableView *)tableView
@@ -357,6 +395,14 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
 }
 
 - (void)refreshData {
+    if (!self.coordinator.transportAvailable) {
+        self.contacts = [NSArray array];
+        self.recentCalls = [NSArray array];
+        [self.contactPopUpButton removeAllItems];
+        [self.tableView reloadData];
+        [self applyTransportAvailability];
+        return;
+    }
     if (self.loading) {
         return;
     }
@@ -404,6 +450,34 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     });
 }
 
+- (void)applyTransportAvailability {
+    BOOL available = self.coordinator.transportAvailable;
+    NSArray *callControls = [NSArray arrayWithObjects:
+                             [self viewWithTag:601],
+                             self.contactPopUpButton,
+                             self.startCallButton,
+                             self.refreshButton,
+                             [self viewWithTag:602],
+                             self.historyScrollView,
+                             self.mockOutgoingButton,
+                             self.mockIncomingButton,
+                             self.statusField,
+                             self.spinner,
+                             nil];
+    for (NSView *view in callControls) {
+        [view setHidden:!available];
+    }
+    [self.unavailableTitleField setHidden:available];
+    [self.unavailableDetailField setHidden:available];
+    if (!available) {
+        [self.unavailableTitleField setStringValue:TGLoc(@"calls.unavailable.title")];
+        [self.unavailableDetailField setStringValue:
+            [TGCallAudioEngine isOperatingSystemSupported]
+                ? TGLoc(@"calls.transportUnavailable")
+                : TGLoc(@"calls.osUnsupported")];
+    }
+}
+
 - (void)startCallPressed:(id)sender {
     (void)sender;
     NSDictionary *profile = [[self.contactPopUpButton selectedItem] representedObject];
@@ -437,6 +511,7 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [self.refreshButton setTitle:TGLoc(@"refresh")];
     [self.mockOutgoingButton setTitle:TGLoc(@"calls.demo.outgoing")];
     [self.mockIncomingButton setTitle:TGLoc(@"calls.demo.incoming")];
+    [self applyTransportAvailability];
 }
 
 - (void)refreshThemeAppearance {
@@ -444,6 +519,8 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [(NSTextField *)[self viewWithTag:601] setTextColor:TGClassicCardInkColor()];
     [(NSTextField *)[self viewWithTag:602] setTextColor:TGClassicCardInkColor()];
     [self.statusField setTextColor:TGClassicCardMutedInkColor()];
+    [self.unavailableTitleField setTextColor:TGClassicCardInkColor()];
+    [self.unavailableDetailField setTextColor:TGClassicCardMutedInkColor()];
     [self.cardView setNeedsDisplay:YES];
     [self.tableView setNeedsDisplay:YES];
     [self setNeedsDisplay:YES];
@@ -466,6 +543,8 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [_tableView release];
     [_historyScrollView release];
     [_spinner release];
+    [_unavailableTitleField release];
+    [_unavailableDetailField release];
     [super dealloc];
 }
 
