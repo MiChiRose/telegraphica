@@ -73,6 +73,7 @@
 		111111111111111111111165 /* TGProfileEditWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111334 /* TGProfileEditWindowController.m */; };
 		111111111111111111111166 /* TGTDLibClient+ChatFolders.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111336 /* TGTDLibClient+ChatFolders.m */; };
 		FA0000000000000000000001 /* TGTDLibClient+ForumTopics.m in Sources */ = {isa = PBXBuildFile; fileRef = FA0000000000000000000003 /* TGTDLibClient+ForumTopics.m */; };
+		FB0000000000000000000001 /* TGTDLibClient+Reactions.m in Sources */ = {isa = PBXBuildFile; fileRef = FB0000000000000000000003 /* TGTDLibClient+Reactions.m */; };
 		111111111111111111111167 /* TGChatFolderManagementWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111338 /* TGChatFolderManagementWindowController.m */; };
 		111111111111111111111168 /* TGTDLibClient+Notifications.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111340 /* TGTDLibClient+Notifications.m */; };
 		111111111111111111111169 /* TGNotificationSettingsWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111342 /* TGNotificationSettingsWindowController.m */; };
@@ -273,6 +274,8 @@
 		111111111111111111111336 /* TGTDLibClient+ChatFolders.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ChatFolders.m"; sourceTree = "<group>"; };
 		FA0000000000000000000002 /* TGTDLibClient+ForumTopics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+ForumTopics.h"; sourceTree = "<group>"; };
 		FA0000000000000000000003 /* TGTDLibClient+ForumTopics.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+ForumTopics.m"; sourceTree = "<group>"; };
+		FB0000000000000000000002 /* TGTDLibClient+Reactions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Reactions.h"; sourceTree = "<group>"; };
+		FB0000000000000000000003 /* TGTDLibClient+Reactions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Reactions.m"; sourceTree = "<group>"; };
 		111111111111111111111337 /* TGChatFolderManagementWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatFolderManagementWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111338 /* TGChatFolderManagementWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatFolderManagementWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111339 /* TGTDLibClient+Notifications.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Notifications.h"; sourceTree = "<group>"; };
@@ -462,6 +465,8 @@
 				111111111111111111111336 /* TGTDLibClient+ChatFolders.m */,
 				FA0000000000000000000002 /* TGTDLibClient+ForumTopics.h */,
 				FA0000000000000000000003 /* TGTDLibClient+ForumTopics.m */,
+				FB0000000000000000000002 /* TGTDLibClient+Reactions.h */,
+				FB0000000000000000000003 /* TGTDLibClient+Reactions.m */,
 				111111111111111111111339 /* TGTDLibClient+Notifications.h */,
 				111111111111111111111340 /* TGTDLibClient+Notifications.m */,
 				111111111111111111111343 /* TGTDLibClient+ChatMembers.h */,
@@ -861,6 +866,7 @@
 				111111111111111111111165 /* TGProfileEditWindowController.m in Sources */,
 				111111111111111111111166 /* TGTDLibClient+ChatFolders.m in Sources */,
 				FA0000000000000000000001 /* TGTDLibClient+ForumTopics.m in Sources */,
+				FB0000000000000000000001 /* TGTDLibClient+Reactions.m in Sources */,
 				111111111111111111111167 /* TGChatFolderManagementWindowController.m in Sources */,
 				111111111111111111111168 /* TGTDLibClient+Notifications.m in Sources */,
 				111111111111111111111169 /* TGNotificationSettingsWindowController.m in Sources */,

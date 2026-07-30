@@ -748,12 +748,7 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                                                          keyEquivalent:@""] autorelease];
     [reactionTitleItem setEnabled:NO];
     [menu addItem:reactionTitleItem];
-    NSArray *emojis = [NSArray arrayWithObjects:
-                       @"👍", @"👎", @"❤", @"🔥", @"🥰", @"👏", @"😁", @"🤔",
-                       @"🤯", @"😱", @"😢", @"🎉", @"🤩", @"🤮", @"💩", @"🙏",
-                       @"👌", @"🕊", @"🤡", @"🥱", @"🥴", @"😍", @"🐳", @"💯",
-                       @"🤣", @"⚡", @"🍌", @"🏆", @"💔", @"🤨", @"😐", @"👀",
-                       nil];
+    NSArray *emojis = [self reactionEmojisForMessageItem:item];
     NSUInteger reactionIndex = 0;
     while (reactionIndex < [emojis count]) {
         NSUInteger remaining = [emojis count] - reactionIndex;
