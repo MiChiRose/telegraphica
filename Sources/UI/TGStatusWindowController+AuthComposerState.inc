@@ -39,6 +39,7 @@
         ![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
         return;
     }
+    self.qrPhoneLoginRecoveryVisible = NO;
     if (!self.qrLoginWindowController) {
         self.qrLoginWindowController = [[[TGQRCodeLoginWindowController alloc] initWithClient:self.client] autorelease];
         [self.qrLoginWindowController setDelegate:(id<TGQRCodeLoginWindowControllerDelegate>)self];
@@ -68,6 +69,7 @@
     self.qrLoginWindowController = nil;
     self.authClientRecoveryInFlight = YES;
     self.authSubmissionInFlight = NO;
+    self.qrPhoneLoginRecoveryVisible = YES;
     TGTDLibClient *clientToReplace = [self.client retain];
     TGTDLibClient *replacementClient = [[TGTDLibClient alloc] init];
 
@@ -80,7 +82,7 @@
     [replacementClient release];
     self.initialConnectStarted = NO;
     [self setControlsBusy:YES];
-    [self updateAuthControlsForState:@"waitPhoneNumber"];
+    [self updateAuthControlsForState:self.currentAuthState];
     [self appendDetail:@"QR sign-in closed; detached the QR client and restored phone-number sign-in."];
 
     TGTDLibClient *expectedReplacement = [self.client retain];
@@ -596,9 +598,26 @@
 }
 
 - (void)updateAuthControlsForState:(NSString *)state {
+    NSString *transportState = state;
+    if (self.qrPhoneLoginRecoveryVisible &&
+        ([transportState isEqualToString:@"waitPhoneNumber"] ||
+         [transportState isEqualToString:@"waitCode"] ||
+         [transportState isEqualToString:@"waitPassword"] ||
+         [transportState isEqualToString:@"ready"])) {
+        self.qrPhoneLoginRecoveryVisible = NO;
+    }
+    if (self.qrPhoneLoginRecoveryVisible &&
+        [transportState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        /*
+         * The detached QR client can report this state once more while it is
+         * closing. Keep presenting phone login until the replacement client
+         * reaches waitPhoneNumber instead of flashing back to QR-only UI.
+         */
+        state = @"waitPhoneNumber";
+    }
     NSString *previousState = [self.currentAuthState copy];
-    self.currentAuthState = state;
-    BOOL authStateChanged = (!previousState || ![previousState isEqualToString:state]);
+    self.currentAuthState = transportState;
+    BOOL authStateChanged = (!previousState || ![previousState isEqualToString:transportState]);
     BOOL authInputsEnabled = !(self.controlsBusy || self.authSubmissionInFlight);
     [self.qrLoginWindowController authorizationStateDidChange:state];
     [self.qrLoginButton setHidden:YES];
