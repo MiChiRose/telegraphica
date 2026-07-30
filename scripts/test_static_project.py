@@ -1541,6 +1541,9 @@ def check_chat_folder_management_contract(errors):
         '"deleteChatFilter"',
         '"getChatFolderInviteLinks"',
         '"createChatFolderInviteLink"',
+        '"reorderChatFolders"',
+        '"checkChatFolderInviteLink"',
+        '"addChatFolderByInviteLink"',
         '"mountain-lion"',
     ]:
         if fragment not in client_text:
@@ -1550,6 +1553,10 @@ def check_chat_folder_management_contract(errors):
         'assetName:@"folder-add"',
         'assetName:@"folder-remove"',
         'assetName:@"folder-share"',
+        'assetName:@"upload"',
+        "reorderChatFolderDefinitions:",
+        "chatFolderInvitePreviewForLink:",
+        "importChatFolderWithInviteLink:",
         "definitionHasInclusionRule:",
         "setObjectValue:",
         "shareLinkForChatFolderID:",
@@ -1596,6 +1603,74 @@ def check_chat_folder_management_contract(errors):
                           icon_name)
 
 
+def check_qr_login_and_reaction_picker_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    qr_controller_rel = os.path.join("Sources", "UI", "TGQRCodeLoginWindowController.m")
+    qr_generator_rel = os.path.join("Sources", "UI", "TGQRCodeImageGenerator.m")
+    auth_rel = os.path.join("Sources", "UI", "TGStatusWindowController+AuthComposerState.inc")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    reaction_rel = os.path.join("Sources", "UI", "TGReactionMenuRowView.m")
+    project_rel = "Telegraphica.xcodeproj/project.pbxproj"
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    qr_controller_text = read_text(os.path.join(ROOT, qr_controller_rel))
+    qr_generator_text = read_text(os.path.join(ROOT, qr_generator_rel))
+    auth_text = read_text(os.path.join(ROOT, auth_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    reaction_text = read_text(os.path.join(ROOT, reaction_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        '"requestQrCodeAuthentication"',
+        '"authorizationStateWaitOtherDeviceConfirmation"',
+        "currentAuthenticationQRCodeLink",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: QR authentication contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "TGQRCodeImageGenerator",
+        "beginQRCodeAuthentication",
+        "authorizationStateDidChange:",
+    ]:
+        if fragment not in qr_controller_text:
+            errors.append("%s: QR login window is missing `%s`" %
+                          (qr_controller_rel, fragment))
+    for fragment in [
+        "qrcodegen_encodeText",
+        "qrcodegen_getModule",
+        "quietZone = 4",
+    ]:
+        if fragment not in qr_generator_text:
+            errors.append("%s: offline QR generator is missing `%s`" %
+                          (qr_generator_rel, fragment))
+    for fragment in [
+        "openQRCodeLogin:",
+        'isEqualToString:@"waitOtherDeviceConfirmation"',
+    ]:
+        if fragment not in auth_text:
+            errors.append("%s: QR login host wiring is missing `%s`" %
+                          (auth_rel, fragment))
+    for source_name in [
+        "TGQRCodeImageGenerator.m",
+        "TGQRCodeLoginWindowController.m",
+        "TGReactionMenuRowView.m",
+        "qrcodegen.c",
+    ]:
+        if source_name not in project_text:
+            errors.append("%s: target membership is missing `%s`" %
+                          (project_rel, source_name))
+    if "TGReactionMenuRowView" not in menu_text or "rowEmojis" not in menu_text:
+        errors.append("%s: expanded reaction rows are not wired into the message menu" %
+                      menu_rel)
+    for fragment in ["representedObject", "cancelTracking"]:
+        if fragment not in reaction_text:
+            errors.append("%s: reaction picker behavior is missing `%s`" %
+                          (reaction_rel, fragment))
+    qr_icon = os.path.join(ROOT, "Sources", "Resources", "Icons", "qr-scan.png")
+    if not os.path.isfile(qr_icon):
+        errors.append("Sources/Resources/Icons/qr-scan.png: user-provided QR icon is missing")
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1623,6 +1698,7 @@ def main():
     check_composer_link_editor_contract(errors)
     check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
+    check_qr_login_and_reaction_picker_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

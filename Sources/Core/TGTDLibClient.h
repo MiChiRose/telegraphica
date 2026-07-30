@@ -114,6 +114,8 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)submitAuthenticationPhoneNumber:(NSString *)phoneNumber timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)requestQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)currentAuthenticationQRCodeLink;
 - (NSString *)submitAuthenticationCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)submitAuthenticationPassword:(NSString *)password timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)drainSafeUpdateSummaries;

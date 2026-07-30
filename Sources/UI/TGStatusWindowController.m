@@ -23,6 +23,8 @@
 #import "TGProfilePresentation.h"
 #import "TGProfileEditWindowController.h"
 #import "TGPrivacyWindowController.h"
+#import "TGQRCodeLoginWindowController.h"
+#import "TGReactionMenuRowView.h"
 #import "TGSavedMessagesWindowController.h"
 #import "TGStatusButtonCells.h"
 #import "TGSectionTitleField.h"
@@ -423,6 +425,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTextField *authSecondaryLabel;
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
+@property (nonatomic, retain) NSButton *qrLoginButton;
+@property (nonatomic, retain) TGQRCodeLoginWindowController *qrLoginWindowController;
 @property (nonatomic, retain) TGTransparentSpinnerView *busySpinner;
 @property (nonatomic, retain) NSButton *loginLogsButton;
 @property (nonatomic, retain) NSArray *loginLanguageButtons;
@@ -921,6 +925,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize authSecondaryLabel = _authSecondaryLabel;
 @synthesize authSecondaryTextFieldBackgroundView = _authSecondaryTextFieldBackgroundView;
 @synthesize authButton = _authButton;
+@synthesize qrLoginButton = _qrLoginButton;
+@synthesize qrLoginWindowController = _qrLoginWindowController;
 @synthesize busySpinner = _busySpinner;
 @synthesize loginLogsButton = _loginLogsButton;
 @synthesize loginLanguageButtons = _loginLanguageButtons;
@@ -2482,6 +2488,18 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self applySkeuomorphicButtonStyle:self.authButton isPrimary:YES];
     [self.authButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.authButton];
+
+    self.qrLoginButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 366, 190, 32)] autorelease];
+    [self.qrLoginButton setTitle:TGLoc(@"login.qr.button")];
+    [self.qrLoginButton setImage:TGIconAssetImageNamed(@"qr-scan")];
+    [self.qrLoginButton setImagePosition:NSImageLeft];
+    [self.qrLoginButton setTarget:self];
+    [self.qrLoginButton setAction:@selector(openQRCodeLogin:)];
+    [self.qrLoginButton setEnabled:NO];
+    [self.qrLoginButton setHidden:YES];
+    [self applySkeuomorphicButtonStyle:self.qrLoginButton isPrimary:NO];
+    [self.qrLoginButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.qrLoginButton];
 
     self.busySpinner = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
     [self.busySpinner setDisplayedWhenStopped:NO];
@@ -4501,6 +4519,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_authTextField release];
     [_authSecureField release];
     [_authButton release];
+    [_qrLoginButton release];
+    [_qrLoginWindowController release];
     [_busySpinner release];
     [_loginLogsButton release];
     [_loginLanguageButtons release];
