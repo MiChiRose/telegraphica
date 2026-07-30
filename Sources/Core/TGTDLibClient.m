@@ -5136,6 +5136,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [topicInfo setObject:[NSNumber numberWithLongLong:[topicID longLongValue]] forKey:@"forum_topic_id"];
         [topicInfo setObject:(usingLegacyForumTopicSchema ? @"forum_legacy" : @"forum") forKey:@"message_topic_kind"];
         [topicInfo setObject:unreadCount forKey:@"unread_count"];
+        id closedValue = [info objectForKey:@"is_closed"];
+        if (![closedValue respondsToSelector:@selector(boolValue)]) {
+            closedValue = [topic objectForKey:@"is_closed"];
+        }
+        id pinnedValue = [info objectForKey:@"is_pinned"];
+        if (![pinnedValue respondsToSelector:@selector(boolValue)]) {
+            pinnedValue = [topic objectForKey:@"is_pinned"];
+        }
+        [topicInfo setObject:[NSNumber numberWithBool:([closedValue respondsToSelector:@selector(boolValue)] && [closedValue boolValue])]
+                      forKey:@"is_closed"];
+        [topicInfo setObject:[NSNumber numberWithBool:([pinnedValue respondsToSelector:@selector(boolValue)] && [pinnedValue boolValue])]
+                      forKey:@"is_pinned"];
         [topics addObject:topicInfo];
     }
 
@@ -7209,6 +7221,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 [topicItem setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
             }
             [topicItem setForumTopic:YES];
+            [topicItem setForumTopicClosed:[[topic objectForKey:@"is_closed"] boolValue]];
+            [topicItem setForumTopicPinned:[[topic objectForKey:@"is_pinned"] boolValue]];
             [topicItem setParentChatID:chatID];
             [topicItem setMessageThreadID:[NSNumber numberWithLongLong:[threadID longLongValue]]];
             [topicItem setMessageTopicKind:topicKind];

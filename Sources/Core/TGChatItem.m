@@ -15,6 +15,8 @@
 @synthesize markedAsUnread = _markedAsUnread;
 @synthesize pinned = _pinned;
 @synthesize forumTopic = _forumTopic;
+@synthesize forumTopicClosed = _forumTopicClosed;
+@synthesize forumTopicPinned = _forumTopicPinned;
 @synthesize savedMessages = _savedMessages;
 @synthesize bot = _bot;
 @synthesize parentChatID = _parentChatID;
@@ -56,6 +58,12 @@
     }
     if ([identifier isEqual:@"is_pinned"]) {
         return [NSNumber numberWithBool:self.pinned];
+    }
+    if ([identifier isEqual:@"is_forum_topic_closed"]) {
+        return [NSNumber numberWithBool:self.forumTopicClosed];
+    }
+    if ([identifier isEqual:@"is_forum_topic_pinned"]) {
+        return [NSNumber numberWithBool:self.forumTopicPinned];
     }
     if ([identifier isEqual:@"is_saved_messages"]) {
         return [NSNumber numberWithBool:self.savedMessages];
