@@ -424,10 +424,10 @@ static NSString * const TGChatFolderDragPasteboardType = @"com.telegraphica.chat
     [self.chatSearchField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.chatSearchField];
 
-    TGScrollSurfaceView *chatSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(248, 100, 504, 232)] autorelease];
+    TGScrollSurfaceView *chatSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(248, 110, 504, 222)] autorelease];
     [chatSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [root addSubview:chatSurface];
-    NSScrollView *chatScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(252, 104, 496, 224)] autorelease];
+    NSScrollView *chatScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(252, 114, 496, 214)] autorelease];
     [chatScroll setHasVerticalScroller:YES];
     [chatScroll setAutohidesScrollers:YES];
     [chatScroll setBorderType:NSNoBorder];
@@ -470,7 +470,7 @@ static NSString * const TGChatFolderDragPasteboardType = @"com.telegraphica.chat
     [self.spinner setAutoresizingMask:NSViewMaxYMargin];
     [root addSubview:self.spinner];
 
-    self.saveButton = [[[NSButton alloc] initWithFrame:NSMakeRect(620, 68, 120, 30)] autorelease];
+    self.saveButton = [[[NSButton alloc] initWithFrame:NSMakeRect(628, 68, 120, 30)] autorelease];
     [self.saveButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"folders.save")] autorelease]];
     [self.saveButton setTitle:TGLoc(@"folders.save")];
     [self.saveButton setTarget:self];

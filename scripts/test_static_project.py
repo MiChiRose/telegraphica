@@ -1608,6 +1608,9 @@ def check_qr_login_and_reaction_picker_contract(errors):
     qr_controller_rel = os.path.join("Sources", "UI", "TGQRCodeLoginWindowController.m")
     qr_generator_rel = os.path.join("Sources", "UI", "TGQRCodeImageGenerator.m")
     auth_rel = os.path.join("Sources", "UI", "TGStatusWindowController+AuthComposerState.inc")
+    layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
+    video_note_rel = os.path.join("Sources", "UI", "TGVideoNoteRecorderWindowController.m")
     menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
     reaction_rel = os.path.join("Sources", "UI", "TGReactionMenuRowView.m")
     project_rel = "Telegraphica.xcodeproj/project.pbxproj"
@@ -1615,6 +1618,9 @@ def check_qr_login_and_reaction_picker_contract(errors):
     qr_controller_text = read_text(os.path.join(ROOT, qr_controller_rel))
     qr_generator_text = read_text(os.path.join(ROOT, qr_generator_rel))
     auth_text = read_text(os.path.join(ROOT, auth_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+    contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    video_note_text = read_text(os.path.join(ROOT, video_note_rel))
     menu_text = read_text(os.path.join(ROOT, menu_rel))
     reaction_text = read_text(os.path.join(ROOT, reaction_rel))
     project_text = read_text(os.path.join(ROOT, project_rel))
@@ -1623,6 +1629,8 @@ def check_qr_login_and_reaction_picker_contract(errors):
         '"requestQrCodeAuthentication"',
         '"authorizationStateWaitOtherDeviceConfirmation"',
         "currentAuthenticationQRCodeLink",
+        'isEqualToString:@"updateAuthorizationState"',
+        "shouldSeedAuthorizationCache",
     ]:
         if fragment not in client_text:
             errors.append("%s: QR authentication contract is missing `%s`" %
@@ -1631,6 +1639,7 @@ def check_qr_login_and_reaction_picker_contract(errors):
         "TGQRCodeImageGenerator",
         "beginQRCodeAuthentication",
         "authorizationStateDidChange:",
+        "maximumSide:300.0",
     ]:
         if fragment not in qr_controller_text:
             errors.append("%s: QR login window is missing `%s`" %
@@ -1646,10 +1655,23 @@ def check_qr_login_and_reaction_picker_contract(errors):
     for fragment in [
         "openQRCodeLogin:",
         'isEqualToString:@"waitOtherDeviceConfirmation"',
+        'TGLoc(@"login.or")',
     ]:
         if fragment not in auth_text:
             errors.append("%s: QR login host wiring is missing `%s`" %
                           (auth_rel, fragment))
+    for fragment in ["phoneLoginLayout", "qrButtonY", "qrButtonWidth"]:
+        if fragment not in layout_text:
+            errors.append("%s: QR/phone login layout is missing `%s`" %
+                          (layout_rel, fragment))
+    for fragment in ["authorizationRetryCount", 'TGLoc(@"contacts.authWaiting")']:
+        if fragment not in contacts_text:
+            errors.append("%s: post-authorization contact retry is missing `%s`" %
+                          (contacts_rel, fragment))
+    for fragment in ["circularMaskLayerForBounds:", "setMask:"]:
+        if fragment not in video_note_text:
+            errors.append("%s: video-note preview mask is missing `%s`" %
+                          (video_note_rel, fragment))
     for source_name in [
         "TGQRCodeImageGenerator.m",
         "TGQRCodeLoginWindowController.m",

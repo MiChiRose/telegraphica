@@ -343,6 +343,16 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
                                                                  1.0)];
 }
 
+- (CALayer *)circularMaskLayerForBounds:(CGRect)bounds {
+    CAShapeLayer *maskLayer = [CAShapeLayer layer];
+    CGPathRef path = CGPathCreateWithEllipseInRect(bounds, NULL);
+    [maskLayer setFrame:bounds];
+    [maskLayer setPath:path];
+    [maskLayer setFillColor:[[NSColor whiteColor] CGColor]];
+    CGPathRelease(path);
+    return maskLayer;
+}
+
 - (void)attachCameraPreviewLayer {
     [self.playerLayer removeFromSuperlayer];
     self.playerLayer = nil;
@@ -352,6 +362,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
         self.cameraPreviewLayer = layer;
     }
     [self.cameraPreviewLayer setFrame:[[self.previewView layer] bounds]];
+    [self.cameraPreviewLayer setMask:[self circularMaskLayerForBounds:[[self.previewView layer] bounds]]];
     [[self.previewView layer] addSublayer:self.cameraPreviewLayer];
     [self.previewMatteView setNeedsDisplay:YES];
 }
@@ -617,6 +628,7 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     AVPlayerLayer *layer = [AVPlayerLayer playerLayerWithPlayer:player];
     [layer setVideoGravity:AVLayerVideoGravityResizeAspectFill];
     [layer setFrame:[[self.previewView layer] bounds]];
+    [layer setMask:[self circularMaskLayerForBounds:[[self.previewView layer] bounds]]];
     self.playerLayer = layer;
     [[self.previewView layer] addSublayer:layer];
     [self showPreviewControls];
