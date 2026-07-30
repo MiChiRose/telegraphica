@@ -839,33 +839,50 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         ? [item reactionAnimationDisplaySummary]
         : [item reactionSummary];
     if ([reactionSummary length] > 0) {
-        CGFloat reactionProgress = [[item reactionAnimationDisplaySummary] length] > 0
+        BOOL animatingReaction = [[item reactionAnimationDisplaySummary] length] > 0;
+        CGFloat rawProgress = animatingReaction
             ? MAX(0.0, MIN(1.0, [item reactionAnimationProgress]))
             : 1.0;
+        BOOL removingReaction = animatingReaction && [item reactionAnimationRemoving];
+        CGFloat visualProgress = 1.0;
+        if (animatingReaction) {
+            if (removingReaction) {
+                visualProgress = MAX(0.0, 1.0 - MIN(1.0, rawProgress / 0.55));
+            } else {
+                visualProgress = MAX(0.0, MIN(1.0, (rawProgress - 0.46) / 0.54));
+            }
+        }
+        CGFloat inverseVisualProgress = 1.0 - visualProgress;
+        CGFloat easedVisualProgress = 1.0 -
+            (inverseVisualProgress * inverseVisualProgress * inverseVisualProgress);
+        CGFloat reactionOpacity = removingReaction ? visualProgress : easedVisualProgress;
+        CGFloat reactionScale = removingReaction
+            ? (0.90 + (0.10 * visualProgress))
+            : easedVisualProgress;
         NSDictionary *reactionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                             [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
-                                            [TGClassicSelectedRowTextColor() colorWithAlphaComponent:reactionProgress], NSForegroundColorAttributeName,
+                                            [TGClassicSelectedRowTextColor() colorWithAlphaComponent:reactionOpacity], NSForegroundColorAttributeName,
                                             nil];
         NSSize reactionSize = [reactionSummary sizeWithAttributes:reactionAttributes];
-        CGFloat reactionWidth = ceil(reactionSize.width) + 14.0;
+        CGFloat fullReactionWidth = ceil(reactionSize.width) + 14.0;
         CGFloat maximumReactionWidth = NSWidth(bubbleRect) - 24.0;
-        if (reactionWidth > maximumReactionWidth) {
-            reactionWidth = maximumReactionWidth;
+        if (fullReactionWidth > maximumReactionWidth) {
+            fullReactionWidth = maximumReactionWidth;
         }
-        if (reactionWidth > 20.0 && reactionProgress > 0.01) {
-            CGFloat reactionScale = 0.78 + (0.22 * reactionProgress);
-            reactionWidth *= reactionScale;
+        if (fullReactionWidth > 20.0 && reactionScale > 0.01) {
+            CGFloat reactionWidth = fullReactionWidth * reactionScale;
             CGFloat reactionHeight = 18.0 * reactionScale;
             CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 4.0)
                                                         : (NSMinY(bubbleRect) + 4.0);
-            NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0,
+            NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0 +
+                                                 ((fullReactionWidth - reactionWidth) / 2.0),
                                              reactionY,
                                              reactionWidth,
                                              reactionHeight);
             NSBezierPath *reactionPath = [NSBezierPath bezierPathWithRoundedRect:reactionRect xRadius:9.0 yRadius:9.0];
-            [[TGClassicNavigationSelectedColor(0.82) colorWithAlphaComponent:reactionProgress] set];
+            [[TGClassicNavigationSelectedColor(0.82) colorWithAlphaComponent:reactionOpacity] set];
             [reactionPath fill];
-            [[TGClassicNavigationSelectedStrokeColor(0.72) colorWithAlphaComponent:reactionProgress] set];
+            [[TGClassicNavigationSelectedStrokeColor(0.72) colorWithAlphaComponent:reactionOpacity] set];
             [reactionPath setLineWidth:1.0];
             [reactionPath stroke];
 
@@ -874,7 +891,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
             NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
             [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
             NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
-                                                 NSMinY(reactionRect) + floor((reactionHeight - reactionSize.height) / 2.0) - 1.0,
+                                                 NSMinY(reactionRect) +
+                                                     floor((reactionHeight - reactionSize.height) / 2.0) +
+                                                     ([controlView isFlipped] ? 1.0 : -3.0),
                                                  NSWidth(reactionRect) - 8.0,
                                                  reactionSize.height + 3.0);
             [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];

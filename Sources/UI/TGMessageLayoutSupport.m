@@ -861,7 +861,10 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         return;
     }
 
-    NSBezierPath *mediaPath = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
+    BOOL videoNote = [[mediaItem objectForKey:@"content_type"] isEqualToString:@"messageVideoNote"];
+    NSBezierPath *mediaPath = videoNote
+        ? [NSBezierPath bezierPathWithOvalInRect:rect]
+        : [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
     NSString *localPath = TGMediaItemLocalPath(mediaItem);
     NSImage *image = nil;
     if ([localPath length] > 0) {
@@ -1286,8 +1289,18 @@ CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
     if (![item reactionAnimationChangesHeight]) {
         return 22.0;
     }
-    CGFloat progress = MAX(0.0, MIN(1.0, [item reactionAnimationProgress]));
-    return 22.0 * progress;
+    CGFloat rawProgress = MAX(0.0, MIN(1.0, [item reactionAnimationProgress]));
+    CGFloat phaseProgress = 0.0;
+    if ([item reactionAnimationRemoving]) {
+        phaseProgress = (rawProgress <= 0.45)
+            ? 1.0
+            : MAX(0.0, 1.0 - ((rawProgress - 0.45) / 0.55));
+    } else {
+        phaseProgress = MIN(1.0, rawProgress / 0.50);
+    }
+    CGFloat inverse = 1.0 - phaseProgress;
+    CGFloat easedProgress = 1.0 - (inverse * inverse * inverse);
+    return 22.0 * easedProgress;
 }
 
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails) {

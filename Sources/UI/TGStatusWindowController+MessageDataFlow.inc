@@ -372,16 +372,16 @@
     BOOL changesHeight = (([oldSummary length] == 0) != ([newSummary length] == 0));
     NSString *displaySummary = removingBand ? oldSummary : newSummary;
     [item setReactionAnimationDisplaySummary:displaySummary];
-    [item setReactionAnimationProgress:(removingBand ? 1.0 : 0.0)];
+    [item setReactionAnimationProgress:0.0];
     [item setReactionAnimationChangesHeight:changesHeight];
+    [item setReactionAnimationRemoving:removingBand];
 
     if (!self.reactionAnimations) {
         self.reactionAnimations = [NSMutableDictionary dictionary];
     }
-    NSDictionary *animation = [NSDictionary dictionaryWithObjectsAndKeys:
-                               [NSNumber numberWithDouble:[NSDate timeIntervalSinceReferenceDate]], @"started_at",
-                               [NSNumber numberWithBool:removingBand], @"removing",
-                               nil];
+    NSDictionary *animation = [NSDictionary dictionaryWithObject:
+                               [NSNumber numberWithDouble:[NSDate timeIntervalSinceReferenceDate]]
+                                                          forKey:@"started_at"];
     [self.reactionAnimations setObject:animation forKey:key];
 
     if (!self.reactionAnimationTimer) {
@@ -411,16 +411,12 @@
         NSString *key = [keys objectAtIndex:keyIndex];
         NSDictionary *animation = [self.reactionAnimations objectForKey:key];
         NSTimeInterval elapsed = now - [[animation objectForKey:@"started_at"] doubleValue];
-        CGFloat linearProgress = (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.24));
-        CGFloat inverseProgress = 1.0 - linearProgress;
-        CGFloat easedProgress = 1.0 - (inverseProgress * inverseProgress * inverseProgress);
-        BOOL removing = [[animation objectForKey:@"removing"] boolValue];
-        CGFloat presentationProgress = removing ? (1.0 - easedProgress) : easedProgress;
+        CGFloat linearProgress = (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.32));
 
         NSUInteger row = NSNotFound;
         TGMessageItem *item = [self displayedMessageItemForReactionAnimationKey:key row:&row];
         if (item) {
-            [item setReactionAnimationProgress:presentationProgress];
+            [item setReactionAnimationProgress:linearProgress];
             if (row != NSNotFound) {
                 NSIndexSet *rowIndexes = [NSIndexSet indexSetWithIndex:row];
                 if ([item reactionAnimationChangesHeight]) {
@@ -437,6 +433,7 @@
                 [item setReactionAnimationDisplaySummary:nil];
                 [item setReactionAnimationProgress:1.0];
                 [item setReactionAnimationChangesHeight:NO];
+                [item setReactionAnimationRemoving:NO];
             }
             [completedKeys addObject:key];
         }
