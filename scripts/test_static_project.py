@@ -1662,10 +1662,25 @@ def check_qr_login_and_reaction_picker_contract(errors):
         'TGLoc(@"login.or")',
         "qrCodeLoginWindowControllerDidCancel:",
         "shutdownWithTimeout:1.0",
+        "detached the QR client and restored phone-number sign-in",
     ]:
         if fragment not in auth_text:
             errors.append("%s: QR login host wiring is missing `%s`" %
                           (auth_rel, fragment))
+    cancel_method_start = auth_text.find(
+        "- (void)qrCodeLoginWindowControllerDidCancel:")
+    cancel_method_end = auth_text.find(
+        "- (BOOL)isTerminalAuthorizationState:", cancel_method_start)
+    cancel_method = auth_text[cancel_method_start:cancel_method_end]
+    client_detach = cancel_method.find("self.client = replacementClient;")
+    background_shutdown = cancel_method.find(
+        "dispatch_async(dispatch_get_global_queue")
+    if cancel_method_start < 0 or client_detach < 0 or background_shutdown < 0:
+        errors.append("%s: QR cancellation recovery flow is incomplete" % auth_rel)
+    elif client_detach > background_shutdown:
+        errors.append(
+            "%s: QR client must be detached before asynchronous shutdown "
+            "to prevent stale waitOtherDeviceConfirmation UI" % auth_rel)
     for fragment in ["phoneLoginLayout", "qrButtonY", "qrButtonWidth"]:
         if fragment not in layout_text:
             errors.append("%s: QR/phone login layout is missing `%s`" %

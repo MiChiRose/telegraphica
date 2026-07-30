@@ -68,21 +68,29 @@
     self.qrLoginWindowController = nil;
     self.authClientRecoveryInFlight = YES;
     self.authSubmissionInFlight = NO;
+    TGTDLibClient *clientToReplace = [self.client retain];
+    TGTDLibClient *replacementClient = [[TGTDLibClient alloc] init];
+
+    /*
+     * Detach the QR client before asking it to close. Its queued
+     * waitOtherDeviceConfirmation update must never repaint the phone form
+     * while shutdown is in progress.
+     */
+    self.client = replacementClient;
+    [replacementClient release];
+    self.initialConnectStarted = NO;
     [self setControlsBusy:YES];
     [self updateAuthControlsForState:@"waitPhoneNumber"];
-    [self appendDetail:@"QR sign-in closed; restarting Telegram authorization for phone-number sign-in."];
+    [self appendDetail:@"QR sign-in closed; detached the QR client and restored phone-number sign-in."];
 
-    TGTDLibClient *clientToReplace = [self.client retain];
+    TGTDLibClient *expectedReplacement = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         [clientToReplace shutdownWithTimeout:1.0];
         [NSThread sleepForTimeInterval:0.15];
-        TGTDLibClient *replacementClient = [[[TGTDLibClient alloc] init] autorelease];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.client == clientToReplace) {
-                self.client = replacementClient;
-                self.initialConnectStarted = NO;
+            if (self.client == expectedReplacement) {
                 self.authClientRecoveryInFlight = NO;
                 [self setControlsBusy:NO];
                 [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
@@ -90,6 +98,7 @@
                 self.authClientRecoveryInFlight = NO;
                 [self setControlsBusy:NO];
             }
+            [expectedReplacement release];
         });
 
         [clientToReplace release];
