@@ -108,6 +108,8 @@
 		444000000000000000000001 /* TGPrivacyPermissions.m in Sources */ = {isa = PBXBuildFile; fileRef = 444000000000000000000003 /* TGPrivacyPermissions.m */; };
 		555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */ = {isa = PBXBuildFile; fileRef = 555000000000000000000003 /* TGTDLibClient+MessageLinks.m */; };
 		777000000000000000000001 /* TGComposerLinkSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 777000000000000000000003 /* TGComposerLinkSupport.m */; };
+		666000000000000000000001 /* TGVideoNoteRecorderWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 666000000000000000000003 /* TGVideoNoteRecorderWindowController.m */; };
+		666000000000000000000004 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 666000000000000000000005 /* QuartzCore.framework */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
@@ -332,6 +334,9 @@
 		333000000000000000000007 /* TGCallWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGCallWindowController.m; sourceTree = "<group>"; };
 		444000000000000000000002 /* TGPrivacyPermissions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGPrivacyPermissions.h; sourceTree = "<group>"; };
 		444000000000000000000003 /* TGPrivacyPermissions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGPrivacyPermissions.m; sourceTree = "<group>"; };
+		666000000000000000000002 /* TGVideoNoteRecorderWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGVideoNoteRecorderWindowController.h; sourceTree = "<group>"; };
+		666000000000000000000003 /* TGVideoNoteRecorderWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGVideoNoteRecorderWindowController.m; sourceTree = "<group>"; };
+		666000000000000000000005 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		555000000000000000000002 /* TGTDLibClient+MessageLinks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MessageLinks.h"; sourceTree = "<group>"; };
 		555000000000000000000003 /* TGTDLibClient+MessageLinks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MessageLinks.m"; sourceTree = "<group>"; };
 		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
@@ -373,6 +378,7 @@
 				111111111111111111111108 /* Cocoa.framework in Frameworks */,
 				111111111111111111111109 /* Security.framework in Frameworks */,
 				111111111111111111111113 /* AVFoundation.framework in Frameworks */,
+				666000000000000000000004 /* QuartzCore.framework in Frameworks */,
 				111111111111111111111157 /* ImageIO.framework in Frameworks */,
 				111111111111111111111189 /* MapKit.framework in Frameworks */,
 			);
@@ -415,6 +421,7 @@
 				111111111111111111111230 /* Cocoa.framework */,
 				111111111111111111111231 /* Security.framework */,
 				111111111111111111111232 /* AVFoundation.framework */,
+				666000000000000000000005 /* QuartzCore.framework */,
 				111111111111111111111316 /* ImageIO.framework */,
 				111111111111111111111381 /* MapKit.framework */,
 			);
@@ -558,6 +565,8 @@
 				111111111111111111111376 /* TGDatePickerDialog.m */,
 				111111111111111111111377 /* TGLocationPickerWindowController.h */,
 				111111111111111111111378 /* TGLocationPickerWindowController.m */,
+				666000000000000000000002 /* TGVideoNoteRecorderWindowController.h */,
+				666000000000000000000003 /* TGVideoNoteRecorderWindowController.m */,
 				111111111111111111111391 /* TGLocationStaticMapView.h */,
 				111111111111111111111392 /* TGLocationStaticMapView.m */,
 				111111111111111111111395 /* TGLocationSearchService.h */,
@@ -860,6 +869,7 @@
 				333000000000000000000002 /* TGCallCoordinator.m in Sources */,
 				333000000000000000000003 /* TGCallWindowController.m in Sources */,
 				444000000000000000000001 /* TGPrivacyPermissions.m in Sources */,
+				666000000000000000000001 /* TGVideoNoteRecorderWindowController.m in Sources */,
 				555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,

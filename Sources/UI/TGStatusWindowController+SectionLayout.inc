@@ -196,7 +196,10 @@
     [self showView:self.sendLabel visible:NO];
     [self showView:self.attachPhotoButton visible:showConversationContent];
     [self showView:self.stickerButton visible:showConversationContent];
-    [self showView:self.voiceRecordButton visible:showConversationContent];
+    BOOL composerRecordingAllowed =
+        ([TGPrivacyPermissions microphonePermissionState] != TGPrivacyPermissionStateDenied ||
+         [TGPrivacyPermissions cameraPermissionState] != TGPrivacyPermissionStateDenied);
+    [self showView:self.voiceRecordButton visible:(showConversationContent && composerRecordingAllowed)];
     [self showView:self.voiceRecordingIndicatorField visible:NO];
     [self showView:self.sendTextFieldBackgroundView visible:showConversationContent];
     [self showView:self.sendTextField visible:showConversationContent];

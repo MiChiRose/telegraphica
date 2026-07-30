@@ -297,6 +297,11 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
         TGDrawTemplateIconAsset(@"microphone", micRect, iconColor, 1.0, flipped);
         return;
     }
+    if ([title isEqualToString:@"video"] || [title isEqualToString:@"video-off"]) {
+        NSRect videoRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
+        TGDrawTemplateIconAsset(title, videoRect, iconColor, 1.0, flipped);
+        return;
+    }
     if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
         NSRect smileRect = NSMakeRect(NSMidX(buttonRect) - 12.0, NSMidY(buttonRect) - 12.0, 24.0, 24.0);
         TGDrawTemplateIconAsset(@"emoji-smile", smileRect, iconColor, 1.0, flipped);

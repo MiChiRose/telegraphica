@@ -66,6 +66,7 @@
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextField *timerField;
 @property (nonatomic, retain) NSTextField *qualityField;
+@property (nonatomic, retain) NSImageView *qualityImageView;
 @property (nonatomic, retain) TGProfileAvatarView *avatarView;
 @property (nonatomic, retain) NSTextField *nameField;
 @property (nonatomic, retain) NSButton *answerButton;
@@ -92,6 +93,7 @@
 @synthesize statusField = _statusField;
 @synthesize timerField = _timerField;
 @synthesize qualityField = _qualityField;
+@synthesize qualityImageView = _qualityImageView;
 @synthesize avatarView = _avatarView;
 @synthesize nameField = _nameField;
 @synthesize answerButton = _answerButton;
@@ -174,12 +176,17 @@
                                           font:[NSFont boldSystemFontOfSize:16.0]
                                          color:TGClassicCardInkColor()];
         [root addSubview:self.timerField];
-        self.qualityField = [self labelWithFrame:NSMakeRect(40.0, 163.0, 340.0, 18.0)
+        self.qualityField = [self labelWithFrame:NSMakeRect(88.0, 163.0, 214.0, 18.0)
                                             text:@""
                                             font:[NSFont systemFontOfSize:10.5]
                                            color:TGClassicCardMutedInkColor()];
+        [self.qualityField setAlignment:NSRightTextAlignment];
         [self.qualityField setHidden:YES];
         [root addSubview:self.qualityField];
+        self.qualityImageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(307.0, 163.0, 18.0, 18.0)] autorelease];
+        [self.qualityImageView setImageScaling:NSImageScaleProportionallyUpOrDown];
+        [self.qualityImageView setHidden:YES];
+        [root addSubview:self.qualityImageView];
 
         self.answerButton = [self actionButtonWithFrame:NSMakeRect(102.0, 78.0, 64.0, 64.0)
                                               iconName:@"call-receive"
@@ -302,6 +309,22 @@
     NSUInteger safeBars = MIN(5U, signalBars);
     [self.qualityField setStringValue:[NSString stringWithFormat:TGLoc(@"calls.quality"),
                                        (unsigned long)safeBars]];
+    NSArray *iconNames = [NSArray arrayWithObjects:
+                          @"signal-weak",
+                          @"signal-fair",
+                          @"signal-good",
+                          @"signal-strong",
+                          @"signal",
+                          nil];
+    if (safeBars == 0U) {
+        [self.qualityImageView setImage:nil];
+    } else {
+        NSString *iconName = [iconNames objectAtIndex:(safeBars - 1U)];
+        [self.qualityImageView setImage:TGTemplateIconAssetImage(iconName,
+                                                                 NSMakeSize(18.0, 18.0),
+                                                                 TGClassicCardMutedInkColor(),
+                                                                 1.0)];
+    }
 }
 
 - (void)setPresentationState:(TGCallPresentationState)state detail:(NSString *)detail {
@@ -319,6 +342,7 @@
     [self.hangupButton setHidden:ended];
     [self.hangupLabel setHidden:ended];
     [self.qualityField setHidden:!connected];
+    [self.qualityImageView setHidden:!connected];
     if (incoming) {
         [self.answerButton setFrameOrigin:NSMakePoint(102.0, 78.0)];
         [self.answerLabel setFrameOrigin:NSMakePoint(70.0, 51.0)];
@@ -432,6 +456,7 @@
     [_statusField release];
     [_timerField release];
     [_qualityField release];
+    [_qualityImageView release];
     [_avatarView release];
     [_nameField release];
     [_answerButton release];

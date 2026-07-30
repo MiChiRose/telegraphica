@@ -37,6 +37,7 @@
 #import "TGTypingIndicatorPresentation.h"
 #import "TGUpdateSupport.h"
 #import "TGTransparentSpinnerView.h"
+#import "TGVideoNoteRecorderWindowController.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGAttachmentDescriptor.h"
 #import "../Media/TGFileTransferState.h"
@@ -93,6 +94,7 @@ static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"Telegraph
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGChatSidebarWidthDefaultsKey = @"TelegraphicaChatSidebarWidth";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
+static NSString * const TGComposerVideoNoteModeDefaultsKey = @"TelegraphicaComposerVideoNoteMode";
 static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvailableUpdateVersion";
@@ -230,7 +232,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 @end
 
-@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGChatFolderManagementWindowControllerDelegate, TGContactsViewControllerDelegate, TGSidebarResizeHandleDelegate, TGProfileEditWindowControllerDelegate>
+@interface TGStatusWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate, NSMenuDelegate, NSUserNotificationCenterDelegate, TGMediaPreviewMagnificationTarget, TGWorkshopHostContextDelegate, TGWorkshopViewControllerDelegate, TGChatLifecycleWindowControllerDelegate, TGChatFolderManagementWindowControllerDelegate, TGContactsViewControllerDelegate, TGSidebarResizeHandleDelegate, TGProfileEditWindowControllerDelegate, TGVideoNoteRecorderWindowControllerDelegate>
 @property (nonatomic, retain) NSView *topPanelView;
 @property (nonatomic, retain) NSView *sidebarPanelView;
 @property (nonatomic, retain) TGSidebarResizeHandleView *sidebarResizeHandleView;
@@ -406,6 +408,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *botActionButton;
 @property (nonatomic, retain) NSButton *stickerButton;
 @property (nonatomic, retain) NSButton *voiceRecordButton;
+@property (nonatomic, retain) TGVideoNoteRecorderWindowController *videoNoteRecorderWindowController;
+@property (nonatomic, assign) BOOL composerVideoNoteMode;
 @property (nonatomic, retain) NSButton *sendMessageButton;
 @property (nonatomic, retain) NSTextField *authLabel;
 @property (nonatomic, retain) NSTextField *authStateField;
@@ -900,6 +904,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize botActionButton = _botActionButton;
 @synthesize stickerButton = _stickerButton;
 @synthesize voiceRecordButton = _voiceRecordButton;
+@synthesize videoNoteRecorderWindowController = _videoNoteRecorderWindowController;
+@synthesize composerVideoNoteMode = _composerVideoNoteMode;
 @synthesize sendMessageButton = _sendMessageButton;
 @synthesize authLabel = _authLabel;
 @synthesize authStateField = _authStateField;
@@ -1288,6 +1294,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.autoChatListRefreshArmed = YES;
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
+        self.composerVideoNoteMode = [[NSUserDefaults standardUserDefaults]
+            boolForKey:TGComposerVideoNoteModeDefaultsKey];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(handleInlineMediaPlaybackDiagnostic:)
                                                      name:TGInlineMediaPlaybackDiagnosticNotification
@@ -1303,6 +1311,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(chatDisplayPreferencesDidChange:)
                                                      name:TGChatDisplayPreferencesDidChangeNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(composerPrivacyPermissionsDidChange:)
+                                                     name:TGPrivacyPermissionsDidChangeNotification
                                                    object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
@@ -3004,12 +3016,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.voiceRecordButton setCell:voiceCell];
     [self.voiceRecordButton setTitle:@"mic"];
     [self.voiceRecordButton setTarget:self];
-    [self.voiceRecordButton setAction:@selector(toggleVoiceRecording:)];
+    [self.voiceRecordButton setAction:@selector(performComposerRecordingAction:)];
     [self.voiceRecordButton setEnabled:NO];
     [self.voiceRecordButton setBordered:NO];
     [self.voiceRecordButton setToolTip:@"Record voice message"];
     [self.voiceRecordButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.voiceRecordButton];
+    [self configureComposerRecordingMenu];
 
     self.voiceRecordingIndicatorField = [self labelWithFrame:NSMakeRect(150, 84, 340, 18)
                                                         text:@""
@@ -4471,6 +4484,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_botCommandPanelView release];
     [_stickerButton release];
     [_voiceRecordButton release];
+    [_videoNoteRecorderWindowController release];
     [_sendMessageButton release];
     [_authLabel release];
     [_authStateField release];
@@ -4689,6 +4703,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_voicePreviewTimer invalidate];
     [_voicePreviewWindow setDelegate:nil];
     [_voicePreviewWindow close];
+    [[_videoNoteRecorderWindowController window] close];
     [_logsWindow release];
     [_aboutWindow release];
     [_appearanceWindow release];
