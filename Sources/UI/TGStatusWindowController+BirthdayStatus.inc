@@ -18,13 +18,16 @@ static BOOL TGBirthdateIsToday(NSDictionary *birthdate) {
     [self refreshSelectedChatHeaderDisplay];
     if (![chatID respondsToSelector:@selector(longLongValue)] ||
         ![self.selectedChatTypeSummary isEqualToString:@"Private"] ||
-        ![self.tdlibClient isAuthorized]) {
+        ![self.currentAuthState isEqualToString:@"ready"]) {
         return;
     }
 
-    TGTDLibClient *client = [self.tdlibClient retain];
+    TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSDictionary *chat = [client chatSummaryForID:chatID timeout:3.0 error:NULL];
+        NSDictionary *chat = [client chatSummaryForChatID:chatID
+                                           downloadAvatar:NO
+                                                   timeout:3.0
+                                                     error:NULL];
         NSNumber *userID = [chat objectForKey:@"user_id"];
         NSDictionary *profile = nil;
         if ([userID respondsToSelector:@selector(longLongValue)] && [userID longLongValue] != 0LL) {
@@ -36,7 +39,6 @@ static BOOL TGBirthdateIsToday(NSDictionary *birthdate) {
                 [chatID longLongValue] == [self.selectedChatID longLongValue]) {
                 self.selectedChatBirthdayText = isBirthdayToday ? TGLoc(@"chat.birthdayToday") : nil;
                 [self refreshSelectedChatHeaderDisplay];
-                [self layoutCurrentSection];
             }
             [client release];
         });

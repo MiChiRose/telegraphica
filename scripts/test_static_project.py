@@ -1800,6 +1800,30 @@ def check_contact_birthday_contract(errors):
         errors.append("%s: chat selection does not refresh birthday status" % flow_rel)
 
 
+def check_poll_management_contract(errors):
+    header_rel = os.path.join("Sources", "Core", "TGTDLibClient.h")
+    core_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    header_text = read_text(os.path.join(ROOT, header_rel))
+    core_text = read_text(os.path.join(ROOT, core_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    if "stopPollForChatID:" not in header_text:
+        errors.append("%s: stop-poll client API is missing" % header_rel)
+    for fragment in ['@"stopPoll"', 'forKey:@"reply_markup"', 'extraPrefix:@"telegraphica-stop-poll"']:
+        if fragment not in core_text:
+            errors.append("%s: stop-poll TDLib request is missing `%s`" %
+                          (core_rel, fragment))
+    for fragment in [
+        'TGLoc(@"message.poll.stop")',
+        "@selector(stopPollFromMenu:)",
+        "- (void)stopPollFromMenu:",
+        "[item setPollClosed:YES]",
+    ]:
+        if fragment not in menu_text:
+            errors.append("%s: poll close UI is missing `%s`" %
+                          (menu_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1831,6 +1855,7 @@ def main():
     check_forum_topic_management_contract(errors)
     check_server_reaction_catalog_contract(errors)
     check_contact_birthday_contract(errors)
+    check_poll_management_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

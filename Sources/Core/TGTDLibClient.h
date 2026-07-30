@@ -72,6 +72,7 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID archived:(BOOL)archived pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)setMessagePinnedForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)setPollAnswerForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID optionIndexes:(NSArray *)optionIndexes timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (BOOL)stopPollForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)setDraftMessageForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)sendTextMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;
