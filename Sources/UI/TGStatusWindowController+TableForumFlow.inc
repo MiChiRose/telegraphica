@@ -483,6 +483,9 @@
     } else if (newChatID && !shouldOpenTopicList) {
         [self requestComposerRefocus];
     }
+    if (selectionChanged && !selectedForumTopic && [item isMarkedAsUnread]) {
+        [self markChatItemRead:item];
+    }
     [previousChatID release];
     [previousThreadID release];
     [previousTopicKind release];

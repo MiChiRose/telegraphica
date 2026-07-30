@@ -12,6 +12,7 @@
 @property (nonatomic, copy) NSString *avatarLocalPath;
 @property (nonatomic, assign) BOOL serverNotificationsMuted;
 @property (nonatomic, assign) BOOL notificationsMuted;
+@property (nonatomic, assign, getter=isMarkedAsUnread) BOOL markedAsUnread;
 @property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
 @property (nonatomic, assign, getter=isSavedMessages) BOOL savedMessages;

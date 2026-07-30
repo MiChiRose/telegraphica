@@ -107,6 +107,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     } else if (unreadCount > 0) {
         unreadString = [NSString stringWithFormat:@"%ld", (long)unreadCount];
     }
+    BOOL drawsMarkedUnreadDot = ([item isMarkedAsUnread] && unreadCount == 0);
 
     NSColor *unreadTextColor = selected ? TGClassicSelectedRowColor() : TGClassicNavigationTextColor(1.0);
     NSDictionary *unreadAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -136,12 +137,20 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                  NSWidth(compactBadgeRect),
                                                  14.0)
                        withAttributes:compactAttributes];
+        } else if (drawsMarkedUnreadDot) {
+            NSRect compactDotRect = NSMakeRect(NSMaxX(avatarRect) - 7.0,
+                                               NSMaxY(avatarRect) - 7.0,
+                                               10.0,
+                                               10.0);
+            NSBezierPath *compactDotPath = [NSBezierPath bezierPathWithOvalInRect:compactDotRect];
+            [TGClassicHeaderBottomColor() set];
+            [compactDotPath fill];
         }
         return;
     }
     NSSize unreadSize = [unreadString sizeWithAttributes:unreadAttributes];
-    CGFloat unreadWidth = ([unreadString length] > 0) ? MAX(unreadSize.width + 13.0, 20.0) : 0.0;
-    CGFloat unreadHeight = ([unreadString length] > 0) ? 18.0 : 0.0;
+    CGFloat unreadWidth = ([unreadString length] > 0) ? MAX(unreadSize.width + 13.0, 20.0) : (drawsMarkedUnreadDot ? 10.0 : 0.0);
+    CGFloat unreadHeight = ([unreadString length] > 0) ? 18.0 : (drawsMarkedUnreadDot ? 10.0 : 0.0);
     NSRect unreadRect = NSMakeRect(NSMaxX(cellFrame) - unreadWidth - 9.0,
                                    NSMinY(cellFrame) + floor((NSHeight(cellFrame) - unreadHeight) / 2.0),
                                    unreadWidth,
@@ -155,7 +164,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                      paragraph, NSParagraphStyleAttributeName,
                                      nil];
     CGFloat titleX = NSMaxX(avatarRect) + 9.0;
-    CGFloat titleRight = ([unreadString length] > 0) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
+    CGFloat titleRight = ([unreadString length] > 0 || drawsMarkedUnreadDot) ? (NSMinX(unreadRect) - 12.0) : (NSMaxX(cellFrame) - 9.0);
     CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
     CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
     CGFloat botIconWidth = [item isBot] ? 15.0 : 0.0;
@@ -215,6 +224,11 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         NSMutableDictionary *centeredUnreadAttributes = [NSMutableDictionary dictionaryWithDictionary:unreadAttributes];
         [centeredUnreadAttributes setObject:unreadParagraph forKey:NSParagraphStyleAttributeName];
         [unreadString drawInRect:unreadTextRect withAttributes:centeredUnreadAttributes];
+    } else if (drawsMarkedUnreadDot) {
+        NSBezierPath *unreadDotPath = [NSBezierPath bezierPathWithOvalInRect:unreadRect];
+        NSColor *unreadFillColor = selected ? TGClassicSelectedRowTextColor() : TGClassicHeaderBottomColor();
+        [unreadFillColor set];
+        [unreadDotPath fill];
     }
 }
 

@@ -3510,6 +3510,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
     [item setServerNotificationsMuted:serverMuted];
     [item setNotificationsMuted:serverMuted];
+    id markedAsUnreadValue = [chatResponse objectForKey:@"is_marked_as_unread"];
+    [item setMarkedAsUnread:([markedAsUnreadValue respondsToSelector:@selector(boolValue)] &&
+                             [markedAsUnreadValue boolValue])];
     id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
     if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
         [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
@@ -3607,6 +3610,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
+        id markedAsUnreadValue = [chatResponse objectForKey:@"is_marked_as_unread"];
+        [item setMarkedAsUnread:([markedAsUnreadValue respondsToSelector:@selector(boolValue)] &&
+                                 [markedAsUnreadValue boolValue])];
         id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
         if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
@@ -4738,6 +4744,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
+        id markedAsUnreadValue = [chatResponse objectForKey:@"is_marked_as_unread"];
+        [item setMarkedAsUnread:([markedAsUnreadValue respondsToSelector:@selector(boolValue)] &&
+                                 [markedAsUnreadValue boolValue])];
         id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
         if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
@@ -7701,6 +7710,37 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [items count] > 0 ? [items objectAtIndex:0] : nil;
 }
 
+- (TGMessageItem *)messagePreviewItemForChatID:(NSNumber *)chatID unixDate:(NSInteger)unixDate timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || [chatID longLongValue] == 0 || unixDate <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat and date are required for message lookup." code:390];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getChatMessageByDate" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithInteger:unixDate] forKey:@"date"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-get-message-by-date"
+                                                           timeout:timeout
+                                                         errorCode:391
+                                                             error:error];
+    if (!response) {
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"No message was found near the selected date." code:392];
+        }
+        return nil;
+    }
+    NSArray *items = [self messagePreviewItemsFromMessages:[NSArray arrayWithObject:response] chatID:chatID];
+    return [items count] > 0 ? [items objectAtIndex:0] : nil;
+}
+
 - (NSArray *)messageContextPreviewItemsForChatID:(NSNumber *)chatID
                                 messageThreadID:(NSNumber *)messageThreadID
                                messageTopicKind:(NSString *)messageTopicKind
@@ -7982,6 +8022,43 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
         if (error) {
             *error = [self errorWithDescription:@"TDLib viewMessages returned an unexpected response." code:60];
+        }
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)setChatWithID:(NSNumber *)chatID markedAsUnread:(BOOL)markedAsUnread timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || [chatID longLongValue] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:393];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error && *error == nil) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to change the unread state. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:394];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"toggleChatIsMarkedAsUnread" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithBool:markedAsUnread] forKey:@"is_marked_as_unread"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-chat-marked-unread"
+                                                           timeout:timeout
+                                                         errorCode:395
+                                                             error:error];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = [self errorWithDescription:@"TDLib returned an unexpected unread-state response." code:396];
         }
         return NO;
     }
