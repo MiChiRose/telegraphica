@@ -83,6 +83,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize downloadFileSize = _downloadFileSize;
 @synthesize reactionSummary = _reactionSummary;
 @synthesize chosenReactionEmojis = _chosenReactionEmojis;
+@synthesize reactionAnimationDisplaySummary = _reactionAnimationDisplaySummary;
+@synthesize reactionAnimationProgress = _reactionAnimationProgress;
+@synthesize reactionAnimationChangesHeight = _reactionAnimationChangesHeight;
 @synthesize senderID = _senderID;
 @synthesize senderDisplayName = _senderDisplayName;
 @synthesize senderAvatarLocalPath = _senderAvatarLocalPath;
@@ -137,6 +140,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         self.outgoingRead = NO;
         self.canBeReplied = YES;
         self.preview = ([preview length] > 0) ? preview : @"[Message]";
+        self.reactionAnimationProgress = 1.0;
     }
     return self;
 }
@@ -369,6 +373,9 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setDownloadFileSize:_downloadFileSize];
     [copy setReactionSummary:_reactionSummary];
     [copy setChosenReactionEmojis:_chosenReactionEmojis];
+    [copy setReactionAnimationDisplaySummary:_reactionAnimationDisplaySummary];
+    [copy setReactionAnimationProgress:_reactionAnimationProgress];
+    [copy setReactionAnimationChangesHeight:_reactionAnimationChangesHeight];
     [copy setSenderID:_senderID];
     [copy setSenderDisplayName:_senderDisplayName];
     [copy setSenderAvatarLocalPath:_senderAvatarLocalPath];
@@ -447,6 +454,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_downloadFileSize release];
     [_reactionSummary release];
     [_chosenReactionEmojis release];
+    [_reactionAnimationDisplaySummary release];
     [_senderID release];
     [_senderDisplayName release];
     [_senderAvatarLocalPath release];

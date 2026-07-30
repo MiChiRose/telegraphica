@@ -676,6 +676,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) NSUInteger messageLoadingGeneration;
 @property (nonatomic, assign) BOOL pendingLiveChatRefresh;
 @property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
+@property (nonatomic, retain) NSTimer *reactionAnimationTimer;
+@property (nonatomic, retain) NSMutableDictionary *reactionAnimations;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
 @property (nonatomic, assign) BOOL chatsExhausted;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
@@ -1184,6 +1186,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messageLoadingGeneration = _messageLoadingGeneration;
 @synthesize pendingLiveChatRefresh = _pendingLiveChatRefresh;
 @synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
+@synthesize reactionAnimationTimer = _reactionAnimationTimer;
+@synthesize reactionAnimations = _reactionAnimations;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
 @synthesize chatsExhausted = _chatsExhausted;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
@@ -4324,6 +4328,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                              selector:@selector(refreshInlineMediaPlayback)
                                                object:nil];
     [self stopLiveUpdateTimer];
+    [_reactionAnimationTimer invalidate];
     [self.updateCheckScheduler invalidate];
     [self.inlineMediaPlaybackCoordinator invalidate];
     [self.stickerPickerPlaybackCoordinator invalidate];
@@ -4529,6 +4534,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_messageTableView release];
     [_messageDropOverlayView release];
     [_messageItems release];
+    [_reactionAnimationTimer release];
+    [_reactionAnimations release];
     [_composerDraftsByTargetKey release];
     [_composerDraftSyncTimer invalidate];
     [_composerDraftSyncTimer release];

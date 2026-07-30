@@ -24,6 +24,9 @@
 @property (nonatomic, retain) NSNumber *downloadFileSize;
 @property (nonatomic, copy) NSString *reactionSummary;
 @property (nonatomic, copy) NSArray *chosenReactionEmojis;
+@property (nonatomic, copy) NSString *reactionAnimationDisplaySummary;
+@property (nonatomic, assign) CGFloat reactionAnimationProgress;
+@property (nonatomic, assign) BOOL reactionAnimationChangesHeight;
 @property (nonatomic, retain) NSNumber *senderID;
 @property (nonatomic, copy) NSString *senderDisplayName;
 @property (nonatomic, copy) NSString *senderAvatarLocalPath;
