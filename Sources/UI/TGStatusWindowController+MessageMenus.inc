@@ -737,48 +737,35 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     if (addedMessageAction) {
         [menu addItem:[NSMenuItem separatorItem]];
     }
-    NSArray *emojis = [NSArray arrayWithObjects:@"🔥", @"😁", @"👍", @"👎", @"❤", @"😢", @"😱", nil];
-    NSUInteger index = 0;
-    for (index = 0; index < [emojis count]; index++) {
-        NSString *emoji = [emojis objectAtIndex:index];
-        BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
-        NSString *title = chosen ? [NSString stringWithFormat:@"%@ %@", emoji, @"✓"] : emoji;
-        NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
-                                                          action:@selector(reactToMessageFromMenu:)
+    [menu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *reactionTitleItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reactions.more")
+                                                                action:nil
+                                                         keyEquivalent:@""] autorelease];
+    [reactionTitleItem setEnabled:NO];
+    [menu addItem:reactionTitleItem];
+    NSArray *emojis = [NSArray arrayWithObjects:
+                       @"👍", @"👎", @"❤", @"🔥", @"🥰", @"👏", @"😁", @"🤔",
+                       @"🤯", @"😱", @"😢", @"🎉", @"🤩", @"🤮", @"💩", @"🙏",
+                       @"👌", @"🕊", @"🤡", @"🥱", @"🥴", @"😍", @"🐳", @"💯",
+                       @"🤣", @"⚡", @"🍌", @"🏆", @"💔", @"🤨", @"😐", @"👀",
+                       nil];
+    NSUInteger reactionIndex = 0;
+    while (reactionIndex < [emojis count]) {
+        NSUInteger remaining = [emojis count] - reactionIndex;
+        NSUInteger rowCount = MIN((NSUInteger)8, remaining);
+        NSArray *rowEmojis = [emojis subarrayWithRange:NSMakeRange(reactionIndex, rowCount)];
+        TGReactionMenuRowView *rowView = [[[TGReactionMenuRowView alloc]
+            initWithEmojis:rowEmojis
+                   message:item
+            chosenReactions:[item chosenReactionEmojis]
+                    target:self
+                    action:@selector(reactToMessageFromMenu:)] autorelease];
+        NSMenuItem *rowItem = [[[NSMenuItem alloc] initWithTitle:@""
+                                                          action:nil
                                                    keyEquivalent:@""] autorelease];
-        NSDictionary *payload = [NSDictionary dictionaryWithObjectsAndKeys:
-                                 item, @"message",
-                                 emoji, @"emoji",
-                                 nil];
-        [menuItem setRepresentedObject:payload];
-        [menuItem setTarget:self];
-        [menu addItem:menuItem];
-    }
-
-    NSArray *moreEmojis = [NSArray arrayWithObjects:@"😂", @"🎉", @"👏", @"🙏", @"😍", @"🤔", @"🤯", @"💯", @"😡", @"🥰", nil];
-    if ([moreEmojis count] > 0) {
-        [menu addItem:[NSMenuItem separatorItem]];
-        NSMenu *moreMenu = [[[NSMenu alloc] initWithTitle:TGLoc(@"message.reactions.more")] autorelease];
-        for (index = 0; index < [moreEmojis count]; index++) {
-            NSString *emoji = [moreEmojis objectAtIndex:index];
-            BOOL chosen = [[item chosenReactionEmojis] containsObject:emoji];
-            NSString *title = chosen ? [NSString stringWithFormat:@"%@ %@", emoji, @"✓"] : emoji;
-            NSMenuItem *menuItem = [[[NSMenuItem alloc] initWithTitle:title
-                                                              action:@selector(reactToMessageFromMenu:)
-                                                       keyEquivalent:@""] autorelease];
-            NSDictionary *payload = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     item, @"message",
-                                     emoji, @"emoji",
-                                     nil];
-            [menuItem setRepresentedObject:payload];
-            [menuItem setTarget:self];
-            [moreMenu addItem:menuItem];
-        }
-        NSMenuItem *moreItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reactions.more")
-                                                           action:nil
-                                                    keyEquivalent:@""] autorelease];
-        [moreItem setSubmenu:moreMenu];
-        [menu addItem:moreItem];
+        [rowItem setView:rowView];
+        [menu addItem:rowItem];
+        reactionIndex += rowCount;
     }
 }
 

@@ -33,6 +33,25 @@
            [state isEqualToString:@"waitPassword"];
 }
 
+- (void)openQRCodeLogin:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"waitPhoneNumber"] &&
+        ![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        return;
+    }
+    if (!self.qrLoginWindowController) {
+        self.qrLoginWindowController = [[[TGQRCodeLoginWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [self.qrLoginWindowController showWindow:self];
+    [[self.qrLoginWindowController window] center];
+    [[self.qrLoginWindowController window] makeKeyAndOrderFront:self];
+    if ([self.currentAuthState isEqualToString:@"waitPhoneNumber"]) {
+        [self.qrLoginWindowController beginQRCodeAuthentication];
+    } else {
+        [self.qrLoginWindowController refreshQRCodeFromClient];
+    }
+}
+
 - (BOOL)isTerminalAuthorizationState:(NSString *)state {
     return [state isEqualToString:@"loggingOut"] ||
            [state isEqualToString:@"closing"] ||
@@ -90,6 +109,8 @@
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.client == clientToRecover) {
+                [[self.qrLoginWindowController window] close];
+                self.qrLoginWindowController = nil;
                 self.client = replacementClient;
                 self.initialConnectStarted = NO;
                 self.authClientRecoveryInFlight = NO;
@@ -525,6 +546,9 @@
     self.currentAuthState = state;
     BOOL authStateChanged = (!previousState || ![previousState isEqualToString:state]);
     BOOL authInputsEnabled = !(self.controlsBusy || self.authSubmissionInFlight);
+    [self.qrLoginWindowController authorizationStateDidChange:state];
+    [self.qrLoginButton setHidden:YES];
+    [self.qrLoginButton setEnabled:NO];
     if (authStateChanged) {
         [self setLoginErrorMessage:nil];
         [self.authTextField setStringValue:@""];
@@ -657,8 +681,30 @@
         [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
         [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
+        [self.qrLoginButton setTitle:TGLoc(@"login.qr.button")];
+        [self.qrLoginButton setEnabled:authInputsEnabled];
+        [self.qrLoginButton setHidden:NO];
         [self updateVisibleSection];
         [self scheduleLoginInputFocus];
+        [previousState release];
+        return;
+    }
+
+    if ([state isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        [self.statusField setStringValue:TGLoc(@"login.qr.waitingTitle")];
+        [self.loginTitleField setStringValue:TGLoc(@"login.qr.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.qr.hint")];
+        [self.authLabel setStringValue:TGLoc(@"login.status")];
+        [self.authStateField setHidden:YES];
+        [self.authTextField setHidden:YES];
+        [self.authSecureField setHidden:YES];
+        [self.authTextField setEnabled:NO];
+        [self.authSecureField setEnabled:NO];
+        [self.authButton setHidden:YES];
+        [self.qrLoginButton setTitle:TGLoc(@"login.qr.show")];
+        [self.qrLoginButton setEnabled:authInputsEnabled];
+        [self.qrLoginButton setHidden:NO];
+        [self updateVisibleSection];
         [previousState release];
         return;
     }
@@ -781,6 +827,7 @@
     [self.sendMessageButton setEnabled:NO];
     if (busy) {
         [self.authButton setEnabled:NO];
+        [self.qrLoginButton setEnabled:NO];
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:NO];
         [self.loadChatsButton setEnabled:NO];

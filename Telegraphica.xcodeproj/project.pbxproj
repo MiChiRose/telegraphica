@@ -109,6 +109,10 @@
 		555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */ = {isa = PBXBuildFile; fileRef = 555000000000000000000003 /* TGTDLibClient+MessageLinks.m */; };
 		777000000000000000000001 /* TGComposerLinkSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 777000000000000000000003 /* TGComposerLinkSupport.m */; };
 		666000000000000000000001 /* TGVideoNoteRecorderWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 666000000000000000000003 /* TGVideoNoteRecorderWindowController.m */; };
+		888000000000000000000001 /* TGQRCodeImageGenerator.m in Sources */ = {isa = PBXBuildFile; fileRef = 888000000000000000000005 /* TGQRCodeImageGenerator.m */; };
+		888000000000000000000002 /* TGQRCodeLoginWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 888000000000000000000007 /* TGQRCodeLoginWindowController.m */; };
+		888000000000000000000003 /* qrcodegen.c in Sources */ = {isa = PBXBuildFile; fileRef = 888000000000000000000009 /* qrcodegen.c */; };
+		88800000000000000000000A /* TGReactionMenuRowView.m in Sources */ = {isa = PBXBuildFile; fileRef = 88800000000000000000000C /* TGReactionMenuRowView.m */; };
 		666000000000000000000004 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 666000000000000000000005 /* QuartzCore.framework */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
@@ -336,6 +340,14 @@
 		444000000000000000000003 /* TGPrivacyPermissions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGPrivacyPermissions.m; sourceTree = "<group>"; };
 		666000000000000000000002 /* TGVideoNoteRecorderWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGVideoNoteRecorderWindowController.h; sourceTree = "<group>"; };
 		666000000000000000000003 /* TGVideoNoteRecorderWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGVideoNoteRecorderWindowController.m; sourceTree = "<group>"; };
+		888000000000000000000004 /* TGQRCodeImageGenerator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGQRCodeImageGenerator.h; sourceTree = "<group>"; };
+		888000000000000000000005 /* TGQRCodeImageGenerator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGQRCodeImageGenerator.m; sourceTree = "<group>"; };
+		888000000000000000000006 /* TGQRCodeLoginWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGQRCodeLoginWindowController.h; sourceTree = "<group>"; };
+		888000000000000000000007 /* TGQRCodeLoginWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGQRCodeLoginWindowController.m; sourceTree = "<group>"; };
+		888000000000000000000008 /* qrcodegen.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Vendor/qrcodegen/qrcodegen.h; sourceTree = SOURCE_ROOT; };
+		888000000000000000000009 /* qrcodegen.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = Vendor/qrcodegen/qrcodegen.c; sourceTree = SOURCE_ROOT; };
+		88800000000000000000000B /* TGReactionMenuRowView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGReactionMenuRowView.h; sourceTree = "<group>"; };
+		88800000000000000000000C /* TGReactionMenuRowView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGReactionMenuRowView.m; sourceTree = "<group>"; };
 		666000000000000000000005 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		555000000000000000000002 /* TGTDLibClient+MessageLinks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MessageLinks.h"; sourceTree = "<group>"; };
 		555000000000000000000003 /* TGTDLibClient+MessageLinks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MessageLinks.m"; sourceTree = "<group>"; };
@@ -392,6 +404,8 @@
 			children = (
 				111111111111111111111401 /* Sources */,
 				222000000000000000000002 /* Vendor */,
+				888000000000000000000008 /* qrcodegen.h */,
+				888000000000000000000009 /* qrcodegen.c */,
 				111111111111111111111402 /* Frameworks */,
 				111111111111111111111403 /* Products */,
 			);
@@ -567,6 +581,12 @@
 				111111111111111111111378 /* TGLocationPickerWindowController.m */,
 				666000000000000000000002 /* TGVideoNoteRecorderWindowController.h */,
 				666000000000000000000003 /* TGVideoNoteRecorderWindowController.m */,
+				888000000000000000000004 /* TGQRCodeImageGenerator.h */,
+				888000000000000000000005 /* TGQRCodeImageGenerator.m */,
+				888000000000000000000006 /* TGQRCodeLoginWindowController.h */,
+				888000000000000000000007 /* TGQRCodeLoginWindowController.m */,
+				88800000000000000000000B /* TGReactionMenuRowView.h */,
+				88800000000000000000000C /* TGReactionMenuRowView.m */,
 				111111111111111111111391 /* TGLocationStaticMapView.h */,
 				111111111111111111111392 /* TGLocationStaticMapView.m */,
 				111111111111111111111395 /* TGLocationSearchService.h */,
@@ -870,6 +890,10 @@
 				333000000000000000000003 /* TGCallWindowController.m in Sources */,
 				444000000000000000000001 /* TGPrivacyPermissions.m in Sources */,
 				666000000000000000000001 /* TGVideoNoteRecorderWindowController.m in Sources */,
+				888000000000000000000001 /* TGQRCodeImageGenerator.m in Sources */,
+				888000000000000000000002 /* TGQRCodeLoginWindowController.m in Sources */,
+				888000000000000000000003 /* qrcodegen.c in Sources */,
+				88800000000000000000000A /* TGReactionMenuRowView.m in Sources */,
 				555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,

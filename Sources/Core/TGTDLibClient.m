@@ -252,6 +252,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_notificationScopeMutedByType;
     NSMutableDictionary *_savedMessagesTopicsByID;
     NSString *_latestAuthorizationStateSummary;
+    NSString *_latestAuthenticationQRCodeLink;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
@@ -505,6 +506,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     _networkProxyBootstrapAttempted = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
+    [_latestAuthenticationQRCodeLink release];
+    _latestAuthenticationQRCodeLink = nil;
     _mainChatListExhausted = NO;
     [_responseCondition broadcast];
     [_responseCondition unlock];
@@ -535,6 +538,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_savedMessagesTopicsByID release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
+    [_latestAuthenticationQRCodeLink release];
     [_sendLock release];
     [_receiverThread release];
     [_loadedPath release];
@@ -1261,6 +1265,22 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
     NSString *objectType = [[dictionary objectForKey:@"@type"] isKindOfClass:[NSString class]]
         ? [dictionary objectForKey:@"@type"] : @"";
+    NSDictionary *authorizationStateObject = nil;
+    if ([objectType isEqualToString:@"updateAuthorizationState"]) {
+        id state = [dictionary objectForKey:@"authorization_state"];
+        if ([state isKindOfClass:[NSDictionary class]]) {
+            authorizationStateObject = state;
+        }
+    } else if ([objectType hasPrefix:@"authorizationState"]) {
+        authorizationStateObject = dictionary;
+    }
+    NSString *qrCodeLink = nil;
+    if ([[authorizationStateObject objectForKey:@"@type"] isEqualToString:@"authorizationStateWaitOtherDeviceConfirmation"]) {
+        id link = [authorizationStateObject objectForKey:@"link"];
+        if ([link isKindOfClass:[NSString class]] && [(NSString *)link length] > 0) {
+            qrCodeLink = link;
+        }
+    }
     id extraObject = [dictionary objectForKey:@"@extra"];
     NSArray *chatFilterInfos = [self chatFilterInfoItemsFromUpdateObject:dictionary];
     NSString *scopeUpdateType = nil;
@@ -1284,6 +1304,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([authorizationSummary length] > 0) {
         [_latestAuthorizationStateSummary release];
         _latestAuthorizationStateSummary = [authorizationSummary copy];
+        [_latestAuthenticationQRCodeLink release];
+        _latestAuthenticationQRCodeLink = [qrCodeLink copy];
         _authorizationStateGeneration++;
     }
 
@@ -11095,6 +11117,68 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:trimmedPhone forKey:@"phone_number"];
     [request setObject:[NSNull null] forKey:@"settings"];
     return [self sendAuthorizationRequest:request actionName:@"phone number" waitingState:@"waitPhoneNumber" timeout:timeout errorCode:25 error:error];
+}
+
+- (NSString *)requestQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPhoneNumber"] &&
+        ![authorizationState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        if (error && [authorizationState length] > 0) {
+            NSString *message = [NSString stringWithFormat:@"QR sign-in is unavailable while TDLib is in %@.", authorizationState];
+            *error = [self errorWithDescription:message code:230];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"requestQrCodeAuthentication" forKey:@"@type"];
+    [request setObject:[NSArray array] forKey:@"other_user_ids"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-auth-qr"
+                                                            timeout:timeout
+                                                          errorCode:231
+                                                              error:error];
+    NSString *responseType = [[response objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [response objectForKey:@"@type"] : nil;
+    if (![responseType isEqualToString:@"ok"]) {
+        if (response && error) {
+            *error = [self errorWithTDLibErrorResponse:response code:231];
+        }
+        return nil;
+    }
+
+    NSTimeInterval safeTimeout = timeout;
+    if (safeTimeout < 0.5) {
+        safeTimeout = 0.5;
+    } else if (safeTimeout > 15.0) {
+        safeTimeout = 15.0;
+    }
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:safeTimeout];
+    NSString *link = nil;
+    [_responseCondition lock];
+    while ([_latestAuthenticationQRCodeLink length] == 0 &&
+           [[NSDate date] compare:deadline] == NSOrderedAscending) {
+        [_responseCondition waitUntilDate:deadline];
+    }
+    link = [_latestAuthenticationQRCodeLink copy];
+    [_responseCondition unlock];
+
+    if ([link length] == 0) {
+        [link release];
+        if (error) {
+            *error = [self errorWithDescription:@"Telegram accepted QR sign-in, but did not provide the confirmation link before the timeout." code:232];
+        }
+        return nil;
+    }
+    return [link autorelease];
+}
+
+- (NSString *)currentAuthenticationQRCodeLink {
+    [_responseCondition lock];
+    NSString *link = [_latestAuthenticationQRCodeLink copy];
+    [_responseCondition unlock];
+    return [link autorelease];
 }
 
 - (NSString *)submitAuthenticationCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error {
