@@ -45,7 +45,7 @@ static NSTextField *TGQRCodeLoginLabel(NSString *text, NSRect frame, NSFont *fon
 }
 
 - (id)initWithClient:(TGTDLibClient *)client {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 440.0, 510.0)
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 480.0, 570.0)
                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                      backing:NSBackingStoreBuffered
                                                        defer:NO] autorelease];
@@ -56,42 +56,42 @@ static NSTextField *TGQRCodeLoginLabel(NSString *text, NSRect frame, NSFont *fon
         _client = [client retain];
         [window setDelegate:self];
 
-        TGQRCodeLoginBackgroundView *contentView = [[[TGQRCodeLoginBackgroundView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 440.0, 510.0)] autorelease];
+        TGQRCodeLoginBackgroundView *contentView = [[[TGQRCodeLoginBackgroundView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 480.0, 570.0)] autorelease];
         [window setContentView:contentView];
 
         NSTextField *title = TGQRCodeLoginLabel(TGLoc(@"login.qr.title"),
-                                               NSMakeRect(28.0, 464.0, 384.0, 28.0),
+                                               NSMakeRect(28.0, 524.0, 424.0, 28.0),
                                                [NSFont boldSystemFontOfSize:20.0]);
         [title setTextColor:TGClassicHeaderTextColor(1.0)];
         [contentView addSubview:title];
 
         NSTextField *hint = TGQRCodeLoginLabel(TGLoc(@"login.qr.hint"),
-                                              NSMakeRect(38.0, 417.0, 364.0, 42.0),
+                                              NSMakeRect(42.0, 466.0, 396.0, 48.0),
                                               [NSFont systemFontOfSize:12.0]);
         [hint setTextColor:TGClassicHeaderDetailTextColor(1.0)];
         [[hint cell] setLineBreakMode:NSLineBreakByWordWrapping];
         [contentView addSubview:hint];
 
-        TGGroupedCardView *card = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(50.0, 92.0, 340.0, 320.0)] autorelease];
+        TGGroupedCardView *card = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(48.0, 96.0, 384.0, 358.0)] autorelease];
         [contentView addSubview:card];
 
-        _qrImageView = [[NSImageView alloc] initWithFrame:NSMakeRect(80.0, 134.0, 280.0, 280.0)];
+        _qrImageView = [[NSImageView alloc] initWithFrame:NSMakeRect(90.0, 146.0, 300.0, 300.0)];
         [_qrImageView setImageScaling:NSImageScaleProportionallyUpOrDown];
         [contentView addSubview:_qrImageView];
 
-        _spinner = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(207.0, 260.0, 26.0, 26.0)];
+        _spinner = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(227.0, 283.0, 26.0, 26.0)];
         [_spinner setStyle:NSProgressIndicatorSpinningStyle];
         [_spinner setDisplayedWhenStopped:NO];
         [contentView addSubview:_spinner];
 
         _statusField = [TGQRCodeLoginLabel(TGLoc(@"login.qr.loading"),
-                                          NSMakeRect(66.0, 104.0, 308.0, 24.0),
+                                          NSMakeRect(70.0, 108.0, 340.0, 26.0),
                                           [NSFont systemFontOfSize:12.0]) retain];
         [_statusField setTextColor:TGClassicCardMutedInkColor()];
         [[_statusField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
         [contentView addSubview:_statusField];
 
-        _closeButton = [[NSButton alloc] initWithFrame:NSMakeRect(158.0, 38.0, 124.0, 32.0)];
+        _closeButton = [[NSButton alloc] initWithFrame:NSMakeRect(178.0, 40.0, 124.0, 32.0)];
         [_closeButton setTitle:TGLoc(@"close")];
         [_closeButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"close")] autorelease]];
         [_closeButton setTarget:self];
@@ -141,7 +141,7 @@ static NSTextField *TGQRCodeLoginLabel(NSString *text, NSRect frame, NSFont *fon
 }
 
 - (void)showQRCodeLink:(NSString *)link {
-    NSImage *image = [TGQRCodeImageGenerator imageForString:link maximumSide:280.0];
+    NSImage *image = [TGQRCodeImageGenerator imageForString:link maximumSide:300.0];
     if (!image) {
         [self showError:TGLoc(@"login.qr.failed")];
         return;

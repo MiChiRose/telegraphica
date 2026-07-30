@@ -671,6 +671,7 @@
         [self.loginTitleField setStringValue:TGLoc(@"login.title")];
         [self.loginHintField setStringValue:TGLoc(@"login.phone.hint")];
         [self.authLabel setStringValue:TGLoc(@"login.phone.label")];
+        [self.authSecondaryLabel setStringValue:TGLoc(@"login.or")];
         [[self.authTextField cell] setPlaceholderString:@"+123456789"];
         [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];

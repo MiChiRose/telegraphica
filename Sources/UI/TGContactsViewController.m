@@ -100,8 +100,10 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
 @property (nonatomic, assign) BOOL loaded;
 @property (nonatomic, assign) NSUInteger requestGeneration;
 @property (nonatomic, assign) NSUInteger profileRequestGeneration;
+@property (nonatomic, assign) NSUInteger authorizationRetryCount;
 - (void)layoutContent;
 - (void)loadSelectedContactProfile;
+- (void)retryContactsAfterAuthorizationDelay;
 @end
 
 @implementation TGContactsViewController
@@ -128,6 +130,7 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
 @synthesize loaded = _loaded;
 @synthesize requestGeneration = _requestGeneration;
 @synthesize profileRequestGeneration = _profileRequestGeneration;
+@synthesize authorizationRetryCount = _authorizationRetryCount;
 
 - (id)initWithClient:(TGTDLibClient *)client {
     self = [super initWithNibName:nil bundle:nil];
@@ -341,6 +344,9 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(retryContactsAfterAuthorizationDelay)
+                                               object:nil];
     _delegate = nil;
     [_client release];
     [_titleField release];
@@ -410,9 +416,11 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
 }
 
 - (void)refreshContacts:(id)sender {
-    (void)sender;
     if (self.loading) {
         return;
+    }
+    if (sender && sender != self) {
+        self.authorizationRetryCount = 0;
     }
     self.requestGeneration++;
     self.profileRequestGeneration++;
@@ -428,20 +436,34 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *contactsError = nil;
         NSArray *contacts = [[client contactSummariesWithTimeout:12.0 error:&contactsError] copy];
+        NSInteger contactsErrorCode = [contactsError code];
         NSString *errorMessage = [[contactsError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (generation == controller.requestGeneration) {
                 [controller setLoading:NO];
                 controller.loaded = (contacts != nil);
                 if (contacts) {
+                    controller.authorizationRetryCount = 0;
                     controller.contacts = contacts;
                     [controller applySearchFilter];
                 } else {
                     controller.contacts = [NSArray array];
                     controller.filteredContacts = [NSArray array];
                     [controller.tableView reloadData];
-                    [controller.statusField setTextColor:[NSColor colorWithCalibratedRed:0.63 green:0.12 blue:0.10 alpha:1.0]];
-                    [controller.statusField setStringValue:([errorMessage length] > 0 ? errorMessage : TGLoc(@"contacts.error"))];
+                    if (contactsErrorCode == 201 && controller.authorizationRetryCount < 3) {
+                        controller.authorizationRetryCount++;
+                        [controller.statusField setTextColor:TGClassicMutedInkColor()];
+                        [controller.statusField setStringValue:TGLoc(@"contacts.authWaiting")];
+                        [controller performSelector:@selector(retryContactsAfterAuthorizationDelay)
+                                         withObject:nil
+                                         afterDelay:0.8];
+                    } else {
+                        [controller.statusField setTextColor:[NSColor colorWithCalibratedRed:0.63 green:0.12 blue:0.10 alpha:1.0]];
+                        [controller.statusField setStringValue:([errorMessage length] > 0 &&
+                                                                contactsErrorCode != 201
+                                                                    ? errorMessage
+                                                                    : TGLoc(@"contacts.error"))];
+                    }
                 }
             }
             [contacts release];
@@ -451,6 +473,12 @@ static NSString *TGContactsSubtitle(NSDictionary *contact) {
         });
         [pool drain];
     });
+}
+
+- (void)retryContactsAfterAuthorizationDelay {
+    if (!self.loading && !self.loaded) {
+        [self refreshContacts:self];
+    }
 }
 
 - (void)applySearchFilter {

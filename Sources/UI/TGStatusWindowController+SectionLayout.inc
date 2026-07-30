@@ -88,7 +88,8 @@
     [self showView:self.authStateField visible:(showLogin && self.loginErrorVisible)];
     [self showView:self.authTextFieldBackgroundView visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
     [self showView:self.authTextField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitPhoneNumber"] || [self.currentAuthState isEqualToString:@"waitCode"]))];
-    [self showView:self.authSecondaryLabel visible:NO];
+    [self showView:self.authSecondaryLabel
+           visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPhoneNumber"])];
     [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
     [self showView:self.authSecureField visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPassword"])];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
@@ -627,7 +628,8 @@
     if (loginWidth < 390.0) {
         loginWidth = loginAreaWidth - 24.0;
     }
-    CGFloat loginHeight = 276.0;
+    BOOL phoneLoginLayout = [self.currentAuthState isEqualToString:@"waitPhoneNumber"];
+    CGFloat loginHeight = phoneLoginLayout ? 330.0 : 276.0;
     CGFloat loginX = loginAreaX + floor((loginAreaWidth - loginWidth) / 2.0);
     CGFloat centeredLoginY = loginAreaY + floor((loginAreaHeight - loginHeight) / 2.0) - 8.0;
     CGFloat brandIconSide = 68.0;
@@ -652,8 +654,10 @@
     [self.loginPanelView setFrame:NSMakeRect(loginX, loginY, loginWidth, loginHeight)];
     [self.loginTitleField setFrame:NSMakeRect(loginX + 36.0, loginY + loginHeight - 58.0, loginWidth - 72.0, 28.0)];
     [self.loginHintField setFrame:NSMakeRect(loginX + 54.0, loginY + loginHeight - 112.0, loginWidth - 108.0, 44.0)];
-    [self.authLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 114.0, loginWidth - 108.0, 18.0)];
-    [self.authSecondaryLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 94.0, loginWidth - 108.0, 18.0)];
+    CGFloat primaryInputY = phoneLoginLayout ? (loginY + 72.0) : (loginY + 82.0);
+    CGFloat authLabelY = phoneLoginLayout ? (loginY + 109.0) : (loginY + 114.0);
+    [self.authLabel setFrame:NSMakeRect(loginX + 54.0, authLabelY, loginWidth - 108.0, 18.0)];
+    [self.authSecondaryLabel setFrame:NSMakeRect(loginX + 54.0, loginY + 140.0, loginWidth - 108.0, 18.0)];
     CGFloat loginButtonWidth = 92.0;
     CGFloat loginInputX = loginX + 54.0;
     CGFloat loginButtonX = loginX + loginWidth - 54.0 - loginButtonWidth;
@@ -661,7 +665,6 @@
     if (loginInputWidth < 180.0) {
         loginInputWidth = 180.0;
     }
-    CGFloat primaryInputY = loginY + 82.0;
     CGFloat secondaryInputY = loginY + 62.0;
     CGFloat loginErrorHeight = 28.0;
     CGFloat loginErrorGap = 4.0;
@@ -672,6 +675,12 @@
     [self.authSecondaryTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, secondaryInputY, loginInputWidth, 32.0)];
     [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
+    CGFloat qrButtonWidth = phoneLoginLayout ? 220.0 : 190.0;
+    CGFloat qrButtonY = phoneLoginLayout ? (loginY + 166.0) : (loginY + 94.0);
+    [self.qrLoginButton setFrame:NSMakeRect(loginX + floor((loginWidth - qrButtonWidth) / 2.0),
+                                            qrButtonY,
+                                            qrButtonWidth,
+                                            34.0)];
     [self.busySpinner setFrame:NSMakeRect(loginX + loginWidth - 36.0, primaryInputY + 8.0, 16.0, 16.0)];
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
     CGFloat loginLanguageX = margin;

@@ -1301,7 +1301,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     [_responseCondition lock];
-    if ([authorizationSummary length] > 0) {
+    BOOL isAuthorizationUpdate = [objectType isEqualToString:@"updateAuthorizationState"];
+    BOOL shouldSeedAuthorizationCache = ([authorizationSummary length] > 0 &&
+                                         isAuthorizationUpdate);
+    if (shouldSeedAuthorizationCache) {
         [_latestAuthorizationStateSummary release];
         _latestAuthorizationStateSummary = [authorizationSummary copy];
         [_latestAuthenticationQRCodeLink release];
