@@ -1706,10 +1706,17 @@ def check_qr_login_and_reaction_picker_contract(errors):
         if fragment not in contacts_text:
             errors.append("%s: post-authorization contact retry is missing `%s`" %
                           (contacts_rel, fragment))
-    for fragment in ["circularMaskLayerForBounds:", "setMask:"]:
+    for fragment in ["previewClipLayer",
+                     "setCornerRadius:180.0",
+                     "[self.previewClipLayer addSublayer:self.cameraPreviewLayer]",
+                     "TGThemeDrawGroupedCardInPath(backgroundPath"]:
         if fragment not in video_note_text:
-            errors.append("%s: video-note preview mask is missing `%s`" %
+            errors.append("%s: video-note opaque circular preview host is missing `%s`" %
                           (video_note_rel, fragment))
+    if "[self.cameraPreviewLayer setMask:" in video_note_text:
+        errors.append(
+            "%s: AVCaptureVideoPreviewLayer must not be masked directly on "
+            "legacy Core Animation" % video_note_rel)
     for source_name in [
         "TGQRCodeImageGenerator.m",
         "TGQRCodeLoginWindowController.m",
