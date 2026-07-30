@@ -428,7 +428,11 @@
         [self.visibleReadReceiptMessageIDs removeAllObjects];
     }
     [self updateOutgoingReadStateForVisibleMessages];
-    [self refreshSelectedChatHeaderDisplay];
+    if (selectionChanged) {
+        [self refreshSelectedChatBirthdayStatus];
+    } else {
+        [self refreshSelectedChatHeaderDisplay];
+    }
     BOOL shouldOpenTopicList = (!selectedForumTopic &&
                                 !self.showingForumTopicList &&
                                 !self.chatNavigationClosed &&

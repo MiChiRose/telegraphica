@@ -1770,6 +1770,36 @@ def check_server_reaction_catalog_contract(errors):
                       project_rel)
 
 
+def check_contact_birthday_contract(errors):
+    core_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    profile_rel = os.path.join("Sources", "UI", "TGContactProfileView.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BirthdayStatus.inc")
+    flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    core_text = read_text(os.path.join(ROOT, core_rel))
+    profile_text = read_text(os.path.join(ROOT, profile_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    flow_text = read_text(os.path.join(ROOT, flow_rel))
+    for fragment in ['objectForKey:@"birthdate"', 'forKey:@"birthdate"']:
+        if fragment not in core_text:
+            errors.append("%s: contact birthday parsing is missing `%s`" %
+                          (core_rel, fragment))
+    for fragment in ["TGContactProfileBirthday", 'TGLoc(@"profile.birthday")']:
+        if fragment not in profile_text:
+            errors.append("%s: birthday profile row is missing `%s`" %
+                          (profile_rel, fragment))
+    for fragment in [
+        "refreshSelectedChatBirthdayStatus",
+        "TGBirthdateIsToday",
+        'TGLoc(@"chat.birthdayToday")',
+        "selectedChatBirthdayGeneration",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: birthday chat banner is missing `%s`" %
+                          (host_rel, fragment))
+    if "[self refreshSelectedChatBirthdayStatus]" not in flow_text:
+        errors.append("%s: chat selection does not refresh birthday status" % flow_rel)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1800,6 +1830,7 @@ def main():
     check_qr_login_and_reaction_picker_contract(errors)
     check_forum_topic_management_contract(errors)
     check_server_reaction_catalog_contract(errors)
+    check_contact_birthday_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

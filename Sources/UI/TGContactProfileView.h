@@ -11,6 +11,8 @@
     NSTextField *_usernameValueField;
     NSTextField *_phoneTitleField;
     NSTextField *_phoneValueField;
+    NSTextField *_birthdayTitleField;
+    NSTextField *_birthdayValueField;
     NSTextField *_bioTitleField;
     NSTextField *_bioValueField;
     NSTextField *_hintField;

@@ -34,6 +34,34 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     return @"";
 }
 
+static NSString *TGContactProfileBirthday(NSDictionary *contact) {
+    NSDictionary *birthdate = [contact objectForKey:@"birthdate"];
+    NSInteger day = [[birthdate objectForKey:@"day"] integerValue];
+    NSInteger month = [[birthdate objectForKey:@"month"] integerValue];
+    NSInteger year = [[birthdate objectForKey:@"year"] integerValue];
+    if (![birthdate isKindOfClass:[NSDictionary class]] ||
+        day < 1 || day > 31 || month < 1 || month > 12) {
+        return TGLoc(@"contacts.notAvailable");
+    }
+    NSDateComponents *components = [[[NSDateComponents alloc] init] autorelease];
+    [components setDay:day];
+    [components setMonth:month];
+    [components setYear:(year > 0 ? year : 2000)];
+    NSDate *date = [[NSCalendar currentCalendar] dateFromComponents:components];
+    if (!date) {
+        return TGLoc(@"contacts.notAvailable");
+    }
+    NSDateFormatter *formatter = [[[NSDateFormatter alloc] init] autorelease];
+    [formatter setDateStyle:NSDateFormatterLongStyle];
+    [formatter setTimeStyle:NSDateFormatterNoStyle];
+    NSString *formatted = [formatter stringFromDate:date];
+    if (year <= 0) {
+        [formatter setDateFormat:@"d MMMM"];
+        formatted = [formatter stringFromDate:date];
+    }
+    return ([formatted length] > 0 ? formatted : TGLoc(@"contacts.notAvailable"));
+}
+
 @implementation TGContactProfileView
 
 - (id)initWithFrame:(NSRect)frame {
@@ -49,6 +77,8 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
         _usernameValueField = [TGContactProfileLabel(NSZeroRect, [NSFont systemFontOfSize:12.0], NSLeftTextAlignment) retain];
         _phoneTitleField = [TGContactProfileLabel(NSZeroRect, [NSFont boldSystemFontOfSize:11.0], NSLeftTextAlignment) retain];
         _phoneValueField = [TGContactProfileLabel(NSZeroRect, [NSFont systemFontOfSize:12.0], NSLeftTextAlignment) retain];
+        _birthdayTitleField = [TGContactProfileLabel(NSZeroRect, [NSFont boldSystemFontOfSize:11.0], NSLeftTextAlignment) retain];
+        _birthdayValueField = [TGContactProfileLabel(NSZeroRect, [NSFont systemFontOfSize:12.0], NSLeftTextAlignment) retain];
         _bioTitleField = [TGContactProfileLabel(NSZeroRect, [NSFont boldSystemFontOfSize:11.0], NSLeftTextAlignment) retain];
         _bioValueField = [TGContactProfileLabel(NSZeroRect, [NSFont systemFontOfSize:12.0], NSLeftTextAlignment) retain];
         [[_bioValueField cell] setLineBreakMode:NSLineBreakByWordWrapping];
@@ -61,6 +91,8 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
         [self addSubview:_usernameValueField];
         [self addSubview:_phoneTitleField];
         [self addSubview:_phoneValueField];
+        [self addSubview:_birthdayTitleField];
+        [self addSubview:_birthdayValueField];
         [self addSubview:_bioTitleField];
         [self addSubview:_bioValueField];
         [self addSubview:_hintField];
@@ -86,6 +118,9 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     rowY -= 32.0;
     [_phoneTitleField setFrame:NSMakeRect(inset, rowY, 84.0, 17.0)];
     [_phoneValueField setFrame:NSMakeRect(inset + 88.0, rowY, MAX(60.0, width - inset * 2.0 - 88.0), 17.0)];
+    rowY -= 32.0;
+    [_birthdayTitleField setFrame:NSMakeRect(inset, rowY, 84.0, 17.0)];
+    [_birthdayValueField setFrame:NSMakeRect(inset + 88.0, rowY, MAX(60.0, width - inset * 2.0 - 88.0), 17.0)];
     rowY -= 34.0;
     [_bioTitleField setFrame:NSMakeRect(inset, rowY, MAX(80.0, width - inset * 2.0), 17.0)];
     [_bioValueField setFrame:NSMakeRect(inset, 20.0, MAX(80.0, width - inset * 2.0), MAX(38.0, rowY - 24.0))];
@@ -100,6 +135,8 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     [_usernameValueField setHidden:hidden];
     [_phoneTitleField setHidden:hidden];
     [_phoneValueField setHidden:hidden];
+    [_birthdayTitleField setHidden:hidden];
+    [_birthdayValueField setHidden:hidden];
     [_bioTitleField setHidden:hidden];
     [_bioValueField setHidden:hidden];
 }
@@ -137,6 +174,7 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     [_statusField setStringValue:TGContactProfilePresence(_contact)];
     [_usernameTitleField setStringValue:TGLoc(@"profile.username")];
     [_phoneTitleField setStringValue:TGLoc(@"profile.phone")];
+    [_birthdayTitleField setStringValue:TGLoc(@"profile.birthday")];
     [_bioTitleField setStringValue:TGLoc(@"profile.about")];
 
     NSString *username = [_contact objectForKey:@"username"];
@@ -145,6 +183,7 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     NSString *phoneValue = [phone hasPrefix:@"+"] ? phone : [NSString stringWithFormat:@"+%@", phone];
     [_usernameValueField setStringValue:([username length] > 0 ? [NSString stringWithFormat:@"@%@", username] : TGLoc(@"contacts.notAvailable"))];
     [_phoneValueField setStringValue:([phone length] > 0 ? phoneValue : TGLoc(@"contacts.notAvailable"))];
+    [_birthdayValueField setStringValue:TGContactProfileBirthday(_contact)];
     [_bioValueField setStringValue:([bio length] > 0 ? bio : TGLoc(@"contacts.notAvailable"))];
     [self resizeSubviewsWithOldSize:NSZeroSize];
 }
@@ -159,9 +198,11 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     [_statusField setTextColor:TGClassicCardMutedInkColor()];
     [_usernameTitleField setTextColor:TGClassicCardMutedInkColor()];
     [_phoneTitleField setTextColor:TGClassicCardMutedInkColor()];
+    [_birthdayTitleField setTextColor:TGClassicCardMutedInkColor()];
     [_bioTitleField setTextColor:TGClassicCardMutedInkColor()];
     [_usernameValueField setTextColor:TGClassicCardInkColor()];
     [_phoneValueField setTextColor:TGClassicCardInkColor()];
+    [_birthdayValueField setTextColor:TGClassicCardInkColor()];
     [_bioValueField setTextColor:TGClassicCardInkColor()];
     [_hintField setTextColor:TGClassicCardMutedInkColor()];
     [self setNeedsDisplay:YES];
@@ -176,6 +217,8 @@ static NSString *TGContactProfilePresence(NSDictionary *contact) {
     [_usernameValueField release];
     [_phoneTitleField release];
     [_phoneValueField release];
+    [_birthdayTitleField release];
+    [_birthdayValueField release];
     [_bioTitleField release];
     [_bioValueField release];
     [_hintField release];
