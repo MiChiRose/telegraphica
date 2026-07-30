@@ -1629,6 +1629,8 @@ def check_qr_login_and_reaction_picker_contract(errors):
         '"requestQrCodeAuthentication"',
         '"authorizationStateWaitOtherDeviceConfirmation"',
         "currentAuthenticationQRCodeLink",
+        "cancelPendingQRCodeAuthenticationWithTimeout:",
+        '"telegraphica-cancel-qr-auth"',
         'isEqualToString:@"updateAuthorizationState"',
         "shouldSeedAuthorizationCache",
     ]:
@@ -1661,9 +1663,11 @@ def check_qr_login_and_reaction_picker_contract(errors):
         'isEqualToString:@"waitOtherDeviceConfirmation"',
         'TGLoc(@"login.or")',
         "qrCodeLoginWindowControllerDidCancel:",
+        "recoverPhoneLoginFromPendingQRCodeState",
+        "cancelPendingQRCodeAuthenticationWithTimeout:8.0",
         "shutdownWithTimeout:1.0",
-        "detached the QR client and restored phone-number sign-in",
         "qrPhoneLoginRecoveryVisible",
+        "authorizationPresentationState",
     ]:
         if fragment not in auth_text:
             errors.append("%s: QR login host wiring is missing `%s`" %
@@ -1673,15 +1677,27 @@ def check_qr_login_and_reaction_picker_contract(errors):
     cancel_method_end = auth_text.find(
         "- (BOOL)isTerminalAuthorizationState:", cancel_method_start)
     cancel_method = auth_text[cancel_method_start:cancel_method_end]
-    client_detach = cancel_method.find("self.client = replacementClient;")
-    background_shutdown = cancel_method.find(
-        "dispatch_async(dispatch_get_global_queue")
-    if cancel_method_start < 0 or client_detach < 0 or background_shutdown < 0:
+    explicit_cancel = cancel_method.find(
+        "recoverPhoneLoginFromPendingQRCodeState")
+    phone_recovery_presentation = cancel_method.find(
+        "self.qrPhoneLoginRecoveryVisible = YES;")
+    if cancel_method_start < 0 or explicit_cancel < 0 or phone_recovery_presentation < 0:
         errors.append("%s: QR cancellation recovery flow is incomplete" % auth_rel)
-    elif client_detach > background_shutdown:
+    client_cancel_start = client_text.find(
+        "- (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:")
+    client_cancel_end = client_text.find(
+        "- (NSDictionary *)currentUserProfileSummaryWithTimeout:",
+        client_cancel_start)
+    client_cancel_method = client_text[client_cancel_start:client_cancel_end]
+    if (client_cancel_start < 0 or
+            'setObject:@"logOut" forKey:@"@type"' not in client_cancel_method):
         errors.append(
-            "%s: QR client must be detached before asynchronous shutdown "
-            "to prevent stale waitOtherDeviceConfirmation UI" % auth_rel)
+            "%s: pending QR authentication must be canceled through TDLib "
+            "before the client is replaced" % client_rel)
+    for fragment in ["authorizationPresentationState"]:
+        if fragment not in layout_text:
+            errors.append("%s: QR phone recovery layout is missing `%s`" %
+                          (layout_rel, fragment))
     for fragment in ["phoneLoginLayout", "qrButtonY", "qrButtonWidth"]:
         if fragment not in layout_text:
             errors.append("%s: QR/phone login layout is missing `%s`" %

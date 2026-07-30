@@ -10701,6 +10701,98 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib has no pending QR authentication to cancel. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:397];
+        }
+        return nil;
+    }
+
+    /*
+     * TDLib has no separate cancelQrCodeAuthentication function. In the
+     * unauthenticated waitOtherDeviceConfirmation state, logOut destroys only
+     * the temporary authentication keys and clears the persisted QR state.
+     * The ready-session logout path above remains guarded separately.
+     */
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"logOut" forKey:@"@type"];
+    NSString *extra = [self uniqueExtraWithPrefix:@"telegraphica-cancel-qr-auth"];
+    [request setObject:extra forKey:@"@extra"];
+    NSUInteger generation = [self authorizationStateGeneration];
+    NSError *responseError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request
+                                    waitingForExtra:extra
+                                            timeout:timeout
+                                          errorCode:398
+                                              error:&responseError];
+    if (!response) {
+        if (error) {
+            *error = responseError ? responseError : [self errorWithDescription:@"TDLib did not acknowledge QR authentication cancellation before timeout." code:398];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib QR authentication cancellation returned an unexpected response." code:399];
+        }
+        return nil;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSString *waitingState = @"waitOtherDeviceConfirmation";
+    NSUInteger waitingGeneration = generation;
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        NSString *cachedSummary = [self cachedAuthorizationStateSummary];
+        if ([cachedSummary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"QR authentication canceled; auth state: closed";
+        }
+        if ([cachedSummary isEqualToString:@"waitPhoneNumber"]) {
+            return @"QR authentication canceled; auth state: waitPhoneNumber";
+        }
+
+        NSTimeInterval remaining = [deadline timeIntervalSinceNow];
+        if (remaining <= 0.0) {
+            break;
+        }
+        NSString *summary = [self waitForAuthorizationStateDifferentFromState:waitingState
+                                                              afterGeneration:waitingGeneration
+                                                                      timeout:remaining];
+        if ([summary length] == 0) {
+            break;
+        }
+        if ([summary hasPrefix:@"error"]) {
+            if (error) {
+                *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected QR authentication cancellation: %@", summary] code:400];
+            }
+            return nil;
+        }
+        if ([summary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"QR authentication canceled; auth state: closed";
+        }
+        if ([summary isEqualToString:@"waitPhoneNumber"]) {
+            return @"QR authentication canceled; auth state: waitPhoneNumber";
+        }
+
+        waitingState = summary;
+        waitingGeneration = [self authorizationStateGeneration];
+    }
+
+    /*
+     * The logOut response means TDLib accepted destruction of the temporary
+     * QR keys. The owning controller still closes this client and starts a
+     * fresh one, so a slow terminal update must not resurrect QR-only UI.
+     */
+    return @"QR authentication cancellation accepted; restarting authentication";
+}
+
 - (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {

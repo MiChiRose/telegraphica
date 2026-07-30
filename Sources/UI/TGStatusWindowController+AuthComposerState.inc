@@ -33,6 +33,15 @@
            [state isEqualToString:@"waitPassword"];
 }
 
+- (NSString *)authorizationPresentationState {
+    if (self.qrPhoneLoginRecoveryVisible &&
+        ([self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"] ||
+         [self isTerminalAuthorizationState:self.currentAuthState])) {
+        return @"waitPhoneNumber";
+    }
+    return self.currentAuthState;
+}
+
 - (void)openQRCodeLogin:(id)sender {
     (void)sender;
     if (![self.currentAuthState isEqualToString:@"waitPhoneNumber"] &&
@@ -67,43 +76,79 @@
 
     [controller setDelegate:nil];
     self.qrLoginWindowController = nil;
+    self.authSubmissionInFlight = NO;
+    self.qrPhoneLoginRecoveryVisible = YES;
+    [self recoverPhoneLoginFromPendingQRCodeState];
+}
+
+- (void)recoverPhoneLoginFromPendingQRCodeState {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(recoverPhoneLoginFromPendingQRCodeState)
+                                               object:nil];
+    if (self.authClientRecoveryInFlight) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        if ([self.currentAuthState isEqualToString:@"waitPhoneNumber"]) {
+            self.qrPhoneLoginRecoveryVisible = NO;
+            [self updateAuthControlsForState:self.currentAuthState];
+        }
+        return;
+    }
+
     self.authClientRecoveryInFlight = YES;
     self.authSubmissionInFlight = NO;
     self.qrPhoneLoginRecoveryVisible = YES;
-    TGTDLibClient *clientToReplace = [self.client retain];
-    TGTDLibClient *replacementClient = [[TGTDLibClient alloc] init];
-
-    /*
-     * Detach the QR client before asking it to close. Its queued
-     * waitOtherDeviceConfirmation update must never repaint the phone form
-     * while shutdown is in progress.
-     */
-    self.client = replacementClient;
-    [replacementClient release];
-    self.initialConnectStarted = NO;
     [self setControlsBusy:YES];
     [self updateAuthControlsForState:self.currentAuthState];
-    [self appendDetail:@"QR sign-in closed; detached the QR client and restored phone-number sign-in."];
+    [self.statusField setStringValue:TGLoc(@"login.qr.returningToPhone")];
+    [self appendDetail:@"Canceling the pending TDLib QR authentication before returning to phone-number sign-in."];
 
-    TGTDLibClient *expectedReplacement = [self.client retain];
+    TGTDLibClient *clientToReset = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        [clientToReplace shutdownWithTimeout:1.0];
-        [NSThread sleepForTimeInterval:0.15];
+        NSError *cancelError = nil;
+        NSString *cancelSummary = [[clientToReset cancelPendingQRCodeAuthenticationWithTimeout:8.0
+                                                                                         error:&cancelError] copy];
+        NSString *cancelErrorMessage = [[cancelError localizedDescription] copy];
+        if (cancelSummary) {
+            [clientToReset shutdownWithTimeout:1.0];
+            [NSThread sleepForTimeInterval:0.15];
+        }
+        TGTDLibClient *replacementClient = cancelSummary
+            ? [[[TGTDLibClient alloc] init] autorelease]
+            : nil;
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.client == expectedReplacement) {
+            if (self.client == clientToReset && cancelSummary) {
+                self.client = replacementClient;
+                self.initialConnectStarted = NO;
+                [self updateAuthControlsForState:@"closed"];
                 self.authClientRecoveryInFlight = NO;
+                [self appendDetail:[NSString stringWithFormat:@"TDLib QR authentication reset: %@", cancelSummary]];
                 [self setControlsBusy:NO];
                 [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            } else if (self.client == clientToReset) {
+                self.qrPhoneLoginRecoveryVisible = NO;
+                [self setControlsBusy:NO];
+                [self.statusField setStringValue:TGLoc(@"login.qr.cancelFailed")];
+                [self setLoginErrorMessage:([cancelErrorMessage length] > 0
+                    ? cancelErrorMessage
+                    : TGLoc(@"login.qr.cancelFailed"))];
+                [self updateAuthControlsForState:self.currentAuthState];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib QR authentication reset failed: %@",
+                                    [cancelErrorMessage length] > 0
+                                        ? cancelErrorMessage
+                                        : @"unknown error"]];
+                self.authClientRecoveryInFlight = NO;
             } else {
                 self.authClientRecoveryInFlight = NO;
-                [self setControlsBusy:NO];
             }
-            [expectedReplacement release];
+            [cancelSummary release];
+            [cancelErrorMessage release];
         });
 
-        [clientToReplace release];
+        [clientToReset release];
         [pool drain];
     });
 }
@@ -599,6 +644,22 @@
 
 - (void)updateAuthControlsForState:(NSString *)state {
     NSString *transportState = state;
+    if ([transportState isEqualToString:@"waitOtherDeviceConfirmation"] &&
+        !self.qrLoginWindowController &&
+        !self.authClientRecoveryInFlight) {
+        /*
+         * QR confirmation is persisted by TDLib. If the QR window no longer
+         * exists (including after a relaunch), cancel that unfinished login
+         * before offering phone-number authorization again.
+         */
+        self.qrPhoneLoginRecoveryVisible = YES;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(recoverPhoneLoginFromPendingQRCodeState)
+                                                   object:nil];
+        [self performSelector:@selector(recoverPhoneLoginFromPendingQRCodeState)
+                   withObject:nil
+                   afterDelay:0.05];
+    }
     if (self.qrPhoneLoginRecoveryVisible &&
         ([transportState isEqualToString:@"waitPhoneNumber"] ||
          [transportState isEqualToString:@"waitCode"] ||
@@ -607,11 +668,11 @@
         self.qrPhoneLoginRecoveryVisible = NO;
     }
     if (self.qrPhoneLoginRecoveryVisible &&
-        [transportState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        ([transportState isEqualToString:@"waitOtherDeviceConfirmation"] ||
+         [self isTerminalAuthorizationState:transportState])) {
         /*
-         * The detached QR client can report this state once more while it is
-         * closing. Keep presenting phone login until the replacement client
-         * reaches waitPhoneNumber instead of flashing back to QR-only UI.
+         * Keep presenting phone login while TDLib destroys the temporary QR
+         * keys and the replacement client reaches waitPhoneNumber.
          */
         state = @"waitPhoneNumber";
     }
