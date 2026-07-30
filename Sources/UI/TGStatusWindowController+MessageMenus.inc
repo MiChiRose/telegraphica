@@ -615,6 +615,23 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         addedMessageAction = YES;
     }
 
+    NSString *messageLinkChatType = [self.selectedChatTypeSummary isKindOfClass:[NSString class]]
+        ? self.selectedChatTypeSummary
+        : @"";
+    BOOL supportsMessageLinks = ([messageLinkChatType isEqualToString:@"Group"] ||
+                                 [messageLinkChatType isEqualToString:@"Supergroup"] ||
+                                 [messageLinkChatType isEqualToString:@"Channel"]);
+    if (supportsMessageLinks) {
+        NSMenuItem *copyLinkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.copyLink")
+                                                               action:@selector(copyMessageLinkFromMenu:)
+                                                        keyEquivalent:@""] autorelease];
+        [copyLinkItem setRepresentedObject:item];
+        [copyLinkItem setTarget:self];
+        [copyLinkItem setEnabled:[self.currentAuthState isEqualToString:@"ready"]];
+        [menu addItem:copyLinkItem];
+        addedMessageAction = YES;
+    }
+
     if ([item isPollMessage]) {
         NSMenuItem *pollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.poll.vote")
                                                            action:nil
@@ -822,6 +839,55 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [pasteboard clearContents];
     [pasteboard setString:text forType:NSStringPboardType];
     [self appendDetail:@"Message text copied to clipboard."];
+}
+
+- (void)copyMessageLinkFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    NSNumber *chatID = [[NSNumber numberWithLongLong:[[item chatID] longLongValue]] retain];
+    NSNumber *messageID = [[NSNumber numberWithLongLong:[[item messageID] longLongValue]] retain];
+    BOOL inMessageThread = ([self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)] &&
+                            [self.selectedMessageThreadID longLongValue] > 0LL);
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:TGLoc(@"message.linkCopying")];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *linkError = nil;
+        NSString *messageLink = [[client messageLinkForChatID:chatID
+                                                   messageID:messageID
+                                             inMessageThread:inMessageThread
+                                                     timeout:6.0
+                                                       error:&linkError] copy];
+        NSString *errorMessage = [[linkError localizedDescription] copy];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([messageLink length] > 0) {
+                NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+                [pasteboard clearContents];
+                [pasteboard setString:messageLink forType:NSStringPboardType];
+                [self.statusField setStringValue:TGLoc(@"message.linkCopied")];
+                [self appendDetail:@"Message link copied to clipboard."];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"message.linkUnavailable")];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib message link: %@",
+                                    [errorMessage length] > 0 ? errorMessage : @"link unavailable"]];
+                NSBeep();
+            }
+            [messageLink release];
+            [errorMessage release];
+            [chatID release];
+            [messageID release];
+            [client release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)editMessageFromMenu:(id)sender {

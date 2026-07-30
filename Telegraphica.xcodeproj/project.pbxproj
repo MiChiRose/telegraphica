@@ -106,6 +106,7 @@
 		333000000000000000000002 /* TGCallCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 333000000000000000000005 /* TGCallCoordinator.m */; };
 		333000000000000000000003 /* TGCallWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 333000000000000000000007 /* TGCallWindowController.m */; };
 		444000000000000000000001 /* TGPrivacyPermissions.m in Sources */ = {isa = PBXBuildFile; fileRef = 444000000000000000000003 /* TGPrivacyPermissions.m */; };
+		555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */ = {isa = PBXBuildFile; fileRef = 555000000000000000000003 /* TGTDLibClient+MessageLinks.m */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
@@ -328,6 +329,8 @@
 		333000000000000000000007 /* TGCallWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGCallWindowController.m; sourceTree = "<group>"; };
 		444000000000000000000002 /* TGPrivacyPermissions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGPrivacyPermissions.h; sourceTree = "<group>"; };
 		444000000000000000000003 /* TGPrivacyPermissions.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGPrivacyPermissions.m; sourceTree = "<group>"; };
+		555000000000000000000002 /* TGTDLibClient+MessageLinks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MessageLinks.h"; sourceTree = "<group>"; };
+		555000000000000000000003 /* TGTDLibClient+MessageLinks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MessageLinks.m"; sourceTree = "<group>"; };
 		111111111111111111111381 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		111111111111111111111240 /* Telegraphica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Telegraphica.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		221000000000000000000001 /* TGWorkshopCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Catalog/TGWorkshopCatalog.m; sourceTree = "<group>"; };
@@ -452,6 +455,8 @@
 				111111111111111111111394 /* TGTDLibClient+LocationMessages.m */,
 				111111111111111111111397 /* TGTDLibClient+ChatHistory.h */,
 				111111111111111111111398 /* TGTDLibClient+ChatHistory.m */,
+				555000000000000000000002 /* TGTDLibClient+MessageLinks.h */,
+				555000000000000000000003 /* TGTDLibClient+MessageLinks.m */,
 				111111111111111111111387 /* TGTDLibClient+Calls.h */,
 				111111111111111111111388 /* TGTDLibClient+Calls.m */,
 				111111111111111111111290 /* TGTDLibBundledCredentials.h */,
@@ -849,6 +854,7 @@
 				333000000000000000000002 /* TGCallCoordinator.m in Sources */,
 				333000000000000000000003 /* TGCallWindowController.m in Sources */,
 				444000000000000000000001 /* TGPrivacyPermissions.m in Sources */,
+				555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */,
 				220000000000000000000001 /* TGWorkshopCatalog.m in Sources */,
 				220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */,
 				220000000000000000000003 /* TGWorkshopCatalogEntry.m in Sources */,

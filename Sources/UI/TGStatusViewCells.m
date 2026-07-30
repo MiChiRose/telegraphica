@@ -143,7 +143,8 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                                10.0,
                                                10.0);
             NSBezierPath *compactDotPath = [NSBezierPath bezierPathWithOvalInRect:compactDotRect];
-            [TGClassicHeaderBottomColor() set];
+            NSColor *manualUnreadColor = selected ? TGClassicSelectedRowTextColor() : TGColorFromHex(0x2D8BD4);
+            [manualUnreadColor set];
             [compactDotPath fill];
         }
         return;
@@ -226,7 +227,7 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         [unreadString drawInRect:unreadTextRect withAttributes:centeredUnreadAttributes];
     } else if (drawsMarkedUnreadDot) {
         NSBezierPath *unreadDotPath = [NSBezierPath bezierPathWithOvalInRect:unreadRect];
-        NSColor *unreadFillColor = selected ? TGClassicSelectedRowTextColor() : TGClassicHeaderBottomColor();
+        NSColor *unreadFillColor = selected ? TGClassicSelectedRowTextColor() : TGColorFromHex(0x2D8BD4);
         [unreadFillColor set];
         [unreadDotPath fill];
     }
