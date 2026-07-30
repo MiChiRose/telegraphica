@@ -436,6 +436,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTextField *messagesLabel;
 @property (nonatomic, retain) NSTextField *selectedChatField;
 @property (nonatomic, retain) NSTextField *typingIndicatorField;
+@property (nonatomic, copy) NSString *selectedChatBirthdayText;
+@property (nonatomic, assign) NSUInteger selectedChatBirthdayGeneration;
 @property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
 @property (nonatomic, retain) NSButton *selectedChatProfileButton;
 @property (nonatomic, retain) NSButton *selectedChatCallButton;
@@ -939,6 +941,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messagesLabel = _messagesLabel;
 @synthesize selectedChatField = _selectedChatField;
 @synthesize typingIndicatorField = _typingIndicatorField;
+@synthesize selectedChatBirthdayText = _selectedChatBirthdayText;
+@synthesize selectedChatBirthdayGeneration = _selectedChatBirthdayGeneration;
 @synthesize selectedChatAvatarView = _selectedChatAvatarView;
 @synthesize selectedChatProfileButton = _selectedChatProfileButton;
 @synthesize selectedChatCallButton = _selectedChatCallButton;
@@ -2033,6 +2037,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [self.selectedChatID respondsToSelector:@selector(longLongValue)] &&
         [self.typingChatID longLongValue] == [self.selectedChatID longLongValue]) {
         typingText = self.typingIndicatorText;
+    }
+    if ([typingText length] == 0 && [self.selectedChatBirthdayText length] > 0) {
+        typingText = self.selectedChatBirthdayText;
     }
     [self.typingIndicatorField setStringValue:typingText];
     [self.typingIndicatorField setHidden:([typingText length] == 0)];
@@ -4320,6 +4327,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+ReactionCatalog.inc"
 
+#include "TGStatusWindowController+BirthdayStatus.inc"
+
 #include "TGStatusWindowController+MessageMenus.inc"
 
 #include "TGStatusWindowController+ChatLifecycle.inc"
@@ -4543,6 +4552,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_messagesLabel release];
     [_selectedChatField release];
     [_typingIndicatorField release];
+    [_selectedChatBirthdayText release];
     [_selectedChatAvatarView release];
     [_selectedChatProfileButton release];
     [_selectedChatCallButton release];

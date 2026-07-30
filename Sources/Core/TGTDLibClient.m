@@ -4166,6 +4166,20 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([bio length] > 0) {
             [summary setObject:bio forKey:@"bio"];
         }
+        NSDictionary *birthdate = [fullInfoResponse objectForKey:@"birthdate"];
+        NSInteger birthDay = [[birthdate objectForKey:@"day"] integerValue];
+        NSInteger birthMonth = [[birthdate objectForKey:@"month"] integerValue];
+        NSInteger birthYear = [[birthdate objectForKey:@"year"] integerValue];
+        if ([birthdate isKindOfClass:[NSDictionary class]] &&
+            birthDay >= 1 && birthDay <= 31 &&
+            birthMonth >= 1 && birthMonth <= 12) {
+            [summary setObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSNumber numberWithInteger:birthDay], @"day",
+                                [NSNumber numberWithInteger:birthMonth], @"month",
+                                [NSNumber numberWithInteger:MAX(0, birthYear)], @"year",
+                                nil]
+                        forKey:@"birthdate"];
+        }
     }
     return summary;
 }
