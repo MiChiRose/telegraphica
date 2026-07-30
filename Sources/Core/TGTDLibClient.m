@@ -8267,6 +8267,46 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return YES;
 }
 
+- (BOOL)stopPollForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0LL ||
+        [messageID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat or poll message identifier is missing." code:155];
+        }
+        return NO;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to stop polls. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:156];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"stopPoll" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+    [request setObject:[NSNull null] forKey:@"reply_markup"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-stop-poll"
+                                                           timeout:timeout
+                                                         errorCode:157
+                                                             error:error];
+    NSString *responseType = [response objectForKey:@"@type"];
+    if ([responseType isEqualToString:@"ok"] || [responseType isEqualToString:@"poll"]) {
+        return YES;
+    }
+    if (error && *error == nil) {
+        *error = [self errorWithDescription:@"TDLib did not confirm that the poll was stopped." code:157];
+    }
+    return NO;
+}
+
 - (BOOL)setDraftMessageForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
     (void)messageTopicKind;
     if (![chatID respondsToSelector:@selector(longLongValue)]) {

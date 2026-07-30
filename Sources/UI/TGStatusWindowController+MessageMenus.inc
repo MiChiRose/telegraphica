@@ -646,6 +646,15 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [pollItem setEnabled:(![item isPollClosed] && [[item pollOptions] count] > 0)];
         [menu addItem:pollItem];
         addedMessageAction = YES;
+        if ([item outgoing] && ![item isPollClosed]) {
+            NSMenuItem *stopPollItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.poll.stop")
+                                                                   action:@selector(stopPollFromMenu:)
+                                                            keyEquivalent:@""] autorelease];
+            [stopPollItem setRepresentedObject:item];
+            [stopPollItem setTarget:self];
+            [stopPollItem setEnabled:(![item capabilitiesKnown] || [item canBeEdited])];
+            [menu addItem:stopPollItem];
+        }
     }
 
     if ([[item replyMarkup] isKindOfClass:[NSDictionary class]]) {
@@ -1222,6 +1231,57 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
             }
             [errorMessage release];
             [selectedOptions release];
+            [messageID release];
+            [chatID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)stopPollFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![item outgoing] ||
+        [item isPollClosed] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![[item messageID] respondsToSelector:@selector(longLongValue)]) {
+        return;
+    }
+    NSInteger choice = NSRunAlertPanel(TGLoc(@"message.poll.stop"),
+                                       @"%@",
+                                       TGLoc(@"message.poll.stopAction"),
+                                       TGLoc(@"cancel"),
+                                       nil,
+                                       TGLoc(@"message.poll.stopConfirm"));
+    if (choice != NSAlertDefaultReturn) {
+        return;
+    }
+
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *chatID = [[item chatID] retain];
+    NSNumber *messageID = [[item messageID] retain];
+    [self.statusField setStringValue:TGLoc(@"message.poll.stopping")];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *stopError = nil;
+        BOOL ok = [client stopPollForChatID:chatID
+                                  messageID:messageID
+                                    timeout:8.0
+                                      error:&stopError];
+        NSString *errorMessage = [[stopError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (ok) {
+                [item setPollClosed:YES];
+                [self.statusField setStringValue:TGLoc(@"message.poll.stopped")];
+                [self.messageTableView reloadData];
+                [self refreshSelectedMessagesAfterMediaSend];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"message.poll.stopFailed")];
+                [self appendDetail:[NSString stringWithFormat:@"Stop poll failed: %@",
+                                    [errorMessage length] > 0 ? errorMessage : @"TDLib rejected the request"]];
+            }
+            [errorMessage release];
             [messageID release];
             [chatID release];
             [client release];
