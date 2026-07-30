@@ -13,6 +13,7 @@
 #import "TGCallsPlaceholderView.h"
 #import "../Calls/TGCallCoordinator.h"
 #import "TGLocalization.h"
+#import "TGComposerLinkSupport.h"
 #import "TGMessageActionDialogs.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGMessageViewersWindowController.h"

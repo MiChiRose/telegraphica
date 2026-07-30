@@ -2951,6 +2951,29 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [item setTarget:self];
         [formatMenu addItem:item];
     }
+    [formatMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *linkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.link.add")
+                                                       action:@selector(applyComposerLink:)
+                                                keyEquivalent:@""] autorelease];
+    [linkItem setTarget:self];
+    [formatMenu addItem:linkItem];
+
+    NSText *linkEditor = [self.sendTextField currentEditor];
+    NSDictionary *existingLink = nil;
+    if ([linkEditor isKindOfClass:[NSTextView class]]) {
+        NSTextView *linkTextView = (NSTextView *)linkEditor;
+        existingLink = TGComposerLinkInfoForTextSelection([linkTextView string],
+                                                          [linkTextView selectedRange]);
+        if (existingLink) {
+            [linkItem setTitle:TGLoc(@"composer.link.edit")];
+        }
+    }
+    NSMenuItem *removeLinkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.link.remove")
+                                                             action:@selector(removeComposerLink:)
+                                                      keyEquivalent:@""] autorelease];
+    [removeLinkItem setTarget:self];
+    [removeLinkItem setEnabled:(existingLink != nil)];
+    [formatMenu addItem:removeLinkItem];
     [formatItem setSubmenu:formatMenu];
     [menu addItem:formatItem];
     [menu addItem:[NSMenuItem separatorItem]];
@@ -2990,6 +3013,88 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [textView setSelectedRange:NSMakeRange(selection.location + [marker length], selection.length)];
     [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
                                                               object:self.sendTextField]];
+}
+
+- (NSTextView *)activeComposerTextView {
+    NSText *editor = [self.sendTextField currentEditor];
+    if (![editor isKindOfClass:[NSTextView class]]) {
+        [[self window] makeFirstResponder:self.sendTextField];
+        editor = [self.sendTextField currentEditor];
+    }
+    return [editor isKindOfClass:[NSTextView class]] ? (NSTextView *)editor : nil;
+}
+
+- (void)applyComposerLink:(id)sender {
+    (void)sender;
+    NSTextView *textView = [self activeComposerTextView];
+    if (!textView) {
+        return;
+    }
+    NSString *currentText = [textView string];
+    NSRange selection = [textView selectedRange];
+    NSDictionary *existingLink = TGComposerLinkInfoForTextSelection(currentText, selection);
+    NSRange replacementRange = selection;
+    NSString *label = nil;
+    NSString *currentURL = nil;
+    if (existingLink) {
+        replacementRange = [[existingLink objectForKey:TGComposerLinkRangeKey] rangeValue];
+        label = TGComposerPlainTextFromMarkdownLabel([existingLink objectForKey:TGComposerLinkLabelKey]);
+        currentURL = [existingLink objectForKey:TGComposerLinkURLKey];
+    } else if (selection.length > 0 && NSMaxRange(selection) <= [currentText length]) {
+        label = [currentText substringWithRange:selection];
+    }
+    if ([label length] == 0) {
+        [self.statusField setStringValue:TGLoc(@"composer.format.select")];
+        return;
+    }
+
+    NSString *URLString = TGComposerPromptForLinkURL(label, currentURL);
+    if ([URLString length] == 0) {
+        return;
+    }
+    NSString *replacement = TGComposerMarkdownLinkString(label, URLString);
+    [textView replaceCharactersInRange:replacementRange withString:replacement];
+
+    NSString *sentinel = @"\u2063";
+    NSUInteger labelLocation = replacementRange.location + 1;
+    if (![[textView string] hasPrefix:sentinel]) {
+        [textView replaceCharactersInRange:NSMakeRange(0, 0) withString:sentinel];
+        labelLocation += [sentinel length];
+    }
+    NSRange divider = [replacement rangeOfString:@"]("];
+    NSUInteger fallbackLabelLength = (divider.location != NSNotFound && divider.location > 0)
+        ? divider.location - 1 : [label length];
+    NSRange labelSelection = NSMakeRange(labelLocation, fallbackLabelLength);
+    NSDictionary *updatedLink = TGComposerLinkInfoForTextSelection([textView string],
+                                                                   NSMakeRange(labelLocation, 0));
+    if (updatedLink) {
+        labelSelection = [[updatedLink objectForKey:TGComposerLinkLabelRangeKey] rangeValue];
+    }
+    [textView setSelectedRange:labelSelection];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
+    [self.statusField setStringValue:TGLoc(@"composer.link.ready")];
+}
+
+- (void)removeComposerLink:(id)sender {
+    (void)sender;
+    NSTextView *textView = [self activeComposerTextView];
+    if (!textView) {
+        return;
+    }
+    NSDictionary *existingLink = TGComposerLinkInfoForTextSelection([textView string],
+                                                                    [textView selectedRange]);
+    if (!existingLink) {
+        [self.statusField setStringValue:TGLoc(@"composer.link.select")];
+        return;
+    }
+    NSRange linkRange = [[existingLink objectForKey:TGComposerLinkRangeKey] rangeValue];
+    NSString *label = TGComposerPlainTextFromMarkdownLabel([existingLink objectForKey:TGComposerLinkLabelKey]);
+    [textView replaceCharactersInRange:linkRange withString:label];
+    [textView setSelectedRange:NSMakeRange(linkRange.location, [label length])];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
+    [self.statusField setStringValue:TGLoc(@"composer.link.removed")];
 }
 
 - (void)sendMessage:(id)sender {
