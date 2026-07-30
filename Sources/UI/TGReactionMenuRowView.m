@@ -1,6 +1,27 @@
 #import "TGReactionMenuRowView.h"
 #import "../Core/TGMessageItem.h"
 
+static BOOL TGReactionEmojiCanRender(NSString *emoji) {
+    if (![emoji isKindOfClass:[NSString class]] || [emoji length] == 0) {
+        return NO;
+    }
+    NSTextStorage *storage = [[[NSTextStorage alloc] initWithString:emoji
+                                                        attributes:[NSDictionary dictionaryWithObject:[NSFont systemFontOfSize:17.0]
+                                                                                             forKey:NSFontAttributeName]] autorelease];
+    NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
+    NSTextContainer *container = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(128.0, 32.0)] autorelease];
+    [layoutManager addTextContainer:container];
+    [storage addLayoutManager:layoutManager];
+    NSRange glyphRange = [layoutManager glyphRangeForTextContainer:container];
+    NSUInteger index = 0;
+    for (index = glyphRange.location; index < NSMaxRange(glyphRange); index++) {
+        if ([layoutManager glyphAtIndex:index] == NSNullGlyph) {
+            return NO;
+        }
+    }
+    return (glyphRange.length > 0);
+}
+
 @interface TGReactionMenuButton : NSButton {
     NSDictionary *_reactionPayload;
 }
@@ -41,9 +62,10 @@
         NSUInteger index = 0;
         for (index = 0; index < [emojis count]; index++) {
             NSString *emoji = [emojis objectAtIndex:index];
+            NSString *displayEmoji = TGReactionEmojiCanRender(emoji) ? emoji : @"?";
             TGReactionMenuButton *button = [[[TGReactionMenuButton alloc]
                 initWithFrame:NSMakeRect(index * buttonWidth, 2.0, buttonWidth, 30.0)] autorelease];
-            [button setTitle:emoji];
+            [button setTitle:displayEmoji];
             [button setFont:[NSFont systemFontOfSize:17.0]];
             [button setButtonType:NSMomentaryChangeButton];
             [button setBezelStyle:NSShadowlessSquareBezelStyle];

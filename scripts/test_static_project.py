@@ -1724,6 +1724,52 @@ def check_forum_topic_management_contract(errors):
                       project_rel)
 
 
+def check_server_reaction_catalog_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+Reactions.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ReactionCatalog.inc")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    row_rel = os.path.join("Sources", "UI", "TGReactionMenuRowView.m")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    row_text = read_text(os.path.join(ROOT, row_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        '"getMessageAvailableReactions"',
+        '"availableReactions"',
+        '"top_reactions"',
+        '"recent_reactions"',
+        '"popular_reactions"',
+        '"reactionTypeEmoji"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: server reaction catalog is missing `%s`" %
+                          (client_rel, fragment))
+    if "reactionTypePaid" in client_text or "allow_custom_emoji" in client_text:
+        errors.append("%s: paid/custom reaction paths must not be exposed by the free reaction picker" %
+                      client_rel)
+    for fragment in [
+        "prefetchReactionCatalogForMessageItem:",
+        "availableReactionEmojisByChatID",
+        "reactionCatalogAttemptedChatIDs",
+        "fallbackStandardReactionEmojis",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: reaction catalog cache is missing `%s`" %
+                          (host_rel, fragment))
+    if "reactionEmojisForMessageItem:item" not in menu_text:
+        errors.append("%s: message menu does not use the reaction catalog" % menu_rel)
+    for fragment in ["TGReactionEmojiCanRender", 'displayEmoji =', '@"?"']:
+        if fragment not in row_text:
+            errors.append("%s: unsupported emoji fallback is missing `%s`" %
+                          (row_rel, fragment))
+    if "TGTDLibClient+Reactions.m in Sources" not in project_text:
+        errors.append("%s: target membership is missing `TGTDLibClient+Reactions.m`" %
+                      project_rel)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1753,6 +1799,7 @@ def main():
     check_chat_folder_management_contract(errors)
     check_qr_login_and_reaction_picker_contract(errors)
     check_forum_topic_management_contract(errors)
+    check_server_reaction_catalog_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:
