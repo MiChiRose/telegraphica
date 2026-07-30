@@ -58,6 +58,7 @@
 
 - (void)updateVisibleSection {
     BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
+    NSString *authPresentationState = [self authorizationPresentationState];
     NSString *section = self.activeSection ? self.activeSection : TGSectionChats;
     if (!ready && ![section isEqualToString:TGSectionChats]) {
         section = TGSectionChats;
@@ -86,13 +87,13 @@
 
     [self showView:self.authLabel visible:showLogin];
     [self showView:self.authStateField visible:(showLogin && self.loginErrorVisible)];
-    [self showView:self.authTextFieldBackgroundView visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
-    [self showView:self.authTextField visible:(showLogin && ([self.currentAuthState isEqualToString:@"waitPhoneNumber"] || [self.currentAuthState isEqualToString:@"waitCode"]))];
+    [self showView:self.authTextFieldBackgroundView visible:(showLogin && [self isAuthInputState:authPresentationState])];
+    [self showView:self.authTextField visible:(showLogin && ([authPresentationState isEqualToString:@"waitPhoneNumber"] || [authPresentationState isEqualToString:@"waitCode"]))];
     [self showView:self.authSecondaryLabel
-           visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPhoneNumber"])];
+           visible:(showLogin && [authPresentationState isEqualToString:@"waitPhoneNumber"])];
     [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
-    [self showView:self.authSecureField visible:(showLogin && [self.currentAuthState isEqualToString:@"waitPassword"])];
-    [self showView:self.authButton visible:(showLogin && [self isAuthInputState:self.currentAuthState])];
+    [self showView:self.authSecureField visible:(showLogin && [authPresentationState isEqualToString:@"waitPassword"])];
+    [self showView:self.authButton visible:(showLogin && [self isAuthInputState:authPresentationState])];
     [self showView:self.busySpinner visible:(showLogin && self.controlsBusy)];
     [self showView:self.loginLogsButton visible:showLogin];
     NSUInteger loginLanguageIndex = 0;
@@ -628,7 +629,8 @@
     if (loginWidth < 390.0) {
         loginWidth = loginAreaWidth - 24.0;
     }
-    BOOL phoneLoginLayout = [self.currentAuthState isEqualToString:@"waitPhoneNumber"];
+    NSString *authPresentationState = [self authorizationPresentationState];
+    BOOL phoneLoginLayout = [authPresentationState isEqualToString:@"waitPhoneNumber"];
     CGFloat loginHeight = phoneLoginLayout ? 330.0 : 276.0;
     CGFloat loginX = loginAreaX + floor((loginAreaWidth - loginWidth) / 2.0);
     CGFloat centeredLoginY = loginAreaY + floor((loginAreaHeight - loginHeight) / 2.0) - 8.0;
