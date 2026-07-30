@@ -30,6 +30,36 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 
 @end
 
+@interface TGVideoNoteCircularMatteView : NSView
+@end
+
+@implementation TGVideoNoteCircularMatteView
+
+- (BOOL)isOpaque {
+    return NO;
+}
+
+- (NSView *)hitTest:(NSPoint)point {
+    (void)point;
+    return nil;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    NSRect bounds = [self bounds];
+    NSBezierPath *mattePath = [NSBezierPath bezierPathWithRect:bounds];
+    [mattePath appendBezierPathWithOvalInRect:NSInsetRect(bounds, 0.5, 0.5)];
+    [mattePath setWindingRule:NSEvenOddWindingRule];
+    TGThemeDrawGroupedCardInPath(mattePath, bounds, [self isFlipped]);
+
+    NSBezierPath *ringPath = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(bounds, 0.5, 0.5)];
+    [TGClassicTableGridColor() set];
+    [ringPath setLineWidth:1.0];
+    [ringPath stroke];
+}
+
+@end
+
 @interface TGVideoNoteRecorderWindowController () <AVCaptureFileOutputRecordingDelegate, NSWindowDelegate>
 @property (nonatomic, retain) AVCaptureSession *captureSession;
 @property (nonatomic, retain) AVCaptureMovieFileOutput *movieOutput;
@@ -38,6 +68,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 @property (nonatomic, retain) AVPlayer *previewPlayer;
 @property (nonatomic, retain) AVPlayerLayer *playerLayer;
 @property (nonatomic, retain) TGVideoNotePreviewView *previewView;
+@property (nonatomic, retain) TGVideoNoteCircularMatteView *previewMatteView;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextField *timerField;
 @property (nonatomic, retain) NSImageView *cameraStateImageView;
@@ -55,6 +86,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 @property (nonatomic, assign) BOOL microphoneEnabled;
 @property (nonatomic, assign) BOOL preparing;
 @property (nonatomic, assign) BOOL cancelling;
+@property (nonatomic, assign) NSUInteger presentationGeneration;
 @end
 
 @implementation TGVideoNoteRecorderWindowController
@@ -67,6 +99,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 @synthesize previewPlayer = _previewPlayer;
 @synthesize playerLayer = _playerLayer;
 @synthesize previewView = _previewView;
+@synthesize previewMatteView = _previewMatteView;
 @synthesize statusField = _statusField;
 @synthesize timerField = _timerField;
 @synthesize cameraStateImageView = _cameraStateImageView;
@@ -84,6 +117,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 @synthesize microphoneEnabled = _microphoneEnabled;
 @synthesize preparing = _preparing;
 @synthesize cancelling = _cancelling;
+@synthesize presentationGeneration = _presentationGeneration;
 
 - (id)init {
     NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 540.0, 650.0)
@@ -163,6 +197,8 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
     [[self.previewView layer] setCornerRadius:180.0];
     [[self.previewView layer] setMasksToBounds:YES];
     [root addSubview:self.previewView];
+    self.previewMatteView = [[[TGVideoNoteCircularMatteView alloc] initWithFrame:[self.previewView frame]] autorelease];
+    [root addSubview:self.previewMatteView];
 
     self.statusField = [self labelWithFrame:NSMakeRect(72.0, 150.0, 396.0, 22.0)
                                        font:[NSFont systemFontOfSize:12.0]
@@ -176,6 +212,11 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
                                  alignment:NSCenterTextAlignment];
     [self.timerField setStringValue:@"0:00 / 1:00"];
     [self.timerField setHidden:YES];
+    [self.timerField setDrawsBackground:YES];
+    [self.timerField setBackgroundColor:[NSColor colorWithCalibratedWhite:0.0 alpha:0.58]];
+    [self.timerField setWantsLayer:YES];
+    [[self.timerField layer] setCornerRadius:10.0];
+    [[self.timerField layer] setMasksToBounds:YES];
     [root addSubview:self.timerField];
 
     self.spinner = [[[NSProgressIndicator alloc] initWithFrame:NSMakeRect(258.0, 154.0, 16.0, 16.0)] autorelease];
@@ -241,15 +282,30 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 }
 
 - (void)showRecordingControls {
+    self.preparing = NO;
+    [self.spinner stopAnimation:nil];
     [self.recordButton setHidden:YES];
     [self.stopButton setHidden:NO];
     [self.playButton setHidden:YES];
     [self.retryButton setHidden:YES];
     [self.sendButton setHidden:YES];
     [self.timerField setHidden:NO];
+    [self.timerField setStringValue:@"0:00 / 1:00"];
     [self.statusField setStringValue:(self.microphoneEnabled
         ? TGLoc(@"videoNote.recording")
         : TGLoc(@"videoNote.recordingSilent"))];
+}
+
+- (void)showStartingControls {
+    self.preparing = NO;
+    [self.recordButton setHidden:YES];
+    [self.stopButton setHidden:YES];
+    [self.playButton setHidden:YES];
+    [self.retryButton setHidden:YES];
+    [self.sendButton setHidden:YES];
+    [self.timerField setHidden:YES];
+    [self.statusField setStringValue:TGLoc(@"videoNote.preparing")];
+    [self.spinner startAnimation:nil];
 }
 
 - (void)showPreparingControls {
@@ -297,6 +353,20 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
     }
     [self.cameraPreviewLayer setFrame:[[self.previewView layer] bounds]];
     [[self.previewView layer] addSublayer:self.cameraPreviewLayer];
+    [self.previewMatteView setNeedsDisplay:YES];
+}
+
+- (void)tearDownCaptureSession {
+    [self.recordingTimer invalidate];
+    self.recordingTimer = nil;
+    [self.cameraPreviewLayer removeFromSuperlayer];
+    self.cameraPreviewLayer = nil;
+    if ([self.movieOutput isRecording]) {
+        [self.movieOutput stopRecording];
+    }
+    [self.captureSession stopRunning];
+    self.movieOutput = nil;
+    self.captureSession = nil;
 }
 
 - (BOOL)configureCaptureSession {
@@ -348,6 +418,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 }
 
 - (void)presentWithMicrophoneEnabled:(BOOL)microphoneEnabled {
+    self.presentationGeneration++;
     self.cancelling = NO;
     self.microphoneEnabled = microphoneEnabled;
     [self.cameraStateImageView setImage:TGTemplateIconAssetImage(@"video",
@@ -361,7 +432,10 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
     self.preparedPath = nil;
     [self.previewPlayer pause];
     self.previewPlayer = nil;
-    [self showReadyToRecordControls];
+    [self.playerLayer removeFromSuperlayer];
+    self.playerLayer = nil;
+    [self tearDownCaptureSession];
+    [self showStartingControls];
     if (![self configureCaptureSession]) {
         [[self window] center];
         [[self window] makeKeyAndOrderFront:nil];
@@ -369,10 +443,28 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
     }
     [[self window] center];
     [[self window] makeKeyAndOrderFront:nil];
+    [self startCaptureSessionAndRecordForGeneration:self.presentationGeneration];
+}
+
+- (void)startCaptureSessionAndRecordForGeneration:(NSUInteger)generation {
     AVCaptureSession *session = [self.captureSession retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [session startRunning];
-        [session release];
+        BOOL running = [session isRunning];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.18 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            if (generation == self.presentationGeneration &&
+                self.captureSession == session &&
+                !self.cancelling &&
+                [[self window] isVisible]) {
+                if (running) {
+                    [self recordPressed:nil];
+                } else {
+                    [self showError:TGLoc(@"videoNote.failed")];
+                }
+            }
+            [session release];
+        });
     });
 }
 
@@ -408,7 +500,9 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
         ? [[NSDate date] timeIntervalSinceDate:self.recordingStartDate]
         : 0.0;
     NSInteger seconds = MIN((NSInteger)floor(duration), (NSInteger)TGVideoNoteMaximumDuration);
-    [self.timerField setStringValue:[NSString stringWithFormat:@"0:%02ld / 1:00", (long)seconds]];
+    [self.timerField setStringValue:[NSString stringWithFormat:@"%ld:%02ld / 1:00",
+                                                               (long)(seconds / 60),
+                                                               (long)(seconds % 60)]];
     if (duration >= TGVideoNoteMaximumDuration && [self.movieOutput isRecording]) {
         [self.movieOutput stopRecording];
     }
@@ -432,7 +526,8 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.recordingTimer invalidate];
         self.recordingTimer = nil;
-        if (self.cancelling) {
+        BOOL staleRecording = ![path isEqualToString:self.recordingPath];
+        if (self.cancelling || staleRecording) {
             [self removeFileAtPath:path];
         } else if (error && ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
             [self showError:errorDescription];
@@ -557,14 +652,9 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     [self removeFileAtPath:self.preparedPath];
     self.preparedPath = nil;
     [self attachCameraPreviewLayer];
-    if (![self.captureSession isRunning]) {
-        AVCaptureSession *session = [self.captureSession retain];
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            [session startRunning];
-            [session release];
-        });
-    }
-    [self showReadyToRecordControls];
+    self.presentationGeneration++;
+    [self showStartingControls];
+    [self startCaptureSessionAndRecordForGeneration:self.presentationGeneration];
 }
 
 - (void)sendPressed:(id)sender {
@@ -588,6 +678,7 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
 }
 
 - (void)cancelAndNotify:(BOOL)notify {
+    self.presentationGeneration++;
     self.cancelling = YES;
     [self.recordingTimer invalidate];
     self.recordingTimer = nil;
@@ -632,6 +723,7 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     [_previewPlayer release];
     [_playerLayer release];
     [_previewView release];
+    [_previewMatteView release];
     [_statusField release];
     [_timerField release];
     [_cameraStateImageView release];

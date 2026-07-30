@@ -86,6 +86,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize reactionAnimationDisplaySummary = _reactionAnimationDisplaySummary;
 @synthesize reactionAnimationProgress = _reactionAnimationProgress;
 @synthesize reactionAnimationChangesHeight = _reactionAnimationChangesHeight;
+@synthesize reactionAnimationRemoving = _reactionAnimationRemoving;
 @synthesize senderID = _senderID;
 @synthesize senderDisplayName = _senderDisplayName;
 @synthesize senderAvatarLocalPath = _senderAvatarLocalPath;
@@ -376,6 +377,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setReactionAnimationDisplaySummary:_reactionAnimationDisplaySummary];
     [copy setReactionAnimationProgress:_reactionAnimationProgress];
     [copy setReactionAnimationChangesHeight:_reactionAnimationChangesHeight];
+    [copy setReactionAnimationRemoving:_reactionAnimationRemoving];
     [copy setSenderID:_senderID];
     [copy setSenderDisplayName:_senderDisplayName];
     [copy setSenderAvatarLocalPath:_senderAvatarLocalPath];
