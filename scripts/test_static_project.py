@@ -1832,6 +1832,23 @@ def check_server_reaction_catalog_contract(errors):
         if fragment not in row_text:
             errors.append("%s: unsupported emoji fallback is missing `%s`" %
                           (row_rel, fragment))
+    layout_rel = os.path.join("Sources", "UI", "TGMessageLayoutSupport.m")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+    for fragment in [
+        "TGStringByReplacingUnrenderableEmoji",
+        "TGReplaceUnrenderableEmojiInAttributedString",
+        "rangeOfComposedCharacterSequenceAtIndex:",
+        "NSNullGlyph",
+        'withString:@"?"',
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: message emoji fallback is missing `%s`" %
+                          (layout_rel, fragment))
+    if "TGStringByReplacingUnrenderableEmoji([item reactionSummary]" not in cells_text:
+        errors.append("%s: rendered reaction summaries do not use the legacy emoji fallback" %
+                      cells_rel)
     if "TGTDLibClient+Reactions.m in Sources" not in project_text:
         errors.append("%s: target membership is missing `TGTDLibClient+Reactions.m`" %
                       project_rel)

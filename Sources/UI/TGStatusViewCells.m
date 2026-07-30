@@ -838,6 +838,8 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     NSString *reactionSummary = [[item reactionAnimationDisplaySummary] length] > 0
         ? [item reactionAnimationDisplaySummary]
         : [item reactionSummary];
+    reactionSummary = TGStringByReplacingUnrenderableEmoji(reactionSummary,
+                                                           [NSFont boldSystemFontOfSize:10.0]);
     if ([reactionSummary length] > 0) {
         BOOL animatingReaction = [[item reactionAnimationDisplaySummary] length] > 0;
         CGFloat rawProgress = animatingReaction
@@ -1099,7 +1101,8 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     }
 
     CGFloat footerY = flipped ? (NSMaxY(textRect) + 4.0) : (NSMinY(textRect) - 20.0);
-    NSString *reactionSummary = [item reactionSummary];
+    NSString *reactionSummary = TGStringByReplacingUnrenderableEmoji([item reactionSummary],
+                                                                     TGChatMessageBoldSecondaryFont());
     NSString *commentTitle = nil;
     if (TGMessageItemHasCommentThread(item)) {
         NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
