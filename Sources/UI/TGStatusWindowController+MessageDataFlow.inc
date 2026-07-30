@@ -332,6 +332,124 @@
     [self updateMessageJumpToNewestButtonVisibility];
 }
 
+- (NSString *)reactionAnimationKeyForMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![[item messageID] respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%lld:%lld",
+            [[item chatID] longLongValue],
+            [[item messageID] longLongValue]];
+}
+
+- (TGMessageItem *)displayedMessageItemForReactionAnimationKey:(NSString *)key row:(NSUInteger *)row {
+    if (![key isKindOfClass:[NSString class]] || [key length] == 0) {
+        return nil;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        if ([[self reactionAnimationKeyForMessageItem:item] isEqualToString:key]) {
+            if (row) {
+                *row = index;
+            }
+            return item;
+        }
+    }
+    return nil;
+}
+
+- (void)beginReactionAnimationForMessageItem:(TGMessageItem *)item
+                                 fromSummary:(NSString *)oldSummary
+                                   toSummary:(NSString *)newSummary {
+    NSString *key = [self reactionAnimationKeyForMessageItem:item];
+    if ([key length] == 0) {
+        return;
+    }
+
+    BOOL removingBand = ([oldSummary length] > 0 && [newSummary length] == 0);
+    BOOL changesHeight = (([oldSummary length] == 0) != ([newSummary length] == 0));
+    NSString *displaySummary = removingBand ? oldSummary : newSummary;
+    [item setReactionAnimationDisplaySummary:displaySummary];
+    [item setReactionAnimationProgress:(removingBand ? 1.0 : 0.0)];
+    [item setReactionAnimationChangesHeight:changesHeight];
+
+    if (!self.reactionAnimations) {
+        self.reactionAnimations = [NSMutableDictionary dictionary];
+    }
+    NSDictionary *animation = [NSDictionary dictionaryWithObjectsAndKeys:
+                               [NSNumber numberWithDouble:[NSDate timeIntervalSinceReferenceDate]], @"started_at",
+                               [NSNumber numberWithBool:removingBand], @"removing",
+                               nil];
+    [self.reactionAnimations setObject:animation forKey:key];
+
+    if (!self.reactionAnimationTimer) {
+        NSTimer *timer = [NSTimer timerWithTimeInterval:(1.0 / 30.0)
+                                                target:self
+                                              selector:@selector(updateReactionAnimations:)
+                                              userInfo:nil
+                                               repeats:YES];
+        self.reactionAnimationTimer = timer;
+        [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+    }
+}
+
+- (void)updateReactionAnimations:(NSTimer *)timer {
+    (void)timer;
+    if ([self.reactionAnimations count] == 0) {
+        [self.reactionAnimationTimer invalidate];
+        self.reactionAnimationTimer = nil;
+        return;
+    }
+
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    NSArray *keys = [[self.reactionAnimations allKeys] copy];
+    NSMutableArray *completedKeys = [NSMutableArray array];
+    NSUInteger keyIndex = 0;
+    for (keyIndex = 0; keyIndex < [keys count]; keyIndex++) {
+        NSString *key = [keys objectAtIndex:keyIndex];
+        NSDictionary *animation = [self.reactionAnimations objectForKey:key];
+        NSTimeInterval elapsed = now - [[animation objectForKey:@"started_at"] doubleValue];
+        CGFloat linearProgress = (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.24));
+        CGFloat inverseProgress = 1.0 - linearProgress;
+        CGFloat easedProgress = 1.0 - (inverseProgress * inverseProgress * inverseProgress);
+        BOOL removing = [[animation objectForKey:@"removing"] boolValue];
+        CGFloat presentationProgress = removing ? (1.0 - easedProgress) : easedProgress;
+
+        NSUInteger row = NSNotFound;
+        TGMessageItem *item = [self displayedMessageItemForReactionAnimationKey:key row:&row];
+        if (item) {
+            [item setReactionAnimationProgress:presentationProgress];
+            if (row != NSNotFound) {
+                NSIndexSet *rowIndexes = [NSIndexSet indexSetWithIndex:row];
+                if ([item reactionAnimationChangesHeight]) {
+                    [self.messageTableView noteHeightOfRowsWithIndexesChanged:rowIndexes];
+                }
+                NSIndexSet *columnIndexes = [NSIndexSet indexSetWithIndexesInRange:
+                                             NSMakeRange(0, [[self.messageTableView tableColumns] count])];
+                [self.messageTableView reloadDataForRowIndexes:rowIndexes columnIndexes:columnIndexes];
+            }
+        }
+
+        if (linearProgress >= 1.0 || !item) {
+            if (item) {
+                [item setReactionAnimationDisplaySummary:nil];
+                [item setReactionAnimationProgress:1.0];
+                [item setReactionAnimationChangesHeight:NO];
+            }
+            [completedKeys addObject:key];
+        }
+    }
+    [keys release];
+    [self.reactionAnimations removeObjectsForKeys:completedKeys];
+
+    if ([self.reactionAnimations count] == 0) {
+        [self.reactionAnimationTimer invalidate];
+        self.reactionAnimationTimer = nil;
+    }
+}
+
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     BOOL forceScrollToNewest = self.forceMessageScrollToNewest;
@@ -372,6 +490,14 @@
         id messageID = [item messageID];
         NSNumber *existingIndex = messageID ? [messageIndexesByID objectForKey:messageID] : nil;
         if (existingIndex) {
+            TGMessageItem *existingItem = [mergedItems objectAtIndex:[existingIndex unsignedIntegerValue]];
+            NSString *oldReactionSummary = [existingItem reactionSummary] ? [existingItem reactionSummary] : @"";
+            NSString *newReactionSummary = [item reactionSummary] ? [item reactionSummary] : @"";
+            if (![oldReactionSummary isEqualToString:newReactionSummary]) {
+                [self beginReactionAnimationForMessageItem:item
+                                               fromSummary:oldReactionSummary
+                                                 toSummary:newReactionSummary];
+            }
             [mergedItems replaceObjectAtIndex:[existingIndex unsignedIntegerValue] withObject:item];
             continue;
         }

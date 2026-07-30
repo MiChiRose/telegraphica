@@ -835,11 +835,16 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         TGDrawOutgoingStatusDotsForItem(item, timeRect, [controlView isFlipped]);
     }
 
-    NSString *reactionSummary = [item reactionSummary];
+    NSString *reactionSummary = [[item reactionAnimationDisplaySummary] length] > 0
+        ? [item reactionAnimationDisplaySummary]
+        : [item reactionSummary];
     if ([reactionSummary length] > 0) {
+        CGFloat reactionProgress = [[item reactionAnimationDisplaySummary] length] > 0
+            ? MAX(0.0, MIN(1.0, [item reactionAnimationProgress]))
+            : 1.0;
         NSDictionary *reactionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                             [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
-                                            TGClassicSelectedRowTextColor(), NSForegroundColorAttributeName,
+                                            [TGClassicSelectedRowTextColor() colorWithAlphaComponent:reactionProgress], NSForegroundColorAttributeName,
                                             nil];
         NSSize reactionSize = [reactionSummary sizeWithAttributes:reactionAttributes];
         CGFloat reactionWidth = ceil(reactionSize.width) + 14.0;
@@ -847,8 +852,10 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         if (reactionWidth > maximumReactionWidth) {
             reactionWidth = maximumReactionWidth;
         }
-        if (reactionWidth > 20.0) {
-            CGFloat reactionHeight = 18.0;
+        if (reactionWidth > 20.0 && reactionProgress > 0.01) {
+            CGFloat reactionScale = 0.78 + (0.22 * reactionProgress);
+            reactionWidth *= reactionScale;
+            CGFloat reactionHeight = 18.0 * reactionScale;
             CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 4.0)
                                                         : (NSMinY(bubbleRect) + 4.0);
             NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0,
@@ -856,9 +863,9 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                              reactionWidth,
                                              reactionHeight);
             NSBezierPath *reactionPath = [NSBezierPath bezierPathWithRoundedRect:reactionRect xRadius:9.0 yRadius:9.0];
-            [TGClassicNavigationSelectedColor(0.82) set];
+            [[TGClassicNavigationSelectedColor(0.82) colorWithAlphaComponent:reactionProgress] set];
             [reactionPath fill];
-            [TGClassicNavigationSelectedStrokeColor(0.72) set];
+            [[TGClassicNavigationSelectedStrokeColor(0.72) colorWithAlphaComponent:reactionProgress] set];
             [reactionPath setLineWidth:1.0];
             [reactionPath stroke];
 

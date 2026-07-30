@@ -1277,7 +1277,17 @@ BOOL TGPollPointIsInConfirmRect(TGMessageItem *item, NSRect bubbleRect, NSPoint 
 }
 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
-    return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
+    NSString *displaySummary = [[item reactionAnimationDisplaySummary] length] > 0
+        ? [item reactionAnimationDisplaySummary]
+        : [item reactionSummary];
+    if ([displaySummary length] == 0) {
+        return 0.0;
+    }
+    if (![item reactionAnimationChangesHeight]) {
+        return 22.0;
+    }
+    CGFloat progress = MAX(0.0, MIN(1.0, [item reactionAnimationProgress]));
+    return 22.0 * progress;
 }
 
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails) {

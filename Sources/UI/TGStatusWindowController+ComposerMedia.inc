@@ -2270,6 +2270,136 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     return [TGPrivacyPermissions requestMicrophonePermission];
 }
 
+- (void)configureComposerRecordingMenu {
+    TGPrivacyPermissionState microphoneState = [TGPrivacyPermissions microphonePermissionState];
+    TGPrivacyPermissionState cameraState = [TGPrivacyPermissions cameraPermissionState];
+    BOOL microphoneAvailable = (microphoneState != TGPrivacyPermissionStateDenied);
+    BOOL cameraAvailable = (cameraState != TGPrivacyPermissionStateDenied);
+
+    if (!cameraAvailable && self.composerVideoNoteMode) {
+        self.composerVideoNoteMode = NO;
+        [[NSUserDefaults standardUserDefaults] setBool:NO
+                                               forKey:TGComposerVideoNoteModeDefaultsKey];
+    } else if (!microphoneAvailable && cameraAvailable) {
+        self.composerVideoNoteMode = YES;
+        [[NSUserDefaults standardUserDefaults] setBool:YES
+                                               forKey:TGComposerVideoNoteModeDefaultsKey];
+    }
+
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+    if (microphoneAvailable) {
+        NSMenuItem *voiceItem = [[[NSMenuItem alloc]
+            initWithTitle:TGLoc(@"composer.mediaMode.voice")
+                   action:@selector(selectVoiceComposerRecordingMode:)
+            keyEquivalent:@""] autorelease];
+        [voiceItem setTarget:self];
+        [voiceItem setState:(self.composerVideoNoteMode ? NSOffState : NSOnState)];
+        [menu addItem:voiceItem];
+    }
+    if (cameraAvailable) {
+        NSMenuItem *videoItem = [[[NSMenuItem alloc]
+            initWithTitle:TGLoc(@"composer.mediaMode.video")
+                   action:@selector(selectVideoNoteComposerRecordingMode:)
+            keyEquivalent:@""] autorelease];
+        [videoItem setTarget:self];
+        [videoItem setState:(self.composerVideoNoteMode ? NSOnState : NSOffState)];
+        [menu addItem:videoItem];
+    }
+    [self.voiceRecordButton setMenu:([menu numberOfItems] > 0 ? menu : nil)];
+    [self.voiceRecordButton setHidden:(!microphoneAvailable && !cameraAvailable)];
+    [self.voiceRecordButton setTitle:(self.composerVideoNoteMode ? @"video" : @"mic")];
+    [[self.voiceRecordButton cell] setTitle:(self.composerVideoNoteMode ? @"video" : @"mic")];
+    [self.voiceRecordButton setToolTip:TGLoc(self.composerVideoNoteMode
+        ? @"composer.mediaMode.video"
+        : @"composer.mediaMode.voice")];
+}
+
+- (void)composerPrivacyPermissionsDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self configureComposerRecordingMenu];
+    [self layoutContentView];
+}
+
+- (void)selectVoiceComposerRecordingMode:(id)sender {
+    (void)sender;
+    self.composerVideoNoteMode = NO;
+    [[NSUserDefaults standardUserDefaults] setBool:NO
+                                           forKey:TGComposerVideoNoteModeDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self configureComposerRecordingMenu];
+}
+
+- (void)selectVideoNoteComposerRecordingMode:(id)sender {
+    (void)sender;
+    if ([TGPrivacyPermissions cameraPermissionState] == TGPrivacyPermissionStateDenied) {
+        [TGPrivacyPermissions requestCameraPermission];
+        [self configureComposerRecordingMenu];
+        return;
+    }
+    self.composerVideoNoteMode = YES;
+    [[NSUserDefaults standardUserDefaults] setBool:YES
+                                           forKey:TGComposerVideoNoteModeDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self configureComposerRecordingMenu];
+}
+
+- (void)performComposerRecordingAction:(id)sender {
+    if ([self.voiceRecorder isRecording]) {
+        [self toggleVoiceRecording:sender];
+        return;
+    }
+    if (self.composerVideoNoteMode) {
+        [self beginVideoNoteRecording:sender];
+    } else {
+        [self toggleVoiceRecording:sender];
+    }
+}
+
+- (void)beginVideoNoteRecording:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil &&
+                             (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        return;
+    }
+    if (![TGPrivacyPermissions requestCameraPermission]) {
+        [self configureComposerRecordingMenu];
+        return;
+    }
+
+    BOOL microphoneEnabled = NO;
+    TGPrivacyPermissionState microphoneState = [TGPrivacyPermissions microphonePermissionState];
+    if (microphoneState == TGPrivacyPermissionStateAllowed) {
+        microphoneEnabled = YES;
+    } else if (microphoneState == TGPrivacyPermissionStateNotDetermined) {
+        microphoneEnabled = [TGPrivacyPermissions requestMicrophonePermission];
+    }
+
+    if (!self.videoNoteRecorderWindowController) {
+        TGVideoNoteRecorderWindowController *controller =
+            [[[TGVideoNoteRecorderWindowController alloc] init] autorelease];
+        [controller setDelegate:self];
+        self.videoNoteRecorderWindowController = controller;
+    }
+    [self.videoNoteRecorderWindowController presentWithMicrophoneEnabled:microphoneEnabled];
+}
+
+- (void)videoNoteRecorder:(TGVideoNoteRecorderWindowController *)recorder
+     didFinishVideoAtPath:(NSString *)path {
+    (void)recorder;
+    if ([path length] == 0) {
+        [self requestComposerRefocus];
+        return;
+    }
+    [self sendSharedComposerItemWithKind:@"video_note"
+                                 values:[NSDictionary dictionaryWithObject:path forKey:@"path"]];
+}
+
+- (void)videoNoteRecorderDidCancel:(TGVideoNoteRecorderWindowController *)recorder {
+    (void)recorder;
+    [self requestComposerRefocus];
+}
+
 - (void)toggleVoiceRecording:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
