@@ -55,6 +55,7 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+ChatHistory.h"
 #import "../Core/TGTDLibClient+ChatMembers.h"
+#import "../Core/TGTDLibClient+ForumTopics.h"
 #import "../Core/TGTDLibClient+MessageLinks.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Core/TGTDLibClient+MessageTypes.h"
@@ -707,6 +708,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL chatFilterRefreshPending;
 @property (nonatomic, assign) NSUInteger chatFilterRefreshRetryCount;
 @property (nonatomic, assign) BOOL forumTopicRefreshInFlight;
+@property (nonatomic, assign) BOOL forumTopicMutationInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @property (nonatomic, assign) BOOL showingForumTopicList;
 @property (nonatomic, assign) BOOL chatNavigationClosed;
@@ -1219,6 +1221,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatFilterRefreshPending = _chatFilterRefreshPending;
 @synthesize chatFilterRefreshRetryCount = _chatFilterRefreshRetryCount;
 @synthesize forumTopicRefreshInFlight = _forumTopicRefreshInFlight;
+@synthesize forumTopicMutationInFlight = _forumTopicMutationInFlight;
 @synthesize typingChatID = _typingChatID;
 @synthesize typingIndicatorText = _typingIndicatorText;
 @synthesize typingClearTimer = _typingClearTimer;
@@ -2150,6 +2153,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.topicParentAvatarLocalPath = nil;
     [self refreshChatListTitle];
     [self.loadChatsButton setToolTip:TGLoc(@"settings.sessions.refresh")];
+    [self.composeChatButton setAction:@selector(openNewChatWindow:)];
+    [self.composeChatButton setToolTip:TGLoc(@"contacts.newChat")];
 }
 
 - (void)clearProfileDisplayCache {
@@ -2570,7 +2575,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
     self.composeChatButton = [[[NSButton alloc] initWithFrame:NSMakeRect(152, 332, 32, 32)] autorelease];
     [self.composeChatButton setTitle:@"+"];
-    [self.composeChatButton setToolTip:TGLoc(@"contacts.newChat")];
+    [self.composeChatButton setToolTip:(self.showingForumTopicList ? TGLoc(@"forum.topic.create") : TGLoc(@"contacts.newChat"))];
     [self.composeChatButton setTarget:self];
     [self.composeChatButton setAction:@selector(openNewChatWindow:)];
     [self.composeChatButton setEnabled:NO];
@@ -4305,6 +4310,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 #include "TGStatusWindowController+MessageMediaHitTesting.inc"
 
 #include "TGStatusWindowController+MessagingActions.inc"
+
+#include "TGStatusWindowController+ForumTopicManagement.inc"
 
 #include "TGStatusWindowController+MessageMenus.inc"
 

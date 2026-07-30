@@ -720,6 +720,8 @@
     self.chatNavigationClosed = NO;
     self.suppressedForumTopicAutoOpenChatID = nil;
     [self.loadChatsButton setToolTip:@"Refresh topics"];
+    [self.composeChatButton setAction:@selector(createForumTopic:)];
+    [self.composeChatButton setToolTip:TGLoc(@"forum.topic.create")];
     self.chatsExhausted = YES;
     self.autoChatListLoadArmed = NO;
     self.autoChatListRefreshArmed = NO;
@@ -804,6 +806,8 @@
     self.selectedMessageTopicKind = nil;
     self.chatsExhausted = NO;
     self.autoChatListRefreshArmed = YES;
+    [self.composeChatButton setAction:@selector(openNewChatWindow:)];
+    [self.composeChatButton setToolTip:TGLoc(@"contacts.newChat")];
 
     NSArray *restoreItems = self.chatItemsBeforeTopicList ? self.chatItemsBeforeTopicList : [NSArray array];
     NSUInteger selectedIndex = [self indexOfChatID:parentChatID inChatItems:restoreItems];

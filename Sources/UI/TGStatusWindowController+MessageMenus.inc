@@ -413,6 +413,11 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [menu addItem:titleItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
+    if ([item isForumTopic]) {
+        [self populateForumTopicContextMenu:menu forItem:item];
+        return;
+    }
+
     BOOL chatHasUnreadState = (([[item unreadCount] respondsToSelector:@selector(integerValue)] &&
                                 [[item unreadCount] integerValue] > 0) ||
                                [item isMarkedAsUnread]);

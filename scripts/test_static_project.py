@@ -1671,6 +1671,59 @@ def check_qr_login_and_reaction_picker_contract(errors):
         errors.append("Sources/Resources/Icons/qr-scan.png: user-provided QR icon is missing")
 
 
+def check_forum_topic_management_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ForumTopics.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ForumTopicManagement.inc")
+    flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    model_rel = os.path.join("Sources", "Core", "TGChatItem.h")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    flow_text = read_text(os.path.join(ROOT, flow_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    model_text = read_text(os.path.join(ROOT, model_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        '"createForumTopic"',
+        '"editForumTopic"',
+        '"toggleForumTopicIsClosed"',
+        '"toggleForumTopicIsPinned"',
+        '"deleteForumTopic"',
+        '"forumTopicIcon"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: forum topic TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "createForumTopic:",
+        "renameForumTopicFromMenu:",
+        "toggleForumTopicClosedFromMenu:",
+        "toggleForumTopicPinnedFromMenu:",
+        "deleteForumTopicFromMenu:",
+        "reloadCurrentForumTopicListInteractive:NO",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: forum topic host action is missing `%s`" %
+                          (host_rel, fragment))
+    for fragment in [
+        "[self.composeChatButton setAction:@selector(createForumTopic:)]",
+        "[self.composeChatButton setAction:@selector(openNewChatWindow:)]",
+    ]:
+        if fragment not in flow_text:
+            errors.append("%s: forum topic compose-button routing is missing `%s`" %
+                          (flow_rel, fragment))
+    if "populateForumTopicContextMenu:menu forItem:item" not in menu_text:
+        errors.append("%s: forum topic context menu is not routed" % menu_rel)
+    for fragment in ["forumTopicClosed", "forumTopicPinned"]:
+        if fragment not in model_text:
+            errors.append("%s: forum topic state is missing `%s`" % (model_rel, fragment))
+    if "TGTDLibClient+ForumTopics.m in Sources" not in project_text:
+        errors.append("%s: target membership is missing `TGTDLibClient+ForumTopics.m`" %
+                      project_rel)
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1699,6 +1752,7 @@ def main():
     check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
     check_qr_login_and_reaction_picker_contract(errors)
+    check_forum_topic_management_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

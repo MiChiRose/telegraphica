@@ -15,6 +15,8 @@
 @property (nonatomic, assign, getter=isMarkedAsUnread) BOOL markedAsUnread;
 @property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
+@property (nonatomic, assign, getter=isForumTopicClosed) BOOL forumTopicClosed;
+@property (nonatomic, assign, getter=isForumTopicPinned) BOOL forumTopicPinned;
 @property (nonatomic, assign, getter=isSavedMessages) BOOL savedMessages;
 @property (nonatomic, assign, getter=isBot) BOOL bot;
 @property (nonatomic, retain) NSNumber *parentChatID;
