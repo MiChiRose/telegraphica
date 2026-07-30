@@ -107,6 +107,7 @@
 		333000000000000000000003 /* TGCallWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 333000000000000000000007 /* TGCallWindowController.m */; };
 		444000000000000000000001 /* TGPrivacyPermissions.m in Sources */ = {isa = PBXBuildFile; fileRef = 444000000000000000000003 /* TGPrivacyPermissions.m */; };
 		555000000000000000000001 /* TGTDLibClient+MessageLinks.m in Sources */ = {isa = PBXBuildFile; fileRef = 555000000000000000000003 /* TGTDLibClient+MessageLinks.m */; };
+		777000000000000000000001 /* TGComposerLinkSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 777000000000000000000003 /* TGComposerLinkSupport.m */; };
 		111111111111111111111189 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 111111111111111111111381 /* MapKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		220000000000000000000001 /* TGWorkshopCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000001 /* TGWorkshopCatalog.m */; };
 		220000000000000000000002 /* TGWorkshopCatalogClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000002 /* TGWorkshopCatalogClient.m */; };
@@ -185,6 +186,8 @@
 		111111111111111111111244 /* TGTGSFileValidator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTGSFileValidator.m; sourceTree = "<group>"; };
 		111111111111111111111245 /* TGMessageActionDialogs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageActionDialogs.h; sourceTree = "<group>"; };
 		111111111111111111111246 /* TGMessageActionDialogs.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageActionDialogs.m; sourceTree = "<group>"; };
+		777000000000000000000002 /* TGComposerLinkSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGComposerLinkSupport.h; sourceTree = "<group>"; };
+		777000000000000000000003 /* TGComposerLinkSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGComposerLinkSupport.m; sourceTree = "<group>"; };
 		111111111111111111111247 /* TGMessageLayoutSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageLayoutSupport.h; sourceTree = "<group>"; };
 		111111111111111111111248 /* TGMessageLayoutSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageLayoutSupport.m; sourceTree = "<group>"; };
 		111111111111111111111249 /* TGStatusViewComponents.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStatusViewComponents.h; sourceTree = "<group>"; };
@@ -517,6 +520,8 @@
 				111111111111111111111217 /* TGActiveSessionsPresentation.m */,
 				111111111111111111111245 /* TGMessageActionDialogs.h */,
 				111111111111111111111246 /* TGMessageActionDialogs.m */,
+				777000000000000000000002 /* TGComposerLinkSupport.h */,
+				777000000000000000000003 /* TGComposerLinkSupport.m */,
 				111111111111111111111292 /* TGMessageViewersWindowController.h */,
 				111111111111111111111293 /* TGMessageViewersWindowController.m */,
 				111111111111111111111319 /* TGChatLifecycleWindowController.h */,
@@ -783,6 +788,7 @@
 				111111111111111111111123 /* TGMediaItemSupport.m in Sources */,
 				111111111111111111111124 /* TGTGSFileValidator.m in Sources */,
 				111111111111111111111125 /* TGMessageActionDialogs.m in Sources */,
+				777000000000000000000001 /* TGComposerLinkSupport.m in Sources */,
 				111111111111111111111126 /* TGMessageLayoutSupport.m in Sources */,
 				111111111111111111111127 /* TGStatusViewComponents.m in Sources */,
 				111111111111111111111128 /* TGStatusButtonCells.m in Sources */,

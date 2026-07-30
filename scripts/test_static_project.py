@@ -1432,6 +1432,49 @@ def check_message_link_contract(errors):
         errors.append("%s: message-link client category is not compiled" % project_rel)
 
 
+def check_composer_link_editor_contract(errors):
+    support_rel = os.path.join("Sources", "UI", "TGComposerLinkSupport.m")
+    composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
+    localization_rel = os.path.join("Sources", "UI", "TGLocalization.m")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    support_text = read_text(os.path.join(ROOT, support_rel))
+    composer_text = read_text(os.path.join(ROOT, composer_rel))
+    localization_text = read_text(os.path.join(ROOT, localization_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        "TGComposerLinkInfoForTextSelection",
+        "TGComposerMarkdownLinkString",
+        "TGComposerPromptForLinkURL",
+        'stringByAppendingString:candidate',
+        '[scheme isEqualToString:@"tg"]',
+    ]:
+        if fragment not in support_text:
+            errors.append("%s: composer link support is missing `%s`" %
+                          (support_rel, fragment))
+    for fragment in [
+        "applyComposerLink:",
+        "removeComposerLink:",
+        'TGLoc(@"composer.link.add")',
+        'TGLoc(@"composer.link.remove")',
+        'NSString *sentinel = @"\\u2063"',
+    ]:
+        if fragment not in composer_text:
+            errors.append("%s: composer link editor wiring is missing `%s`" %
+                          (composer_rel, fragment))
+    for key in [
+        "composer.link.add",
+        "composer.link.edit",
+        "composer.link.remove",
+        "composer.link.invalid",
+    ]:
+        if localization_text.count('@"%s"' % key) != 3:
+            errors.append("%s: composer link localization `%s` must exist in all three languages" %
+                          (localization_rel, key))
+    if "TGComposerLinkSupport.m in Sources" not in project_text:
+        errors.append("%s: composer link support is not compiled" % project_rel)
+
+
 def check_hourly_update_check_contract(errors):
     scheduler_rel = os.path.join("Sources", "Services", "TGUpdateCheckScheduler.m")
     scheduler_text = read_text(os.path.join(ROOT, scheduler_rel))
@@ -1577,6 +1620,7 @@ def main():
     check_chat_history_deletion_contract(errors)
     check_chat_navigation_actions_contract(errors)
     check_message_link_contract(errors)
+    check_composer_link_editor_contract(errors)
     check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
     if errors:
