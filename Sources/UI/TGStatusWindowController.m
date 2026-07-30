@@ -675,6 +675,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL controlsBusy;
 @property (nonatomic, assign) BOOL authSubmissionInFlight;
 @property (nonatomic, assign) BOOL authClientRecoveryInFlight;
+@property (nonatomic, assign) BOOL qrPhoneLoginRecoveryVisible;
 @property (nonatomic, assign) NSUInteger authClientRecoveryAttemptCount;
 @property (nonatomic, assign) NSUInteger accountUnreadCount;
 @property (nonatomic, assign) BOOL hasAccountUnreadCount;
@@ -1192,6 +1193,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize controlsBusy = _controlsBusy;
 @synthesize authSubmissionInFlight = _authSubmissionInFlight;
 @synthesize authClientRecoveryInFlight = _authClientRecoveryInFlight;
+@synthesize qrPhoneLoginRecoveryVisible = _qrPhoneLoginRecoveryVisible;
 @synthesize authClientRecoveryAttemptCount = _authClientRecoveryAttemptCount;
 @synthesize accountUnreadCount = _accountUnreadCount;
 @synthesize hasAccountUnreadCount = _hasAccountUnreadCount;

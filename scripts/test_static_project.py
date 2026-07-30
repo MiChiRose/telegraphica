@@ -1663,6 +1663,7 @@ def check_qr_login_and_reaction_picker_contract(errors):
         "qrCodeLoginWindowControllerDidCancel:",
         "shutdownWithTimeout:1.0",
         "detached the QR client and restored phone-number sign-in",
+        "qrPhoneLoginRecoveryVisible",
     ]:
         if fragment not in auth_text:
             errors.append("%s: QR login host wiring is missing `%s`" %
