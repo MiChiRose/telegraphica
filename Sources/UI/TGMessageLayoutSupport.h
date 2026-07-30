@@ -9,6 +9,7 @@ void TGDrawImageAspectFillInRect(NSImage *image, NSRect rect, BOOL drawingInFlip
 void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected, BOOL drawingInFlippedView);
 NSString *TGShortTimeStringFromDateValue(NSNumber *dateValue);
 NSString *TGDisplayTextForMessageItem(TGMessageItem *item);
+NSString *TGStringByReplacingUnrenderableEmoji(NSString *text, NSFont *font);
 NSTextCheckingResult *TGFirstLinkResultInString(NSString *text);
 NSURL *TGFirstURLInMessageItem(TGMessageItem *item);
 BOOL TGIsSupportedPhotoPath(NSString *path);

@@ -184,6 +184,127 @@ NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
     return preview;
 }
 
+static BOOL TGComposedSequenceNeedsEmojiGlyphCheck(NSString *sequence) {
+    if (![sequence isKindOfClass:[NSString class]] || [sequence length] == 0) {
+        return NO;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [sequence length]; index++) {
+        unichar value = [sequence characterAtIndex:index];
+        if ((value >= 0xD800 && value <= 0xDBFF) ||
+            value == 0x200D ||
+            value == 0x20E3 ||
+            value == 0xFE0E ||
+            value == 0xFE0F ||
+            (value >= 0x2600 && value <= 0x27BF)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL TGComposedSequenceCanRender(NSString *sequence, NSFont *font) {
+    if (!TGComposedSequenceNeedsEmojiGlyphCheck(sequence)) {
+        return YES;
+    }
+    NSFont *safeFont = font ? font : TGChatMessageBodyFont();
+    static NSMutableDictionary *renderabilityCache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        renderabilityCache = [[NSMutableDictionary alloc] init];
+    });
+    NSString *cacheKey = [NSString stringWithFormat:@"%@|%.1f|%@",
+                          [safeFont fontName],
+                          [safeFont pointSize],
+                          sequence];
+    @synchronized(renderabilityCache) {
+        NSNumber *cached = [renderabilityCache objectForKey:cacheKey];
+        if (cached) {
+            return [cached boolValue];
+        }
+    }
+
+    NSDictionary *attributes = [NSDictionary dictionaryWithObject:safeFont
+                                                           forKey:NSFontAttributeName];
+    NSTextStorage *storage = [[[NSTextStorage alloc] initWithString:sequence
+                                                        attributes:attributes] autorelease];
+    NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
+    NSTextContainer *container = [[[NSTextContainer alloc]
+        initWithContainerSize:NSMakeSize(256.0, MAX(32.0, [safeFont pointSize] * 2.0))] autorelease];
+    [layoutManager addTextContainer:container];
+    [storage addLayoutManager:layoutManager];
+    NSRange glyphRange = [layoutManager glyphRangeForTextContainer:container];
+    BOOL renderable = (glyphRange.length > 0);
+    NSUInteger glyphIndex = 0;
+    for (glyphIndex = glyphRange.location;
+         renderable && glyphIndex < NSMaxRange(glyphRange);
+         glyphIndex++) {
+        if ([layoutManager glyphAtIndex:glyphIndex] == NSNullGlyph) {
+            renderable = NO;
+        }
+    }
+    @synchronized(renderabilityCache) {
+        if ([renderabilityCache count] >= 512) {
+            [renderabilityCache removeAllObjects];
+        }
+        [renderabilityCache setObject:[NSNumber numberWithBool:renderable] forKey:cacheKey];
+    }
+    return renderable;
+}
+
+NSString *TGStringByReplacingUnrenderableEmoji(NSString *text, NSFont *font) {
+    if (![text isKindOfClass:[NSString class]] || [text length] == 0) {
+        return [text isKindOfClass:[NSString class]] ? text : @"";
+    }
+    NSMutableString *safeText = nil;
+    NSUInteger location = 0;
+    while (location < [text length]) {
+        NSRange sequenceRange = [text rangeOfComposedCharacterSequenceAtIndex:location];
+        NSString *sequence = [text substringWithRange:sequenceRange];
+        BOOL renderable = TGComposedSequenceCanRender(sequence, font);
+        if (!renderable && !safeText) {
+            safeText = [NSMutableString stringWithCapacity:[text length]];
+            [safeText appendString:[text substringToIndex:sequenceRange.location]];
+        }
+        if (safeText) {
+            [safeText appendString:(renderable ? sequence : @"?")];
+        }
+        location = NSMaxRange(sequenceRange);
+    }
+    return safeText ? safeText : text;
+}
+
+static void TGReplaceUnrenderableEmojiInAttributedString(NSMutableAttributedString *attributed,
+                                                          NSFont *fallbackFont) {
+    if (![attributed isKindOfClass:[NSMutableAttributedString class]] ||
+        [[attributed string] length] == 0) {
+        return;
+    }
+    NSString *text = [attributed string];
+    NSMutableArray *replacementRanges = [NSMutableArray array];
+    NSUInteger location = 0;
+    while (location < [text length]) {
+        NSRange sequenceRange = [text rangeOfComposedCharacterSequenceAtIndex:location];
+        NSString *sequence = [text substringWithRange:sequenceRange];
+        NSFont *font = [attributed attribute:NSFontAttributeName
+                                     atIndex:sequenceRange.location
+                              effectiveRange:NULL];
+        if (!TGComposedSequenceCanRender(sequence, font ? font : fallbackFont)) {
+            [replacementRanges addObject:[NSValue valueWithRange:sequenceRange]];
+        }
+        location = NSMaxRange(sequenceRange);
+    }
+    NSInteger replacementIndex = (NSInteger)[replacementRanges count] - 1;
+    for (; replacementIndex >= 0; replacementIndex--) {
+        NSRange range = [[replacementRanges objectAtIndex:(NSUInteger)replacementIndex] rangeValue];
+        NSDictionary *attributes = [[attributed attributesAtIndex:range.location
+                                                   effectiveRange:NULL] retain];
+        [attributed replaceCharactersInRange:range withString:@"?"];
+        [attributed setAttributes:attributes range:NSMakeRange(range.location, 1)];
+        [attributes release];
+    }
+}
+
 static NSString *TGLocalizedMediaLabel(NSString *label) {
     if (![label isKindOfClass:[NSString class]] || [label length] == 0) {
         return TGLoc(@"media.media");
@@ -345,6 +466,8 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
     NSMutableAttributedString *attributed = [[TGAttributedMessageString(text, baseAttributes) mutableCopy] autorelease];
     NSArray *entities = [item formattedEntities];
     if (![entities isKindOfClass:[NSArray class]] || [entities count] == 0 || [text length] == 0) {
+        TGReplaceUnrenderableEmojiInAttributedString(attributed,
+                                                     [baseAttributes objectForKey:NSFontAttributeName]);
         return attributed;
     }
 
@@ -440,6 +563,7 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
             }
         }
     }
+    TGReplaceUnrenderableEmojiInAttributedString(attributed, baseFont);
     return attributed;
 }
 
