@@ -12,6 +12,7 @@
 @synthesize avatarLocalPath = _avatarLocalPath;
 @synthesize serverNotificationsMuted = _serverNotificationsMuted;
 @synthesize notificationsMuted = _notificationsMuted;
+@synthesize markedAsUnread = _markedAsUnread;
 @synthesize pinned = _pinned;
 @synthesize forumTopic = _forumTopic;
 @synthesize savedMessages = _savedMessages;
@@ -64,6 +65,9 @@
     }
     if ([identifier isEqual:@"notifications_muted"]) {
         return [NSNumber numberWithBool:self.notificationsMuted];
+    }
+    if ([identifier isEqual:@"is_marked_as_unread"]) {
+        return [NSNumber numberWithBool:self.markedAsUnread];
     }
     if ([identifier isEqual:@"chat_id"]) {
         return self.chatID;

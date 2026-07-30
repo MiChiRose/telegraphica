@@ -413,14 +413,25 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [menu addItem:titleItem];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    NSMenuItem *markReadItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.markRead")
-                                                           action:@selector(markChatReadFromMenu:)
+    BOOL chatHasUnreadState = (([[item unreadCount] respondsToSelector:@selector(integerValue)] &&
+                                [[item unreadCount] integerValue] > 0) ||
+                               [item isMarkedAsUnread]);
+    NSMenuItem *markReadItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(chatHasUnreadState ? @"chat.markRead" : @"chat.markUnread")
+                                                           action:@selector(toggleChatReadStateFromMenu:)
                                                     keyEquivalent:@""] autorelease];
     [markReadItem setRepresentedObject:item];
     [markReadItem setTarget:self];
-    [markReadItem setEnabled:([[item unreadCount] respondsToSelector:@selector(integerValue)] && [[item unreadCount] integerValue] > 0)];
+    [markReadItem setEnabled:(![item isForumTopic] && [self.currentAuthState isEqualToString:@"ready"])];
     [markReadItem setImage:TGTemplateIconAssetImage(@"bell", NSMakeSize(16.0, 16.0), [NSColor blackColor], 0.82)];
     [menu addItem:markReadItem];
+
+    NSMenuItem *jumpToDateItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"chat.jumpToDate")
+                                                              action:@selector(jumpToChatDateFromMenu:)
+                                                       keyEquivalent:@""] autorelease];
+    [jumpToDateItem setRepresentedObject:item];
+    [jumpToDateItem setTarget:self];
+    [jumpToDateItem setEnabled:(![item isForumTopic] && [self.currentAuthState isEqualToString:@"ready"])];
+    [menu addItem:jumpToDateItem];
 
     NSMenuItem *pinItem = [[[NSMenuItem alloc] initWithTitle:([item isPinned] ? TGLoc(@"chat.unpin") : TGLoc(@"chat.pin"))
                                                       action:@selector(toggleChatPinnedFromMenu:)
@@ -1214,6 +1225,63 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [self markChatItemRead:item];
 }
 
+- (void)toggleChatReadStateFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]] || [item isForumTopic]) {
+        return;
+    }
+    BOOL hasUnreadState = (([[item unreadCount] respondsToSelector:@selector(integerValue)] &&
+                            [[item unreadCount] integerValue] > 0) ||
+                           [item isMarkedAsUnread]);
+    if (hasUnreadState) {
+        [self markChatItemRead:item];
+    } else {
+        [self markChatItemUnread:item];
+    }
+}
+
+- (void)markChatItemUnread:(TGChatItem *)item {
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        [item isForumTopic] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    TGChatItem *retainedItem = [item retain];
+    NSNumber *chatID = [[item chatID] retain];
+    TGTDLibClient *client = [self.client retain];
+    [retainedItem setMarkedAsUnread:YES];
+    [self.chatTableView reloadData];
+    [self updateApplicationBadge];
+    [self.statusField setStringValue:TGLoc(@"chat.markingUnread")];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *stateError = nil;
+        BOOL success = [client setChatWithID:chatID markedAsUnread:YES timeout:5.0 error:&stateError];
+        NSString *errorMessage = [[stateError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (success) {
+                [self.statusField setStringValue:TGLoc(@"chat.markedUnread")];
+            } else {
+                [retainedItem setMarkedAsUnread:NO];
+                [self.chatTableView reloadData];
+                [self updateApplicationBadge];
+                [self.statusField setStringValue:TGLoc(@"chat.markUnreadFailed")];
+                if ([errorMessage length] > 0) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib mark unread: %@", errorMessage]];
+                }
+            }
+            [errorMessage release];
+            [retainedItem release];
+            [chatID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
 - (void)markChatItemRead:(TGChatItem *)item {
     NSNumber *sourceChatID = [item isForumTopic] ? [item parentChatID] : [item chatID];
     NSNumber *sourceThreadID = [item isForumTopic] ? [item messageThreadID] : nil;
@@ -1221,17 +1289,24 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     NSNumber *chatID = [sourceChatID retain];
     NSNumber *threadID = [sourceThreadID retain];
     NSString *topicKind = [sourceTopicKind copy];
+    TGChatItem *retainedItem = [item retain];
+    BOOL wasMarkedAsUnread = [item isMarkedAsUnread];
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
         [chatID release];
         [threadID release];
         [topicKind release];
+        [retainedItem release];
         return;
     }
 
     TGTDLibClient *client = [self.client retain];
+    [retainedItem setMarkedAsUnread:NO];
     [self clearUnreadCountForChatID:chatID messageThreadID:threadID];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *stateError = nil;
+        BOOL unreadStateCleared = ([retainedItem isForumTopic] ||
+                                   [client setChatWithID:chatID markedAsUnread:NO timeout:5.0 error:&stateError]);
         NSError *messageError = nil;
         NSArray *items = [client recentMessagePreviewItemsForChatID:chatID
                                                     messageThreadID:threadID
@@ -1241,7 +1316,16 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                                                               error:&messageError];
         NSArray *itemsCopy = [items copy];
         NSString *errorMessage = [[messageError localizedDescription] copy];
+        NSString *stateErrorMessage = [[stateError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (!unreadStateCleared && wasMarkedAsUnread) {
+                [retainedItem setMarkedAsUnread:YES];
+                [self.chatTableView reloadData];
+                [self updateApplicationBadge];
+                if ([stateErrorMessage length] > 0) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib clear marked unread: %@", stateErrorMessage]];
+                }
+            }
             if ([itemsCopy count] > 0) {
                 [self markMessageItemsReadForChatID:chatID messageThreadID:threadID messageTopicKind:topicKind items:itemsCopy];
             } else if ([errorMessage length] > 0) {
@@ -1249,9 +1333,66 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
             }
             [itemsCopy release];
             [errorMessage release];
+            [stateErrorMessage release];
+            [retainedItem release];
             [chatID release];
             [threadID release];
             [topicKind release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)jumpToChatDateFromMenu:(id)sender {
+    TGChatItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGChatItem class]] ||
+        [item isForumTopic] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    NSDate *date = [TGDatePickerDialog dateWithTitle:TGLoc(@"chat.jumpToDate.title")
+                                                help:TGLoc(@"chat.jumpToDate.help")
+                                         actionTitle:TGLoc(@"chat.jumpToDate.action")
+                                         initialDate:[NSDate date]
+                                             minDate:nil];
+    if (!date) {
+        return;
+    }
+
+    NSNumber *chatID = [[item chatID] retain];
+    NSString *chatTitle = [[item title] copy];
+    NSInteger unixDate = (NSInteger)[date timeIntervalSince1970];
+    TGTDLibClient *client = [self.client retain];
+    [self.statusField setStringValue:TGLoc(@"chat.jumpToDate.loading")];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *lookupError = nil;
+        TGMessageItem *messageItem = [[client messagePreviewItemForChatID:chatID
+                                                                 unixDate:unixDate
+                                                                  timeout:8.0
+                                                                    error:&lookupError] retain];
+        NSString *errorMessage = [[lookupError localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (messageItem && [[messageItem messageID] respondsToSelector:@selector(longLongValue)]) {
+                TGSearchResultItem *result = [[[TGSearchResultItem alloc] init] autorelease];
+                [result setChatID:chatID];
+                [result setMessageID:[messageItem messageID]];
+                [result setChatTitle:chatTitle];
+                [result setMessageItem:messageItem];
+                [self jumpToSearchResult:result];
+            } else {
+                [self.statusField setStringValue:TGLoc(@"chat.jumpToDate.notFound")];
+                if ([errorMessage length] > 0) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib jump to date: %@", errorMessage]];
+                }
+            }
+            [messageItem release];
+            [errorMessage release];
+            [chatID release];
+            [chatTitle release];
             [client release];
         });
         [pool drain];
@@ -1270,11 +1411,13 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         NSArray *sourceItems = collections[collectionIndex];
         for (index = 0; index < [sourceItems count]; index++) {
             id candidate = [sourceItems objectAtIndex:index];
-            if (![candidate isKindOfClass:[TGChatItem class]] ||
-                [(TGChatItem *)candidate unreadCount] <= 0) {
+            TGChatItem *candidateItem = [candidate isKindOfClass:[TGChatItem class]] ? (TGChatItem *)candidate : nil;
+            BOOL hasUnreadCount = ([[candidateItem unreadCount] respondsToSelector:@selector(integerValue)] &&
+                                   [[candidateItem unreadCount] integerValue] > 0);
+            if (!candidateItem || (!hasUnreadCount && ![candidateItem isMarkedAsUnread])) {
                 continue;
             }
-            TGChatItem *chatItem = (TGChatItem *)candidate;
+            TGChatItem *chatItem = candidateItem;
             NSNumber *sourceChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
             NSNumber *sourceThreadID = [chatItem isForumTopic] ? [chatItem messageThreadID] : nil;
             if (![sourceChatID respondsToSelector:@selector(longLongValue)]) {
@@ -1309,12 +1452,13 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                 NSUInteger itemIndex = 0;
                 for (itemIndex = 0; itemIndex < [source count]; itemIndex++) {
                     id candidate = [source objectAtIndex:itemIndex];
-                    if (![candidate isKindOfClass:[TGChatItem class]] ||
-                        ![[(TGChatItem *)candidate unreadCount] respondsToSelector:@selector(integerValue)] ||
-                        [[(TGChatItem *)candidate unreadCount] integerValue] <= 0) {
+                    TGChatItem *candidateItem = [candidate isKindOfClass:[TGChatItem class]] ? (TGChatItem *)candidate : nil;
+                    BOOL hasUnreadCount = ([[candidateItem unreadCount] respondsToSelector:@selector(integerValue)] &&
+                                           [[candidateItem unreadCount] integerValue] > 0);
+                    if (!candidateItem || (!hasUnreadCount && ![candidateItem isMarkedAsUnread])) {
                         continue;
                     }
-                    TGChatItem *chatItem = (TGChatItem *)candidate;
+                    TGChatItem *chatItem = candidateItem;
                     NSNumber *sourceChatID = [chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID];
                     NSNumber *sourceThreadID = [chatItem isForumTopic] ? [chatItem messageThreadID] : nil;
                     if (![sourceChatID respondsToSelector:@selector(longLongValue)]) {

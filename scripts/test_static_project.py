@@ -1382,6 +1382,32 @@ def check_chat_history_deletion_contract(errors):
                           (lifecycle_rel, fragment))
 
 
+def check_chat_navigation_actions_contract(errors):
+    item_rel = os.path.join("Sources", "Core", "TGChatItem.h")
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    item_text = read_text(os.path.join(ROOT, item_rel))
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    menus_text = read_text(os.path.join(ROOT, menus_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+
+    if "isMarkedAsUnread" not in item_text:
+        errors.append("%s: manually unread chat state is missing" % item_rel)
+    for fragment in ['@"toggleChatIsMarkedAsUnread"', '@"is_marked_as_unread"',
+                     '@"getChatMessageByDate"', '@"date"']:
+        if fragment not in client_text:
+            errors.append("%s: chat navigation TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in ["toggleChatReadStateFromMenu:", "markChatItemUnread:",
+                     "jumpToChatDateFromMenu:", "jumpToSearchResult:"]:
+        if fragment not in menus_text:
+            errors.append("%s: chat navigation action is missing `%s`" %
+                          (menus_rel, fragment))
+    if "drawsMarkedUnreadDot" not in cells_text:
+        errors.append("%s: manually unread chats need a visible unread dot" % cells_rel)
+
+
 def check_hourly_update_check_contract(errors):
     scheduler_rel = os.path.join("Sources", "Services", "TGUpdateCheckScheduler.m")
     scheduler_text = read_text(os.path.join(ROOT, scheduler_rel))
@@ -1525,6 +1551,7 @@ def main():
     check_retro_console_contract(errors)
     check_chat_archive_contract(errors)
     check_chat_history_deletion_contract(errors)
+    check_chat_navigation_actions_contract(errors)
     check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
     if errors:
