@@ -24,38 +24,9 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 
 - (void)drawRect:(NSRect)dirtyRect {
     (void)dirtyRect;
-    [[NSColor blackColor] setFill];
-    NSRectFill([self bounds]);
-}
-
-@end
-
-@interface TGVideoNoteCircularMatteView : NSView
-@end
-
-@implementation TGVideoNoteCircularMatteView
-
-- (BOOL)isOpaque {
-    return NO;
-}
-
-- (NSView *)hitTest:(NSPoint)point {
-    (void)point;
-    return nil;
-}
-
-- (void)drawRect:(NSRect)dirtyRect {
-    (void)dirtyRect;
     NSRect bounds = [self bounds];
-    NSBezierPath *mattePath = [NSBezierPath bezierPathWithRect:bounds];
-    [mattePath appendBezierPathWithOvalInRect:NSInsetRect(bounds, 0.5, 0.5)];
-    [mattePath setWindingRule:NSEvenOddWindingRule];
-    TGThemeDrawGroupedCardInPath(mattePath, bounds, [self isFlipped]);
-
-    NSBezierPath *ringPath = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(bounds, 0.5, 0.5)];
-    [TGClassicTableGridColor() set];
-    [ringPath setLineWidth:1.0];
-    [ringPath stroke];
+    NSBezierPath *backgroundPath = [NSBezierPath bezierPathWithRect:bounds];
+    TGThemeDrawGroupedCardInPath(backgroundPath, bounds, [self isFlipped]);
 }
 
 @end
@@ -68,7 +39,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 @property (nonatomic, retain) AVPlayer *previewPlayer;
 @property (nonatomic, retain) AVPlayerLayer *playerLayer;
 @property (nonatomic, retain) TGVideoNotePreviewView *previewView;
-@property (nonatomic, retain) TGVideoNoteCircularMatteView *previewMatteView;
+@property (nonatomic, retain) CALayer *previewClipLayer;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextField *timerField;
 @property (nonatomic, retain) NSImageView *cameraStateImageView;
@@ -99,7 +70,7 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 @synthesize previewPlayer = _previewPlayer;
 @synthesize playerLayer = _playerLayer;
 @synthesize previewView = _previewView;
-@synthesize previewMatteView = _previewMatteView;
+@synthesize previewClipLayer = _previewClipLayer;
 @synthesize statusField = _statusField;
 @synthesize timerField = _timerField;
 @synthesize cameraStateImageView = _cameraStateImageView;
@@ -194,11 +165,24 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
 
     self.previewView = [[[TGVideoNotePreviewView alloc] initWithFrame:NSMakeRect(90.0, 184.0, 360.0, 360.0)] autorelease];
     [self.previewView setWantsLayer:YES];
-    [[self.previewView layer] setCornerRadius:180.0];
     [[self.previewView layer] setMasksToBounds:YES];
     [root addSubview:self.previewView];
-    self.previewMatteView = [[[TGVideoNoteCircularMatteView alloc] initWithFrame:[self.previewView frame]] autorelease];
-    [root addSubview:self.previewMatteView];
+
+    /*
+     * Keep the AppKit backing layer rectangular and opaque. Old Core Animation
+     * can leak stale IOSurface tiles through transparent corners when an
+     * AVCaptureVideoPreviewLayer is masked directly. A normal child layer owns
+     * the circular clip instead, while the parent paints every outside pixel.
+     */
+    CALayer *clipLayer = [CALayer layer];
+    [clipLayer setFrame:[[self.previewView layer] bounds]];
+    [clipLayer setCornerRadius:180.0];
+    [clipLayer setMasksToBounds:YES];
+    [clipLayer setBackgroundColor:[[NSColor blackColor] CGColor]];
+    [clipLayer setBorderWidth:1.0];
+    [clipLayer setBorderColor:[TGClassicTableGridColor() CGColor]];
+    [[self.previewView layer] addSublayer:clipLayer];
+    self.previewClipLayer = clipLayer;
 
     self.statusField = [self labelWithFrame:NSMakeRect(72.0, 150.0, 396.0, 22.0)
                                        font:[NSFont systemFontOfSize:12.0]
@@ -343,16 +327,6 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
                                                                  1.0)];
 }
 
-- (CALayer *)circularMaskLayerForBounds:(CGRect)bounds {
-    CAShapeLayer *maskLayer = [CAShapeLayer layer];
-    CGPathRef path = CGPathCreateWithEllipseInRect(bounds, NULL);
-    [maskLayer setFrame:bounds];
-    [maskLayer setPath:path];
-    [maskLayer setFillColor:[[NSColor whiteColor] CGColor]];
-    CGPathRelease(path);
-    return maskLayer;
-}
-
 - (void)attachCameraPreviewLayer {
     [self.playerLayer removeFromSuperlayer];
     self.playerLayer = nil;
@@ -361,10 +335,9 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
         [layer setVideoGravity:AVLayerVideoGravityResizeAspectFill];
         self.cameraPreviewLayer = layer;
     }
-    [self.cameraPreviewLayer setFrame:[[self.previewView layer] bounds]];
-    [self.cameraPreviewLayer setMask:[self circularMaskLayerForBounds:[[self.previewView layer] bounds]]];
-    [[self.previewView layer] addSublayer:self.cameraPreviewLayer];
-    [self.previewMatteView setNeedsDisplay:YES];
+    [self.cameraPreviewLayer setFrame:[self.previewClipLayer bounds]];
+    [self.previewClipLayer addSublayer:self.cameraPreviewLayer];
+    [self.previewView setNeedsDisplay:YES];
 }
 
 - (void)tearDownCaptureSession {
@@ -432,6 +405,8 @@ static NSTimeInterval const TGVideoNoteMaximumDuration = 60.0;
     self.presentationGeneration++;
     self.cancelling = NO;
     self.microphoneEnabled = microphoneEnabled;
+    [self.previewView setNeedsDisplay:YES];
+    [self.previewClipLayer setBorderColor:[TGClassicTableGridColor() CGColor]];
     [self.cameraStateImageView setImage:TGTemplateIconAssetImage(@"video",
                                                                  NSMakeSize(24.0, 24.0),
                                                                  TGClassicHeaderTextColor(1.0),
@@ -627,10 +602,9 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     self.previewPlayer = player;
     AVPlayerLayer *layer = [AVPlayerLayer playerLayerWithPlayer:player];
     [layer setVideoGravity:AVLayerVideoGravityResizeAspectFill];
-    [layer setFrame:[[self.previewView layer] bounds]];
-    [layer setMask:[self circularMaskLayerForBounds:[[self.previewView layer] bounds]]];
+    [layer setFrame:[self.previewClipLayer bounds]];
     self.playerLayer = layer;
-    [[self.previewView layer] addSublayer:layer];
+    [self.previewClipLayer addSublayer:layer];
     [self showPreviewControls];
     [player seekToTime:kCMTimeZero];
     [player play];
@@ -735,7 +709,7 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
     [_previewPlayer release];
     [_playerLayer release];
     [_previewView release];
-    [_previewMatteView release];
+    [_previewClipLayer release];
     [_statusField release];
     [_timerField release];
     [_cameraStateImageView release];
