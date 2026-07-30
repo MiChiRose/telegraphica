@@ -51,6 +51,7 @@
 #import "../Core/TGTDLibClient.h"
 #import "../Core/TGTDLibClient+ChatHistory.h"
 #import "../Core/TGTDLibClient+ChatMembers.h"
+#import "../Core/TGTDLibClient+MessageLinks.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Core/TGTDLibClient+MessageTypes.h"
 #import "../Services/TGLocalDataReset.h"

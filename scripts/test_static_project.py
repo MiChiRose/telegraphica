@@ -1404,8 +1404,32 @@ def check_chat_navigation_actions_contract(errors):
         if fragment not in menus_text:
             errors.append("%s: chat navigation action is missing `%s`" %
                           (menus_rel, fragment))
-    if "drawsMarkedUnreadDot" not in cells_text:
-        errors.append("%s: manually unread chats need a visible unread dot" % cells_rel)
+    for fragment in ["drawsMarkedUnreadDot", "TGColorFromHex(0x2D8BD4)"]:
+        if fragment not in cells_text:
+            errors.append("%s: manually unread chat indicator is missing `%s`" %
+                          (cells_rel, fragment))
+
+
+def check_message_link_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+MessageLinks.m")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in ['@"getMessageLink"', '@"in_message_thread"', '@"for_comment"',
+                     '@"messageLink"', '@"link"']:
+        if fragment not in client_text:
+            errors.append("%s: TDLib message-link compatibility is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in ["copyMessageLinkFromMenu:", 'TGLoc(@"message.copyLink")',
+                     "messageLinkForChatID:", "NSPasteboard"]:
+        if fragment not in menu_text:
+            errors.append("%s: message-link menu action is missing `%s`" %
+                          (menu_rel, fragment))
+    if "TGTDLibClient+MessageLinks.m in Sources" not in project_text:
+        errors.append("%s: message-link client category is not compiled" % project_rel)
 
 
 def check_hourly_update_check_contract(errors):
@@ -1552,6 +1576,7 @@ def main():
     check_chat_archive_contract(errors)
     check_chat_history_deletion_contract(errors)
     check_chat_navigation_actions_contract(errors)
+    check_message_link_contract(errors)
     check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
     if errors:
