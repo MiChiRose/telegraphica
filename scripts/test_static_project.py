@@ -1640,10 +1640,14 @@ def check_qr_login_and_reaction_picker_contract(errors):
         "beginQRCodeAuthentication",
         "authorizationStateDidChange:",
         "maximumSide:300.0",
+        "qrCodeLoginWindowControllerDidCancel:",
     ]:
         if fragment not in qr_controller_text:
             errors.append("%s: QR login window is missing `%s`" %
                           (qr_controller_rel, fragment))
+    if "_closeButton" in qr_controller_text:
+        errors.append("%s: redundant in-window QR close button must not be present" %
+                      qr_controller_rel)
     for fragment in [
         "qrcodegen_encodeText",
         "qrcodegen_getModule",
@@ -1656,6 +1660,8 @@ def check_qr_login_and_reaction_picker_contract(errors):
         "openQRCodeLogin:",
         'isEqualToString:@"waitOtherDeviceConfirmation"',
         'TGLoc(@"login.or")',
+        "qrCodeLoginWindowControllerDidCancel:",
+        "shutdownWithTimeout:1.0",
     ]:
         if fragment not in auth_text:
             errors.append("%s: QR login host wiring is missing `%s`" %

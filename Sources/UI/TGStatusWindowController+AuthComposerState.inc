@@ -41,6 +41,7 @@
     }
     if (!self.qrLoginWindowController) {
         self.qrLoginWindowController = [[[TGQRCodeLoginWindowController alloc] initWithClient:self.client] autorelease];
+        [self.qrLoginWindowController setDelegate:(id<TGQRCodeLoginWindowControllerDelegate>)self];
     }
     [self.qrLoginWindowController showWindow:self];
     [[self.qrLoginWindowController window] center];
@@ -50,6 +51,50 @@
     } else {
         [self.qrLoginWindowController refreshQRCodeFromClient];
     }
+}
+
+- (void)qrCodeLoginWindowControllerDidCancel:(TGQRCodeLoginWindowController *)controller {
+    if (controller != self.qrLoginWindowController || self.authClientRecoveryInFlight) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"waitPhoneNumber"] &&
+        ![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        [controller setDelegate:nil];
+        self.qrLoginWindowController = nil;
+        return;
+    }
+
+    [controller setDelegate:nil];
+    self.qrLoginWindowController = nil;
+    self.authClientRecoveryInFlight = YES;
+    self.authSubmissionInFlight = NO;
+    [self setControlsBusy:YES];
+    [self updateAuthControlsForState:@"waitPhoneNumber"];
+    [self appendDetail:@"QR sign-in closed; restarting Telegram authorization for phone-number sign-in."];
+
+    TGTDLibClient *clientToReplace = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        [clientToReplace shutdownWithTimeout:1.0];
+        [NSThread sleepForTimeInterval:0.15];
+        TGTDLibClient *replacementClient = [[[TGTDLibClient alloc] init] autorelease];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client == clientToReplace) {
+                self.client = replacementClient;
+                self.initialConnectStarted = NO;
+                self.authClientRecoveryInFlight = NO;
+                [self setControlsBusy:NO];
+                [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            } else {
+                self.authClientRecoveryInFlight = NO;
+                [self setControlsBusy:NO];
+            }
+        });
+
+        [clientToReplace release];
+        [pool drain];
+    });
 }
 
 - (BOOL)isTerminalAuthorizationState:(NSString *)state {
