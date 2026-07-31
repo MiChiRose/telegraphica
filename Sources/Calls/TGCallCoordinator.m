@@ -283,6 +283,15 @@ static NSString *TGCallReadableFailure(NSString *message) {
             }
         }
     } else if ([stateType isEqualToString:@"callStateDiscarded"]) {
+        NSDictionary *reason = [[state objectForKey:@"reason"] isKindOfClass:[NSDictionary class]]
+            ? [state objectForKey:@"reason"] : nil;
+        NSString *reasonType = [[reason objectForKey:@"@type"] description];
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+            @"Audio call: TDLib discarded the %@ call; reason=%@ duration=%@ need-rating=%@.",
+            video ? @"video" : @"audio",
+            [reasonType length] > 0 ? reasonType : @"unspecified",
+            [state objectForKey:@"duration"] ?: @0,
+            [[state objectForKey:@"need_rating"] boolValue] ? @"yes" : @"no"]];
         [self.callWindowController setPresentationState:TGCallPresentationStateEnded detail:nil];
         [self finishCallAfterDelay:4.0];
     } else if ([stateType isEqualToString:@"callStateError"]) {

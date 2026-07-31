@@ -210,9 +210,6 @@ private:
         if (matched.width <= 0 || matched.height <= 0 || matched.maxFPS <= 0) {
             matched = requested;
         }
-#ifndef WEBRTC_WIN
-        matched.videoType = webrtc::VideoType::kI420;
-#endif
         if (_module->StartCapture(matched) != 0) {
             stopCapture();
             reportFailure();

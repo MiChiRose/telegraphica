@@ -616,6 +616,10 @@ def check_call_transport_stability_contract(errors):
         "MutingAudioTransport",
         "MutingAudioDeviceModule",
         "audioOutputState->muted.store",
+        "libyuv::I420Rotate",
+        "libyuv::I420ToBGRA",
+        "remotePrefferedAspectRatioUpdated = [rawOwner]",
+        "Local camera capture failed",
     ]:
         if fragment not in modern_source_text:
             errors.append("%s: modern Telegram transport is missing `%s`" %
@@ -712,6 +716,9 @@ def check_call_transport_stability_contract(errors):
                           (coordinator_rel, fragment))
     if "descriptor.config.allowTCP = true;" not in modern_source_text:
         errors.append("%s: Telegram call transport must retain TCP relay fallback" %
+                      modern_source_rel)
+    if "setRequestedVideoAspect(4.0f / 3.0f)" in modern_source_text:
+        errors.append("%s: fixed 4:3 incoming-video requests distort portrait callers" %
                       modern_source_rel)
 
     privacy_permissions_rel = os.path.join(

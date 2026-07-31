@@ -12,6 +12,7 @@
 #include "api/video/video_frame.h"
 #include "api/video/video_sink_interface.h"
 #include "libyuv/convert_argb.h"
+#include "libyuv/rotate.h"
 
 #include <algorithm>
 #include <array>
@@ -63,6 +64,33 @@ public:
         if (!source) {
             return;
         }
+        libyuv::RotationMode rotation = libyuv::kRotate0;
+        if (frame.rotation() == webrtc::kVideoRotation_90) {
+            rotation = libyuv::kRotate90;
+        } else if (frame.rotation() == webrtc::kVideoRotation_180) {
+            rotation = libyuv::kRotate180;
+        } else if (frame.rotation() == webrtc::kVideoRotation_270) {
+            rotation = libyuv::kRotate270;
+        }
+        if (rotation != libyuv::kRotate0) {
+            const int sourceWidth = source->width();
+            const int sourceHeight = source->height();
+            const bool swapsDimensions =
+                (rotation == libyuv::kRotate90 || rotation == libyuv::kRotate270);
+            rtc::scoped_refptr<webrtc::I420Buffer> rotated =
+                webrtc::I420Buffer::Create(swapsDimensions ? sourceHeight : sourceWidth,
+                                           swapsDimensions ? sourceWidth : sourceHeight);
+            if (libyuv::I420Rotate(source->DataY(), source->StrideY(),
+                                  source->DataU(), source->StrideU(),
+                                  source->DataV(), source->StrideV(),
+                                  rotated->MutableDataY(), rotated->StrideY(),
+                                  rotated->MutableDataU(), rotated->StrideU(),
+                                  rotated->MutableDataV(), rotated->StrideV(),
+                                  sourceWidth, sourceHeight, rotation) != 0) {
+                return;
+            }
+            source = rotated;
+        }
         int width = source->width();
         int height = source->height();
         if (width > 640 || height > 480) {
@@ -77,7 +105,7 @@ public:
         const int bytesPerRow = width * 4;
         std::vector<uint8_t> pixels(
             static_cast<size_t>(bytesPerRow) * static_cast<size_t>(height));
-        if (libyuv::I420ToARGB(
+        if (libyuv::I420ToBGRA(
                 source->DataY(),
                 source->StrideY(),
                 source->DataU(),
@@ -89,6 +117,12 @@ public:
                 width,
                 height) != 0) {
             return;
+        }
+        if (!_didLogFirstFrame.exchange(true) && _callbacks.logMessage) {
+            const std::string message = std::string(_local ? "Local" : "Remote") +
+                " video frame received: " + std::to_string(width) + "x" +
+                std::to_string(height) + ".";
+            _callbacks.logMessage(_context, message.c_str());
         }
         _callbacks.videoFrame(
             _context,
@@ -105,6 +139,7 @@ private:
     TGModernCallCallbacks _callbacks;
     void *_context;
     std::chrono::steady_clock::time_point _lastFrameAt;
+    std::atomic<bool> _didLogFirstFrame{false};
 };
 
 /*
@@ -656,7 +691,13 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
             owner->remoteVideoSink =
                 std::make_shared<CallbackVideoSink>(false, callbacks, context);
             owner->videoCapture->setOutput(owner->localVideoSink);
-            owner->videoCapture->setPreferredAspectRatio(4.0f / 3.0f);
+            owner->videoCapture->setOnFatalError([rawOwner]() {
+                if (rawOwner->callbacks.logMessage) {
+                    rawOwner->callbacks.logMessage(
+                        rawOwner->callbackContext,
+                        "Local camera capture failed; the call remains connected without local video.");
+                }
+            });
             owner->videoCapture->setState(tgcalls::VideoState::Active);
             descriptor.videoCapture = owner->videoCapture;
         }
@@ -688,7 +729,12 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
                     static_cast<int>(video));
             }
         };
-        descriptor.remotePrefferedAspectRatioUpdated = [](float value) { (void)value; };
+        descriptor.remotePrefferedAspectRatioUpdated = [rawOwner](float value) {
+            if (rawOwner->videoCapture && std::isfinite(value) &&
+                value >= 0.25f && value <= 4.0f) {
+                rawOwner->videoCapture->setPreferredAspectRatio(value);
+            }
+        };
 
         owner->instance = tgcalls::Meta::Create(UTF8String(version), std::move(descriptor));
         if (!owner->instance) {
@@ -699,7 +745,6 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
         }
         if (owner->remoteVideoSink) {
             owner->instance->setIncomingVideoOutput(owner->remoteVideoSink);
-            owner->instance->setRequestedVideoAspect(4.0f / 3.0f);
         }
         if (callbacks.logMessage) {
             std::string message = std::string("Modern call transport started with protocol ") +
