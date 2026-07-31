@@ -163,8 +163,6 @@
 @property (nonatomic, retain) NSPopUpButton *contactPopUpButton;
 @property (nonatomic, retain) NSButton *startCallButton;
 @property (nonatomic, retain) NSButton *refreshButton;
-@property (nonatomic, retain) NSButton *videoTestOutgoingButton;
-@property (nonatomic, retain) NSButton *videoTestIncomingButton;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSScrollView *historyScrollView;
@@ -186,8 +184,6 @@
 @synthesize contactPopUpButton = _contactPopUpButton;
 @synthesize startCallButton = _startCallButton;
 @synthesize refreshButton = _refreshButton;
-@synthesize videoTestOutgoingButton = _videoTestOutgoingButton;
-@synthesize videoTestIncomingButton = _videoTestIncomingButton;
 @synthesize statusField = _statusField;
 @synthesize tableView = _tableView;
 @synthesize historyScrollView = _historyScrollView;
@@ -327,20 +323,7 @@
         [scrollView setDocumentView:self.tableView];
         [self addSubview:scrollView];
 
-        self.videoTestOutgoingButton = [self textButtonWithFrame:NSMakeRect(30.0, 18.0, 174.0, 26.0)
-                                                            title:@""
-                                                           action:@selector(videoTestOutgoingPressed:)
-                                                          primary:NO];
-        [self.videoTestOutgoingButton setAutoresizingMask:NSViewMaxXMargin];
-        [self addSubview:self.videoTestOutgoingButton];
-        self.videoTestIncomingButton = [self textButtonWithFrame:NSMakeRect(212.0, 18.0, 174.0, 26.0)
-                                                            title:@""
-                                                           action:@selector(videoTestIncomingPressed:)
-                                                          primary:NO];
-        [self.videoTestIncomingButton setAutoresizingMask:NSViewMaxXMargin];
-        [self addSubview:self.videoTestIncomingButton];
-
-        self.statusField = [self labelWithFrame:NSMakeRect(398.0, 20.0, MAX(100.0, NSWidth(frame) - 450.0), 18.0)
+        self.statusField = [self labelWithFrame:NSMakeRect(30.0, 20.0, MAX(100.0, NSWidth(frame) - 82.0), 18.0)
                                            text:@""
                                            font:[NSFont systemFontOfSize:10.5]];
         [self.statusField setTextColor:TGClassicCardMutedInkColor()];
@@ -401,16 +384,9 @@
                                                 46.0,
                                                 MAX(220.0, NSWidth(bounds) - 60.0),
                                                 MAX(80.0, NSHeight(bounds) - 202.0))];
-    CGFloat testButtonWidth = MIN(174.0, MAX(116.0, (NSWidth(bounds) - 96.0) / 3.0));
-    [self.videoTestOutgoingButton setFrame:NSMakeRect(30.0, 18.0, testButtonWidth, 26.0)];
-    [self.videoTestIncomingButton setFrame:NSMakeRect(38.0 + testButtonWidth,
-                                                       18.0,
-                                                       testButtonWidth,
-                                                       26.0)];
-    CGFloat statusX = 46.0 + (testButtonWidth * 2.0);
-    [self.statusField setFrame:NSMakeRect(statusX,
+    [self.statusField setFrame:NSMakeRect(30.0,
                                           20.0,
-                                          MAX(80.0, NSWidth(bounds) - statusX - 52.0),
+                                          MAX(100.0, NSWidth(bounds) - 82.0),
                                           18.0)];
     [self.spinner setFrame:NSMakeRect(NSWidth(bounds) - 42.0, 20.0, 16.0, 16.0)];
     [self.unavailableTitleField setFrame:NSMakeRect(80.0,
@@ -600,8 +576,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
                              self.contactPopUpButton,
                              self.startCallButton,
                              self.refreshButton,
-                             self.videoTestOutgoingButton,
-                             self.videoTestIncomingButton,
                              [self viewWithTag:602],
                              self.historyScrollView,
                              self.statusField,
@@ -629,16 +603,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     }
 }
 
-- (void)videoTestOutgoingPressed:(id)sender {
-    (void)sender;
-    [self.coordinator startMockOutgoingVideoCall];
-}
-
-- (void)videoTestIncomingPressed:(id)sender {
-    (void)sender;
-    [self.coordinator startMockIncomingVideoCall];
-}
-
 - (void)callFinished:(NSNotification *)notification {
     (void)notification;
     [self refreshData];
@@ -652,8 +616,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [recentLabel setStringValue:TGLoc(@"calls.recent")];
     [self.startCallButton setTitle:TGLoc(@"calls.start")];
     [self.refreshButton setTitle:TGLoc(@"refresh")];
-    [self.videoTestOutgoingButton setTitle:TGLoc(@"calls.demo.video.outgoing")];
-    [self.videoTestIncomingButton setTitle:TGLoc(@"calls.demo.video.incoming")];
     if ([self.contactPopUpButton numberOfItems] > 0 &&
         [[self.contactPopUpButton itemAtIndex:0] representedObject] == nil) {
         [[self.contactPopUpButton itemAtIndex:0] setTitle:TGLoc(@"calls.selectContact")];
@@ -686,8 +648,6 @@ objectValueForTableColumn:(NSTableColumn *)tableColumn
     [_contactPopUpButton release];
     [_startCallButton release];
     [_refreshButton release];
-    [_videoTestOutgoingButton release];
-    [_videoTestIncomingButton release];
     [_statusField release];
     [_tableView release];
     [_historyScrollView release];

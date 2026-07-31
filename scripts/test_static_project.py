@@ -774,6 +774,10 @@ def check_call_transport_stability_contract(errors):
 
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     history_text = read_text(os.path.join(ROOT, history_rel))
+    coordinator_header_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.h")
+    coordinator_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.m")
+    coordinator_text = read_text(os.path.join(ROOT, coordinator_header_rel)) + read_text(
+        os.path.join(ROOT, coordinator_rel))
     if "cell->_callSummary = [_callSummary retain];" not in history_text:
         errors.append("%s: call history cells must own copied row summaries on legacy AppKit" %
                       history_rel)
@@ -803,7 +807,7 @@ def check_call_transport_stability_contract(errors):
         if forbidden_fragment in history_text:
             errors.append("%s: demo call controls must not be visible in the production calls screen `%s`" %
                           (history_rel, forbidden_fragment))
-    for fragment in [
+    for forbidden_fragment in [
         "videoTestOutgoingButton",
         "videoTestIncomingButton",
         "@selector(videoTestOutgoingPressed:)",
@@ -811,9 +815,9 @@ def check_call_transport_stability_contract(errors):
         "startMockOutgoingVideoCall",
         "startMockIncomingVideoCall",
     ]:
-        if fragment not in history_text:
-            errors.append("%s: requested local video-call test control is missing `%s`" %
-                          (history_rel, fragment))
+        if forbidden_fragment in history_text or forbidden_fragment in coordinator_text:
+            errors.append("Video-call test controls must not ship in the release candidate: `%s`" %
+                          forbidden_fragment)
     if "[self.unavailableDetailField setLineBreakMode:" in history_text:
         errors.append("%s: legacy NSTextField line breaking must be configured through its cell" %
                       history_rel)
