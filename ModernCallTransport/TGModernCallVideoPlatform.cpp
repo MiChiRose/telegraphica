@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace tgcalls {
 namespace {
@@ -56,6 +57,31 @@ std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> SinkForSource(
     CameraTrackSource *trackSource =
         static_cast<CameraTrackSource *>(proxy->internal());
     return trackSource->sink();
+}
+
+bool ValidCapability(const webrtc::VideoCaptureCapability &capability) {
+    return capability.width > 0 && capability.height > 0 && capability.maxFPS > 0;
+}
+
+void AppendCapability(std::vector<webrtc::VideoCaptureCapability> &capabilities,
+                      const webrtc::VideoCaptureCapability &capability) {
+    if (!ValidCapability(capability) ||
+        std::find(capabilities.begin(), capabilities.end(), capability) != capabilities.end()) {
+        return;
+    }
+    capabilities.push_back(capability);
+}
+
+void AppendCapabilityWithI420Fallback(
+        std::vector<webrtc::VideoCaptureCapability> &capabilities,
+        const webrtc::VideoCaptureCapability &capability) {
+    if (!ValidCapability(capability)) {
+        return;
+    }
+    webrtc::VideoCaptureCapability converted = capability;
+    converted.videoType = webrtc::VideoType::kI420;
+    AppendCapability(capabilities, converted);
+    AppendCapability(capabilities, capability);
 }
 
 class CameraCapturer final
@@ -194,26 +220,38 @@ private:
             reportFailure();
             return;
         }
-        _module = webrtc::VideoCaptureFactory::Create(selectedID.c_str());
-        if (!_module) {
-            reportFailure();
-            return;
-        }
-        _module->RegisterCaptureDataCallback(this);
         webrtc::VideoCaptureCapability requested;
         requested.videoType = webrtc::VideoType::kI420;
         requested.width = 640;
         requested.height = 480;
         requested.maxFPS = 15;
         webrtc::VideoCaptureCapability matched;
-        info->GetBestMatchedCapability(_module->CurrentDeviceName(), requested, matched);
-        if (matched.width <= 0 || matched.height <= 0 || matched.maxFPS <= 0) {
-            matched = requested;
+        std::vector<webrtc::VideoCaptureCapability> candidates;
+        if (info->GetBestMatchedCapability(selectedID.c_str(), requested, matched) >= 0) {
+            AppendCapabilityWithI420Fallback(candidates, matched);
         }
-        if (_module->StartCapture(matched) != 0) {
-            stopCapture();
-            reportFailure();
+        const int capabilityCount = info->NumberOfCapabilities(selectedID.c_str());
+        for (int capabilityIndex = 0; capabilityIndex < capabilityCount; ++capabilityIndex) {
+            webrtc::VideoCaptureCapability capability;
+            if (info->GetCapability(selectedID.c_str(), capabilityIndex, capability) == 0) {
+                AppendCapabilityWithI420Fallback(candidates, capability);
+            }
         }
+        AppendCapability(candidates, requested);
+
+        for (const webrtc::VideoCaptureCapability &candidate : candidates) {
+            _module = webrtc::VideoCaptureFactory::Create(selectedID.c_str());
+            if (!_module) {
+                continue;
+            }
+            _module->RegisterCaptureDataCallback(this);
+            if (_module->StartCapture(candidate) == 0) {
+                return;
+            }
+            _module->DeRegisterCaptureDataCallback();
+            _module = nullptr;
+        }
+        reportFailure();
     }
 
     void stopCapture() {

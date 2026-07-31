@@ -585,11 +585,13 @@ def check_call_transport_stability_contract(errors):
 
     modern_header_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.h")
     modern_source_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.mm")
+    modern_video_rel = os.path.join("ModernCallTransport", "TGModernCallVideoPlatform.cpp")
     modern_cmake_rel = os.path.join("ModernCallTransport", "CMakeLists.txt")
     verified_transport_rel = os.path.join(
         "ModernCallTransport", "VERIFIED_TRANSPORT.sha256")
     modern_header_text = read_text(os.path.join(ROOT, modern_header_rel))
     modern_source_text = read_text(os.path.join(ROOT, modern_source_rel))
+    modern_video_text = read_text(os.path.join(ROOT, modern_video_rel))
     modern_cmake_text = read_text(os.path.join(ROOT, modern_cmake_rel))
     verified_transport_text = read_text(
         os.path.join(ROOT, verified_transport_rel))
@@ -627,6 +629,14 @@ def check_call_transport_stability_contract(errors):
         if fragment not in modern_source_text:
             errors.append("%s: modern Telegram transport is missing `%s`" %
                           (modern_source_rel, fragment))
+    for fragment in [
+        "AppendCapabilityWithI420Fallback",
+        "NumberOfCapabilities(selectedID.c_str())",
+        "StartCapture(candidate)",
+    ]:
+        if fragment not in modern_video_text:
+            errors.append("%s: legacy camera fallback is missing `%s`" %
+                          (modern_video_rel, fragment))
     for fragment in [
         "CMAKE_OSX_DEPLOYMENT_TARGET 10.9",
         'OUTPUT_NAME "TelegraphicaCallTransport"',
@@ -680,6 +690,8 @@ def check_call_transport_stability_contract(errors):
                       window_rel)
     for fragment in [
         "updateSignalBars:",
+        "layoutQualityIndicator",
+        "layoutStatusForConnectedState:",
         'TGLoc(@"calls.quality")',
         "[self.qualityField setHidden:!connected]",
         'iconName:@"headphones"',
@@ -1842,13 +1854,14 @@ def check_server_reaction_catalog_contract(errors):
         "TGReactionEmojiCanRender(emoji)",
         "must never displace these legacy-safe defaults",
         "Preserve unsupported server reactions at the end",
+        "unsupportedCount < 8U",
     ]:
         if fragment not in host_text:
             errors.append("%s: reaction catalog cache is missing `%s`" %
                           (host_rel, fragment))
     if "reactionEmojisForMessageItem:item" not in menu_text:
         errors.append("%s: message menu does not use the reaction catalog" % menu_rel)
-    for fragment in ["TGReactionEmojiCanRender", 'displayEmoji =', '@"?"']:
+    for fragment in ["TGReactionEmojiCanRender", "legacySafeEmojis", 'displayEmoji =', '@"?"']:
         if fragment not in row_text:
             errors.append("%s: unsupported emoji fallback is missing `%s`" %
                           (row_rel, fragment))

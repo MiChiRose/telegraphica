@@ -114,11 +114,13 @@
      * the safe question-mark fallback visually while retaining the original
      * emoji in the action payload.
      */
-    for (index = 0; index < [catalog count]; index++) {
+    NSUInteger unsupportedCount = 0;
+    for (index = 0; index < [catalog count] && unsupportedCount < 8U; index++) {
         NSString *emoji = [catalog objectAtIndex:index];
         if (![addedEmojis containsObject:emoji]) {
             [orderedEmojis addObject:emoji];
             [addedEmojis addObject:emoji];
+            unsupportedCount++;
         }
     }
     return orderedEmojis;

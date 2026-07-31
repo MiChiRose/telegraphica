@@ -5,6 +5,24 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
     if (![emoji isKindOfClass:[NSString class]] || [emoji length] == 0) {
         return NO;
     }
+    /*
+     * NSLayoutManager on 10.8/10.9 can report NSNullGlyph for color emoji
+     * even though NSButton correctly draws them through Apple Color Emoji.
+     * Keep the stock legacy set explicit so the renderer probe cannot turn
+     * familiar reactions into question marks.
+     */
+    static NSSet *legacySafeEmojis = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        legacySafeEmojis = [[NSSet alloc] initWithObjects:
+            @"👍", @"👎", @"❤", @"🔥", @"😂", @"😢", @"😭", @"😁",
+            @"👏", @"😱", @"🎉", @"💩", @"🙏", @"👌", @"😍", @"👀",
+            @"⚡", @"💔", @"😐", @"🎃", @"👻", @"🎅", @"🎄", @"☃",
+            nil];
+    });
+    if ([legacySafeEmojis containsObject:emoji]) {
+        return YES;
+    }
     NSTextStorage *storage = [[[NSTextStorage alloc] initWithString:emoji
                                                         attributes:[NSDictionary dictionaryWithObject:[NSFont systemFontOfSize:17.0]
                                                                                              forKey:NSFontAttributeName]] autorelease];
