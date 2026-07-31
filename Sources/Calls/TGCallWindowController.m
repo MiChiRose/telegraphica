@@ -493,7 +493,7 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     [self.qualityField setFrame:NSMakeRect(originX, rowY, textWidth, 18.0)];
     [self.qualityField setAlignment:NSLeftTextAlignment];
     [self.qualityImageView setFrame:NSMakeRect(originX + textWidth + gap,
-                                                rowY + 3.0,
+                                                rowY + 4.0,
                                                 iconSide,
                                                 iconSide)];
 }
