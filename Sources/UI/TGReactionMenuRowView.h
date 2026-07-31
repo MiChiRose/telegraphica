@@ -2,6 +2,8 @@
 
 @class TGMessageItem;
 
+BOOL TGReactionEmojiCanRender(NSString *emoji);
+
 @interface TGReactionMenuRowView : NSView
 
 - (id)initWithEmojis:(NSArray *)emojis

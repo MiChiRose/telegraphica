@@ -77,5 +77,51 @@
     NSString *catalogKey = [self reactionCatalogKeyForChatID:item.chatID];
     NSArray *serverEmojis = [catalogKey length] > 0 ? [self.availableReactionEmojisByChatID objectForKey:catalogKey] : nil;
     [self prefetchReactionCatalogForMessageItem:item];
-    return (serverEmojis ? serverEmojis : [self fallbackStandardReactionEmojis]);
+
+    NSArray *catalog = serverEmojis ? serverEmojis : [self fallbackStandardReactionEmojis];
+    NSMutableArray *orderedEmojis = [NSMutableArray array];
+    NSMutableSet *catalogSet = [NSMutableSet setWithArray:catalog];
+    NSMutableSet *addedEmojis = [NSMutableSet set];
+    NSArray *standardEmojis = [self fallbackStandardReactionEmojis];
+    NSUInteger index = 0;
+
+    /*
+     * Keep the familiar reactions that the current OS can actually draw at
+     * the front of the picker.  Once TDLib has supplied a per-message
+     * catalog, do not expose standard reactions that Telegram did not allow
+     * for that message.
+     */
+    for (index = 0; index < [standardEmojis count]; index++) {
+        NSString *emoji = [standardEmojis objectAtIndex:index];
+        if ((!serverEmojis || [catalogSet containsObject:emoji]) &&
+            TGReactionEmojiCanRender(emoji) &&
+            ![addedEmojis containsObject:emoji]) {
+            [orderedEmojis addObject:emoji];
+            [addedEmojis addObject:emoji];
+        }
+    }
+
+    /* Then show any other server-approved emoji the old system can render. */
+    for (index = 0; index < [catalog count]; index++) {
+        NSString *emoji = [catalog objectAtIndex:index];
+        if (TGReactionEmojiCanRender(emoji) &&
+            ![addedEmojis containsObject:emoji]) {
+            [orderedEmojis addObject:emoji];
+            [addedEmojis addObject:emoji];
+        }
+    }
+
+    /*
+     * Preserve unsupported server reactions at the end.  The row view uses
+     * the safe question-mark fallback visually while retaining the original
+     * emoji in the action payload.
+     */
+    for (index = 0; index < [catalog count]; index++) {
+        NSString *emoji = [catalog objectAtIndex:index];
+        if (![addedEmojis containsObject:emoji]) {
+            [orderedEmojis addObject:emoji];
+            [addedEmojis addObject:emoji];
+        }
+    }
+    return orderedEmojis;
 }

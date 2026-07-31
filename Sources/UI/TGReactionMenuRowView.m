@@ -1,7 +1,7 @@
 #import "TGReactionMenuRowView.h"
 #import "../Core/TGMessageItem.h"
 
-static BOOL TGReactionEmojiCanRender(NSString *emoji) {
+BOOL TGReactionEmojiCanRender(NSString *emoji) {
     if (![emoji isKindOfClass:[NSString class]] || [emoji length] == 0) {
         return NO;
     }

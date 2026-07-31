@@ -17,7 +17,29 @@ static BOOL TGBirthdateIsToday(NSDictionary *birthdate) {
     self.selectedChatBirthdayText = nil;
     self.selectedChatSafetyNoticeText = nil;
     [self refreshSelectedChatHeaderDisplay];
+    BOOL isSavedMessages = ([chatID respondsToSelector:@selector(longLongValue)] &&
+                            [self.profileUserID respondsToSelector:@selector(longLongValue)] &&
+                            [chatID longLongValue] == [self.profileUserID longLongValue]);
+    if (!isSavedMessages) {
+        NSArray *collections[2] = { self.chatItems, self.chatItemsBeforeTopicList };
+        NSUInteger collectionIndex = 0;
+        for (collectionIndex = 0; collectionIndex < 2 && !isSavedMessages; collectionIndex++) {
+            NSArray *collection = collections[collectionIndex];
+            NSUInteger itemIndex = 0;
+            for (itemIndex = 0; itemIndex < [collection count]; itemIndex++) {
+                id candidate = [collection objectAtIndex:itemIndex];
+                if ([candidate isKindOfClass:[TGChatItem class]] &&
+                    [(TGChatItem *)candidate isSavedMessages] &&
+                    [[(TGChatItem *)candidate chatID] respondsToSelector:@selector(longLongValue)] &&
+                    [[(TGChatItem *)candidate chatID] longLongValue] == [chatID longLongValue]) {
+                    isSavedMessages = YES;
+                    break;
+                }
+            }
+        }
+    }
     if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        isSavedMessages ||
         ![self.selectedChatTypeSummary isEqualToString:@"Private"] ||
         ![self.currentAuthState isEqualToString:@"ready"]) {
         return;

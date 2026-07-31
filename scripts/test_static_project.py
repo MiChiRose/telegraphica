@@ -1829,6 +1829,8 @@ def check_server_reaction_catalog_contract(errors):
         "availableReactionEmojisByChatID",
         "reactionCatalogAttemptedChatIDs",
         "fallbackStandardReactionEmojis",
+        "TGReactionEmojiCanRender(emoji)",
+        "Preserve unsupported server reactions at the end",
     ]:
         if fragment not in host_text:
             errors.append("%s: reaction catalog cache is missing `%s`" %
