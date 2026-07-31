@@ -342,7 +342,9 @@
 }
 
 - (void)refreshMessageHistorySeparators {
-    NSInteger unreadRow = [self firstUnreadMessageRow];
+    NSInteger unreadRow = self.unreadSeparatorDismissedForCurrentSelection
+        ? -1
+        : [self firstUnreadMessageRow];
     NSString *previousDayKey = nil;
     NSDateFormatter *dayKeyFormatter = [[[NSDateFormatter alloc] init] autorelease];
     [dayKeyFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"] autorelease]];
@@ -362,6 +364,25 @@
         }
         previousDayKey = dayKey;
     }
+}
+
+- (void)dismissCurrentUnreadSeparator {
+    BOOL changed = NO;
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        if ([item showsUnreadSeparator]) {
+            [item setShowsUnreadSeparator:NO];
+            changed = YES;
+        }
+    }
+    self.unreadSeparatorDismissedForCurrentSelection = YES;
+    if (!changed) {
+        return;
+    }
+    [self.messageTableView noteHeightOfRowsWithIndexesChanged:
+        [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, [self.messageItems count])]];
+    [self.messageTableView reloadData];
 }
 
 - (void)scrollMessagesToInitialUnreadIfAvailable {
@@ -1098,8 +1119,19 @@
         NSString *readErrorMessage = [[readError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameSelection = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+            BOOL sameThread = ((!messageThreadIDCopy && !self.selectedMessageThreadID) ||
+                               (messageThreadIDCopy && self.selectedMessageThreadID &&
+                                [messageThreadIDCopy longLongValue] == [self.selectedMessageThreadID longLongValue]));
             if (!success && sameSelection) {
                 [self.visibleReadReceiptMessageIDs minusSet:[NSSet setWithArray:messageIDsCopy]];
+            }
+            if (success && sameSelection && sameThread) {
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(dismissCurrentUnreadSeparator)
+                                                           object:nil];
+                [self performSelector:@selector(dismissCurrentUnreadSeparator)
+                           withObject:nil
+                           afterDelay:1.25];
             }
             if (!success && [readErrorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib visible read state: %@", readErrorMessage]];
@@ -1152,6 +1184,19 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             if (success) {
                 [self clearUnreadCountForChatID:chatIDCopy messageThreadID:messageThreadIDCopy];
+                BOOL sameSelection = (self.selectedChatID &&
+                                      [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+                BOOL sameThread = ((!messageThreadIDCopy && !self.selectedMessageThreadID) ||
+                                   (messageThreadIDCopy && self.selectedMessageThreadID &&
+                                    [messageThreadIDCopy longLongValue] == [self.selectedMessageThreadID longLongValue]));
+                if (sameSelection && sameThread) {
+                    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                             selector:@selector(dismissCurrentUnreadSeparator)
+                                                               object:nil];
+                    [self performSelector:@selector(dismissCurrentUnreadSeparator)
+                               withObject:nil
+                               afterDelay:1.25];
+                }
                 [self appendDetail:@"TDLib read state: selected chat messages marked as read."];
             } else if ([readErrorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib read state: %@", readErrorMessage]];

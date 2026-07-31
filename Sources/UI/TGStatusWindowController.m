@@ -570,6 +570,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSNumber *selectedChatLastReadOutboxMessageID;
 @property (nonatomic, assign) NSUInteger selectedChatUnreadCount;
 @property (nonatomic, assign) BOOL initialUnreadPositionPending;
+@property (nonatomic, assign) BOOL unreadSeparatorDismissedForCurrentSelection;
 @property (nonatomic, retain) NSMutableSet *visibleReadReceiptMessageIDs;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
@@ -779,6 +780,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 - (void)refreshForumTopicTabSelection;
 - (void)selectForumTopicFromTab:(id)sender;
 - (void)selectForumTopicItem:(TGChatItem *)item;
+- (void)switchForumTopicPresentationForCurrentPreference;
+- (void)dismissCurrentUnreadSeparator;
 - (void)sendSharedComposerItemWithKind:(NSString *)kind values:(NSDictionary *)values;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
@@ -1097,6 +1100,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize selectedChatLastReadOutboxMessageID = _selectedChatLastReadOutboxMessageID;
 @synthesize selectedChatUnreadCount = _selectedChatUnreadCount;
 @synthesize initialUnreadPositionPending = _initialUnreadPositionPending;
+@synthesize unreadSeparatorDismissedForCurrentSelection = _unreadSeparatorDismissedForCurrentSelection;
 @synthesize visibleReadReceiptMessageIDs = _visibleReadReceiptMessageIDs;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;

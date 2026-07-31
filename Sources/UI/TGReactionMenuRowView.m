@@ -67,6 +67,30 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
 }
 @end
 
+@interface TGReactionMenuClipView : NSClipView
+@end
+
+@implementation TGReactionMenuClipView
+
+- (NSRect)constrainBoundsRect:(NSRect)proposedBounds {
+    NSRect constrainedBounds = [super constrainBoundsRect:proposedBounds];
+    NSView *documentView = [self documentView];
+    if (!documentView) {
+        return constrainedBounds;
+    }
+
+    NSRect documentBounds = [documentView bounds];
+    CGFloat minimumX = NSMinX(documentBounds);
+    CGFloat minimumY = NSMinY(documentBounds);
+    CGFloat maximumX = MAX(minimumX, NSMaxX(documentBounds) - NSWidth(constrainedBounds));
+    CGFloat maximumY = MAX(minimumY, NSMaxY(documentBounds) - NSHeight(constrainedBounds));
+    constrainedBounds.origin.x = MAX(minimumX, MIN(constrainedBounds.origin.x, maximumX));
+    constrainedBounds.origin.y = MAX(minimumY, MIN(constrainedBounds.origin.y, maximumY));
+    return constrainedBounds;
+}
+
+@end
+
 @interface TGReactionMenuRowView () {
     id _reactionTarget;
     SEL _reactionAction;
@@ -99,11 +123,16 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
 
         NSScrollView *scrollView = [[[NSScrollView alloc]
             initWithFrame:[self bounds]] autorelease];
+        TGReactionMenuClipView *clipView = [[[TGReactionMenuClipView alloc]
+            initWithFrame:[[scrollView contentView] frame]] autorelease];
+        [scrollView setContentView:clipView];
         [scrollView setBorderType:NSNoBorder];
         [scrollView setDrawsBackground:NO];
         [scrollView setHasHorizontalScroller:NO];
         [scrollView setHasVerticalScroller:(rowCount > maximumVisibleRows)];
         [scrollView setAutohidesScrollers:NO];
+        [scrollView setHorizontalScrollElasticity:NSScrollElasticityNone];
+        [scrollView setVerticalScrollElasticity:NSScrollElasticityNone];
 
         TGReactionMenuDocumentView *documentView = [[[TGReactionMenuDocumentView alloc]
             initWithFrame:NSMakeRect(0.0,
