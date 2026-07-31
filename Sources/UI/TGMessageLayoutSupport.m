@@ -207,6 +207,24 @@ static BOOL TGComposedSequenceCanRender(NSString *sequence, NSFont *font) {
     if (!TGComposedSequenceNeedsEmojiGlyphCheck(sequence)) {
         return YES;
     }
+    /*
+     * NSLayoutManager on 10.8/10.9 reports NSNullGlyph for several stock
+     * Apple Color Emoji sequences that AppKit still draws correctly.  Keep
+     * the same conservative legacy-safe set used by the reaction picker so
+     * accepted reactions do not disappear from the message bubble.
+     */
+    static NSSet *legacySafeEmojis = nil;
+    static dispatch_once_t legacyEmojiOnceToken;
+    dispatch_once(&legacyEmojiOnceToken, ^{
+        legacySafeEmojis = [[NSSet alloc] initWithObjects:
+            @"👍", @"👎", @"❤", @"🔥", @"😂", @"😢", @"😭", @"😁",
+            @"👏", @"😱", @"🎉", @"💩", @"🙏", @"👌", @"😍", @"👀",
+            @"⚡", @"💔", @"😐", @"🎃", @"👻", @"🎅", @"🎄", @"☃",
+            nil];
+    });
+    if ([legacySafeEmojis containsObject:sequence]) {
+        return YES;
+    }
     NSFont *safeFont = font ? font : TGChatMessageBodyFont();
     static NSMutableDictionary *renderabilityCache = nil;
     static dispatch_once_t onceToken;

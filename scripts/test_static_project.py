@@ -1755,8 +1755,8 @@ def check_qr_login_and_reaction_picker_contract(errors):
         if source_name not in project_text:
             errors.append("%s: target membership is missing `%s`" %
                           (project_rel, source_name))
-    if "TGReactionMenuRowView" not in menu_text or "rowEmojis" not in menu_text:
-        errors.append("%s: expanded reaction rows are not wired into the message menu" %
+    if "TGReactionMenuRowView" not in menu_text or "reactionGridView" not in menu_text:
+        errors.append("%s: scrollable reaction grid is not wired into the message menu" %
                       menu_rel)
     for fragment in ["representedObject", "cancelTracking"]:
         if fragment not in reaction_text:
@@ -1861,7 +1861,15 @@ def check_server_reaction_catalog_contract(errors):
                           (host_rel, fragment))
     if "reactionEmojisForMessageItem:item" not in menu_text:
         errors.append("%s: message menu does not use the reaction catalog" % menu_rel)
-    for fragment in ["TGReactionEmojiCanRender", "legacySafeEmojis", 'displayEmoji =', '@"?"']:
+    for fragment in [
+        "TGReactionEmojiCanRender",
+        "legacySafeEmojis",
+        "TGReactionMenuDocumentView",
+        "setHasVerticalScroller:",
+        "maximumVisibleRows",
+        'displayEmoji =',
+        '@"?"',
+    ]:
         if fragment not in row_text:
             errors.append("%s: unsupported emoji fallback is missing `%s`" %
                           (row_rel, fragment))
@@ -1874,6 +1882,7 @@ def check_server_reaction_catalog_contract(errors):
         "TGReplaceUnrenderableEmojiInAttributedString",
         "rangeOfComposedCharacterSequenceAtIndex:",
         "NSNullGlyph",
+        "legacySafeEmojis",
         'withString:@"?"',
     ]:
         if fragment not in layout_text:
