@@ -169,33 +169,6 @@ static NSString *TGCallReadableFailure(NSString *message) {
     [self presentProfile:[self mockProfile] outgoing:NO video:NO mock:YES];
 }
 
-- (void)startMockOutgoingVideoCall {
-    if (self.callWindowController) {
-        [[self.callWindowController window] makeKeyAndOrderFront:nil];
-        return;
-    }
-    if (![TGPrivacyPermissions requestMicrophonePermission] ||
-        ![TGPrivacyPermissions requestCameraPermission]) {
-        return;
-    }
-    [self presentProfile:[self mockProfile] outgoing:YES video:YES mock:YES];
-    if (![self.callWindowController startLocalCameraPreview]) {
-        [self.callWindowController setPresentationState:TGCallPresentationStateFailed
-                                                  detail:TGLoc(@"calls.video.cameraUnavailable")];
-        [self finishCallAfterDelay:4.0];
-        return;
-    }
-    [self performSelector:@selector(connectMockCall) withObject:nil afterDelay:2.2];
-}
-
-- (void)startMockIncomingVideoCall {
-    if (self.callWindowController) {
-        [[self.callWindowController window] makeKeyAndOrderFront:nil];
-        return;
-    }
-    [self presentProfile:[self mockProfile] outgoing:NO video:YES mock:YES];
-}
-
 - (void)connectMockCall {
     if (self.mockCall && !self.finishing && self.callWindowController) {
         [self.callWindowController setPresentationState:TGCallPresentationStateConnected detail:nil];
