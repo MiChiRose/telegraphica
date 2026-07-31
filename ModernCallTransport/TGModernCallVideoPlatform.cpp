@@ -1,3 +1,7 @@
+#import <AVFoundation/AVFoundation.h>
+#import <CoreMedia/CoreMedia.h>
+#import <CoreVideo/CoreVideo.h>
+
 #include "platform/PlatformInterface.h"
 
 #include "VideoCapturerInterface.h"
@@ -13,6 +17,7 @@
 #include "modules/video_capture/video_capture_factory.h"
 #include "pc/video_track_source.h"
 #include "pc/video_track_source_proxy.h"
+#include "libyuv/convert.h"
 
 #include <algorithm>
 #include <cmath>
@@ -20,6 +25,30 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+typedef void (*TGModernCameraFrameCallback)(void *context,
+                                            CMSampleBufferRef sampleBuffer);
+
+@interface TGModernCameraFrameDelegate : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate> {
+@public
+    void *_callbackContext;
+    TGModernCameraFrameCallback _frameCallback;
+}
+@end
+
+@implementation TGModernCameraFrameDelegate
+
+- (void)captureOutput:(AVCaptureOutput *)captureOutput
+ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+        fromConnection:(AVCaptureConnection *)connection {
+    (void)captureOutput;
+    (void)connection;
+    if (_frameCallback && _callbackContext && sampleBuffer) {
+        _frameCallback(_callbackContext, sampleBuffer);
+    }
+}
+
+@end
 
 namespace tgcalls {
 namespace {
@@ -113,7 +142,7 @@ public:
             // "enable camera" request useful even when the logical state is
             // already Active: if no capture module survived the first attempt,
             // try to acquire it again instead of silently doing nothing.
-            if (state == VideoState::Active && !_module) {
+            if (state == VideoState::Active && !_captureSession && !_module) {
                 startCapture();
             }
             return;
@@ -193,6 +222,120 @@ public:
     }
 
 private:
+    static void ReceiveSampleBuffer(void *context,
+                                    CMSampleBufferRef sampleBuffer) {
+        CameraCapturer *capturer = static_cast<CameraCapturer *>(context);
+        if (capturer) {
+            capturer->onSampleBuffer(sampleBuffer);
+        }
+    }
+
+    void onSampleBuffer(CMSampleBufferRef sampleBuffer) {
+        if (_state != VideoState::Active || !sampleBuffer) {
+            return;
+        }
+        CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+        if (!imageBuffer || CVPixelBufferGetPlaneCount(imageBuffer) < 2) {
+            return;
+        }
+        CVReturn lockResult = CVPixelBufferLockBaseAddress(
+            imageBuffer, kCVPixelBufferLock_ReadOnly);
+        if (lockResult != kCVReturnSuccess) {
+            return;
+        }
+        const int width = static_cast<int>(CVPixelBufferGetWidth(imageBuffer));
+        const int height = static_cast<int>(CVPixelBufferGetHeight(imageBuffer));
+        const uint8_t *yPlane = static_cast<const uint8_t *>(
+            CVPixelBufferGetBaseAddressOfPlane(imageBuffer, 0));
+        const uint8_t *uvPlane = static_cast<const uint8_t *>(
+            CVPixelBufferGetBaseAddressOfPlane(imageBuffer, 1));
+        const int yStride = static_cast<int>(
+            CVPixelBufferGetBytesPerRowOfPlane(imageBuffer, 0));
+        const int uvStride = static_cast<int>(
+            CVPixelBufferGetBytesPerRowOfPlane(imageBuffer, 1));
+        rtc::scoped_refptr<webrtc::I420Buffer> converted =
+            webrtc::I420Buffer::Create(width, height);
+        const int conversionResult = libyuv::NV12ToI420(
+            yPlane,
+            yStride,
+            uvPlane,
+            uvStride,
+            converted->MutableDataY(),
+            converted->StrideY(),
+            converted->MutableDataU(),
+            converted->StrideU(),
+            converted->MutableDataV(),
+            converted->StrideV(),
+            width,
+            height);
+        CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
+        if (conversionResult != 0) {
+            return;
+        }
+        CMTime presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+        int64_t timestampMicros = 0;
+        if (CMTIME_IS_NUMERIC(presentationTime) && presentationTime.timescale != 0) {
+            timestampMicros = static_cast<int64_t>(
+                CMTimeGetSeconds(presentationTime) * 1000000.0);
+        }
+        OnFrame(webrtc::VideoFrame::Builder()
+            .set_video_frame_buffer(converted)
+            .set_rotation(webrtc::kVideoRotation_0)
+            .set_timestamp_us(timestampMicros)
+            .build());
+    }
+
+    bool startAVFoundationCapture() {
+        AVCaptureDevice *camera =
+            [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+        if (!camera) {
+            return false;
+        }
+        NSError *inputError = nil;
+        AVCaptureDeviceInput *input =
+            [AVCaptureDeviceInput deviceInputWithDevice:camera error:&inputError];
+        if (!input) {
+            return false;
+        }
+        AVCaptureSession *session = [[AVCaptureSession alloc] init];
+        if ([session canSetSessionPreset:AVCaptureSessionPreset640x480]) {
+            [session setSessionPreset:AVCaptureSessionPreset640x480];
+        }
+        if (![session canAddInput:input]) {
+            [session release];
+            return false;
+        }
+        [session addInput:input];
+
+        AVCaptureVideoDataOutput *output =
+            [[AVCaptureVideoDataOutput alloc] init];
+        [output setAlwaysDiscardsLateVideoFrames:YES];
+        [output setVideoSettings:[NSDictionary dictionaryWithObject:
+            [NSNumber numberWithUnsignedInt:
+                kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+            forKey:(id)kCVPixelBufferPixelFormatTypeKey]];
+        if (![session canAddOutput:output]) {
+            [output release];
+            [session release];
+            return false;
+        }
+        TGModernCameraFrameDelegate *delegate =
+            [[TGModernCameraFrameDelegate alloc] init];
+        delegate->_callbackContext = this;
+        delegate->_frameCallback = &CameraCapturer::ReceiveSampleBuffer;
+        dispatch_queue_t queue = dispatch_queue_create(
+            "org.telegraphica.call-camera", DISPATCH_QUEUE_SERIAL);
+        [output setSampleBufferDelegate:delegate queue:queue];
+        [session addOutput:output];
+        [output release];
+
+        _captureSession = session;
+        _captureDelegate = delegate;
+        _captureQueue = queue;
+        [session startRunning];
+        return true;
+    }
+
     void reportFailure() {
         if (_fatalError) {
             _fatalError();
@@ -201,6 +344,9 @@ private:
 
     void startCapture() {
         stopCapture();
+        if (startAVFoundationCapture()) {
+            return;
+        }
         std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(
             webrtc::VideoCaptureFactory::CreateDeviceInfo());
         if (!info || info->NumberOfDevices() <= 0) {
@@ -264,6 +410,29 @@ private:
     }
 
     void stopCapture() {
+        if (_captureSession) {
+            [_captureSession stopRunning];
+            for (AVCaptureOutput *output in [_captureSession outputs]) {
+                if ([output isKindOfClass:[AVCaptureVideoDataOutput class]]) {
+                    [(AVCaptureVideoDataOutput *)output setSampleBufferDelegate:nil
+                                                                          queue:NULL];
+                }
+            }
+        }
+        if (_captureDelegate) {
+            _captureDelegate->_callbackContext = nullptr;
+            _captureDelegate->_frameCallback = nullptr;
+            [_captureDelegate release];
+            _captureDelegate = nil;
+        }
+        if (_captureSession) {
+            [_captureSession release];
+            _captureSession = nil;
+        }
+        if (_captureQueue) {
+            dispatch_release(_captureQueue);
+            _captureQueue = nullptr;
+        }
         if (!_module) {
             return;
         }
@@ -276,6 +445,9 @@ private:
     std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> _sink;
     std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> _uncroppedSink;
     rtc::scoped_refptr<webrtc::VideoCaptureModule> _module;
+    AVCaptureSession *_captureSession = nil;
+    TGModernCameraFrameDelegate *_captureDelegate = nil;
+    dispatch_queue_t _captureQueue = nullptr;
     std::string _deviceID;
     std::function<void(VideoState)> _stateUpdated;
     std::function<void()> _fatalError;
