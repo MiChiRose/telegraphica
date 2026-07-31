@@ -107,6 +107,15 @@ public:
 
     void setState(VideoState state) override {
         if (_state == state) {
+            // A camera can be temporarily unavailable while the call transport
+            // is being created (for example while the system finishes handing
+            // the device over after the permission prompt).  Keep an explicit
+            // "enable camera" request useful even when the logical state is
+            // already Active: if no capture module survived the first attempt,
+            // try to acquire it again instead of silently doing nothing.
+            if (state == VideoState::Active && !_module) {
+                startCapture();
+            }
             return;
         }
         _state = state;

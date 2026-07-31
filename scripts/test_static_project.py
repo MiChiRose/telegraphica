@@ -712,6 +712,14 @@ def check_call_transport_stability_contract(errors):
                           (window_rel, forbidden_fallback))
     if "state == TGCallPresentationStateCalling || state == TGCallPresentationStateIncoming" in window_text:
         errors.append("%s: outgoing calls must not play the incoming Marimba ringtone" % window_rel)
+    for fragment in [
+        "if (self.videoCall && ended)",
+        "[self.timerField setHidden:(self.videoCall && ended)]",
+        "NSMakeRect(120.0, 116.0, 440.0, 18.0)",
+    ]:
+        if fragment not in window_text:
+            errors.append("%s: ended video-call status must remain below the retained video `%s`" %
+                          (window_rel, fragment))
 
     coordinator_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.m")
     coordinator_text = read_text(os.path.join(ROOT, coordinator_rel))
@@ -725,6 +733,8 @@ def check_call_transport_stability_contract(errors):
         "TGTDLibCallSignalingDataDidUpdateNotification",
         "sendAudioCallSignalingData:",
         "receiveSignalingData:",
+        "Video call: first local preview frame reached AppKit.",
+        "Video call: requested local camera after media establishment.",
     ]:
         if fragment not in coordinator_text:
             errors.append("%s: call negotiation diagnostics are missing `%s`" %
@@ -732,6 +742,9 @@ def check_call_transport_stability_contract(errors):
     if "descriptor.config.allowTCP = true;" not in modern_source_text:
         errors.append("%s: Telegram call transport must retain TCP relay fallback" %
                       modern_source_rel)
+    if "state == VideoState::Active && !_module" not in modern_video_text:
+        errors.append("%s: local camera activation must retry after a transient legacy capture failure" %
+                      modern_video_rel)
     if "setRequestedVideoAspect(4.0f / 3.0f)" in modern_source_text:
         errors.append("%s: fixed 4:3 incoming-video requests distort portrait callers" %
                       modern_source_rel)

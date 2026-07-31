@@ -549,6 +549,16 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     BOOL ended = (state == TGCallPresentationStateEnded ||
                   state == TGCallPresentationStateFailed);
     [self layoutStatusForConnectedState:connected];
+    if (self.videoCall && ended) {
+        // Keep the final result readable below the retained last video frame.
+        // The call window deliberately remains visible for a few seconds after
+        // hang-up, so placing this label over the picture made it disappear on
+        // darker or busy frames.
+        [self.statusField setFrame:NSMakeRect(120.0, 116.0, 440.0, 18.0)];
+        [self.statusField setAlignment:NSCenterTextAlignment];
+        [self.statusField setFont:[NSFont systemFontOfSize:11.0]];
+    }
+    [self.timerField setHidden:(self.videoCall && ended)];
     [self.answerButton setHidden:!incoming];
     [self.answerLabel setHidden:!incoming];
     [self.muteButton setHidden:!connected];
