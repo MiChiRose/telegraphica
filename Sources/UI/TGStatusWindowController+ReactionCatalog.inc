@@ -1,9 +1,10 @@
 - (NSArray *)fallbackStandardReactionEmojis {
     return [NSArray arrayWithObjects:
-            @"👍", @"👎", @"❤", @"🔥", @"🥰", @"👏", @"😁", @"🤔",
-            @"🤯", @"😱", @"😢", @"🎉", @"🤩", @"🤮", @"💩", @"🙏",
-            @"👌", @"🕊", @"🤡", @"🥱", @"🥴", @"😍", @"🐳", @"💯",
-            @"🤣", @"⚡", @"🍌", @"🏆", @"💔", @"🤨", @"😐", @"👀",
+            @"👍", @"👎", @"❤", @"🔥", @"😂", @"😢", @"😭", @"😁",
+            @"👏", @"😱", @"🎉", @"💩", @"🙏", @"👌", @"😍", @"👀",
+            @"🥰", @"🤔", @"🤯", @"🤩", @"🤮",
+            @"🕊", @"🤡", @"🥱", @"🥴", @"🐳", @"💯",
+            @"🤣", @"⚡", @"🍌", @"🏆", @"💔", @"🤨", @"😐",
             @"🎃", @"👻", @"👨‍💻", @"🤝", @"✍", @"🤗", @"🫡", @"🎅",
             @"🎄", @"☃", @"💅", @"🤪", @"🗿", @"🆒", @"💘", @"🙉",
             nil];
@@ -80,21 +81,18 @@
 
     NSArray *catalog = serverEmojis ? serverEmojis : [self fallbackStandardReactionEmojis];
     NSMutableArray *orderedEmojis = [NSMutableArray array];
-    NSMutableSet *catalogSet = [NSMutableSet setWithArray:catalog];
     NSMutableSet *addedEmojis = [NSMutableSet set];
     NSArray *standardEmojis = [self fallbackStandardReactionEmojis];
     NSUInteger index = 0;
 
     /*
-     * Keep the familiar reactions that the current OS can actually draw at
-     * the front of the picker.  Once TDLib has supplied a per-message
-     * catalog, do not expose standard reactions that Telegram did not allow
-     * for that message.
+     * Always keep familiar reactions that the current OS can actually draw
+     * at the front of the picker.  TDLib's top/recent/popular lists are not a
+     * complete allow-list and must never displace these legacy-safe defaults.
      */
     for (index = 0; index < [standardEmojis count]; index++) {
         NSString *emoji = [standardEmojis objectAtIndex:index];
-        if ((!serverEmojis || [catalogSet containsObject:emoji]) &&
-            TGReactionEmojiCanRender(emoji) &&
+        if (TGReactionEmojiCanRender(emoji) &&
             ![addedEmojis containsObject:emoji]) {
             [orderedEmojis addObject:emoji];
             [addedEmojis addObject:emoji];

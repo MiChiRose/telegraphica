@@ -1840,6 +1840,7 @@ def check_server_reaction_catalog_contract(errors):
         "reactionCatalogAttemptedChatIDs",
         "fallbackStandardReactionEmojis",
         "TGReactionEmojiCanRender(emoji)",
+        "must never displace these legacy-safe defaults",
         "Preserve unsupported server reactions at the end",
     ]:
         if fragment not in host_text:
