@@ -13,5 +13,7 @@ extern NSString * const TGCallCoordinatorDidFinishCallNotification;
 - (void)startVideoCallToProfile:(NSDictionary *)profile;
 - (void)startMockOutgoingCall;
 - (void)startMockIncomingCall;
+- (void)startMockOutgoingVideoCall;
+- (void)startMockIncomingVideoCall;
 
 @end

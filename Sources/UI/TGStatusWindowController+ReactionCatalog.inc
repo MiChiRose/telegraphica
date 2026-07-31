@@ -74,34 +74,32 @@
     });
 }
 
-- (NSArray *)reactionEmojisForMessageItem:(TGMessageItem *)item {
+- (NSArray *)standardReactionEmojisForMessageItem:(TGMessageItem *)item {
+    (void)item;
+    NSMutableArray *renderableEmojis = [NSMutableArray array];
+    for (NSString *emoji in [self fallbackStandardReactionEmojis]) {
+        if (TGReactionEmojiCanRender(emoji)) {
+            [renderableEmojis addObject:emoji];
+        }
+    }
+    return renderableEmojis;
+}
+
+- (NSArray *)telegramReactionEmojisForMessageItem:(TGMessageItem *)item {
     NSString *catalogKey = [self reactionCatalogKeyForChatID:item.chatID];
     NSArray *serverEmojis = [catalogKey length] > 0 ? [self.availableReactionEmojisByChatID objectForKey:catalogKey] : nil;
     [self prefetchReactionCatalogForMessageItem:item];
-
-    NSArray *catalog = serverEmojis ? serverEmojis : [self fallbackStandardReactionEmojis];
-    NSMutableArray *orderedEmojis = [NSMutableArray array];
-    NSMutableSet *addedEmojis = [NSMutableSet set];
-    NSArray *standardEmojis = [self fallbackStandardReactionEmojis];
-    NSUInteger index = 0;
-
-    /*
-     * Always keep familiar reactions that the current OS can actually draw
-     * at the front of the picker.  TDLib's top/recent/popular lists are not a
-     * complete allow-list and must never displace these legacy-safe defaults.
-     */
-    for (index = 0; index < [standardEmojis count]; index++) {
-        NSString *emoji = [standardEmojis objectAtIndex:index];
-        if (TGReactionEmojiCanRender(emoji) &&
-            ![addedEmojis containsObject:emoji]) {
-            [orderedEmojis addObject:emoji];
-            [addedEmojis addObject:emoji];
-        }
+    if (![serverEmojis count]) {
+        return [NSArray array];
     }
 
-    /* Then show any other server-approved emoji the old system can render. */
-    for (index = 0; index < [catalog count]; index++) {
-        NSString *emoji = [catalog objectAtIndex:index];
+    NSMutableArray *orderedEmojis = [NSMutableArray array];
+    NSMutableSet *addedEmojis = [NSMutableSet setWithArray:[self fallbackStandardReactionEmojis]];
+    NSUInteger index = 0;
+
+    /* Keep Telegram's additional server-approved reactions in their own list. */
+    for (index = 0; index < [serverEmojis count]; index++) {
+        NSString *emoji = [serverEmojis objectAtIndex:index];
         if (TGReactionEmojiCanRender(emoji) &&
             ![addedEmojis containsObject:emoji]) {
             [orderedEmojis addObject:emoji];
@@ -115,8 +113,8 @@
      * emoji in the action payload.
      */
     NSUInteger unsupportedCount = 0;
-    for (index = 0; index < [catalog count] && unsupportedCount < 8U; index++) {
-        NSString *emoji = [catalog objectAtIndex:index];
+    for (index = 0; index < [serverEmojis count] && unsupportedCount < 8U; index++) {
+        NSString *emoji = [serverEmojis objectAtIndex:index];
         if (![addedEmojis containsObject:emoji]) {
             [orderedEmojis addObject:emoji];
             [addedEmojis addObject:emoji];
@@ -124,4 +122,11 @@
         }
     }
     return orderedEmojis;
+}
+
+- (NSArray *)reactionEmojisForMessageItem:(TGMessageItem *)item {
+    NSMutableArray *allEmojis = [NSMutableArray arrayWithArray:
+        [self standardReactionEmojisForMessageItem:item]];
+    [allEmojis addObjectsFromArray:[self telegramReactionEmojisForMessageItem:item]];
+    return allEmojis;
 }

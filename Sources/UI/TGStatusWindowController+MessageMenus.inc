@@ -752,12 +752,12 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [menu addItem:[NSMenuItem separatorItem]];
     }
     [menu addItem:[NSMenuItem separatorItem]];
-    NSMenuItem *reactionTitleItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reactions.more")
+    NSMenuItem *reactionTitleItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"message.reactions.standard")
                                                                 action:nil
                                                          keyEquivalent:@""] autorelease];
     [reactionTitleItem setEnabled:NO];
     [menu addItem:reactionTitleItem];
-    NSArray *emojis = [self reactionEmojisForMessageItem:item];
+    NSArray *emojis = [self standardReactionEmojisForMessageItem:item];
     TGReactionMenuRowView *reactionGridView = [[[TGReactionMenuRowView alloc]
             initWithEmojis:emojis
                    message:item
@@ -769,6 +769,27 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
                                                         keyEquivalent:@""] autorelease];
     [reactionGridItem setView:reactionGridView];
     [menu addItem:reactionGridItem];
+
+    NSArray *telegramEmojis = [self telegramReactionEmojisForMessageItem:item];
+    if ([telegramEmojis count] > 0) {
+        NSMenuItem *telegramTitleItem = [[[NSMenuItem alloc]
+            initWithTitle:TGLoc(@"message.reactions.telegram")
+                   action:nil
+            keyEquivalent:@""] autorelease];
+        [telegramTitleItem setEnabled:NO];
+        [menu addItem:telegramTitleItem];
+        TGReactionMenuRowView *telegramGridView = [[[TGReactionMenuRowView alloc]
+            initWithEmojis:telegramEmojis
+                   message:item
+            chosenReactions:[item chosenReactionEmojis]
+                    target:self
+                    action:@selector(reactToMessageFromMenu:)] autorelease];
+        NSMenuItem *telegramGridItem = [[[NSMenuItem alloc] initWithTitle:@""
+                                                                   action:nil
+                                                            keyEquivalent:@""] autorelease];
+        [telegramGridItem setView:telegramGridView];
+        [menu addItem:telegramGridItem];
+    }
 }
 
 - (void)openBotKeyboardFromMenu:(id)sender {

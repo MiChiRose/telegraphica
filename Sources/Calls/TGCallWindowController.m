@@ -5,6 +5,8 @@
 #import "../UI/TGStatusButtonCells.h"
 #import "../UI/TGStatusViewComponents.h"
 #import "../UI/TGTheme.h"
+#import <AVFoundation/AVFoundation.h>
+#import <QuartzCore/QuartzCore.h>
 #include <math.h>
 
 @interface TGCallActionButtonCell : NSButtonCell
@@ -80,6 +82,8 @@
 @property (nonatomic, retain) NSTextField *cameraLabel;
 @property (nonatomic, retain) NSImageView *remoteVideoView;
 @property (nonatomic, retain) NSImageView *localVideoView;
+@property (nonatomic, retain) AVCaptureSession *localPreviewCaptureSession;
+@property (nonatomic, retain) AVCaptureVideoPreviewLayer *localPreviewLayer;
 @property (nonatomic, retain) NSTextField *muteLabel;
 @property (nonatomic, retain) NSTextField *speakerLabel;
 @property (nonatomic, retain) NSTextField *answerLabel;
@@ -113,6 +117,8 @@
 @synthesize cameraLabel = _cameraLabel;
 @synthesize remoteVideoView = _remoteVideoView;
 @synthesize localVideoView = _localVideoView;
+@synthesize localPreviewCaptureSession = _localPreviewCaptureSession;
+@synthesize localPreviewLayer = _localPreviewLayer;
 @synthesize muteLabel = _muteLabel;
 @synthesize speakerLabel = _speakerLabel;
 @synthesize answerLabel = _answerLabel;
@@ -358,6 +364,56 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     }
 }
 
+- (BOOL)startLocalCameraPreview {
+    if (!self.videoCall || !self.cameraEnabled || !self.localVideoView) {
+        return NO;
+    }
+    if (self.localPreviewCaptureSession) {
+        [self.localVideoView setHidden:NO];
+        return YES;
+    }
+
+    AVCaptureDevice *camera = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    if (!camera) {
+        return NO;
+    }
+    NSError *inputError = nil;
+    AVCaptureDeviceInput *cameraInput = [AVCaptureDeviceInput deviceInputWithDevice:camera
+                                                                              error:&inputError];
+    if (!cameraInput) {
+        return NO;
+    }
+    AVCaptureSession *session = [[[AVCaptureSession alloc] init] autorelease];
+    if ([session canSetSessionPreset:AVCaptureSessionPreset640x480]) {
+        [session setSessionPreset:AVCaptureSessionPreset640x480];
+    }
+    if (![session canAddInput:cameraInput]) {
+        return NO;
+    }
+    [session addInput:cameraInput];
+
+    [self.localVideoView setImage:nil];
+    [self.localVideoView setWantsLayer:YES];
+    CALayer *hostLayer = [self.localVideoView layer];
+    [hostLayer setMasksToBounds:YES];
+    AVCaptureVideoPreviewLayer *previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:session];
+    [previewLayer setFrame:[hostLayer bounds]];
+    [previewLayer setVideoGravity:AVLayerVideoGravityResizeAspectFill];
+    [hostLayer addSublayer:previewLayer];
+    self.localPreviewCaptureSession = session;
+    self.localPreviewLayer = previewLayer;
+    [self.localVideoView setHidden:NO];
+    [session startRunning];
+    return YES;
+}
+
+- (void)stopLocalCameraPreview {
+    [self.localPreviewCaptureSession stopRunning];
+    [self.localPreviewLayer removeFromSuperlayer];
+    self.localPreviewLayer = nil;
+    self.localPreviewCaptureSession = nil;
+}
+
 - (void)updateProfile:(NSDictionary *)profile {
     if (![profile isKindOfClass:[NSDictionary class]]) {
         return;
@@ -563,6 +619,7 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     }
     if (ended) {
         self.finished = YES;
+        [self stopLocalCameraPreview];
         [self.timer invalidate];
         self.timer = nil;
     }
@@ -633,6 +690,7 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
 
 - (void)dealloc {
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [self stopLocalCameraPreview];
     [_timer invalidate];
     [_ringSound stop];
     [_profile release];
@@ -653,6 +711,8 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     [_cameraLabel release];
     [_remoteVideoView release];
     [_localVideoView release];
+    [_localPreviewCaptureSession release];
+    [_localPreviewLayer release];
     [_muteLabel release];
     [_speakerLabel release];
     [_answerLabel release];
