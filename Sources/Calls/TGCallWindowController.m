@@ -419,6 +419,45 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
                                      (unsigned long)(elapsed % 60U)]];
 }
 
+- (void)layoutQualityIndicator {
+    NSSize measured = [[self.qualityField cell] cellSize];
+    CGFloat maximumTextWidth = self.videoCall ? 180.0 : 220.0;
+    CGFloat textWidth = MIN(maximumTextWidth, MAX(92.0, ceil(measured.width)));
+    CGFloat iconSide = 16.0;
+    CGFloat gap = 5.0;
+    CGFloat centerX = self.videoCall ? 492.0 : 210.0;
+    CGFloat rowY = self.videoCall ? 116.0 : 163.0;
+    CGFloat totalWidth = textWidth + gap + iconSide;
+    CGFloat originX = floor(centerX - totalWidth / 2.0);
+    [self.qualityField setFrame:NSMakeRect(originX, rowY, textWidth, 18.0)];
+    [self.qualityField setAlignment:NSLeftTextAlignment];
+    [self.qualityImageView setFrame:NSMakeRect(originX + textWidth + gap,
+                                                rowY + 1.0,
+                                                iconSide,
+                                                iconSide)];
+}
+
+- (void)layoutStatusForConnectedState:(BOOL)connected {
+    if (!self.videoCall) {
+        return;
+    }
+    if (connected) {
+        [self.statusField setFrame:NSMakeRect(76.0, 116.0, 180.0, 18.0)];
+        [self.statusField setAlignment:NSRightTextAlignment];
+        [self.statusField setFont:[NSFont systemFontOfSize:10.5]];
+        [self.timerField setFrame:NSMakeRect(262.0, 116.0, 62.0, 18.0)];
+        [self.timerField setAlignment:NSCenterTextAlignment];
+        [self.timerField setFont:[NSFont boldSystemFontOfSize:11.0]];
+    } else {
+        [self.statusField setFrame:NSMakeRect(120.0, 248.0, 440.0, 22.0)];
+        [self.statusField setAlignment:NSCenterTextAlignment];
+        [self.statusField setFont:[NSFont systemFontOfSize:13.0]];
+        [self.timerField setFrame:NSMakeRect(120.0, 222.0, 440.0, 22.0)];
+        [self.timerField setAlignment:NSCenterTextAlignment];
+        [self.timerField setFont:[NSFont boldSystemFontOfSize:16.0]];
+    }
+}
+
 - (void)updateSignalBars:(NSUInteger)signalBars {
     NSUInteger safeBars = MIN(5U, signalBars);
     [self.qualityField setStringValue:[NSString stringWithFormat:TGLoc(@"calls.quality"),
@@ -435,10 +474,11 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     } else {
         NSString *iconName = [iconNames objectAtIndex:(safeBars - 1U)];
         [self.qualityImageView setImage:TGTemplateIconAssetImage(iconName,
-                                                                 NSMakeSize(18.0, 18.0),
+                                                                 NSMakeSize(14.0, 14.0),
                                                                  TGClassicCardMutedInkColor(),
                                                                  1.0)];
     }
+    [self layoutQualityIndicator];
 }
 
 - (void)setPresentationState:(TGCallPresentationState)state detail:(NSString *)detail {
@@ -447,6 +487,7 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
                       state == TGCallPresentationStateReconnecting);
     BOOL ended = (state == TGCallPresentationStateEnded ||
                   state == TGCallPresentationStateFailed);
+    [self layoutStatusForConnectedState:connected];
     [self.answerButton setHidden:!incoming];
     [self.answerLabel setHidden:!incoming];
     [self.muteButton setHidden:!connected];
