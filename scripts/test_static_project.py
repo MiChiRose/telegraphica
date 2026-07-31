@@ -1831,56 +1831,38 @@ def check_forum_topic_management_contract(errors):
                       project_rel)
 
 
-def check_server_reaction_catalog_contract(errors):
-    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+Reactions.m")
+def check_standard_reaction_picker_contract(errors):
     host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ReactionCatalog.inc")
     menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
     row_rel = os.path.join("Sources", "UI", "TGReactionMenuRowView.m")
-    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
-    client_text = read_text(os.path.join(ROOT, client_rel))
     host_text = read_text(os.path.join(ROOT, host_rel))
     menu_text = read_text(os.path.join(ROOT, menu_rel))
     row_text = read_text(os.path.join(ROOT, row_rel))
-    project_text = read_text(os.path.join(ROOT, project_rel))
 
     for fragment in [
-        '"getMessageAvailableReactions"',
-        '"availableReactions"',
-        '"top_reactions"',
-        '"recent_reactions"',
-        '"popular_reactions"',
-        '"reactionTypeEmoji"',
+        "fallbackStandardReactionEmojis",
+        "standardReactionEmojisForMessageItem:",
+        "TGReactionEmojiCanRender(emoji)",
     ]:
-        if fragment not in client_text:
-            errors.append("%s: server reaction catalog is missing `%s`" %
-                          (client_rel, fragment))
-    if "reactionTypePaid" in client_text or "allow_custom_emoji" in client_text:
-        errors.append("%s: paid/custom reaction paths must not be exposed by the free reaction picker" %
-                      client_rel)
+        if fragment not in host_text:
+            errors.append("%s: standard reaction picker is missing `%s`" %
+                          (host_rel, fragment))
+    for fragment in [
+        "standardReactionEmojisForMessageItem:item",
+        'TGLoc(@"message.reactions.standard")',
+    ]:
+        if fragment not in menu_text:
+            errors.append("%s: message menu does not use the standard reaction picker `%s`" %
+                          (menu_rel, fragment))
     for fragment in [
         "prefetchReactionCatalogForMessageItem:",
         "availableReactionEmojisByChatID",
         "reactionCatalogAttemptedChatIDs",
-        "fallbackStandardReactionEmojis",
-        "standardReactionEmojisForMessageItem:",
         "telegramReactionEmojisForMessageItem:",
-        "TGReactionEmojiCanRender(emoji)",
-        "Keep Telegram's additional server-approved reactions in their own list",
-        "Preserve unsupported server reactions at the end",
-        "unsupportedCount < 8U",
-    ]:
-        if fragment not in host_text:
-            errors.append("%s: reaction catalog cache is missing `%s`" %
-                          (host_rel, fragment))
-    for fragment in [
-        "standardReactionEmojisForMessageItem:item",
-        "telegramReactionEmojisForMessageItem:item",
-        'TGLoc(@"message.reactions.standard")',
         'TGLoc(@"message.reactions.telegram")',
     ]:
-        if fragment not in menu_text:
-            errors.append("%s: message menu does not use the split reaction catalog `%s`" %
-                          (menu_rel, fragment))
+        if fragment in host_text or fragment in menu_text:
+            errors.append("Telegram-only reaction catalog must not be exposed: `%s`" % fragment)
     for fragment in [
         "TGReactionEmojiCanRender",
         "legacySafeEmojis",
@@ -1911,9 +1893,6 @@ def check_server_reaction_catalog_contract(errors):
     if "TGStringByReplacingUnrenderableEmoji([item reactionSummary]" not in cells_text:
         errors.append("%s: rendered reaction summaries do not use the legacy emoji fallback" %
                       cells_rel)
-    if "TGTDLibClient+Reactions.m in Sources" not in project_text:
-        errors.append("%s: target membership is missing `TGTDLibClient+Reactions.m`" %
-                      project_rel)
 
 
 def check_contact_birthday_contract(errors):
@@ -2037,7 +2016,7 @@ def main():
     check_chat_folder_management_contract(errors)
     check_qr_login_and_reaction_picker_contract(errors)
     check_forum_topic_management_contract(errors)
-    check_server_reaction_catalog_contract(errors)
+    check_standard_reaction_picker_contract(errors)
     check_contact_birthday_contract(errors)
     check_poll_management_contract(errors)
     check_received_link_preview_contract(errors)
