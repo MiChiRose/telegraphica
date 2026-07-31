@@ -619,6 +619,12 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             bubbleWidth = photoBubbleWidth;
         }
     }
+    if (TGMessageItemHasLinkPreview(item)) {
+        CGFloat previewBubbleWidth = MIN(maximumBubbleWidth, 316.0);
+        if (previewBubbleWidth > bubbleWidth) {
+            bubbleWidth = previewBubbleWidth;
+        }
+    }
     if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         CGFloat footerWidth = ceil(timeSize.width) + TGOutgoingStatusDotsWidthForItem(item) + 29.0;
@@ -652,6 +658,9 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     }
     if (callContent) {
         bubbleHeight = TGCallBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
+    }
+    if (TGMessageItemHasLinkPreview(item)) {
+        bubbleHeight += TGLinkPreviewCardHeightForItem(item, bubbleWidth - 16.0) + 8.0;
     }
     if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
         bubbleHeight += 17.0;
@@ -902,6 +911,16 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         contentTop = flipped ? (NSMaxY(imageRect) + 8.0) : (NSMinY(imageRect) - 8.0);
     }
 
+    NSRect linkPreviewRect = TGLinkPreviewCardRectForItem(item,
+                                                         bubbleRect,
+                                                         showSenderDetails,
+                                                         flipped);
+    BOOL linkPreviewAboveText = (TGMessageItemHasLinkPreview(item) &&
+                                 [[[item linkPreviewInfo] objectForKey:@"show_above_text"] boolValue]);
+    if (linkPreviewAboveText && !NSIsEmptyRect(linkPreviewRect)) {
+        contentTop += flipped ? (NSHeight(linkPreviewRect) + 8.0)
+                              : -(NSHeight(linkPreviewRect) + 8.0);
+    }
     if ([messageText length] > 0) {
         CGFloat textHeight = ceil(NSHeight(measuredRect));
         NSRect textRect = NSMakeRect(NSMinX(bubbleRect) + 12.0,
@@ -910,6 +929,9 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                      textHeight + 2.0);
         [attributedMessageText drawWithRect:textRect
                                     options:NSStringDrawingUsesLineFragmentOrigin];
+    }
+    if (!NSIsEmptyRect(linkPreviewRect)) {
+        TGDrawLinkPreviewCardForItem(item, linkPreviewRect, outgoing, flipped);
     }
 
     TGDrawMessageCommentBarForItem(item, bubbleRect, outgoing, flipped);
@@ -1106,6 +1128,17 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         textY += flipped ? 15.0 : -15.0;
     }
 
+    NSRect linkPreviewRect = TGLinkPreviewCardRectForItem(item,
+                                                         rowRect,
+                                                         self.showSenderDetails,
+                                                         flipped);
+    BOOL linkPreviewAboveText = (TGMessageItemHasLinkPreview(item) &&
+                                 [[[item linkPreviewInfo] objectForKey:@"show_above_text"] boolValue]);
+    if (linkPreviewAboveText && !NSIsEmptyRect(linkPreviewRect)) {
+        textY += flipped ? (NSHeight(linkPreviewRect) + 8.0)
+                         : -(NSHeight(linkPreviewRect) + 8.0);
+    }
+
     NSString *messageText = TGDisplayTextForMessageItem(item);
     BOOL messageTextIsPlaceholder = NO;
     if ([messageText length] == 0) {
@@ -1193,6 +1226,9 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                               textWidth,
                               textHeight + 2.0);
         [attributedText drawWithRect:textRect options:NSStringDrawingUsesLineFragmentOrigin];
+    }
+    if (!NSIsEmptyRect(linkPreviewRect)) {
+        TGDrawLinkPreviewCardForItem(item, linkPreviewRect, outgoing, flipped);
     }
 
     CGFloat footerY = flipped ? (NSMaxY(textRect) + 4.0) : (NSMinY(textRect) - 20.0);

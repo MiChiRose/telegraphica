@@ -1915,6 +1915,44 @@ def check_poll_management_contract(errors):
                           (menu_rel, fragment))
 
 
+def check_received_link_preview_contract(errors):
+    item_rel = os.path.join("Sources", "Core", "TGMessageItem.h")
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    layout_rel = os.path.join("Sources", "UI", "TGMessageLayoutSupport.m")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    hit_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
+    item_text = read_text(os.path.join(ROOT, item_rel))
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+    hit_text = read_text(os.path.join(ROOT, hit_rel))
+    if "linkPreviewInfo" not in item_text:
+        errors.append("%s: received link preview model is missing" % item_rel)
+    for fragment in [
+        'objectForKey:@"link_preview"',
+        "linkPreviewInfoFromMessageContentObject:",
+        '@"show_large_media"',
+        '@"show_above_text"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: received link preview parsing is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "TGLinkPreviewCardHeightForItem",
+        "TGLinkPreviewCardRectForItem",
+        "TGDrawLinkPreviewCardForItem",
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: link preview layout is missing `%s`" %
+                          (layout_rel, fragment))
+    if "TGDrawLinkPreviewCardForItem" not in cells_text:
+        errors.append("%s: message cells do not draw received link previews" % cells_rel)
+    for fragment in ["TGLinkPreviewCardRectForItem", 'objectForKey:@"url"', "openURL:url"]:
+        if fragment not in hit_text:
+            errors.append("%s: link preview card click handling is missing `%s`" %
+                          (hit_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1947,6 +1985,7 @@ def main():
     check_server_reaction_catalog_contract(errors)
     check_contact_birthday_contract(errors)
     check_poll_management_contract(errors)
+    check_received_link_preview_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:
