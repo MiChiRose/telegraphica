@@ -1038,6 +1038,10 @@ def check_primary_navigation_contract(errors):
         "commandSelector == @selector(moveUp:)",
         "[_tableView deselectAll:self]",
         "[TGClassicSelectedRowColor() set]",
+        "NSRectFillUsingOperation(clipRect, NSCompositeCopy)",
+        "CGFloat documentHeight = MAX(1.0, ((CGFloat)[_results count] * rowExtent))",
+        "[_scrollView setHasVerticalScroller:needsVerticalScroller]",
+        "NSArray *snapshot = results ? [[NSArray alloc] initWithArray:results]",
     ]:
         if fragment not in chat_search_panel_text:
             errors.append("%s: explicit chat-search selection is missing `%s`" %

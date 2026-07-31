@@ -310,6 +310,60 @@
     return -1;
 }
 
+- (NSString *)dateSeparatorTitleForMessageDate:(NSNumber *)dateValue {
+    if (![dateValue respondsToSelector:@selector(doubleValue)] || [dateValue doubleValue] <= 0.0) {
+        return nil;
+    }
+    NSDate *messageDate = [NSDate dateWithTimeIntervalSince1970:[dateValue doubleValue]];
+    NSDate *today = [NSDate date];
+    NSDate *yesterday = [today dateByAddingTimeInterval:-86400.0];
+    NSDateFormatter *dayKeyFormatter = [[[NSDateFormatter alloc] init] autorelease];
+    [dayKeyFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"] autorelease]];
+    [dayKeyFormatter setDateFormat:@"yyyy-MM-dd"];
+    NSString *messageDayKey = [dayKeyFormatter stringFromDate:messageDate];
+    if ([messageDayKey isEqualToString:[dayKeyFormatter stringFromDate:today]]) {
+        return TGLoc(@"message.date.today");
+    }
+    if ([messageDayKey isEqualToString:[dayKeyFormatter stringFromDate:yesterday]]) {
+        return TGLoc(@"message.date.yesterday");
+    }
+
+    NSCalendar *calendar = [NSCalendar currentCalendar];
+    NSDateComponents *messageComponents = [calendar components:NSYearCalendarUnit fromDate:messageDate];
+    NSDateComponents *todayComponents = [calendar components:NSYearCalendarUnit fromDate:today];
+    NSDateFormatter *displayFormatter = [[[NSDateFormatter alloc] init] autorelease];
+    if ([messageComponents year] == [todayComponents year]) {
+        [displayFormatter setDateFormat:@"d MMMM"];
+    } else {
+        [displayFormatter setDateStyle:NSDateFormatterLongStyle];
+        [displayFormatter setTimeStyle:NSDateFormatterNoStyle];
+    }
+    return [displayFormatter stringFromDate:messageDate];
+}
+
+- (void)refreshMessageHistorySeparators {
+    NSInteger unreadRow = [self firstUnreadMessageRow];
+    NSString *previousDayKey = nil;
+    NSDateFormatter *dayKeyFormatter = [[[NSDateFormatter alloc] init] autorelease];
+    [dayKeyFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"] autorelease]];
+    [dayKeyFormatter setDateFormat:@"yyyy-MM-dd"];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        [item setDateSeparatorTitle:nil];
+        [item setShowsUnreadSeparator:((NSInteger)index == unreadRow)];
+        NSDate *date = ([[item date] respondsToSelector:@selector(doubleValue)] &&
+                        [[item date] doubleValue] > 0.0)
+            ? [NSDate dateWithTimeIntervalSince1970:[[item date] doubleValue]]
+            : nil;
+        NSString *dayKey = date ? [dayKeyFormatter stringFromDate:date] : nil;
+        if ([dayKey length] > 0 && ![dayKey isEqualToString:previousDayKey]) {
+            [item setDateSeparatorTitle:[self dateSeparatorTitleForMessageDate:[item date]]];
+        }
+        previousDayKey = dayKey;
+    }
+}
+
 - (void)scrollMessagesToInitialUnreadIfAvailable {
     NSInteger unreadRow = [self firstUnreadMessageRow];
     self.initialUnreadPositionPending = NO;
@@ -454,6 +508,7 @@
     if (!preserveOlder || [self.messageItems count] == 0) {
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:orderedItems]];
+        [self refreshMessageHistorySeparators];
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self updateOutgoingReadStateForVisibleMessages];
@@ -506,6 +561,7 @@
 
     [self.messageItems removeAllObjects];
     [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
+    [self refreshMessageHistorySeparators];
     [self updateOutgoingReadStateForVisibleMessages];
     [self markVisiblePinnedMessagesFromPinnedItems];
     [self.inlineMediaPlaybackCoordinator removeAllPlayback];
@@ -558,6 +614,7 @@
         [mergedItems addObjectsFromArray:self.messageItems];
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
+        [self refreshMessageHistorySeparators];
     }
 
     if (added > 0) {

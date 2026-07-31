@@ -571,6 +571,20 @@ CGFloat TGMessageExtraBlockVerticalPadding(void) {
     return 0.0;
 }
 
+CGFloat TGMessageTopAccessoryHeightForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return 0.0;
+    }
+    CGFloat height = 0.0;
+    if ([[item dateSeparatorTitle] length] > 0) {
+        height += 30.0;
+    }
+    if ([item showsUnreadSeparator]) {
+        height += 30.0;
+    }
+    return height;
+}
+
 BOOL TGMessageUsesSeparateMetadataFooter(void) {
     return TGChatMessageBodyFontSize() >= 16.0;
 }
@@ -1742,7 +1756,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         if (rowHeight < 44.0) {
             rowHeight = 44.0;
         }
-        return ceil(rowHeight);
+        return ceil(rowHeight + TGMessageTopAccessoryHeightForItem(item));
     }
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
@@ -1803,7 +1817,8 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     }
     height += TGReactionBandHeightForMessageItem(item);
     height += TGMessageCommentBarHeightForItem(item);
-    return height + 10.0 + TGMessageExtraBlockVerticalPadding();
+    return height + 10.0 + TGMessageExtraBlockVerticalPadding() +
+        TGMessageTopAccessoryHeightForItem(item);
 }
 
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails) {
@@ -1928,7 +1943,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     CGFloat blockOffset = floor(TGMessageExtraBlockVerticalPadding() / 2.0);
-    return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0 + blockOffset, bubbleWidth, bubbleHeight);
+    CGFloat topAccessoryHeight = TGMessageTopAccessoryHeightForItem(item);
+    CGFloat bubbleY = NSMinY(cellFrame) + 5.0 + blockOffset + topAccessoryHeight;
+    return NSMakeRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight);
 }
 
 void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {

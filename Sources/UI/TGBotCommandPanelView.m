@@ -18,11 +18,54 @@
         return;
     }
     NSDictionary *command = (NSDictionary *)value;
-    NSString *name = [[command objectForKey:@"command"] isKindOfClass:[NSString class]]
-        ? [@"/" stringByAppendingString:[command objectForKey:@"command"]] : @"";
-    NSString *detail = [[command objectForKey:@"description"] isKindOfClass:[NSString class]]
-        ? [command objectForKey:@"description"] : @"";
+    BOOL replyButton = [[command objectForKey:@"tg_panel_kind"] isEqualToString:@"reply"];
+    NSString *name = nil;
+    NSString *detail = nil;
+    if (replyButton) {
+        name = [[command objectForKey:@"text"] isKindOfClass:[NSString class]]
+            ? [command objectForKey:@"text"] : @"";
+        NSDictionary *type = [[command objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+            ? [command objectForKey:@"type"] : nil;
+        NSString *typeName = [[type objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [type objectForKey:@"@type"] : @"";
+        if ([typeName rangeOfString:@"RequestPhone"].location != NSNotFound) {
+            detail = TGLoc(@"bot.button.phone");
+        } else if ([typeName rangeOfString:@"RequestLocation"].location != NSNotFound) {
+            detail = TGLoc(@"bot.button.location");
+        } else if ([typeName rangeOfString:@"RequestPoll"].location != NSNotFound) {
+            detail = TGLoc(@"bot.button.poll");
+        } else if ([typeName rangeOfString:@"WebApp"].location != NSNotFound) {
+            detail = TGLoc(@"bot.button.webApp");
+        } else {
+            detail = TGLoc(@"bot.button.text");
+        }
+    } else {
+        name = [[command objectForKey:@"command"] isKindOfClass:[NSString class]]
+            ? [@"/" stringByAppendingString:[command objectForKey:@"command"]] : @"";
+        detail = [[command objectForKey:@"description"] isKindOfClass:[NSString class]]
+            ? [command objectForKey:@"description"] : @"";
+    }
     BOOL highlighted = [self isHighlighted];
+    if (replyButton) {
+        NSDictionary *type = [[command objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+            ? [command objectForKey:@"type"] : nil;
+        NSString *typeName = [[type objectForKey:@"@type"] description];
+        NSColor *buttonColor = TGClassicSelectedRowColor();
+        if ([typeName rangeOfString:@"Request"].location != NSNotFound) {
+            buttonColor = TGClassicOutgoingBubbleBottomColor();
+        } else if ([typeName rangeOfString:@"WebApp"].location != NSNotFound) {
+            buttonColor = TGClassicNavigationHighlightedColor(1.0);
+        }
+        NSRect backgroundRect = NSInsetRect(cellFrame, 5.0, 3.0);
+        NSBezierPath *background = [NSBezierPath bezierPathWithRoundedRect:backgroundRect
+                                                                   xRadius:8.0
+                                                                   yRadius:8.0];
+        [[buttonColor colorWithAlphaComponent:highlighted ? 0.95 : 0.30] set];
+        [background fill];
+        [TGClassicPanelStrokeColor() set];
+        [background setLineWidth:1.0];
+        [background stroke];
+    }
     NSColor *nameColor = highlighted ? [NSColor whiteColor] : TGClassicCardInkColor();
     NSColor *detailColor = highlighted
         ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.82]
@@ -209,6 +252,40 @@
         });
         [pool drain];
     });
+}
+
+- (void)showReplyMarkup:(NSDictionary *)replyMarkup {
+    self.generation++;
+    NSArray *rows = [[replyMarkup objectForKey:@"rows"] isKindOfClass:[NSArray class]]
+        ? [replyMarkup objectForKey:@"rows"] : [NSArray array];
+    NSMutableArray *items = [NSMutableArray array];
+    NSUInteger rowIndex = 0;
+    for (rowIndex = 0; rowIndex < [rows count]; rowIndex++) {
+        NSArray *row = [[rows objectAtIndex:rowIndex] isKindOfClass:[NSArray class]]
+            ? [rows objectAtIndex:rowIndex] : nil;
+        NSUInteger columnIndex = 0;
+        for (columnIndex = 0; columnIndex < [row count]; columnIndex++) {
+            NSDictionary *button = [[row objectAtIndex:columnIndex] isKindOfClass:[NSDictionary class]]
+                ? [row objectAtIndex:columnIndex] : nil;
+            if (!button) {
+                continue;
+            }
+            NSMutableDictionary *item = [NSMutableDictionary dictionaryWithDictionary:button];
+            [item setObject:@"reply" forKey:@"tg_panel_kind"];
+            [item setObject:[NSNumber numberWithUnsignedInteger:rowIndex] forKey:@"tg_row"];
+            [item setObject:[NSNumber numberWithUnsignedInteger:columnIndex] forKey:@"tg_column"];
+            [items addObject:item];
+        }
+    }
+    self.commands = items;
+    [self.spinner stopAnimation:nil];
+    [self.tableView reloadData];
+    BOOL hasItems = ([self.commands count] > 0);
+    [self.tableView setHidden:!hasItems];
+    [self.statusField setHidden:hasItems];
+    if (!hasItems) {
+        [self.statusField setStringValue:TGLoc(@"bot.keyboard.empty")];
+    }
 }
 
 @end

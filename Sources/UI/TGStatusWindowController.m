@@ -4,6 +4,7 @@
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
 #import "TGDatePickerDialog.h"
+#import "TGLinkPreviewOptionsDialog.h"
 #import "TGBotCommandPanelView.h"
 #import "TGBotKeyboardWindowController.h"
 #import "TGBotInteractionWindowController.h"
@@ -99,6 +100,7 @@ static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGChatSidebarWidthDefaultsKey = @"TelegraphicaChatSidebarWidth";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
 static NSString * const TGComposerVideoNoteModeDefaultsKey = @"TelegraphicaComposerVideoNoteMode";
+static NSString * const TGVideoPlaybackResumePositionsDefaultsKey = @"TelegraphicaVideoPlaybackResumePositions";
 static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
 static NSString * const TGLastUpdateCheckDefaultsKey = @"TelegraphicaLastUpdateCheckTime";
 static NSString * const TGAvailableUpdateVersionDefaultsKey = @"TelegraphicaAvailableUpdateVersion";
@@ -325,10 +327,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *composeChatButton;
 @property (nonatomic, retain) NSButton *conversationSearchButton;
 @property (nonatomic, retain) NSButton *mediaCenterButton;
+@property (nonatomic, retain) NSScrollView *forumTopicTabsScrollView;
+@property (nonatomic, retain) NSView *forumTopicTabsContentView;
+@property (nonatomic, retain) NSMutableArray *forumTopicTabButtons;
 @property (nonatomic, retain) TGGroupedCardView *searchPanelView;
 @property (nonatomic, retain) NSTextField *searchTextField;
 @property (nonatomic, retain) NSPopUpButton *searchScopePopUpButton;
 @property (nonatomic, retain) NSPopUpButton *searchFilterPopUpButton;
+@property (nonatomic, retain) NSButton *searchAdvancedButton;
 @property (nonatomic, retain) NSButton *searchCloseButton;
 @property (nonatomic, retain) NSTextField *searchStatusField;
 @property (nonatomic, retain) NSScrollView *searchResultsScrollView;
@@ -336,6 +342,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableArray *searchResultItems;
 @property (nonatomic, retain) NSTimer *searchDebounceTimer;
 @property (nonatomic, copy) NSString *globalSearchOffset;
+@property (nonatomic, copy) NSString *searchSenderQuery;
+@property (nonatomic, assign) NSInteger searchDateRangeIndex;
 @property (nonatomic, assign) BOOL searchPanelVisible;
 @property (nonatomic, assign) BOOL searchLoading;
 @property (nonatomic, assign) BOOL searchEndReached;
@@ -437,6 +445,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTextField *selectedChatField;
 @property (nonatomic, retain) NSTextField *typingIndicatorField;
 @property (nonatomic, copy) NSString *selectedChatBirthdayText;
+@property (nonatomic, copy) NSString *selectedChatSafetyNoticeText;
+@property (nonatomic, retain) TGGroupedCardView *chatSafetyNoticeView;
+@property (nonatomic, retain) NSTextField *chatSafetyNoticeTitleField;
+@property (nonatomic, retain) NSTextField *chatSafetyNoticeDetailField;
 @property (nonatomic, assign) NSUInteger selectedChatBirthdayGeneration;
 @property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
 @property (nonatomic, retain) NSButton *selectedChatProfileButton;
@@ -726,6 +738,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL mediaPlaybackAudioOnly;
 @property (nonatomic, assign) BOOL mediaPlaybackVideoNote;
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
+@property (nonatomic, copy) NSString *mediaPlaybackResumeIdentifier;
+@property (nonatomic, assign) NSTimeInterval mediaPlaybackLastPersistedPosition;
 @property (nonatomic, assign) NSUInteger mediaPlaybackPreparationGeneration;
 @property (nonatomic, retain) NSOperationQueue *mediaPlaybackPreparationQueue;
 @property (nonatomic, retain) TGOpusVoiceTranscodeCancellationToken *mediaPlaybackPreparationCancellationToken;
@@ -750,6 +764,15 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 - (NSString *)localAttachmentPathForMessageItem:(TGMessageItem *)item;
 - (void)openDocumentAttachmentForMessageItem:(TGMessageItem *)item;
 - (void)downloadAttachmentForMessageItem:(TGMessageItem *)item;
+- (NSString *)mediaPlaybackResumeIdentifierForPath:(NSString *)path;
+- (void)persistMediaPlaybackPositionIfNeededAtTime:(NSTimeInterval)position
+                                          duration:(NSTimeInterval)duration
+                                             force:(BOOL)force;
+- (void)clearRememberedMediaPlaybackPosition;
+- (NSTimeInterval)rememberedMediaPlaybackPosition;
+- (void)rebuildForumTopicTabs;
+- (void)refreshForumTopicTabSelection;
+- (void)selectForumTopicFromTab:(id)sender;
 - (void)sendSharedComposerItemWithKind:(NSString *)kind values:(NSDictionary *)values;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
@@ -831,10 +854,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize composeChatButton = _composeChatButton;
 @synthesize conversationSearchButton = _conversationSearchButton;
 @synthesize mediaCenterButton = _mediaCenterButton;
+@synthesize forumTopicTabsScrollView = _forumTopicTabsScrollView;
+@synthesize forumTopicTabsContentView = _forumTopicTabsContentView;
+@synthesize forumTopicTabButtons = _forumTopicTabButtons;
 @synthesize searchPanelView = _searchPanelView;
 @synthesize searchTextField = _searchTextField;
 @synthesize searchScopePopUpButton = _searchScopePopUpButton;
 @synthesize searchFilterPopUpButton = _searchFilterPopUpButton;
+@synthesize searchAdvancedButton = _searchAdvancedButton;
 @synthesize searchCloseButton = _searchCloseButton;
 @synthesize searchStatusField = _searchStatusField;
 @synthesize searchResultsScrollView = _searchResultsScrollView;
@@ -842,6 +869,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize searchResultItems = _searchResultItems;
 @synthesize searchDebounceTimer = _searchDebounceTimer;
 @synthesize globalSearchOffset = _globalSearchOffset;
+@synthesize searchSenderQuery = _searchSenderQuery;
+@synthesize searchDateRangeIndex = _searchDateRangeIndex;
 @synthesize searchPanelVisible = _searchPanelVisible;
 @synthesize searchLoading = _searchLoading;
 @synthesize searchEndReached = _searchEndReached;
@@ -943,6 +972,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize selectedChatField = _selectedChatField;
 @synthesize typingIndicatorField = _typingIndicatorField;
 @synthesize selectedChatBirthdayText = _selectedChatBirthdayText;
+@synthesize selectedChatSafetyNoticeText = _selectedChatSafetyNoticeText;
+@synthesize chatSafetyNoticeView = _chatSafetyNoticeView;
+@synthesize chatSafetyNoticeTitleField = _chatSafetyNoticeTitleField;
+@synthesize chatSafetyNoticeDetailField = _chatSafetyNoticeDetailField;
 @synthesize selectedChatBirthdayGeneration = _selectedChatBirthdayGeneration;
 @synthesize selectedChatAvatarView = _selectedChatAvatarView;
 @synthesize selectedChatProfileButton = _selectedChatProfileButton;
@@ -1251,6 +1284,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackAudioOnly = _mediaPlaybackAudioOnly;
 @synthesize mediaPlaybackVideoNote = _mediaPlaybackVideoNote;
 @synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
+@synthesize mediaPlaybackResumeIdentifier = _mediaPlaybackResumeIdentifier;
+@synthesize mediaPlaybackLastPersistedPosition = _mediaPlaybackLastPersistedPosition;
 @synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
@@ -2161,6 +2196,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 - (void)clearForumTopicListState {
     self.showingForumTopicList = NO;
+    [[self.forumTopicTabsContentView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
+    [self.forumTopicTabButtons removeAllObjects];
     self.chatItemsBeforeTopicList = nil;
     self.topicParentChatID = nil;
     self.topicParentTitle = nil;
@@ -2740,6 +2777,23 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.typingIndicatorField setHidden:YES];
     [contentView addSubview:self.typingIndicatorField];
 
+    self.chatSafetyNoticeView = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(264, 138, 472, 54)] autorelease];
+    [self.chatSafetyNoticeView setHidden:YES];
+    [contentView addSubview:self.chatSafetyNoticeView];
+    self.chatSafetyNoticeTitleField = [self labelWithFrame:NSMakeRect(278, 166, 440, 18)
+                                                       text:TGLoc(@"chat.safety.unknown.title")
+                                                       font:[NSFont boldSystemFontOfSize:12.0]];
+    [self.chatSafetyNoticeTitleField setTextColor:TGClassicCardInkColor()];
+    [self.chatSafetyNoticeTitleField setHidden:YES];
+    [contentView addSubview:self.chatSafetyNoticeTitleField];
+    self.chatSafetyNoticeDetailField = [self labelWithFrame:NSMakeRect(278, 146, 440, 17)
+                                                        text:@""
+                                                        font:[NSFont systemFontOfSize:10.5]];
+    [self.chatSafetyNoticeDetailField setTextColor:TGClassicCardMutedInkColor()];
+    [[self.chatSafetyNoticeDetailField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+    [self.chatSafetyNoticeDetailField setHidden:YES];
+    [contentView addSubview:self.chatSafetyNoticeDetailField];
+
     self.selectedChatAvatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(232, 194, 26, 26)] autorelease];
     [self.selectedChatAvatarView setDisplayName:@"Select a chat"];
     [self.selectedChatAvatarView setHidden:YES];
@@ -2924,6 +2978,18 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.searchPanelView setHidden:YES];
     [contentView addSubview:self.searchPanelView];
 
+    self.forumTopicTabsScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(264, 180, 472, 40)] autorelease];
+    [self.forumTopicTabsScrollView setBorderType:NSNoBorder];
+    [self.forumTopicTabsScrollView setDrawsBackground:NO];
+    [self.forumTopicTabsScrollView setHasHorizontalScroller:YES];
+    [self.forumTopicTabsScrollView setHasVerticalScroller:NO];
+    [self.forumTopicTabsScrollView setAutohidesScrollers:YES];
+    [self.forumTopicTabsScrollView setHidden:YES];
+    [contentView addSubview:self.forumTopicTabsScrollView];
+    self.forumTopicTabsContentView = [[[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 472.0, 34.0)] autorelease];
+    [self.forumTopicTabsScrollView setDocumentView:self.forumTopicTabsContentView];
+    self.forumTopicTabButtons = [NSMutableArray array];
+
     self.searchTextField = [[[NSTextField alloc] initWithFrame:NSMakeRect(36, 318, 260, 24)] autorelease];
     [[self.searchTextField cell] setPlaceholderString:@"Search"];
     [self.searchTextField setTarget:self];
@@ -2956,6 +3022,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.searchFilterPopUpButton setAction:@selector(searchFilterChanged:)];
     [self.searchFilterPopUpButton setHidden:YES];
     [contentView addSubview:self.searchFilterPopUpButton];
+
+    self.searchAdvancedButton = [[[NSButton alloc] initWithFrame:NSMakeRect(500, 318, 88, 26)] autorelease];
+    [self.searchAdvancedButton setTitle:TGLoc(@"search.messages.filters")];
+    [self.searchAdvancedButton setTarget:self];
+    [self.searchAdvancedButton setAction:@selector(showAdvancedMessageSearchFilters:)];
+    [self applyUtilityButtonStyle:self.searchAdvancedButton];
+    [self.searchAdvancedButton setHidden:YES];
+    [contentView addSubview:self.searchAdvancedButton];
 
     self.searchCloseButton = [[[NSButton alloc] initWithFrame:NSMakeRect(560, 318, 32, 26)] autorelease];
     [self.searchCloseButton setTitle:@"×"];
@@ -3116,6 +3190,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                         keyEquivalent:@""];
     [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.previewAbove")
                                action:@selector(sendMessageWithPreviewAboveText:)
+                        keyEquivalent:@""];
+    [sendOptionsMenu addItemWithTitle:TGLoc(@"composer.linkPreview.configure")
+                               action:@selector(sendMessageWithLinkPreviewOptions:)
                         keyEquivalent:@""];
     [sendOptionsMenu addItem:[NSMenuItem separatorItem]];
     [sendOptionsMenu addItemWithTitle:TGLoc(@"scheduled.open")
@@ -4456,9 +4533,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_composeChatButton release];
     [_conversationSearchButton release];
     [_searchPanelView release];
+    [_forumTopicTabsScrollView release];
+    [_forumTopicTabsContentView release];
+    [_forumTopicTabButtons release];
     [_searchTextField release];
     [_searchScopePopUpButton release];
     [_searchFilterPopUpButton release];
+    [_searchAdvancedButton release];
     [_searchCloseButton release];
     [_searchStatusField release];
     [_searchResultsScrollView release];
@@ -4467,6 +4548,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_searchDebounceTimer invalidate];
     [_searchDebounceTimer release];
     [_globalSearchOffset release];
+    [_searchSenderQuery release];
     [_chatSearchWindow release];
     [_chatSearchWindowTextField release];
     [_chatSearchWindowScrollView release];
@@ -4555,6 +4637,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_selectedChatField release];
     [_typingIndicatorField release];
     [_selectedChatBirthdayText release];
+    [_selectedChatSafetyNoticeText release];
+    [_chatSafetyNoticeView release];
+    [_chatSafetyNoticeTitleField release];
+    [_chatSafetyNoticeDetailField release];
     [_selectedChatAvatarView release];
     [_selectedChatProfileButton release];
     [_selectedChatCallButton release];
@@ -4789,6 +4875,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaPlaybackTimeField release];
     [_mediaPlaybackCloseButton release];
     [_mediaPlaybackPlayer release];
+    [_mediaPlaybackResumeIdentifier release];
     [_mediaPlaybackLayer release];
     [_mediaPlaybackTimer release];
     [_mediaPlaybackPreparationQueue release];

@@ -320,6 +320,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
+- (BOOL)isCommunityChatObject:(NSDictionary *)chatObject;
 - (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject;
 - (BOOL)scopeNotificationsMutedForType:(NSString *)scopeType timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
@@ -3433,8 +3434,30 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([(NSString *)type isEqualToString:@"chatTypeSecret"]) {
         return @"Secret";
     }
+    if ([(NSString *)type rangeOfString:@"community" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        return @"Community";
+    }
 
     return @"Chat";
+}
+
+- (BOOL)isCommunityChatObject:(NSDictionary *)chatObject {
+    if (![chatObject isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    id flag = [chatObject objectForKey:@"is_community"];
+    if ([flag respondsToSelector:@selector(boolValue)] && [flag boolValue]) {
+        return YES;
+    }
+    id communityID = [chatObject objectForKey:@"community_id"];
+    if ([communityID respondsToSelector:@selector(longLongValue)] && [communityID longLongValue] != 0LL) {
+        return YES;
+    }
+    NSDictionary *type = [[chatObject objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+        ? [chatObject objectForKey:@"type"] : nil;
+    NSString *typeName = [[type objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [type objectForKey:@"@type"] : @"";
+    return ([typeName rangeOfString:@"community" options:NSCaseInsensitiveSearch].location != NSNotFound);
 }
 
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID {
@@ -3531,6 +3554,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                      title:title
                                                typeSummary:typeSummary
                                                unreadCount:unreadCount] autorelease];
+    [item setCommunity:[self isCommunityChatObject:chatResponse]];
     [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:chatListType filterID:filterID];
     BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
     [item setServerNotificationsMuted:serverMuted];
@@ -3631,6 +3655,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        [item setCommunity:[self isCommunityChatObject:chatResponse]];
         [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:@"chatListMain" filterID:nil];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
@@ -3969,6 +3994,28 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([userType isKindOfClass:[NSDictionary class]] &&
         [[(NSDictionary *)userType objectForKey:@"@type"] isEqualToString:@"userTypeBot"]) {
         [summary setObject:[NSNumber numberWithBool:YES] forKey:@"is_bot"];
+    }
+    NSArray *booleanProfileKeys = [NSArray arrayWithObjects:
+                                   @"is_contact",
+                                   @"is_mutual_contact",
+                                   @"is_verified",
+                                   @"is_support",
+                                   @"is_scam",
+                                   @"is_fake",
+                                   nil];
+    NSUInteger booleanKeyIndex = 0;
+    for (booleanKeyIndex = 0; booleanKeyIndex < [booleanProfileKeys count]; booleanKeyIndex++) {
+        NSString *key = [booleanProfileKeys objectAtIndex:booleanKeyIndex];
+        id value = [userObject objectForKey:key];
+        if ([value respondsToSelector:@selector(boolValue)]) {
+            [summary setObject:[NSNumber numberWithBool:[value boolValue]] forKey:key];
+        }
+    }
+    NSDictionary *verificationStatus = [[userObject objectForKey:@"verification_status"]
+        isKindOfClass:[NSDictionary class]] ? [userObject objectForKey:@"verification_status"] : nil;
+    NSString *verificationType = [verificationStatus objectForKey:@"@type"];
+    if ([verificationType isKindOfClass:[NSString class]]) {
+        [summary setObject:verificationType forKey:@"verification_status_type"];
     }
     id status = [userObject objectForKey:@"status"];
     if ([status isKindOfClass:[NSDictionary class]]) {
@@ -4779,6 +4826,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        [item setCommunity:[self isCommunityChatObject:chatResponse]];
         [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:chatListType filterID:filterID];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
@@ -8493,13 +8541,20 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [content setObject:[NSNumber numberWithBool:YES] forKey:@"clear_draft"];
     BOOL disableLinkPreview = [[sendOptions objectForKey:@"disable_link_preview"] boolValue];
     BOOL previewAboveText = [[sendOptions objectForKey:@"preview_above_text"] boolValue];
-    if (disableLinkPreview || previewAboveText) {
+    BOOL previewLargeMedia = [[sendOptions objectForKey:@"preview_large_media"] boolValue];
+    BOOL previewSmallMedia = [[sendOptions objectForKey:@"preview_small_media"] boolValue];
+    NSString *linkPreviewURL = [sendOptions objectForKey:@"link_preview_url"];
+    if (![linkPreviewURL isKindOfClass:[NSString class]]) {
+        linkPreviewURL = @"";
+    }
+    if (disableLinkPreview || previewAboveText || previewLargeMedia ||
+        previewSmallMedia || [linkPreviewURL length] > 0) {
         NSDictionary *linkPreviewOptions = [NSDictionary dictionaryWithObjectsAndKeys:
                                             @"linkPreviewOptions", @"@type",
                                             [NSNumber numberWithBool:disableLinkPreview], @"is_disabled",
-                                            @"", @"url",
-                                            [NSNumber numberWithBool:NO], @"force_small_media",
-                                            [NSNumber numberWithBool:NO], @"force_large_media",
+                                            linkPreviewURL, @"url",
+                                            [NSNumber numberWithBool:previewSmallMedia], @"force_small_media",
+                                            [NSNumber numberWithBool:previewLargeMedia], @"force_large_media",
                                             [NSNumber numberWithBool:previewAboveText], @"show_above_text",
                                             nil];
         [content setObject:linkPreviewOptions forKey:@"link_preview_options"];

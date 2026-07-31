@@ -8,7 +8,14 @@
 }
 
 - (void)drawBackgroundInClipRect:(NSRect)clipRect {
-    (void)clipRect;
+    /*
+     * The table is transparent so the themed results card remains visible.
+     * Clear its backing store explicitly when a search shrinks the result
+     * count; otherwise AppKit 10.8/10.9 can leave the previously drawn rows
+     * cached below the last real result.
+     */
+    [[NSColor clearColor] set];
+    NSRectFillUsingOperation(clipRect, NSCompositeCopy);
 }
 
 - (void)drawRow:(NSInteger)row clipRect:(NSRect)clipRect {
@@ -112,6 +119,7 @@
 - (TGSearchResultItem *)selectedResult;
 - (NSSearchField *)searchField;
 - (void)layoutPanelSubviews;
+- (void)updateResultsDocumentGeometry;
 @end
 
 @implementation TGChatSearchPanelView
@@ -240,12 +248,34 @@
     [_statusField setFrame:NSMakeRect(inset + 16.0, 101.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 32.0), 18.0)];
     [_scrollView setFrame:NSMakeRect(inset + 12.0, 138.0, MAX(120.0, NSWidth(bounds) - (inset * 2.0) - 24.0), MAX(80.0, NSHeight(bounds) - 162.0))];
 
+    [self updateResultsDocumentGeometry];
     CGFloat tableWidth = NSWidth([[_scrollView contentView] bounds]);
     NSArray *columns = [_tableView tableColumns];
     if ([columns count] == 1) {
         [[columns objectAtIndex:0] setWidth:MAX(100.0, tableWidth)];
     }
     [self setNeedsDisplay:YES];
+}
+
+- (void)updateResultsDocumentGeometry {
+    NSClipView *clipView = [_scrollView contentView];
+    CGFloat visibleHeight = NSHeight([clipView bounds]);
+    NSSize intercellSpacing = [_tableView intercellSpacing];
+    CGFloat rowExtent = [_tableView rowHeight] + intercellSpacing.height;
+    CGFloat documentHeight = MAX(1.0, ((CGFloat)[_results count] * rowExtent));
+    BOOL needsVerticalScroller = documentHeight > visibleHeight + 0.5;
+
+    if ([_scrollView hasVerticalScroller] != needsVerticalScroller) {
+        [_scrollView setHasVerticalScroller:needsVerticalScroller];
+        [_scrollView tile];
+    }
+
+    CGFloat documentWidth = NSWidth([clipView bounds]);
+    [_tableView setFrame:NSMakeRect(0.0, 0.0, MAX(1.0, documentWidth), documentHeight)];
+    [clipView scrollToPoint:NSZeroPoint];
+    [_scrollView reflectScrolledClipView:clipView];
+    [clipView setNeedsDisplay:YES];
+    [_tableView setNeedsDisplay:YES];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -311,13 +341,17 @@
 }
 
 - (void)setResults:(NSArray *)results {
-    if (_results == results) {
-        return;
-    }
+    /*
+     * The controller deliberately reuses one mutable result buffer. Keep a
+     * snapshot here and always reload: pointer equality does not mean that its
+     * contents (or row count) stayed unchanged between searches.
+     */
+    NSArray *snapshot = results ? [[NSArray alloc] initWithArray:results] : [[NSArray alloc] init];
     [_results release];
-    _results = [results retain];
+    _results = snapshot;
     [_tableView reloadData];
     [_tableView deselectAll:self];
+    [self updateResultsDocumentGeometry];
 }
 
 - (TGSearchResultItem *)selectedResult {

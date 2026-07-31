@@ -9,6 +9,7 @@
 
 - (id)initWithFrame:(NSRect)frame client:(TGTDLibClient *)client;
 - (void)loadCommandsForUserID:(NSNumber *)userID;
+- (void)showReplyMarkup:(NSDictionary *)replyMarkup;
 - (void)clearCommands;
 
 @end

@@ -66,6 +66,8 @@
 @property (nonatomic, copy) NSDictionary *replyMarkup;
 @property (nonatomic, retain) NSNumber *callDuration;
 @property (nonatomic, copy) NSString *callDiscardReason;
+@property (nonatomic, copy) NSString *dateSeparatorTitle;
+@property (nonatomic, assign) BOOL showsUnreadSeparator;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID

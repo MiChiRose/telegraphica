@@ -169,9 +169,17 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
     CGFloat muteIconWidth = [item notificationsMuted] ? 15.0 : 0.0;
     CGFloat pinIconWidth = [item isPinned] ? 12.0 : 0.0;
     CGFloat botIconWidth = [item isBot] ? 15.0 : 0.0;
+    NSString *communityBadge = [item isCommunity] ? TGLoc(@"chat.community.badge") : @"";
+    NSDictionary *communityAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                         [NSFont boldSystemFontOfSize:8.0], NSFontAttributeName,
+                                         selected ? TGClassicSelectedRowTextColor() : TGClassicLinkColor(), NSForegroundColorAttributeName,
+                                         nil];
+    CGFloat communityBadgeWidth = [communityBadge length] > 0
+        ? MIN(64.0, [communityBadge sizeWithAttributes:communityAttributes].width + 12.0) : 0.0;
     CGFloat trailingIconWidth = ([item notificationsMuted] ? (muteIconWidth + 5.0) : 0.0) +
                                 ([item isPinned] ? (pinIconWidth + 4.0) : 0.0) +
-                                ([item isBot] ? (botIconWidth + 4.0) : 0.0);
+                                ([item isBot] ? (botIconWidth + 4.0) : 0.0) +
+                                (communityBadgeWidth > 0.0 ? (communityBadgeWidth + 4.0) : 0.0);
     CGFloat titleAvailableWidth = titleRight - titleX - trailingIconWidth;
     if (titleAvailableWidth < 40.0) {
         titleAvailableWidth = 40.0;
@@ -182,6 +190,23 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
                                   16.0);
     [displayTitle drawInRect:titleRect withAttributes:titleAttributes];
     CGFloat iconX = titleRight - trailingIconWidth;
+    if (communityBadgeWidth > 0.0) {
+        NSRect badgeRect = NSMakeRect(iconX,
+                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 16.0) / 2.0),
+                                     communityBadgeWidth,
+                                     16.0);
+        NSBezierPath *badgePath = [NSBezierPath bezierPathWithRoundedRect:badgeRect xRadius:8.0 yRadius:8.0];
+        [TGClassicNavigationHighlightedColor(selected ? 0.34 : 0.16) set];
+        [badgePath fill];
+        NSMutableParagraphStyle *badgeStyle = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [badgeStyle setAlignment:NSCenterTextAlignment];
+        NSMutableDictionary *badgeAttributes = [NSMutableDictionary dictionaryWithDictionary:communityAttributes];
+        [badgeAttributes setObject:badgeStyle forKey:NSParagraphStyleAttributeName];
+        [communityBadge drawInRect:NSMakeRect(NSMinX(badgeRect), NSMinY(badgeRect) + 3.0,
+                                              NSWidth(badgeRect), 11.0)
+                    withAttributes:badgeAttributes];
+        iconX = NSMaxX(badgeRect) + 4.0;
+    }
     if ([item isBot]) {
         NSRect botRect = NSMakeRect(iconX,
                                     NSMinY(cellFrame) + floor((NSHeight(cellFrame) - 15.0) / 2.0),
@@ -416,6 +441,65 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 
 @end
 
+static void TGDrawMessageTopAccessories(TGMessageItem *item,
+                                        NSRect cellFrame,
+                                        BOOL flipped) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return;
+    }
+    CGFloat currentY = NSMinY(cellFrame) + 3.0;
+    NSString *dateTitle = [item dateSeparatorTitle];
+    if ([dateTitle length] > 0) {
+        NSDictionary *dateAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSFont boldSystemFontOfSize:11.5], NSFontAttributeName,
+                                        TGClassicSelectedRowTextColor(), NSForegroundColorAttributeName,
+                                        nil];
+        NSSize titleSize = [dateTitle sizeWithAttributes:dateAttributes];
+        CGFloat pillWidth = MIN(NSWidth(cellFrame) - 28.0, MAX(82.0, ceil(titleSize.width) + 24.0));
+        NSRect pillRect = NSMakeRect(NSMidX(cellFrame) - floor(pillWidth / 2.0),
+                                     currentY,
+                                     pillWidth,
+                                     23.0);
+        NSBezierPath *pillPath = [NSBezierPath bezierPathWithRoundedRect:pillRect
+                                                                 xRadius:11.5
+                                                                 yRadius:11.5];
+        [TGClassicSelectedRowColor() set];
+        [pillPath fill];
+        NSRect textRect = NSMakeRect(NSMinX(pillRect) + 10.0,
+                                     NSMidY(pillRect) - floor(titleSize.height / 2.0) - 1.0,
+                                     NSWidth(pillRect) - 20.0,
+                                     titleSize.height + 2.0);
+        NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [paragraph setAlignment:NSCenterTextAlignment];
+        NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:dateAttributes];
+        [centeredAttributes setObject:paragraph forKey:NSParagraphStyleAttributeName];
+        [dateTitle drawInRect:textRect withAttributes:centeredAttributes];
+        currentY += 30.0;
+    }
+    if ([item showsUnreadSeparator]) {
+        NSRect separatorRect = NSMakeRect(NSMinX(cellFrame) + 14.0,
+                                          currentY,
+                                          MAX(40.0, NSWidth(cellFrame) - 28.0),
+                                          23.0);
+        NSBezierPath *separatorPath = [NSBezierPath bezierPathWithRoundedRect:separatorRect
+                                                                      xRadius:11.5
+                                                                      yRadius:11.5];
+        TGThemeDrawGroupedCardInPath(separatorPath, separatorRect, flipped);
+        [TGClassicPanelStrokeColor() set];
+        [separatorPath setLineWidth:0.7];
+        [separatorPath stroke];
+        NSString *title = TGLoc(@"message.unreadSeparator");
+        NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+        [paragraph setAlignment:NSCenterTextAlignment];
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    [NSFont systemFontOfSize:11.5], NSFontAttributeName,
+                                    TGClassicCardMutedInkColor(), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+        [title drawInRect:NSInsetRect(separatorRect, 12.0, 3.0) withAttributes:attributes];
+    }
+}
+
 @implementation TGMessageBubbleCell
 
 @synthesize messageItem = _messageItem;
@@ -452,8 +536,16 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
         return;
     }
 
+    CGFloat topAccessoryHeight = TGMessageTopAccessoryHeightForItem(item);
+    if (topAccessoryHeight > 0.0) {
+        TGDrawMessageTopAccessories(item, cellFrame, [controlView isFlipped]);
+    }
+
     if (TGChatMessagesAsBlocksEnabled()) {
-        [self drawListMessageItem:item withFrame:cellFrame inView:controlView];
+        NSRect messageFrame = cellFrame;
+        messageFrame.origin.y += topAccessoryHeight;
+        messageFrame.size.height = MAX(1.0, messageFrame.size.height - topAccessoryHeight);
+        [self drawListMessageItem:item withFrame:messageFrame inView:controlView];
         return;
     }
 
@@ -574,7 +666,10 @@ static CGFloat const TGPanelHeaderHeight = 40.0;
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     CGFloat blockOffset = floor(TGMessageExtraBlockVerticalPadding() / 2.0);
-    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0 + blockOffset, bubbleWidth, bubbleHeight);
+    NSRect bubbleRect = NSMakeRect(bubbleX,
+                                   NSMinY(cellFrame) + 5.0 + blockOffset + topAccessoryHeight,
+                                   bubbleWidth,
+                                   bubbleHeight);
     if (TGChatMessagesAsBlocksEnabled()) {
         NSRect blockRect = NSInsetRect(bubbleRect, -5.0, -4.0);
         NSBezierPath *blockPath = [NSBezierPath bezierPathWithRoundedRect:blockRect xRadius:15.0 yRadius:15.0];

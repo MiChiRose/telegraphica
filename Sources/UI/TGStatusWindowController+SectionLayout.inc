@@ -148,6 +148,10 @@
     [self showView:self.commentThreadBackButton visible:showCommentThreadBack];
     [self showView:self.selectedChatField visible:showConversationContent];
     [self showView:self.typingIndicatorField visible:(showConversationContent && [[self.typingIndicatorField stringValue] length] > 0)];
+    BOOL showSafetyNotice = (showConversationContent && [self.selectedChatSafetyNoticeText length] > 0);
+    [self showView:self.chatSafetyNoticeView visible:showSafetyNotice];
+    [self showView:self.chatSafetyNoticeTitleField visible:showSafetyNotice];
+    [self showView:self.chatSafetyNoticeDetailField visible:showSafetyNotice];
     BOOL showSelectedChatProfile = (showConversationContent && self.selectedChatID != nil);
     [self showView:self.selectedChatAvatarView visible:showSelectedChatProfile];
     [self showView:self.selectedChatProfileButton visible:showSelectedChatProfile];
@@ -171,10 +175,15 @@
     [self showView:self.searchTextField visible:showSearchPanel];
     [self showView:self.searchScopePopUpButton visible:showSearchPanel];
     [self showView:self.searchFilterPopUpButton visible:showSearchPanel];
+    [self showView:self.searchAdvancedButton visible:showSearchPanel];
     [self showView:self.searchCloseButton visible:showSearchPanel];
     [self showView:self.searchStatusField visible:showSearchPanel];
     [self showView:self.searchResultsScrollView visible:showSearchPanel];
     [self showView:self.searchResultsTableView visible:showSearchPanel];
+    BOOL showForumTabs = (showConversationContent &&
+                          self.showingForumTopicList &&
+                          [self.forumTopicTabButtons count] > 0);
+    [self showView:self.forumTopicTabsScrollView visible:showForumTabs];
     BOOL showPinnedPanel = (showConversationContent && !self.searchPanelVisible && self.pinnedMessageItem != nil);
     [self showView:self.pinnedMessagePanelView visible:showPinnedPanel];
     [self showView:self.pinnedMessageStripeField visible:showPinnedPanel];
@@ -856,19 +865,54 @@
     if (self.searchPanelVisible) {
         BOOL hasSearchText = ([[self.searchTextField stringValue] length] > 0);
         BOOL hasSearchResults = ([self.searchResultItems count] > 0);
+        BOOL stackedSearchControls = (panelWidth < 650.0);
         CGFloat searchHeight = (hasSearchResults || (hasSearchText && self.searchLoading)) ? 174.0 : 78.0;
+        if (stackedSearchControls) {
+            searchHeight += 34.0;
+        }
         CGFloat searchY = messageTop - searchHeight;
         [self.searchPanelView setFrame:NSMakeRect(panelInsetX, searchY, panelWidth, searchHeight)];
         BOOL hidesScopeControl = (self.chatTitleSearchOnly || self.searchInlineCurrentChatOnly);
-        CGFloat searchFieldWidth = hidesScopeControl ? (panelWidth - 212.0) : (panelWidth - 326.0);
-        [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, searchFieldWidth, 24.0)];
-        [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 306.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
-        [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 168.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
-        [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
+        CGFloat controlsBottomOffset = 62.0;
+        if (stackedSearchControls) {
+            [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0,
+                                                      searchY + searchHeight - 40.0,
+                                                      MAX(110.0, panelWidth - 70.0),
+                                                      24.0)];
+            [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0,
+                                                        searchY + searchHeight - 42.0,
+                                                        38.0,
+                                                        26.0)];
+            CGFloat controlsY = searchY + searchHeight - 74.0;
+            CGFloat controlsX = panelInsetX + 14.0;
+            [self.searchScopePopUpButton setFrame:NSMakeRect(controlsX, controlsY, 132.0, 26.0)];
+            if (!hidesScopeControl) {
+                controlsX += 138.0;
+            }
+            [self.searchFilterPopUpButton setFrame:NSMakeRect(controlsX, controlsY, 106.0, 26.0)];
+            [self.searchAdvancedButton setFrame:NSMakeRect(controlsX + 112.0, controlsY, 96.0, 26.0)];
+            controlsBottomOffset = 96.0;
+        } else {
+            CGFloat searchFieldWidth = hidesScopeControl ? (panelWidth - 304.0) : (panelWidth - 418.0);
+            if (searchFieldWidth < 110.0) {
+                searchFieldWidth = 110.0;
+            }
+            [self.searchTextField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 40.0, searchFieldWidth, 24.0)];
+            [self.searchScopePopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 398.0, searchY + searchHeight - 42.0, 132.0, 26.0)];
+            [self.searchFilterPopUpButton setFrame:NSMakeRect(panelInsetX + panelWidth - 260.0, searchY + searchHeight - 42.0, 106.0, 26.0)];
+            [self.searchAdvancedButton setFrame:NSMakeRect(panelInsetX + panelWidth - 148.0, searchY + searchHeight - 42.0, 90.0, 26.0)];
+            [self.searchCloseButton setFrame:NSMakeRect(panelInsetX + panelWidth - 54.0, searchY + searchHeight - 42.0, 38.0, 26.0)];
+        }
         [self.searchScopePopUpButton setHidden:hidesScopeControl];
         [self.searchFilterPopUpButton setHidden:NO];
-        [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0, searchY + searchHeight - 62.0, panelWidth - 28.0, 18.0)];
-        [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0, searchY + 12.0, panelWidth - 28.0, searchHeight - 78.0)];
+        [self.searchStatusField setFrame:NSMakeRect(panelInsetX + 14.0,
+                                                    searchY + searchHeight - controlsBottomOffset,
+                                                    panelWidth - 28.0,
+                                                    18.0)];
+        [self.searchResultsScrollView setFrame:NSMakeRect(panelInsetX + 14.0,
+                                                          searchY + 12.0,
+                                                          panelWidth - 28.0,
+                                                          searchHeight - controlsBottomOffset - 16.0)];
         [self.searchResultsScrollView setHidden:!(hasSearchResults || self.searchLoading)];
         [self.searchResultsTableView setHidden:!(hasSearchResults || self.searchLoading)];
         NSTableColumn *searchColumn = [self.searchResultsTableView tableColumnWithIdentifier:@"search"];
@@ -877,6 +921,29 @@
             [searchColumn setWidth:NSWidth([[self.searchResultsScrollView contentView] bounds])];
         }
         messageTop = searchY - 6.0;
+    }
+    if (showForumTabs && !self.searchPanelVisible) {
+        CGFloat tabsHeight = 40.0;
+        CGFloat tabsY = messageTop - tabsHeight;
+        [self.forumTopicTabsScrollView setFrame:NSMakeRect(panelInsetX,
+                                                           tabsY,
+                                                           panelWidth,
+                                                           tabsHeight)];
+        messageTop = tabsY - 6.0;
+    }
+    if ([self.selectedChatSafetyNoticeText length] > 0 && !self.searchPanelVisible) {
+        CGFloat safetyHeight = 54.0;
+        CGFloat safetyY = messageTop - safetyHeight;
+        [self.chatSafetyNoticeView setFrame:NSMakeRect(panelInsetX, safetyY, panelWidth, safetyHeight)];
+        [self.chatSafetyNoticeTitleField setFrame:NSMakeRect(panelInsetX + 14.0,
+                                                             safetyY + 29.0,
+                                                             panelWidth - 28.0,
+                                                             18.0)];
+        [self.chatSafetyNoticeDetailField setFrame:NSMakeRect(panelInsetX + 14.0,
+                                                              safetyY + 9.0,
+                                                              panelWidth - 28.0,
+                                                              17.0)];
+        messageTop = safetyY - 6.0;
     }
     BOOL hasPinnedPanel = (self.pinnedMessageItem != nil && !self.searchPanelVisible);
     if (hasPinnedPanel) {

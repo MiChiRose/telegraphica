@@ -19,6 +19,7 @@ NSMutableParagraphStyle *TGMessageTextParagraphStyle(void);
 NSAttributedString *TGAttributedMessageString(NSString *text, NSDictionary *baseAttributes);
 NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item, NSString *text, NSDictionary *baseAttributes);
 CGFloat TGMessageExtraBlockVerticalPadding(void);
+CGFloat TGMessageTopAccessoryHeightForItem(TGMessageItem *item);
 BOOL TGMessageUsesSeparateMetadataFooter(void);
 NSString *TGDurationStringFromSecondsValue(id durationValue);
 NSString *TGVoicePreviewTimeString(NSTimeInterval seconds);

@@ -125,6 +125,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize replyMarkup = _replyMarkup;
 @synthesize callDuration = _callDuration;
 @synthesize callDiscardReason = _callDiscardReason;
+@synthesize dateSeparatorTitle = _dateSeparatorTitle;
+@synthesize showsUnreadSeparator = _showsUnreadSeparator;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -416,6 +418,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setReplyMarkup:_replyMarkup];
     [copy setCallDuration:_callDuration];
     [copy setCallDiscardReason:_callDiscardReason];
+    [copy setDateSeparatorTitle:_dateSeparatorTitle];
+    [copy setShowsUnreadSeparator:_showsUnreadSeparator];
     return copy;
 }
 
@@ -485,6 +489,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_replyMarkup release];
     [_callDuration release];
     [_callDiscardReason release];
+    [_dateSeparatorTitle release];
     [super dealloc];
 }
 

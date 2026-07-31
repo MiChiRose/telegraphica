@@ -19,6 +19,7 @@
 @synthesize forumTopicPinned = _forumTopicPinned;
 @synthesize savedMessages = _savedMessages;
 @synthesize bot = _bot;
+@synthesize community = _community;
 @synthesize parentChatID = _parentChatID;
 @synthesize messageThreadID = _messageThreadID;
 @synthesize messageTopicKind = _messageTopicKind;
@@ -70,6 +71,9 @@
     }
     if ([identifier isEqual:@"is_bot"]) {
         return [NSNumber numberWithBool:self.bot];
+    }
+    if ([identifier isEqual:@"is_community"]) {
+        return [NSNumber numberWithBool:self.community];
     }
     if ([identifier isEqual:@"notifications_muted"]) {
         return [NSNumber numberWithBool:self.notificationsMuted];

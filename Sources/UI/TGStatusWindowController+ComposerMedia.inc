@@ -3256,6 +3256,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                              forKey:@"preview_above_text"]];
 }
 
+- (void)sendMessageWithLinkPreviewOptions:(id)sender {
+    (void)sender;
+    NSDictionary *options = [TGLinkPreviewOptionsDialog sendOptionsForMessageText:[self.sendTextField stringValue]];
+    if (options) {
+        [self sendMessageWithOptions:options];
+    }
+}
+
 - (void)showScheduledMessages:(id)sender {
     (void)sender;
     if (![self.selectedChatID respondsToSelector:@selector(longLongValue)]) {

@@ -197,6 +197,82 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     [self performSearchReset:YES];
 }
 
+- (void)showAdvancedMessageSearchFilters:(id)sender {
+    (void)sender;
+    NSView *accessory = [[[NSView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 360.0, 82.0)] autorelease];
+    NSTextField *senderLabel = [self labelWithFrame:NSMakeRect(0.0, 61.0, 126.0, 18.0)
+                                               text:TGLoc(@"search.messages.sender")
+                                               font:[NSFont systemFontOfSize:12.0]];
+    [accessory addSubview:senderLabel];
+    NSTextField *senderField = [[[NSTextField alloc] initWithFrame:NSMakeRect(132.0, 56.0, 228.0, 26.0)] autorelease];
+    [senderField setPlaceholderString:TGLoc(@"search.messages.senderPlaceholder")];
+    [senderField setStringValue:([self.searchSenderQuery length] > 0 ? self.searchSenderQuery : @"")];
+    [accessory addSubview:senderField];
+
+    NSTextField *dateLabel = [self labelWithFrame:NSMakeRect(0.0, 25.0, 126.0, 18.0)
+                                             text:TGLoc(@"search.messages.date")
+                                             font:[NSFont systemFontOfSize:12.0]];
+    [accessory addSubview:dateLabel];
+    NSPopUpButton *datePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(132.0, 20.0, 228.0, 28.0)
+                                                          pullsDown:NO] autorelease];
+    [datePopup addItemWithTitle:TGLoc(@"search.messages.dateAny")];
+    [datePopup addItemWithTitle:TGLoc(@"search.messages.dateToday")];
+    [datePopup addItemWithTitle:TGLoc(@"search.messages.dateWeek")];
+    [datePopup addItemWithTitle:TGLoc(@"search.messages.dateMonth")];
+    [datePopup selectItemAtIndex:MAX(0, MIN(3, self.searchDateRangeIndex))];
+    [accessory addSubview:datePopup];
+
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"search.messages.filtersTitle")];
+    [alert setInformativeText:TGLoc(@"search.messages.filtersHelp")];
+    [alert setAccessoryView:accessory];
+    [alert addButtonWithTitle:TGLoc(@"apply")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    [alert addButtonWithTitle:TGLoc(@"search.messages.reset")];
+    NSInteger result = [alert runModal];
+    if (result == NSAlertThirdButtonReturn) {
+        self.searchSenderQuery = nil;
+        self.searchDateRangeIndex = 0;
+    } else if (result == NSAlertFirstButtonReturn) {
+        self.searchSenderQuery = [[senderField stringValue]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        self.searchDateRangeIndex = [datePopup indexOfSelectedItem];
+    } else {
+        return;
+    }
+    BOOL active = ([self.searchSenderQuery length] > 0 || self.searchDateRangeIndex > 0);
+    [self.searchAdvancedButton setTitle:(active
+        ? TGLoc(@"search.messages.filtersActive")
+        : TGLoc(@"search.messages.filters"))];
+    [self performSearchReset:YES];
+}
+
+- (BOOL)messageItem:(TGMessageItem *)item matchesAdvancedSearchAtDate:(NSDate *)now {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return NO;
+    }
+    if ([self.searchSenderQuery length] > 0) {
+        NSString *sender = [[item senderDisplayName] length] > 0 ? [item senderDisplayName] : @"";
+        if ([[sender lowercaseString] rangeOfString:[self.searchSenderQuery lowercaseString]].location == NSNotFound) {
+            return NO;
+        }
+    }
+    if (self.searchDateRangeIndex > 0) {
+        NSTimeInterval maximumAge = 24.0 * 60.0 * 60.0;
+        if (self.searchDateRangeIndex == 2) {
+            maximumAge *= 7.0;
+        } else if (self.searchDateRangeIndex == 3) {
+            maximumAge *= 30.0;
+        }
+        NSTimeInterval timestamp = [[item date] respondsToSelector:@selector(doubleValue)]
+            ? [[item date] doubleValue] : 0.0;
+        if (timestamp <= 0.0 || [now timeIntervalSince1970] - timestamp > maximumAge) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
 - (NSArray *)localChatSearchResultsForQuery:(NSString *)query {
     if ([query length] == 0) {
         return [NSArray array];
@@ -381,8 +457,13 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
             }
             if (messageItems) {
                 NSUInteger index = 0;
+                NSDate *searchNow = [NSDate date];
                 for (index = 0; index < [messageItems count]; index++) {
-                    TGSearchResultItem *result = [self searchResultForMessageItem:[messageItems objectAtIndex:index] chatTitle:chatTitle];
+                    TGMessageItem *messageItem = [messageItems objectAtIndex:index];
+                    if (![self messageItem:messageItem matchesAdvancedSearchAtDate:searchNow]) {
+                        continue;
+                    }
+                    TGSearchResultItem *result = [self searchResultForMessageItem:messageItem chatTitle:chatTitle];
                     NSString *key = [self searchResultIdentityKey:result];
                     if (result && ([key length] == 0 || ![existingKeys containsObject:key])) {
                         [results addObject:result];

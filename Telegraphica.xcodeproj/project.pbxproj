@@ -94,6 +94,7 @@
 		111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111372 /* TGBotInteractionWindowController.m */; };
 		111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111374 /* TGBotKeyboardWindowController.m */; };
 		111111111111111111111186 /* TGDatePickerDialog.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111376 /* TGDatePickerDialog.m */; };
+		ABCD00000000000000000001 /* TGLinkPreviewOptionsDialog.m in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00000000000000000003 /* TGLinkPreviewOptionsDialog.m */; };
 		111111111111111111111187 /* TGLocationPickerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111378 /* TGLocationPickerWindowController.m */; };
 		111111111111111111111188 /* TGSavedMessagesCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111380 /* TGSavedMessagesCell.m */; };
 		111111111111111111111190 /* TGBotCommandPanelView.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111384 /* TGBotCommandPanelView.m */; };
@@ -316,6 +317,8 @@
 		111111111111111111111374 /* TGBotKeyboardWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGBotKeyboardWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111375 /* TGDatePickerDialog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDatePickerDialog.h; sourceTree = "<group>"; };
 		111111111111111111111376 /* TGDatePickerDialog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDatePickerDialog.m; sourceTree = "<group>"; };
+		ABCD00000000000000000002 /* TGLinkPreviewOptionsDialog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLinkPreviewOptionsDialog.h; sourceTree = "<group>"; };
+		ABCD00000000000000000003 /* TGLinkPreviewOptionsDialog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLinkPreviewOptionsDialog.m; sourceTree = "<group>"; };
 		111111111111111111111377 /* TGLocationPickerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLocationPickerWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111378 /* TGLocationPickerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGLocationPickerWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111379 /* TGSavedMessagesCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSavedMessagesCell.h; sourceTree = "<group>"; };
@@ -587,6 +590,8 @@
 				111111111111111111111374 /* TGBotKeyboardWindowController.m */,
 				111111111111111111111375 /* TGDatePickerDialog.h */,
 				111111111111111111111376 /* TGDatePickerDialog.m */,
+				ABCD00000000000000000002 /* TGLinkPreviewOptionsDialog.h */,
+				ABCD00000000000000000003 /* TGLinkPreviewOptionsDialog.m */,
 				111111111111111111111377 /* TGLocationPickerWindowController.h */,
 				111111111111111111111378 /* TGLocationPickerWindowController.m */,
 				666000000000000000000002 /* TGVideoNoteRecorderWindowController.h */,
@@ -887,6 +892,7 @@
 				111111111111111111111184 /* TGBotInteractionWindowController.m in Sources */,
 				111111111111111111111185 /* TGBotKeyboardWindowController.m in Sources */,
 				111111111111111111111186 /* TGDatePickerDialog.m in Sources */,
+				ABCD00000000000000000001 /* TGLinkPreviewOptionsDialog.m in Sources */,
 				111111111111111111111187 /* TGLocationPickerWindowController.m in Sources */,
 				111111111111111111111188 /* TGSavedMessagesCell.m in Sources */,
 				111111111111111111111190 /* TGBotCommandPanelView.m in Sources */,
