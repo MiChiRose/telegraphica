@@ -586,12 +586,14 @@ def check_call_transport_stability_contract(errors):
     modern_header_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.h")
     modern_source_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.mm")
     modern_video_rel = os.path.join("ModernCallTransport", "TGModernCallVideoPlatform.cpp")
+    legacy_clock_rel = os.path.join("ModernCallTransport", "TGModernCallLegacyClock.cpp")
     modern_cmake_rel = os.path.join("ModernCallTransport", "CMakeLists.txt")
     verified_transport_rel = os.path.join(
         "ModernCallTransport", "VERIFIED_TRANSPORT.sha256")
     modern_header_text = read_text(os.path.join(ROOT, modern_header_rel))
     modern_source_text = read_text(os.path.join(ROOT, modern_source_rel))
     modern_video_text = read_text(os.path.join(ROOT, modern_video_rel))
+    legacy_clock_text = read_text(os.path.join(ROOT, legacy_clock_rel))
     modern_cmake_text = read_text(os.path.join(ROOT, modern_cmake_rel))
     verified_transport_text = read_text(
         os.path.join(ROOT, verified_transport_rel))
@@ -642,7 +644,16 @@ def check_call_transport_stability_contract(errors):
             errors.append("%s: legacy camera fallback is missing `%s`" %
                           (modern_video_rel, fragment))
     for fragment in [
+        'extern "C" int clock_gettime',
+        "mach_absolute_time()",
+        "clockID == CLOCK_REALTIME",
+    ]:
+        if fragment not in legacy_clock_text:
+            errors.append("%s: Mavericks libvpx clock compatibility is missing `%s`" %
+                          (legacy_clock_rel, fragment))
+    for fragment in [
         "CMAKE_OSX_DEPLOYMENT_TARGET 10.9",
+        "TGModernCallLegacyClock.cpp",
         "TGModernCallVideoPlatform.cpp PROPERTIES LANGUAGE OBJCXX",
         'OUTPUT_NAME "TelegraphicaCallTransport"',
         'PREFIX ""',
