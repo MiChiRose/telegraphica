@@ -1728,7 +1728,7 @@ CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
         return 0.0;
     }
     if (![item reactionAnimationChangesHeight]) {
-        return 22.0;
+        return 26.0;
     }
     CGFloat rawProgress = MAX(0.0, MIN(1.0, [item reactionAnimationProgress]));
     CGFloat phaseProgress = 0.0;
@@ -1741,7 +1741,7 @@ CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
     }
     CGFloat inverse = 1.0 - phaseProgress;
     CGFloat easedProgress = 1.0 - (inverse * inverse * inverse);
-    return 22.0 * easedProgress;
+    return 26.0 * easedProgress;
 }
 
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails) {

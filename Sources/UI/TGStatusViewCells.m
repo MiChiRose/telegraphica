@@ -16,7 +16,7 @@ static NSFont *TGReactionDisplayFont(void) {
     static NSFont *reactionFont = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        reactionFont = [[NSFont fontWithName:@"Apple Color Emoji" size:13.0] retain];
+        reactionFont = [[NSFont fontWithName:@"Apple Color Emoji" size:15.0] retain];
         if (!reactionFont) {
             reactionFont = [[NSFont boldSystemFontOfSize:11.0] retain];
         }
@@ -995,14 +995,14 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                             [TGClassicSelectedRowTextColor() colorWithAlphaComponent:reactionOpacity], NSForegroundColorAttributeName,
                                             nil];
         NSSize reactionSize = [reactionSummary sizeWithAttributes:reactionAttributes];
-        CGFloat fullReactionWidth = ceil(reactionSize.width) + 14.0;
+        CGFloat fullReactionWidth = ceil(reactionSize.width) + 16.0;
         CGFloat maximumReactionWidth = NSWidth(bubbleRect) - 24.0;
         if (fullReactionWidth > maximumReactionWidth) {
             fullReactionWidth = maximumReactionWidth;
         }
         if (fullReactionWidth > 20.0 && reactionScale > 0.01) {
             CGFloat reactionWidth = fullReactionWidth * reactionScale;
-            CGFloat fullReactionHeight = 20.0;
+            CGFloat fullReactionHeight = 24.0;
             CGFloat reactionHeight = fullReactionHeight * reactionScale;
             CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 2.0)
                                                         : (NSMinY(bubbleRect) + 2.0);
@@ -1011,7 +1011,10 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                              reactionY,
                                              reactionWidth,
                                              reactionHeight);
-            NSBezierPath *reactionPath = [NSBezierPath bezierPathWithRoundedRect:reactionRect xRadius:9.0 yRadius:9.0];
+            CGFloat reactionRadius = floor(NSHeight(reactionRect) / 2.0);
+            NSBezierPath *reactionPath = [NSBezierPath bezierPathWithRoundedRect:reactionRect
+                                                                         xRadius:reactionRadius
+                                                                         yRadius:reactionRadius];
             [[TGClassicNavigationSelectedColor(0.82) colorWithAlphaComponent:reactionOpacity] set];
             [reactionPath fill];
             [[TGClassicNavigationSelectedStrokeColor(0.72) colorWithAlphaComponent:reactionOpacity] set];
@@ -1022,7 +1025,8 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             [reactionParagraph setAlignment:NSCenterTextAlignment];
             NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
             [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
-            CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0);
+            CGFloat opticalOffset = [controlView isFlipped] ? -1.0 : 1.0;
+            CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0) + opticalOffset;
             NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
                                                  reactionTextY,
                                                  NSWidth(reactionRect) - 8.0,

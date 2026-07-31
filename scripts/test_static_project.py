@@ -803,6 +803,17 @@ def check_call_transport_stability_contract(errors):
         if forbidden_fragment in history_text:
             errors.append("%s: demo call controls must not be visible in the production calls screen `%s`" %
                           (history_rel, forbidden_fragment))
+    for fragment in [
+        "videoTestOutgoingButton",
+        "videoTestIncomingButton",
+        "@selector(videoTestOutgoingPressed:)",
+        "@selector(videoTestIncomingPressed:)",
+        "startMockOutgoingVideoCall",
+        "startMockIncomingVideoCall",
+    ]:
+        if fragment not in history_text:
+            errors.append("%s: requested local video-call test control is missing `%s`" %
+                          (history_rel, fragment))
     if "[self.unavailableDetailField setLineBreakMode:" in history_text:
         errors.append("%s: legacy NSTextField line breaking must be configured through its cell" %
                       history_rel)
@@ -1851,16 +1862,25 @@ def check_server_reaction_catalog_contract(errors):
         "availableReactionEmojisByChatID",
         "reactionCatalogAttemptedChatIDs",
         "fallbackStandardReactionEmojis",
+        "standardReactionEmojisForMessageItem:",
+        "telegramReactionEmojisForMessageItem:",
         "TGReactionEmojiCanRender(emoji)",
-        "must never displace these legacy-safe defaults",
+        "Keep Telegram's additional server-approved reactions in their own list",
         "Preserve unsupported server reactions at the end",
         "unsupportedCount < 8U",
     ]:
         if fragment not in host_text:
             errors.append("%s: reaction catalog cache is missing `%s`" %
                           (host_rel, fragment))
-    if "reactionEmojisForMessageItem:item" not in menu_text:
-        errors.append("%s: message menu does not use the reaction catalog" % menu_rel)
+    for fragment in [
+        "standardReactionEmojisForMessageItem:item",
+        "telegramReactionEmojisForMessageItem:item",
+        'TGLoc(@"message.reactions.standard")',
+        'TGLoc(@"message.reactions.telegram")',
+    ]:
+        if fragment not in menu_text:
+            errors.append("%s: message menu does not use the split reaction catalog `%s`" %
+                          (menu_rel, fragment))
     for fragment in [
         "TGReactionEmojiCanRender",
         "legacySafeEmojis",

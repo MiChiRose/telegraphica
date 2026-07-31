@@ -31,6 +31,8 @@ typedef NS_ENUM(NSInteger, TGCallPresentationState) {
 - (void)updateSignalBars:(NSUInteger)signalBars;
 - (void)updateVideoImage:(NSImage *)image local:(BOOL)local;
 - (void)updateRemoteVideoState:(NSInteger)state;
+- (BOOL)startLocalCameraPreview;
+- (void)stopLocalCameraPreview;
 - (void)setPresentationState:(TGCallPresentationState)state detail:(NSString *)detail;
 - (NSTimeInterval)connectedDuration;
 - (void)closeAfterDelay:(NSTimeInterval)delay;

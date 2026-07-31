@@ -169,6 +169,33 @@ static NSString *TGCallReadableFailure(NSString *message) {
     [self presentProfile:[self mockProfile] outgoing:NO video:NO mock:YES];
 }
 
+- (void)startMockOutgoingVideoCall {
+    if (self.callWindowController) {
+        [[self.callWindowController window] makeKeyAndOrderFront:nil];
+        return;
+    }
+    if (![TGPrivacyPermissions requestMicrophonePermission] ||
+        ![TGPrivacyPermissions requestCameraPermission]) {
+        return;
+    }
+    [self presentProfile:[self mockProfile] outgoing:YES video:YES mock:YES];
+    if (![self.callWindowController startLocalCameraPreview]) {
+        [self.callWindowController setPresentationState:TGCallPresentationStateFailed
+                                                  detail:TGLoc(@"calls.video.cameraUnavailable")];
+        [self finishCallAfterDelay:4.0];
+        return;
+    }
+    [self performSelector:@selector(connectMockCall) withObject:nil afterDelay:2.2];
+}
+
+- (void)startMockIncomingVideoCall {
+    if (self.callWindowController) {
+        [[self.callWindowController window] makeKeyAndOrderFront:nil];
+        return;
+    }
+    [self presentProfile:[self mockProfile] outgoing:NO video:YES mock:YES];
+}
+
 - (void)connectMockCall {
     if (self.mockCall && !self.finishing && self.callWindowController) {
         [self.callWindowController setPresentationState:TGCallPresentationStateConnected detail:nil];
@@ -395,6 +422,17 @@ static NSString *TGCallReadableFailure(NSString *message) {
 
 - (void)callWindowControllerDidRequestAnswer:(TGCallWindowController *)controller {
     if (self.mockCall) {
+        if (self.videoCall &&
+            (![TGPrivacyPermissions requestMicrophonePermission] ||
+             ![TGPrivacyPermissions requestCameraPermission])) {
+            return;
+        }
+        if (self.videoCall && ![controller startLocalCameraPreview]) {
+            [controller setPresentationState:TGCallPresentationStateFailed
+                                      detail:TGLoc(@"calls.video.cameraUnavailable")];
+            [self finishCallAfterDelay:4.0];
+            return;
+        }
         [controller setPresentationState:TGCallPresentationStateConnected detail:nil];
         [controller updateSignalBars:5U];
         return;
@@ -444,7 +482,17 @@ static NSString *TGCallReadableFailure(NSString *message) {
 
 - (void)callWindowController:(TGCallWindowController *)controller
       didRequestCameraEnabled:(BOOL)enabled {
-    (void)controller;
+    if (self.mockCall) {
+        if (enabled) {
+            if (![TGPrivacyPermissions requestCameraPermission] ||
+                ![controller startLocalCameraPreview]) {
+                NSBeep();
+            }
+        } else {
+            [controller stopLocalCameraPreview];
+        }
+        return;
+    }
     [self.audioEngine setCameraEnabled:enabled];
 }
 
