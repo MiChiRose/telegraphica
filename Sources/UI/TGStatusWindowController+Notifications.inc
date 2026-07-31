@@ -438,16 +438,19 @@
 }
 
 - (void)interfaceSettingChanged:(id)sender {
-    (void)sender;
     BOOL drawerHidden = ([self.settingsDrawerHiddenButton state] == NSOnState);
+    BOOL forumTopicsInTopBar = ([self.settingsForumTopicsTopBarButton state] == NSOnState);
+    BOOL forumPresentationNeedsSwitch = (sender == self.settingsForumTopicsTopBarButton &&
+                                         ((forumTopicsInTopBar && self.showingForumTopicList) ||
+                                          (!forumTopicsInTopBar && self.forumTopicsPresentedInTopBar)));
     [[NSUserDefaults standardUserDefaults] setBool:drawerHidden forKey:TGDrawerHiddenDefaultsKey];
     [[NSUserDefaults standardUserDefaults] setBool:([self.settingsTypingIndicatorsButton state] == NSOnState)
                                             forKey:TGTypingIndicatorsEnabledDefaultsKey];
-    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsForumTopicsTopBarButton state] == NSOnState)
+    [[NSUserDefaults standardUserDefaults] setBool:forumTopicsInTopBar
                                             forKey:TGForumTopicsTopBarDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
-    if (self.showingForumTopicList || self.forumTopicsPresentedInTopBar) {
-        [self closeForumTopicList:nil];
+    if (forumPresentationNeedsSwitch) {
+        [self switchForumTopicPresentationForCurrentPreference];
     }
     if (drawerHidden) {
         self.drawerOpen = NO;
