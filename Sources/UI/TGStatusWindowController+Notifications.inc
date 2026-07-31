@@ -443,7 +443,12 @@
     [[NSUserDefaults standardUserDefaults] setBool:drawerHidden forKey:TGDrawerHiddenDefaultsKey];
     [[NSUserDefaults standardUserDefaults] setBool:([self.settingsTypingIndicatorsButton state] == NSOnState)
                                             forKey:TGTypingIndicatorsEnabledDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] setBool:([self.settingsForumTopicsTopBarButton state] == NSOnState)
+                                            forKey:TGForumTopicsTopBarDefaultsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
+    if (self.showingForumTopicList || self.forumTopicsPresentedInTopBar) {
+        [self closeForumTopicList:nil];
+    }
     if (drawerHidden) {
         self.drawerOpen = NO;
     }

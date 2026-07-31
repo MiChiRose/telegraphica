@@ -1002,9 +1002,10 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         }
         if (fullReactionWidth > 20.0 && reactionScale > 0.01) {
             CGFloat reactionWidth = fullReactionWidth * reactionScale;
-            CGFloat reactionHeight = 18.0 * reactionScale;
-            CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 4.0)
-                                                        : (NSMinY(bubbleRect) + 4.0);
+            CGFloat fullReactionHeight = 20.0;
+            CGFloat reactionHeight = fullReactionHeight * reactionScale;
+            CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 2.0)
+                                                        : (NSMinY(bubbleRect) + 2.0);
             NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0 +
                                                  ((fullReactionWidth - reactionWidth) / 2.0),
                                              reactionY,
@@ -1021,12 +1022,11 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             [reactionParagraph setAlignment:NSCenterTextAlignment];
             NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
             [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
+            CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0);
             NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
-                                                 NSMinY(reactionRect) +
-                                                     floor((reactionHeight - reactionSize.height) / 2.0) +
-                                                     ([controlView isFlipped] ? 1.0 : -3.0),
+                                                 reactionTextY,
                                                  NSWidth(reactionRect) - 8.0,
-                                                 reactionSize.height + 3.0);
+                                                 reactionSize.height + 2.0);
             [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];
         }
     }

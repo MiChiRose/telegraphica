@@ -2057,9 +2057,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         if (TGMessageItemHasCommentThread(item)) {
             rowHeight += 24.0;
         }
-        if ([[item reactionSummary] length] > 0) {
-            rowHeight += 20.0;
-        }
+        rowHeight += TGReactionBandHeightForMessageItem(item);
         if (rowHeight < 44.0) {
             rowHeight = 44.0;
         }

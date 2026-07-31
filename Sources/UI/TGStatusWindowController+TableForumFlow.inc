@@ -392,6 +392,11 @@
     } else {
         self.selectedChatID = nil;
     }
+    if (self.forumTopicsPresentedInTopBar &&
+        [self.topicParentChatID respondsToSelector:@selector(longLongValue)] &&
+        (!newChatID || [newChatID longLongValue] != [self.topicParentChatID longLongValue])) {
+        [self clearForumTopicListState];
+    }
     NSNumber *newThreadID = nil;
     NSString *newTopicKind = nil;
     if (selectedForumTopic && [[item messageThreadID] respondsToSelector:@selector(longLongValue)]) {
@@ -435,6 +440,7 @@
     }
     BOOL shouldOpenTopicList = (!selectedForumTopic &&
                                 !self.showingForumTopicList &&
+                                !self.forumTopicsPresentedInTopBar &&
                                 !self.chatNavigationClosed &&
                                 ![self isForumTopicAutoOpenSuppressedForChatID:newChatID] &&
                                 [[item typeSummary] isEqualToString:@"Supergroup"]);
@@ -723,15 +729,19 @@
     self.topicParentChatID = [chatItem chatID];
     self.topicParentTitle = [chatItem title];
     self.topicParentAvatarLocalPath = [chatItem avatarLocalPath];
-    self.showingForumTopicList = YES;
+    BOOL useTopBar = TGUserDefaultBoolWithDefault(TGForumTopicsTopBarDefaultsKey, NO);
+    self.showingForumTopicList = !useTopBar;
+    self.forumTopicsPresentedInTopBar = useTopBar;
     self.chatNavigationClosed = NO;
     self.suppressedForumTopicAutoOpenChatID = nil;
-    [self.loadChatsButton setToolTip:@"Refresh topics"];
-    [self.composeChatButton setAction:@selector(createForumTopic:)];
-    [self.composeChatButton setToolTip:TGLoc(@"forum.topic.create")];
-    self.chatsExhausted = YES;
-    self.autoChatListLoadArmed = NO;
-    self.autoChatListRefreshArmed = NO;
+    if (!useTopBar) {
+        [self.loadChatsButton setToolTip:@"Refresh topics"];
+        [self.composeChatButton setAction:@selector(createForumTopic:)];
+        [self.composeChatButton setToolTip:TGLoc(@"forum.topic.create")];
+        self.chatsExhausted = YES;
+        self.autoChatListLoadArmed = NO;
+        self.autoChatListRefreshArmed = NO;
+    }
 
     NSMutableArray *topicItems = [NSMutableArray array];
     NSUInteger index = 0;
@@ -745,11 +755,14 @@
         [topicItems addObject:topicItem];
     }
     [self applyLocalNotificationMuteStateToItems:topicItems];
+    self.forumTopicItems = [NSArray arrayWithArray:topicItems];
 
     self.suppressChatSelectionHandling = YES;
-    [self.chatItems removeAllObjects];
-    [self.chatItems addObjectsFromArray:topicItems];
-    [self.chatTableView reloadData];
+    if (!useTopBar) {
+        [self.chatItems removeAllObjects];
+        [self.chatItems addObjectsFromArray:topicItems];
+        [self.chatTableView reloadData];
+    }
     [self rebuildForumTopicTabs];
     self.suppressChatSelectionHandling = NO;
 
@@ -771,11 +784,13 @@
         self.selectedChatAvatarLocalPath = [firstTopicItem avatarLocalPath] ? [firstTopicItem avatarLocalPath] : self.topicParentAvatarLocalPath;
         self.selectedMessageThreadID = firstThreadID;
         self.selectedMessageTopicKind = ([[firstTopicItem messageTopicKind] length] > 0 ? [firstTopicItem messageTopicKind] : @"forum");
-        self.suppressChatSelectionHandling = YES;
-        [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
-        [self.chatTableView scrollRowToVisible:0];
-        self.suppressChatSelectionHandling = NO;
-    } else {
+        if (!useTopBar) {
+            self.suppressChatSelectionHandling = YES;
+            [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+            [self.chatTableView scrollRowToVisible:0];
+            self.suppressChatSelectionHandling = NO;
+        }
+    } else if (!useTopBar) {
         [self.chatTableView deselectAll:nil];
     }
     [self refreshSelectedChatHeaderDisplay];
@@ -786,8 +801,12 @@
     [self restoreComposerDraftForChatID:self.selectedChatID
                         messageThreadID:self.selectedMessageThreadID
                          messageTopicKind:self.selectedMessageTopicKind];
-    NSString *topicListTitle = ([self.topicParentTitle length] > 0 ? self.topicParentTitle : @"Topics");
-    [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
+    if (!useTopBar) {
+        NSString *topicListTitle = ([self.topicParentTitle length] > 0 ? self.topicParentTitle : @"Topics");
+        [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
+    } else {
+        [self refreshChatListTitle];
+    }
     [self updateAuthControlsForState:self.currentAuthState];
     [self layoutContentView];
     [self updateVisibleSection];
@@ -798,23 +817,32 @@
 
 - (void)closeForumTopicList:(id)sender {
     (void)sender;
-    if (!self.showingForumTopicList) {
+    if (!self.showingForumTopicList && !self.forumTopicsPresentedInTopBar) {
         return;
     }
 
     NSNumber *parentChatID = [self.topicParentChatID retain];
+    NSString *parentTitle = [self.topicParentTitle copy];
+    NSString *parentAvatarPath = [self.topicParentAvatarLocalPath copy];
     if ([parentChatID respondsToSelector:@selector(longLongValue)]) {
         self.suppressedForumTopicAutoOpenChatID = [NSNumber numberWithLongLong:[parentChatID longLongValue]];
     }
     self.forumTopicNavigationGeneration = self.forumTopicNavigationGeneration + 1;
     self.showingForumTopicList = NO;
+    BOOL wasTopBar = self.forumTopicsPresentedInTopBar;
+    self.forumTopicsPresentedInTopBar = NO;
     [[self.forumTopicTabsContentView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
     [self.forumTopicTabButtons removeAllObjects];
     self.topicParentChatID = nil;
     self.topicParentTitle = nil;
     self.topicParentAvatarLocalPath = nil;
+    self.forumTopicItems = nil;
     self.selectedMessageThreadID = nil;
     self.selectedMessageTopicKind = nil;
+    self.selectedChatID = parentChatID;
+    self.selectedChatTitle = parentTitle;
+    self.selectedChatTypeSummary = @"Supergroup";
+    self.selectedChatAvatarLocalPath = parentAvatarPath;
     self.chatsExhausted = NO;
     self.autoChatListRefreshArmed = YES;
     [self.composeChatButton setAction:@selector(openNewChatWindow:)];
@@ -823,9 +851,11 @@
     NSArray *restoreItems = self.chatItemsBeforeTopicList ? self.chatItemsBeforeTopicList : [NSArray array];
     NSUInteger selectedIndex = [self indexOfChatID:parentChatID inChatItems:restoreItems];
     self.suppressChatSelectionHandling = YES;
-    [self.chatItems removeAllObjects];
-    [self.chatItems addObjectsFromArray:restoreItems];
-    [self.chatTableView reloadData];
+    if (!wasTopBar) {
+        [self.chatItems removeAllObjects];
+        [self.chatItems addObjectsFromArray:restoreItems];
+        [self.chatTableView reloadData];
+    }
     if (selectedIndex != NSNotFound) {
         [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:selectedIndex] byExtendingSelection:NO];
         [self.chatTableView scrollRowToVisible:selectedIndex];
@@ -835,14 +865,18 @@
     self.suppressChatSelectionHandling = NO;
     self.chatItemsBeforeTopicList = nil;
     [self refreshChatListTitle];
+    [self refreshSelectedChatHeaderDisplay];
     [self updateAuthControlsForState:self.currentAuthState];
     [self layoutContentView];
     [self updateVisibleSection];
     [parentChatID release];
+    [parentTitle release];
+    [parentAvatarPath release];
 }
 
 - (void)reloadCurrentForumTopicListInteractive:(BOOL)interactive {
-    if (!self.showingForumTopicList || ![self.topicParentChatID respondsToSelector:@selector(longLongValue)]) {
+    if ((!self.showingForumTopicList && !self.forumTopicsPresentedInTopBar) ||
+        ![self.topicParentChatID respondsToSelector:@selector(longLongValue)]) {
         return;
     }
 
@@ -863,7 +897,9 @@
         NSString *topicErrorMessage = [[topicError localizedDescription] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL stillCurrent = (self.showingForumTopicList && self.topicParentChatID && [self.topicParentChatID longLongValue] == [parentChatID longLongValue]);
+            BOOL stillCurrent = ((self.showingForumTopicList || self.forumTopicsPresentedInTopBar) &&
+                                 self.topicParentChatID &&
+                                 [self.topicParentChatID longLongValue] == [parentChatID longLongValue]);
             if (stillCurrent && [topics count] > 0) {
                 NSMutableArray *topicItems = [NSMutableArray array];
                 NSUInteger index = 0;
@@ -876,10 +912,13 @@
                     [topicItem setAvatarLocalPath:parentAvatarPath];
                     [topicItems addObject:topicItem];
                 }
+                self.forumTopicItems = [NSArray arrayWithArray:topicItems];
                 self.suppressChatSelectionHandling = YES;
-                [self.chatItems removeAllObjects];
-                [self.chatItems addObjectsFromArray:topicItems];
-                [self.chatTableView reloadData];
+                if (!self.forumTopicsPresentedInTopBar) {
+                    [self.chatItems removeAllObjects];
+                    [self.chatItems addObjectsFromArray:topicItems];
+                    [self.chatTableView reloadData];
+                }
                 [self rebuildForumTopicTabs];
                 self.suppressChatSelectionHandling = NO;
                 self.selectedChatID = parentChatID;
@@ -900,11 +939,13 @@
                     self.selectedChatAvatarLocalPath = [firstTopicItem avatarLocalPath] ? [firstTopicItem avatarLocalPath] : parentAvatarPath;
                     self.selectedMessageThreadID = firstThreadID;
                     self.selectedMessageTopicKind = ([[firstTopicItem messageTopicKind] length] > 0 ? [firstTopicItem messageTopicKind] : @"forum");
-                    self.suppressChatSelectionHandling = YES;
-                    [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
-                    [self.chatTableView scrollRowToVisible:0];
-                    self.suppressChatSelectionHandling = NO;
-                } else {
+                    if (!self.forumTopicsPresentedInTopBar) {
+                        self.suppressChatSelectionHandling = YES;
+                        [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+                        [self.chatTableView scrollRowToVisible:0];
+                        self.suppressChatSelectionHandling = NO;
+                    }
+                } else if (!self.forumTopicsPresentedInTopBar) {
                     [self.chatTableView deselectAll:nil];
                 }
                 [self refreshSelectedChatHeaderDisplay];
@@ -913,8 +954,10 @@
                 [self.messageItems removeAllObjects];
                 [self.inlineMediaPlaybackCoordinator removeAllPlayback];
                 [self.messageTableView reloadData];
-                NSString *topicListTitle = ([parentTitle length] > 0 ? parentTitle : @"Topics");
-                [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
+                if (!self.forumTopicsPresentedInTopBar) {
+                    NSString *topicListTitle = ([parentTitle length] > 0 ? parentTitle : @"Topics");
+                    [self.chatsLabel setStringValue:[NSString stringWithFormat:@"%@ (%lu)", topicListTitle, (unsigned long)[topicItems count]]];
+                }
                 [self appendDetail:[NSString stringWithFormat:@"Forum topics: loaded %lu topics.", (unsigned long)[topicItems count]]];
                 if (firstTopicItem && self.selectedChatID && self.selectedMessageThreadID) {
                     [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
@@ -940,7 +983,7 @@
 - (void)rebuildForumTopicTabs {
     [[self.forumTopicTabsContentView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
     [self.forumTopicTabButtons removeAllObjects];
-    if (!self.showingForumTopicList) {
+    if (!self.forumTopicsPresentedInTopBar) {
         return;
     }
 
@@ -948,8 +991,8 @@
                                                                  forKey:NSFontAttributeName];
     CGFloat x = 4.0;
     NSUInteger index = 0;
-    for (index = 0; index < [self.chatItems count]; index++) {
-        id candidate = [self.chatItems objectAtIndex:index];
+    for (index = 0; index < [self.forumTopicItems count]; index++) {
+        id candidate = [self.forumTopicItems objectAtIndex:index];
         if (![candidate isKindOfClass:[TGChatItem class]] || ![(TGChatItem *)candidate isForumTopic]) {
             continue;
         }
@@ -989,20 +1032,53 @@
     }
     long long threadID = (long long)[sender tag];
     NSUInteger index = 0;
-    for (index = 0; index < [self.chatItems count]; index++) {
-        id candidate = [self.chatItems objectAtIndex:index];
+    for (index = 0; index < [self.forumTopicItems count]; index++) {
+        id candidate = [self.forumTopicItems objectAtIndex:index];
         if (![candidate isKindOfClass:[TGChatItem class]]) {
             continue;
         }
         TGChatItem *item = (TGChatItem *)candidate;
         if ([[item messageThreadID] respondsToSelector:@selector(longLongValue)] &&
             [[item messageThreadID] longLongValue] == threadID) {
-            [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
-            [self.chatTableView scrollRowToVisible:index];
-            [self refreshForumTopicTabSelection];
+            [self selectForumTopicItem:item];
             return;
         }
     }
+}
+
+- (void)selectForumTopicItem:(TGChatItem *)item {
+    if (![item isKindOfClass:[TGChatItem class]] || ![item isForumTopic]) {
+        return;
+    }
+    [self saveComposerDraftForChatID:self.selectedChatID
+                     messageThreadID:self.selectedMessageThreadID
+                      messageTopicKind:self.selectedMessageTopicKind];
+    self.selectedChatID = [item parentChatID];
+    self.selectedMessageThreadID = [item messageThreadID];
+    self.selectedMessageTopicKind = ([[item messageTopicKind] length] > 0 ? [item messageTopicKind] : @"forum");
+    self.selectedChatTitle = ([[item title] length] > 0 ? [item title] : self.topicParentTitle);
+    self.selectedChatTypeSummary = [item typeSummary];
+    self.selectedChatAvatarLocalPath = ([item avatarLocalPath] ? [item avatarLocalPath] : self.topicParentAvatarLocalPath);
+    self.selectedChatLastReadInboxMessageID = [item lastReadInboxMessageID];
+    self.selectedChatLastReadOutboxMessageID = [item lastReadOutboxMessageID];
+    self.selectedChatUnreadCount = [[item unreadCount] respondsToSelector:@selector(unsignedIntegerValue)] ? [[item unreadCount] unsignedIntegerValue] : 0;
+    self.initialUnreadPositionPending = (self.selectedChatUnreadCount > 0);
+    [self.visibleReadReceiptMessageIDs removeAllObjects];
+    [self refreshSelectedChatHeaderDisplay];
+    [self refreshForumTopicTabSelection];
+    [self restoreComposerDraftForChatID:self.selectedChatID
+                        messageThreadID:self.selectedMessageThreadID
+                         messageTopicKind:self.selectedMessageTopicKind];
+    self.pinnedMessageItems = [NSArray array];
+    self.pinnedMessageItem = nil;
+    self.pinnedMessageCarouselIndex = 0;
+    [self loadPinnedMessageForSelectedChat];
+    [self.messageItems removeAllObjects];
+    [self.inlineMediaPlaybackCoordinator removeAllPlayback];
+    [self.messageTableView reloadData];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+    [self requestComposerRefocus];
 }
 
 - (void)loadForumTopicsForChatItem:(TGChatItem *)chatItem {
