@@ -99,6 +99,7 @@ static NSString * const TGChatNotificationMuteOverridesDefaultsKey = @"Telegraph
 static NSString * const TGDrawerHiddenDefaultsKey = @"TelegraphicaDrawerHidden";
 static NSString * const TGChatSidebarWidthDefaultsKey = @"TelegraphicaChatSidebarWidth";
 static NSString * const TGTypingIndicatorsEnabledDefaultsKey = @"TelegraphicaTypingIndicatorsEnabled";
+static NSString * const TGForumTopicsTopBarDefaultsKey = @"TelegraphicaForumTopicsTopBar";
 static NSString * const TGComposerVideoNoteModeDefaultsKey = @"TelegraphicaComposerVideoNoteMode";
 static NSString * const TGVideoPlaybackResumePositionsDefaultsKey = @"TelegraphicaVideoPlaybackResumePositions";
 static NSString * const TGMountainLionSafeLoginModeDisabledDefaultsKey = @"TelegraphicaMountainLionSafeLoginModeDisabled";
@@ -464,6 +465,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTableView *chatTableView;
 @property (nonatomic, retain) NSMutableArray *chatItems;
 @property (nonatomic, retain) NSArray *chatItemsBeforeTopicList;
+@property (nonatomic, retain) NSArray *forumTopicItems;
 @property (nonatomic, retain) NSView *messageScrollSurfaceView;
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
@@ -516,6 +518,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsNotificationExceptionsButton;
 @property (nonatomic, retain) NSButton *settingsDrawerHiddenButton;
 @property (nonatomic, retain) NSButton *settingsTypingIndicatorsButton;
+@property (nonatomic, retain) NSButton *settingsForumTopicsTopBarButton;
 @property (nonatomic, retain) NSButton *settingsChatFoldersButton;
 @property (nonatomic, retain) NSButton *settingsSavedMessagesButton;
 @property (nonatomic, retain) NSButton *settingsPrivacyButton;
@@ -730,6 +733,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL forumTopicMutationInFlight;
 @property (nonatomic, assign) BOOL suppressChatSelectionHandling;
 @property (nonatomic, assign) BOOL showingForumTopicList;
+@property (nonatomic, assign) BOOL forumTopicsPresentedInTopBar;
 @property (nonatomic, assign) BOOL chatNavigationClosed;
 @property (nonatomic, retain) NSNumber *suppressedForumTopicAutoOpenChatID;
 @property (nonatomic, assign) NSUInteger forumTopicNavigationGeneration;
@@ -774,6 +778,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 - (void)rebuildForumTopicTabs;
 - (void)refreshForumTopicTabSelection;
 - (void)selectForumTopicFromTab:(id)sender;
+- (void)selectForumTopicItem:(TGChatItem *)item;
 - (void)sendSharedComposerItemWithKind:(NSString *)kind values:(NSDictionary *)values;
 - (void)updateSavedMessagesPresentationForChatItems;
 - (void)setMarkAllChatsReadBusy:(BOOL)busy;
@@ -987,6 +992,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize chatTableView = _chatTableView;
 @synthesize chatItems = _chatItems;
 @synthesize chatItemsBeforeTopicList = _chatItemsBeforeTopicList;
+@synthesize forumTopicItems = _forumTopicItems;
 @synthesize messageScrollSurfaceView = _messageScrollSurfaceView;
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
@@ -1039,6 +1045,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsNotificationExceptionsButton = _settingsNotificationExceptionsButton;
 @synthesize settingsDrawerHiddenButton = _settingsDrawerHiddenButton;
 @synthesize settingsTypingIndicatorsButton = _settingsTypingIndicatorsButton;
+@synthesize settingsForumTopicsTopBarButton = _settingsForumTopicsTopBarButton;
 @synthesize settingsChatFoldersButton = _settingsChatFoldersButton;
 @synthesize settingsSavedMessagesButton = _settingsSavedMessagesButton;
 @synthesize settingsPrivacyButton = _settingsPrivacyButton;
@@ -1277,6 +1284,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
+@synthesize forumTopicsPresentedInTopBar = _forumTopicsPresentedInTopBar;
 @synthesize chatNavigationClosed = _chatNavigationClosed;
 @synthesize suppressedForumTopicAutoOpenChatID = _suppressedForumTopicAutoOpenChatID;
 @synthesize forumTopicNavigationGeneration = _forumTopicNavigationGeneration;
@@ -1759,6 +1767,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsNotificationExceptionsButton setTitle:TGLoc(@"notifications.exceptions.open")];
     [self.settingsDrawerHiddenButton setTitle:TGLoc(@"settings.drawer")];
     [self.settingsTypingIndicatorsButton setTitle:TGLoc(@"settings.typing")];
+    [self.settingsForumTopicsTopBarButton setTitle:TGLoc(@"settings.forumTopicsTopBar")];
     [self.settingsChatFoldersButton setTitle:TGLoc(@"folders.manage.open")];
     [self.settingsSavedMessagesButton setTitle:TGLoc(@"saved.open")];
     [self.settingsPrivacyButton setTitle:TGLoc(@"privacy.open")];
@@ -1937,6 +1946,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                       self.settingsNotificationsWhenActiveButton,
                                       self.settingsDrawerHiddenButton,
                                       self.settingsTypingIndicatorsButton,
+                                      self.settingsForumTopicsTopBarButton,
                                       self.settingsMessagesAsBlocksButton,
                                       self.settingsEconomyModeButton,
                                       self.settingsAutoDownloadPhotosButton,
@@ -2245,9 +2255,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 - (void)clearForumTopicListState {
     self.showingForumTopicList = NO;
+    self.forumTopicsPresentedInTopBar = NO;
     [[self.forumTopicTabsContentView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
     [self.forumTopicTabButtons removeAllObjects];
     self.chatItemsBeforeTopicList = nil;
+    self.forumTopicItems = nil;
     self.topicParentChatID = nil;
     self.topicParentTitle = nil;
     self.topicParentAvatarLocalPath = nil;
@@ -3635,6 +3647,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsTypingIndicatorsButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.settingsTypingIndicatorsButton];
 
+    self.settingsForumTopicsTopBarButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 180, 440, 22)] autorelease];
+    [self.settingsForumTopicsTopBarButton setButtonType:NSSwitchButton];
+    [self.settingsForumTopicsTopBarButton setTitle:TGLoc(@"settings.forumTopicsTopBar")];
+    [self.settingsForumTopicsTopBarButton setTarget:self];
+    [self.settingsForumTopicsTopBarButton setAction:@selector(interfaceSettingChanged:)];
+    [self.settingsForumTopicsTopBarButton setState:TGUserDefaultBoolWithDefault(TGForumTopicsTopBarDefaultsKey, NO) ? NSOnState : NSOffState];
+    [self.settingsForumTopicsTopBarButton setFont:[NSFont systemFontOfSize:13.0]];
+    [self.settingsForumTopicsTopBarButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.settingsForumTopicsTopBarButton];
+
     self.settingsChatFoldersButton = [[[NSButton alloc] initWithFrame:NSMakeRect(64, 201, 716, 30)] autorelease];
     [self.settingsChatFoldersButton setTitle:TGLoc(@"folders.manage.open")];
     [self.settingsChatFoldersButton setTarget:self];
@@ -3839,6 +3861,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsNotificationExceptionsButton,
                                      self.settingsDrawerHiddenButton,
                                      self.settingsTypingIndicatorsButton,
+                                     self.settingsForumTopicsTopBarButton,
                                      self.settingsChatFoldersButton,
                                      self.settingsSavedMessagesButton,
                                      self.settingsPrivacyButton,
@@ -4719,6 +4742,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_chatTableView release];
     [_chatItems release];
     [_chatItemsBeforeTopicList release];
+    [_forumTopicItems release];
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
     [_messageLoadingSpinner release];
@@ -4789,6 +4813,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsNotificationExceptionsButton release];
     [_settingsDrawerHiddenButton release];
     [_settingsTypingIndicatorsButton release];
+    [_settingsForumTopicsTopBarButton release];
     [_settingsChatFoldersButton release];
     [_settingsSavedMessagesButton release];
     [_settingsPrivacyButton release];

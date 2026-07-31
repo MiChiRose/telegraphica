@@ -4,7 +4,7 @@
 @implementation TGChatSearchResultsTableView
 
 - (BOOL)isOpaque {
-    return NO;
+    return YES;
 }
 
 - (void)drawBackgroundInClipRect:(NSRect)clipRect {
@@ -14,7 +14,7 @@
      * count; otherwise AppKit 10.8/10.9 can leave the previously drawn rows
      * cached below the last real result.
      */
-    [[NSColor clearColor] set];
+    [TGClassicTablePaperColor() set];
     NSRectFillUsingOperation(clipRect, NSCompositeCopy);
 }
 
@@ -182,7 +182,7 @@
         [_tableView setAction:@selector(commitSearch:)];
         [_tableView setDoubleAction:@selector(commitSearch:)];
         [_tableView setAllowsEmptySelection:YES];
-        [_tableView setBackgroundColor:[NSColor clearColor]];
+        [_tableView setBackgroundColor:TGClassicTablePaperColor()];
         [_tableView setUsesAlternatingRowBackgroundColors:NO];
         [_tableView setGridStyleMask:NSTableViewGridNone];
         [_tableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleNone];
@@ -198,9 +198,10 @@
         [_scrollView setHasVerticalScroller:YES];
         [_scrollView setHasHorizontalScroller:NO];
         [_scrollView setBorderType:NSNoBorder];
-        [_scrollView setDrawsBackground:NO];
-        [[_scrollView contentView] setDrawsBackground:NO];
-        [[_scrollView contentView] setBackgroundColor:[NSColor clearColor]];
+        [_scrollView setDrawsBackground:YES];
+        [_scrollView setBackgroundColor:TGClassicTablePaperColor()];
+        [[_scrollView contentView] setDrawsBackground:YES];
+        [[_scrollView contentView] setBackgroundColor:TGClassicTablePaperColor()];
         [_scrollView setAutohidesScrollers:YES];
         [_scrollView setDocumentView:_tableView];
         [self addSubview:_scrollView];

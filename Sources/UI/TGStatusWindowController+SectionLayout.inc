@@ -121,7 +121,7 @@
     [self showView:self.sidebarResizeHandleView visible:showChats];
     [self showView:self.conversationPanelView visible:showChats];
     [self showView:self.chatsLabel visible:(showChats && !compactChatSidebar)];
-    [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList && !compactChatSidebar)];
+    [self showView:self.topicBackButton visible:(showChats && self.showingForumTopicList && !self.forumTopicsPresentedInTopBar && !compactChatSidebar)];
     [self showView:self.loadChatsButton visible:(showChats && !compactChatSidebar)];
     [self showView:self.loadMoreChatsButton visible:NO];
     [self showView:self.chatSearchButton visible:(showChats && !compactChatSidebar)];
@@ -182,7 +182,7 @@
     [self showView:self.searchResultsScrollView visible:showSearchPanel];
     [self showView:self.searchResultsTableView visible:showSearchPanel];
     BOOL showForumTabs = (showConversationContent &&
-                          self.showingForumTopicList &&
+                          self.forumTopicsPresentedInTopBar &&
                           [self.forumTopicTabButtons count] > 0);
     [self showView:self.forumTopicTabsScrollView visible:showForumTabs];
     BOOL showPinnedPanel = (showConversationContent && !self.searchPanelVisible && self.pinnedMessageItem != nil);
@@ -296,6 +296,7 @@
     [self showView:self.settingsNotificationExceptionsButton visible:showSettings];
     [self showView:self.settingsDrawerHiddenButton visible:showSettings];
     [self showView:self.settingsTypingIndicatorsButton visible:showSettings];
+    [self showView:self.settingsForumTopicsTopBarButton visible:showSettings];
     [self showView:self.settingsChatFoldersButton visible:showSettings];
     [self showView:self.settingsSavedMessagesButton visible:showSettings];
     [self showView:self.settingsPrivacyButton visible:showSettings];
@@ -866,7 +867,7 @@
     if (panelWidth < 260.0) {
         panelWidth = 260.0;
     }
-    BOOL showForumTabs = (self.showingForumTopicList &&
+    BOOL showForumTabs = (self.forumTopicsPresentedInTopBar &&
                           [self.forumTopicTabButtons count] > 0);
     if (self.searchPanelVisible) {
         BOOL hasSearchText = ([[self.searchTextField stringValue] length] > 0);
@@ -1278,7 +1279,7 @@
     CGFloat foldersCardHeight = 54.0;
     CGFloat savedCardHeight = 54.0;
     CGFloat privacyCardHeight = 54.0;
-    CGFloat drawerCardHeight = 78.0;
+    CGFloat drawerCardHeight = 104.0;
     CGFloat resourceCardHeight = 276.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
@@ -1402,6 +1403,7 @@
     [self.settingsDrawerCardView setFrame:NSMakeRect(settingsGroupedX, drawerCardY, settingsGroupedWidth, drawerCardHeight)];
     [self.settingsDrawerHiddenButton setFrame:NSMakeRect(rowLeft, drawerCardY + 12.0, rowWidth, 22.0)];
     [self.settingsTypingIndicatorsButton setFrame:NSMakeRect(rowLeft, drawerCardY + 42.0, rowWidth, 22.0)];
+    [self.settingsForumTopicsTopBarButton setFrame:NSMakeRect(rowLeft, drawerCardY + 72.0, rowWidth, 22.0)];
     settingsNextY = drawerCardY + drawerCardHeight + settingsGroupGap;
 
     [self.settingsResourceSectionField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];

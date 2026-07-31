@@ -288,14 +288,25 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         }
         TGChatItem *chatItem = (TGChatItem *)candidate;
         NSString *title = [chatItem title] ? [chatItem title] : @"";
-        if ([[title lowercaseString] rangeOfString:needle].location == NSNotFound) {
+        BOOL isSavedMessages = [chatItem isSavedMessages];
+        if (!isSavedMessages &&
+            [[chatItem chatID] respondsToSelector:@selector(longLongValue)] &&
+            [self.profileUserID respondsToSelector:@selector(longLongValue)]) {
+            isSavedMessages = ([[chatItem chatID] longLongValue] == [self.profileUserID longLongValue]);
+        }
+        NSString *savedMessagesAlias = isSavedMessages ? TGLoc(@"savedMessages") : @"";
+        BOOL titleMatches = ([[title lowercaseString] rangeOfString:needle].location != NSNotFound);
+        BOOL savedMessagesMatches = ([savedMessagesAlias length] > 0 &&
+                                     [[savedMessagesAlias lowercaseString] rangeOfString:needle].location != NSNotFound);
+        if (!titleMatches && !savedMessagesMatches) {
             continue;
         }
         TGSearchResultItem *result = [[[TGSearchResultItem alloc] init] autorelease];
         [result setChatID:([chatItem isForumTopic] ? [chatItem parentChatID] : [chatItem chatID])];
         [result setMessageThreadID:[chatItem messageThreadID]];
         [result setMessageTopicKind:[chatItem messageTopicKind]];
-        [result setChatTitle:title];
+        [result setChatTitle:(isSavedMessages ? TGLoc(@"savedMessages") : title)];
+        [result setAvatarLocalPath:[chatItem avatarLocalPath]];
         [result setSnippet:[chatItem typeSummary]];
         [result setChatTitleOnly:YES];
         [results addObject:result];
@@ -542,10 +553,15 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
         return;
     }
     if (result.chatTitleOnly || ![result.messageID respondsToSelector:@selector(longLongValue)]) {
+        if (self.showingForumTopicList || self.forumTopicsPresentedInTopBar) {
+            [self closeForumTopicList:nil];
+        }
         NSUInteger index = [self indexOfChatID:result.chatID inChatItems:self.chatItems];
         if (index != NSNotFound) {
             [self.chatTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
             [self.chatTableView scrollRowToVisible:index];
+            [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification
+                                                                             object:self.chatTableView]];
         }
         return;
     }
