@@ -12,6 +12,18 @@
 static CGFloat const TGPanelCornerRadius = 8.0;
 static CGFloat const TGPanelHeaderHeight = 40.0;
 
+static NSFont *TGReactionDisplayFont(void) {
+    static NSFont *reactionFont = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        reactionFont = [[NSFont fontWithName:@"Apple Color Emoji" size:13.0] retain];
+        if (!reactionFont) {
+            reactionFont = [[NSFont boldSystemFontOfSize:11.0] retain];
+        }
+    });
+    return reactionFont;
+}
+
 @implementation TGRepresentedObjectCell
 
 @synthesize representedObject = _representedObject;
@@ -955,8 +967,8 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     NSString *reactionSummary = [[item reactionAnimationDisplaySummary] length] > 0
         ? [item reactionAnimationDisplaySummary]
         : [item reactionSummary];
-    reactionSummary = TGStringByReplacingUnrenderableEmoji(reactionSummary,
-                                                           [NSFont boldSystemFontOfSize:10.0]);
+    NSFont *reactionFont = TGReactionDisplayFont();
+    reactionSummary = TGStringByReplacingUnrenderableEmoji(reactionSummary, reactionFont);
     if ([reactionSummary length] > 0) {
         BOOL animatingReaction = [[item reactionAnimationDisplaySummary] length] > 0;
         CGFloat rawProgress = animatingReaction
@@ -979,7 +991,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             ? (0.90 + (0.10 * visualProgress))
             : easedVisualProgress;
         NSDictionary *reactionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                            [NSFont boldSystemFontOfSize:10.0], NSFontAttributeName,
+                                            reactionFont, NSFontAttributeName,
                                             [TGClassicSelectedRowTextColor() colorWithAlphaComponent:reactionOpacity], NSForegroundColorAttributeName,
                                             nil];
         NSSize reactionSize = [reactionSummary sizeWithAttributes:reactionAttributes];
@@ -1232,8 +1244,9 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     }
 
     CGFloat footerY = flipped ? (NSMaxY(textRect) + 4.0) : (NSMinY(textRect) - 20.0);
+    NSFont *reactionFont = TGReactionDisplayFont();
     NSString *reactionSummary = TGStringByReplacingUnrenderableEmoji([item reactionSummary],
-                                                                     TGChatMessageBoldSecondaryFont());
+                                                                     reactionFont);
     NSString *commentTitle = nil;
     if (TGMessageItemHasCommentThread(item)) {
         NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
@@ -1244,7 +1257,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         NSMutableParagraphStyle *footerParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
         [footerParagraph setLineBreakMode:NSLineBreakByTruncatingTail];
         NSDictionary *footerAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                          TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
+                                          reactionFont, NSFontAttributeName,
                                           TGClassicNavigationSelectedColor(0.92), NSForegroundColorAttributeName,
                                           footerParagraph, NSParagraphStyleAttributeName,
                                           nil];

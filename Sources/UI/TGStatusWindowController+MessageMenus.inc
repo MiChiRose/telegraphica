@@ -758,24 +758,17 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     [reactionTitleItem setEnabled:NO];
     [menu addItem:reactionTitleItem];
     NSArray *emojis = [self reactionEmojisForMessageItem:item];
-    NSUInteger reactionIndex = 0;
-    while (reactionIndex < [emojis count]) {
-        NSUInteger remaining = [emojis count] - reactionIndex;
-        NSUInteger rowCount = MIN((NSUInteger)8, remaining);
-        NSArray *rowEmojis = [emojis subarrayWithRange:NSMakeRange(reactionIndex, rowCount)];
-        TGReactionMenuRowView *rowView = [[[TGReactionMenuRowView alloc]
-            initWithEmojis:rowEmojis
+    TGReactionMenuRowView *reactionGridView = [[[TGReactionMenuRowView alloc]
+            initWithEmojis:emojis
                    message:item
             chosenReactions:[item chosenReactionEmojis]
                     target:self
                     action:@selector(reactToMessageFromMenu:)] autorelease];
-        NSMenuItem *rowItem = [[[NSMenuItem alloc] initWithTitle:@""
-                                                          action:nil
-                                                   keyEquivalent:@""] autorelease];
-        [rowItem setView:rowView];
-        [menu addItem:rowItem];
-        reactionIndex += rowCount;
-    }
+    NSMenuItem *reactionGridItem = [[[NSMenuItem alloc] initWithTitle:@""
+                                                               action:nil
+                                                        keyEquivalent:@""] autorelease];
+    [reactionGridItem setView:reactionGridView];
+    [menu addItem:reactionGridItem];
 }
 
 - (void)openBotKeyboardFromMenu:(id)sender {

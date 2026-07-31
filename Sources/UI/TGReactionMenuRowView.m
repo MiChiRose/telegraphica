@@ -58,6 +58,15 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
 }
 @end
 
+@interface TGReactionMenuDocumentView : NSView
+@end
+
+@implementation TGReactionMenuDocumentView
+- (BOOL)isFlipped {
+    return YES;
+}
+@end
+
 @interface TGReactionMenuRowView () {
     id _reactionTarget;
     SEL _reactionAction;
@@ -72,17 +81,49 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
       chosenReactions:(NSArray *)chosenReactions
               target:(id)target
               action:(SEL)action {
-    CGFloat buttonWidth = 36.0;
-    self = [super initWithFrame:NSMakeRect(0.0, 0.0, buttonWidth * [emojis count], 34.0)];
+    const NSUInteger columnCount = 8U;
+    const NSUInteger maximumVisibleRows = 4U;
+    CGFloat buttonWidth = 34.0;
+    CGFloat rowHeight = 34.0;
+    NSUInteger emojiCount = [emojis count];
+    NSUInteger rowCount = MAX((NSUInteger)1U,
+                              (emojiCount + columnCount - 1U) / columnCount);
+    NSUInteger visibleRowCount = MIN(maximumVisibleRows, rowCount);
+    CGFloat viewportWidth = buttonWidth * columnCount + 16.0;
+    CGFloat documentWidth = buttonWidth * columnCount;
+    CGFloat viewportHeight = rowHeight * visibleRowCount;
+    self = [super initWithFrame:NSMakeRect(0.0, 0.0, viewportWidth, viewportHeight)];
     if (self) {
         _reactionTarget = target;
         _reactionAction = action;
+
+        NSScrollView *scrollView = [[[NSScrollView alloc]
+            initWithFrame:[self bounds]] autorelease];
+        [scrollView setBorderType:NSNoBorder];
+        [scrollView setDrawsBackground:NO];
+        [scrollView setHasHorizontalScroller:NO];
+        [scrollView setHasVerticalScroller:(rowCount > maximumVisibleRows)];
+        [scrollView setAutohidesScrollers:NO];
+
+        TGReactionMenuDocumentView *documentView = [[[TGReactionMenuDocumentView alloc]
+            initWithFrame:NSMakeRect(0.0,
+                                     0.0,
+                                     documentWidth,
+                                     rowHeight * rowCount)] autorelease];
+        [scrollView setDocumentView:documentView];
+        [self addSubview:scrollView];
+
         NSUInteger index = 0;
-        for (index = 0; index < [emojis count]; index++) {
+        for (index = 0; index < emojiCount; index++) {
             NSString *emoji = [emojis objectAtIndex:index];
             NSString *displayEmoji = TGReactionEmojiCanRender(emoji) ? emoji : @"?";
+            NSUInteger column = index % columnCount;
+            NSUInteger row = index / columnCount;
             TGReactionMenuButton *button = [[[TGReactionMenuButton alloc]
-                initWithFrame:NSMakeRect(index * buttonWidth, 2.0, buttonWidth, 30.0)] autorelease];
+                initWithFrame:NSMakeRect(column * buttonWidth,
+                                         row * rowHeight + 2.0,
+                                         buttonWidth,
+                                         30.0)] autorelease];
             [button setTitle:displayEmoji];
             [button setFont:[NSFont systemFontOfSize:17.0]];
             [button setButtonType:NSMomentaryChangeButton];
@@ -97,7 +138,7 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
                                       message, @"message",
                                       emoji, @"emoji",
                                       nil];
-            [self addSubview:button];
+            [documentView addSubview:button];
         }
     }
     return self;
