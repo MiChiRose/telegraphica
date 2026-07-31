@@ -30,6 +30,8 @@ static NSString *TGCallReadableFailure(NSString *message) {
 @property (nonatomic, assign) BOOL outgoing;
 @property (nonatomic, assign) BOOL videoCall;
 @property (nonatomic, assign) BOOL finishing;
+@property (nonatomic, assign) BOOL receivedLocalVideoFrame;
+@property (nonatomic, assign) BOOL receivedRemoteVideoFrame;
 @property (nonatomic, copy) NSString *activeCallStateType;
 @property (nonatomic, retain) NSMutableArray *pendingSignalingData;
 @end
@@ -45,6 +47,8 @@ static NSString *TGCallReadableFailure(NSString *message) {
 @synthesize outgoing = _outgoing;
 @synthesize videoCall = _videoCall;
 @synthesize finishing = _finishing;
+@synthesize receivedLocalVideoFrame = _receivedLocalVideoFrame;
+@synthesize receivedRemoteVideoFrame = _receivedRemoteVideoFrame;
 @synthesize activeCallStateType = _activeCallStateType;
 @synthesize pendingSignalingData = _pendingSignalingData;
 
@@ -88,6 +92,8 @@ static NSString *TGCallReadableFailure(NSString *message) {
     self.videoCall = video;
     self.mockCall = mock;
     self.finishing = NO;
+    self.receivedLocalVideoFrame = NO;
+    self.receivedRemoteVideoFrame = NO;
     self.callWindowController = [[[TGCallWindowController alloc] initWithProfile:profile
                                                                         outgoing:outgoing
                                                                            video:video] autorelease];
@@ -334,6 +340,14 @@ static NSString *TGCallReadableFailure(NSString *message) {
     (void)engine;
     if (state == TGCallAudioEngineStateEstablished) {
         [[TGLogger sharedLogger] log:@"Audio call: media transport established."];
+        if (self.videoCall) {
+            // The camera is first requested while the transport is created.
+            // Request it once more after media establishment so a temporary
+            // legacy-device acquisition failure gets a deterministic retry.
+            [self.audioEngine setCameraEnabled:YES];
+            [[TGLogger sharedLogger] log:
+                @"Video call: requested local camera after media establishment."];
+        }
         [self.callWindowController setPresentationState:TGCallPresentationStateConnected detail:nil];
     } else if (state == TGCallAudioEngineStateReconnecting) {
         [[TGLogger sharedLogger] log:@"Audio call: media transport reconnecting."];
@@ -384,6 +398,13 @@ static NSString *TGCallReadableFailure(NSString *message) {
    didReceiveVideoImage:(NSImage *)image
                   local:(BOOL)local {
     (void)engine;
+    if (local && !self.receivedLocalVideoFrame) {
+        self.receivedLocalVideoFrame = YES;
+        [[TGLogger sharedLogger] log:@"Video call: first local preview frame reached AppKit."];
+    } else if (!local && !self.receivedRemoteVideoFrame) {
+        self.receivedRemoteVideoFrame = YES;
+        [[TGLogger sharedLogger] log:@"Video call: first remote frame reached AppKit."];
+    }
     [self.callWindowController updateVideoImage:image local:local];
 }
 
