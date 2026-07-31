@@ -106,7 +106,7 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
               target:(id)target
               action:(SEL)action {
     const NSUInteger columnCount = 8U;
-    const NSUInteger maximumVisibleRows = 4U;
+    const NSUInteger maximumVisibleRows = 3U;
     CGFloat buttonWidth = 34.0;
     CGFloat rowHeight = 34.0;
     NSUInteger emojiCount = [emojis count];

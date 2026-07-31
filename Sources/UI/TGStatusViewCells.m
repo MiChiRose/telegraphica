@@ -16,7 +16,7 @@ static NSFont *TGReactionDisplayFont(void) {
     static NSFont *reactionFont = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        reactionFont = [[NSFont fontWithName:@"Apple Color Emoji" size:15.0] retain];
+        reactionFont = [[NSFont fontWithName:@"Apple Color Emoji" size:14.0] retain];
         if (!reactionFont) {
             reactionFont = [[NSFont boldSystemFontOfSize:11.0] retain];
         }
@@ -1025,7 +1025,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             [reactionParagraph setAlignment:NSCenterTextAlignment];
             NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
             [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
-            CGFloat opticalOffset = [controlView isFlipped] ? -1.0 : 1.0;
+            CGFloat opticalOffset = [controlView isFlipped] ? -2.0 : 2.0;
             CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0) + opticalOffset;
             NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
                                                  reactionTextY,

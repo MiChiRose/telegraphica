@@ -202,9 +202,14 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
             [self.remoteVideoView setImageScaling:NSImageScaleProportionallyUpOrDown];
             [self.remoteVideoView setImageFrameStyle:NSImageFramePhoto];
             [root addSubview:self.remoteVideoView];
-            self.localVideoView = [[[NSImageView alloc] initWithFrame:NSMakeRect(492.0, 368.0, 138.0, 104.0)] autorelease];
+            self.localVideoView = [[[NSImageView alloc] initWithFrame:NSMakeRect(492.0, 400.0, 138.0, 104.0)] autorelease];
             [self.localVideoView setImageScaling:NSImageScaleProportionallyUpOrDown];
-            [self.localVideoView setImageFrameStyle:NSImageFramePhoto];
+            [self.localVideoView setImageFrameStyle:NSImageFrameNone];
+            [self.localVideoView setWantsLayer:YES];
+            [[self.localVideoView layer] setCornerRadius:10.0];
+            [[self.localVideoView layer] setMasksToBounds:YES];
+            [[self.localVideoView layer] setBorderWidth:1.0];
+            [[self.localVideoView layer] setBorderColor:[TGClassicTableGridColor() CGColor]];
             [root addSubview:self.localVideoView];
         }
 
@@ -338,7 +343,7 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
         return;
     }
     if (local) {
-        NSRect localBounds = NSMakeRect(492.0, 368.0, 138.0, 104.0);
+        NSRect localBounds = NSMakeRect(492.0, 400.0, 138.0, 104.0);
         [self.localVideoView setFrame:TGCallAspectFitRect([image size], localBounds)];
         [self.localVideoView setImage:image];
         [self.localVideoView setHidden:!self.cameraEnabled];
@@ -488,7 +493,7 @@ static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
     [self.qualityField setFrame:NSMakeRect(originX, rowY, textWidth, 18.0)];
     [self.qualityField setAlignment:NSLeftTextAlignment];
     [self.qualityImageView setFrame:NSMakeRect(originX + textWidth + gap,
-                                                rowY + 1.0,
+                                                rowY + 3.0,
                                                 iconSide,
                                                 iconSide)];
 }
