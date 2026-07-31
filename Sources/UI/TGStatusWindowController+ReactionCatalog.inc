@@ -89,17 +89,16 @@
     NSString *catalogKey = [self reactionCatalogKeyForChatID:item.chatID];
     NSArray *serverEmojis = [catalogKey length] > 0 ? [self.availableReactionEmojisByChatID objectForKey:catalogKey] : nil;
     [self prefetchReactionCatalogForMessageItem:item];
-    if (![serverEmojis count]) {
-        return [NSArray array];
-    }
-
+    NSArray *catalog = [serverEmojis count] > 0
+        ? serverEmojis : [self fallbackStandardReactionEmojis];
     NSMutableArray *orderedEmojis = [NSMutableArray array];
-    NSMutableSet *addedEmojis = [NSMutableSet setWithArray:[self fallbackStandardReactionEmojis]];
+    NSMutableSet *addedEmojis = [NSMutableSet setWithArray:
+        [self standardReactionEmojisForMessageItem:item]];
     NSUInteger index = 0;
 
     /* Keep Telegram's additional server-approved reactions in their own list. */
-    for (index = 0; index < [serverEmojis count]; index++) {
-        NSString *emoji = [serverEmojis objectAtIndex:index];
+    for (index = 0; index < [catalog count]; index++) {
+        NSString *emoji = [catalog objectAtIndex:index];
         if (TGReactionEmojiCanRender(emoji) &&
             ![addedEmojis containsObject:emoji]) {
             [orderedEmojis addObject:emoji];
@@ -113,8 +112,8 @@
      * emoji in the action payload.
      */
     NSUInteger unsupportedCount = 0;
-    for (index = 0; index < [serverEmojis count] && unsupportedCount < 8U; index++) {
-        NSString *emoji = [serverEmojis objectAtIndex:index];
+    for (index = 0; index < [catalog count] && unsupportedCount < 8U; index++) {
+        NSString *emoji = [catalog objectAtIndex:index];
         if (![addedEmojis containsObject:emoji]) {
             [orderedEmojis addObject:emoji];
             [addedEmojis addObject:emoji];
