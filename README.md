@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.8 through macOS 10.13 on Intel Macs.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.5.5-blue" alt="version v0.5.5" />
+    <img src="https://img.shields.io/badge/version-v0.5.6-blue" alt="version v0.5.6" />
     <img src="https://img.shields.io/badge/macOS-10.8--10.13-black" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -105,7 +105,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Open Beta: `v0.5.5`
+## Current Open Beta: `v0.5.6`
 
 This open beta is ready for broader legacy-Mac testing. Telegraphica is still
 young software, but the everyday loop is now useful enough for real feedback:
@@ -114,7 +114,7 @@ voice messages, and keep the app updated from GitHub Releases.
 
 ### ✅ Working In This Beta
 
-- 🔐 TDLib login flow: phone number, login code, and 2FA password.
+- 🔐 TDLib login flow: phone number, QR code, login code, and 2FA password.
 - 🧾 Automatic TDLib app configuration bootstrap for public builds, with local
   developer override support.
 - 💬 Chat list with unread badges, muted indicators, avatars, and selected chat
@@ -127,6 +127,8 @@ voice messages, and keep the app updated from GitHub Releases.
 - 🎙 Voice-message recording, preview, sending, and playback.
 - 🔊 Ogg/Opus voice-message playback through a bundled Mavericks-safe helper.
 - 👍 Message reactions with local display and real Telegram sync.
+- 📹 One-to-one Telegram video calls with local camera preview on OS X
+  10.9 and newer.
 - 🖼 Grouped photo display, image preview, zoom controls, and pinch-to-zoom.
 - 🎞 Video playback in a resizable native window.
 - 📎 Basic document display with filenames where TDLib exposes them.
@@ -140,6 +142,7 @@ voice messages, and keep the app updated from GitHub Releases.
 - 🧩 Native sticker display with WEBP, TGS, and animated WEBM/VP9 sticker
   support on Mavericks.
 - 🔍 Chat search/navigation with a native search field.
+- 🔗 Received link-preview cards and composer controls for link previews.
 - 👥 Contacts browser with search, direct chat opening, and profile details
   including presence, username, phone number, biography, and avatar.
 - 🧭 Private-chat, group, channel, secret-chat, archive, invite-link, member,
@@ -181,8 +184,9 @@ voice messages, and keep the app updated from GitHub Releases.
 - Text address search in the location picker is temporarily disabled after a
   legacy MapKit lifecycle crash. Mavericks and newer retain map, pin, zoom, and
   current-location selection; Mountain Lion has no native MapKit picker.
-- Calls remain a placeholder. Voice, video, and group calling are not included
-  in this release.
+- One-to-one audio and experimental video calls require OS X 10.9 or newer;
+  OS X 10.8 keeps the same app bundle with a clear unavailable state. Group
+  calls and screen sharing are not included.
 - Telegram Premium, Stars, payments, subscriptions, gifts, paid media, and
   other purchase flows are intentionally not implemented.
 - The project is moving fast, so UI details and release packaging may change.
