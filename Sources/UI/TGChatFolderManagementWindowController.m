@@ -10,6 +10,8 @@
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
+static NSString * const TGChatFolderDragPasteboardType = @"com.telegraphica.chat-folder-row";
+
 @interface TGChatFolderListCell : TGRepresentedObjectCell
 @end
 
@@ -112,6 +114,7 @@
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
 @property (nonatomic, retain) NSButton *addButton;
+@property (nonatomic, retain) NSButton *importButton;
 @property (nonatomic, retain) NSButton *deleteButton;
 @property (nonatomic, retain) NSButton *shareButton;
 @property (nonatomic, retain) NSButton *refreshButton;
@@ -144,6 +147,7 @@
 @synthesize statusField = _statusField;
 @synthesize spinner = _spinner;
 @synthesize addButton = _addButton;
+@synthesize importButton = _importButton;
 @synthesize deleteButton = _deleteButton;
 @synthesize shareButton = _shareButton;
 @synthesize refreshButton = _refreshButton;
@@ -195,6 +199,7 @@
     [_statusField release];
     [_spinner release];
     [_addButton release];
+    [_importButton release];
     [_deleteButton release];
     [_shareButton release];
     [_refreshButton release];
@@ -269,6 +274,13 @@
     [subtitle setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:subtitle];
 
+    self.importButton = [self iconButtonWithFrame:NSMakeRect(566, 584, 34, 32)
+                                       assetName:@"upload"
+                                          toolTip:TGLoc(@"folders.import")
+                                           action:@selector(importFolder:)];
+    [self.importButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+    [root addSubview:self.importButton];
+
     self.addButton = [self iconButtonWithFrame:NSMakeRect(604, 584, 34, 32)
                                     assetName:@"folder-add"
                                        toolTip:TGLoc(@"folders.add")
@@ -328,6 +340,8 @@
     [self.folderTableView setAllowsMultipleSelection:NO];
     [self.folderTableView setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
     [self.folderTableView setColumnAutoresizingStyle:NSTableViewLastColumnOnlyAutoresizingStyle];
+    [self.folderTableView registerForDraggedTypes:[NSArray arrayWithObject:TGChatFolderDragPasteboardType]];
+    [self.folderTableView setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
     NSTableColumn *folderColumn = [[[NSTableColumn alloc] initWithIdentifier:@"folder"] autorelease];
     [folderColumn setWidth:190.0];
     [folderColumn setMinWidth:120.0];
@@ -410,10 +424,10 @@
     [self.chatSearchField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [root addSubview:self.chatSearchField];
 
-    TGScrollSurfaceView *chatSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(248, 100, 504, 232)] autorelease];
+    TGScrollSurfaceView *chatSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(248, 110, 504, 222)] autorelease];
     [chatSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [root addSubview:chatSurface];
-    NSScrollView *chatScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(252, 104, 496, 224)] autorelease];
+    NSScrollView *chatScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(252, 114, 496, 214)] autorelease];
     [chatScroll setHasVerticalScroller:YES];
     [chatScroll setAutohidesScrollers:YES];
     [chatScroll setBorderType:NSNoBorder];
@@ -456,7 +470,7 @@
     [self.spinner setAutoresizingMask:NSViewMaxYMargin];
     [root addSubview:self.spinner];
 
-    self.saveButton = [[[NSButton alloc] initWithFrame:NSMakeRect(620, 68, 120, 30)] autorelease];
+    self.saveButton = [[[NSButton alloc] initWithFrame:NSMakeRect(628, 68, 120, 30)] autorelease];
     [self.saveButton setCell:[[[TGPrimaryTextButtonCell alloc] initTextCell:TGLoc(@"folders.save")] autorelease]];
     [self.saveButton setTitle:TGLoc(@"folders.save")];
     [self.saveButton setTarget:self];
@@ -481,6 +495,7 @@
     BOOL hasFolder = self.editingDefinition != nil;
     BOOL supportsSharing = hasFolder &&
         [self.client chatFolderAPIKindSupportsSharing:[self.editingDefinition objectForKey:@"api_kind"]];
+    [self.importButton setEnabled:!self.loading];
     [self.addButton setEnabled:!self.loading];
     [self.deleteButton setEnabled:(!self.loading && hasFolder)];
     [self.shareButton setEnabled:(!self.loading && hasFolder && supportsSharing)];
@@ -645,6 +660,108 @@
     }
 }
 
+- (BOOL)tableView:(NSTableView *)tableView
+writeRowsWithIndexes:(NSIndexSet *)rowIndexes
+     toPasteboard:(NSPasteboard *)pasteboard {
+    if (tableView != self.folderTableView || self.loading || [rowIndexes count] != 1) {
+        return NO;
+    }
+    NSUInteger row = [rowIndexes firstIndex];
+    if (row == NSNotFound || row >= [self.folderDefinitions count]) {
+        return NO;
+    }
+    [pasteboard declareTypes:[NSArray arrayWithObject:TGChatFolderDragPasteboardType] owner:nil];
+    return [pasteboard setString:[NSString stringWithFormat:@"%lu", (unsigned long)row]
+                         forType:TGChatFolderDragPasteboardType];
+}
+
+- (NSDragOperation)tableView:(NSTableView *)tableView
+                validateDrop:(id<NSDraggingInfo>)info
+                 proposedRow:(NSInteger)row
+       proposedDropOperation:(NSTableViewDropOperation)dropOperation {
+    (void)info;
+    if (tableView != self.folderTableView || self.loading || dropOperation != NSTableViewDropAbove) {
+        return NSDragOperationNone;
+    }
+    if (row < 0 || row > (NSInteger)[self.folderDefinitions count]) {
+        return NSDragOperationNone;
+    }
+    [tableView setDropRow:row dropOperation:NSTableViewDropAbove];
+    return NSDragOperationMove;
+}
+
+- (BOOL)tableView:(NSTableView *)tableView
+       acceptDrop:(id<NSDraggingInfo>)info
+              row:(NSInteger)row
+    dropOperation:(NSTableViewDropOperation)dropOperation {
+    if (tableView != self.folderTableView || self.loading || dropOperation != NSTableViewDropAbove) {
+        return NO;
+    }
+    NSString *sourceString = [[info draggingPasteboard] stringForType:TGChatFolderDragPasteboardType];
+    NSInteger sourceRow = [sourceString integerValue];
+    if (sourceRow < 0 || sourceRow >= (NSInteger)[self.folderDefinitions count]) {
+        return NO;
+    }
+    NSInteger destinationRow = row;
+    if (destinationRow > sourceRow) {
+        destinationRow--;
+    }
+    if (destinationRow < 0) {
+        destinationRow = 0;
+    } else if (destinationRow >= (NSInteger)[self.folderDefinitions count]) {
+        destinationRow = (NSInteger)[self.folderDefinitions count] - 1;
+    }
+    if (destinationRow == sourceRow) {
+        return NO;
+    }
+
+    NSArray *previousOrder = [self.folderDefinitions copy];
+    NSMutableArray *newOrder = [NSMutableArray arrayWithArray:self.folderDefinitions];
+    id movedDefinition = [[newOrder objectAtIndex:(NSUInteger)sourceRow] retain];
+    [newOrder removeObjectAtIndex:(NSUInteger)sourceRow];
+    [newOrder insertObject:movedDefinition atIndex:(NSUInteger)destinationRow];
+    [movedDefinition release];
+    self.folderDefinitions = newOrder;
+    [self.folderTableView reloadData];
+    [self.folderTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)destinationRow]
+                      byExtendingSelection:NO];
+    self.loading = YES;
+    [self.statusField setStringValue:TGLoc(@"folders.reordering")];
+
+    TGTDLibClient *client = [self.client retain];
+    NSArray *requestedOrder = [self.folderDefinitions copy];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        BOOL reordered = [client reorderChatFolderDefinitions:requestedOrder timeout:5.0 error:&error];
+        NSError *resultError = [error retain];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client == client) {
+                self.loading = NO;
+                if (reordered) {
+                    [self.statusField setStringValue:TGLoc(@"folders.reordered")];
+                    if ([self.delegate respondsToSelector:@selector(chatFolderManagementWindowControllerDidChangeFolders:)]) {
+                        [self.delegate chatFolderManagementWindowControllerDidChangeFolders:self];
+                    }
+                } else {
+                    self.folderDefinitions = previousOrder;
+                    [self.folderTableView reloadData];
+                    [self.folderTableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)sourceRow]
+                                      byExtendingSelection:NO];
+                    [self.statusField setStringValue:(resultError ? [resultError localizedDescription] : TGLoc(@"folders.error.reorder"))];
+                    NSBeep();
+                }
+            }
+            [resultError release];
+            [requestedOrder release];
+            [previousOrder release];
+            [client release];
+        });
+        [pool drain];
+    });
+    return YES;
+}
+
 - (void)controlTextDidChange:(NSNotification *)notification {
     if ([notification object] == self.chatSearchField) {
         [self applyChatSearch];
@@ -654,6 +771,122 @@
 - (void)addFolder:(id)sender {
     (void)sender;
     [self beginNewFolder];
+}
+
+- (void)importFolder:(id)sender {
+    (void)sender;
+    NSAlert *linkAlert = [[[NSAlert alloc] init] autorelease];
+    [linkAlert setMessageText:TGLoc(@"folders.import.title")];
+    [linkAlert setInformativeText:TGLoc(@"folders.import.hint")];
+    [linkAlert addButtonWithTitle:TGLoc(@"folders.import.check")];
+    [linkAlert addButtonWithTitle:TGLoc(@"cancel")];
+    NSTextField *linkField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0.0, 0.0, 420.0, 24.0)] autorelease];
+    [[linkField cell] setPlaceholderString:@"https://t.me/addlist/..."];
+    [linkAlert setAccessoryView:linkField];
+    [[linkAlert window] makeFirstResponder:linkField];
+    if ([linkAlert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+
+    NSString *inviteLink = [[[linkField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    if ([inviteLink length] == 0) {
+        [inviteLink release];
+        NSBeep();
+        return;
+    }
+
+    self.loading = YES;
+    [self.statusField setStringValue:TGLoc(@"folders.import.checking")];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *previewError = nil;
+        NSDictionary *preview = [[client chatFolderInvitePreviewForLink:inviteLink timeout:5.0 error:&previewError] retain];
+        NSError *resultError = [previewError retain];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client != client) {
+                [preview release];
+                [resultError release];
+                [inviteLink release];
+                [client release];
+                return;
+            }
+            self.loading = NO;
+            if (!preview) {
+                [self.statusField setStringValue:(resultError ? [resultError localizedDescription] : TGLoc(@"folders.import.error"))];
+                NSBeep();
+                [preview release];
+                [resultError release];
+                [inviteLink release];
+                [client release];
+                return;
+            }
+
+            NSArray *missingChatIDs = [preview objectForKey:@"missing_chat_ids"];
+            NSString *folderTitle = [preview objectForKey:@"title"];
+            if ([missingChatIDs count] == 0) {
+                [self.statusField setStringValue:TGLoc(@"folders.import.alreadyAdded")];
+                NSBeep();
+                [preview release];
+                [resultError release];
+                [inviteLink release];
+                [client release];
+                return;
+            }
+
+            NSAlert *confirmAlert = [[[NSAlert alloc] init] autorelease];
+            [confirmAlert setMessageText:[NSString stringWithFormat:TGLoc(@"folders.import.confirm.title"), folderTitle]];
+            [confirmAlert setInformativeText:[NSString stringWithFormat:TGLoc(@"folders.import.confirm.text"),
+                                              (unsigned long)[missingChatIDs count]]];
+            [confirmAlert addButtonWithTitle:TGLoc(@"folders.import")];
+            [confirmAlert addButtonWithTitle:TGLoc(@"cancel")];
+            if ([confirmAlert runModal] != NSAlertFirstButtonReturn) {
+                [self.statusField setStringValue:@""];
+                [preview release];
+                [resultError release];
+                [inviteLink release];
+                [client release];
+                return;
+            }
+
+            self.loading = YES;
+            [self.statusField setStringValue:TGLoc(@"folders.import.importing")];
+            NSArray *requestedChatIDs = [missingChatIDs copy];
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                NSAutoreleasePool *importPool = [[NSAutoreleasePool alloc] init];
+                NSError *importError = nil;
+                BOOL imported = [client importChatFolderWithInviteLink:inviteLink
+                                                               chatIDs:requestedChatIDs
+                                                               timeout:8.0
+                                                                 error:&importError];
+                NSError *finalError = [importError retain];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (self.client == client) {
+                        self.loading = NO;
+                        if (imported) {
+                            [self.statusField setStringValue:TGLoc(@"folders.import.done")];
+                            if ([self.delegate respondsToSelector:@selector(chatFolderManagementWindowControllerDidChangeFolders:)]) {
+                                [self.delegate chatFolderManagementWindowControllerDidChangeFolders:self];
+                            }
+                            [self performSelector:@selector(reloadFolders) withObject:nil afterDelay:0.35];
+                        } else {
+                            [self.statusField setStringValue:(finalError ? [finalError localizedDescription] : TGLoc(@"folders.import.error"))];
+                            NSBeep();
+                        }
+                    }
+                    [finalError release];
+                    [requestedChatIDs release];
+                    [preview release];
+                    [resultError release];
+                    [inviteLink release];
+                    [client release];
+                });
+                [importPool drain];
+            });
+        });
+        [pool drain];
+    });
 }
 
 - (void)refreshAction:(id)sender {

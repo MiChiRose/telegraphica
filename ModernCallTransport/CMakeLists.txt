@@ -83,9 +83,14 @@ set(REFLECTOR_PORT_PATCHED_SOURCE
     "${CMAKE_CURRENT_BINARY_DIR}/TGReflectorPortPatched.cpp")
 file(WRITE "${REFLECTOR_PORT_PATCHED_SOURCE}" "${REFLECTOR_PORT_PATCHED_CONTENTS}")
 
+# The legacy camera bridge uses AVFoundation directly because WebRTC's old
+# VideoCaptureModule cannot open every FaceTime camera supported by Mavericks.
+set_source_files_properties(TGModernCallVideoPlatform.cpp PROPERTIES LANGUAGE OBJCXX)
+
 add_library(TelegraphicaCallTransport SHARED
     TGModernCallTransport.mm
-    TGModernCallAudioOnlyPlatform.cpp
+    TGModernCallLegacyClock.cpp
+    TGModernCallVideoPlatform.cpp
     "${TGCALLS_DIR}/CodecSelectHelper.cpp"
     "${TGCALLS_DIR}/CryptoHelper.cpp"
     "${TGCALLS_DIR}/EncryptedConnection.cpp"
@@ -126,6 +131,7 @@ target_include_directories(TelegraphicaCallTransport PRIVATE
     "${TGCALLS_DIR}/v2"
     "${TG_OWT_SOURCE_DIR}/src"
     "${TG_OWT_SOURCE_DIR}/src/third_party/abseil-cpp"
+    "${TG_OWT_SOURCE_DIR}/src/third_party/libyuv/include"
     "${OPENSSL_ROOT}/include"
     "${OPUS_ROOT}/include"
     "${OPUS_ROOT}/include/opus"

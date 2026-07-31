@@ -4,8 +4,15 @@
 
 #include "tgcalls/Instance.h"
 #include "tgcalls/InstanceImpl.h"
+#include "tgcalls/StaticThreads.h"
+#include "tgcalls/VideoCaptureInterface.h"
 #include "tgcalls/platform/PlatformInterface.h"
 #include "tgcalls/v2/InstanceV2Impl.h"
+#include "api/video/i420_buffer.h"
+#include "api/video/video_frame.h"
+#include "api/video/video_sink_interface.h"
+#include "libyuv/convert_argb.h"
+#include "libyuv/rotate.h"
 
 #include <algorithm>
 #include <array>
@@ -25,6 +32,117 @@ struct AudioOutputState {
 
     AudioOutputState() : muted(false) {
     }
+};
+
+class CallbackVideoSink final
+    : public rtc::VideoSinkInterface<webrtc::VideoFrame> {
+public:
+    CallbackVideoSink(bool local,
+                      TGModernCallCallbacks callbacks,
+                      void *context)
+        : _local(local),
+          _callbacks(callbacks),
+          _context(context),
+          _lastFrameAt(std::chrono::steady_clock::time_point::min()) {
+    }
+
+    void OnFrame(const webrtc::VideoFrame &frame) override {
+        if (!_callbacks.videoFrame || frame.width() <= 0 || frame.height() <= 0) {
+            return;
+        }
+        const std::chrono::steady_clock::time_point now =
+            std::chrono::steady_clock::now();
+        if (_lastFrameAt != std::chrono::steady_clock::time_point::min() &&
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - _lastFrameAt).count() < 120) {
+            return;
+        }
+        _lastFrameAt = now;
+
+        rtc::scoped_refptr<webrtc::I420BufferInterface> source =
+            frame.video_frame_buffer()->ToI420();
+        if (!source) {
+            return;
+        }
+        libyuv::RotationMode rotation = libyuv::kRotate0;
+        if (frame.rotation() == webrtc::kVideoRotation_90) {
+            rotation = libyuv::kRotate90;
+        } else if (frame.rotation() == webrtc::kVideoRotation_180) {
+            rotation = libyuv::kRotate180;
+        } else if (frame.rotation() == webrtc::kVideoRotation_270) {
+            rotation = libyuv::kRotate270;
+        }
+        if (rotation != libyuv::kRotate0) {
+            const int sourceWidth = source->width();
+            const int sourceHeight = source->height();
+            const bool swapsDimensions =
+                (rotation == libyuv::kRotate90 || rotation == libyuv::kRotate270);
+            rtc::scoped_refptr<webrtc::I420Buffer> rotated =
+                webrtc::I420Buffer::Create(swapsDimensions ? sourceHeight : sourceWidth,
+                                           swapsDimensions ? sourceWidth : sourceHeight);
+            if (libyuv::I420Rotate(source->DataY(), source->StrideY(),
+                                  source->DataU(), source->StrideU(),
+                                  source->DataV(), source->StrideV(),
+                                  rotated->MutableDataY(), rotated->StrideY(),
+                                  rotated->MutableDataU(), rotated->StrideU(),
+                                  rotated->MutableDataV(), rotated->StrideV(),
+                                  sourceWidth, sourceHeight, rotation) != 0) {
+                return;
+            }
+            source = rotated;
+        }
+        int width = source->width();
+        int height = source->height();
+        // This callback only feeds the AppKit preview. Keeping it modest on
+        // legacy Macs leaves the real-time audio playout thread responsive;
+        // it does not change the encoded video sent to the other participant.
+        if (width > 480 || height > 360) {
+            const double scale = std::min(480.0 / width, 360.0 / height);
+            width = std::max(2, static_cast<int>(width * scale)) & ~1;
+            height = std::max(2, static_cast<int>(height * scale)) & ~1;
+            rtc::scoped_refptr<webrtc::I420Buffer> scaled =
+                webrtc::I420Buffer::Create(width, height);
+            scaled->ScaleFrom(*source);
+            source = scaled;
+        }
+        const int bytesPerRow = width * 4;
+        std::vector<uint8_t> pixels(
+            static_cast<size_t>(bytesPerRow) * static_cast<size_t>(height));
+        if (libyuv::I420ToBGRA(
+                source->DataY(),
+                source->StrideY(),
+                source->DataU(),
+                source->StrideU(),
+                source->DataV(),
+                source->StrideV(),
+                pixels.data(),
+                bytesPerRow,
+                width,
+                height) != 0) {
+            return;
+        }
+        if (!_didLogFirstFrame.exchange(true) && _callbacks.logMessage) {
+            const std::string message = std::string(_local ? "Local" : "Remote") +
+                " video frame received: " + std::to_string(width) + "x" +
+                std::to_string(height) + ".";
+            _callbacks.logMessage(_context, message.c_str());
+        }
+        _callbacks.videoFrame(
+            _context,
+            _local ? 1 : 0,
+            pixels.data(),
+            pixels.size(),
+            width,
+            height,
+            bytesPerRow);
+    }
+
+private:
+    bool _local;
+    TGModernCallCallbacks _callbacks;
+    void *_context;
+    std::chrono::steady_clock::time_point _lastFrameAt;
+    std::atomic<bool> _didLogFirstFrame{false};
 };
 
 /*
@@ -187,6 +305,9 @@ private:
 struct TransportContext {
     std::unique_ptr<tgcalls::Instance> instance;
     std::shared_ptr<AudioOutputState> audioOutputState;
+    std::shared_ptr<tgcalls::VideoCaptureInterface> videoCapture;
+    std::shared_ptr<CallbackVideoSink> localVideoSink;
+    std::shared_ptr<CallbackVideoSink> remoteVideoSink;
     TGModernCallCallbacks callbacks;
     void *callbackContext = nullptr;
 };
@@ -552,6 +673,37 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
         owner->callbacks = callbacks;
         owner->callbackContext = context;
         TransportContext *rawOwner = owner.get();
+        const bool videoCall = [[call objectForKey:@"is_video"] boolValue];
+        if (videoCall) {
+            std::unique_ptr<tgcalls::VideoCaptureInterface> capture =
+                tgcalls::VideoCaptureInterface::Create(
+                    tgcalls::StaticThreads::getThreads(),
+                    "default",
+                    false,
+                    nullptr);
+            if (!capture) {
+                CopyError(@"The camera transport could not be created.",
+                          errorBuffer,
+                          errorBufferLength);
+                return nullptr;
+            }
+            owner->videoCapture =
+                std::shared_ptr<tgcalls::VideoCaptureInterface>(std::move(capture));
+            owner->localVideoSink =
+                std::make_shared<CallbackVideoSink>(true, callbacks, context);
+            owner->remoteVideoSink =
+                std::make_shared<CallbackVideoSink>(false, callbacks, context);
+            owner->videoCapture->setOutput(owner->localVideoSink);
+            owner->videoCapture->setOnFatalError([rawOwner]() {
+                if (rawOwner->callbacks.logMessage) {
+                    rawOwner->callbacks.logMessage(
+                        rawOwner->callbackContext,
+                        "Local camera capture failed; the call remains connected without local video.");
+                }
+            });
+            owner->videoCapture->setState(tgcalls::VideoState::Active);
+            descriptor.videoCapture = owner->videoCapture;
+        }
         descriptor.stateUpdated = [rawOwner](tgcalls::State stateValue) {
             if (rawOwner->callbacks.stateChanged) {
                 rawOwner->callbacks.stateChanged(rawOwner->callbackContext, StateValue(stateValue));
@@ -571,11 +723,21 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
             }
         };
         descriptor.remoteBatteryLevelIsLowUpdated = [](bool value) { (void)value; };
-        descriptor.remoteMediaStateUpdated = [](tgcalls::AudioState audio, tgcalls::VideoState video) {
+        descriptor.remoteMediaStateUpdated = [rawOwner](tgcalls::AudioState audio,
+                                                        tgcalls::VideoState video) {
             (void)audio;
-            (void)video;
+            if (rawOwner->callbacks.remoteVideoStateChanged) {
+                rawOwner->callbacks.remoteVideoStateChanged(
+                    rawOwner->callbackContext,
+                    static_cast<int>(video));
+            }
         };
-        descriptor.remotePrefferedAspectRatioUpdated = [](float value) { (void)value; };
+        descriptor.remotePrefferedAspectRatioUpdated = [rawOwner](float value) {
+            if (rawOwner->videoCapture && std::isfinite(value) &&
+                value >= 0.25f && value <= 4.0f) {
+                rawOwner->videoCapture->setPreferredAspectRatio(value);
+            }
+        };
 
         owner->instance = tgcalls::Meta::Create(UTF8String(version), std::move(descriptor));
         if (!owner->instance) {
@@ -583,6 +745,9 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
                       errorBuffer,
                       errorBufferLength);
             return nullptr;
+        }
+        if (owner->remoteVideoSink) {
+            owner->instance->setIncomingVideoOutput(owner->remoteVideoSink);
         }
         if (callbacks.logMessage) {
             std::string message = std::string("Modern call transport started with protocol ") +
@@ -614,6 +779,14 @@ extern "C" void TGModernCallTransportSetSpeakerMuted(void *transport, int muted)
     TransportContext *owner = static_cast<TransportContext *>(transport);
     if (owner && owner->audioOutputState) {
         owner->audioOutputState->muted.store(muted != 0, std::memory_order_release);
+    }
+}
+
+extern "C" void TGModernCallTransportSetCameraEnabled(void *transport, int enabled) {
+    TransportContext *owner = static_cast<TransportContext *>(transport);
+    if (owner && owner->videoCapture) {
+        owner->videoCapture->setState(
+            enabled ? tgcalls::VideoState::Active : tgcalls::VideoState::Inactive);
     }
 }
 

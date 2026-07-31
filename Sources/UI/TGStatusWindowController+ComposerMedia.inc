@@ -2270,6 +2270,136 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     return [TGPrivacyPermissions requestMicrophonePermission];
 }
 
+- (void)configureComposerRecordingMenu {
+    TGPrivacyPermissionState microphoneState = [TGPrivacyPermissions microphonePermissionState];
+    TGPrivacyPermissionState cameraState = [TGPrivacyPermissions cameraPermissionState];
+    BOOL microphoneAvailable = (microphoneState != TGPrivacyPermissionStateDenied);
+    BOOL cameraAvailable = (cameraState != TGPrivacyPermissionStateDenied);
+
+    if (!cameraAvailable && self.composerVideoNoteMode) {
+        self.composerVideoNoteMode = NO;
+        [[NSUserDefaults standardUserDefaults] setBool:NO
+                                               forKey:TGComposerVideoNoteModeDefaultsKey];
+    } else if (!microphoneAvailable && cameraAvailable) {
+        self.composerVideoNoteMode = YES;
+        [[NSUserDefaults standardUserDefaults] setBool:YES
+                                               forKey:TGComposerVideoNoteModeDefaultsKey];
+    }
+
+    NSMenu *menu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+    if (microphoneAvailable) {
+        NSMenuItem *voiceItem = [[[NSMenuItem alloc]
+            initWithTitle:TGLoc(@"composer.mediaMode.voice")
+                   action:@selector(selectVoiceComposerRecordingMode:)
+            keyEquivalent:@""] autorelease];
+        [voiceItem setTarget:self];
+        [voiceItem setState:(self.composerVideoNoteMode ? NSOffState : NSOnState)];
+        [menu addItem:voiceItem];
+    }
+    if (cameraAvailable) {
+        NSMenuItem *videoItem = [[[NSMenuItem alloc]
+            initWithTitle:TGLoc(@"composer.mediaMode.video")
+                   action:@selector(selectVideoNoteComposerRecordingMode:)
+            keyEquivalent:@""] autorelease];
+        [videoItem setTarget:self];
+        [videoItem setState:(self.composerVideoNoteMode ? NSOnState : NSOffState)];
+        [menu addItem:videoItem];
+    }
+    [self.voiceRecordButton setMenu:([menu numberOfItems] > 0 ? menu : nil)];
+    [self.voiceRecordButton setHidden:(!microphoneAvailable && !cameraAvailable)];
+    [self.voiceRecordButton setTitle:(self.composerVideoNoteMode ? @"video" : @"mic")];
+    [[self.voiceRecordButton cell] setTitle:(self.composerVideoNoteMode ? @"video" : @"mic")];
+    [self.voiceRecordButton setToolTip:TGLoc(self.composerVideoNoteMode
+        ? @"composer.mediaMode.video"
+        : @"composer.mediaMode.voice")];
+}
+
+- (void)composerPrivacyPermissionsDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self configureComposerRecordingMenu];
+    [self layoutContentView];
+}
+
+- (void)selectVoiceComposerRecordingMode:(id)sender {
+    (void)sender;
+    self.composerVideoNoteMode = NO;
+    [[NSUserDefaults standardUserDefaults] setBool:NO
+                                           forKey:TGComposerVideoNoteModeDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self configureComposerRecordingMenu];
+}
+
+- (void)selectVideoNoteComposerRecordingMode:(id)sender {
+    (void)sender;
+    if ([TGPrivacyPermissions cameraPermissionState] == TGPrivacyPermissionStateDenied) {
+        [TGPrivacyPermissions requestCameraPermission];
+        [self configureComposerRecordingMenu];
+        return;
+    }
+    self.composerVideoNoteMode = YES;
+    [[NSUserDefaults standardUserDefaults] setBool:YES
+                                           forKey:TGComposerVideoNoteModeDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self configureComposerRecordingMenu];
+}
+
+- (void)performComposerRecordingAction:(id)sender {
+    if ([self.voiceRecorder isRecording]) {
+        [self toggleVoiceRecording:sender];
+        return;
+    }
+    if (self.composerVideoNoteMode) {
+        [self beginVideoNoteRecording:sender];
+    } else {
+        [self toggleVoiceRecording:sender];
+    }
+}
+
+- (void)beginVideoNoteRecording:(id)sender {
+    (void)sender;
+    BOOL hasMessageTarget = (self.selectedChatID != nil &&
+                             (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
+    if (![self.currentAuthState isEqualToString:@"ready"] || !hasMessageTarget || self.controlsBusy) {
+        return;
+    }
+    if (![TGPrivacyPermissions requestCameraPermission]) {
+        [self configureComposerRecordingMenu];
+        return;
+    }
+
+    BOOL microphoneEnabled = NO;
+    TGPrivacyPermissionState microphoneState = [TGPrivacyPermissions microphonePermissionState];
+    if (microphoneState == TGPrivacyPermissionStateAllowed) {
+        microphoneEnabled = YES;
+    } else if (microphoneState == TGPrivacyPermissionStateNotDetermined) {
+        microphoneEnabled = [TGPrivacyPermissions requestMicrophonePermission];
+    }
+
+    if (!self.videoNoteRecorderWindowController) {
+        TGVideoNoteRecorderWindowController *controller =
+            [[[TGVideoNoteRecorderWindowController alloc] init] autorelease];
+        [controller setDelegate:self];
+        self.videoNoteRecorderWindowController = controller;
+    }
+    [self.videoNoteRecorderWindowController presentWithMicrophoneEnabled:microphoneEnabled];
+}
+
+- (void)videoNoteRecorder:(TGVideoNoteRecorderWindowController *)recorder
+     didFinishVideoAtPath:(NSString *)path {
+    (void)recorder;
+    if ([path length] == 0) {
+        [self requestComposerRefocus];
+        return;
+    }
+    [self sendSharedComposerItemWithKind:@"video_note"
+                                 values:[NSDictionary dictionaryWithObject:path forKey:@"path"]];
+}
+
+- (void)videoNoteRecorderDidCancel:(TGVideoNoteRecorderWindowController *)recorder {
+    (void)recorder;
+    [self requestComposerRefocus];
+}
+
 - (void)toggleVoiceRecording:(id)sender {
     (void)sender;
     BOOL hasMessageTarget = (self.selectedChatID != nil && (!self.showingForumTopicList || self.selectedMessageThreadID != nil));
@@ -2951,6 +3081,29 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [item setTarget:self];
         [formatMenu addItem:item];
     }
+    [formatMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *linkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.link.add")
+                                                       action:@selector(applyComposerLink:)
+                                                keyEquivalent:@""] autorelease];
+    [linkItem setTarget:self];
+    [formatMenu addItem:linkItem];
+
+    NSText *linkEditor = [self.sendTextField currentEditor];
+    NSDictionary *existingLink = nil;
+    if ([linkEditor isKindOfClass:[NSTextView class]]) {
+        NSTextView *linkTextView = (NSTextView *)linkEditor;
+        existingLink = TGComposerLinkInfoForTextSelection([linkTextView string],
+                                                          [linkTextView selectedRange]);
+        if (existingLink) {
+            [linkItem setTitle:TGLoc(@"composer.link.edit")];
+        }
+    }
+    NSMenuItem *removeLinkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.link.remove")
+                                                             action:@selector(removeComposerLink:)
+                                                      keyEquivalent:@""] autorelease];
+    [removeLinkItem setTarget:self];
+    [removeLinkItem setEnabled:(existingLink != nil)];
+    [formatMenu addItem:removeLinkItem];
     [formatItem setSubmenu:formatMenu];
     [menu addItem:formatItem];
     [menu addItem:[NSMenuItem separatorItem]];
@@ -2992,6 +3145,88 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                               object:self.sendTextField]];
 }
 
+- (NSTextView *)activeComposerTextView {
+    NSText *editor = [self.sendTextField currentEditor];
+    if (![editor isKindOfClass:[NSTextView class]]) {
+        [[self window] makeFirstResponder:self.sendTextField];
+        editor = [self.sendTextField currentEditor];
+    }
+    return [editor isKindOfClass:[NSTextView class]] ? (NSTextView *)editor : nil;
+}
+
+- (void)applyComposerLink:(id)sender {
+    (void)sender;
+    NSTextView *textView = [self activeComposerTextView];
+    if (!textView) {
+        return;
+    }
+    NSString *currentText = [textView string];
+    NSRange selection = [textView selectedRange];
+    NSDictionary *existingLink = TGComposerLinkInfoForTextSelection(currentText, selection);
+    NSRange replacementRange = selection;
+    NSString *label = nil;
+    NSString *currentURL = nil;
+    if (existingLink) {
+        replacementRange = [[existingLink objectForKey:TGComposerLinkRangeKey] rangeValue];
+        label = TGComposerPlainTextFromMarkdownLabel([existingLink objectForKey:TGComposerLinkLabelKey]);
+        currentURL = [existingLink objectForKey:TGComposerLinkURLKey];
+    } else if (selection.length > 0 && NSMaxRange(selection) <= [currentText length]) {
+        label = [currentText substringWithRange:selection];
+    }
+    if ([label length] == 0) {
+        [self.statusField setStringValue:TGLoc(@"composer.format.select")];
+        return;
+    }
+
+    NSString *URLString = TGComposerPromptForLinkURL(label, currentURL);
+    if ([URLString length] == 0) {
+        return;
+    }
+    NSString *replacement = TGComposerMarkdownLinkString(label, URLString);
+    [textView replaceCharactersInRange:replacementRange withString:replacement];
+
+    NSString *sentinel = @"\u2063";
+    NSUInteger labelLocation = replacementRange.location + 1;
+    if (![[textView string] hasPrefix:sentinel]) {
+        [textView replaceCharactersInRange:NSMakeRange(0, 0) withString:sentinel];
+        labelLocation += [sentinel length];
+    }
+    NSRange divider = [replacement rangeOfString:@"]("];
+    NSUInteger fallbackLabelLength = (divider.location != NSNotFound && divider.location > 0)
+        ? divider.location - 1 : [label length];
+    NSRange labelSelection = NSMakeRange(labelLocation, fallbackLabelLength);
+    NSDictionary *updatedLink = TGComposerLinkInfoForTextSelection([textView string],
+                                                                   NSMakeRange(labelLocation, 0));
+    if (updatedLink) {
+        labelSelection = [[updatedLink objectForKey:TGComposerLinkLabelRangeKey] rangeValue];
+    }
+    [textView setSelectedRange:labelSelection];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
+    [self.statusField setStringValue:TGLoc(@"composer.link.ready")];
+}
+
+- (void)removeComposerLink:(id)sender {
+    (void)sender;
+    NSTextView *textView = [self activeComposerTextView];
+    if (!textView) {
+        return;
+    }
+    NSDictionary *existingLink = TGComposerLinkInfoForTextSelection([textView string],
+                                                                    [textView selectedRange]);
+    if (!existingLink) {
+        [self.statusField setStringValue:TGLoc(@"composer.link.select")];
+        return;
+    }
+    NSRange linkRange = [[existingLink objectForKey:TGComposerLinkRangeKey] rangeValue];
+    NSString *label = TGComposerPlainTextFromMarkdownLabel([existingLink objectForKey:TGComposerLinkLabelKey]);
+    [textView replaceCharactersInRange:linkRange withString:label];
+    [textView setSelectedRange:NSMakeRange(linkRange.location, [label length])];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
+    [self.statusField setStringValue:TGLoc(@"composer.link.removed")];
+}
+
 - (void)sendMessage:(id)sender {
     (void)sender;
     [self sendMessageWithOptions:nil];
@@ -3019,6 +3254,14 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     (void)sender;
     [self sendMessageWithOptions:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES]
                                                              forKey:@"preview_above_text"]];
+}
+
+- (void)sendMessageWithLinkPreviewOptions:(id)sender {
+    (void)sender;
+    NSDictionary *options = [TGLinkPreviewOptionsDialog sendOptionsForMessageText:[self.sendTextField stringValue]];
+    if (options) {
+        [self sendMessageWithOptions:options];
+    }
 }
 
 - (void)showScheduledMessages:(id)sender {

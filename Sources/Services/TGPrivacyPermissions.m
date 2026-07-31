@@ -7,6 +7,8 @@ NSString * const TGPrivacyPermissionsDidChangeNotification =
 
 static NSString * const TGMicrophonePermissionDefaultsKey =
     @"TelegraphicaMicrophonePermissionDecisionV2";
+static NSString * const TGCameraPermissionDefaultsKey =
+    @"TelegraphicaCameraPermissionDecisionV1";
 static NSString * const TGLocationPermissionDefaultsKey =
     @"TelegraphicaLocationPermissionDecisionV1";
 
@@ -34,6 +36,10 @@ static NSString * const TGLocationPermissionDefaultsKey =
 
 + (TGPrivacyPermissionState)microphonePermissionState {
     return [self permissionStateForKey:TGMicrophonePermissionDefaultsKey];
+}
+
++ (TGPrivacyPermissionState)cameraPermissionState {
+    return [self permissionStateForKey:TGCameraPermissionDefaultsKey];
 }
 
 + (TGPrivacyPermissionState)locationPermissionState {
@@ -75,6 +81,12 @@ static NSString * const TGLocationPermissionDefaultsKey =
                                   defaultsKey:TGMicrophonePermissionDefaultsKey];
 }
 
++ (BOOL)requestCameraPermission {
+    return [self requestPermissionWithTitleKey:@"privacy.permissions.cameraPrompt.title"
+                                   messageKey:@"privacy.permissions.cameraPrompt.message"
+                                  defaultsKey:TGCameraPermissionDefaultsKey];
+}
+
 + (BOOL)requestLocationPermission {
     return [self requestPermissionWithTitleKey:@"privacy.permissions.locationPrompt.title"
                                    messageKey:@"privacy.permissions.locationPrompt.message"
@@ -86,6 +98,13 @@ static NSString * const TGLocationPermissionDefaultsKey =
         ? TGPrivacyPermissionStateAllowed
         : TGPrivacyPermissionStateDenied)
                          key:TGMicrophonePermissionDefaultsKey];
+}
+
++ (void)setCameraAllowed:(BOOL)allowed {
+    [self setPermissionState:(allowed
+        ? TGPrivacyPermissionStateAllowed
+        : TGPrivacyPermissionStateDenied)
+                         key:TGCameraPermissionDefaultsKey];
 }
 
 + (void)setLocationAllowed:(BOOL)allowed {

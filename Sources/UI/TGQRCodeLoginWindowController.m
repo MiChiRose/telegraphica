@@ -1,0 +1,188 @@
+#import "TGQRCodeLoginWindowController.h"
+#import "TGQRCodeImageGenerator.h"
+#import "TGLocalization.h"
+#import "TGStatusButtonCells.h"
+#import "TGStatusViewCells.h"
+#import "TGStatusViewComponents.h"
+#import "TGTheme.h"
+#import "../Core/TGTDLibClient.h"
+
+@interface TGQRCodeLoginBackgroundView : NSView
+@end
+
+@implementation TGQRCodeLoginBackgroundView
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    TGThemeDrawWindowBackgroundInRect([self bounds], [self isFlipped]);
+}
+@end
+
+@interface TGQRCodeLoginWindowController () {
+    TGTDLibClient *_client;
+    NSImageView *_qrImageView;
+    NSTextField *_statusField;
+    NSProgressIndicator *_spinner;
+    BOOL _requestInFlight;
+    BOOL _authenticationRequested;
+    BOOL _closesForCompletedAuthorization;
+    id<TGQRCodeLoginWindowControllerDelegate> _delegate;
+}
+- (void)showQRCodeLink:(NSString *)link;
+- (void)showError:(NSString *)message;
+@end
+
+@implementation TGQRCodeLoginWindowController
+
+@synthesize delegate = _delegate;
+
+static NSTextField *TGQRCodeLoginLabel(NSString *text, NSRect frame, NSFont *font) {
+    NSTextField *label = [[[NSTextField alloc] initWithFrame:frame] autorelease];
+    [label setEditable:NO];
+    [label setSelectable:NO];
+    [label setBordered:NO];
+    [label setDrawsBackground:NO];
+    [label setAlignment:NSCenterTextAlignment];
+    [label setFont:font];
+    [label setStringValue:text ? text : @""];
+    return label;
+}
+
+- (id)initWithClient:(TGTDLibClient *)client {
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 480.0, 520.0)
+                                                   styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                                     backing:NSBackingStoreBuffered
+                                                       defer:NO] autorelease];
+    [window setTitle:TGLoc(@"login.qr.windowTitle")];
+    [window setReleasedWhenClosed:NO];
+    self = [super initWithWindow:window];
+    if (self) {
+        _client = [client retain];
+        [window setDelegate:self];
+
+        TGQRCodeLoginBackgroundView *contentView = [[[TGQRCodeLoginBackgroundView alloc] initWithFrame:NSMakeRect(0.0, 0.0, 480.0, 520.0)] autorelease];
+        [window setContentView:contentView];
+
+        NSTextField *title = TGQRCodeLoginLabel(TGLoc(@"login.qr.title"),
+                                               NSMakeRect(28.0, 474.0, 424.0, 28.0),
+                                               [NSFont boldSystemFontOfSize:20.0]);
+        [title setTextColor:TGClassicHeaderTextColor(1.0)];
+        [contentView addSubview:title];
+
+        NSTextField *hint = TGQRCodeLoginLabel(TGLoc(@"login.qr.hint"),
+                                              NSMakeRect(42.0, 416.0, 396.0, 48.0),
+                                              [NSFont systemFontOfSize:12.0]);
+        [hint setTextColor:TGClassicHeaderDetailTextColor(1.0)];
+        [[hint cell] setLineBreakMode:NSLineBreakByWordWrapping];
+        [contentView addSubview:hint];
+
+        TGGroupedCardView *card = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(48.0, 46.0, 384.0, 358.0)] autorelease];
+        [contentView addSubview:card];
+
+        _qrImageView = [[NSImageView alloc] initWithFrame:NSMakeRect(90.0, 96.0, 300.0, 300.0)];
+        [_qrImageView setImageScaling:NSImageScaleProportionallyUpOrDown];
+        [contentView addSubview:_qrImageView];
+
+        _spinner = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(227.0, 233.0, 26.0, 26.0)];
+        [_spinner setStyle:NSProgressIndicatorSpinningStyle];
+        [_spinner setDisplayedWhenStopped:NO];
+        [contentView addSubview:_spinner];
+
+        _statusField = [TGQRCodeLoginLabel(TGLoc(@"login.qr.loading"),
+                                          NSMakeRect(70.0, 58.0, 340.0, 26.0),
+                                          [NSFont systemFontOfSize:12.0]) retain];
+        [_statusField setTextColor:TGClassicCardMutedInkColor()];
+        [[_statusField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+        [contentView addSubview:_statusField];
+
+    }
+    return self;
+}
+
+- (void)dealloc {
+    _delegate = nil;
+    [_client release];
+    [_qrImageView release];
+    [_statusField release];
+    [_spinner release];
+    [super dealloc];
+}
+
+- (void)beginQRCodeAuthentication {
+    if (_requestInFlight) {
+        return;
+    }
+    _authenticationRequested = YES;
+    _closesForCompletedAuthorization = NO;
+    _requestInFlight = YES;
+    [_spinner startAnimation:self];
+    [_statusField setStringValue:TGLoc(@"login.qr.loading")];
+
+    TGTDLibClient *client = [_client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        NSString *link = [[client requestQRCodeAuthenticationWithTimeout:8.0 error:&error] copy];
+        NSString *message = [[error localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            _requestInFlight = NO;
+            [_spinner stopAnimation:self];
+            if ([link length] > 0) {
+                [self showQRCodeLink:link];
+            } else {
+                [self showError:([message length] > 0 ? message : TGLoc(@"login.qr.failed"))];
+            }
+            [link release];
+            [message release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)showQRCodeLink:(NSString *)link {
+    NSImage *image = [TGQRCodeImageGenerator imageForString:link maximumSide:300.0];
+    if (!image) {
+        [self showError:TGLoc(@"login.qr.failed")];
+        return;
+    }
+    [_qrImageView setImage:image];
+    [_statusField setStringValue:TGLoc(@"login.qr.ready")];
+}
+
+- (void)showError:(NSString *)message {
+    [_qrImageView setImage:nil];
+    [_statusField setTextColor:[NSColor colorWithCalibratedRed:0.72 green:0.12 blue:0.10 alpha:1.0]];
+    [_statusField setStringValue:message ? message : TGLoc(@"login.qr.failed")];
+}
+
+- (void)refreshQRCodeFromClient {
+    NSString *link = [_client currentAuthenticationQRCodeLink];
+    if ([link length] > 0) {
+        [_statusField setTextColor:TGClassicCardMutedInkColor()];
+        [self showQRCodeLink:link];
+    }
+}
+
+- (void)authorizationStateDidChange:(NSString *)state {
+    if ([state isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        [self refreshQRCodeFromClient];
+        return;
+    }
+    if ([state isEqualToString:@"waitPassword"] || [state isEqualToString:@"ready"]) {
+        _closesForCompletedAuthorization = YES;
+        [[self window] close];
+    }
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    (void)notification;
+    [_spinner stopAnimation:self];
+    if (_authenticationRequested && !_closesForCompletedAuthorization) {
+        id<TGQRCodeLoginWindowControllerDelegate> delegate = _delegate;
+        if ([delegate respondsToSelector:@selector(qrCodeLoginWindowControllerDidCancel:)]) {
+            [delegate qrCodeLoginWindowControllerDidCancel:self];
+        }
+    }
+}
+
+@end

@@ -71,7 +71,11 @@
     self.botCommandPanelVisible = canShow;
     [self layoutContentView];
     if (canShow) {
-        [self.botCommandPanelView loadCommandsForUserID:self.selectedBotUserID];
+        if (self.activeBotReplyMarkup) {
+            [self.botCommandPanelView showReplyMarkup:self.activeBotReplyMarkup];
+        } else {
+            [self.botCommandPanelView loadCommandsForUserID:self.selectedBotUserID];
+        }
     }
     if (!animated || ![[self window] isVisible]) {
         [self.botCommandPanelView setHidden:!canShow];
@@ -175,20 +179,34 @@
         return;
     }
     if (self.activeBotReplyMarkup && self.activeBotReplyMarkupMessageID) {
-        [[self.botKeyboardWindowController window] close];
-        self.botKeyboardWindowController = [[[TGBotKeyboardWindowController alloc] initWithClient:self.client
-                                                                                           chatID:self.selectedChatID
-                                                                                        messageID:self.activeBotReplyMarkupMessageID
-                                                                                      replyMarkup:self.activeBotReplyMarkup] autorelease];
-        [self.botKeyboardWindowController showWindow:self];
-        [[self.botKeyboardWindowController window] center];
-        [[self.botKeyboardWindowController window] makeKeyAndOrderFront:self];
+        [self setBotCommandPanelVisible:!self.botCommandPanelVisible animated:YES];
         return;
     }
     NSBeep();
 }
 
 - (void)botCommandChosen:(NSDictionary *)command {
+    if ([[command objectForKey:@"tg_panel_kind"] isEqualToString:@"reply"]) {
+        NSDictionary *type = [[command objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+            ? [command objectForKey:@"type"] : nil;
+        NSString *typeName = [[type objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [type objectForKey:@"@type"] : @"";
+        NSString *text = [[command objectForKey:@"text"] isKindOfClass:[NSString class]]
+            ? [command objectForKey:@"text"] : @"";
+        if ([typeName isEqualToString:@"keyboardButtonTypeText"] || [typeName length] == 0) {
+            [self.sendTextField setStringValue:text];
+            [self setBotCommandPanelVisible:NO animated:YES];
+            [self sendMessage:nil];
+        } else {
+            NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+            [alert setMessageText:TGLoc(@"bot.keyboard.title")];
+            [alert setInformativeText:([typeName rangeOfString:@"WebApp"].location != NSNotFound)
+                ? TGLoc(@"bot.webApp.officialOnly") : TGLoc(@"bot.personalData.manualOnly")];
+            [alert addButtonWithTitle:TGLoc(@"ok")];
+            [alert runModal];
+        }
+        return;
+    }
     NSString *name = [[command objectForKey:@"command"] isKindOfClass:[NSString class]]
         ? [command objectForKey:@"command"] : @"";
     if ([name length] == 0) {

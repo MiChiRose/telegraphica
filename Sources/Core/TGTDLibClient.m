@@ -252,6 +252,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_notificationScopeMutedByType;
     NSMutableDictionary *_savedMessagesTopicsByID;
     NSString *_latestAuthorizationStateSummary;
+    NSString *_latestAuthenticationQRCodeLink;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
@@ -319,6 +320,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
+- (BOOL)isCommunityChatObject:(NSDictionary *)chatObject;
 - (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject;
 - (BOOL)scopeNotificationsMutedForType:(NSString *)scopeType timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID;
@@ -331,6 +333,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                       timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
 - (BOOL)shouldAutoDownloadMessageContentObject:(id)contentObject downloadableInfo:(NSDictionary *)downloadableInfo;
+- (NSDictionary *)linkPreviewInfoFromMessageContentObject:(id)contentObject
+                                           downloadMissing:(BOOL)downloadMissing
+                                                   timeout:(NSTimeInterval)timeout
+                                        didRequestDownload:(BOOL *)didRequestDownload;
 - (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)replyContextForMessageObject:(NSDictionary *)messageObject chatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout;
 - (NSString *)messageContentPreviewForObject:(id)contentObject;
@@ -505,6 +511,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     _networkProxyBootstrapAttempted = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
+    [_latestAuthenticationQRCodeLink release];
+    _latestAuthenticationQRCodeLink = nil;
     _mainChatListExhausted = NO;
     [_responseCondition broadcast];
     [_responseCondition unlock];
@@ -535,6 +543,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_savedMessagesTopicsByID release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
+    [_latestAuthenticationQRCodeLink release];
     [_sendLock release];
     [_receiverThread release];
     [_loadedPath release];
@@ -1261,6 +1270,22 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
     NSString *objectType = [[dictionary objectForKey:@"@type"] isKindOfClass:[NSString class]]
         ? [dictionary objectForKey:@"@type"] : @"";
+    NSDictionary *authorizationStateObject = nil;
+    if ([objectType isEqualToString:@"updateAuthorizationState"]) {
+        id state = [dictionary objectForKey:@"authorization_state"];
+        if ([state isKindOfClass:[NSDictionary class]]) {
+            authorizationStateObject = state;
+        }
+    } else if ([objectType hasPrefix:@"authorizationState"]) {
+        authorizationStateObject = dictionary;
+    }
+    NSString *qrCodeLink = nil;
+    if ([[authorizationStateObject objectForKey:@"@type"] isEqualToString:@"authorizationStateWaitOtherDeviceConfirmation"]) {
+        id link = [authorizationStateObject objectForKey:@"link"];
+        if ([link isKindOfClass:[NSString class]] && [(NSString *)link length] > 0) {
+            qrCodeLink = link;
+        }
+    }
     id extraObject = [dictionary objectForKey:@"@extra"];
     NSArray *chatFilterInfos = [self chatFilterInfoItemsFromUpdateObject:dictionary];
     NSString *scopeUpdateType = nil;
@@ -1281,9 +1306,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     [_responseCondition lock];
-    if ([authorizationSummary length] > 0) {
+    BOOL isAuthorizationUpdate = [objectType isEqualToString:@"updateAuthorizationState"];
+    BOOL shouldSeedAuthorizationCache = ([authorizationSummary length] > 0 &&
+                                         isAuthorizationUpdate);
+    if (shouldSeedAuthorizationCache) {
         [_latestAuthorizationStateSummary release];
         _latestAuthorizationStateSummary = [authorizationSummary copy];
+        [_latestAuthenticationQRCodeLink release];
+        _latestAuthenticationQRCodeLink = [qrCodeLink copy];
         _authorizationStateGeneration++;
     }
 
@@ -3408,8 +3438,30 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if ([(NSString *)type isEqualToString:@"chatTypeSecret"]) {
         return @"Secret";
     }
+    if ([(NSString *)type rangeOfString:@"community" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        return @"Community";
+    }
 
     return @"Chat";
+}
+
+- (BOOL)isCommunityChatObject:(NSDictionary *)chatObject {
+    if (![chatObject isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    id flag = [chatObject objectForKey:@"is_community"];
+    if ([flag respondsToSelector:@selector(boolValue)] && [flag boolValue]) {
+        return YES;
+    }
+    id communityID = [chatObject objectForKey:@"community_id"];
+    if ([communityID respondsToSelector:@selector(longLongValue)] && [communityID longLongValue] != 0LL) {
+        return YES;
+    }
+    NSDictionary *type = [[chatObject objectForKey:@"type"] isKindOfClass:[NSDictionary class]]
+        ? [chatObject objectForKey:@"type"] : nil;
+    NSString *typeName = [[type objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [type objectForKey:@"@type"] : @"";
+    return ([typeName rangeOfString:@"community" options:NSCaseInsensitiveSearch].location != NSNotFound);
 }
 
 - (NSDictionary *)chatPositionFromChatObject:(NSDictionary *)chatObject chatListType:(NSString *)chatListType filterID:(NSNumber *)filterID {
@@ -3506,10 +3558,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                      title:title
                                                typeSummary:typeSummary
                                                unreadCount:unreadCount] autorelease];
+    [item setCommunity:[self isCommunityChatObject:chatResponse]];
     [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:chatListType filterID:filterID];
     BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
     [item setServerNotificationsMuted:serverMuted];
     [item setNotificationsMuted:serverMuted];
+    id markedAsUnreadValue = [chatResponse objectForKey:@"is_marked_as_unread"];
+    [item setMarkedAsUnread:([markedAsUnreadValue respondsToSelector:@selector(boolValue)] &&
+                             [markedAsUnreadValue boolValue])];
     id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
     if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
         [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
@@ -3603,10 +3659,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        [item setCommunity:[self isCommunityChatObject:chatResponse]];
         [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:@"chatListMain" filterID:nil];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
+        id markedAsUnreadValue = [chatResponse objectForKey:@"is_marked_as_unread"];
+        [item setMarkedAsUnread:([markedAsUnreadValue respondsToSelector:@selector(boolValue)] &&
+                                 [markedAsUnreadValue boolValue])];
         id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
         if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
@@ -3939,6 +3999,28 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [[(NSDictionary *)userType objectForKey:@"@type"] isEqualToString:@"userTypeBot"]) {
         [summary setObject:[NSNumber numberWithBool:YES] forKey:@"is_bot"];
     }
+    NSArray *booleanProfileKeys = [NSArray arrayWithObjects:
+                                   @"is_contact",
+                                   @"is_mutual_contact",
+                                   @"is_verified",
+                                   @"is_support",
+                                   @"is_scam",
+                                   @"is_fake",
+                                   nil];
+    NSUInteger booleanKeyIndex = 0;
+    for (booleanKeyIndex = 0; booleanKeyIndex < [booleanProfileKeys count]; booleanKeyIndex++) {
+        NSString *key = [booleanProfileKeys objectAtIndex:booleanKeyIndex];
+        id value = [userObject objectForKey:key];
+        if ([value respondsToSelector:@selector(boolValue)]) {
+            [summary setObject:[NSNumber numberWithBool:[value boolValue]] forKey:key];
+        }
+    }
+    NSDictionary *verificationStatus = [[userObject objectForKey:@"verification_status"]
+        isKindOfClass:[NSDictionary class]] ? [userObject objectForKey:@"verification_status"] : nil;
+    NSString *verificationType = [verificationStatus objectForKey:@"@type"];
+    if ([verificationType isKindOfClass:[NSString class]]) {
+        [summary setObject:verificationType forKey:@"verification_status_type"];
+    }
     id status = [userObject objectForKey:@"status"];
     if ([status isKindOfClass:[NSDictionary class]]) {
         NSString *statusType = [(NSDictionary *)status objectForKey:@"@type"];
@@ -4137,6 +4219,20 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         NSString *bio = [self textFromFormattedTextObject:[fullInfoResponse objectForKey:@"bio"]];
         if ([bio length] > 0) {
             [summary setObject:bio forKey:@"bio"];
+        }
+        NSDictionary *birthdate = [fullInfoResponse objectForKey:@"birthdate"];
+        NSInteger birthDay = [[birthdate objectForKey:@"day"] integerValue];
+        NSInteger birthMonth = [[birthdate objectForKey:@"month"] integerValue];
+        NSInteger birthYear = [[birthdate objectForKey:@"year"] integerValue];
+        if ([birthdate isKindOfClass:[NSDictionary class]] &&
+            birthDay >= 1 && birthDay <= 31 &&
+            birthMonth >= 1 && birthMonth <= 12) {
+            [summary setObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSNumber numberWithInteger:birthDay], @"day",
+                                [NSNumber numberWithInteger:birthMonth], @"month",
+                                [NSNumber numberWithInteger:MAX(0, birthYear)], @"year",
+                                nil]
+                        forKey:@"birthdate"];
         }
     }
     return summary;
@@ -4734,10 +4830,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                          title:title
                                                    typeSummary:typeSummary
                                                    unreadCount:unreadCount] autorelease];
+        [item setCommunity:[self isCommunityChatObject:chatResponse]];
         [self applyChatPositionFromChatObject:chatResponse toChatItem:item chatListType:chatListType filterID:filterID];
         BOOL serverMuted = [self chatNotificationsMutedFromObject:chatResponse];
         [item setServerNotificationsMuted:serverMuted];
         [item setNotificationsMuted:serverMuted];
+        id markedAsUnreadValue = [chatResponse objectForKey:@"is_marked_as_unread"];
+        [item setMarkedAsUnread:([markedAsUnreadValue respondsToSelector:@selector(boolValue)] &&
+                                 [markedAsUnreadValue boolValue])];
         id lastReadInboxValue = [chatResponse objectForKey:@"last_read_inbox_message_id"];
         if ([lastReadInboxValue respondsToSelector:@selector(longLongValue)]) {
             [item setLastReadInboxMessageID:[NSNumber numberWithLongLong:[lastReadInboxValue longLongValue]]];
@@ -5105,6 +5205,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [topicInfo setObject:[NSNumber numberWithLongLong:[topicID longLongValue]] forKey:@"forum_topic_id"];
         [topicInfo setObject:(usingLegacyForumTopicSchema ? @"forum_legacy" : @"forum") forKey:@"message_topic_kind"];
         [topicInfo setObject:unreadCount forKey:@"unread_count"];
+        id closedValue = [info objectForKey:@"is_closed"];
+        if (![closedValue respondsToSelector:@selector(boolValue)]) {
+            closedValue = [topic objectForKey:@"is_closed"];
+        }
+        id pinnedValue = [info objectForKey:@"is_pinned"];
+        if (![pinnedValue respondsToSelector:@selector(boolValue)]) {
+            pinnedValue = [topic objectForKey:@"is_pinned"];
+        }
+        [topicInfo setObject:[NSNumber numberWithBool:([closedValue respondsToSelector:@selector(boolValue)] && [closedValue boolValue])]
+                      forKey:@"is_closed"];
+        [topicInfo setObject:[NSNumber numberWithBool:([pinnedValue respondsToSelector:@selector(boolValue)] && [pinnedValue boolValue])]
+                      forKey:@"is_pinned"];
         [topics addObject:topicInfo];
     }
 
@@ -5833,6 +5945,124 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                    didRequestDownload:didRequestDownload];
     }
     return nil;
+}
+
+- (NSDictionary *)linkPreviewMediaInfoFromTypeObject:(id)typeObject
+                                      downloadMissing:(BOOL)downloadMissing
+                                              timeout:(NSTimeInterval)timeout
+                                   didRequestDownload:(BOOL *)didRequestDownload {
+    if (![typeObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *type = (NSDictionary *)typeObject;
+    NSArray *photoKeys = [NSArray arrayWithObjects:@"photo", @"cover", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [photoKeys count]; index++) {
+        id photoObject = [type objectForKey:[photoKeys objectAtIndex:index]];
+        if (![photoObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *photoInfo = [self photoInfoFromPhotoSizes:[(NSDictionary *)photoObject objectForKey:@"sizes"]
+                                                downloadMissing:downloadMissing
+                                                        timeout:timeout
+                                             didRequestDownload:didRequestDownload];
+        NSMutableDictionary *info = photoInfo
+            ? [NSMutableDictionary dictionaryWithDictionary:photoInfo]
+            : [NSMutableDictionary dictionary];
+        [self addMiniThumbnailFromContainerObject:(NSDictionary *)photoObject toMediaInfo:info];
+        if ([info count] > 0) {
+            return info;
+        }
+    }
+
+    NSArray *containerKeys = [NSArray arrayWithObjects:
+                              @"thumbnail",
+                              @"animation",
+                              @"video",
+                              @"document",
+                              @"sticker",
+                              @"audio",
+                              nil];
+    for (index = 0; index < [containerKeys count]; index++) {
+        id containerObject = [type objectForKey:[containerKeys objectAtIndex:index]];
+        if (![containerObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *mediaInfo = [self visualMediaInfoFromContainerObject:containerObject
+                                                            downloadMissing:downloadMissing
+                                                                    timeout:timeout
+                                                         didRequestDownload:didRequestDownload];
+        if ([mediaInfo count] > 0) {
+            return mediaInfo;
+        }
+    }
+    return nil;
+}
+
+- (NSDictionary *)linkPreviewInfoFromMessageContentObject:(id)contentObject
+                                           downloadMissing:(BOOL)downloadMissing
+                                                   timeout:(NSTimeInterval)timeout
+                                        didRequestDownload:(BOOL *)didRequestDownload {
+    if (![contentObject isKindOfClass:[NSDictionary class]] ||
+        ![[(NSDictionary *)contentObject objectForKey:@"@type"] isEqualToString:@"messageText"]) {
+        return nil;
+    }
+
+    id previewObject = [(NSDictionary *)contentObject objectForKey:@"link_preview"];
+    if (![previewObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSDictionary *preview = (NSDictionary *)previewObject;
+    NSString *url = [self trimmedStringValue:[preview objectForKey:@"url"]];
+    if ([url length] == 0) {
+        return nil;
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    [info setObject:url forKey:@"url"];
+    NSArray *stringKeys = [NSArray arrayWithObjects:
+                           @"display_url",
+                           @"site_name",
+                           @"title",
+                           @"author",
+                           nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [stringKeys count]; index++) {
+        NSString *key = [stringKeys objectAtIndex:index];
+        NSString *value = [self trimmedStringValue:[preview objectForKey:key]];
+        if ([value length] > 0) {
+            [info setObject:value forKey:key];
+        }
+    }
+    NSString *description = [self textFromFormattedTextObject:[preview objectForKey:@"description"]];
+    description = [self singleLineTrimmedString:description maximumLength:420];
+    if ([description length] > 0) {
+        [info setObject:description forKey:@"description"];
+    }
+
+    NSArray *booleanKeys = [NSArray arrayWithObjects:
+                            @"has_large_media",
+                            @"show_large_media",
+                            @"show_media_above_description",
+                            @"show_above_text",
+                            nil];
+    for (index = 0; index < [booleanKeys count]; index++) {
+        NSString *key = [booleanKeys objectAtIndex:index];
+        id value = [preview objectForKey:key];
+        if ([value respondsToSelector:@selector(boolValue)]) {
+            [info setObject:[NSNumber numberWithBool:[value boolValue]] forKey:key];
+        }
+    }
+
+    NSDictionary *mediaInfo = [self linkPreviewMediaInfoFromTypeObject:[preview objectForKey:@"type"]
+                                                        downloadMissing:downloadMissing
+                                                                timeout:timeout
+                                                     didRequestDownload:didRequestDownload];
+    if ([mediaInfo count] > 0) {
+        [info setObject:mediaInfo forKey:@"media"];
+    }
+    return info;
 }
 
 - (NSDictionary *)playableMediaInfoFromContainerObject:(id)containerObject
@@ -6862,6 +7092,39 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 [item setFormattedEntities:entities];
             }
         }
+        if ([contentType isEqualToString:@"messageText"]) {
+            NSDictionary *linkPreviewInfo = [self linkPreviewInfoFromMessageContentObject:contentObject
+                                                                          downloadMissing:NO
+                                                                                  timeout:0.0
+                                                                       didRequestDownload:NULL];
+            NSDictionary *linkPreviewMedia = [linkPreviewInfo objectForKey:@"media"];
+            NSString *linkPreviewMediaPath = [linkPreviewMedia objectForKey:@"local_path"];
+            id linkPreviewMediaSize = [linkPreviewMedia objectForKey:@"file_size"];
+            long long declaredLinkPreviewBytes = [linkPreviewMediaSize respondsToSelector:@selector(longLongValue)]
+                ? [linkPreviewMediaSize longLongValue] : 0;
+            BOOL canAutoDownloadPreview = ([linkPreviewInfo count] > 0 &&
+                                           [linkPreviewMedia count] > 0 &&
+                                           [linkPreviewMediaPath length] == 0 &&
+                                           visualMediaDownloadsRemaining > 0 &&
+                                           TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto",
+                                                                                               declaredLinkPreviewBytes));
+            if (canAutoDownloadPreview) {
+                BOOL didRequestLinkPreviewDownload = NO;
+                NSDictionary *downloadedLinkPreviewInfo = [self linkPreviewInfoFromMessageContentObject:contentObject
+                                                                                         downloadMissing:YES
+                                                                                                 timeout:1.5
+                                                                                      didRequestDownload:&didRequestLinkPreviewDownload];
+                if ([downloadedLinkPreviewInfo count] > 0) {
+                    linkPreviewInfo = downloadedLinkPreviewInfo;
+                }
+                if (didRequestLinkPreviewDownload && visualMediaDownloadsRemaining > 0) {
+                    visualMediaDownloadsRemaining--;
+                }
+            }
+            if ([linkPreviewInfo count] > 0) {
+                [item setLinkPreviewInfo:linkPreviewInfo];
+            }
+        }
         NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(message);
         if (capabilities) {
             [item setCapabilitiesKnown:YES];
@@ -7178,6 +7441,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 [topicItem setLastReadOutboxMessageID:[NSNumber numberWithLongLong:[lastReadOutboxValue longLongValue]]];
             }
             [topicItem setForumTopic:YES];
+            [topicItem setForumTopicClosed:[[topic objectForKey:@"is_closed"] boolValue]];
+            [topicItem setForumTopicPinned:[[topic objectForKey:@"is_pinned"] boolValue]];
             [topicItem setParentChatID:chatID];
             [topicItem setMessageThreadID:[NSNumber numberWithLongLong:[threadID longLongValue]]];
             [topicItem setMessageTopicKind:topicKind];
@@ -7701,6 +7966,37 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [items count] > 0 ? [items objectAtIndex:0] : nil;
 }
 
+- (TGMessageItem *)messagePreviewItemForChatID:(NSNumber *)chatID unixDate:(NSInteger)unixDate timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || [chatID longLongValue] == 0 || unixDate <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat and date are required for message lookup." code:390];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"getChatMessageByDate" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithInteger:unixDate] forKey:@"date"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-get-message-by-date"
+                                                           timeout:timeout
+                                                         errorCode:391
+                                                             error:error];
+    if (!response) {
+        return nil;
+    }
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"message"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"No message was found near the selected date." code:392];
+        }
+        return nil;
+    }
+    NSArray *items = [self messagePreviewItemsFromMessages:[NSArray arrayWithObject:response] chatID:chatID];
+    return [items count] > 0 ? [items objectAtIndex:0] : nil;
+}
+
 - (NSArray *)messageContextPreviewItemsForChatID:(NSNumber *)chatID
                                 messageThreadID:(NSNumber *)messageThreadID
                                messageTopicKind:(NSString *)messageTopicKind
@@ -7988,6 +8284,43 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return YES;
 }
 
+- (BOOL)setChatWithID:(NSNumber *)chatID markedAsUnread:(BOOL)markedAsUnread timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] || [chatID longLongValue] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat identifier is missing." code:393];
+        }
+        return NO;
+    }
+
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error && *error == nil) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to change the unread state. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:394];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"toggleChatIsMarkedAsUnread" forKey:@"@type"];
+    [request setObject:chatID forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithBool:markedAsUnread] forKey:@"is_marked_as_unread"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-chat-marked-unread"
+                                                           timeout:timeout
+                                                         errorCode:395
+                                                             error:error];
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error && *error == nil) {
+            *error = [self errorWithDescription:@"TDLib returned an unexpected unread-state response." code:396];
+        }
+        return NO;
+    }
+    return YES;
+}
+
 - (BOOL)toggleChatPinnedForChatID:(NSNumber *)chatID chatFilterID:(NSNumber *)chatFilterID pinned:(BOOL)pinned timeout:(NSTimeInterval)timeout error:(NSError **)error {
     return [self toggleChatPinnedForChatID:chatID
                              chatFilterID:chatFilterID
@@ -8138,6 +8471,46 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return NO;
     }
     return YES;
+}
+
+- (BOOL)stopPollForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0LL ||
+        [messageID longLongValue] == 0LL) {
+        if (error) {
+            *error = [self errorWithDescription:@"Chat or poll message identifier is missing." code:155];
+        }
+        return NO;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to stop polls. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:156];
+        }
+        return NO;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"stopPoll" forKey:@"@type"];
+    [request setObject:[NSNumber numberWithLongLong:[chatID longLongValue]] forKey:@"chat_id"];
+    [request setObject:[NSNumber numberWithLongLong:[messageID longLongValue]] forKey:@"message_id"];
+    [request setObject:[NSNull null] forKey:@"reply_markup"];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-stop-poll"
+                                                           timeout:timeout
+                                                         errorCode:157
+                                                             error:error];
+    NSString *responseType = [response objectForKey:@"@type"];
+    if ([responseType isEqualToString:@"ok"] || [responseType isEqualToString:@"poll"]) {
+        return YES;
+    }
+    if (error && *error == nil) {
+        *error = [self errorWithDescription:@"TDLib did not confirm that the poll was stopped." code:157];
+    }
+    return NO;
 }
 
 - (BOOL)setDraftMessageForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind text:(NSString *)text replyToMessageID:(NSNumber *)replyToMessageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -8323,13 +8696,20 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [content setObject:[NSNumber numberWithBool:YES] forKey:@"clear_draft"];
     BOOL disableLinkPreview = [[sendOptions objectForKey:@"disable_link_preview"] boolValue];
     BOOL previewAboveText = [[sendOptions objectForKey:@"preview_above_text"] boolValue];
-    if (disableLinkPreview || previewAboveText) {
+    BOOL previewLargeMedia = [[sendOptions objectForKey:@"preview_large_media"] boolValue];
+    BOOL previewSmallMedia = [[sendOptions objectForKey:@"preview_small_media"] boolValue];
+    NSString *linkPreviewURL = [sendOptions objectForKey:@"link_preview_url"];
+    if (![linkPreviewURL isKindOfClass:[NSString class]]) {
+        linkPreviewURL = @"";
+    }
+    if (disableLinkPreview || previewAboveText || previewLargeMedia ||
+        previewSmallMedia || [linkPreviewURL length] > 0) {
         NSDictionary *linkPreviewOptions = [NSDictionary dictionaryWithObjectsAndKeys:
                                             @"linkPreviewOptions", @"@type",
                                             [NSNumber numberWithBool:disableLinkPreview], @"is_disabled",
-                                            @"", @"url",
-                                            [NSNumber numberWithBool:NO], @"force_small_media",
-                                            [NSNumber numberWithBool:NO], @"force_large_media",
+                                            linkPreviewURL, @"url",
+                                            [NSNumber numberWithBool:previewSmallMedia], @"force_small_media",
+                                            [NSNumber numberWithBool:previewLargeMedia], @"force_large_media",
                                             [NSNumber numberWithBool:previewAboveText], @"show_above_text",
                                             nil];
         [content setObject:linkPreviewOptions forKey:@"link_preview_options"];
@@ -10531,6 +10911,98 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        if (error) {
+            NSString *message = [NSString stringWithFormat:@"TDLib has no pending QR authentication to cancel. Current auth state: %@",
+                                 authorizationState ? authorizationState : @"unknown"];
+            *error = [self errorWithDescription:message code:397];
+        }
+        return nil;
+    }
+
+    /*
+     * TDLib has no separate cancelQrCodeAuthentication function. In the
+     * unauthenticated waitOtherDeviceConfirmation state, logOut destroys only
+     * the temporary authentication keys and clears the persisted QR state.
+     * The ready-session logout path above remains guarded separately.
+     */
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"logOut" forKey:@"@type"];
+    NSString *extra = [self uniqueExtraWithPrefix:@"telegraphica-cancel-qr-auth"];
+    [request setObject:extra forKey:@"@extra"];
+    NSUInteger generation = [self authorizationStateGeneration];
+    NSError *responseError = nil;
+    NSDictionary *response = [self sendTDLibRequest:request
+                                    waitingForExtra:extra
+                                            timeout:timeout
+                                          errorCode:398
+                                              error:&responseError];
+    if (!response) {
+        if (error) {
+            *error = responseError ? responseError : [self errorWithDescription:@"TDLib did not acknowledge QR authentication cancellation before timeout." code:398];
+        }
+        return nil;
+    }
+
+    id responseType = [response objectForKey:@"@type"];
+    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib QR authentication cancellation returned an unexpected response." code:399];
+        }
+        return nil;
+    }
+
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSString *waitingState = @"waitOtherDeviceConfirmation";
+    NSUInteger waitingGeneration = generation;
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        NSString *cachedSummary = [self cachedAuthorizationStateSummary];
+        if ([cachedSummary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"QR authentication canceled; auth state: closed";
+        }
+        if ([cachedSummary isEqualToString:@"waitPhoneNumber"]) {
+            return @"QR authentication canceled; auth state: waitPhoneNumber";
+        }
+
+        NSTimeInterval remaining = [deadline timeIntervalSinceNow];
+        if (remaining <= 0.0) {
+            break;
+        }
+        NSString *summary = [self waitForAuthorizationStateDifferentFromState:waitingState
+                                                              afterGeneration:waitingGeneration
+                                                                      timeout:remaining];
+        if ([summary length] == 0) {
+            break;
+        }
+        if ([summary hasPrefix:@"error"]) {
+            if (error) {
+                *error = [self errorWithDescription:[NSString stringWithFormat:@"TDLib rejected QR authentication cancellation: %@", summary] code:400];
+            }
+            return nil;
+        }
+        if ([summary isEqualToString:@"closed"]) {
+            [self destroyTDLibClient];
+            return @"QR authentication canceled; auth state: closed";
+        }
+        if ([summary isEqualToString:@"waitPhoneNumber"]) {
+            return @"QR authentication canceled; auth state: waitPhoneNumber";
+        }
+
+        waitingState = summary;
+        waitingGeneration = [self authorizationStateGeneration];
+    }
+
+    /*
+     * The logOut response means TDLib accepted destruction of the temporary
+     * QR keys. The owning controller still closes this client and starts a
+     * fresh one, so a slow terminal update must not resurrect QR-only UI.
+     */
+    return @"QR authentication cancellation accepted; restarting authentication";
+}
+
 - (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
     if (![authorizationState isEqualToString:@"ready"]) {
@@ -11018,6 +11490,68 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:trimmedPhone forKey:@"phone_number"];
     [request setObject:[NSNull null] forKey:@"settings"];
     return [self sendAuthorizationRequest:request actionName:@"phone number" waitingState:@"waitPhoneNumber" timeout:timeout errorCode:25 error:error];
+}
+
+- (NSString *)requestQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPhoneNumber"] &&
+        ![authorizationState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        if (error && [authorizationState length] > 0) {
+            NSString *message = [NSString stringWithFormat:@"QR sign-in is unavailable while TDLib is in %@.", authorizationState];
+            *error = [self errorWithDescription:message code:230];
+        }
+        return nil;
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:@"requestQrCodeAuthentication" forKey:@"@type"];
+    [request setObject:[NSArray array] forKey:@"other_user_ids"];
+
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-auth-qr"
+                                                            timeout:timeout
+                                                          errorCode:231
+                                                              error:error];
+    NSString *responseType = [[response objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [response objectForKey:@"@type"] : nil;
+    if (![responseType isEqualToString:@"ok"]) {
+        if (response && error) {
+            *error = [self errorWithTDLibErrorResponse:response code:231];
+        }
+        return nil;
+    }
+
+    NSTimeInterval safeTimeout = timeout;
+    if (safeTimeout < 0.5) {
+        safeTimeout = 0.5;
+    } else if (safeTimeout > 15.0) {
+        safeTimeout = 15.0;
+    }
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:safeTimeout];
+    NSString *link = nil;
+    [_responseCondition lock];
+    while ([_latestAuthenticationQRCodeLink length] == 0 &&
+           [[NSDate date] compare:deadline] == NSOrderedAscending) {
+        [_responseCondition waitUntilDate:deadline];
+    }
+    link = [_latestAuthenticationQRCodeLink copy];
+    [_responseCondition unlock];
+
+    if ([link length] == 0) {
+        [link release];
+        if (error) {
+            *error = [self errorWithDescription:@"Telegram accepted QR sign-in, but did not provide the confirmation link before the timeout." code:232];
+        }
+        return nil;
+    }
+    return [link autorelease];
+}
+
+- (NSString *)currentAuthenticationQRCodeLink {
+    [_responseCondition lock];
+    NSString *link = [_latestAuthenticationQRCodeLink copy];
+    [_responseCondition unlock];
+    return [link autorelease];
 }
 
 - (NSString *)submitAuthenticationCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error {

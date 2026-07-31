@@ -310,6 +310,81 @@
     return -1;
 }
 
+- (NSString *)dateSeparatorTitleForMessageDate:(NSNumber *)dateValue {
+    if (![dateValue respondsToSelector:@selector(doubleValue)] || [dateValue doubleValue] <= 0.0) {
+        return nil;
+    }
+    NSDate *messageDate = [NSDate dateWithTimeIntervalSince1970:[dateValue doubleValue]];
+    NSDate *today = [NSDate date];
+    NSDate *yesterday = [today dateByAddingTimeInterval:-86400.0];
+    NSDateFormatter *dayKeyFormatter = [[[NSDateFormatter alloc] init] autorelease];
+    [dayKeyFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"] autorelease]];
+    [dayKeyFormatter setDateFormat:@"yyyy-MM-dd"];
+    NSString *messageDayKey = [dayKeyFormatter stringFromDate:messageDate];
+    if ([messageDayKey isEqualToString:[dayKeyFormatter stringFromDate:today]]) {
+        return TGLoc(@"message.date.today");
+    }
+    if ([messageDayKey isEqualToString:[dayKeyFormatter stringFromDate:yesterday]]) {
+        return TGLoc(@"message.date.yesterday");
+    }
+
+    NSCalendar *calendar = [NSCalendar currentCalendar];
+    NSDateComponents *messageComponents = [calendar components:NSYearCalendarUnit fromDate:messageDate];
+    NSDateComponents *todayComponents = [calendar components:NSYearCalendarUnit fromDate:today];
+    NSDateFormatter *displayFormatter = [[[NSDateFormatter alloc] init] autorelease];
+    if ([messageComponents year] == [todayComponents year]) {
+        [displayFormatter setDateFormat:@"d MMMM"];
+    } else {
+        [displayFormatter setDateStyle:NSDateFormatterLongStyle];
+        [displayFormatter setTimeStyle:NSDateFormatterNoStyle];
+    }
+    return [displayFormatter stringFromDate:messageDate];
+}
+
+- (void)refreshMessageHistorySeparators {
+    NSInteger unreadRow = self.unreadSeparatorDismissedForCurrentSelection
+        ? -1
+        : [self firstUnreadMessageRow];
+    NSString *previousDayKey = nil;
+    NSDateFormatter *dayKeyFormatter = [[[NSDateFormatter alloc] init] autorelease];
+    [dayKeyFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"] autorelease]];
+    [dayKeyFormatter setDateFormat:@"yyyy-MM-dd"];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        [item setDateSeparatorTitle:nil];
+        [item setShowsUnreadSeparator:((NSInteger)index == unreadRow)];
+        NSDate *date = ([[item date] respondsToSelector:@selector(doubleValue)] &&
+                        [[item date] doubleValue] > 0.0)
+            ? [NSDate dateWithTimeIntervalSince1970:[[item date] doubleValue]]
+            : nil;
+        NSString *dayKey = date ? [dayKeyFormatter stringFromDate:date] : nil;
+        if ([dayKey length] > 0 && ![dayKey isEqualToString:previousDayKey]) {
+            [item setDateSeparatorTitle:[self dateSeparatorTitleForMessageDate:[item date]]];
+        }
+        previousDayKey = dayKey;
+    }
+}
+
+- (void)dismissCurrentUnreadSeparator {
+    BOOL changed = NO;
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        if ([item showsUnreadSeparator]) {
+            [item setShowsUnreadSeparator:NO];
+            changed = YES;
+        }
+    }
+    self.unreadSeparatorDismissedForCurrentSelection = YES;
+    if (!changed) {
+        return;
+    }
+    [self.messageTableView noteHeightOfRowsWithIndexesChanged:
+        [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, [self.messageItems count])]];
+    [self.messageTableView reloadData];
+}
+
 - (void)scrollMessagesToInitialUnreadIfAvailable {
     NSInteger unreadRow = [self firstUnreadMessageRow];
     self.initialUnreadPositionPending = NO;
@@ -332,6 +407,121 @@
     [self updateMessageJumpToNewestButtonVisibility];
 }
 
+- (NSString *)reactionAnimationKeyForMessageItem:(TGMessageItem *)item {
+    if (![item isKindOfClass:[TGMessageItem class]] ||
+        ![[item chatID] respondsToSelector:@selector(longLongValue)] ||
+        ![[item messageID] respondsToSelector:@selector(longLongValue)]) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"%lld:%lld",
+            [[item chatID] longLongValue],
+            [[item messageID] longLongValue]];
+}
+
+- (TGMessageItem *)displayedMessageItemForReactionAnimationKey:(NSString *)key row:(NSUInteger *)row {
+    if (![key isKindOfClass:[NSString class]] || [key length] == 0) {
+        return nil;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        if ([[self reactionAnimationKeyForMessageItem:item] isEqualToString:key]) {
+            if (row) {
+                *row = index;
+            }
+            return item;
+        }
+    }
+    return nil;
+}
+
+- (void)beginReactionAnimationForMessageItem:(TGMessageItem *)item
+                                 fromSummary:(NSString *)oldSummary
+                                   toSummary:(NSString *)newSummary {
+    NSString *key = [self reactionAnimationKeyForMessageItem:item];
+    if ([key length] == 0) {
+        return;
+    }
+
+    BOOL removingBand = ([oldSummary length] > 0 && [newSummary length] == 0);
+    BOOL changesHeight = (([oldSummary length] == 0) != ([newSummary length] == 0));
+    NSString *displaySummary = removingBand ? oldSummary : newSummary;
+    [item setReactionAnimationDisplaySummary:displaySummary];
+    [item setReactionAnimationProgress:0.0];
+    [item setReactionAnimationChangesHeight:changesHeight];
+    [item setReactionAnimationRemoving:removingBand];
+
+    if (!self.reactionAnimations) {
+        self.reactionAnimations = [NSMutableDictionary dictionary];
+    }
+    NSDictionary *animation = [NSDictionary dictionaryWithObject:
+                               [NSNumber numberWithDouble:[NSDate timeIntervalSinceReferenceDate]]
+                                                          forKey:@"started_at"];
+    [self.reactionAnimations setObject:animation forKey:key];
+
+    if (!self.reactionAnimationTimer) {
+        NSTimer *timer = [NSTimer timerWithTimeInterval:(1.0 / 30.0)
+                                                target:self
+                                              selector:@selector(updateReactionAnimations:)
+                                              userInfo:nil
+                                               repeats:YES];
+        self.reactionAnimationTimer = timer;
+        [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+    }
+}
+
+- (void)updateReactionAnimations:(NSTimer *)timer {
+    (void)timer;
+    if ([self.reactionAnimations count] == 0) {
+        [self.reactionAnimationTimer invalidate];
+        self.reactionAnimationTimer = nil;
+        return;
+    }
+
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    NSArray *keys = [[self.reactionAnimations allKeys] copy];
+    NSMutableArray *completedKeys = [NSMutableArray array];
+    NSUInteger keyIndex = 0;
+    for (keyIndex = 0; keyIndex < [keys count]; keyIndex++) {
+        NSString *key = [keys objectAtIndex:keyIndex];
+        NSDictionary *animation = [self.reactionAnimations objectForKey:key];
+        NSTimeInterval elapsed = now - [[animation objectForKey:@"started_at"] doubleValue];
+        CGFloat linearProgress = (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.32));
+
+        NSUInteger row = NSNotFound;
+        TGMessageItem *item = [self displayedMessageItemForReactionAnimationKey:key row:&row];
+        if (item) {
+            [item setReactionAnimationProgress:linearProgress];
+            if (row != NSNotFound) {
+                NSIndexSet *rowIndexes = [NSIndexSet indexSetWithIndex:row];
+                if ([item reactionAnimationChangesHeight]) {
+                    [self.messageTableView noteHeightOfRowsWithIndexesChanged:rowIndexes];
+                }
+                NSIndexSet *columnIndexes = [NSIndexSet indexSetWithIndexesInRange:
+                                             NSMakeRange(0, [[self.messageTableView tableColumns] count])];
+                [self.messageTableView reloadDataForRowIndexes:rowIndexes columnIndexes:columnIndexes];
+            }
+        }
+
+        if (linearProgress >= 1.0 || !item) {
+            if (item) {
+                [item setReactionAnimationDisplaySummary:nil];
+                [item setReactionAnimationProgress:1.0];
+                [item setReactionAnimationChangesHeight:NO];
+                [item setReactionAnimationRemoving:NO];
+            }
+            [completedKeys addObject:key];
+        }
+    }
+    [keys release];
+    [self.reactionAnimations removeObjectsForKeys:completedKeys];
+
+    if ([self.reactionAnimations count] == 0) {
+        [self.reactionAnimationTimer invalidate];
+        self.reactionAnimationTimer = nil;
+    }
+}
+
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     BOOL forceScrollToNewest = self.forceMessageScrollToNewest;
@@ -339,6 +529,7 @@
     if (!preserveOlder || [self.messageItems count] == 0) {
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:orderedItems]];
+        [self refreshMessageHistorySeparators];
         self.olderMessagesExhausted = NO;
         self.autoOlderMessagesLoadArmed = YES;
         [self updateOutgoingReadStateForVisibleMessages];
@@ -372,6 +563,14 @@
         id messageID = [item messageID];
         NSNumber *existingIndex = messageID ? [messageIndexesByID objectForKey:messageID] : nil;
         if (existingIndex) {
+            TGMessageItem *existingItem = [mergedItems objectAtIndex:[existingIndex unsignedIntegerValue]];
+            NSString *oldReactionSummary = [existingItem reactionSummary] ? [existingItem reactionSummary] : @"";
+            NSString *newReactionSummary = [item reactionSummary] ? [item reactionSummary] : @"";
+            if (![oldReactionSummary isEqualToString:newReactionSummary]) {
+                [self beginReactionAnimationForMessageItem:item
+                                               fromSummary:oldReactionSummary
+                                                 toSummary:newReactionSummary];
+            }
             [mergedItems replaceObjectAtIndex:[existingIndex unsignedIntegerValue] withObject:item];
             continue;
         }
@@ -383,6 +582,7 @@
 
     [self.messageItems removeAllObjects];
     [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
+    [self refreshMessageHistorySeparators];
     [self updateOutgoingReadStateForVisibleMessages];
     [self markVisiblePinnedMessagesFromPinnedItems];
     [self.inlineMediaPlaybackCoordinator removeAllPlayback];
@@ -435,6 +635,7 @@
         [mergedItems addObjectsFromArray:self.messageItems];
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:mergedItems]];
+        [self refreshMessageHistorySeparators];
     }
 
     if (added > 0) {
@@ -918,8 +1119,19 @@
         NSString *readErrorMessage = [[readError localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             BOOL sameSelection = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+            BOOL sameThread = ((!messageThreadIDCopy && !self.selectedMessageThreadID) ||
+                               (messageThreadIDCopy && self.selectedMessageThreadID &&
+                                [messageThreadIDCopy longLongValue] == [self.selectedMessageThreadID longLongValue]));
             if (!success && sameSelection) {
                 [self.visibleReadReceiptMessageIDs minusSet:[NSSet setWithArray:messageIDsCopy]];
+            }
+            if (success && sameSelection && sameThread) {
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(dismissCurrentUnreadSeparator)
+                                                           object:nil];
+                [self performSelector:@selector(dismissCurrentUnreadSeparator)
+                           withObject:nil
+                           afterDelay:1.25];
             }
             if (!success && [readErrorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib visible read state: %@", readErrorMessage]];
@@ -972,6 +1184,19 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             if (success) {
                 [self clearUnreadCountForChatID:chatIDCopy messageThreadID:messageThreadIDCopy];
+                BOOL sameSelection = (self.selectedChatID &&
+                                      [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
+                BOOL sameThread = ((!messageThreadIDCopy && !self.selectedMessageThreadID) ||
+                                   (messageThreadIDCopy && self.selectedMessageThreadID &&
+                                    [messageThreadIDCopy longLongValue] == [self.selectedMessageThreadID longLongValue]));
+                if (sameSelection && sameThread) {
+                    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                             selector:@selector(dismissCurrentUnreadSeparator)
+                                                               object:nil];
+                    [self performSelector:@selector(dismissCurrentUnreadSeparator)
+                               withObject:nil
+                               afterDelay:1.25];
+                }
                 [self appendDetail:@"TDLib read state: selected chat messages marked as read."];
             } else if ([readErrorMessage length] > 0) {
                 [self appendDetail:[NSString stringWithFormat:@"TDLib read state: %@", readErrorMessage]];

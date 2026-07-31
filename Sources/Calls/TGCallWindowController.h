@@ -16,6 +16,7 @@ typedef NS_ENUM(NSInteger, TGCallPresentationState) {
 - (void)callWindowControllerDidRequestAnswer:(TGCallWindowController *)controller;
 - (void)callWindowController:(TGCallWindowController *)controller didRequestMicrophoneMuted:(BOOL)muted;
 - (void)callWindowController:(TGCallWindowController *)controller didRequestSpeakerMuted:(BOOL)muted;
+- (void)callWindowController:(TGCallWindowController *)controller didRequestCameraEnabled:(BOOL)enabled;
 - (void)callWindowControllerDidRequestHangUp:(TGCallWindowController *)controller;
 @end
 
@@ -25,9 +26,13 @@ typedef NS_ENUM(NSInteger, TGCallPresentationState) {
 @property (nonatomic, readonly, getter=isMicrophoneMuted) BOOL microphoneMuted;
 @property (nonatomic, readonly, getter=isSpeakerMuted) BOOL speakerMuted;
 
-- (id)initWithProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing;
+- (id)initWithProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing video:(BOOL)video;
 - (void)updateProfile:(NSDictionary *)profile;
 - (void)updateSignalBars:(NSUInteger)signalBars;
+- (void)updateVideoImage:(NSImage *)image local:(BOOL)local;
+- (void)updateRemoteVideoState:(NSInteger)state;
+- (BOOL)startLocalCameraPreview;
+- (void)stopLocalCameraPreview;
 - (void)setPresentationState:(TGCallPresentationState)state detail:(NSString *)detail;
 - (NSTimeInterval)connectedDuration;
 - (void)closeAfterDelay:(NSTimeInterval)delay;

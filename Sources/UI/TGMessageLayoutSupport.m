@@ -184,6 +184,145 @@ NSString *TGDisplayTextForMessageItem(TGMessageItem *item) {
     return preview;
 }
 
+static BOOL TGComposedSequenceNeedsEmojiGlyphCheck(NSString *sequence) {
+    if (![sequence isKindOfClass:[NSString class]] || [sequence length] == 0) {
+        return NO;
+    }
+    NSUInteger index = 0;
+    for (index = 0; index < [sequence length]; index++) {
+        unichar value = [sequence characterAtIndex:index];
+        if ((value >= 0xD800 && value <= 0xDBFF) ||
+            value == 0x200D ||
+            value == 0x20E3 ||
+            value == 0xFE0E ||
+            value == 0xFE0F ||
+            (value >= 0x2600 && value <= 0x27BF)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL TGComposedSequenceCanRender(NSString *sequence, NSFont *font) {
+    if (!TGComposedSequenceNeedsEmojiGlyphCheck(sequence)) {
+        return YES;
+    }
+    /*
+     * NSLayoutManager on 10.8/10.9 reports NSNullGlyph for several stock
+     * Apple Color Emoji sequences that AppKit still draws correctly.  Keep
+     * the same conservative legacy-safe set used by the reaction picker so
+     * accepted reactions do not disappear from the message bubble.
+     */
+    static NSSet *legacySafeEmojis = nil;
+    static dispatch_once_t legacyEmojiOnceToken;
+    dispatch_once(&legacyEmojiOnceToken, ^{
+        legacySafeEmojis = [[NSSet alloc] initWithObjects:
+            @"👍", @"👎", @"❤", @"🔥", @"😂", @"😢", @"😭", @"😁",
+            @"👏", @"😱", @"🎉", @"💩", @"🙏", @"👌", @"😍", @"👀",
+            @"⚡", @"💔", @"😐", @"🎃", @"👻", @"🎅", @"🎄", @"☃",
+            nil];
+    });
+    if ([legacySafeEmojis containsObject:sequence]) {
+        return YES;
+    }
+    NSFont *safeFont = font ? font : TGChatMessageBodyFont();
+    static NSMutableDictionary *renderabilityCache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        renderabilityCache = [[NSMutableDictionary alloc] init];
+    });
+    NSString *cacheKey = [NSString stringWithFormat:@"%@|%.1f|%@",
+                          [safeFont fontName],
+                          [safeFont pointSize],
+                          sequence];
+    @synchronized(renderabilityCache) {
+        NSNumber *cached = [renderabilityCache objectForKey:cacheKey];
+        if (cached) {
+            return [cached boolValue];
+        }
+    }
+
+    NSDictionary *attributes = [NSDictionary dictionaryWithObject:safeFont
+                                                           forKey:NSFontAttributeName];
+    NSTextStorage *storage = [[[NSTextStorage alloc] initWithString:sequence
+                                                        attributes:attributes] autorelease];
+    NSLayoutManager *layoutManager = [[[NSLayoutManager alloc] init] autorelease];
+    NSTextContainer *container = [[[NSTextContainer alloc]
+        initWithContainerSize:NSMakeSize(256.0, MAX(32.0, [safeFont pointSize] * 2.0))] autorelease];
+    [layoutManager addTextContainer:container];
+    [storage addLayoutManager:layoutManager];
+    NSRange glyphRange = [layoutManager glyphRangeForTextContainer:container];
+    BOOL renderable = (glyphRange.length > 0);
+    NSUInteger glyphIndex = 0;
+    for (glyphIndex = glyphRange.location;
+         renderable && glyphIndex < NSMaxRange(glyphRange);
+         glyphIndex++) {
+        if ([layoutManager glyphAtIndex:glyphIndex] == NSNullGlyph) {
+            renderable = NO;
+        }
+    }
+    @synchronized(renderabilityCache) {
+        if ([renderabilityCache count] >= 512) {
+            [renderabilityCache removeAllObjects];
+        }
+        [renderabilityCache setObject:[NSNumber numberWithBool:renderable] forKey:cacheKey];
+    }
+    return renderable;
+}
+
+NSString *TGStringByReplacingUnrenderableEmoji(NSString *text, NSFont *font) {
+    if (![text isKindOfClass:[NSString class]] || [text length] == 0) {
+        return [text isKindOfClass:[NSString class]] ? text : @"";
+    }
+    NSMutableString *safeText = nil;
+    NSUInteger location = 0;
+    while (location < [text length]) {
+        NSRange sequenceRange = [text rangeOfComposedCharacterSequenceAtIndex:location];
+        NSString *sequence = [text substringWithRange:sequenceRange];
+        BOOL renderable = TGComposedSequenceCanRender(sequence, font);
+        if (!renderable && !safeText) {
+            safeText = [NSMutableString stringWithCapacity:[text length]];
+            [safeText appendString:[text substringToIndex:sequenceRange.location]];
+        }
+        if (safeText) {
+            [safeText appendString:(renderable ? sequence : @"?")];
+        }
+        location = NSMaxRange(sequenceRange);
+    }
+    return safeText ? safeText : text;
+}
+
+static void TGReplaceUnrenderableEmojiInAttributedString(NSMutableAttributedString *attributed,
+                                                          NSFont *fallbackFont) {
+    if (![attributed isKindOfClass:[NSMutableAttributedString class]] ||
+        [[attributed string] length] == 0) {
+        return;
+    }
+    NSString *text = [attributed string];
+    NSMutableArray *replacementRanges = [NSMutableArray array];
+    NSUInteger location = 0;
+    while (location < [text length]) {
+        NSRange sequenceRange = [text rangeOfComposedCharacterSequenceAtIndex:location];
+        NSString *sequence = [text substringWithRange:sequenceRange];
+        NSFont *font = [attributed attribute:NSFontAttributeName
+                                     atIndex:sequenceRange.location
+                              effectiveRange:NULL];
+        if (!TGComposedSequenceCanRender(sequence, font ? font : fallbackFont)) {
+            [replacementRanges addObject:[NSValue valueWithRange:sequenceRange]];
+        }
+        location = NSMaxRange(sequenceRange);
+    }
+    NSInteger replacementIndex = (NSInteger)[replacementRanges count] - 1;
+    for (; replacementIndex >= 0; replacementIndex--) {
+        NSRange range = [[replacementRanges objectAtIndex:(NSUInteger)replacementIndex] rangeValue];
+        NSDictionary *attributes = [[attributed attributesAtIndex:range.location
+                                                   effectiveRange:NULL] retain];
+        [attributed replaceCharactersInRange:range withString:@"?"];
+        [attributed setAttributes:attributes range:NSMakeRange(range.location, 1)];
+        [attributes release];
+    }
+}
+
 static NSString *TGLocalizedMediaLabel(NSString *label) {
     if (![label isKindOfClass:[NSString class]] || [label length] == 0) {
         return TGLoc(@"media.media");
@@ -345,6 +484,8 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
     NSMutableAttributedString *attributed = [[TGAttributedMessageString(text, baseAttributes) mutableCopy] autorelease];
     NSArray *entities = [item formattedEntities];
     if (![entities isKindOfClass:[NSArray class]] || [entities count] == 0 || [text length] == 0) {
+        TGReplaceUnrenderableEmojiInAttributedString(attributed,
+                                                     [baseAttributes objectForKey:NSFontAttributeName]);
         return attributed;
     }
 
@@ -440,11 +581,26 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
             }
         }
     }
+    TGReplaceUnrenderableEmojiInAttributedString(attributed, baseFont);
     return attributed;
 }
 
 CGFloat TGMessageExtraBlockVerticalPadding(void) {
     return 0.0;
+}
+
+CGFloat TGMessageTopAccessoryHeightForItem(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return 0.0;
+    }
+    CGFloat height = 0.0;
+    if ([[item dateSeparatorTitle] length] > 0) {
+        height += 30.0;
+    }
+    if ([item showsUnreadSeparator]) {
+        height += 30.0;
+    }
+    return height;
 }
 
 BOOL TGMessageUsesSeparateMetadataFooter(void) {
@@ -861,7 +1017,10 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
         return;
     }
 
-    NSBezierPath *mediaPath = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
+    BOOL videoNote = [[mediaItem objectForKey:@"content_type"] isEqualToString:@"messageVideoNote"];
+    NSBezierPath *mediaPath = videoNote
+        ? [NSBezierPath bezierPathWithOvalInRect:rect]
+        : [NSBezierPath bezierPathWithRoundedRect:rect xRadius:7.0 yRadius:7.0];
     NSString *localPath = TGMediaItemLocalPath(mediaItem);
     NSImage *image = nil;
     if ([localPath length] > 0) {
@@ -1023,6 +1182,291 @@ BOOL TGMessageItemIsPollContent(TGMessageItem *item) {
 
 BOOL TGMessageItemIsCallContent(TGMessageItem *item) {
     return ([item isKindOfClass:[TGMessageItem class]] && [item isCallMessage]);
+}
+
+BOOL TGMessageItemHasLinkPreview(TGMessageItem *item) {
+    if (![item isKindOfClass:[TGMessageItem class]]) {
+        return NO;
+    }
+    NSDictionary *previewInfo = [item linkPreviewInfo];
+    NSString *url = [previewInfo objectForKey:@"url"];
+    return ([previewInfo isKindOfClass:[NSDictionary class]] &&
+            [url isKindOfClass:[NSString class]] &&
+            [url length] > 0);
+}
+
+static CGFloat TGLinkPreviewMeasuredTextHeight(NSString *text,
+                                               NSFont *font,
+                                               CGFloat width,
+                                               CGFloat maximumHeight) {
+    if (![text isKindOfClass:[NSString class]] || [text length] == 0 || width <= 0.0) {
+        return 0.0;
+    }
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByWordWrapping];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                font, NSFontAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSRect bounds = [text boundingRectWithSize:NSMakeSize(width, maximumHeight)
+                                       options:(NSStringDrawingUsesLineFragmentOrigin |
+                                                NSStringDrawingTruncatesLastVisibleLine)
+                                    attributes:attributes];
+    return MIN(maximumHeight, MAX(0.0, ceil(NSHeight(bounds))));
+}
+
+static BOOL TGLinkPreviewHasMedia(TGMessageItem *item) {
+    NSDictionary *media = [[item linkPreviewInfo] objectForKey:@"media"];
+    if (![media isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    return ([[media objectForKey:@"local_path"] length] > 0 ||
+            [[media objectForKey:@"minithumbnail_data"] length] > 0 ||
+            [[media objectForKey:@"file_id"] respondsToSelector:@selector(integerValue)]);
+}
+
+static NSString *TGLinkPreviewSiteText(TGMessageItem *item) {
+    NSDictionary *info = [item linkPreviewInfo];
+    NSArray *keys = [NSArray arrayWithObjects:@"site_name", @"display_url", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [keys count]; index++) {
+        id value = [info objectForKey:[keys objectAtIndex:index]];
+        if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 0) {
+            return (NSString *)value;
+        }
+    }
+    NSURL *url = [NSURL URLWithString:[info objectForKey:@"url"]];
+    NSString *host = [url host];
+    return ([host length] > 0) ? host : [info objectForKey:@"url"];
+}
+
+CGFloat TGLinkPreviewCardHeightForItem(TGMessageItem *item, CGFloat width) {
+    if (!TGMessageItemHasLinkPreview(item) || width <= 0.0) {
+        return 0.0;
+    }
+    NSDictionary *info = [item linkPreviewInfo];
+    BOOL hasMedia = TGLinkPreviewHasMedia(item);
+    BOOL largeMedia = (hasMedia && [[info objectForKey:@"show_large_media"] boolValue]);
+    CGFloat compactMediaWidth = (hasMedia && !largeMedia) ? MIN(76.0, MAX(58.0, width * 0.26)) : 0.0;
+    CGFloat textWidth = MAX(76.0, width - 20.0 - ((compactMediaWidth > 0.0) ? (compactMediaWidth + 9.0) : 0.0));
+    CGFloat siteHeight = TGLinkPreviewMeasuredTextHeight(TGLinkPreviewSiteText(item),
+                                                         TGChatMessageBoldSecondaryFont(),
+                                                         textWidth,
+                                                         15.0);
+    CGFloat titleHeight = TGLinkPreviewMeasuredTextHeight([info objectForKey:@"title"],
+                                                          TGChatMessageBoldBodyFont(),
+                                                          textWidth,
+                                                          36.0);
+    CGFloat descriptionHeight = TGLinkPreviewMeasuredTextHeight([info objectForKey:@"description"],
+                                                                TGChatMessageSecondaryFont(),
+                                                                textWidth,
+                                                                48.0);
+    CGFloat textHeight = siteHeight + ((siteHeight > 0.0 && titleHeight > 0.0) ? 3.0 : 0.0) +
+                         titleHeight + (((siteHeight > 0.0 || titleHeight > 0.0) && descriptionHeight > 0.0) ? 4.0 : 0.0) +
+                         descriptionHeight;
+    if (textHeight <= 0.0) {
+        textHeight = 18.0;
+    }
+    CGFloat cardHeight = MAX(50.0, textHeight + 16.0);
+    if (compactMediaWidth > 0.0) {
+        cardHeight = MAX(cardHeight, compactMediaWidth + 12.0);
+    }
+    if (largeMedia) {
+        CGFloat mediaHeight = MIN(164.0, MAX(94.0, floor((width - 8.0) * 0.54)));
+        cardHeight += mediaHeight + 7.0;
+    }
+    return ceil(cardHeight);
+}
+
+static CGFloat TGLinkPreviewMessageTextHeight(TGMessageItem *item, CGFloat textWidth) {
+    NSString *messageText = TGDisplayTextForMessageItem(item);
+    if ([messageText length] == 0 || textWidth <= 0.0) {
+        return 0.0;
+    }
+    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                TGChatMessageBodyFont(), NSFontAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSMutableAttributedString *text = [[TGAttributedMessageStringForItem(item, messageText, attributes) mutableCopy] autorelease];
+    if (!TGMessageUsesSeparateMetadataFooter()) {
+        NSString *timeString = TGShortTimeStringFromDateValue([item date]);
+        if ([timeString length] > 0) {
+            NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                            TGChatMessageMetaFont(), NSFontAttributeName,
+                                            nil];
+            [text appendAttributedString:[[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
+                                                                            attributes:timeAttributes] autorelease]];
+            NSAttributedString *status = TGOutgoingStatusInlineAttributedStringForItem(item);
+            if ([status length] > 0) {
+                [text appendAttributedString:status];
+            }
+        }
+    }
+    NSRect bounds = [text boundingRectWithSize:NSMakeSize(textWidth, 12000.0)
+                                       options:NSStringDrawingUsesLineFragmentOrigin];
+    return ceil(NSHeight(bounds));
+}
+
+NSRect TGLinkPreviewCardRectForItem(TGMessageItem *item,
+                                    NSRect bubbleRect,
+                                    BOOL showSenderDetails,
+                                    BOOL flipped) {
+    if (!TGMessageItemHasLinkPreview(item) || NSIsEmptyRect(bubbleRect)) {
+        return NSZeroRect;
+    }
+
+    BOOL blocks = TGChatMessagesAsBlocksEnabled();
+    CGFloat cardX = blocks ? (NSMinX(bubbleRect) + 50.0) : (NSMinX(bubbleRect) + 8.0);
+    CGFloat cardWidth = blocks ? (NSWidth(bubbleRect) - 64.0) : (NSWidth(bubbleRect) - 16.0);
+    if (cardWidth <= 40.0) {
+        return NSZeroRect;
+    }
+    CGFloat cardHeight = TGLinkPreviewCardHeightForItem(item, cardWidth);
+    CGFloat senderHeight = blocks
+        ? ((showSenderDetails || [item outgoing]) ? 15.0 : 0.0)
+        : TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+    CGFloat contextHeight = TGMessageContextHeaderHeightForItem(item);
+    CGFloat textWidth = blocks ? cardWidth : (NSWidth(bubbleRect) - 24.0);
+    CGFloat textHeight = TGLinkPreviewMessageTextHeight(item, textWidth);
+    BOOL showAboveText = [[[item linkPreviewInfo] objectForKey:@"show_above_text"] boolValue];
+    CGFloat topOffset = blocks ? 7.0 : 9.0;
+    topOffset += senderHeight + contextHeight;
+    if (!showAboveText && textHeight > 0.0) {
+        topOffset += textHeight + 8.0;
+    }
+    CGFloat cardY = flipped
+        ? (NSMinY(bubbleRect) + topOffset)
+        : (NSMaxY(bubbleRect) - topOffset - cardHeight);
+    return NSMakeRect(cardX, cardY, cardWidth, cardHeight);
+}
+
+static NSRect TGLinkPreviewRectFromTop(NSRect rect, CGFloat top, CGFloat height, BOOL flipped) {
+    return NSMakeRect(NSMinX(rect),
+                      flipped ? (NSMinY(rect) + top) : (NSMaxY(rect) - top - height),
+                      NSWidth(rect),
+                      height);
+}
+
+void TGDrawLinkPreviewCardForItem(TGMessageItem *item,
+                                  NSRect cardRect,
+                                  BOOL outgoing,
+                                  BOOL flipped) {
+    if (!TGMessageItemHasLinkPreview(item) || NSIsEmptyRect(cardRect)) {
+        return;
+    }
+    NSDictionary *info = [item linkPreviewInfo];
+    NSDictionary *media = [info objectForKey:@"media"];
+    BOOL hasMedia = TGLinkPreviewHasMedia(item);
+    BOOL largeMedia = (hasMedia && [[info objectForKey:@"show_large_media"] boolValue]);
+    CGFloat largeMediaHeight = largeMedia
+        ? MIN(164.0, MAX(94.0, floor((NSWidth(cardRect) - 8.0) * 0.54)))
+        : 0.0;
+    BOOL mediaAbove = (largeMedia && [[info objectForKey:@"show_media_above_description"] boolValue]);
+
+    NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect xRadius:9.0 yRadius:9.0];
+    NSColor *cardColor = outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
+    [[cardColor colorWithAlphaComponent:0.76] set];
+    [cardPath fill];
+    [TGClassicPanelStrokeColor() set];
+    [cardPath setLineWidth:0.8];
+    [cardPath stroke];
+
+    NSRect accentRect = NSMakeRect(NSMinX(cardRect) + 5.0, NSMinY(cardRect) + 6.0, 3.0, NSHeight(cardRect) - 12.0);
+    NSBezierPath *accentPath = [NSBezierPath bezierPathWithRoundedRect:accentRect xRadius:1.5 yRadius:1.5];
+    [TGClassicNavigationSelectedColor(0.94) set];
+    [accentPath fill];
+
+    CGFloat mediaWidth = 0.0;
+    if (hasMedia && !largeMedia) {
+        mediaWidth = MIN(76.0, MAX(58.0, NSWidth(cardRect) * 0.26));
+    }
+    NSRect textArea = NSMakeRect(NSMinX(cardRect) + 14.0,
+                                 NSMinY(cardRect) + 8.0,
+                                 NSWidth(cardRect) - 24.0 - ((mediaWidth > 0.0) ? (mediaWidth + 9.0) : 0.0),
+                                 NSHeight(cardRect) - 16.0);
+    if (largeMediaHeight > 0.0) {
+        CGFloat reservedHeight = largeMediaHeight + 7.0;
+        textArea.size.height = MAX(16.0, textArea.size.height - reservedHeight);
+        if ((flipped && mediaAbove) || (!flipped && !mediaAbove)) {
+            textArea.origin.y += reservedHeight;
+        }
+    }
+    NSString *site = TGLinkPreviewSiteText(item);
+    NSString *title = [info objectForKey:@"title"];
+    NSString *description = [info objectForKey:@"description"];
+    CGFloat siteHeight = TGLinkPreviewMeasuredTextHeight(site, TGChatMessageBoldSecondaryFont(), NSWidth(textArea), 15.0);
+    CGFloat titleHeight = TGLinkPreviewMeasuredTextHeight(title, TGChatMessageBoldBodyFont(), NSWidth(textArea), 36.0);
+    CGFloat descriptionHeight = TGLinkPreviewMeasuredTextHeight(description, TGChatMessageSecondaryFont(), NSWidth(textArea), 48.0);
+    CGFloat textTop = 0.0;
+
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSDictionary *siteAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                    TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
+                                    TGClassicNavigationSelectedColor(0.96), NSForegroundColorAttributeName,
+                                    paragraph, NSParagraphStyleAttributeName,
+                                    nil];
+    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     TGChatMessageBoldBodyFont(), NSFontAttributeName,
+                                     TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     nil];
+    NSDictionary *descriptionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           TGChatMessageSecondaryFont(), NSFontAttributeName,
+                                           TGClassicMutedInkColor(), NSForegroundColorAttributeName,
+                                           nil];
+    if (siteHeight > 0.0) {
+        [site drawInRect:TGLinkPreviewRectFromTop(textArea, textTop, siteHeight, flipped)
+          withAttributes:siteAttributes];
+        textTop += siteHeight + ((titleHeight > 0.0) ? 3.0 : 0.0);
+    }
+    if (titleHeight > 0.0) {
+        [title drawInRect:TGLinkPreviewRectFromTop(textArea, textTop, titleHeight, flipped)
+              withAttributes:titleAttributes];
+        textTop += titleHeight + ((descriptionHeight > 0.0) ? 4.0 : 0.0);
+    }
+    if (descriptionHeight > 0.0) {
+        [description drawInRect:TGLinkPreviewRectFromTop(textArea, textTop, descriptionHeight, flipped)
+                    withAttributes:descriptionAttributes];
+    }
+
+    if (!hasMedia) {
+        return;
+    }
+    NSImage *image = nil;
+    NSString *path = [media objectForKey:@"local_path"];
+    if ([path length] > 0) {
+        image = TGImageThumbnailFromFile(path, 768);
+        if (!image) {
+            image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+        }
+    }
+    if (!image) {
+        NSData *miniThumbnailData = [media objectForKey:@"minithumbnail_data"];
+        if ([miniThumbnailData length] > 0) {
+            image = TGImageThumbnailFromData(miniThumbnailData, 384);
+        }
+    }
+    NSRect mediaRect = NSZeroRect;
+    if (largeMedia) {
+        CGFloat mediaTop = mediaAbove ? 4.0 : (NSHeight(cardRect) - largeMediaHeight - 4.0);
+        mediaRect = TGLinkPreviewRectFromTop(NSInsetRect(cardRect, 4.0, 0.0), mediaTop, largeMediaHeight, flipped);
+    } else {
+        mediaRect = NSMakeRect(NSMaxX(cardRect) - mediaWidth - 6.0,
+                               flipped ? (NSMinY(cardRect) + 6.0) : (NSMaxY(cardRect) - mediaWidth - 6.0),
+                               mediaWidth,
+                               mediaWidth);
+    }
+    NSBezierPath *mediaPath = [NSBezierPath bezierPathWithRoundedRect:mediaRect xRadius:7.0 yRadius:7.0];
+    if (image) {
+        [NSGraphicsContext saveGraphicsState];
+        [mediaPath addClip];
+        TGDrawImageAspectFillInRect(image, mediaRect, flipped);
+        [NSGraphicsContext restoreGraphicsState];
+    } else {
+        [[TGClassicPanelStrokeColor() colorWithAlphaComponent:0.18] set];
+        [mediaPath fill];
+    }
 }
 
 BOOL TGMessageItemHasDownloadableAttachment(TGMessageItem *item) {
@@ -1277,7 +1721,27 @@ BOOL TGPollPointIsInConfirmRect(TGMessageItem *item, NSRect bubbleRect, NSPoint 
 }
 
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
-    return ([[item reactionSummary] length] > 0) ? 22.0 : 0.0;
+    NSString *displaySummary = [[item reactionAnimationDisplaySummary] length] > 0
+        ? [item reactionAnimationDisplaySummary]
+        : [item reactionSummary];
+    if ([displaySummary length] == 0) {
+        return 0.0;
+    }
+    if (![item reactionAnimationChangesHeight]) {
+        return 26.0;
+    }
+    CGFloat rawProgress = MAX(0.0, MIN(1.0, [item reactionAnimationProgress]));
+    CGFloat phaseProgress = 0.0;
+    if ([item reactionAnimationRemoving]) {
+        phaseProgress = (rawProgress <= 0.45)
+            ? 1.0
+            : MAX(0.0, 1.0 - ((rawProgress - 0.45) / 0.55));
+    } else {
+        phaseProgress = MIN(1.0, rawProgress / 0.50);
+    }
+    CGFloat inverse = 1.0 - phaseProgress;
+    CGFloat easedProgress = 1.0 - (inverse * inverse * inverse);
+    return 26.0 * easedProgress;
 }
 
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails) {
@@ -1579,6 +2043,10 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             mediaHeight = TGPollBubbleHeightForItem(item) - 18.0;
         }
         CGFloat contentHeight = MAX(textHeight + titleHeight + contextHeight, mediaHeight + titleHeight + contextHeight);
+        if (TGMessageItemHasLinkPreview(item)) {
+            CGFloat previewWidth = MAX(120.0, availableWidth - 86.0);
+            contentHeight += TGLinkPreviewCardHeightForItem(item, previewWidth) + 8.0;
+        }
         CGFloat rowHeight = contentHeight + 30.0;
         if (TGMessageItemIsNonVisualPlayableMedia(item) || TGMessageItemIsNonVisualDocument(item)) {
             rowHeight = MAX(rowHeight, 82.0);
@@ -1589,13 +2057,11 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         if (TGMessageItemHasCommentThread(item)) {
             rowHeight += 24.0;
         }
-        if ([[item reactionSummary] length] > 0) {
-            rowHeight += 20.0;
-        }
+        rowHeight += TGReactionBandHeightForMessageItem(item);
         if (rowHeight < 44.0) {
             rowHeight = 44.0;
         }
-        return ceil(rowHeight);
+        return ceil(rowHeight + TGMessageTopAccessoryHeightForItem(item));
     }
     CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
 
@@ -1648,6 +2114,9 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
         height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + contextHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
     }
+    if (TGMessageItemHasLinkPreview(item)) {
+        height += TGLinkPreviewCardHeightForItem(item, maximumTextWidth - 16.0) + 8.0;
+    }
     if ([text length] > 0 && separateMetadataFooter && [[item date] integerValue] > 0) {
         height += 17.0;
     }
@@ -1656,7 +2125,8 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
     }
     height += TGReactionBandHeightForMessageItem(item);
     height += TGMessageCommentBarHeightForItem(item);
-    return height + 10.0 + TGMessageExtraBlockVerticalPadding();
+    return height + 10.0 + TGMessageExtraBlockVerticalPadding() +
+        TGMessageTopAccessoryHeightForItem(item);
 }
 
 NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL showSenderDetails) {
@@ -1733,6 +2203,12 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             bubbleWidth = photoBubbleWidth;
         }
     }
+    if (TGMessageItemHasLinkPreview(item)) {
+        CGFloat previewBubbleWidth = MIN(maximumBubbleWidth, 316.0);
+        if (previewBubbleWidth > bubbleWidth) {
+            bubbleWidth = previewBubbleWidth;
+        }
+    }
     if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         CGFloat footerWidth = ceil(timeSize.width) + TGOutgoingStatusDotsWidthForItem(item) + 29.0;
@@ -1768,6 +2244,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
         }
     }
+    if (TGMessageItemHasLinkPreview(item)) {
+        bubbleHeight += TGLinkPreviewCardHeightForItem(item, bubbleWidth - 16.0) + 8.0;
+    }
     if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
         bubbleHeight += 17.0;
     }
@@ -1781,7 +2260,9 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
     CGFloat blockOffset = floor(TGMessageExtraBlockVerticalPadding() / 2.0);
-    return NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0 + blockOffset, bubbleWidth, bubbleHeight);
+    CGFloat topAccessoryHeight = TGMessageTopAccessoryHeightForItem(item);
+    CGFloat bubbleY = NSMinY(cellFrame) + 5.0 + blockOffset + topAccessoryHeight;
+    return NSMakeRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight);
 }
 
 void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {

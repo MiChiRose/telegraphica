@@ -12,10 +12,14 @@
 @property (nonatomic, copy) NSString *avatarLocalPath;
 @property (nonatomic, assign) BOOL serverNotificationsMuted;
 @property (nonatomic, assign) BOOL notificationsMuted;
+@property (nonatomic, assign, getter=isMarkedAsUnread) BOOL markedAsUnread;
 @property (nonatomic, assign, getter=isPinned) BOOL pinned;
 @property (nonatomic, assign, getter=isForumTopic) BOOL forumTopic;
+@property (nonatomic, assign, getter=isForumTopicClosed) BOOL forumTopicClosed;
+@property (nonatomic, assign, getter=isForumTopicPinned) BOOL forumTopicPinned;
 @property (nonatomic, assign, getter=isSavedMessages) BOOL savedMessages;
 @property (nonatomic, assign, getter=isBot) BOOL bot;
+@property (nonatomic, assign, getter=isCommunity) BOOL community;
 @property (nonatomic, retain) NSNumber *parentChatID;
 @property (nonatomic, retain) NSNumber *messageThreadID;
 @property (nonatomic, copy) NSString *messageTopicKind;

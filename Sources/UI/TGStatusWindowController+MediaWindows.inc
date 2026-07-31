@@ -1680,6 +1680,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSTimeInterval duration = [self currentMediaPlaybackDuration];
     NSTimeInterval currentTime = [self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]];
     if (duration > 0.0 && currentTime >= duration - 0.05 && [self.mediaPlaybackPlayer rate] == 0.0) {
+        [self clearRememberedMediaPlaybackPosition];
         [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(0.0, 600)];
         self.mediaPlaybackPlaying = NO;
         [self updateMediaPlaybackButton];
@@ -1687,6 +1688,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:duration];
         return;
     }
+    [self persistMediaPlaybackPositionIfNeededAtTime:currentTime duration:duration force:NO];
     [self updateMediaPlaybackTimelineWithCurrentTime:currentTime duration:duration];
 }
 
@@ -1714,7 +1716,67 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         value = 0.0;
     }
     [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(value, 600)];
+    [self persistMediaPlaybackPositionIfNeededAtTime:value duration:duration force:YES];
     [self updateMediaPlaybackTimelineWithCurrentTime:value duration:duration];
+}
+
+- (NSString *)mediaPlaybackResumeIdentifierForPath:(NSString *)path {
+    if ([path length] == 0) {
+        return nil;
+    }
+    NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:NULL];
+    NSNumber *fileSize = [attributes objectForKey:NSFileSize];
+    return [NSString stringWithFormat:@"%@:%@", [path lastPathComponent],
+            [fileSize respondsToSelector:@selector(unsignedLongLongValue)] ? fileSize : [NSNumber numberWithInt:0]];
+}
+
+- (void)persistMediaPlaybackPositionIfNeededAtTime:(NSTimeInterval)position
+                                          duration:(NSTimeInterval)duration
+                                             force:(BOOL)force {
+    if ([self.mediaPlaybackResumeIdentifier length] == 0 || duration < 120.0) {
+        return;
+    }
+    if (!force && fabs(position - self.mediaPlaybackLastPersistedPosition) < 5.0) {
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSDictionary *stored = [defaults dictionaryForKey:TGVideoPlaybackResumePositionsDefaultsKey];
+    NSMutableDictionary *positions = stored
+        ? [NSMutableDictionary dictionaryWithDictionary:stored]
+        : [NSMutableDictionary dictionary];
+    if (position < 5.0 || position >= duration - 8.0) {
+        [positions removeObjectForKey:self.mediaPlaybackResumeIdentifier];
+    } else {
+        [positions setObject:[NSNumber numberWithDouble:position]
+                      forKey:self.mediaPlaybackResumeIdentifier];
+    }
+    while ([positions count] > 100) {
+        NSString *key = [[positions allKeys] objectAtIndex:0];
+        [positions removeObjectForKey:key];
+    }
+    [defaults setObject:positions forKey:TGVideoPlaybackResumePositionsDefaultsKey];
+    self.mediaPlaybackLastPersistedPosition = position;
+}
+
+- (void)clearRememberedMediaPlaybackPosition {
+    if ([self.mediaPlaybackResumeIdentifier length] == 0) {
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSDictionary *stored = [defaults dictionaryForKey:TGVideoPlaybackResumePositionsDefaultsKey];
+    if (![stored objectForKey:self.mediaPlaybackResumeIdentifier]) {
+        return;
+    }
+    NSMutableDictionary *positions = [NSMutableDictionary dictionaryWithDictionary:stored];
+    [positions removeObjectForKey:self.mediaPlaybackResumeIdentifier];
+    [defaults setObject:positions forKey:TGVideoPlaybackResumePositionsDefaultsKey];
+}
+
+- (NSTimeInterval)rememberedMediaPlaybackPosition {
+    NSNumber *position = [[[NSUserDefaults standardUserDefaults]
+        dictionaryForKey:TGVideoPlaybackResumePositionsDefaultsKey]
+        objectForKey:self.mediaPlaybackResumeIdentifier];
+    return [position respondsToSelector:@selector(doubleValue)] ? [position doubleValue] : 0.0;
 }
 
 - (void)layoutMediaPlaybackChromeForAudioOnly:(BOOL)audioOnly {
@@ -1763,6 +1825,14 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                           56.0,
                                           MAX(164.0, width - 40.0),
                                           MAX(120.0, height - 78.0))];
+        CGFloat closeWidth = 120.0;
+        CGFloat closeX = MAX(220.0, width - closeWidth - 24.0);
+        CGFloat sliderX = 78.0;
+        CGFloat sliderWidth = MAX(120.0, closeX - sliderX - 16.0);
+        [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(24.0, 18.0, 42.0, 30.0)];
+        [self.mediaPlaybackProgressSlider setFrame:NSMakeRect(sliderX, 29.0, sliderWidth, 20.0)];
+        [self.mediaPlaybackTimeField setFrame:NSMakeRect(sliderX, 10.0, sliderWidth, 18.0)];
+        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(closeX, 18.0, closeWidth, 30.0)];
     }
 }
 
@@ -1804,12 +1874,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                                              MAX(120.0, NSHeight(contentBounds) - 88.0))];
         [self.mediaPlaybackTitleField setHidden:YES];
         [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(24.0, 18.0, 42.0, 30.0)];
-        [self.mediaPlaybackProgressSlider setHidden:YES];
-        [self.mediaPlaybackTimeField setHidden:YES];
-        [self.mediaPlaybackCloseButton setFrame:NSMakeRect(NSWidth(contentBounds) - 144.0,
-                                                           18.0,
-                                                           120.0,
-                                                           30.0)];
+        [self.mediaPlaybackProgressSlider setHidden:NO];
+        [self.mediaPlaybackTimeField setHidden:NO];
+        [self layoutMediaPlaybackChromeForAudioOnly:NO];
     }
 }
 
@@ -1827,6 +1894,11 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 }
 
 - (void)resetMediaPlaybackState {
+    NSTimeInterval outgoingDuration = [self currentMediaPlaybackDuration];
+    NSTimeInterval outgoingTime = [self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]];
+    [self persistMediaPlaybackPositionIfNeededAtTime:outgoingTime
+                                           duration:outgoingDuration
+                                              force:YES];
     [self invalidateMediaPlaybackTimer];
     [self.mediaPlaybackPlayer pause];
     [self.mediaPlaybackLayer removeFromSuperlayer];
@@ -1834,6 +1906,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     self.mediaPlaybackLayer = nil;
     self.mediaPlaybackPlaying = NO;
     self.mediaPlaybackKnownDuration = 0.0;
+    self.mediaPlaybackResumeIdentifier = nil;
+    self.mediaPlaybackLastPersistedPosition = 0.0;
     [self updateMediaPlaybackButton];
     [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:0.0];
 }
@@ -1855,9 +1929,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         }
         [self.mediaPlaybackPlayer play];
         self.mediaPlaybackPlaying = YES;
-        if (self.mediaPlaybackAudioOnly) {
-            [self startMediaPlaybackTimer];
-        }
+        [self startMediaPlaybackTimer];
     }
     [self updateMediaPlaybackButton];
     [self updateMediaPlaybackTimelineWithCurrentTime:[self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]]
@@ -1904,6 +1976,10 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     self.mediaPlaybackVideoNote = videoNote;
     [self layoutMediaPlaybackWindowForAudioOnly:audioOnly title:title];
     self.mediaPlaybackKnownDuration = ([duration respondsToSelector:@selector(doubleValue)] && [duration doubleValue] > 0.0) ? [duration doubleValue] : 0.0;
+    self.mediaPlaybackResumeIdentifier = (!audioOnly && !videoNote)
+        ? [self mediaPlaybackResumeIdentifierForPath:playablePath]
+        : nil;
+    self.mediaPlaybackLastPersistedPosition = 0.0;
 
     NSURL *url = [NSURL fileURLWithPath:playablePath];
     AVPlayer *player = [[[AVPlayer alloc] initWithURL:url] autorelease];
@@ -1927,10 +2003,15 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     [self.mediaPlaybackWindow makeKeyAndOrderFront:nil];
     [self layoutMediaPlaybackLayer];
     [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:[self currentMediaPlaybackDuration]];
-    [self.mediaPlaybackPlayer play];
-    if (audioOnly) {
-        [self startMediaPlaybackTimer];
+    NSTimeInterval resumePosition = [self rememberedMediaPlaybackPosition];
+    NSTimeInterval resumeDuration = [self currentMediaPlaybackDuration];
+    if (resumePosition >= 5.0 && (resumeDuration <= 0.0 || resumePosition < resumeDuration - 8.0)) {
+        [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(resumePosition, 600)];
+        self.mediaPlaybackLastPersistedPosition = resumePosition;
+        [self updateMediaPlaybackTimelineWithCurrentTime:resumePosition duration:resumeDuration];
     }
+    [self.mediaPlaybackPlayer play];
+    [self startMediaPlaybackTimer];
     return YES;
 }
 

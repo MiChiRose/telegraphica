@@ -300,6 +300,156 @@ static void TGChatFolderSetBoolean(NSMutableDictionary *dictionary, NSDictionary
     return savedID;
 }
 
+- (BOOL)reorderChatFolderDefinitions:(NSArray *)definitions timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![definitions isKindOfClass:[NSArray class]] || [definitions count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"There are no chat folders to reorder." code:345];
+        }
+        return NO;
+    }
+
+    NSMutableArray *folderIDs = [NSMutableArray arrayWithCapacity:[definitions count]];
+    BOOL legacyOnly = YES;
+    NSUInteger index = 0;
+    for (index = 0; index < [definitions count]; index++) {
+        NSDictionary *definition = [[definitions objectAtIndex:index] isKindOfClass:[NSDictionary class]]
+            ? [definitions objectAtIndex:index] : nil;
+        id identifier = [definition objectForKey:@"id"];
+        if (![identifier respondsToSelector:@selector(integerValue)] || [identifier integerValue] <= 0) {
+            if (error) {
+                *error = [self errorWithDescription:@"A chat folder identifier is missing from the requested order." code:346];
+            }
+            return NO;
+        }
+        [folderIDs addObject:[NSNumber numberWithInteger:[identifier integerValue]]];
+        if ([[definition objectForKey:@"api_kind"] isEqualToString:@"folder"]) {
+            legacyOnly = NO;
+        }
+    }
+
+    NSMutableDictionary *request = [NSMutableDictionary dictionary];
+    [request setObject:(legacyOnly ? @"reorderChatFilters" : @"reorderChatFolders") forKey:@"@type"];
+    [request setObject:folderIDs forKey:(legacyOnly ? @"chat_filter_ids" : @"chat_folder_ids")];
+    [request setObject:[NSNumber numberWithInteger:0] forKey:@"main_chat_list_position"];
+
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-reorder"
+                                                            timeout:timeout
+                                                          errorCode:347
+                                                              error:&requestError];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"ok"]) {
+        return YES;
+    }
+
+    if (!legacyOnly) {
+        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionary];
+        [legacyRequest setObject:@"reorderChatFilters" forKey:@"@type"];
+        [legacyRequest setObject:folderIDs forKey:@"chat_filter_ids"];
+        [legacyRequest setObject:[NSNumber numberWithInteger:0] forKey:@"main_chat_list_position"];
+        NSError *legacyError = nil;
+        NSDictionary *legacyResponse = [self sendTDLibRequestAndWaitForExtra:legacyRequest
+                                                                 extraPrefix:@"telegraphica-chat-folder-reorder-legacy"
+                                                                     timeout:timeout
+                                                                   errorCode:348
+                                                                       error:&legacyError];
+        if ([[legacyResponse objectForKey:@"@type"] isEqualToString:@"ok"]) {
+            return YES;
+        }
+        if (legacyError) {
+            requestError = legacyError;
+        }
+    }
+
+    if (error) {
+        *error = requestError ? requestError : [self errorWithDescription:@"TDLib could not change the chat folder order." code:349];
+    }
+    return NO;
+}
+
+- (NSDictionary *)chatFolderInvitePreviewForLink:(NSString *)inviteLink
+                                          timeout:(NSTimeInterval)timeout
+                                            error:(NSError **)error {
+    NSString *safeLink = [inviteLink isKindOfClass:[NSString class]]
+        ? [inviteLink stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+        : @"";
+    if ([safeLink length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Enter a chat folder invite link." code:350];
+        }
+        return nil;
+    }
+
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"checkChatFolderInviteLink", @"@type",
+                             safeLink, @"invite_link",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-import-check"
+                                                            timeout:timeout
+                                                          errorCode:351
+                                                              error:error];
+    if (![[response objectForKey:@"@type"] isEqualToString:@"chatFolderInviteLinkInfo"]) {
+        if (error && response && !*error) {
+            *error = [self errorWithDescription:@"TDLib returned an unexpected response for the folder link." code:352];
+        }
+        return nil;
+    }
+
+    NSDictionary *folderInfo = [[response objectForKey:@"chat_folder_info"] isKindOfClass:[NSDictionary class]]
+        ? [response objectForKey:@"chat_folder_info"]
+        : [NSDictionary dictionary];
+    NSString *title = [self safeChatFolderTitleFromObject:[folderInfo objectForKey:@"name"]];
+    if ([title length] == 0) {
+        title = [self safeChatFolderTitleFromObject:[folderInfo objectForKey:@"title"]];
+    }
+    if ([title length] == 0) {
+        title = @"Telegram";
+    }
+    NSArray *missingChatIDs = TGChatFolderSafeIDArray([response objectForKey:@"missing_chat_ids"]);
+    NSArray *addedChatIDs = TGChatFolderSafeIDArray([response objectForKey:@"added_chat_ids"]);
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            safeLink, @"invite_link",
+            title, @"title",
+            missingChatIDs, @"missing_chat_ids",
+            addedChatIDs, @"added_chat_ids",
+            nil];
+}
+
+- (BOOL)importChatFolderWithInviteLink:(NSString *)inviteLink
+                               chatIDs:(NSArray *)chatIDs
+                               timeout:(NSTimeInterval)timeout
+                                 error:(NSError **)error {
+    NSString *safeLink = [inviteLink isKindOfClass:[NSString class]]
+        ? [inviteLink stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+        : @"";
+    NSArray *safeChatIDs = TGChatFolderSafeIDArray(chatIDs);
+    if ([safeLink length] == 0 || [safeChatIDs count] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"The folder link contains no new chats to import." code:353];
+        }
+        return NO;
+    }
+
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"addChatFolderByInviteLink", @"@type",
+                             safeLink, @"invite_link",
+                             safeChatIDs, @"chat_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-import"
+                                                            timeout:timeout
+                                                          errorCode:354
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"ok"]) {
+        return YES;
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib could not import the chat folder." code:355];
+    }
+    return NO;
+}
+
 - (BOOL)deleteChatFolderWithID:(NSNumber *)folderID apiKind:(NSString *)apiKind timeout:(NSTimeInterval)timeout error:(NSError **)error {
     if (![folderID respondsToSelector:@selector(integerValue)] || [folderID integerValue] <= 0) {
         if (error) {

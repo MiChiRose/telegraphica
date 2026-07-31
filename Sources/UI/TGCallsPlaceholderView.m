@@ -323,7 +323,7 @@
         [scrollView setDocumentView:self.tableView];
         [self addSubview:scrollView];
 
-        self.statusField = [self labelWithFrame:NSMakeRect(30.0, 20.0, MAX(180.0, NSWidth(frame) - 82.0), 18.0)
+        self.statusField = [self labelWithFrame:NSMakeRect(30.0, 20.0, MAX(100.0, NSWidth(frame) - 82.0), 18.0)
                                            text:@""
                                            font:[NSFont systemFontOfSize:10.5]];
         [self.statusField setTextColor:TGClassicCardMutedInkColor()];
@@ -386,7 +386,7 @@
                                                 MAX(80.0, NSHeight(bounds) - 202.0))];
     [self.statusField setFrame:NSMakeRect(30.0,
                                           20.0,
-                                          MAX(180.0, NSWidth(bounds) - 82.0),
+                                          MAX(100.0, NSWidth(bounds) - 82.0),
                                           18.0)];
     [self.spinner setFrame:NSMakeRect(NSWidth(bounds) - 42.0, 20.0, 16.0, 16.0)];
     [self.unavailableTitleField setFrame:NSMakeRect(80.0,

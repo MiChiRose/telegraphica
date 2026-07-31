@@ -33,6 +33,126 @@
            [state isEqualToString:@"waitPassword"];
 }
 
+- (NSString *)authorizationPresentationState {
+    if (self.qrPhoneLoginRecoveryVisible &&
+        ([self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"] ||
+         [self isTerminalAuthorizationState:self.currentAuthState])) {
+        return @"waitPhoneNumber";
+    }
+    return self.currentAuthState;
+}
+
+- (void)openQRCodeLogin:(id)sender {
+    (void)sender;
+    if (![self.currentAuthState isEqualToString:@"waitPhoneNumber"] &&
+        ![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        return;
+    }
+    self.qrPhoneLoginRecoveryVisible = NO;
+    if (!self.qrLoginWindowController) {
+        self.qrLoginWindowController = [[[TGQRCodeLoginWindowController alloc] initWithClient:self.client] autorelease];
+        [self.qrLoginWindowController setDelegate:(id<TGQRCodeLoginWindowControllerDelegate>)self];
+    }
+    [self.qrLoginWindowController showWindow:self];
+    [[self.qrLoginWindowController window] center];
+    [[self.qrLoginWindowController window] makeKeyAndOrderFront:self];
+    if ([self.currentAuthState isEqualToString:@"waitPhoneNumber"]) {
+        [self.qrLoginWindowController beginQRCodeAuthentication];
+    } else {
+        [self.qrLoginWindowController refreshQRCodeFromClient];
+    }
+}
+
+- (void)qrCodeLoginWindowControllerDidCancel:(TGQRCodeLoginWindowController *)controller {
+    if (controller != self.qrLoginWindowController || self.authClientRecoveryInFlight) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"waitPhoneNumber"] &&
+        ![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        [controller setDelegate:nil];
+        self.qrLoginWindowController = nil;
+        return;
+    }
+
+    [controller setDelegate:nil];
+    self.qrLoginWindowController = nil;
+    self.authSubmissionInFlight = NO;
+    self.qrPhoneLoginRecoveryVisible = YES;
+    [self recoverPhoneLoginFromPendingQRCodeState];
+}
+
+- (void)recoverPhoneLoginFromPendingQRCodeState {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                             selector:@selector(recoverPhoneLoginFromPendingQRCodeState)
+                                               object:nil];
+    if (self.authClientRecoveryInFlight) {
+        return;
+    }
+    if (![self.currentAuthState isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        if ([self.currentAuthState isEqualToString:@"waitPhoneNumber"]) {
+            self.qrPhoneLoginRecoveryVisible = NO;
+            [self updateAuthControlsForState:self.currentAuthState];
+        }
+        return;
+    }
+
+    self.authClientRecoveryInFlight = YES;
+    self.authSubmissionInFlight = NO;
+    self.qrPhoneLoginRecoveryVisible = YES;
+    [self setControlsBusy:YES];
+    [self updateAuthControlsForState:self.currentAuthState];
+    [self.statusField setStringValue:TGLoc(@"login.qr.returningToPhone")];
+    [self appendDetail:@"Canceling the pending TDLib QR authentication before returning to phone-number sign-in."];
+
+    TGTDLibClient *clientToReset = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *cancelError = nil;
+        NSString *cancelSummary = [[clientToReset cancelPendingQRCodeAuthenticationWithTimeout:8.0
+                                                                                         error:&cancelError] copy];
+        NSString *cancelErrorMessage = [[cancelError localizedDescription] copy];
+        if (cancelSummary) {
+            [clientToReset shutdownWithTimeout:1.0];
+            [NSThread sleepForTimeInterval:0.15];
+        }
+        TGTDLibClient *replacementClient = cancelSummary
+            ? [[[TGTDLibClient alloc] init] autorelease]
+            : nil;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client == clientToReset && cancelSummary) {
+                self.client = replacementClient;
+                self.initialConnectStarted = NO;
+                [self updateAuthControlsForState:@"closed"];
+                self.authClientRecoveryInFlight = NO;
+                [self appendDetail:[NSString stringWithFormat:@"TDLib QR authentication reset: %@", cancelSummary]];
+                [self setControlsBusy:NO];
+                [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            } else if (self.client == clientToReset) {
+                self.qrPhoneLoginRecoveryVisible = NO;
+                [self setControlsBusy:NO];
+                [self.statusField setStringValue:TGLoc(@"login.qr.cancelFailed")];
+                [self setLoginErrorMessage:([cancelErrorMessage length] > 0
+                    ? cancelErrorMessage
+                    : TGLoc(@"login.qr.cancelFailed"))];
+                [self updateAuthControlsForState:self.currentAuthState];
+                [self appendDetail:[NSString stringWithFormat:@"TDLib QR authentication reset failed: %@",
+                                    [cancelErrorMessage length] > 0
+                                        ? cancelErrorMessage
+                                        : @"unknown error"]];
+                self.authClientRecoveryInFlight = NO;
+            } else {
+                self.authClientRecoveryInFlight = NO;
+            }
+            [cancelSummary release];
+            [cancelErrorMessage release];
+        });
+
+        [clientToReset release];
+        [pool drain];
+    });
+}
+
 - (BOOL)isTerminalAuthorizationState:(NSString *)state {
     return [state isEqualToString:@"loggingOut"] ||
            [state isEqualToString:@"closing"] ||
@@ -90,6 +210,8 @@
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.client == clientToRecover) {
+                [[self.qrLoginWindowController window] close];
+                self.qrLoginWindowController = nil;
                 self.client = replacementClient;
                 self.initialConnectStarted = NO;
                 self.authClientRecoveryInFlight = NO;
@@ -521,10 +643,46 @@
 }
 
 - (void)updateAuthControlsForState:(NSString *)state {
+    NSString *transportState = state;
+    if ([transportState isEqualToString:@"waitOtherDeviceConfirmation"] &&
+        !self.qrLoginWindowController &&
+        !self.authClientRecoveryInFlight) {
+        /*
+         * QR confirmation is persisted by TDLib. If the QR window no longer
+         * exists (including after a relaunch), cancel that unfinished login
+         * before offering phone-number authorization again.
+         */
+        self.qrPhoneLoginRecoveryVisible = YES;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                 selector:@selector(recoverPhoneLoginFromPendingQRCodeState)
+                                                   object:nil];
+        [self performSelector:@selector(recoverPhoneLoginFromPendingQRCodeState)
+                   withObject:nil
+                   afterDelay:0.05];
+    }
+    if (self.qrPhoneLoginRecoveryVisible &&
+        ([transportState isEqualToString:@"waitPhoneNumber"] ||
+         [transportState isEqualToString:@"waitCode"] ||
+         [transportState isEqualToString:@"waitPassword"] ||
+         [transportState isEqualToString:@"ready"])) {
+        self.qrPhoneLoginRecoveryVisible = NO;
+    }
+    if (self.qrPhoneLoginRecoveryVisible &&
+        ([transportState isEqualToString:@"waitOtherDeviceConfirmation"] ||
+         [self isTerminalAuthorizationState:transportState])) {
+        /*
+         * Keep presenting phone login while TDLib destroys the temporary QR
+         * keys and the replacement client reaches waitPhoneNumber.
+         */
+        state = @"waitPhoneNumber";
+    }
     NSString *previousState = [self.currentAuthState copy];
-    self.currentAuthState = state;
-    BOOL authStateChanged = (!previousState || ![previousState isEqualToString:state]);
+    self.currentAuthState = transportState;
+    BOOL authStateChanged = (!previousState || ![previousState isEqualToString:transportState]);
     BOOL authInputsEnabled = !(self.controlsBusy || self.authSubmissionInFlight);
+    [self.qrLoginWindowController authorizationStateDidChange:state];
+    [self.qrLoginButton setHidden:YES];
+    [self.qrLoginButton setEnabled:NO];
     if (authStateChanged) {
         [self setLoginErrorMessage:nil];
         [self.authTextField setStringValue:@""];
@@ -647,6 +805,7 @@
         [self.loginTitleField setStringValue:TGLoc(@"login.title")];
         [self.loginHintField setStringValue:TGLoc(@"login.phone.hint")];
         [self.authLabel setStringValue:TGLoc(@"login.phone.label")];
+        [self.authSecondaryLabel setStringValue:TGLoc(@"login.or")];
         [[self.authTextField cell] setPlaceholderString:@"+123456789"];
         [[self.authSecureField cell] setPlaceholderString:@""];
         [self.authStateField setHidden:YES];
@@ -657,8 +816,30 @@
         [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
         [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
+        [self.qrLoginButton setTitle:TGLoc(@"login.qr.button")];
+        [self.qrLoginButton setEnabled:authInputsEnabled];
+        [self.qrLoginButton setHidden:NO];
         [self updateVisibleSection];
         [self scheduleLoginInputFocus];
+        [previousState release];
+        return;
+    }
+
+    if ([state isEqualToString:@"waitOtherDeviceConfirmation"]) {
+        [self.statusField setStringValue:TGLoc(@"login.qr.waitingTitle")];
+        [self.loginTitleField setStringValue:TGLoc(@"login.qr.title")];
+        [self.loginHintField setStringValue:TGLoc(@"login.qr.hint")];
+        [self.authLabel setStringValue:TGLoc(@"login.status")];
+        [self.authStateField setHidden:YES];
+        [self.authTextField setHidden:YES];
+        [self.authSecureField setHidden:YES];
+        [self.authTextField setEnabled:NO];
+        [self.authSecureField setEnabled:NO];
+        [self.authButton setHidden:YES];
+        [self.qrLoginButton setTitle:TGLoc(@"login.qr.show")];
+        [self.qrLoginButton setEnabled:authInputsEnabled];
+        [self.qrLoginButton setHidden:NO];
+        [self updateVisibleSection];
         [previousState release];
         return;
     }
@@ -781,6 +962,7 @@
     [self.sendMessageButton setEnabled:NO];
     if (busy) {
         [self.authButton setEnabled:NO];
+        [self.qrLoginButton setEnabled:NO];
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:NO];
         [self.loadChatsButton setEnabled:NO];

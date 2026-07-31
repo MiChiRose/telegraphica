@@ -12,10 +12,14 @@
 @synthesize avatarLocalPath = _avatarLocalPath;
 @synthesize serverNotificationsMuted = _serverNotificationsMuted;
 @synthesize notificationsMuted = _notificationsMuted;
+@synthesize markedAsUnread = _markedAsUnread;
 @synthesize pinned = _pinned;
 @synthesize forumTopic = _forumTopic;
+@synthesize forumTopicClosed = _forumTopicClosed;
+@synthesize forumTopicPinned = _forumTopicPinned;
 @synthesize savedMessages = _savedMessages;
 @synthesize bot = _bot;
+@synthesize community = _community;
 @synthesize parentChatID = _parentChatID;
 @synthesize messageThreadID = _messageThreadID;
 @synthesize messageTopicKind = _messageTopicKind;
@@ -56,14 +60,26 @@
     if ([identifier isEqual:@"is_pinned"]) {
         return [NSNumber numberWithBool:self.pinned];
     }
+    if ([identifier isEqual:@"is_forum_topic_closed"]) {
+        return [NSNumber numberWithBool:self.forumTopicClosed];
+    }
+    if ([identifier isEqual:@"is_forum_topic_pinned"]) {
+        return [NSNumber numberWithBool:self.forumTopicPinned];
+    }
     if ([identifier isEqual:@"is_saved_messages"]) {
         return [NSNumber numberWithBool:self.savedMessages];
     }
     if ([identifier isEqual:@"is_bot"]) {
         return [NSNumber numberWithBool:self.bot];
     }
+    if ([identifier isEqual:@"is_community"]) {
+        return [NSNumber numberWithBool:self.community];
+    }
     if ([identifier isEqual:@"notifications_muted"]) {
         return [NSNumber numberWithBool:self.notificationsMuted];
+    }
+    if ([identifier isEqual:@"is_marked_as_unread"]) {
+        return [NSNumber numberWithBool:self.markedAsUnread];
     }
     if ([identifier isEqual:@"chat_id"]) {
         return self.chatID;

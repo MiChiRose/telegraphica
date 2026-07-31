@@ -549,7 +549,8 @@ def check_additional_message_types_contract(errors):
                      '@"sendCallSignalingData"', '@"min_layer"', '@"max_layer"',
                      "[TGCallAudioEngine protocolVersions]",
                      "[TGCallAudioEngine maximumProtocolLayer]",
-                     '[NSNumber numberWithBool:NO], @"is_video"']:
+                     '[NSNumber numberWithBool:isVideo], @"is_video"',
+                     "createCallToUserID:userID isVideo:NO"]:
         if fragment not in calls_text:
             errors.append("%s: free audio-call signaling is missing `%s`" %
                           (calls_rel, fragment))
@@ -572,9 +573,11 @@ def check_call_transport_stability_contract(errors):
         "TGModernCallTransportReceiveSignalingData",
         "TGModernCallTransportSetMicrophoneMuted",
         "TGModernCallTransportSetSpeakerMuted",
+        "TGModernCallTransportSetCameraEnabled",
         "TGModernCallTransportPreferredRelayID",
         "TGModernCallTransportStop",
         "didEmitSignalingData:",
+        "didReceiveVideoImage:",
     ]:
         if fragment not in audio_text:
             errors.append("%s: modern call-audio contract is missing `%s`" %
@@ -582,16 +585,20 @@ def check_call_transport_stability_contract(errors):
 
     modern_header_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.h")
     modern_source_rel = os.path.join("ModernCallTransport", "TGModernCallTransport.mm")
+    modern_video_rel = os.path.join("ModernCallTransport", "TGModernCallVideoPlatform.cpp")
+    legacy_clock_rel = os.path.join("ModernCallTransport", "TGModernCallLegacyClock.cpp")
     modern_cmake_rel = os.path.join("ModernCallTransport", "CMakeLists.txt")
     verified_transport_rel = os.path.join(
         "ModernCallTransport", "VERIFIED_TRANSPORT.sha256")
     modern_header_text = read_text(os.path.join(ROOT, modern_header_rel))
     modern_source_text = read_text(os.path.join(ROOT, modern_source_rel))
+    modern_video_text = read_text(os.path.join(ROOT, modern_video_rel))
+    legacy_clock_text = read_text(os.path.join(ROOT, legacy_clock_rel))
     modern_cmake_text = read_text(os.path.join(ROOT, modern_cmake_rel))
     verified_transport_text = read_text(
         os.path.join(ROOT, verified_transport_rel))
     expected_transport_sha = (
-        "96713ab9689d8e79c0caa7c8985e88d31fcfee2a235134e92f5c622250f9677e")
+        "d56dec30e80855fc9c2592d1f28293259a1289e3661c1b954302ccaece1419e4")
     if expected_transport_sha not in verified_transport_text:
         errors.append(
             "%s: the HITL-approved audio-call transport hash changed" %
@@ -613,12 +620,41 @@ def check_call_transport_stability_contract(errors):
         "MutingAudioTransport",
         "MutingAudioDeviceModule",
         "audioOutputState->muted.store",
+        "libyuv::I420Rotate",
+        "libyuv::I420ToBGRA",
+        "now - _lastFrameAt).count() < 120",
+        "width > 480 || height > 360",
+        "does not change the encoded video sent",
+        "remotePrefferedAspectRatioUpdated = [rawOwner]",
+        "Local camera capture failed",
     ]:
         if fragment not in modern_source_text:
             errors.append("%s: modern Telegram transport is missing `%s`" %
                           (modern_source_rel, fragment))
     for fragment in [
+        "AppendCapabilityWithI420Fallback",
+        "NumberOfCapabilities(selectedID.c_str())",
+        "StartCapture(candidate)",
+        "AVCaptureVideoDataOutput",
+        "kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange",
+        "libyuv::NV12ToI420",
+        "startAVFoundationCapture",
+    ]:
+        if fragment not in modern_video_text:
+            errors.append("%s: legacy camera fallback is missing `%s`" %
+                          (modern_video_rel, fragment))
+    for fragment in [
+        'extern "C" int clock_gettime',
+        "mach_absolute_time()",
+        "clockID == CLOCK_REALTIME",
+    ]:
+        if fragment not in legacy_clock_text:
+            errors.append("%s: Mavericks libvpx clock compatibility is missing `%s`" %
+                          (legacy_clock_rel, fragment))
+    for fragment in [
         "CMAKE_OSX_DEPLOYMENT_TARGET 10.9",
+        "TGModernCallLegacyClock.cpp",
+        "TGModernCallVideoPlatform.cpp PROPERTIES LANGUAGE OBJCXX",
         'OUTPUT_NAME "TelegraphicaCallTransport"',
         'PREFIX ""',
         "webrtc::AudioProcessingBuilder audioProcessingBuilder",
@@ -670,6 +706,8 @@ def check_call_transport_stability_contract(errors):
                       window_rel)
     for fragment in [
         "updateSignalBars:",
+        "layoutQualityIndicator",
+        "layoutStatusForConnectedState:",
         'TGLoc(@"calls.quality")',
         "[self.qualityField setHidden:!connected]",
         'iconName:@"headphones"',
@@ -690,6 +728,14 @@ def check_call_transport_stability_contract(errors):
                           (window_rel, forbidden_fallback))
     if "state == TGCallPresentationStateCalling || state == TGCallPresentationStateIncoming" in window_text:
         errors.append("%s: outgoing calls must not play the incoming Marimba ringtone" % window_rel)
+    for fragment in [
+        "if (self.videoCall && ended)",
+        "[self.timerField setHidden:(self.videoCall && ended)]",
+        "NSMakeRect(120.0, 116.0, 440.0, 18.0)",
+    ]:
+        if fragment not in window_text:
+            errors.append("%s: ended video-call status must remain below the retained video `%s`" %
+                          (window_rel, fragment))
 
     coordinator_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.m")
     coordinator_text = read_text(os.path.join(ROOT, coordinator_rel))
@@ -703,12 +749,20 @@ def check_call_transport_stability_contract(errors):
         "TGTDLibCallSignalingDataDidUpdateNotification",
         "sendAudioCallSignalingData:",
         "receiveSignalingData:",
+        "Video call: first local preview frame reached AppKit.",
+        "Video call: requested local camera after media establishment.",
     ]:
         if fragment not in coordinator_text:
             errors.append("%s: call negotiation diagnostics are missing `%s`" %
                           (coordinator_rel, fragment))
     if "descriptor.config.allowTCP = true;" not in modern_source_text:
         errors.append("%s: Telegram call transport must retain TCP relay fallback" %
+                      modern_source_rel)
+    if "state == VideoState::Active && !_captureSession && !_module" not in modern_video_text:
+        errors.append("%s: local camera activation must retry after a transient legacy capture failure" %
+                      modern_video_rel)
+    if "setRequestedVideoAspect(4.0f / 3.0f)" in modern_source_text:
+        errors.append("%s: fixed 4:3 incoming-video requests distort portrait callers" %
                       modern_source_rel)
 
     privacy_permissions_rel = os.path.join(
@@ -749,6 +803,10 @@ def check_call_transport_stability_contract(errors):
 
     history_rel = os.path.join("Sources", "UI", "TGCallsPlaceholderView.m")
     history_text = read_text(os.path.join(ROOT, history_rel))
+    coordinator_header_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.h")
+    coordinator_rel = os.path.join("Sources", "Calls", "TGCallCoordinator.m")
+    coordinator_text = read_text(os.path.join(ROOT, coordinator_header_rel)) + read_text(
+        os.path.join(ROOT, coordinator_rel))
     if "cell->_callSummary = [_callSummary retain];" not in history_text:
         errors.append("%s: call history cells must own copied row summaries on legacy AppKit" %
                       history_rel)
@@ -778,6 +836,17 @@ def check_call_transport_stability_contract(errors):
         if forbidden_fragment in history_text:
             errors.append("%s: demo call controls must not be visible in the production calls screen `%s`" %
                           (history_rel, forbidden_fragment))
+    for forbidden_fragment in [
+        "videoTestOutgoingButton",
+        "videoTestIncomingButton",
+        "@selector(videoTestOutgoingPressed:)",
+        "@selector(videoTestIncomingPressed:)",
+        "startMockOutgoingVideoCall",
+        "startMockIncomingVideoCall",
+    ]:
+        if forbidden_fragment in history_text or forbidden_fragment in coordinator_text:
+            errors.append("Video-call test controls must not ship in the release candidate: `%s`" %
+                          forbidden_fragment)
     if "[self.unavailableDetailField setLineBreakMode:" in history_text:
         errors.append("%s: legacy NSTextField line breaking must be configured through its cell" %
                       history_rel)
@@ -1038,6 +1107,10 @@ def check_primary_navigation_contract(errors):
         "commandSelector == @selector(moveUp:)",
         "[_tableView deselectAll:self]",
         "[TGClassicSelectedRowColor() set]",
+        "NSRectFillUsingOperation(clipRect, NSCompositeCopy)",
+        "CGFloat documentHeight = MAX(1.0, ((CGFloat)[_results count] * rowExtent))",
+        "[_scrollView setHasVerticalScroller:needsVerticalScroller]",
+        "NSArray *snapshot = results ? [[NSArray alloc] initWithArray:results]",
     ]:
         if fragment not in chat_search_panel_text:
             errors.append("%s: explicit chat-search selection is missing `%s`" %
@@ -1382,6 +1455,99 @@ def check_chat_history_deletion_contract(errors):
                           (lifecycle_rel, fragment))
 
 
+def check_chat_navigation_actions_contract(errors):
+    item_rel = os.path.join("Sources", "Core", "TGChatItem.h")
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    menus_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    item_text = read_text(os.path.join(ROOT, item_rel))
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    menus_text = read_text(os.path.join(ROOT, menus_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+
+    if "isMarkedAsUnread" not in item_text:
+        errors.append("%s: manually unread chat state is missing" % item_rel)
+    for fragment in ['@"toggleChatIsMarkedAsUnread"', '@"is_marked_as_unread"',
+                     '@"getChatMessageByDate"', '@"date"']:
+        if fragment not in client_text:
+            errors.append("%s: chat navigation TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in ["toggleChatReadStateFromMenu:", "markChatItemUnread:",
+                     "jumpToChatDateFromMenu:", "jumpToSearchResult:"]:
+        if fragment not in menus_text:
+            errors.append("%s: chat navigation action is missing `%s`" %
+                          (menus_rel, fragment))
+    for fragment in ["drawsMarkedUnreadDot", "TGColorFromHex(0x2D8BD4)"]:
+        if fragment not in cells_text:
+            errors.append("%s: manually unread chat indicator is missing `%s`" %
+                          (cells_rel, fragment))
+
+
+def check_message_link_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+MessageLinks.m")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in ['@"getMessageLink"', '@"in_message_thread"', '@"for_comment"',
+                     '@"messageLink"', '@"link"']:
+        if fragment not in client_text:
+            errors.append("%s: TDLib message-link compatibility is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in ["copyMessageLinkFromMenu:", 'TGLoc(@"message.copyLink")',
+                     "messageLinkForChatID:", "NSPasteboard"]:
+        if fragment not in menu_text:
+            errors.append("%s: message-link menu action is missing `%s`" %
+                          (menu_rel, fragment))
+    if "TGTDLibClient+MessageLinks.m in Sources" not in project_text:
+        errors.append("%s: message-link client category is not compiled" % project_rel)
+
+
+def check_composer_link_editor_contract(errors):
+    support_rel = os.path.join("Sources", "UI", "TGComposerLinkSupport.m")
+    composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ComposerMedia.inc")
+    localization_rel = os.path.join("Sources", "UI", "TGLocalization.m")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    support_text = read_text(os.path.join(ROOT, support_rel))
+    composer_text = read_text(os.path.join(ROOT, composer_rel))
+    localization_text = read_text(os.path.join(ROOT, localization_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        "TGComposerLinkInfoForTextSelection",
+        "TGComposerMarkdownLinkString",
+        "TGComposerPromptForLinkURL",
+        'stringByAppendingString:candidate',
+        '[scheme isEqualToString:@"tg"]',
+    ]:
+        if fragment not in support_text:
+            errors.append("%s: composer link support is missing `%s`" %
+                          (support_rel, fragment))
+    for fragment in [
+        "applyComposerLink:",
+        "removeComposerLink:",
+        'TGLoc(@"composer.link.add")',
+        'TGLoc(@"composer.link.remove")',
+        'NSString *sentinel = @"\\u2063"',
+    ]:
+        if fragment not in composer_text:
+            errors.append("%s: composer link editor wiring is missing `%s`" %
+                          (composer_rel, fragment))
+    for key in [
+        "composer.link.add",
+        "composer.link.edit",
+        "composer.link.remove",
+        "composer.link.invalid",
+    ]:
+        if localization_text.count('@"%s"' % key) != 3:
+            errors.append("%s: composer link localization `%s` must exist in all three languages" %
+                          (localization_rel, key))
+    if "TGComposerLinkSupport.m in Sources" not in project_text:
+        errors.append("%s: composer link support is not compiled" % project_rel)
+
+
 def check_hourly_update_check_contract(errors):
     scheduler_rel = os.path.join("Sources", "Services", "TGUpdateCheckScheduler.m")
     scheduler_text = read_text(os.path.join(ROOT, scheduler_rel))
@@ -1448,6 +1614,9 @@ def check_chat_folder_management_contract(errors):
         '"deleteChatFilter"',
         '"getChatFolderInviteLinks"',
         '"createChatFolderInviteLink"',
+        '"reorderChatFolders"',
+        '"checkChatFolderInviteLink"',
+        '"addChatFolderByInviteLink"',
         '"mountain-lion"',
     ]:
         if fragment not in client_text:
@@ -1457,6 +1626,10 @@ def check_chat_folder_management_contract(errors):
         'assetName:@"folder-add"',
         'assetName:@"folder-remove"',
         'assetName:@"folder-share"',
+        'assetName:@"upload"',
+        "reorderChatFolderDefinitions:",
+        "chatFolderInvitePreviewForLink:",
+        "importChatFolderWithInviteLink:",
         "definitionHasInclusionRule:",
         "setObjectValue:",
         "shareLinkForChatFolderID:",
@@ -1503,6 +1676,350 @@ def check_chat_folder_management_contract(errors):
                           icon_name)
 
 
+def check_qr_login_and_reaction_picker_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    qr_controller_rel = os.path.join("Sources", "UI", "TGQRCodeLoginWindowController.m")
+    qr_generator_rel = os.path.join("Sources", "UI", "TGQRCodeImageGenerator.m")
+    auth_rel = os.path.join("Sources", "UI", "TGStatusWindowController+AuthComposerState.inc")
+    layout_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SectionLayout.inc")
+    contacts_rel = os.path.join("Sources", "UI", "TGContactsViewController.m")
+    video_note_rel = os.path.join("Sources", "UI", "TGVideoNoteRecorderWindowController.m")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    reaction_rel = os.path.join("Sources", "UI", "TGReactionMenuRowView.m")
+    project_rel = "Telegraphica.xcodeproj/project.pbxproj"
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    qr_controller_text = read_text(os.path.join(ROOT, qr_controller_rel))
+    qr_generator_text = read_text(os.path.join(ROOT, qr_generator_rel))
+    auth_text = read_text(os.path.join(ROOT, auth_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+    contacts_text = read_text(os.path.join(ROOT, contacts_rel))
+    video_note_text = read_text(os.path.join(ROOT, video_note_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    reaction_text = read_text(os.path.join(ROOT, reaction_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        '"requestQrCodeAuthentication"',
+        '"authorizationStateWaitOtherDeviceConfirmation"',
+        "currentAuthenticationQRCodeLink",
+        "cancelPendingQRCodeAuthenticationWithTimeout:",
+        '"telegraphica-cancel-qr-auth"',
+        'isEqualToString:@"updateAuthorizationState"',
+        "shouldSeedAuthorizationCache",
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: QR authentication contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "TGQRCodeImageGenerator",
+        "beginQRCodeAuthentication",
+        "authorizationStateDidChange:",
+        "maximumSide:300.0",
+        "qrCodeLoginWindowControllerDidCancel:",
+    ]:
+        if fragment not in qr_controller_text:
+            errors.append("%s: QR login window is missing `%s`" %
+                          (qr_controller_rel, fragment))
+    if "_closeButton" in qr_controller_text:
+        errors.append("%s: redundant in-window QR close button must not be present" %
+                      qr_controller_rel)
+    for fragment in [
+        "qrcodegen_encodeText",
+        "qrcodegen_getModule",
+        "quietZone = 4",
+    ]:
+        if fragment not in qr_generator_text:
+            errors.append("%s: offline QR generator is missing `%s`" %
+                          (qr_generator_rel, fragment))
+    for fragment in [
+        "openQRCodeLogin:",
+        'isEqualToString:@"waitOtherDeviceConfirmation"',
+        'TGLoc(@"login.or")',
+        "qrCodeLoginWindowControllerDidCancel:",
+        "recoverPhoneLoginFromPendingQRCodeState",
+        "cancelPendingQRCodeAuthenticationWithTimeout:8.0",
+        "shutdownWithTimeout:1.0",
+        "qrPhoneLoginRecoveryVisible",
+        "authorizationPresentationState",
+    ]:
+        if fragment not in auth_text:
+            errors.append("%s: QR login host wiring is missing `%s`" %
+                          (auth_rel, fragment))
+    cancel_method_start = auth_text.find(
+        "- (void)qrCodeLoginWindowControllerDidCancel:")
+    cancel_method_end = auth_text.find(
+        "- (BOOL)isTerminalAuthorizationState:", cancel_method_start)
+    cancel_method = auth_text[cancel_method_start:cancel_method_end]
+    explicit_cancel = cancel_method.find(
+        "recoverPhoneLoginFromPendingQRCodeState")
+    phone_recovery_presentation = cancel_method.find(
+        "self.qrPhoneLoginRecoveryVisible = YES;")
+    if cancel_method_start < 0 or explicit_cancel < 0 or phone_recovery_presentation < 0:
+        errors.append("%s: QR cancellation recovery flow is incomplete" % auth_rel)
+    client_cancel_start = client_text.find(
+        "- (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:")
+    client_cancel_end = client_text.find(
+        "- (NSDictionary *)currentUserProfileSummaryWithTimeout:",
+        client_cancel_start)
+    client_cancel_method = client_text[client_cancel_start:client_cancel_end]
+    if (client_cancel_start < 0 or
+            'setObject:@"logOut" forKey:@"@type"' not in client_cancel_method):
+        errors.append(
+            "%s: pending QR authentication must be canceled through TDLib "
+            "before the client is replaced" % client_rel)
+    for fragment in ["authorizationPresentationState"]:
+        if fragment not in layout_text:
+            errors.append("%s: QR phone recovery layout is missing `%s`" %
+                          (layout_rel, fragment))
+    for fragment in ["phoneLoginLayout", "qrButtonY", "qrButtonWidth"]:
+        if fragment not in layout_text:
+            errors.append("%s: QR/phone login layout is missing `%s`" %
+                          (layout_rel, fragment))
+    for fragment in ["authorizationRetryCount", 'TGLoc(@"contacts.authWaiting")']:
+        if fragment not in contacts_text:
+            errors.append("%s: post-authorization contact retry is missing `%s`" %
+                          (contacts_rel, fragment))
+    for fragment in ["previewClipLayer",
+                     "setCornerRadius:180.0",
+                     "[self.previewClipLayer addSublayer:self.cameraPreviewLayer]",
+                     "TGThemeDrawGroupedCardInPath(backgroundPath"]:
+        if fragment not in video_note_text:
+            errors.append("%s: video-note opaque circular preview host is missing `%s`" %
+                          (video_note_rel, fragment))
+    if "[self.cameraPreviewLayer setMask:" in video_note_text:
+        errors.append(
+            "%s: AVCaptureVideoPreviewLayer must not be masked directly on "
+            "legacy Core Animation" % video_note_rel)
+    for source_name in [
+        "TGQRCodeImageGenerator.m",
+        "TGQRCodeLoginWindowController.m",
+        "TGReactionMenuRowView.m",
+        "qrcodegen.c",
+    ]:
+        if source_name not in project_text:
+            errors.append("%s: target membership is missing `%s`" %
+                          (project_rel, source_name))
+    if "TGReactionMenuRowView" not in menu_text or "reactionGridView" not in menu_text:
+        errors.append("%s: scrollable reaction grid is not wired into the message menu" %
+                      menu_rel)
+    for fragment in ["representedObject", "cancelTracking"]:
+        if fragment not in reaction_text:
+            errors.append("%s: reaction picker behavior is missing `%s`" %
+                          (reaction_rel, fragment))
+    qr_icon = os.path.join(ROOT, "Sources", "Resources", "Icons", "qr-scan.png")
+    if not os.path.isfile(qr_icon):
+        errors.append("Sources/Resources/Icons/qr-scan.png: user-provided QR icon is missing")
+
+
+def check_forum_topic_management_contract(errors):
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+ForumTopics.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ForumTopicManagement.inc")
+    flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    model_rel = os.path.join("Sources", "Core", "TGChatItem.h")
+    project_rel = os.path.join("Telegraphica.xcodeproj", "project.pbxproj")
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    flow_text = read_text(os.path.join(ROOT, flow_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    model_text = read_text(os.path.join(ROOT, model_rel))
+    project_text = read_text(os.path.join(ROOT, project_rel))
+
+    for fragment in [
+        '"createForumTopic"',
+        '"editForumTopic"',
+        '"toggleForumTopicIsClosed"',
+        '"toggleForumTopicIsPinned"',
+        '"deleteForumTopic"',
+        '"forumTopicIcon"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: forum topic TDLib contract is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "createForumTopic:",
+        "renameForumTopicFromMenu:",
+        "toggleForumTopicClosedFromMenu:",
+        "toggleForumTopicPinnedFromMenu:",
+        "deleteForumTopicFromMenu:",
+        "reloadCurrentForumTopicListInteractive:NO",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: forum topic host action is missing `%s`" %
+                          (host_rel, fragment))
+    for fragment in [
+        "[self.composeChatButton setAction:@selector(createForumTopic:)]",
+        "[self.composeChatButton setAction:@selector(openNewChatWindow:)]",
+    ]:
+        if fragment not in flow_text:
+            errors.append("%s: forum topic compose-button routing is missing `%s`" %
+                          (flow_rel, fragment))
+    if "populateForumTopicContextMenu:menu forItem:item" not in menu_text:
+        errors.append("%s: forum topic context menu is not routed" % menu_rel)
+    for fragment in ["forumTopicClosed", "forumTopicPinned"]:
+        if fragment not in model_text:
+            errors.append("%s: forum topic state is missing `%s`" % (model_rel, fragment))
+    if "TGTDLibClient+ForumTopics.m in Sources" not in project_text:
+        errors.append("%s: target membership is missing `TGTDLibClient+ForumTopics.m`" %
+                      project_rel)
+
+
+def check_standard_reaction_picker_contract(errors):
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+ReactionCatalog.inc")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    row_rel = os.path.join("Sources", "UI", "TGReactionMenuRowView.m")
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    row_text = read_text(os.path.join(ROOT, row_rel))
+
+    for fragment in [
+        "fallbackStandardReactionEmojis",
+        "standardReactionEmojisForMessageItem:",
+        "TGReactionEmojiCanRender(emoji)",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: standard reaction picker is missing `%s`" %
+                          (host_rel, fragment))
+    for fragment in [
+        "standardReactionEmojisForMessageItem:item",
+        'TGLoc(@"message.reactions.standard")',
+    ]:
+        if fragment not in menu_text:
+            errors.append("%s: message menu does not use the standard reaction picker `%s`" %
+                          (menu_rel, fragment))
+    for fragment in [
+        "prefetchReactionCatalogForMessageItem:",
+        "availableReactionEmojisByChatID",
+        "reactionCatalogAttemptedChatIDs",
+        "telegramReactionEmojisForMessageItem:",
+        'TGLoc(@"message.reactions.telegram")',
+    ]:
+        if fragment in host_text or fragment in menu_text:
+            errors.append("Telegram-only reaction catalog must not be exposed: `%s`" % fragment)
+    for fragment in [
+        "TGReactionEmojiCanRender",
+        "legacySafeEmojis",
+        "TGReactionMenuDocumentView",
+        "setHasVerticalScroller:",
+        "maximumVisibleRows",
+        'displayEmoji =',
+        '@"?"',
+    ]:
+        if fragment not in row_text:
+            errors.append("%s: unsupported emoji fallback is missing `%s`" %
+                          (row_rel, fragment))
+    layout_rel = os.path.join("Sources", "UI", "TGMessageLayoutSupport.m")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+    for fragment in [
+        "TGStringByReplacingUnrenderableEmoji",
+        "TGReplaceUnrenderableEmojiInAttributedString",
+        "rangeOfComposedCharacterSequenceAtIndex:",
+        "NSNullGlyph",
+        "legacySafeEmojis",
+        'withString:@"?"',
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: message emoji fallback is missing `%s`" %
+                          (layout_rel, fragment))
+    if "TGStringByReplacingUnrenderableEmoji([item reactionSummary]" not in cells_text:
+        errors.append("%s: rendered reaction summaries do not use the legacy emoji fallback" %
+                      cells_rel)
+
+
+def check_contact_birthday_contract(errors):
+    core_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    profile_rel = os.path.join("Sources", "UI", "TGContactProfileView.m")
+    host_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BirthdayStatus.inc")
+    flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+TableForumFlow.inc")
+    core_text = read_text(os.path.join(ROOT, core_rel))
+    profile_text = read_text(os.path.join(ROOT, profile_rel))
+    host_text = read_text(os.path.join(ROOT, host_rel))
+    flow_text = read_text(os.path.join(ROOT, flow_rel))
+    for fragment in ['objectForKey:@"birthdate"', 'forKey:@"birthdate"']:
+        if fragment not in core_text:
+            errors.append("%s: contact birthday parsing is missing `%s`" %
+                          (core_rel, fragment))
+    for fragment in ["TGContactProfileBirthday", 'TGLoc(@"profile.birthday")']:
+        if fragment not in profile_text:
+            errors.append("%s: birthday profile row is missing `%s`" %
+                          (profile_rel, fragment))
+    for fragment in [
+        "refreshSelectedChatBirthdayStatus",
+        "TGBirthdateIsToday",
+        'TGLoc(@"chat.birthdayToday")',
+        "selectedChatBirthdayGeneration",
+    ]:
+        if fragment not in host_text:
+            errors.append("%s: birthday chat banner is missing `%s`" %
+                          (host_rel, fragment))
+    if "[self refreshSelectedChatBirthdayStatus]" not in flow_text:
+        errors.append("%s: chat selection does not refresh birthday status" % flow_rel)
+
+
+def check_poll_management_contract(errors):
+    header_rel = os.path.join("Sources", "Core", "TGTDLibClient.h")
+    core_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    menu_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMenus.inc")
+    header_text = read_text(os.path.join(ROOT, header_rel))
+    core_text = read_text(os.path.join(ROOT, core_rel))
+    menu_text = read_text(os.path.join(ROOT, menu_rel))
+    if "stopPollForChatID:" not in header_text:
+        errors.append("%s: stop-poll client API is missing" % header_rel)
+    for fragment in ['@"stopPoll"', 'forKey:@"reply_markup"', 'extraPrefix:@"telegraphica-stop-poll"']:
+        if fragment not in core_text:
+            errors.append("%s: stop-poll TDLib request is missing `%s`" %
+                          (core_rel, fragment))
+    for fragment in [
+        'TGLoc(@"message.poll.stop")',
+        "@selector(stopPollFromMenu:)",
+        "- (void)stopPollFromMenu:",
+        "[item setPollClosed:YES]",
+    ]:
+        if fragment not in menu_text:
+            errors.append("%s: poll close UI is missing `%s`" %
+                          (menu_rel, fragment))
+
+
+def check_received_link_preview_contract(errors):
+    item_rel = os.path.join("Sources", "Core", "TGMessageItem.h")
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    layout_rel = os.path.join("Sources", "UI", "TGMessageLayoutSupport.m")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    hit_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageMediaHitTesting.inc")
+    item_text = read_text(os.path.join(ROOT, item_rel))
+    client_text = read_text(os.path.join(ROOT, client_rel))
+    layout_text = read_text(os.path.join(ROOT, layout_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+    hit_text = read_text(os.path.join(ROOT, hit_rel))
+    if "linkPreviewInfo" not in item_text:
+        errors.append("%s: received link preview model is missing" % item_rel)
+    for fragment in [
+        'objectForKey:@"link_preview"',
+        "linkPreviewInfoFromMessageContentObject:",
+        '@"show_large_media"',
+        '@"show_above_text"',
+    ]:
+        if fragment not in client_text:
+            errors.append("%s: received link preview parsing is missing `%s`" %
+                          (client_rel, fragment))
+    for fragment in [
+        "TGLinkPreviewCardHeightForItem",
+        "TGLinkPreviewCardRectForItem",
+        "TGDrawLinkPreviewCardForItem",
+    ]:
+        if fragment not in layout_text:
+            errors.append("%s: link preview layout is missing `%s`" %
+                          (layout_rel, fragment))
+    if "TGDrawLinkPreviewCardForItem" not in cells_text:
+        errors.append("%s: message cells do not draw received link previews" % cells_rel)
+    for fragment in ["TGLinkPreviewCardRectForItem", 'objectForKey:@"url"', "openURL:url"]:
+        if fragment not in hit_text:
+            errors.append("%s: link preview card click handling is missing `%s`" %
+                          (hit_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -1525,8 +2042,17 @@ def main():
     check_retro_console_contract(errors)
     check_chat_archive_contract(errors)
     check_chat_history_deletion_contract(errors)
+    check_chat_navigation_actions_contract(errors)
+    check_message_link_contract(errors)
+    check_composer_link_editor_contract(errors)
     check_hourly_update_check_contract(errors)
     check_chat_folder_management_contract(errors)
+    check_qr_login_and_reaction_picker_contract(errors)
+    check_forum_topic_management_contract(errors)
+    check_standard_reaction_picker_contract(errors)
+    check_contact_birthday_contract(errors)
+    check_poll_management_contract(errors)
+    check_received_link_preview_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

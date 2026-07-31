@@ -75,6 +75,7 @@
 @property (nonatomic, retain) NSButton *unblockButton;
 @property (nonatomic, retain) NSButton *refreshButton;
 @property (nonatomic, retain) NSButton *microphonePermissionButton;
+@property (nonatomic, retain) NSButton *cameraPermissionButton;
 @property (nonatomic, retain) NSButton *locationPermissionButton;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSTextField *ruleHintField;
@@ -101,6 +102,7 @@
 @synthesize unblockButton = _unblockButton;
 @synthesize refreshButton = _refreshButton;
 @synthesize microphonePermissionButton = _microphonePermissionButton;
+@synthesize cameraPermissionButton = _cameraPermissionButton;
 @synthesize locationPermissionButton = _locationPermissionButton;
 @synthesize statusField = _statusField;
 @synthesize ruleHintField = _ruleHintField;
@@ -151,6 +153,7 @@
     [_unblockButton release];
     [_refreshButton release];
     [_microphonePermissionButton release];
+    [_cameraPermissionButton release];
     [_locationPermissionButton release];
     [_statusField release];
     [_ruleHintField release];
@@ -317,7 +320,7 @@
     [permissionsTitle setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:permissionsTitle];
 
-    self.microphonePermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(36, 410, 310, 24)] autorelease];
+    self.microphonePermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(36, 410, 218, 24)] autorelease];
     [self.microphonePermissionButton setButtonType:NSSwitchButton];
     [self.microphonePermissionButton setTitle:TGLoc(@"privacy.permissions.microphone")];
     [self.microphonePermissionButton setTarget:self];
@@ -325,7 +328,15 @@
     [self.microphonePermissionButton setAutoresizingMask:NSViewMinYMargin];
     [root addSubview:self.microphonePermissionButton];
 
-    self.locationPermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(378, 410, 340, 24)] autorelease];
+    self.cameraPermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(260, 410, 218, 24)] autorelease];
+    [self.cameraPermissionButton setButtonType:NSSwitchButton];
+    [self.cameraPermissionButton setTitle:TGLoc(@"privacy.permissions.camera")];
+    [self.cameraPermissionButton setTarget:self];
+    [self.cameraPermissionButton setAction:@selector(cameraPermissionChanged:)];
+    [self.cameraPermissionButton setAutoresizingMask:NSViewMinYMargin];
+    [root addSubview:self.cameraPermissionButton];
+
+    self.locationPermissionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 410, 234, 24)] autorelease];
     [self.locationPermissionButton setButtonType:NSSwitchButton];
     [self.locationPermissionButton setTitle:TGLoc(@"privacy.permissions.location")];
     [self.locationPermissionButton setTarget:self];
@@ -403,6 +414,9 @@
     [self.microphonePermissionButton setState:
         ([TGPrivacyPermissions microphonePermissionState] == TGPrivacyPermissionStateAllowed
             ? NSOnState : NSOffState)];
+    [self.cameraPermissionButton setState:
+        ([TGPrivacyPermissions cameraPermissionState] == TGPrivacyPermissionStateAllowed
+            ? NSOnState : NSOffState)];
     [self.locationPermissionButton setState:
         ([TGPrivacyPermissions locationPermissionState] == TGPrivacyPermissionStateAllowed
             ? NSOnState : NSOffState)];
@@ -415,6 +429,10 @@
 
 - (void)microphonePermissionChanged:(id)sender {
     [TGPrivacyPermissions setMicrophoneAllowed:([sender state] == NSOnState)];
+}
+
+- (void)cameraPermissionChanged:(id)sender {
+    [TGPrivacyPermissions setCameraAllowed:([sender state] == NSOnState)];
 }
 
 - (void)locationPermissionChanged:(id)sender {

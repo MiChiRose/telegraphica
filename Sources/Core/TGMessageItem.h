@@ -22,8 +22,13 @@
 @property (nonatomic, copy) NSString *mediaMimeType;
 @property (nonatomic, copy) NSString *downloadFileName;
 @property (nonatomic, retain) NSNumber *downloadFileSize;
+@property (nonatomic, copy) NSDictionary *linkPreviewInfo;
 @property (nonatomic, copy) NSString *reactionSummary;
 @property (nonatomic, copy) NSArray *chosenReactionEmojis;
+@property (nonatomic, copy) NSString *reactionAnimationDisplaySummary;
+@property (nonatomic, assign) CGFloat reactionAnimationProgress;
+@property (nonatomic, assign) BOOL reactionAnimationChangesHeight;
+@property (nonatomic, assign) BOOL reactionAnimationRemoving;
 @property (nonatomic, retain) NSNumber *senderID;
 @property (nonatomic, copy) NSString *senderDisplayName;
 @property (nonatomic, copy) NSString *senderAvatarLocalPath;
@@ -62,6 +67,8 @@
 @property (nonatomic, copy) NSDictionary *replyMarkup;
 @property (nonatomic, retain) NSNumber *callDuration;
 @property (nonatomic, copy) NSString *callDiscardReason;
+@property (nonatomic, copy) NSString *dateSeparatorTitle;
+@property (nonatomic, assign) BOOL showsUnreadSeparator;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID

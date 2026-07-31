@@ -81,8 +81,13 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize mediaMimeType = _mediaMimeType;
 @synthesize downloadFileName = _downloadFileName;
 @synthesize downloadFileSize = _downloadFileSize;
+@synthesize linkPreviewInfo = _linkPreviewInfo;
 @synthesize reactionSummary = _reactionSummary;
 @synthesize chosenReactionEmojis = _chosenReactionEmojis;
+@synthesize reactionAnimationDisplaySummary = _reactionAnimationDisplaySummary;
+@synthesize reactionAnimationProgress = _reactionAnimationProgress;
+@synthesize reactionAnimationChangesHeight = _reactionAnimationChangesHeight;
+@synthesize reactionAnimationRemoving = _reactionAnimationRemoving;
 @synthesize senderID = _senderID;
 @synthesize senderDisplayName = _senderDisplayName;
 @synthesize senderAvatarLocalPath = _senderAvatarLocalPath;
@@ -121,6 +126,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize replyMarkup = _replyMarkup;
 @synthesize callDuration = _callDuration;
 @synthesize callDiscardReason = _callDiscardReason;
+@synthesize dateSeparatorTitle = _dateSeparatorTitle;
+@synthesize showsUnreadSeparator = _showsUnreadSeparator;
 
 - (instancetype)initWithChatID:(NSNumber *)chatID
                      messageID:(NSNumber *)messageID
@@ -137,6 +144,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
         self.outgoingRead = NO;
         self.canBeReplied = YES;
         self.preview = ([preview length] > 0) ? preview : @"[Message]";
+        self.reactionAnimationProgress = 1.0;
     }
     return self;
 }
@@ -367,8 +375,13 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setMediaMimeType:_mediaMimeType];
     [copy setDownloadFileName:_downloadFileName];
     [copy setDownloadFileSize:_downloadFileSize];
+    [copy setLinkPreviewInfo:_linkPreviewInfo];
     [copy setReactionSummary:_reactionSummary];
     [copy setChosenReactionEmojis:_chosenReactionEmojis];
+    [copy setReactionAnimationDisplaySummary:_reactionAnimationDisplaySummary];
+    [copy setReactionAnimationProgress:_reactionAnimationProgress];
+    [copy setReactionAnimationChangesHeight:_reactionAnimationChangesHeight];
+    [copy setReactionAnimationRemoving:_reactionAnimationRemoving];
     [copy setSenderID:_senderID];
     [copy setSenderDisplayName:_senderDisplayName];
     [copy setSenderAvatarLocalPath:_senderAvatarLocalPath];
@@ -407,6 +420,8 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setReplyMarkup:_replyMarkup];
     [copy setCallDuration:_callDuration];
     [copy setCallDiscardReason:_callDiscardReason];
+    [copy setDateSeparatorTitle:_dateSeparatorTitle];
+    [copy setShowsUnreadSeparator:_showsUnreadSeparator];
     return copy;
 }
 
@@ -445,8 +460,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_mediaMimeType release];
     [_downloadFileName release];
     [_downloadFileSize release];
+    [_linkPreviewInfo release];
     [_reactionSummary release];
     [_chosenReactionEmojis release];
+    [_reactionAnimationDisplaySummary release];
     [_senderID release];
     [_senderDisplayName release];
     [_senderAvatarLocalPath release];
@@ -475,6 +492,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_replyMarkup release];
     [_callDuration release];
     [_callDiscardReason release];
+    [_dateSeparatorTitle release];
     [super dealloc];
 }
 

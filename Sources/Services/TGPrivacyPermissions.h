@@ -11,12 +11,15 @@ extern NSString * const TGPrivacyPermissionsDidChangeNotification;
 @interface TGPrivacyPermissions : NSObject
 
 + (TGPrivacyPermissionState)microphonePermissionState;
++ (TGPrivacyPermissionState)cameraPermissionState;
 + (TGPrivacyPermissionState)locationPermissionState;
 
 + (BOOL)requestMicrophonePermission;
++ (BOOL)requestCameraPermission;
 + (BOOL)requestLocationPermission;
 
 + (void)setMicrophoneAllowed:(BOOL)allowed;
++ (void)setCameraAllowed:(BOOL)allowed;
 + (void)setLocationAllowed:(BOOL)allowed;
 
 @end

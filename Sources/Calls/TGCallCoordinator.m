@@ -28,7 +28,10 @@ static NSString *TGCallReadableFailure(NSString *message) {
 @property (nonatomic, retain) NSDictionary *activeProfile;
 @property (nonatomic, assign) BOOL mockCall;
 @property (nonatomic, assign) BOOL outgoing;
+@property (nonatomic, assign) BOOL videoCall;
 @property (nonatomic, assign) BOOL finishing;
+@property (nonatomic, assign) BOOL receivedLocalVideoFrame;
+@property (nonatomic, assign) BOOL receivedRemoteVideoFrame;
 @property (nonatomic, copy) NSString *activeCallStateType;
 @property (nonatomic, retain) NSMutableArray *pendingSignalingData;
 @end
@@ -42,7 +45,10 @@ static NSString *TGCallReadableFailure(NSString *message) {
 @synthesize activeProfile = _activeProfile;
 @synthesize mockCall = _mockCall;
 @synthesize outgoing = _outgoing;
+@synthesize videoCall = _videoCall;
 @synthesize finishing = _finishing;
+@synthesize receivedLocalVideoFrame = _receivedLocalVideoFrame;
+@synthesize receivedRemoteVideoFrame = _receivedRemoteVideoFrame;
 @synthesize activeCallStateType = _activeCallStateType;
 @synthesize pendingSignalingData = _pendingSignalingData;
 
@@ -73,22 +79,38 @@ static NSString *TGCallReadableFailure(NSString *message) {
             nil];
 }
 
-- (void)presentProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing mock:(BOOL)mock {
+- (void)presentProfile:(NSDictionary *)profile
+               outgoing:(BOOL)outgoing
+                  video:(BOOL)video
+                   mock:(BOOL)mock {
     if (self.callWindowController) {
         [[self.callWindowController window] makeKeyAndOrderFront:nil];
         return;
     }
     self.activeProfile = profile;
     self.outgoing = outgoing;
+    self.videoCall = video;
     self.mockCall = mock;
     self.finishing = NO;
-    self.callWindowController = [[[TGCallWindowController alloc] initWithProfile:profile outgoing:outgoing] autorelease];
+    self.receivedLocalVideoFrame = NO;
+    self.receivedRemoteVideoFrame = NO;
+    self.callWindowController = [[[TGCallWindowController alloc] initWithProfile:profile
+                                                                        outgoing:outgoing
+                                                                           video:video] autorelease];
     [self.callWindowController setDelegate:self];
     [self.callWindowController showWindow:nil];
     [[self.callWindowController window] makeKeyAndOrderFront:nil];
 }
 
 - (void)startAudioCallToProfile:(NSDictionary *)profile {
+    [self startCallToProfile:profile video:NO];
+}
+
+- (void)startVideoCallToProfile:(NSDictionary *)profile {
+    [self startCallToProfile:profile video:YES];
+}
+
+- (void)startCallToProfile:(NSDictionary *)profile video:(BOOL)video {
     if (self.callWindowController) {
         [[self.callWindowController window] makeKeyAndOrderFront:nil];
         return;
@@ -96,18 +118,24 @@ static NSString *TGCallReadableFailure(NSString *message) {
     if (![TGPrivacyPermissions requestMicrophonePermission]) {
         return;
     }
+    if (video && ![TGPrivacyPermissions requestCameraPermission]) {
+        return;
+    }
     NSNumber *userID = [profile objectForKey:@"user_id"];
     if (![userID respondsToSelector:@selector(longLongValue)] || !self.transportAvailable) {
         NSBeep();
         return;
     }
-    [self presentProfile:profile outgoing:YES mock:NO];
+    [self presentProfile:profile outgoing:YES video:video mock:NO];
     TGTDLibClient *client = [self.client retain];
     NSDictionary *retainedProfile = [profile retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *error = nil;
-        NSNumber *callID = [[client createAudioCallToUserID:userID timeout:10.0 error:&error] retain];
+        NSNumber *callID = [[client createCallToUserID:userID
+                                              isVideo:video
+                                               timeout:10.0
+                                                 error:&error] retain];
         NSString *failure = [[error localizedDescription] copy];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.activeProfile == retainedProfile && !self.finishing) {
@@ -135,7 +163,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
         [[self.callWindowController window] makeKeyAndOrderFront:nil];
         return;
     }
-    [self presentProfile:[self mockProfile] outgoing:YES mock:YES];
+    [self presentProfile:[self mockProfile] outgoing:YES video:NO mock:YES];
     [self performSelector:@selector(connectMockCall) withObject:nil afterDelay:2.2];
 }
 
@@ -144,7 +172,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
         [[self.callWindowController window] makeKeyAndOrderFront:nil];
         return;
     }
-    [self presentProfile:[self mockProfile] outgoing:NO mock:YES];
+    [self presentProfile:[self mockProfile] outgoing:NO video:NO mock:YES];
 }
 
 - (void)connectMockCall {
@@ -161,6 +189,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
     NSNumber *userID = [[call objectForKey:@"user_id"] respondsToSelector:@selector(longLongValue)]
         ? [NSNumber numberWithLongLong:[[call objectForKey:@"user_id"] longLongValue]] : nil;
     BOOL outgoing = [[call objectForKey:@"is_outgoing"] boolValue];
+    BOOL video = [[call objectForKey:@"is_video"] boolValue];
     NSDictionary *state = [[call objectForKey:@"state"] isKindOfClass:[NSDictionary class]]
         ? [call objectForKey:@"state"] : nil;
     NSString *stateType = [state objectForKey:@"@type"];
@@ -175,12 +204,13 @@ static NSString *TGCallReadableFailure(NSString *message) {
         NSNumber *declinedCallID = [callID retain];
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-            [client discardAudioCallWithID:declinedCallID
-                              disconnected:NO
-                                  duration:0
-                              connectionID:nil
-                                   timeout:8.0
-                                     error:NULL];
+            [client discardCallWithID:declinedCallID
+                         disconnected:NO
+                             duration:0
+                              isVideo:video
+                         connectionID:nil
+                              timeout:8.0
+                                error:NULL];
             [declinedCallID release];
             [client release];
             [pool drain];
@@ -196,6 +226,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
                                          nil];
         [self presentProfile:fallbackProfile
                     outgoing:NO
+                       video:video
                         mock:NO];
         self.activeCallID = callID;
         TGTDLibClient *client = [self.client retain];
@@ -225,6 +256,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
     if (!self.activeCallID) {
         self.activeCallID = callID;
     }
+    self.videoCall = video;
     self.activeCallStateType = stateType;
     if ([stateType isEqualToString:@"callStateExchangingKeys"]) {
         [self.callWindowController setPresentationState:TGCallPresentationStateConnecting detail:nil];
@@ -257,6 +289,15 @@ static NSString *TGCallReadableFailure(NSString *message) {
             }
         }
     } else if ([stateType isEqualToString:@"callStateDiscarded"]) {
+        NSDictionary *reason = [[state objectForKey:@"reason"] isKindOfClass:[NSDictionary class]]
+            ? [state objectForKey:@"reason"] : nil;
+        NSString *reasonType = [[reason objectForKey:@"@type"] description];
+        [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+            @"Audio call: TDLib discarded the %@ call; reason=%@ duration=%@ need-rating=%@.",
+            video ? @"video" : @"audio",
+            [reasonType length] > 0 ? reasonType : @"unspecified",
+            [state objectForKey:@"duration"] ?: @0,
+            [[state objectForKey:@"need_rating"] boolValue] ? @"yes" : @"no"]];
         [self.callWindowController setPresentationState:TGCallPresentationStateEnded detail:nil];
         [self finishCallAfterDelay:4.0];
     } else if ([stateType isEqualToString:@"callStateError"]) {
@@ -299,6 +340,14 @@ static NSString *TGCallReadableFailure(NSString *message) {
     (void)engine;
     if (state == TGCallAudioEngineStateEstablished) {
         [[TGLogger sharedLogger] log:@"Audio call: media transport established."];
+        if (self.videoCall) {
+            // The camera is first requested while the transport is created.
+            // Request it once more after media establishment so a temporary
+            // legacy-device acquisition failure gets a deterministic retry.
+            [self.audioEngine setCameraEnabled:YES];
+            [[TGLogger sharedLogger] log:
+                @"Video call: requested local camera after media establishment."];
+        }
         [self.callWindowController setPresentationState:TGCallPresentationStateConnected detail:nil];
     } else if (state == TGCallAudioEngineStateReconnecting) {
         [[TGLogger sharedLogger] log:@"Audio call: media transport reconnecting."];
@@ -345,13 +394,47 @@ static NSString *TGCallReadableFailure(NSString *message) {
     });
 }
 
+- (void)callAudioEngine:(TGCallAudioEngine *)engine
+   didReceiveVideoImage:(NSImage *)image
+                  local:(BOOL)local {
+    (void)engine;
+    if (local && !self.receivedLocalVideoFrame) {
+        self.receivedLocalVideoFrame = YES;
+        [[TGLogger sharedLogger] log:@"Video call: first local preview frame reached AppKit."];
+    } else if (!local && !self.receivedRemoteVideoFrame) {
+        self.receivedRemoteVideoFrame = YES;
+        [[TGLogger sharedLogger] log:@"Video call: first remote frame reached AppKit."];
+    }
+    [self.callWindowController updateVideoImage:image local:local];
+}
+
+- (void)callAudioEngine:(TGCallAudioEngine *)engine
+ didChangeRemoteVideoState:(NSInteger)state {
+    (void)engine;
+    [self.callWindowController updateRemoteVideoState:state];
+}
+
 - (void)callWindowControllerDidRequestAnswer:(TGCallWindowController *)controller {
     if (self.mockCall) {
+        if (self.videoCall &&
+            (![TGPrivacyPermissions requestMicrophonePermission] ||
+             ![TGPrivacyPermissions requestCameraPermission])) {
+            return;
+        }
+        if (self.videoCall && ![controller startLocalCameraPreview]) {
+            [controller setPresentationState:TGCallPresentationStateFailed
+                                      detail:TGLoc(@"calls.video.cameraUnavailable")];
+            [self finishCallAfterDelay:4.0];
+            return;
+        }
         [controller setPresentationState:TGCallPresentationStateConnected detail:nil];
         [controller updateSignalBars:5U];
         return;
     }
     if (![TGPrivacyPermissions requestMicrophonePermission]) {
+        return;
+    }
+    if (self.videoCall && ![TGPrivacyPermissions requestCameraPermission]) {
         return;
     }
     NSNumber *callID = [self.activeCallID retain];
@@ -391,6 +474,22 @@ static NSString *TGCallReadableFailure(NSString *message) {
     [self.audioEngine setSpeakerMuted:muted];
 }
 
+- (void)callWindowController:(TGCallWindowController *)controller
+      didRequestCameraEnabled:(BOOL)enabled {
+    if (self.mockCall) {
+        if (enabled) {
+            if (![TGPrivacyPermissions requestCameraPermission] ||
+                ![controller startLocalCameraPreview]) {
+                NSBeep();
+            }
+        } else {
+            [controller stopLocalCameraPreview];
+        }
+        return;
+    }
+    [self.audioEngine setCameraEnabled:enabled];
+}
+
 - (void)callWindowControllerDidRequestHangUp:(TGCallWindowController *)controller {
     if (self.finishing) {
         return;
@@ -409,14 +508,16 @@ static NSString *TGCallReadableFailure(NSString *message) {
     NSNumber *callID = [self.activeCallID retain];
     TGTDLibClient *client = [self.client retain];
     NSUInteger duration = (NSUInteger)floor([self.callWindowController connectedDuration]);
+    BOOL videoCall = self.videoCall;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        [client discardAudioCallWithID:callID
-                          disconnected:disconnected
-                              duration:duration
-                          connectionID:relayID
-                               timeout:8.0
-                                 error:NULL];
+        [client discardCallWithID:callID
+                     disconnected:disconnected
+                         duration:duration
+                          isVideo:videoCall
+                     connectionID:relayID
+                          timeout:8.0
+                            error:NULL];
         [callID release];
         [client release];
         [pool drain];
@@ -443,6 +544,7 @@ static NSString *TGCallReadableFailure(NSString *message) {
     self.activeCallStateType = nil;
     [self.pendingSignalingData removeAllObjects];
     self.mockCall = NO;
+    self.videoCall = NO;
     self.finishing = NO;
     [[NSNotificationCenter defaultCenter] postNotificationName:TGCallCoordinatorDidFinishCallNotification
                                                         object:self];
