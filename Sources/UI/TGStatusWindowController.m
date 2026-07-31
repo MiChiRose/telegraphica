@@ -60,7 +60,6 @@
 #import "../Core/TGTDLibClient+MessageLinks.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Core/TGTDLibClient+MessageTypes.h"
-#import "../Core/TGTDLibClient+Reactions.h"
 #import "../Services/TGLocalDataReset.h"
 #import "../Services/TGDownloadManager.h"
 #import "../Services/TGLogger.h"
@@ -704,8 +703,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL pendingLiveMessageRefresh;
 @property (nonatomic, retain) NSTimer *reactionAnimationTimer;
 @property (nonatomic, retain) NSMutableDictionary *reactionAnimations;
-@property (nonatomic, retain) NSMutableDictionary *availableReactionEmojisByChatID;
-@property (nonatomic, retain) NSMutableSet *reactionCatalogAttemptedChatIDs;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
 @property (nonatomic, assign) BOOL chatsExhausted;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
@@ -1251,8 +1248,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize pendingLiveMessageRefresh = _pendingLiveMessageRefresh;
 @synthesize reactionAnimationTimer = _reactionAnimationTimer;
 @synthesize reactionAnimations = _reactionAnimations;
-@synthesize availableReactionEmojisByChatID = _availableReactionEmojisByChatID;
-@synthesize reactionCatalogAttemptedChatIDs = _reactionCatalogAttemptedChatIDs;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
 @synthesize chatsExhausted = _chatsExhausted;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
@@ -4761,8 +4756,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_messageItems release];
     [_reactionAnimationTimer release];
     [_reactionAnimations release];
-    [_availableReactionEmojisByChatID release];
-    [_reactionCatalogAttemptedChatIDs release];
     [_composerDraftsByTargetKey release];
     [_composerDraftSyncTimer invalidate];
     [_composerDraftSyncTimer release];

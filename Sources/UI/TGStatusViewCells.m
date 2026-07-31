@@ -1004,8 +1004,8 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             CGFloat reactionWidth = fullReactionWidth * reactionScale;
             CGFloat fullReactionHeight = 24.0;
             CGFloat reactionHeight = fullReactionHeight * reactionScale;
-            CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 2.0)
-                                                        : (NSMinY(bubbleRect) + 2.0);
+            CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 5.0)
+                                                        : (NSMinY(bubbleRect) + 5.0);
             NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0 +
                                                  ((fullReactionWidth - reactionWidth) / 2.0),
                                              reactionY,
@@ -1025,7 +1025,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             [reactionParagraph setAlignment:NSCenterTextAlignment];
             NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
             [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
-            CGFloat opticalOffset = [controlView isFlipped] ? -3.0 : 3.0;
+            CGFloat opticalOffset = [controlView isFlipped] ? -4.0 : 4.0;
             CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0) + opticalOffset;
             NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
                                                  reactionTextY,
