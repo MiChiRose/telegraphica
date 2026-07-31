@@ -4,8 +4,14 @@
 
 #include "tgcalls/Instance.h"
 #include "tgcalls/InstanceImpl.h"
+#include "tgcalls/StaticThreads.h"
+#include "tgcalls/VideoCaptureInterface.h"
 #include "tgcalls/platform/PlatformInterface.h"
 #include "tgcalls/v2/InstanceV2Impl.h"
+#include "api/video/i420_buffer.h"
+#include "api/video/video_frame.h"
+#include "api/video/video_sink_interface.h"
+#include "libyuv/convert_argb.h"
 
 #include <algorithm>
 #include <array>
@@ -25,6 +31,80 @@ struct AudioOutputState {
 
     AudioOutputState() : muted(false) {
     }
+};
+
+class CallbackVideoSink final
+    : public rtc::VideoSinkInterface<webrtc::VideoFrame> {
+public:
+    CallbackVideoSink(bool local,
+                      TGModernCallCallbacks callbacks,
+                      void *context)
+        : _local(local),
+          _callbacks(callbacks),
+          _context(context),
+          _lastFrameAt(std::chrono::steady_clock::time_point::min()) {
+    }
+
+    void OnFrame(const webrtc::VideoFrame &frame) override {
+        if (!_callbacks.videoFrame || frame.width() <= 0 || frame.height() <= 0) {
+            return;
+        }
+        const std::chrono::steady_clock::time_point now =
+            std::chrono::steady_clock::now();
+        if (_lastFrameAt != std::chrono::steady_clock::time_point::min() &&
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - _lastFrameAt).count() < 75) {
+            return;
+        }
+        _lastFrameAt = now;
+
+        rtc::scoped_refptr<webrtc::I420BufferInterface> source =
+            frame.video_frame_buffer()->ToI420();
+        if (!source) {
+            return;
+        }
+        int width = source->width();
+        int height = source->height();
+        if (width > 640 || height > 480) {
+            const double scale = std::min(640.0 / width, 480.0 / height);
+            width = std::max(2, static_cast<int>(width * scale)) & ~1;
+            height = std::max(2, static_cast<int>(height * scale)) & ~1;
+            rtc::scoped_refptr<webrtc::I420Buffer> scaled =
+                webrtc::I420Buffer::Create(width, height);
+            scaled->ScaleFrom(*source);
+            source = scaled;
+        }
+        const int bytesPerRow = width * 4;
+        std::vector<uint8_t> pixels(
+            static_cast<size_t>(bytesPerRow) * static_cast<size_t>(height));
+        if (libyuv::I420ToARGB(
+                source->DataY(),
+                source->StrideY(),
+                source->DataU(),
+                source->StrideU(),
+                source->DataV(),
+                source->StrideV(),
+                pixels.data(),
+                bytesPerRow,
+                width,
+                height) != 0) {
+            return;
+        }
+        _callbacks.videoFrame(
+            _context,
+            _local ? 1 : 0,
+            pixels.data(),
+            pixels.size(),
+            width,
+            height,
+            bytesPerRow);
+    }
+
+private:
+    bool _local;
+    TGModernCallCallbacks _callbacks;
+    void *_context;
+    std::chrono::steady_clock::time_point _lastFrameAt;
 };
 
 /*
@@ -187,6 +267,9 @@ private:
 struct TransportContext {
     std::unique_ptr<tgcalls::Instance> instance;
     std::shared_ptr<AudioOutputState> audioOutputState;
+    std::shared_ptr<tgcalls::VideoCaptureInterface> videoCapture;
+    std::shared_ptr<CallbackVideoSink> localVideoSink;
+    std::shared_ptr<CallbackVideoSink> remoteVideoSink;
     TGModernCallCallbacks callbacks;
     void *callbackContext = nullptr;
 };
@@ -552,6 +635,31 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
         owner->callbacks = callbacks;
         owner->callbackContext = context;
         TransportContext *rawOwner = owner.get();
+        const bool videoCall = [[call objectForKey:@"is_video"] boolValue];
+        if (videoCall) {
+            std::unique_ptr<tgcalls::VideoCaptureInterface> capture =
+                tgcalls::VideoCaptureInterface::Create(
+                    tgcalls::StaticThreads::getThreads(),
+                    "default",
+                    false,
+                    nullptr);
+            if (!capture) {
+                CopyError(@"The camera transport could not be created.",
+                          errorBuffer,
+                          errorBufferLength);
+                return nullptr;
+            }
+            owner->videoCapture =
+                std::shared_ptr<tgcalls::VideoCaptureInterface>(std::move(capture));
+            owner->localVideoSink =
+                std::make_shared<CallbackVideoSink>(true, callbacks, context);
+            owner->remoteVideoSink =
+                std::make_shared<CallbackVideoSink>(false, callbacks, context);
+            owner->videoCapture->setOutput(owner->localVideoSink);
+            owner->videoCapture->setPreferredAspectRatio(4.0f / 3.0f);
+            owner->videoCapture->setState(tgcalls::VideoState::Active);
+            descriptor.videoCapture = owner->videoCapture;
+        }
         descriptor.stateUpdated = [rawOwner](tgcalls::State stateValue) {
             if (rawOwner->callbacks.stateChanged) {
                 rawOwner->callbacks.stateChanged(rawOwner->callbackContext, StateValue(stateValue));
@@ -571,9 +679,14 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
             }
         };
         descriptor.remoteBatteryLevelIsLowUpdated = [](bool value) { (void)value; };
-        descriptor.remoteMediaStateUpdated = [](tgcalls::AudioState audio, tgcalls::VideoState video) {
+        descriptor.remoteMediaStateUpdated = [rawOwner](tgcalls::AudioState audio,
+                                                        tgcalls::VideoState video) {
             (void)audio;
-            (void)video;
+            if (rawOwner->callbacks.remoteVideoStateChanged) {
+                rawOwner->callbacks.remoteVideoStateChanged(
+                    rawOwner->callbackContext,
+                    static_cast<int>(video));
+            }
         };
         descriptor.remotePrefferedAspectRatioUpdated = [](float value) { (void)value; };
 
@@ -583,6 +696,10 @@ extern "C" void *TGModernCallTransportCreate(const char *callJSON,
                       errorBuffer,
                       errorBufferLength);
             return nullptr;
+        }
+        if (owner->remoteVideoSink) {
+            owner->instance->setIncomingVideoOutput(owner->remoteVideoSink);
+            owner->instance->setRequestedVideoAspect(4.0f / 3.0f);
         }
         if (callbacks.logMessage) {
             std::string message = std::string("Modern call transport started with protocol ") +
@@ -614,6 +731,14 @@ extern "C" void TGModernCallTransportSetSpeakerMuted(void *transport, int muted)
     TransportContext *owner = static_cast<TransportContext *>(transport);
     if (owner && owner->audioOutputState) {
         owner->audioOutputState->muted.store(muted != 0, std::memory_order_release);
+    }
+}
+
+extern "C" void TGModernCallTransportSetCameraEnabled(void *transport, int enabled) {
+    TransportContext *owner = static_cast<TransportContext *>(transport);
+    if (owner && owner->videoCapture) {
+        owner->videoCapture->setState(
+            enabled ? tgcalls::VideoState::Active : tgcalls::VideoState::Inactive);
     }
 }
 

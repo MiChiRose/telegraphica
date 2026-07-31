@@ -10,12 +10,18 @@ typedef NS_ENUM(NSInteger, TGCallAudioEngineState) {
 };
 
 @class TGCallAudioEngine;
+@class NSImage;
 
 @protocol TGCallAudioEngineDelegate <NSObject>
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeState:(TGCallAudioEngineState)state;
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didChangeSignalBars:(NSUInteger)signalBars;
 @optional
 - (void)callAudioEngine:(TGCallAudioEngine *)engine didEmitSignalingData:(NSData *)data;
+- (void)callAudioEngine:(TGCallAudioEngine *)engine
+   didReceiveVideoImage:(NSImage *)image
+                  local:(BOOL)local;
+- (void)callAudioEngine:(TGCallAudioEngine *)engine
+ didChangeRemoteVideoState:(NSInteger)state;
 @end
 
 @interface TGCallAudioEngine : NSObject {
@@ -40,6 +46,7 @@ typedef NS_ENUM(NSInteger, TGCallAudioEngineState) {
 - (void)receiveSignalingData:(NSData *)data;
 - (void)setMicrophoneMuted:(BOOL)muted;
 - (void)setSpeakerMuted:(BOOL)muted;
+- (void)setCameraEnabled:(BOOL)enabled;
 - (void)stop;
 
 @end

@@ -47,9 +47,16 @@ static NSNumber *TGUserIdentifierFromSender(id sender) {
 - (NSNumber *)createAudioCallToUserID:(NSNumber *)userID
                                timeout:(NSTimeInterval)timeout
                                  error:(NSError **)error {
+    return [self createCallToUserID:userID isVideo:NO timeout:timeout error:error];
+}
+
+- (NSNumber *)createCallToUserID:(NSNumber *)userID
+                         isVideo:(BOOL)isVideo
+                          timeout:(NSTimeInterval)timeout
+                            error:(NSError **)error {
     if (![userID respondsToSelector:@selector(longLongValue)] || [userID longLongValue] <= 0LL) {
         if (error) {
-            *error = [self errorWithDescription:@"A Telegram user is required for an audio call." code:430];
+            *error = [self errorWithDescription:@"A Telegram user is required for a call." code:430];
         }
         return nil;
     }
@@ -57,10 +64,12 @@ static NSNumber *TGUserIdentifierFromSender(id sender) {
                              @"createCall", @"@type",
                              [NSNumber numberWithLongLong:[userID longLongValue]], @"user_id",
                              TGCallProtocolDescriptor(), @"protocol",
-                             [NSNumber numberWithBool:NO], @"is_video",
+                             [NSNumber numberWithBool:isVideo], @"is_video",
                              nil];
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                        extraPrefix:@"telegraphica-create-audio-call"
+                                                        extraPrefix:(isVideo
+                                                            ? @"telegraphica-create-video-call"
+                                                            : @"telegraphica-create-audio-call")
                                                             timeout:timeout
                                                           errorCode:431
                                                               error:error];
@@ -109,6 +118,22 @@ static NSNumber *TGUserIdentifierFromSender(id sender) {
                   connectionID:(NSNumber *)connectionID
                        timeout:(NSTimeInterval)timeout
                          error:(NSError **)error {
+    return [self discardCallWithID:callID
+                      disconnected:disconnected
+                          duration:duration
+                           isVideo:NO
+                      connectionID:connectionID
+                           timeout:timeout
+                             error:error];
+}
+
+- (BOOL)discardCallWithID:(NSNumber *)callID
+              disconnected:(BOOL)disconnected
+                  duration:(NSUInteger)duration
+                   isVideo:(BOOL)isVideo
+              connectionID:(NSNumber *)connectionID
+                   timeout:(NSTimeInterval)timeout
+                     error:(NSError **)error {
     NSNumber *safeCallID = TGPositiveCallIdentifier(callID);
     if (!safeCallID) {
         if (error) {
@@ -123,7 +148,7 @@ static NSNumber *TGUserIdentifierFromSender(id sender) {
                              safeCallID, @"call_id",
                              [NSNumber numberWithBool:disconnected], @"is_disconnected",
                              [NSNumber numberWithUnsignedInteger:duration], @"duration",
-                             [NSNumber numberWithBool:NO], @"is_video",
+                             [NSNumber numberWithBool:isVideo], @"is_video",
                              [NSNumber numberWithLongLong:relayID], @"connection_id",
                              nil];
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request

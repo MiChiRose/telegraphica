@@ -57,6 +57,8 @@
 @interface TGCallWindowController ()
 @property (nonatomic, retain) NSDictionary *profile;
 @property (nonatomic, assign) BOOL outgoing;
+@property (nonatomic, assign) BOOL videoCall;
+@property (nonatomic, assign) BOOL cameraEnabled;
 @property (nonatomic, assign) BOOL microphoneMuted;
 @property (nonatomic, assign) BOOL speakerMuted;
 @property (nonatomic, assign) BOOL finished;
@@ -73,6 +75,10 @@
 @property (nonatomic, retain) NSButton *muteButton;
 @property (nonatomic, retain) NSButton *speakerButton;
 @property (nonatomic, retain) NSButton *hangupButton;
+@property (nonatomic, retain) NSButton *cameraButton;
+@property (nonatomic, retain) NSTextField *cameraLabel;
+@property (nonatomic, retain) NSImageView *remoteVideoView;
+@property (nonatomic, retain) NSImageView *localVideoView;
 @property (nonatomic, retain) NSTextField *muteLabel;
 @property (nonatomic, retain) NSTextField *speakerLabel;
 @property (nonatomic, retain) NSTextField *answerLabel;
@@ -84,6 +90,8 @@
 @synthesize delegate = _delegate;
 @synthesize profile = _profile;
 @synthesize outgoing = _outgoing;
+@synthesize videoCall = _videoCall;
+@synthesize cameraEnabled = _cameraEnabled;
 @synthesize microphoneMuted = _microphoneMuted;
 @synthesize speakerMuted = _speakerMuted;
 @synthesize finished = _finished;
@@ -100,6 +108,10 @@
 @synthesize muteButton = _muteButton;
 @synthesize speakerButton = _speakerButton;
 @synthesize hangupButton = _hangupButton;
+@synthesize cameraButton = _cameraButton;
+@synthesize cameraLabel = _cameraLabel;
+@synthesize remoteVideoView = _remoteVideoView;
+@synthesize localVideoView = _localVideoView;
 @synthesize muteLabel = _muteLabel;
 @synthesize speakerLabel = _speakerLabel;
 @synthesize answerLabel = _answerLabel;
@@ -137,8 +149,11 @@
     return button;
 }
 
-- (id)initWithProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0, 420.0, 500.0)
+- (id)initWithProfile:(NSDictionary *)profile outgoing:(BOOL)outgoing video:(BOOL)video {
+    NSSize windowSize = video ? NSMakeSize(680.0, 560.0) : NSMakeSize(420.0, 500.0);
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0.0, 0.0,
+                                                                        windowSize.width,
+                                                                        windowSize.height)
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
@@ -146,44 +161,71 @@
     if (self) {
         self.profile = profile;
         self.outgoing = outgoing;
-        [[self window] setTitle:TGLoc(@"calls.window.title")];
+        self.videoCall = video;
+        self.cameraEnabled = video;
+        [[self window] setTitle:TGLoc(video ? @"calls.video.window.title" : @"calls.window.title")];
         [[self window] setReleasedWhenClosed:NO];
         [[self window] setDelegate:self];
         [[self window] center];
 
         TGUtilityWindowView *root = [[[TGUtilityWindowView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
         [[self window] setContentView:root];
-        TGUtilityPanelView *card = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(18.0, 20.0, 384.0, 456.0)] autorelease];
+        TGUtilityPanelView *card = [[[TGUtilityPanelView alloc] initWithFrame:
+            (video ? NSMakeRect(18.0, 20.0, 644.0, 516.0)
+                   : NSMakeRect(18.0, 20.0, 384.0, 456.0))] autorelease];
         [root addSubview:card];
 
-        self.avatarView = [[[TGProfileAvatarView alloc] initWithFrame:NSMakeRect(140.0, 288.0, 140.0, 140.0)] autorelease];
+        if (video) {
+            self.remoteVideoView = [[[NSImageView alloc] initWithFrame:NSMakeRect(34.0, 138.0, 612.0, 382.0)] autorelease];
+            [self.remoteVideoView setImageScaling:NSImageScaleProportionallyUpOrDown];
+            [self.remoteVideoView setImageFrameStyle:NSImageFramePhoto];
+            [root addSubview:self.remoteVideoView];
+            self.localVideoView = [[[NSImageView alloc] initWithFrame:NSMakeRect(492.0, 368.0, 138.0, 104.0)] autorelease];
+            [self.localVideoView setImageScaling:NSImageScaleProportionallyUpOrDown];
+            [self.localVideoView setImageFrameStyle:NSImageFramePhoto];
+            [root addSubview:self.localVideoView];
+        }
+
+        self.avatarView = [[[TGProfileAvatarView alloc] initWithFrame:
+            (video ? NSMakeRect(270.0, 320.0, 140.0, 140.0)
+                   : NSMakeRect(140.0, 288.0, 140.0, 140.0))] autorelease];
         [root addSubview:self.avatarView];
 
-        self.nameField = [self labelWithFrame:NSMakeRect(40.0, 238.0, 340.0, 34.0)
+        self.nameField = [self labelWithFrame:
+            (video ? NSMakeRect(120.0, 274.0, 440.0, 34.0)
+                   : NSMakeRect(40.0, 238.0, 340.0, 34.0))
                                          text:@""
                                          font:[NSFont boldSystemFontOfSize:22.0]
                                         color:TGClassicCardInkColor()];
         [[self.nameField cell] setLineBreakMode:NSLineBreakByTruncatingTail];
         [root addSubview:self.nameField];
 
-        self.statusField = [self labelWithFrame:NSMakeRect(40.0, 211.0, 340.0, 22.0)
+        self.statusField = [self labelWithFrame:
+            (video ? NSMakeRect(120.0, 248.0, 440.0, 22.0)
+                   : NSMakeRect(40.0, 211.0, 340.0, 22.0))
                                            text:@""
                                            font:[NSFont systemFontOfSize:13.0]
                                           color:TGClassicCardMutedInkColor()];
         [root addSubview:self.statusField];
-        self.timerField = [self labelWithFrame:NSMakeRect(40.0, 184.0, 340.0, 22.0)
+        self.timerField = [self labelWithFrame:
+            (video ? NSMakeRect(120.0, 222.0, 440.0, 22.0)
+                   : NSMakeRect(40.0, 184.0, 340.0, 22.0))
                                           text:@""
                                           font:[NSFont boldSystemFontOfSize:16.0]
                                          color:TGClassicCardInkColor()];
         [root addSubview:self.timerField];
-        self.qualityField = [self labelWithFrame:NSMakeRect(88.0, 163.0, 214.0, 18.0)
+        self.qualityField = [self labelWithFrame:
+            (video ? NSMakeRect(218.0, 118.0, 214.0, 18.0)
+                   : NSMakeRect(88.0, 163.0, 214.0, 18.0))
                                             text:@""
                                             font:[NSFont systemFontOfSize:10.5]
                                            color:TGClassicCardMutedInkColor()];
         [self.qualityField setAlignment:NSRightTextAlignment];
         [self.qualityField setHidden:YES];
         [root addSubview:self.qualityField];
-        self.qualityImageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(307.0, 163.0, 18.0, 18.0)] autorelease];
+        self.qualityImageView = [[[NSImageView alloc] initWithFrame:
+            (video ? NSMakeRect(437.0, 118.0, 18.0, 18.0)
+                   : NSMakeRect(307.0, 163.0, 18.0, 18.0))] autorelease];
         [self.qualityImageView setImageScaling:NSImageScaleProportionallyUpOrDown];
         [self.qualityImageView setHidden:YES];
         [root addSubview:self.qualityImageView];
@@ -221,6 +263,20 @@
         [self.hangupButton setToolTip:TGLoc(@"calls.hangup")];
         [root addSubview:self.hangupButton];
 
+        self.cameraButton = [self actionButtonWithFrame:NSMakeRect(420.0, 42.0, 64.0, 64.0)
+                                              iconName:@"video"
+                                                 color:TGClassicNavigationSelectedColor(1.0)
+                                                action:@selector(cameraPressed:)];
+        [self.cameraButton setToolTip:TGLoc(@"calls.video.disable")];
+        [self.cameraButton setHidden:!video];
+        [root addSubview:self.cameraButton];
+        self.cameraLabel = [self labelWithFrame:NSMakeRect(388.0, 20.0, 128.0, 20.0)
+                                           text:TGLoc(@"calls.video.disable")
+                                           font:[NSFont systemFontOfSize:11.0]
+                                          color:TGClassicCardMutedInkColor()];
+        [self.cameraLabel setHidden:!video];
+        [root addSubview:self.cameraLabel];
+
         self.muteLabel = [self labelWithFrame:NSMakeRect(32.0, 51.0, 128.0, 20.0)
                                          text:TGLoc(@"calls.mute")
                                          font:[NSFont systemFontOfSize:11.0]
@@ -237,11 +293,49 @@
                                           color:TGClassicCardMutedInkColor()];
         [root addSubview:self.hangupLabel];
 
+        if (video) {
+            [self.muteButton setFrameOrigin:NSMakePoint(72.0, 42.0)];
+            [self.muteLabel setFrameOrigin:NSMakePoint(40.0, 20.0)];
+            [self.speakerButton setFrameOrigin:NSMakePoint(188.0, 42.0)];
+            [self.speakerLabel setFrameOrigin:NSMakePoint(156.0, 20.0)];
+            [self.cameraButton setFrameOrigin:NSMakePoint(304.0, 42.0)];
+            [self.cameraLabel setFrameOrigin:NSMakePoint(272.0, 20.0)];
+            [self.hangupButton setFrameOrigin:NSMakePoint(536.0, 42.0)];
+            [self.hangupLabel setFrameOrigin:NSMakePoint(504.0, 20.0)];
+        }
+
         [self updateProfile:profile];
         [self setPresentationState:(outgoing ? TGCallPresentationStateCalling : TGCallPresentationStateIncoming)
                             detail:nil];
     }
     return self;
+}
+
+- (void)updateVideoImage:(NSImage *)image local:(BOOL)local {
+    if (!self.videoCall || !image) {
+        return;
+    }
+    if (local) {
+        [self.localVideoView setImage:image];
+        [self.localVideoView setHidden:!self.cameraEnabled];
+    } else {
+        [self.remoteVideoView setImage:image];
+        [self.remoteVideoView setHidden:NO];
+        [self.avatarView setHidden:YES];
+        [self.nameField setHidden:YES];
+    }
+}
+
+- (void)updateRemoteVideoState:(NSInteger)state {
+    if (!self.videoCall) {
+        return;
+    }
+    BOOL active = (state == 2);
+    if (!active) {
+        [self.remoteVideoView setImage:nil];
+        [self.avatarView setHidden:NO];
+        [self.nameField setHidden:NO];
+    }
 }
 
 - (void)updateProfile:(NSDictionary *)profile {
@@ -344,16 +438,24 @@
     [self.qualityField setHidden:!connected];
     [self.qualityImageView setHidden:!connected];
     if (incoming) {
-        [self.answerButton setFrameOrigin:NSMakePoint(102.0, 78.0)];
-        [self.answerLabel setFrameOrigin:NSMakePoint(70.0, 51.0)];
-        [self.hangupButton setFrameOrigin:NSMakePoint(254.0, 78.0)];
-        [self.hangupLabel setFrameOrigin:NSMakePoint(222.0, 51.0)];
+        [self.answerButton setFrameOrigin:(self.videoCall ? NSMakePoint(220.0, 42.0)
+                                                         : NSMakePoint(102.0, 78.0))];
+        [self.answerLabel setFrameOrigin:(self.videoCall ? NSMakePoint(188.0, 20.0)
+                                                        : NSMakePoint(70.0, 51.0))];
+        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(396.0, 42.0)
+                                                         : NSMakePoint(254.0, 78.0))];
+        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(364.0, 20.0)
+                                                        : NSMakePoint(222.0, 51.0))];
     } else if (connected) {
-        [self.hangupButton setFrameOrigin:NSMakePoint(292.0, 78.0)];
-        [self.hangupLabel setFrameOrigin:NSMakePoint(260.0, 51.0)];
+        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(536.0, 42.0)
+                                                         : NSMakePoint(292.0, 78.0))];
+        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(504.0, 20.0)
+                                                        : NSMakePoint(260.0, 51.0))];
     } else {
-        [self.hangupButton setFrameOrigin:NSMakePoint(178.0, 78.0)];
-        [self.hangupLabel setFrameOrigin:NSMakePoint(146.0, 51.0)];
+        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(308.0, 42.0)
+                                                         : NSMakePoint(178.0, 78.0))];
+        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(276.0, 20.0)
+                                                        : NSMakePoint(146.0, 51.0))];
     }
 
     NSString *status = detail;
@@ -395,6 +497,21 @@
         [self.timer invalidate];
         self.timer = nil;
     }
+}
+
+- (void)cameraPressed:(id)sender {
+    (void)sender;
+    self.cameraEnabled = !self.cameraEnabled;
+    NSString *iconName = self.cameraEnabled ? @"video" : @"video-off";
+    NSString *label = self.cameraEnabled
+        ? TGLoc(@"calls.video.disable") : TGLoc(@"calls.video.enable");
+    [[self.cameraButton cell] setImage:TGTemplateIconAssetImage(
+        iconName, NSMakeSize(26.0, 26.0), [NSColor whiteColor], 1.0)];
+    [self.cameraButton setToolTip:label];
+    [self.cameraLabel setStringValue:label];
+    [self.localVideoView setHidden:!self.cameraEnabled];
+    [self.delegate callWindowController:self
+                didRequestCameraEnabled:self.cameraEnabled];
 }
 
 - (NSTimeInterval)connectedDuration {
@@ -463,6 +580,10 @@
     [_muteButton release];
     [_speakerButton release];
     [_hangupButton release];
+    [_cameraButton release];
+    [_cameraLabel release];
+    [_remoteVideoView release];
+    [_localVideoView release];
     [_muteLabel release];
     [_speakerLabel release];
     [_answerLabel release];
