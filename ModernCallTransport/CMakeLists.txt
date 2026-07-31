@@ -89,6 +89,7 @@ set_source_files_properties(TGModernCallVideoPlatform.cpp PROPERTIES LANGUAGE OB
 
 add_library(TelegraphicaCallTransport SHARED
     TGModernCallTransport.mm
+    TGModernCallLegacyClock.cpp
     TGModernCallVideoPlatform.cpp
     "${TGCALLS_DIR}/CodecSelectHelper.cpp"
     "${TGCALLS_DIR}/CryptoHelper.cpp"
