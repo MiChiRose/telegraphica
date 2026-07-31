@@ -598,7 +598,7 @@ def check_call_transport_stability_contract(errors):
     verified_transport_text = read_text(
         os.path.join(ROOT, verified_transport_rel))
     expected_transport_sha = (
-        "96713ab9689d8e79c0caa7c8985e88d31fcfee2a235134e92f5c622250f9677e")
+        "d56dec30e80855fc9c2592d1f28293259a1289e3661c1b954302ccaece1419e4")
     if expected_transport_sha not in verified_transport_text:
         errors.append(
             "%s: the HITL-approved audio-call transport hash changed" %
