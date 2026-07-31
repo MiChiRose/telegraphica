@@ -107,13 +107,19 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
               action:(SEL)action {
     const NSUInteger columnCount = 8U;
     const NSUInteger maximumVisibleRows = 3U;
-    CGFloat buttonWidth = 34.0;
-    CGFloat rowHeight = 34.0;
+    /*
+     * Keep eight reactions per row so the catalog remains easy to scan, but
+     * give each glyph a larger hit target and a little more breathing room.
+     * Three visible rows preserve the bounded scrolling behaviour on legacy
+     * AppKit while making the contextual palette visibly larger.
+     */
+    CGFloat buttonWidth = 38.0;
+    CGFloat rowHeight = 38.0;
     NSUInteger emojiCount = [emojis count];
     NSUInteger rowCount = MAX((NSUInteger)1U,
                               (emojiCount + columnCount - 1U) / columnCount);
     NSUInteger visibleRowCount = MIN(maximumVisibleRows, rowCount);
-    CGFloat viewportWidth = buttonWidth * columnCount + 16.0;
+    CGFloat viewportWidth = buttonWidth * columnCount + 20.0;
     CGFloat documentWidth = buttonWidth * columnCount;
     CGFloat viewportHeight = rowHeight * visibleRowCount;
     self = [super initWithFrame:NSMakeRect(0.0, 0.0, viewportWidth, viewportHeight)];
@@ -152,9 +158,9 @@ BOOL TGReactionEmojiCanRender(NSString *emoji) {
                 initWithFrame:NSMakeRect(column * buttonWidth,
                                          row * rowHeight + 2.0,
                                          buttonWidth,
-                                         30.0)] autorelease];
+                                         34.0)] autorelease];
             [button setTitle:displayEmoji];
-            [button setFont:[NSFont systemFontOfSize:17.0]];
+            [button setFont:[NSFont systemFontOfSize:18.0]];
             [button setButtonType:NSMomentaryChangeButton];
             [button setBezelStyle:NSShadowlessSquareBezelStyle];
             [button setBordered:NO];

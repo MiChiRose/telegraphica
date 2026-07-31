@@ -1025,7 +1025,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             [reactionParagraph setAlignment:NSCenterTextAlignment];
             NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
             [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
-            CGFloat opticalOffset = [controlView isFlipped] ? -2.0 : 2.0;
+            CGFloat opticalOffset = [controlView isFlipped] ? -3.0 : 3.0;
             CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0) + opticalOffset;
             NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
                                                  reactionTextY,
