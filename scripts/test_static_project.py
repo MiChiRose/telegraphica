@@ -633,12 +633,17 @@ def check_call_transport_stability_contract(errors):
         "AppendCapabilityWithI420Fallback",
         "NumberOfCapabilities(selectedID.c_str())",
         "StartCapture(candidate)",
+        "AVCaptureVideoDataOutput",
+        "kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange",
+        "libyuv::NV12ToI420",
+        "startAVFoundationCapture",
     ]:
         if fragment not in modern_video_text:
             errors.append("%s: legacy camera fallback is missing `%s`" %
                           (modern_video_rel, fragment))
     for fragment in [
         "CMAKE_OSX_DEPLOYMENT_TARGET 10.9",
+        "TGModernCallVideoPlatform.cpp PROPERTIES LANGUAGE OBJCXX",
         'OUTPUT_NAME "TelegraphicaCallTransport"',
         'PREFIX ""',
         "webrtc::AudioProcessingBuilder audioProcessingBuilder",
@@ -742,7 +747,7 @@ def check_call_transport_stability_contract(errors):
     if "descriptor.config.allowTCP = true;" not in modern_source_text:
         errors.append("%s: Telegram call transport must retain TCP relay fallback" %
                       modern_source_rel)
-    if "state == VideoState::Active && !_module" not in modern_video_text:
+    if "state == VideoState::Active && !_captureSession && !_module" not in modern_video_text:
         errors.append("%s: local camera activation must retry after a transient legacy capture failure" %
                       modern_video_rel)
     if "setRequestedVideoAspect(4.0f / 3.0f)" in modern_source_text:
