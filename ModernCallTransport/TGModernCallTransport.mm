@@ -54,7 +54,7 @@ public:
             std::chrono::steady_clock::now();
         if (_lastFrameAt != std::chrono::steady_clock::time_point::min() &&
             std::chrono::duration_cast<std::chrono::milliseconds>(
-                now - _lastFrameAt).count() < 75) {
+                now - _lastFrameAt).count() < 120) {
             return;
         }
         _lastFrameAt = now;
@@ -93,8 +93,11 @@ public:
         }
         int width = source->width();
         int height = source->height();
-        if (width > 640 || height > 480) {
-            const double scale = std::min(640.0 / width, 480.0 / height);
+        // This callback only feeds the AppKit preview. Keeping it modest on
+        // legacy Macs leaves the real-time audio playout thread responsive;
+        // it does not change the encoded video sent to the other participant.
+        if (width > 480 || height > 360) {
+            const double scale = std::min(480.0 / width, 360.0 / height);
             width = std::max(2, static_cast<int>(width * scale)) & ~1;
             height = std::max(2, static_cast<int>(height * scale)) & ~1;
             rtc::scoped_refptr<webrtc::I420Buffer> scaled =
