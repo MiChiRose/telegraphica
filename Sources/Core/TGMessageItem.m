@@ -81,6 +81,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize mediaMimeType = _mediaMimeType;
 @synthesize downloadFileName = _downloadFileName;
 @synthesize downloadFileSize = _downloadFileSize;
+@synthesize linkPreviewInfo = _linkPreviewInfo;
 @synthesize reactionSummary = _reactionSummary;
 @synthesize chosenReactionEmojis = _chosenReactionEmojis;
 @synthesize reactionAnimationDisplaySummary = _reactionAnimationDisplaySummary;
@@ -374,6 +375,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setMediaMimeType:_mediaMimeType];
     [copy setDownloadFileName:_downloadFileName];
     [copy setDownloadFileSize:_downloadFileSize];
+    [copy setLinkPreviewInfo:_linkPreviewInfo];
     [copy setReactionSummary:_reactionSummary];
     [copy setChosenReactionEmojis:_chosenReactionEmojis];
     [copy setReactionAnimationDisplaySummary:_reactionAnimationDisplaySummary];
@@ -458,6 +460,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_mediaMimeType release];
     [_downloadFileName release];
     [_downloadFileSize release];
+    [_linkPreviewInfo release];
     [_reactionSummary release];
     [_chosenReactionEmojis release];
     [_reactionAnimationDisplaySummary release];

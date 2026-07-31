@@ -420,6 +420,21 @@
     if (![item isKindOfClass:[TGMessageItem class]] || NSIsEmptyRect(cellFrame)) {
         return nil;
     }
+    if (TGMessageItemHasLinkPreview(item)) {
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+        NSRect previewBubbleRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
+        NSRect previewCardRect = TGLinkPreviewCardRectForItem(item,
+                                                             previewBubbleRect,
+                                                             showSenderDetails,
+                                                             [self.messageTableView isFlipped]);
+        if (!NSIsEmptyRect(previewCardRect) && NSPointInRect(tablePoint, previewCardRect)) {
+            NSString *previewURLString = [[item linkPreviewInfo] objectForKey:@"url"];
+            NSURL *previewURL = [NSURL URLWithString:previewURLString];
+            if (previewURL) {
+                return previewURL;
+            }
+        }
+    }
     if (TGMessageItemIsNonVisualPlayableMedia(item)) {
         return nil;
     }

@@ -333,6 +333,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                       timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)downloadableInfoFromMessageContentObject:(id)contentObject;
 - (BOOL)shouldAutoDownloadMessageContentObject:(id)contentObject downloadableInfo:(NSDictionary *)downloadableInfo;
+- (NSDictionary *)linkPreviewInfoFromMessageContentObject:(id)contentObject
+                                           downloadMissing:(BOOL)downloadMissing
+                                                   timeout:(NSTimeInterval)timeout
+                                        didRequestDownload:(BOOL *)didRequestDownload;
 - (NSDictionary *)senderSummaryFromMessageObject:(NSDictionary *)messageObject timeout:(NSTimeInterval)timeout;
 - (NSDictionary *)replyContextForMessageObject:(NSDictionary *)messageObject chatID:(NSNumber *)chatID timeout:(NSTimeInterval)timeout;
 - (NSString *)messageContentPreviewForObject:(id)contentObject;
@@ -5943,6 +5947,124 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSDictionary *)linkPreviewMediaInfoFromTypeObject:(id)typeObject
+                                      downloadMissing:(BOOL)downloadMissing
+                                              timeout:(NSTimeInterval)timeout
+                                   didRequestDownload:(BOOL *)didRequestDownload {
+    if (![typeObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *type = (NSDictionary *)typeObject;
+    NSArray *photoKeys = [NSArray arrayWithObjects:@"photo", @"cover", nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [photoKeys count]; index++) {
+        id photoObject = [type objectForKey:[photoKeys objectAtIndex:index]];
+        if (![photoObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *photoInfo = [self photoInfoFromPhotoSizes:[(NSDictionary *)photoObject objectForKey:@"sizes"]
+                                                downloadMissing:downloadMissing
+                                                        timeout:timeout
+                                             didRequestDownload:didRequestDownload];
+        NSMutableDictionary *info = photoInfo
+            ? [NSMutableDictionary dictionaryWithDictionary:photoInfo]
+            : [NSMutableDictionary dictionary];
+        [self addMiniThumbnailFromContainerObject:(NSDictionary *)photoObject toMediaInfo:info];
+        if ([info count] > 0) {
+            return info;
+        }
+    }
+
+    NSArray *containerKeys = [NSArray arrayWithObjects:
+                              @"thumbnail",
+                              @"animation",
+                              @"video",
+                              @"document",
+                              @"sticker",
+                              @"audio",
+                              nil];
+    for (index = 0; index < [containerKeys count]; index++) {
+        id containerObject = [type objectForKey:[containerKeys objectAtIndex:index]];
+        if (![containerObject isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *mediaInfo = [self visualMediaInfoFromContainerObject:containerObject
+                                                            downloadMissing:downloadMissing
+                                                                    timeout:timeout
+                                                         didRequestDownload:didRequestDownload];
+        if ([mediaInfo count] > 0) {
+            return mediaInfo;
+        }
+    }
+    return nil;
+}
+
+- (NSDictionary *)linkPreviewInfoFromMessageContentObject:(id)contentObject
+                                           downloadMissing:(BOOL)downloadMissing
+                                                   timeout:(NSTimeInterval)timeout
+                                        didRequestDownload:(BOOL *)didRequestDownload {
+    if (![contentObject isKindOfClass:[NSDictionary class]] ||
+        ![[(NSDictionary *)contentObject objectForKey:@"@type"] isEqualToString:@"messageText"]) {
+        return nil;
+    }
+
+    id previewObject = [(NSDictionary *)contentObject objectForKey:@"link_preview"];
+    if (![previewObject isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSDictionary *preview = (NSDictionary *)previewObject;
+    NSString *url = [self trimmedStringValue:[preview objectForKey:@"url"]];
+    if ([url length] == 0) {
+        return nil;
+    }
+
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    [info setObject:url forKey:@"url"];
+    NSArray *stringKeys = [NSArray arrayWithObjects:
+                           @"display_url",
+                           @"site_name",
+                           @"title",
+                           @"author",
+                           nil];
+    NSUInteger index = 0;
+    for (index = 0; index < [stringKeys count]; index++) {
+        NSString *key = [stringKeys objectAtIndex:index];
+        NSString *value = [self trimmedStringValue:[preview objectForKey:key]];
+        if ([value length] > 0) {
+            [info setObject:value forKey:key];
+        }
+    }
+    NSString *description = [self textFromFormattedTextObject:[preview objectForKey:@"description"]];
+    description = [self singleLineTrimmedString:description maximumLength:420];
+    if ([description length] > 0) {
+        [info setObject:description forKey:@"description"];
+    }
+
+    NSArray *booleanKeys = [NSArray arrayWithObjects:
+                            @"has_large_media",
+                            @"show_large_media",
+                            @"show_media_above_description",
+                            @"show_above_text",
+                            nil];
+    for (index = 0; index < [booleanKeys count]; index++) {
+        NSString *key = [booleanKeys objectAtIndex:index];
+        id value = [preview objectForKey:key];
+        if ([value respondsToSelector:@selector(boolValue)]) {
+            [info setObject:[NSNumber numberWithBool:[value boolValue]] forKey:key];
+        }
+    }
+
+    NSDictionary *mediaInfo = [self linkPreviewMediaInfoFromTypeObject:[preview objectForKey:@"type"]
+                                                        downloadMissing:downloadMissing
+                                                                timeout:timeout
+                                                     didRequestDownload:didRequestDownload];
+    if ([mediaInfo count] > 0) {
+        [info setObject:mediaInfo forKey:@"media"];
+    }
+    return info;
+}
+
 - (NSDictionary *)playableMediaInfoFromContainerObject:(id)containerObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -6968,6 +7090,39 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                                   alignedToDisplayText:formattedDisplayText];
             if ([entities count] > 0) {
                 [item setFormattedEntities:entities];
+            }
+        }
+        if ([contentType isEqualToString:@"messageText"]) {
+            NSDictionary *linkPreviewInfo = [self linkPreviewInfoFromMessageContentObject:contentObject
+                                                                          downloadMissing:NO
+                                                                                  timeout:0.0
+                                                                       didRequestDownload:NULL];
+            NSDictionary *linkPreviewMedia = [linkPreviewInfo objectForKey:@"media"];
+            NSString *linkPreviewMediaPath = [linkPreviewMedia objectForKey:@"local_path"];
+            id linkPreviewMediaSize = [linkPreviewMedia objectForKey:@"file_size"];
+            long long declaredLinkPreviewBytes = [linkPreviewMediaSize respondsToSelector:@selector(longLongValue)]
+                ? [linkPreviewMediaSize longLongValue] : 0;
+            BOOL canAutoDownloadPreview = ([linkPreviewInfo count] > 0 &&
+                                           [linkPreviewMedia count] > 0 &&
+                                           [linkPreviewMediaPath length] == 0 &&
+                                           visualMediaDownloadsRemaining > 0 &&
+                                           TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto",
+                                                                                               declaredLinkPreviewBytes));
+            if (canAutoDownloadPreview) {
+                BOOL didRequestLinkPreviewDownload = NO;
+                NSDictionary *downloadedLinkPreviewInfo = [self linkPreviewInfoFromMessageContentObject:contentObject
+                                                                                         downloadMissing:YES
+                                                                                                 timeout:1.5
+                                                                                      didRequestDownload:&didRequestLinkPreviewDownload];
+                if ([downloadedLinkPreviewInfo count] > 0) {
+                    linkPreviewInfo = downloadedLinkPreviewInfo;
+                }
+                if (didRequestLinkPreviewDownload && visualMediaDownloadsRemaining > 0) {
+                    visualMediaDownloadsRemaining--;
+                }
+            }
+            if ([linkPreviewInfo count] > 0) {
+                [item setLinkPreviewInfo:linkPreviewInfo];
             }
         }
         NSDictionary *capabilities = TGTDLibMessageCapabilitiesFromObject(message);
