@@ -453,6 +453,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGProfileAvatarView *selectedChatAvatarView;
 @property (nonatomic, retain) NSButton *selectedChatProfileButton;
 @property (nonatomic, retain) NSButton *selectedChatCallButton;
+@property (nonatomic, retain) NSButton *selectedChatVideoCallButton;
 @property (nonatomic, retain) TGGroupedCardView *closedChatPlaceholderView;
 @property (nonatomic, retain) NSTextField *closedChatTitleField;
 @property (nonatomic, retain) NSTextField *closedChatHintField;
@@ -980,6 +981,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize selectedChatAvatarView = _selectedChatAvatarView;
 @synthesize selectedChatProfileButton = _selectedChatProfileButton;
 @synthesize selectedChatCallButton = _selectedChatCallButton;
+@synthesize selectedChatVideoCallButton = _selectedChatVideoCallButton;
 @synthesize chatScrollSurfaceView = _chatScrollSurfaceView;
 @synthesize chatScrollView = _chatScrollView;
 @synthesize chatTableView = _chatTableView;
@@ -1857,6 +1859,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                                    NSMakeSize(18.0, 18.0),
                                                                    TGClassicHeaderTextColor(1.0),
                                                                    1.0)];
+    [self.selectedChatVideoCallButton setImage:TGTemplateIconAssetImage(@"video",
+                                                                        NSMakeSize(18.0, 18.0),
+                                                                        TGClassicHeaderTextColor(1.0),
+                                                                        1.0)];
     [self applyPanelHeaderLabelStyle:self.profileTitleField];
     [self applyPanelHeaderLabelStyle:self.settingsTitleField];
     [self applyPanelHeaderDetailStyle:self.selectedChatField];
@@ -2090,7 +2096,50 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.selectedChatCallButton setToolTip:(self.callCoordinator.transportAvailable
                                              ? TGLoc(@"calls.start")
                                              : TGLoc(@"calls.transportUnavailable"))];
+    [self.selectedChatVideoCallButton setEnabled:canCall];
+    [self.selectedChatVideoCallButton setToolTip:(self.callCoordinator.transportAvailable
+                                                  ? TGLoc(@"calls.video.start")
+                                                  : TGLoc(@"calls.transportUnavailable"))];
     [self.selectedChatAvatarView setNeedsDisplay:YES];
+}
+
+- (void)startSelectedChatVideoCall:(id)sender {
+    (void)sender;
+    if (!self.callCoordinator.transportAvailable) {
+        NSRunAlertPanel(TGLoc(@"calls.video.window.title"),
+                        @"%@",
+                        TGLoc(@"ok"),
+                        nil,
+                        nil,
+                        TGLoc(@"calls.transportUnavailable"));
+        return;
+    }
+    NSNumber *chatID = [self.selectedChatID retain];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSDictionary *chat = [[client chatSummaryForChatID:chatID
+                                            downloadAvatar:YES
+                                                   timeout:3.0
+                                                     error:NULL] retain];
+        NSNumber *userID = [[chat objectForKey:@"user_id"] retain];
+        NSDictionary *profile = userID
+            ? [[client userProfileSummaryForUserID:userID timeout:3.0 error:NULL] retain]
+            : nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (profile) {
+                [self.callCoordinator startVideoCallToProfile:profile];
+            } else {
+                NSBeep();
+            }
+            [profile release];
+            [userID release];
+            [chat release];
+            [client release];
+            [chatID release];
+        });
+        [pool drain];
+    });
 }
 
 - (void)startSelectedChatCall:(id)sender {
@@ -2659,6 +2708,21 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                                    1.0)];
     [self.selectedChatCallButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.selectedChatCallButton];
+
+    self.selectedChatVideoCallButton = [[[TGHeaderActionButton alloc] initWithFrame:NSMakeRect(628, 332, 32, 32)] autorelease];
+    [self.selectedChatVideoCallButton setTitle:@""];
+    [self.selectedChatVideoCallButton setToolTip:TGLoc(@"calls.video.start")];
+    [self.selectedChatVideoCallButton setTarget:self];
+    [self.selectedChatVideoCallButton setAction:@selector(startSelectedChatVideoCall:)];
+    [self.selectedChatVideoCallButton setEnabled:NO];
+    [self.selectedChatVideoCallButton setHidden:YES];
+    [self applyHeaderIconButtonStyle:self.selectedChatVideoCallButton];
+    [self.selectedChatVideoCallButton setImage:TGTemplateIconAssetImage(@"video",
+                                                                        NSMakeSize(18.0, 18.0),
+                                                                        TGClassicHeaderTextColor(1.0),
+                                                                        1.0)];
+    [self.selectedChatVideoCallButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.selectedChatVideoCallButton];
 
     self.topicBackButton = [[[NSButton alloc] initWithFrame:NSMakeRect(24, 332, 32, 32)] autorelease];
     [self.topicBackButton setTitle:@"‹"];
@@ -4644,6 +4708,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_selectedChatAvatarView release];
     [_selectedChatProfileButton release];
     [_selectedChatCallButton release];
+    [_selectedChatVideoCallButton release];
     [_closedChatPlaceholderView release];
     [_closedChatTitleField release];
     [_closedChatHintField release];

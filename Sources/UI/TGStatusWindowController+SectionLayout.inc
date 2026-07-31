@@ -139,6 +139,7 @@
     BOOL showSelectedChatCall = (showConversationContent &&
                                  [self.selectedChatTypeSummary isEqualToString:@"Private"]);
     [self showView:self.selectedChatCallButton visible:showSelectedChatCall];
+    [self showView:self.selectedChatVideoCallButton visible:showSelectedChatCall];
     [self showView:self.mediaCenterButton visible:NO];
     [self.mediaCenterButton setEnabled:NO];
     BOOL showCommentThreadBack = (showChats &&
@@ -769,6 +770,7 @@
     CGFloat conversationJumpX = conversationRefreshX - 6.0 - headerButtonSize;
     CGFloat conversationSearchX = conversationJumpX - 6.0 - headerButtonSize;
     CGFloat conversationCallX = conversationSearchX - 6.0 - headerButtonSize;
+    CGFloat conversationVideoCallX = conversationCallX - 6.0 - headerButtonSize;
     BOOL layoutSelectedChatCall = ([self.selectedChatTypeSummary isEqualToString:@"Private"] &&
                                    [self.activeSection isEqualToString:TGSectionChats] &&
                                    !self.mediaCenterVisible);
@@ -778,6 +780,7 @@
     [self.mediaCenterButton setFrame:NSMakeRect(conversationRefreshX, headerButtonY, 0.0, 0.0)];
     [self.conversationSearchButton setFrame:NSMakeRect(conversationSearchX, headerButtonY, headerButtonSize, headerButtonSize)];
     [self.selectedChatCallButton setFrame:NSMakeRect(conversationCallX, headerButtonY, headerButtonSize, headerButtonSize)];
+    [self.selectedChatVideoCallButton setFrame:NSMakeRect(conversationVideoCallX, headerButtonY, headerButtonSize, headerButtonSize)];
     BOOL layoutCommentThreadBack = ([self.selectedMessageTopicKind isEqualToString:@"thread"] &&
                                     [self.selectedMessageThreadID respondsToSelector:@selector(longLongValue)]);
     CGFloat conversationHeaderLeftX = conversationX + 16.0;
@@ -794,7 +797,7 @@
     [self.selectedChatAvatarView setFrame:NSMakeRect(selectedAvatarX, selectedAvatarY, selectedAvatarSize, selectedAvatarSize)];
     CGFloat selectedTitleX = NSMaxX([self.selectedChatAvatarView frame]) + 8.0;
     CGFloat selectedTitleRightX = layoutSelectedChatCall
-        ? NSMinX([self.selectedChatCallButton frame])
+        ? NSMinX([self.selectedChatVideoCallButton frame])
         : NSMinX([self.conversationSearchButton frame]);
     CGFloat selectedTitleWidth = selectedTitleRightX - selectedTitleX - 12.0;
     if (selectedTitleWidth < 40.0) {
@@ -823,6 +826,7 @@
     NSArray *chatHeaderControls = [NSArray arrayWithObjects:
                                    self.conversationSearchButton,
                                    self.selectedChatCallButton,
+                                   self.selectedChatVideoCallButton,
                                    self.messageJumpToNewestButton,
                                    self.loadMessagesButton,
                                    self.loadOlderMessagesButton,

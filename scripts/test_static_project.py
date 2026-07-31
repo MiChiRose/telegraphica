@@ -549,7 +549,8 @@ def check_additional_message_types_contract(errors):
                      '@"sendCallSignalingData"', '@"min_layer"', '@"max_layer"',
                      "[TGCallAudioEngine protocolVersions]",
                      "[TGCallAudioEngine maximumProtocolLayer]",
-                     '[NSNumber numberWithBool:NO], @"is_video"']:
+                     '[NSNumber numberWithBool:isVideo], @"is_video"',
+                     "createCallToUserID:userID isVideo:NO"]:
         if fragment not in calls_text:
             errors.append("%s: free audio-call signaling is missing `%s`" %
                           (calls_rel, fragment))
@@ -572,9 +573,11 @@ def check_call_transport_stability_contract(errors):
         "TGModernCallTransportReceiveSignalingData",
         "TGModernCallTransportSetMicrophoneMuted",
         "TGModernCallTransportSetSpeakerMuted",
+        "TGModernCallTransportSetCameraEnabled",
         "TGModernCallTransportPreferredRelayID",
         "TGModernCallTransportStop",
         "didEmitSignalingData:",
+        "didReceiveVideoImage:",
     ]:
         if fragment not in audio_text:
             errors.append("%s: modern call-audio contract is missing `%s`" %

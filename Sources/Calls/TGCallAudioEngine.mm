@@ -29,6 +29,7 @@ typedef struct TGModernTransportAPI {
     TGTransportReceiveSignalingFunction receiveSignaling;
     TGTransportSetMutedFunction setMicrophoneMuted;
     TGTransportSetMutedFunction setSpeakerMuted;
+    TGTransportSetMutedFunction setCameraEnabled;
     TGTransportPreferredRelayFunction preferredRelayID;
     TGTransportStopFunction stop;
 } TGModernTransportAPI;
@@ -84,6 +85,8 @@ static TGModernTransportAPI *TGModernTransport(void) {
             TGRequiredTransportSymbol(library, "TGModernCallTransportSetMicrophoneMuted");
         TGLoadedTransportAPI.setSpeakerMuted = (TGTransportSetMutedFunction)
             TGRequiredTransportSymbol(library, "TGModernCallTransportSetSpeakerMuted");
+        TGLoadedTransportAPI.setCameraEnabled = (TGTransportSetMutedFunction)
+            TGRequiredTransportSymbol(library, "TGModernCallTransportSetCameraEnabled");
         TGLoadedTransportAPI.preferredRelayID = (TGTransportPreferredRelayFunction)
             TGRequiredTransportSymbol(library, "TGModernCallTransportPreferredRelayID");
         TGLoadedTransportAPI.stop = (TGTransportStopFunction)
@@ -95,6 +98,7 @@ static TGModernTransportAPI *TGModernTransport(void) {
             !TGLoadedTransportAPI.receiveSignaling ||
             !TGLoadedTransportAPI.setMicrophoneMuted ||
             !TGLoadedTransportAPI.setSpeakerMuted ||
+            !TGLoadedTransportAPI.setCameraEnabled ||
             !TGLoadedTransportAPI.preferredRelayID ||
             !TGLoadedTransportAPI.stop ||
             TGLoadedTransportAPI.abiVersion() != TG_MODERN_CALL_TRANSPORT_ABI_VERSION) {
@@ -116,6 +120,8 @@ static TGModernTransportAPI *TGModernTransport(void) {
 - (void)deliverSignalBarsNumber:(NSNumber *)signalBarsNumber;
 - (void)deliverSignalingData:(NSData *)data;
 - (void)deliverTransportLog:(NSString *)message;
+- (void)deliverVideoFramePayload:(NSDictionary *)payload;
+- (void)deliverRemoteVideoStateNumber:(NSNumber *)stateNumber;
 @end
 
 static void TGModernStateChanged(void *context, int state) {
@@ -158,6 +164,40 @@ static void TGModernTransportLog(void *context, const char *message) {
     NSString *text = [NSString stringWithUTF8String:message];
     [engine performSelectorOnMainThread:@selector(deliverTransportLog:)
                             withObject:text
+                         waitUntilDone:NO];
+    [pool drain];
+}
+
+static void TGModernVideoFrame(void *context,
+                               int local,
+                               const uint8_t *bytes,
+                               size_t length,
+                               int width,
+                               int height,
+                               int bytesPerRow) {
+    if (!bytes || length == 0 || width <= 0 || height <= 0 || bytesPerRow <= 0) {
+        return;
+    }
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    TGCallAudioEngine *engine = (TGCallAudioEngine *)context;
+    NSDictionary *payload = [NSDictionary dictionaryWithObjectsAndKeys:
+                             [NSData dataWithBytes:bytes length:length], @"data",
+                             [NSNumber numberWithInt:width], @"width",
+                             [NSNumber numberWithInt:height], @"height",
+                             [NSNumber numberWithInt:bytesPerRow], @"bytes_per_row",
+                             [NSNumber numberWithBool:(local != 0)], @"local",
+                             nil];
+    [engine performSelectorOnMainThread:@selector(deliverVideoFramePayload:)
+                            withObject:payload
+                         waitUntilDone:NO];
+    [pool drain];
+}
+
+static void TGModernRemoteVideoStateChanged(void *context, int state) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    TGCallAudioEngine *engine = (TGCallAudioEngine *)context;
+    [engine performSelectorOnMainThread:@selector(deliverRemoteVideoStateNumber:)
+                            withObject:[NSNumber numberWithInt:state]
                          waitUntilDone:NO];
     [pool drain];
 }
@@ -246,10 +286,13 @@ static void TGModernTransportLog(void *context, const char *message) {
                                             encoding:NSUTF8StringEncoding] autorelease];
     char transportError[512] = { 0 };
     TGModernCallCallbacks callbacks;
+    memset(&callbacks, 0, sizeof(callbacks));
     callbacks.stateChanged = &TGModernStateChanged;
     callbacks.signalBarsChanged = &TGModernSignalBarsChanged;
     callbacks.signalingDataEmitted = &TGModernSignalingDataEmitted;
     callbacks.logMessage = &TGModernTransportLog;
+    callbacks.videoFrame = &TGModernVideoFrame;
+    callbacks.remoteVideoStateChanged = &TGModernRemoteVideoStateChanged;
     _transport = api->create([json UTF8String],
                              callbacks,
                              self,
@@ -290,6 +333,13 @@ static void TGModernTransportLog(void *context, const char *message) {
     TGModernTransportAPI *api = TGModernTransport();
     if (api && _transport) {
         api->setSpeakerMuted(_transport, muted ? 1 : 0);
+    }
+}
+
+- (void)setCameraEnabled:(BOOL)enabled {
+    TGModernTransportAPI *api = TGModernTransport();
+    if (api && _transport) {
+        api->setCameraEnabled(_transport, enabled ? 1 : 0);
     }
 }
 
@@ -335,6 +385,51 @@ static void TGModernTransportLog(void *context, const char *message) {
     if ([message length]) {
         [[TGLogger sharedLogger] log:[NSString stringWithFormat:@"Audio call: %@",
                                       message]];
+    }
+}
+
+- (void)deliverVideoFramePayload:(NSDictionary *)payload {
+    NSData *data = [payload objectForKey:@"data"];
+    NSInteger width = [[payload objectForKey:@"width"] integerValue];
+    NSInteger height = [[payload objectForKey:@"height"] integerValue];
+    NSInteger bytesPerRow = [[payload objectForKey:@"bytes_per_row"] integerValue];
+    if (![data length] || width <= 0 || height <= 0 || bytesPerRow < width * 4) {
+        return;
+    }
+    NSBitmapImageRep *representation =
+        [[[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
+                                                pixelsWide:width
+                                                pixelsHigh:height
+                                             bitsPerSample:8
+                                           samplesPerPixel:4
+                                                  hasAlpha:YES
+                                                  isPlanar:NO
+                                            colorSpaceName:NSDeviceRGBColorSpace
+                                               bitmapFormat:(NSAlphaFirstBitmapFormat |
+                                                             NSAlphaNonpremultipliedBitmapFormat)
+                                                bytesPerRow:bytesPerRow
+                                               bitsPerPixel:32] autorelease];
+    if (!representation) {
+        return;
+    }
+    memcpy([representation bitmapData],
+           [data bytes],
+           MIN((NSUInteger)(bytesPerRow * height), [data length]));
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(width, height)] autorelease];
+    [image addRepresentation:representation];
+    id<TGCallAudioEngineDelegate> delegate = self.delegate;
+    if ([delegate respondsToSelector:@selector(callAudioEngine:didReceiveVideoImage:local:)]) {
+        [delegate callAudioEngine:self
+             didReceiveVideoImage:image
+                            local:[[payload objectForKey:@"local"] boolValue]];
+    }
+}
+
+- (void)deliverRemoteVideoStateNumber:(NSNumber *)stateNumber {
+    id<TGCallAudioEngineDelegate> delegate = self.delegate;
+    if ([delegate respondsToSelector:@selector(callAudioEngine:didChangeRemoteVideoState:)]) {
+        [delegate callAudioEngine:self
+          didChangeRemoteVideoState:[stateNumber integerValue]];
     }
 }
 

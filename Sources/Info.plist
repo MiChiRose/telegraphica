@@ -31,7 +31,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Telegraphica uses the microphone only during calls and voice-message recording.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Telegraphica uses the camera only when you choose to record a video message.</string>
+	<string>Telegraphica uses the camera only during video calls and video-message recording.</string>
 	<key>NSLocationUsageDescription</key>
 	<string>Telegraphica uses your location only when you choose to send it.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

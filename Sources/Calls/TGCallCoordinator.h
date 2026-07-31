@@ -10,6 +10,7 @@ extern NSString * const TGCallCoordinatorDidFinishCallNotification;
 
 - (id)initWithClient:(TGTDLibClient *)client;
 - (void)startAudioCallToProfile:(NSDictionary *)profile;
+- (void)startVideoCallToProfile:(NSDictionary *)profile;
 - (void)startMockOutgoingCall;
 - (void)startMockIncomingCall;
 
