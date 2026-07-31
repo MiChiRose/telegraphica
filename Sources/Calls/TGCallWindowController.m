@@ -5,6 +5,7 @@
 #import "../UI/TGStatusButtonCells.h"
 #import "../UI/TGStatusViewComponents.h"
 #import "../UI/TGTheme.h"
+#include <math.h>
 
 @interface TGCallActionButtonCell : NSButtonCell
 @property (nonatomic, retain) NSColor *actionColor;
@@ -116,6 +117,21 @@
 @synthesize speakerLabel = _speakerLabel;
 @synthesize answerLabel = _answerLabel;
 @synthesize hangupLabel = _hangupLabel;
+
+static NSRect TGCallAspectFitRect(NSSize imageSize, NSRect bounds) {
+    if (imageSize.width <= 0.0 || imageSize.height <= 0.0 ||
+        NSWidth(bounds) <= 0.0 || NSHeight(bounds) <= 0.0) {
+        return bounds;
+    }
+    CGFloat scale = MIN(NSWidth(bounds) / imageSize.width,
+                        NSHeight(bounds) / imageSize.height);
+    NSSize fittedSize = NSMakeSize(floor(imageSize.width * scale),
+                                   floor(imageSize.height * scale));
+    return NSMakeRect(floor(NSMidX(bounds) - fittedSize.width / 2.0),
+                      floor(NSMidY(bounds) - fittedSize.height / 2.0),
+                      fittedSize.width,
+                      fittedSize.height);
+}
 
 - (NSTextField *)labelWithFrame:(NSRect)frame
                            text:(NSString *)text
@@ -316,9 +332,13 @@
         return;
     }
     if (local) {
+        NSRect localBounds = NSMakeRect(492.0, 368.0, 138.0, 104.0);
+        [self.localVideoView setFrame:TGCallAspectFitRect([image size], localBounds)];
         [self.localVideoView setImage:image];
         [self.localVideoView setHidden:!self.cameraEnabled];
     } else {
+        NSRect remoteBounds = NSMakeRect(34.0, 138.0, 612.0, 382.0);
+        [self.remoteVideoView setFrame:TGCallAspectFitRect([image size], remoteBounds)];
         [self.remoteVideoView setImage:image];
         [self.remoteVideoView setHidden:NO];
         [self.avatarView setHidden:YES];
@@ -435,26 +455,34 @@
     [self.speakerLabel setHidden:!connected];
     [self.hangupButton setHidden:ended];
     [self.hangupLabel setHidden:ended];
+    [self.cameraButton setHidden:(!self.videoCall || ended)];
+    [self.cameraLabel setHidden:(!self.videoCall || ended)];
     [self.qualityField setHidden:!connected];
     [self.qualityImageView setHidden:!connected];
     if (incoming) {
-        [self.answerButton setFrameOrigin:(self.videoCall ? NSMakePoint(220.0, 42.0)
+        [self.answerButton setFrameOrigin:(self.videoCall ? NSMakePoint(162.0, 42.0)
                                                          : NSMakePoint(102.0, 78.0))];
-        [self.answerLabel setFrameOrigin:(self.videoCall ? NSMakePoint(188.0, 20.0)
+        [self.answerLabel setFrameOrigin:(self.videoCall ? NSMakePoint(130.0, 20.0)
                                                         : NSMakePoint(70.0, 51.0))];
-        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(396.0, 42.0)
+        [self.cameraButton setFrameOrigin:NSMakePoint(308.0, 42.0)];
+        [self.cameraLabel setFrameOrigin:NSMakePoint(276.0, 20.0)];
+        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(454.0, 42.0)
                                                          : NSMakePoint(254.0, 78.0))];
-        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(364.0, 20.0)
+        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(422.0, 20.0)
                                                         : NSMakePoint(222.0, 51.0))];
     } else if (connected) {
+        [self.cameraButton setFrameOrigin:NSMakePoint(304.0, 42.0)];
+        [self.cameraLabel setFrameOrigin:NSMakePoint(272.0, 20.0)];
         [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(536.0, 42.0)
                                                          : NSMakePoint(292.0, 78.0))];
         [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(504.0, 20.0)
                                                         : NSMakePoint(260.0, 51.0))];
     } else {
-        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(308.0, 42.0)
+        [self.cameraButton setFrameOrigin:NSMakePoint(220.0, 42.0)];
+        [self.cameraLabel setFrameOrigin:NSMakePoint(188.0, 20.0)];
+        [self.hangupButton setFrameOrigin:(self.videoCall ? NSMakePoint(396.0, 42.0)
                                                          : NSMakePoint(178.0, 78.0))];
-        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(276.0, 20.0)
+        [self.hangupLabel setFrameOrigin:(self.videoCall ? NSMakePoint(364.0, 20.0)
                                                         : NSMakePoint(146.0, 51.0))];
     }
 
