@@ -618,6 +618,9 @@ def check_call_transport_stability_contract(errors):
         "audioOutputState->muted.store",
         "libyuv::I420Rotate",
         "libyuv::I420ToBGRA",
+        "now - _lastFrameAt).count() < 120",
+        "width > 480 || height > 360",
+        "does not change the encoded video sent",
         "remotePrefferedAspectRatioUpdated = [rawOwner]",
         "Local camera capture failed",
     ]:
