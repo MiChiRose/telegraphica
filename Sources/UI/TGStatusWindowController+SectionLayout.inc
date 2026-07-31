@@ -866,6 +866,8 @@
     if (panelWidth < 260.0) {
         panelWidth = 260.0;
     }
+    BOOL showForumTabs = (self.showingForumTopicList &&
+                          [self.forumTopicTabButtons count] > 0);
     if (self.searchPanelVisible) {
         BOOL hasSearchText = ([[self.searchTextField stringValue] length] > 0);
         BOOL hasSearchResults = ([self.searchResultItems count] > 0);
