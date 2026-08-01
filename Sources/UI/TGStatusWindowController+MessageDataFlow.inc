@@ -841,6 +841,7 @@
     }
 
     [self scheduleInlineMediaPlaybackRefreshAfterDelay:0.03];
+    [self refreshDocumentDownloadSpinnerOverlays];
     [self updateMessageJumpToNewestButtonVisibility];
     [self scheduleVisibleMessageItemsRead];
 

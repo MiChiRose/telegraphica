@@ -186,6 +186,12 @@
                 messageItem = (TGMessageItem *)item;
             }
         }
+        if (TGMessageItemIsNonVisualDocument(messageItem)) {
+            NSNumber *fileID = [self downloadFileIDForMessageItem:messageItem localPath:NULL fileName:NULL];
+            NSString *state = [[TGDownloadManager sharedManager]
+                presentationStateForFileID:fileID savedPath:NULL];
+            [messageItem setDocumentDownloadState:state];
+        }
         [(TGMessageBubbleCell *)cell setMessageItem:messageItem];
         [(TGMessageBubbleCell *)cell setShowSenderDetails:[self shouldShowGroupSenderDetailsForMessageItem:messageItem]];
         [self scheduleInlineMediaPlaybackRefresh];

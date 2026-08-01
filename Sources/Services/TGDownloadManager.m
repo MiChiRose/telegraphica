@@ -6,6 +6,7 @@
 #import "TGResourcePolicy.h"
 
 NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDidChangeNotification";
+static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaCompletedDownloadPathsByFileID";
 
 @interface TGDownloadManager () {
     dispatch_queue_t _downloadQueue;
@@ -85,6 +86,53 @@ NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDid
     }
 }
 
+- (NSString *)presentationStateForFileID:(NSNumber *)fileID
+                               savedPath:(NSString **)savedPathOut {
+    if (savedPathOut) {
+        *savedPathOut = nil;
+    }
+    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
+        return nil;
+    }
+
+    NSString *state = nil;
+    NSString *savedPath = nil;
+    @synchronized(self) {
+        NSUInteger index = 0;
+        for (index = 0; index < [self.records count]; index++) {
+            NSDictionary *record = [self.records objectAtIndex:index];
+            if ([[record objectForKey:@"file_id"] integerValue] != [fileID integerValue]) {
+                continue;
+            }
+            state = [[record objectForKey:@"state"] copy];
+            savedPath = [[record objectForKey:@"saved_path"] copy];
+            break;
+        }
+    }
+
+    if ([state isEqualToString:@"completed"] &&
+        ([savedPath length] == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:savedPath])) {
+        [state release];
+        state = nil;
+        [savedPath release];
+        savedPath = nil;
+    }
+    if (!state) {
+        NSDictionary *completedPaths = [[NSUserDefaults standardUserDefaults]
+            dictionaryForKey:TGCompletedDownloadPathsDefaultsKey];
+        NSString *persistedPath = [completedPaths objectForKey:[fileID stringValue]];
+        if ([persistedPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:persistedPath]) {
+            state = [@"completed" copy];
+            savedPath = [persistedPath copy];
+        }
+    }
+    if (savedPathOut && [savedPath length] > 0) {
+        *savedPathOut = [[savedPath copy] autorelease];
+    }
+    [savedPath release];
+    return [state autorelease];
+}
+
 - (NSString *)nextIdentifier {
     @synchronized(self) {
         _identifierCounter++;
@@ -110,6 +158,20 @@ NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDid
             completion(nil, error, NO);
         }
         return nil;
+    }
+
+    if (hasFileID) {
+        @synchronized(self) {
+            NSUInteger existingIndex = 0;
+            for (existingIndex = 0; existingIndex < [self.records count]; existingIndex++) {
+                NSDictionary *existingRecord = [self.records objectAtIndex:existingIndex];
+                NSString *existingState = [existingRecord objectForKey:@"state"];
+                if ([[existingRecord objectForKey:@"file_id"] integerValue] == [fileID integerValue] &&
+                    ([existingState isEqualToString:@"queued"] || [existingState isEqualToString:@"downloading"])) {
+                    return [existingRecord objectForKey:@"identifier"];
+                }
+            }
+        }
     }
 
     NSString *identifier = [self nextIdentifier];
@@ -188,6 +250,14 @@ NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDid
                 [current setObject:@"completed" forKey:@"state"];
                 [current setObject:savedPath forKey:@"saved_path"];
                 [current setObject:[NSDate date] forKey:@"finished_at"];
+                if ([fileIDCopy integerValue] > 0) {
+                    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+                    NSMutableDictionary *completedPaths = [NSMutableDictionary dictionaryWithDictionary:
+                        ([defaults dictionaryForKey:TGCompletedDownloadPathsDefaultsKey] ?: [NSDictionary dictionary])];
+                    [completedPaths setObject:savedPath forKey:[fileIDCopy stringValue]];
+                    [defaults setObject:completedPaths forKey:TGCompletedDownloadPathsDefaultsKey];
+                    [defaults synchronize];
+                }
             } else {
                 [current setObject:@"failed" forKey:@"state"];
                 [current setObject:([errorMessage length] > 0 ? errorMessage : @"Download failed.")

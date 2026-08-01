@@ -360,17 +360,97 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
 }
 
 - (void)openDocumentAttachmentForMessageItem:(TGMessageItem *)item {
-    NSString *localPath = [self localAttachmentPathForMessageItem:item];
-    if ([localPath length] == 0) {
+    NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:NULL fileName:NULL];
+    NSString *savedPath = nil;
+    NSString *downloadState = [[TGDownloadManager sharedManager]
+        presentationStateForFileID:fileID savedPath:&savedPath];
+    if (![downloadState isEqualToString:@"completed"] || [savedPath length] == 0) {
         [self downloadAttachmentForMessageItem:item];
         return;
     }
-    if ([[NSWorkspace sharedWorkspace] openFile:localPath]) {
+    if ([[NSWorkspace sharedWorkspace] openFile:savedPath]) {
         [self.statusField setStringValue:TGLoc(@"media.center.open")];
-        [self appendDetail:[NSString stringWithFormat:@"Opened document %@", [localPath lastPathComponent]]];
+        [self appendDetail:[NSString stringWithFormat:@"Opened document %@", [savedPath lastPathComponent]]];
     } else {
         [self.statusField setStringValue:TGLoc(@"media.center.openFailed")];
     }
+}
+
+- (void)removeDocumentDownloadSpinnerOverlays {
+    NSArray *spinnerViews = [[self.documentDownloadSpinnerViewsByKey allValues] copy];
+    NSUInteger index = 0;
+    for (index = 0; index < [spinnerViews count]; index++) {
+        TGTransparentSpinnerView *spinner = [spinnerViews objectAtIndex:index];
+        [spinner stopAnimation:nil];
+        [spinner removeFromSuperview];
+    }
+    [spinnerViews release];
+    [self.documentDownloadSpinnerViewsByKey removeAllObjects];
+}
+
+- (void)refreshDocumentDownloadSpinnerOverlays {
+    [self removeDocumentDownloadSpinnerOverlays];
+    if (!self.messageTableView || [self.messageItems count] == 0) {
+        return;
+    }
+
+    NSRect visibleRect = [self.messageTableView visibleRect];
+    BOOL flipped = [self.messageTableView isFlipped];
+    NSUInteger index = 0;
+    for (index = 0; index < [self.messageItems count]; index++) {
+        TGMessageItem *item = [self.messageItems objectAtIndex:index];
+        if (![item isKindOfClass:[TGMessageItem class]] || !TGMessageItemIsNonVisualDocument(item)) {
+            continue;
+        }
+        NSNumber *fileID = [self downloadFileIDForMessageItem:item localPath:NULL fileName:NULL];
+        NSString *state = [[TGDownloadManager sharedManager]
+            presentationStateForFileID:fileID savedPath:NULL];
+        [item setDocumentDownloadState:state];
+        if (![state isEqualToString:@"queued"] && ![state isEqualToString:@"downloading"]) {
+            continue;
+        }
+
+        NSRect rowRect = [self.messageTableView rectOfRow:(NSInteger)index];
+        if (!NSIntersectsRect(rowRect, visibleRect)) {
+            continue;
+        }
+        NSRect cellFrame = [self messageBubbleCellFrameForRow:(NSInteger)index];
+        BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
+        NSRect documentRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
+        CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
+        if (senderHeaderHeight > 0.0) {
+            if (flipped) {
+                documentRect.origin.y += senderHeaderHeight;
+            }
+            documentRect.size.height -= senderHeaderHeight;
+        }
+        CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+        if (contextHeaderHeight > 0.0) {
+            if (flipped) {
+                documentRect.origin.y += contextHeaderHeight;
+            }
+            documentRect.size.height -= contextHeaderHeight;
+        }
+        documentRect.size.height -= (TGMessageCommentBarHeightForItem(item) + TGReactionBandHeightForMessageItem(item));
+        NSRect iconRect = TGDocumentIconRectForBubbleRect(documentRect);
+        NSRect spinnerRect = NSMakeRect(NSMidX(iconRect) - 10.0,
+                                        NSMidY(iconRect) - 10.0,
+                                        20.0,
+                                        20.0);
+        TGTransparentSpinnerView *spinner = [[[TGTransparentSpinnerView alloc] initWithFrame:spinnerRect] autorelease];
+        [spinner setTintColor:[NSColor whiteColor]];
+        [spinner setDisplayedWhenStopped:NO];
+        [spinner startAnimation:nil];
+        [self.messageTableView addSubview:spinner];
+        NSString *key = [NSString stringWithFormat:@"%@-%lu", [fileID stringValue], (unsigned long)index];
+        [self.documentDownloadSpinnerViewsByKey setObject:spinner forKey:key];
+    }
+}
+
+- (void)documentDownloadManagerDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self.messageTableView reloadData];
+    [self refreshDocumentDownloadSpinnerOverlays];
 }
 
 - (void)downloadAttachmentForMessageItem:(TGMessageItem *)item {

@@ -469,6 +469,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
 @property (nonatomic, retain) TGTransparentSpinnerView *messageLoadingSpinner;
+@property (nonatomic, retain) NSMutableDictionary *documentDownloadSpinnerViewsByKey;
 @property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
@@ -997,6 +998,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
 @synthesize messageLoadingSpinner = _messageLoadingSpinner;
+@synthesize documentDownloadSpinnerViewsByKey = _documentDownloadSpinnerViewsByKey;
 @synthesize messageJumpToNewestButton = _messageJumpToNewestButton;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
@@ -1325,6 +1327,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.documentDownloadSpinnerViewsByKey = [NSMutableDictionary dictionary];
         self.visibleReadReceiptMessageIDs = [NSMutableSet set];
         self.searchResultItems = [NSMutableArray array];
         self.chatSearchWindowResults = [NSMutableArray array];
@@ -1384,6 +1387,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                  selector:@selector(composerPrivacyPermissionsDidChange:)
                                                      name:TGPrivacyPermissionsDidChangeNotification
                                                    object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(documentDownloadManagerDidChange:)
+                                                     name:TGDownloadManagerDidChangeNotification
+                                                   object:[TGDownloadManager sharedManager]];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self refreshUpdateAvailabilityBadge];
@@ -4745,6 +4752,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
     [_messageLoadingSpinner release];
+    [_documentDownloadSpinnerViewsByKey release];
     [_messageJumpToNewestButton release];
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];

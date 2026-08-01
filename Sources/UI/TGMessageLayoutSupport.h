@@ -45,6 +45,7 @@ CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWi
 CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
 CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item);
+NSRect TGDocumentIconRectForBubbleRect(NSRect bubbleRect);
 CGFloat TGPollBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
 CGFloat TGPollBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGCallBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
