@@ -7,6 +7,7 @@ static NSString * const TGResourcePolicyEconomyModeKey = @"TelegraphicaEconomyMo
 static NSString * const TGResourcePolicyAutoPhotoKey = @"TelegraphicaAutoDownloadPhotos";
 static NSString * const TGResourcePolicyAutoVideoKey = @"TelegraphicaAutoDownloadVideos";
 static NSString * const TGResourcePolicyAutoDocumentKey = @"TelegraphicaAutoDownloadDocuments";
+static NSString * const TGResourcePolicyLinkPreviewsKey = @"TelegraphicaLinkPreviewsEnabled";
 static NSString * const TGResourcePolicyMaxAutoDownloadBytesKey = @"TelegraphicaMaxAutoDownloadBytes";
 static NSString * const TGResourcePolicyAutoplayAnimatedStickersKey = @"TelegraphicaAutoplayAnimatedStickers";
 static NSString * const TGResourcePolicyMaximumActiveAnimationsKey = @"TelegraphicaMaximumActiveAnimations";
@@ -55,6 +56,7 @@ void TGResourcePolicyApplyDefaultsIfNeeded(void) {
     TGResourceSetBool(TGResourcePolicyAutoPhotoKey, YES);
     TGResourceSetBool(TGResourcePolicyAutoVideoKey, YES);
     TGResourceSetBool(TGResourcePolicyAutoDocumentKey, YES);
+    TGResourceSetBool(TGResourcePolicyLinkPreviewsKey, YES);
     TGResourceSetLongLong(TGResourcePolicyMaxAutoDownloadBytesKey, TGResourceMB(20));
     TGResourceSetBool(TGResourcePolicyAutoplayAnimatedStickersKey, YES);
     TGResourceSetLongLong(TGResourcePolicyMaximumActiveAnimationsKey, 5);
@@ -139,6 +141,18 @@ BOOL TGResourcePolicyAllowsAutoDownloadForMessageContent(NSString *contentType, 
     }
     long long maximumBytes = TGResourcePolicyMaxAutoDownloadBytes();
     return maximumBytes > 0 && declaredBytes <= maximumBytes;
+}
+
+BOOL TGResourcePolicyLinkPreviewsEnabled(void) {
+    TGResourcePolicyApplyDefaultsIfNeeded();
+    return TGResourceBoolForKey(TGResourcePolicyLinkPreviewsKey, YES);
+}
+
+void TGResourcePolicySetLinkPreviewsEnabled(BOOL enabled) {
+    TGResourcePolicyApplyDefaultsIfNeeded();
+    TGResourceSetBool(TGResourcePolicyLinkPreviewsKey, enabled);
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    TGResourcePolicyPostChange();
 }
 
 void TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadType type, BOOL enabled) {

@@ -655,6 +655,41 @@ BOOL TGMediaItemIsSticker(NSDictionary *mediaItem) {
     return [TGMediaItemContentType(mediaItem) isEqualToString:@"messageSticker"];
 }
 
+BOOL TGMediaItemNeedsLoadingSpinner(NSDictionary *mediaItem) {
+    if (![mediaItem isKindOfClass:[NSDictionary class]] || TGMediaItemIsSticker(mediaItem)) {
+        return NO;
+    }
+    if ([TGMediaItemLocalPath(mediaItem) length] > 0 ||
+        [TGMediaItemFullLocalPath(mediaItem) length] > 0 ||
+        [TGMediaItemMiniThumbnailData(mediaItem) length] > 0) {
+        return NO;
+    }
+    id fileID = [mediaItem objectForKey:@"file_id"];
+    id fullFileID = TGMediaItemFullFileID(mediaItem);
+    return (([fileID respondsToSelector:@selector(integerValue)] && [fileID integerValue] > 0) ||
+            ([fullFileID respondsToSelector:@selector(integerValue)] && [fullFileID integerValue] > 0));
+}
+
+NSRect TGMediaItemLoadingSpinnerRect(NSDictionary *mediaItem, NSRect mediaRect) {
+    if (!TGMediaItemNeedsLoadingSpinner(mediaItem) || NSIsEmptyRect(mediaRect)) {
+        return NSZeroRect;
+    }
+    NSString *displayText = TGLocalizedMediaLabel(TGMediaItemPlaceholder(mediaItem));
+    CGFloat fontSize = ([displayText length] <= 4) ? 34.0 : 13.0;
+    NSDictionary *attributes = [NSDictionary dictionaryWithObject:[NSFont boldSystemFontOfSize:fontSize]
+                                                             forKey:NSFontAttributeName];
+    NSSize textSize = [displayText sizeWithAttributes:attributes];
+    CGFloat spinnerSide = 14.0;
+    CGFloat gap = 6.0;
+    CGFloat groupWidth = ceil(textSize.width) + gap + spinnerSide;
+    CGFloat groupX = NSMidX(mediaRect) - floor(groupWidth / 2.0);
+    CGFloat textCenterY = NSMidY(mediaRect) + 26.0;
+    return NSMakeRect(groupX + ceil(textSize.width) + gap,
+                      textCenterY - floor(spinnerSide / 2.0),
+                      spinnerSide,
+                      spinnerSide);
+}
+
 void TGDrawMediaKindBadge(NSString *badgeText, NSRect rect, BOOL flipped) {
     if (![badgeText isKindOfClass:[NSString class]] || [badgeText length] == 0 || NSIsEmptyRect(rect)) {
         return;
@@ -1077,10 +1112,16 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
                                             nil];
         NSSize fallbackSize = [fallbackDisplayText sizeWithAttributes:fallbackAttributes];
         CGFloat fallbackTextCenterY = [fallbackIconName length] > 0 ? (NSMidY(rect) + 26.0) : NSMidY(rect);
+        NSRect spinnerRect = TGMediaItemLoadingSpinnerRect(mediaItem, rect);
         NSRect fallbackRect = NSMakeRect(NSMinX(rect) + 4.0,
                                          fallbackTextCenterY - ceil(fallbackSize.height / 2.0) - 1.0,
                                          NSWidth(rect) - 8.0,
                                          fallbackSize.height + 4.0);
+        if (!NSIsEmptyRect(spinnerRect)) {
+            CGFloat groupWidth = ceil(fallbackSize.width) + 6.0 + NSWidth(spinnerRect);
+            fallbackRect.origin.x = NSMidX(rect) - floor(groupWidth / 2.0);
+            fallbackRect.size.width = ceil(fallbackSize.width);
+        }
         [fallbackDisplayText drawInRect:fallbackRect withAttributes:fallbackAttributes];
     }
 
@@ -1185,7 +1226,7 @@ BOOL TGMessageItemIsCallContent(TGMessageItem *item) {
 }
 
 BOOL TGMessageItemHasLinkPreview(TGMessageItem *item) {
-    if (![item isKindOfClass:[TGMessageItem class]]) {
+    if (!TGResourcePolicyLinkPreviewsEnabled() || ![item isKindOfClass:[TGMessageItem class]]) {
         return NO;
     }
     NSDictionary *previewInfo = [item linkPreviewInfo];

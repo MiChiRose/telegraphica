@@ -96,6 +96,7 @@ static void TGClearProbeDefaults(void) {
                      @"TelegraphicaAutoDownloadPhotos",
                      @"TelegraphicaAutoDownloadVideos",
                      @"TelegraphicaAutoDownloadDocuments",
+                     @"TelegraphicaLinkPreviewsEnabled",
                      @"TelegraphicaMaxAutoDownloadBytes",
                      @"TelegraphicaAutoplayAnimatedStickers",
                      @"TelegraphicaMaximumActiveAnimations",
@@ -212,6 +213,7 @@ static void TGTestResourcePolicy(void) {
     TGAssertTrue(!TGResourcePolicyEconomyModeEnabled(), @"economy mode should default off");
     TGAssertTrue(TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadPhoto), @"photos should auto-download by default");
     TGAssertTrue(TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo), @"videos should auto-download by default");
+    TGAssertTrue(TGResourcePolicyLinkPreviewsEnabled(), @"link previews should default on");
     TGAssertTrue(TGResourcePolicyMaximumActiveAnimations() == 5, @"active animation default should be five");
 
     TGResourcePolicySetEconomyModeEnabled(YES);
@@ -229,6 +231,10 @@ static void TGTestResourcePolicy(void) {
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageUnknown", 1024), @"unknown message content should fail closed");
     TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVideo, NO);
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageVideo", 1024), @"disabled media category should not auto-download");
+    TGResourcePolicySetLinkPreviewsEnabled(NO);
+    TGAssertTrue(!TGResourcePolicyLinkPreviewsEnabled(), @"link preview preference should persist off");
+    TGResourcePolicySetLinkPreviewsEnabled(YES);
+    TGAssertTrue(TGResourcePolicyLinkPreviewsEnabled(), @"link preview preference should persist on");
 
     TGResourcePolicySetMaxAutoDownloadBytes(-1);
     TGAssertTrue(TGResourcePolicyMaxAutoDownloadBytes() > 0, @"invalid auto-download size should fall back to a positive value");

@@ -447,10 +447,68 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
     }
 }
 
+- (void)removeMediaLoadingSpinnerOverlays {
+    NSArray *spinnerViews = [[self.mediaLoadingSpinnerViewsByKey allValues] copy];
+    NSUInteger index = 0;
+    for (index = 0; index < [spinnerViews count]; index++) {
+        TGTransparentSpinnerView *spinner = [spinnerViews objectAtIndex:index];
+        [spinner stopAnimation:nil];
+        [spinner removeFromSuperview];
+    }
+    [spinnerViews release];
+    [self.mediaLoadingSpinnerViewsByKey removeAllObjects];
+}
+
+- (void)refreshMediaLoadingSpinnerOverlays {
+    [self removeMediaLoadingSpinnerOverlays];
+    if (!self.messageTableView || [self.messageItems count] == 0 || [self.messageTableView isHidden]) {
+        return;
+    }
+
+    NSRect visibleRect = [self.messageTableView visibleRect];
+    NSRange visibleRows = [self.messageTableView rowsInRect:visibleRect];
+    if (visibleRows.location == NSNotFound || visibleRows.length == 0) {
+        return;
+    }
+    NSUInteger lastRow = MIN(NSMaxRange(visibleRows), [self.messageItems count]);
+    NSUInteger row = visibleRows.location;
+    for (row = visibleRows.location; row < lastRow; row++) {
+        id candidate = [self.messageItems objectAtIndex:row];
+        if (![candidate isKindOfClass:[TGMessageItem class]]) {
+            continue;
+        }
+        TGMessageItem *item = (TGMessageItem *)candidate;
+        NSArray *entries = [self mediaLayoutEntriesForItem:item
+                                               inCellFrame:[self messageBubbleCellFrameForRow:(NSInteger)row]];
+        NSUInteger entryIndex = 0;
+        for (entryIndex = 0; entryIndex < [entries count]; entryIndex++) {
+            NSDictionary *entry = [entries objectAtIndex:entryIndex];
+            NSDictionary *mediaItem = [entry objectForKey:@"media_item"];
+            NSRect mediaRect = [[entry objectForKey:@"frame"] rectValue];
+            NSRect spinnerRect = TGMediaItemLoadingSpinnerRect(mediaItem, mediaRect);
+            if (NSIsEmptyRect(spinnerRect) || !NSIntersectsRect(mediaRect, visibleRect)) {
+                continue;
+            }
+            TGTransparentSpinnerView *spinner = [[[TGTransparentSpinnerView alloc] initWithFrame:spinnerRect] autorelease];
+            [spinner setTintColor:TGClassicNavigationSelectedColor(0.92)];
+            [spinner setDisplayedWhenStopped:NO];
+            [spinner startAnimation:nil];
+            [self.messageTableView addSubview:spinner];
+            id messageID = [item messageID];
+            NSString *key = [NSString stringWithFormat:@"%@-%lu-%lu",
+                             messageID ? messageID : [NSNumber numberWithUnsignedInteger:row],
+                             (unsigned long)row,
+                             (unsigned long)entryIndex];
+            [self.mediaLoadingSpinnerViewsByKey setObject:spinner forKey:key];
+        }
+    }
+}
+
 - (void)documentDownloadManagerDidChange:(NSNotification *)notification {
     (void)notification;
     [self.messageTableView reloadData];
     [self refreshDocumentDownloadSpinnerOverlays];
+    [self refreshMediaLoadingSpinnerOverlays];
 }
 
 - (void)downloadAttachmentForMessageItem:(TGMessageItem *)item {
