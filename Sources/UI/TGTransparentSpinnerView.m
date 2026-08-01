@@ -13,12 +13,14 @@
 @synthesize animationStep = _animationStep;
 @synthesize animating = _animating;
 @synthesize displayedWhenStopped = _displayedWhenStopped;
+@synthesize tintColor = _tintColor;
 
 - (id)initWithFrame:(NSRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
         _displayedWhenStopped = NO;
         _animationStep = 0;
+        _tintColor = [[NSColor colorWithCalibratedWhite:0.18 alpha:1.0] retain];
     }
     return self;
 }
@@ -26,11 +28,17 @@
 - (void)dealloc {
     [_animationTimer invalidate];
     [_animationTimer release];
+    [_tintColor release];
     [super dealloc];
 }
 
 - (BOOL)isOpaque {
     return NO;
+}
+
+- (NSView *)hitTest:(NSPoint)aPoint {
+    (void)aPoint;
+    return nil;
 }
 
 - (void)startAnimation:(id)sender {
@@ -100,7 +108,7 @@
         NSBezierPath *path = [NSBezierPath bezierPath];
         [path setLineWidth:lineWidth];
         [path setLineCapStyle:NSRoundLineCapStyle];
-        [[NSColor colorWithCalibratedWhite:0.18 alpha:alpha] setStroke];
+        [[self.tintColor colorWithAlphaComponent:alpha] setStroke];
         [path moveToPoint:start];
         [path lineToPoint:end];
         [path stroke];

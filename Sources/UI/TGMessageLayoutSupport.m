@@ -1512,7 +1512,7 @@ static NSString *TGDocumentFileSubtitleForMessageItem(TGMessageItem *item) {
         sizeText = TGResourcePolicyReadableSize([[item downloadFileSize] longLongValue]);
     }
     if ([sizeText length] > 0) {
-        return [NSString stringWithFormat:@"%@ - %@", sizeText, TGLoc(@"message.download.action")];
+        return [NSString stringWithFormat:@"%@ · %@", sizeText, TGLoc(@"message.download.action")];
     }
     return TGLoc(@"message.download.action");
 }
@@ -1559,14 +1559,23 @@ CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth) 
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                      TGChatMessageBoldBodyFont(), NSFontAttributeName,
                                      nil];
-    CGFloat width = [title sizeWithAttributes:titleAttributes].width + 96.0;
-    if (width < 210.0) {
-        width = 210.0;
+    CGFloat width = [title sizeWithAttributes:titleAttributes].width + 112.0;
+    if (width < 250.0) {
+        width = 250.0;
     }
     if (width > maximumWidth) {
         width = maximumWidth;
     }
     return width;
+}
+
+NSRect TGDocumentIconRectForBubbleRect(NSRect bubbleRect) {
+    NSRect contentRect = NSInsetRect(bubbleRect, 12.0, 9.0);
+    CGFloat iconSide = 36.0;
+    return NSMakeRect(NSMinX(contentRect),
+                      NSMidY(contentRect) - (iconSide / 2.0),
+                      iconSide,
+                      iconSide);
 }
 
 CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item) {
@@ -2271,38 +2280,31 @@ void TGDrawDocumentContentForItem(TGMessageItem *item, NSRect bubbleRect, BOOL o
     }
 
     NSRect contentRect = NSInsetRect(bubbleRect, 12.0, 9.0);
-    CGFloat iconSide = 36.0;
-    NSRect iconRect = NSMakeRect(NSMinX(contentRect),
-                                 NSMidY(contentRect) - (iconSide / 2.0),
-                                 iconSide,
-                                 iconSide);
+    NSRect iconRect = TGDocumentIconRectForBubbleRect(bubbleRect);
     NSBezierPath *iconPath = [NSBezierPath bezierPathWithOvalInRect:iconRect];
     NSColor *accentColor = outgoing ? TGClassicNavigationSelectedColor(0.95) : [NSColor colorWithCalibratedRed:0.05 green:0.67 blue:0.17 alpha:1.0];
     [accentColor set];
     [iconPath fill];
 
-    [[NSColor whiteColor] set];
-    NSBezierPath *arrowPath = [NSBezierPath bezierPath];
-    [arrowPath setLineWidth:3.0];
-    [arrowPath setLineCapStyle:NSRoundLineCapStyle];
-    CGFloat centerX = NSMidX(iconRect);
-    CGFloat topY = flipped ? (NSMinY(iconRect) + 9.0) : (NSMaxY(iconRect) - 9.0);
-    CGFloat bottomY = flipped ? (NSMaxY(iconRect) - 12.0) : (NSMinY(iconRect) + 12.0);
-    [arrowPath moveToPoint:NSMakePoint(centerX, topY)];
-    [arrowPath lineToPoint:NSMakePoint(centerX, bottomY)];
-    [arrowPath moveToPoint:NSMakePoint(centerX - 7.0, flipped ? (bottomY - 7.0) : (bottomY + 7.0))];
-    [arrowPath lineToPoint:NSMakePoint(centerX, bottomY)];
-    [arrowPath lineToPoint:NSMakePoint(centerX + 7.0, flipped ? (bottomY - 7.0) : (bottomY + 7.0))];
-    [arrowPath stroke];
+    NSString *downloadState = [item documentDownloadState];
+    if ([downloadState isEqualToString:@"completed"]) {
+        TGDrawTemplateIconAsset(@"document", NSInsetRect(iconRect, 9.0, 8.0), [NSColor whiteColor], 1.0, flipped);
+    } else if (![downloadState isEqualToString:@"queued"] &&
+               ![downloadState isEqualToString:@"downloading"]) {
+        TGDrawTemplateIconAsset(@"arrow-down", NSInsetRect(iconRect, 9.0, 8.0), [NSColor whiteColor], 1.0, flipped);
+    }
 
     CGFloat textX = NSMaxX(iconRect) + 10.0;
     CGFloat textWidth = NSMaxX(contentRect) - textX - 52.0;
     if (textWidth < 80.0) {
         textWidth = 80.0;
     }
+    NSMutableParagraphStyle *titleParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [titleParagraph setLineBreakMode:NSLineBreakByTruncatingTail];
     NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                      TGChatMessageBoldBodyFont(), NSFontAttributeName,
                                      TGClassicInkColor(), NSForegroundColorAttributeName,
+                                     titleParagraph, NSParagraphStyleAttributeName,
                                      nil];
     NSDictionary *subtitleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                         TGChatMessageBodyFont(), NSFontAttributeName,
