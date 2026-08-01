@@ -41,6 +41,7 @@
 "saved.saved" = "Changes saved.";
 "saved.failed" = "Could not update the topic.";
 "settings.forumTopicsTopBar" = "Show forum topics above messages";
+"settings.resources.linkPreviews" = "Show link previews";
 "settings.section.privacy" = "Privacy";
 "privacy.open" = "Privacy and retention";
 "privacy.title" = "Privacy and Retention";

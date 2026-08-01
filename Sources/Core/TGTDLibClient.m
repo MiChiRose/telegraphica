@@ -345,6 +345,11 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                downloadMissing:(BOOL)downloadMissing
                                        timeout:(NSTimeInterval)timeout
                             didRequestDownload:(BOOL *)didRequestDownload;
+- (NSDictionary *)photoInfoFromPhotoSizes:(NSArray *)sizes
+                         targetLongestSide:(NSInteger)targetLongestSide
+                           downloadMissing:(BOOL)downloadMissing
+                                   timeout:(NSTimeInterval)timeout
+                        didRequestDownload:(BOOL *)didRequestDownload;
 - (NSDictionary *)stickerPreviewInfoFromStickerObject:(id)stickerObject
                                       downloadMissing:(BOOL)downloadMissing
                                               timeout:(NSTimeInterval)timeout
@@ -5627,8 +5632,23 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                           downloadMissing:(BOOL)downloadMissing
                                   timeout:(NSTimeInterval)timeout
                        didRequestDownload:(BOOL *)didRequestDownload {
+    return [self photoInfoFromPhotoSizes:sizes
+                       targetLongestSide:300
+                         downloadMissing:downloadMissing
+                                 timeout:timeout
+                      didRequestDownload:didRequestDownload];
+}
+
+- (NSDictionary *)photoInfoFromPhotoSizes:(NSArray *)sizes
+                         targetLongestSide:(NSInteger)targetLongestSide
+                           downloadMissing:(BOOL)downloadMissing
+                                   timeout:(NSTimeInterval)timeout
+                        didRequestDownload:(BOOL *)didRequestDownload {
     if (![sizes isKindOfClass:[NSArray class]] || [sizes count] == 0) {
         return nil;
+    }
+    if (targetLongestSide <= 0) {
+        targetLongestSide = 300;
     }
 
     NSDictionary *bestDisplayDownloadedSize = nil;
@@ -5652,7 +5672,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             continue;
         }
         NSInteger longestSide = (width > height) ? width : height;
-        NSInteger score = (longestSide > 300) ? (longestSide - 300) : (300 - longestSide);
+        NSInteger score = (longestSide > targetLongestSide)
+            ? (longestSide - targetLongestSide)
+            : (targetLongestSide - longestSide);
         long long area = (long long)width * (long long)height;
         id fileObject = [size objectForKey:@"photo"];
         NSString *localPath = [self completedLocalPathFromFileObject:fileObject];
@@ -5675,9 +5697,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     NSDictionary *displaySize = bestDisplayDownloadedSize ? bestDisplayDownloadedSize : (bestDisplayDownloadableSize ? bestDisplayDownloadableSize : largestSize);
+    if (targetLongestSide > 300 && bestDisplayDownloadableSize &&
+        (!bestDisplayDownloadedSize || bestDisplayDownloadableScore < bestDisplayScore)) {
+        displaySize = bestDisplayDownloadableSize;
+    }
     if (!displaySize) {
         return nil;
     }
+    BOOL displaySizeAlreadyDownloaded = (displaySize == bestDisplayDownloadedSize);
 
     id widthObject = [displaySize objectForKey:@"width"];
     id heightObject = [displaySize objectForKey:@"height"];
@@ -5686,7 +5713,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSDictionary *displayInfo = [self photoInfoFromFileObject:[displaySize objectForKey:@"photo"]
                                                         width:width
                                                        height:height
-                                              downloadMissing:(downloadMissing && !bestDisplayDownloadedSize)
+                                              downloadMissing:(downloadMissing && !displaySizeAlreadyDownloaded)
                                                       timeout:timeout
                                            didRequestDownload:didRequestDownload];
     NSMutableDictionary *info = displayInfo ? [NSMutableDictionary dictionaryWithDictionary:displayInfo] : [NSMutableDictionary dictionary];
@@ -5964,9 +5991,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             continue;
         }
         NSDictionary *photoInfo = [self photoInfoFromPhotoSizes:[(NSDictionary *)photoObject objectForKey:@"sizes"]
-                                                downloadMissing:downloadMissing
-                                                        timeout:timeout
-                                             didRequestDownload:didRequestDownload];
+                                               targetLongestSide:640
+                                                 downloadMissing:downloadMissing
+                                                         timeout:timeout
+                                              didRequestDownload:didRequestDownload];
         NSMutableDictionary *info = photoInfo
             ? [NSMutableDictionary dictionaryWithDictionary:photoInfo]
             : [NSMutableDictionary dictionary];
@@ -7092,7 +7120,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                 [item setFormattedEntities:entities];
             }
         }
-        if ([contentType isEqualToString:@"messageText"]) {
+        if ([contentType isEqualToString:@"messageText"] && TGResourcePolicyLinkPreviewsEnabled()) {
             NSDictionary *linkPreviewInfo = [self linkPreviewInfoFromMessageContentObject:contentObject
                                                                           downloadMissing:NO
                                                                                   timeout:0.0

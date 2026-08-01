@@ -96,6 +96,10 @@
                                                                       action:@selector(resourceSettingChanged:)];
     [contentView addSubview:self.settingsAutoDownloadDocumentsButton];
 
+    self.settingsLinkPreviewsButton = [self resourceSwitchWithTitle:@"Show link previews"
+                                                              action:@selector(resourceSettingChanged:)];
+    [contentView addSubview:self.settingsLinkPreviewsButton];
+
     self.settingsMaxAutoDownloadLabel = [self resourceLabelWithTitle:@"Max auto-download"];
     [contentView addSubview:self.settingsMaxAutoDownloadLabel];
 
@@ -140,6 +144,7 @@
     [self.settingsAutoDownloadPhotosButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadPhoto) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadVideosButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadDocumentsButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadDocument) ? NSOnState : NSOffState];
+    [self.settingsLinkPreviewsButton setState:TGResourcePolicyLinkPreviewsEnabled() ? NSOnState : NSOffState];
     [self.settingsAutoplayAnimatedStickersButton setState:TGResourcePolicyAutoplayAnimatedStickersEnabled() ? NSOnState : NSOffState];
     [self.settingsStopInactiveAnimationsButton setState:TGResourcePolicyStopAnimationsWhenInactiveEnabled() ? NSOnState : NSOffState];
     [self selectPopUp:self.settingsMaxAutoDownloadPopUpButton representedUnsignedLongLong:TGResourcePolicyMaxAutoDownloadBytes()];
@@ -177,6 +182,18 @@
         TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVideo, [self.settingsAutoDownloadVideosButton state] == NSOnState);
     } else if (sender == self.settingsAutoDownloadDocumentsButton) {
         TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadDocument, [self.settingsAutoDownloadDocumentsButton state] == NSOnState);
+    } else if (sender == self.settingsLinkPreviewsButton) {
+        BOOL enabled = ([self.settingsLinkPreviewsButton state] == NSOnState);
+        if (enabled != TGResourcePolicyLinkPreviewsEnabled()) {
+            TGResourcePolicySetLinkPreviewsEnabled(enabled);
+            NSIndexSet *allRows = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, [self.messageItems count])];
+            [self.messageTableView noteHeightOfRowsWithIndexesChanged:allRows];
+            [self.messageTableView reloadData];
+            if (enabled && self.selectedChatID && [self.currentAuthState isEqualToString:@"ready"]) {
+                [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
+            }
+        }
+        return;
     } else if (sender == self.settingsAutoplayAnimatedStickersButton) {
         TGResourcePolicySetAutoplayAnimatedStickersEnabled([self.settingsAutoplayAnimatedStickersButton state] == NSOnState);
     } else if (sender == self.settingsStopInactiveAnimationsButton) {

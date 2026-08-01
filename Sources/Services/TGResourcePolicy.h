@@ -16,6 +16,9 @@ void TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadType ty
 BOOL TGResourcePolicyAutoDownloadTypeForMessageContent(NSString *contentType, TGResourceAutoDownloadType *type);
 BOOL TGResourcePolicyAllowsAutoDownloadForMessageContent(NSString *contentType, long long declaredBytes);
 
+BOOL TGResourcePolicyLinkPreviewsEnabled(void);
+void TGResourcePolicySetLinkPreviewsEnabled(BOOL enabled);
+
 long long TGResourcePolicyMaxAutoDownloadBytes(void);
 void TGResourcePolicySetMaxAutoDownloadBytes(long long bytes);
 NSArray *TGResourcePolicyMaxAutoDownloadChoices(void);
