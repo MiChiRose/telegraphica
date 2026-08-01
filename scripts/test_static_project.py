@@ -935,6 +935,8 @@ def check_media_file_management_contract(errors):
         "selectFile:path",
         "copyItemAtPath:sourcePath",
         "createDirectoryAtPath:directoryPath",
+        'postNotificationName:@"com.apple.DownloadFileFinished"',
+        "noteFileSystemChanged:path",
     ]:
         if fragment not in actions_text:
             errors.append("%s: focused local file action is missing `%s`" %
