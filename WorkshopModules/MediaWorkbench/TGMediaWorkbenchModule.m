@@ -18,7 +18,7 @@ static NSString * const TGMediaWorkbenchModuleIdentifier =
 - (NSString *)moduleDisplayName {
     return [_hostContext localizedStringForKey:@"mediaWorkbench.title" fallback:@"Media Center"];
 }
-- (NSString *)moduleVersion { return @"1.0.0"; }
+- (NSString *)moduleVersion { return @"1.0.1"; }
 - (NSString *)minimumHostVersion { return @"0.5.1"; }
 - (NSUInteger)moduleAPIVersion { return TGWorkshopModuleAPIVersion; }
 - (NSViewController *)mainViewController { return _viewController; }

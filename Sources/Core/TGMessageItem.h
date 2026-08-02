@@ -22,6 +22,7 @@
 @property (nonatomic, copy) NSString *mediaMimeType;
 @property (nonatomic, copy) NSString *downloadFileName;
 @property (nonatomic, retain) NSNumber *downloadFileSize;
+@property (nonatomic, copy) NSString *documentDownloadState;
 @property (nonatomic, copy) NSDictionary *linkPreviewInfo;
 @property (nonatomic, copy) NSString *reactionSummary;
 @property (nonatomic, copy) NSArray *chosenReactionEmojis;

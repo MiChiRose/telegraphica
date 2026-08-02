@@ -19,7 +19,7 @@
 - (NSString *)moduleDisplayName {
     return [_hostContext localizedStringForKey:@"checkers.title" fallback:@"Checkers"];
 }
-- (NSString *)moduleVersion { return @"1.0.0"; }
+- (NSString *)moduleVersion { return @"1.0.1"; }
 - (NSString *)minimumHostVersion { return @"0.5.1"; }
 - (NSUInteger)moduleAPIVersion { return TGWorkshopModuleAPIVersion; }
 - (NSViewController *)mainViewController { return _viewController; }

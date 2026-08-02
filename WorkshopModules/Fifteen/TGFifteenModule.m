@@ -23,7 +23,7 @@ static NSString * const TGFifteenModuleIdentifier = @"com.michirose.telegraphica
 - (NSString *)moduleDisplayName {
     return [_hostContext localizedStringForKey:@"fifteen.title" fallback:@"Fifteen"];
 }
-- (NSString *)moduleVersion { return @"1.0.0"; }
+- (NSString *)moduleVersion { return @"1.0.1"; }
 - (NSString *)minimumHostVersion { return @"0.5.1"; }
 - (NSUInteger)moduleAPIVersion { return TGWorkshopModuleAPIVersion; }
 - (NSViewController *)mainViewController { return _viewController; }

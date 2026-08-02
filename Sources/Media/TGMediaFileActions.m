@@ -1,6 +1,21 @@
 #import "TGMediaFileActions.h"
 #import "../UI/TGLocalization.h"
 
+static void TGAnnounceCompletedDownloadAtPath(NSString *path) {
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
+        return;
+    }
+
+    // Finder notices ordinary file-system changes, but the Downloads stack in
+    // the Dock only animates when applications explicitly announce a finished
+    // download. This legacy notification is understood throughout our unified
+    // OS X 10.8-macOS 10.13 lane.
+    [[NSDistributedNotificationCenter defaultCenter]
+        postNotificationName:@"com.apple.DownloadFileFinished"
+                      object:path];
+    [[NSWorkspace sharedWorkspace] noteFileSystemChanged:path];
+}
+
 @implementation TGMediaFileActions
 
 + (BOOL)validateSourceFileAtPath:(NSString *)sourcePath error:(NSError **)error {
@@ -139,6 +154,7 @@
         [fileManager removeItemAtPath:temporaryPath error:NULL];
         return nil;
     }
+    TGAnnounceCompletedDownloadAtPath(destinationPath);
     return destinationPath;
 }
 

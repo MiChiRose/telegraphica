@@ -25,6 +25,8 @@ NSString *TGDurationStringFromSecondsValue(id durationValue);
 NSString *TGVoicePreviewTimeString(NSTimeInterval seconds);
 NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem);
 BOOL TGMediaItemIsSticker(NSDictionary *mediaItem);
+BOOL TGMediaItemNeedsLoadingSpinner(NSDictionary *mediaItem);
+NSRect TGMediaItemLoadingSpinnerRect(NSDictionary *mediaItem, NSRect mediaRect);
 void TGDrawMediaKindBadge(NSString *badgeText, NSRect rect, BOOL flipped);
 void TGDrawMediaPlayBadge(NSRect rect, BOOL flipped);
 NSSize TGDisplaySizeForMediaDictionary(NSDictionary *mediaItem, CGFloat maximumWidth);
@@ -45,6 +47,7 @@ CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWi
 CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGDocumentBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
 CGFloat TGDocumentBubbleHeightForItem(TGMessageItem *item);
+NSRect TGDocumentIconRectForBubbleRect(NSRect bubbleRect);
 CGFloat TGPollBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);
 CGFloat TGPollBubbleHeightForItem(TGMessageItem *item);
 CGFloat TGCallBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWidth);

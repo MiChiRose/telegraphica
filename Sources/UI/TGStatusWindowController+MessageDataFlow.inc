@@ -536,6 +536,7 @@
         [self markVisiblePinnedMessagesFromPinnedItems];
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
+        [self refreshMediaLoadingSpinnerOverlays];
         [self refreshBotReplyMarkupFromMessages];
         if (self.initialUnreadPositionPending) {
             [self scrollMessagesToInitialUnreadIfAvailable];
@@ -587,6 +588,7 @@
     [self markVisiblePinnedMessagesFromPinnedItems];
     [self.inlineMediaPlaybackCoordinator removeAllPlayback];
     [self.messageTableView reloadData];
+    [self refreshMediaLoadingSpinnerOverlays];
     [self refreshBotReplyMarkupFromMessages];
     if (shouldScrollToNewest) {
         [self scrollMessagesToNewestIfAvailable];
@@ -642,6 +644,7 @@
         [self updateOutgoingReadStateForVisibleMessages];
         [self.inlineMediaPlaybackCoordinator removeAllPlayback];
         [self.messageTableView reloadData];
+        [self refreshMediaLoadingSpinnerOverlays];
     }
     if (added > 0) {
         if (preserveVisiblePosition) {
@@ -841,6 +844,8 @@
     }
 
     [self scheduleInlineMediaPlaybackRefreshAfterDelay:0.03];
+    [self refreshDocumentDownloadSpinnerOverlays];
+    [self refreshMediaLoadingSpinnerOverlays];
     [self updateMessageJumpToNewestButtonVisibility];
     [self scheduleVisibleMessageItemsRead];
 

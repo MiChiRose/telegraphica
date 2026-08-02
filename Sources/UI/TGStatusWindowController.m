@@ -469,6 +469,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSScrollView *messageScrollView;
 @property (nonatomic, retain) NSTableView *messageTableView;
 @property (nonatomic, retain) TGTransparentSpinnerView *messageLoadingSpinner;
+@property (nonatomic, retain) NSMutableDictionary *documentDownloadSpinnerViewsByKey;
+@property (nonatomic, retain) NSMutableDictionary *mediaLoadingSpinnerViewsByKey;
 @property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
@@ -525,6 +527,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsAutoDownloadPhotosButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadVideosButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadDocumentsButton;
+@property (nonatomic, retain) NSButton *settingsLinkPreviewsButton;
 @property (nonatomic, retain) NSButton *settingsAutoplayAnimatedStickersButton;
 @property (nonatomic, retain) NSButton *settingsStopInactiveAnimationsButton;
 @property (nonatomic, retain) NSTextField *settingsMaxAutoDownloadLabel;
@@ -997,6 +1000,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messageScrollView = _messageScrollView;
 @synthesize messageTableView = _messageTableView;
 @synthesize messageLoadingSpinner = _messageLoadingSpinner;
+@synthesize documentDownloadSpinnerViewsByKey = _documentDownloadSpinnerViewsByKey;
+@synthesize mediaLoadingSpinnerViewsByKey = _mediaLoadingSpinnerViewsByKey;
 @synthesize messageJumpToNewestButton = _messageJumpToNewestButton;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
@@ -1053,6 +1058,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsAutoDownloadPhotosButton = _settingsAutoDownloadPhotosButton;
 @synthesize settingsAutoDownloadVideosButton = _settingsAutoDownloadVideosButton;
 @synthesize settingsAutoDownloadDocumentsButton = _settingsAutoDownloadDocumentsButton;
+@synthesize settingsLinkPreviewsButton = _settingsLinkPreviewsButton;
 @synthesize settingsAutoplayAnimatedStickersButton = _settingsAutoplayAnimatedStickersButton;
 @synthesize settingsStopInactiveAnimationsButton = _settingsStopInactiveAnimationsButton;
 @synthesize settingsMaxAutoDownloadLabel = _settingsMaxAutoDownloadLabel;
@@ -1325,6 +1331,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.documentDownloadSpinnerViewsByKey = [NSMutableDictionary dictionary];
+        self.mediaLoadingSpinnerViewsByKey = [NSMutableDictionary dictionary];
         self.visibleReadReceiptMessageIDs = [NSMutableSet set];
         self.searchResultItems = [NSMutableArray array];
         self.chatSearchWindowResults = [NSMutableArray array];
@@ -1384,6 +1392,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                  selector:@selector(composerPrivacyPermissionsDidChange:)
                                                      name:TGPrivacyPermissionsDidChangeNotification
                                                    object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(documentDownloadManagerDidChange:)
+                                                     name:TGDownloadManagerDidChangeNotification
+                                                   object:[TGDownloadManager sharedManager]];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self refreshUpdateAvailabilityBadge];
@@ -1793,6 +1805,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsAutoDownloadPhotosButton setTitle:TGLoc(@"settings.resources.photos")];
     [self.settingsAutoDownloadVideosButton setTitle:TGLoc(@"settings.resources.videos")];
     [self.settingsAutoDownloadDocumentsButton setTitle:TGLoc(@"settings.resources.documents")];
+    [self.settingsLinkPreviewsButton setTitle:TGLoc(@"settings.resources.linkPreviews")];
     [self.settingsAutoplayAnimatedStickersButton setTitle:TGLoc(@"settings.resources.autoplay")];
     [self.settingsStopInactiveAnimationsButton setTitle:TGLoc(@"settings.resources.stopInactive")];
     [self.settingsMaxAutoDownloadLabel setStringValue:TGLoc(@"settings.resources.maxDownload")];
@@ -1951,6 +1964,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                       self.settingsAutoDownloadPhotosButton,
                                       self.settingsAutoDownloadVideosButton,
                                       self.settingsAutoDownloadDocumentsButton,
+                                      self.settingsLinkPreviewsButton,
                                       self.settingsAutoplayAnimatedStickersButton,
                                       self.settingsStopInactiveAnimationsButton,
                                       nil];
@@ -3868,6 +3882,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsAutoDownloadPhotosButton,
                                      self.settingsAutoDownloadVideosButton,
                                      self.settingsAutoDownloadDocumentsButton,
+                                     self.settingsLinkPreviewsButton,
                                      self.settingsAutoplayAnimatedStickersButton,
                                      self.settingsStopInactiveAnimationsButton,
                                      self.settingsMaxAutoDownloadLabel,
@@ -4745,6 +4760,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_messageScrollSurfaceView release];
     [_messageScrollView release];
     [_messageLoadingSpinner release];
+    [_documentDownloadSpinnerViewsByKey release];
+    [_mediaLoadingSpinnerViewsByKey release];
     [_messageJumpToNewestButton release];
     if ([_messageTableView isKindOfClass:[TGMessageTableView class]]) {
         [(TGMessageTableView *)_messageTableView setDropOverlayTarget:nil];
@@ -4818,6 +4835,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsAutoDownloadPhotosButton release];
     [_settingsAutoDownloadVideosButton release];
     [_settingsAutoDownloadDocumentsButton release];
+    [_settingsLinkPreviewsButton release];
     [_settingsAutoplayAnimatedStickersButton release];
     [_settingsStopInactiveAnimationsButton release];
     [_settingsMaxAutoDownloadLabel release];
