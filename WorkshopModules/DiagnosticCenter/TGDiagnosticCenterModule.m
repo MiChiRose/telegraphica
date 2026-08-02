@@ -20,7 +20,7 @@ static NSString * const TGDiagnosticCenterModuleIdentifier =
     return [_hostContext localizedStringForKey:@"diagnosticCenter.title"
                                       fallback:@"Diagnostic Center"];
 }
-- (NSString *)moduleVersion { return @"1.0.0"; }
+- (NSString *)moduleVersion { return @"1.0.1"; }
 - (NSString *)minimumHostVersion { return @"0.5.1"; }
 - (NSUInteger)moduleAPIVersion { return TGWorkshopModuleAPIVersion; }
 - (NSViewController *)mainViewController { return _viewController; }

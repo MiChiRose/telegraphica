@@ -4,6 +4,7 @@
 #import "../Installation/TGWorkshopRegistryStore.h"
 #import "TGWorkshopHostContextImpl.h"
 #import "TGWorkshopPaths.h"
+#import "../../Services/TGLogger.h"
 
 static NSError *TGWorkshopLoaderError(NSInteger code, NSString *message) {
     return [NSError errorWithDomain:TGWorkshopErrorDomain
@@ -111,15 +112,45 @@ static NSError *TGWorkshopLoaderError(NSInteger code, NSString *message) {
             TGWorkshopHostContextImpl *context = [[[TGWorkshopHostContextImpl alloc] initWithModuleIdentifier:identifier
                                                                                                     delegate:_hostDelegate] autorelease];
             module = [[[principalClass alloc] initWithHostContext:context] autorelease];
-            if (![[module moduleIdentifier] isEqualToString:identifier] ||
-                ![[module moduleVersion] isEqualToString:version] ||
-                [module moduleAPIVersion] != TGWorkshopModuleAPIVersion ||
-                ![module startWithError:error] ||
-                ![module mainViewController]) {
+            NSString *bundleVersion = [[bundle infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+            NSString *manifestPath = [bundle pathForResource:[TGWorkshopModuleManifestFileName stringByDeletingPathExtension]
+                                                       ofType:[TGWorkshopModuleManifestFileName pathExtension]];
+            NSDictionary *manifest = [NSDictionary dictionaryWithContentsOfFile:manifestPath];
+            NSString *manifestVersion = [[manifest objectForKey:@"version"] isKindOfClass:[NSString class]]
+                ? [manifest objectForKey:@"version"]
+                : nil;
+            NSString *reportedVersion = module ? [module moduleVersion] : nil;
+            if (!module) {
+                if (error) *error = TGWorkshopLoaderError(386, @"Workshop module principal class could not be initialized.");
+            } else if (![[module moduleIdentifier] isEqualToString:identifier]) {
+                if (error) *error = TGWorkshopLoaderError(387, @"Workshop module identifier does not match the installed bundle.");
+                module = nil;
+            } else if (![bundleVersion isEqualToString:version] ||
+                       ![manifestVersion isEqualToString:version]) {
+                if (error) *error = TGWorkshopLoaderError(388, @"Workshop module bundle version does not match the installed version.");
+                module = nil;
+            } else if ([module moduleAPIVersion] != TGWorkshopModuleAPIVersion) {
+                if (error) *error = TGWorkshopLoaderError(389, @"Workshop module uses an unsupported host API version.");
                 module = nil;
             } else {
-                [_hostContexts setObject:context forKey:identifier];
-                [_loadedModules setObject:module forKey:identifier];
+                if ([reportedVersion length] > 0 && ![reportedVersion isEqualToString:version]) {
+                    [[TGLogger sharedLogger] log:[NSString stringWithFormat:
+                        @"Workshop: module %@ reports version %@ while its signed bundle reports %@; using signed bundle metadata.",
+                        identifier, reportedVersion, version]];
+                }
+                BOOL started = [module startWithError:error];
+                if (!started) {
+                    if (error && !*error) {
+                        *error = TGWorkshopLoaderError(390, @"Workshop module could not be started.");
+                    }
+                    module = nil;
+                } else if (![module mainViewController]) {
+                    if (error) *error = TGWorkshopLoaderError(391, @"Workshop module did not provide its interface.");
+                    module = nil;
+                } else {
+                    [_hostContexts setObject:context forKey:identifier];
+                    [_loadedModules setObject:module forKey:identifier];
+                }
             }
         }
     }

@@ -17,7 +17,7 @@ static NSString * const TGRetroConsoleModuleIdentifier =
 
 - (NSString *)moduleIdentifier { return TGRetroConsoleModuleIdentifier; }
 - (NSString *)moduleDisplayName { return @"Retro Console"; }
-- (NSString *)moduleVersion { return @"1.0.0"; }
+- (NSString *)moduleVersion { return @"1.0.1"; }
 - (NSString *)minimumHostVersion { return @"0.5.2"; }
 - (NSUInteger)moduleAPIVersion { return TGWorkshopModuleAPIVersion; }
 - (NSViewController *)mainViewController { return _viewController; }
@@ -56,4 +56,3 @@ static NSString * const TGRetroConsoleModuleIdentifier =
 }
 
 @end
-
