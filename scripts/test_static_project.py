@@ -1362,6 +1362,49 @@ def check_retro_console_contract(errors):
                               os.path.relpath(os.path.join(directory, filename), ROOT))
 
 
+def check_workshop_module_version_contract(errors):
+    modules_root = os.path.join(ROOT, "WorkshopModules")
+    for module_name in sorted(os.listdir(modules_root)):
+        module_path = os.path.join(modules_root, module_name)
+        info_path = os.path.join(module_path, "Info.plist")
+        manifest_path = os.path.join(module_path, "WorkshopModule.plist")
+        if not os.path.isfile(info_path) or not os.path.isfile(manifest_path):
+            continue
+        info_text = read_text(info_path)
+        manifest_text = read_text(manifest_path)
+        info_match = re.search(r"<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>",
+                               info_text)
+        manifest_match = re.search(r"<key>version</key>\s*<string>([^<]+)</string>",
+                                   manifest_text)
+        source_versions = []
+        for filename in os.listdir(module_path):
+            if not filename.endswith("Module.m"):
+                continue
+            source_text = read_text(os.path.join(module_path, filename))
+            source_versions.extend(re.findall(
+                r"moduleVersion\s*\{[^}]*return\s+@\"([^\"]+)\"\s*;[^}]*\}",
+                source_text,
+                re.S))
+        info_version = info_match.group(1) if info_match else None
+        manifest_version = manifest_match.group(1) if manifest_match else None
+        if not info_version or not manifest_version or len(source_versions) != 1:
+            errors.append("WorkshopModules/%s: module version metadata is incomplete" % module_name)
+        elif info_version != manifest_version or source_versions[0] != manifest_version:
+            errors.append("WorkshopModules/%s: Info.plist, manifest and moduleVersion must match (%s, %s, %s)" %
+                          (module_name, info_version, manifest_version, source_versions[0]))
+
+    loader_rel = os.path.join("Sources", "Workshop", "Host", "TGWorkshopModuleLoader.m")
+    loader_text = read_text(os.path.join(ROOT, loader_rel))
+    for fragment in [
+        "CFBundleShortVersionString",
+        "TGWorkshopModuleManifestFileName",
+        "using signed bundle metadata",
+    ]:
+        if fragment not in loader_text:
+            errors.append("%s: signed bundle version compatibility is missing `%s`" %
+                          (loader_rel, fragment))
+
+
 def check_chat_archive_contract(errors):
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     controller_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
@@ -2042,6 +2085,7 @@ def main():
     check_media_file_management_contract(errors)
     check_primary_navigation_contract(errors)
     check_retro_console_contract(errors)
+    check_workshop_module_version_contract(errors)
     check_chat_archive_contract(errors)
     check_chat_history_deletion_contract(errors)
     check_chat_navigation_actions_contract(errors)
