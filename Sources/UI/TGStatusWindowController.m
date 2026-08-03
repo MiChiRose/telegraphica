@@ -714,6 +714,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableDictionary *reactionAnimations;
 @property (nonatomic, retain) NSMutableDictionary *availableReactionEmojisByMessageKey;
 @property (nonatomic, retain) NSMutableDictionary *availableReactionOperationsByMessageKey;
+@property (nonatomic, retain) TGTDLibOperation *reactionUsersOperation;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
 @property (nonatomic, assign) BOOL chatsExhausted;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
@@ -1266,6 +1267,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize reactionAnimations = _reactionAnimations;
 @synthesize availableReactionEmojisByMessageKey = _availableReactionEmojisByMessageKey;
 @synthesize availableReactionOperationsByMessageKey = _availableReactionOperationsByMessageKey;
+@synthesize reactionUsersOperation = _reactionUsersOperation;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
 @synthesize chatsExhausted = _chatsExhausted;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
@@ -4791,6 +4793,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [operation cancel];
     }
     [_availableReactionOperationsByMessageKey release];
+    [_reactionUsersOperation cancel];
+    [_reactionUsersOperation release];
     [_composerDraftsByTargetKey release];
     [_composerDraftSyncTimer invalidate];
     [_composerDraftSyncTimer release];

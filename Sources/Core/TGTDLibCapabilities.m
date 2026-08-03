@@ -5,6 +5,7 @@ NSString * const TGTDLibCapabilityEmailAuthentication = @"authorization.email";
 NSString * const TGTDLibCapabilityRegistration = @"authorization.registration";
 NSString * const TGTDLibCapabilityPasswordRecovery = @"authorization.password_recovery";
 NSString * const TGTDLibCapabilityAvailableReactions = @"messages.available_reactions";
+NSString * const TGTDLibCapabilityAddedReactionUsers = @"messages.added_reaction_users";
 NSString * const TGTDLibCapabilityCustomEmoji = @"messages.custom_emoji";
 NSString * const TGTDLibCapabilityModernTextEntities = @"messages.modern_text_entities";
 NSString * const TGTDLibCapabilityChatFolderManagement = @"chat_folders.management";
@@ -342,6 +343,7 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
             TGTDLibCapabilityRegistration,
             TGTDLibCapabilityPasswordRecovery,
             TGTDLibCapabilityAvailableReactions,
+            TGTDLibCapabilityAddedReactionUsers,
             TGTDLibCapabilityCustomEmoji,
             TGTDLibCapabilityModernTextEntities,
             TGTDLibCapabilityChatFolderManagement,
@@ -376,6 +378,7 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
                     TGTDLibCapabilityPasswordRecovery, @"checkAuthenticationPasswordRecoveryCode",
                     TGTDLibCapabilityPasswordRecovery, @"recoverAuthenticationPassword",
                     TGTDLibCapabilityAvailableReactions, @"getMessageAvailableReactions",
+                    TGTDLibCapabilityAddedReactionUsers, @"getMessageAddedReactions",
                     TGTDLibCapabilityCustomEmoji, @"getCustomEmojiStickers",
                     TGTDLibCapabilityModernTextEntities, @"getTextEntities",
                     TGTDLibCapabilityModernTextEntities, @"parseTextEntities",

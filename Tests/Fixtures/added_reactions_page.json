@@ -1,0 +1,26 @@
+{
+  "@type": "addedReactions",
+  "total_count": 4,
+  "reactions": [
+    {
+      "@type": "addedReaction",
+      "type": { "@type": "reactionTypeEmoji", "emoji": "🔥" },
+      "sender_id": { "@type": "messageSenderUser", "user_id": 101 },
+      "date": 1700000100
+    },
+    {
+      "@type": "addedReaction",
+      "type": { "@type": "reactionTypeCustomEmoji", "custom_emoji_id": 202 },
+      "sender_id": { "@type": "messageSenderChat", "chat_id": -303 },
+      "date": 1700000200
+    },
+    {
+      "@type": "addedReaction",
+      "type": { "@type": "reactionTypePaid" },
+      "sender_id": { "@type": "messageSenderUser", "user_id": 404 },
+      "date": 1700000300
+    },
+    { "@type": "addedReaction", "type": { "@type": "reactionTypeEmoji", "emoji": "" } }
+  ],
+  "next_offset": "page-2"
+}

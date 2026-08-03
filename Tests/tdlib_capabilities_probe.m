@@ -85,6 +85,9 @@ static void TGTestRequestMappingAndSnapshot(void) {
     TGCapabilityAssert([[TGTDLibCapabilities capabilityIdentifierForRequestType:@"createForumTopic"]
                         isEqualToString:TGTDLibCapabilityForumTopics],
                        @"forum request should map to the forum capability");
+    TGCapabilityAssert([[TGTDLibCapabilities capabilityIdentifierForRequestType:@"getMessageAddedReactions"]
+                        isEqualToString:TGTDLibCapabilityAddedReactionUsers],
+                       @"reaction-user request should map to its own capability");
     TGCapabilityAssert([TGTDLibCapabilities capabilityIdentifierForRequestType:@"getMe"] == nil,
                        @"unrelated requests should not mutate feature capabilities");
 

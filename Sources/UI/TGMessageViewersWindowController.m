@@ -106,6 +106,15 @@
     [self setSingleMessage:TGLoc(@"message.viewers.loading") color:[NSColor colorWithCalibratedWhite:0.38 alpha:1.0]];
 }
 
+- (void)setContentTitle:(NSString *)title windowTitle:(NSString *)windowTitle {
+    if ([title length] > 0) {
+        [self.titleField setStringValue:title];
+    }
+    if ([windowTitle length] > 0) {
+        [[self window] setTitle:windowTitle];
+    }
+}
+
 - (void)showErrorMessage:(NSString *)message {
     [self setSingleMessage:([message length] > 0 ? message : TGLoc(@"message.viewers.unavailable"))
                      color:[NSColor colorWithCalibratedRed:0.62 green:0.12 blue:0.10 alpha:1.0]];
@@ -145,6 +154,16 @@
         NSString *displayName = [summary objectForKey:@"display_name"];
         [name setStringValue:([displayName length] > 0 ? displayName : @"Unknown")];
         [row addSubview:name];
+
+        NSString *reactionDisplay = [summary objectForKey:@"reaction_display"];
+        if ([reactionDisplay length] > 0) {
+            NSTextField *reaction = [self labelWithFrame:NSMakeRect(246, 14, 28, 22)
+                                                     font:[NSFont systemFontOfSize:16.0]
+                                                    color:[NSColor colorWithCalibratedWhite:0.18 alpha:1.0]];
+            [reaction setAlignment:NSCenterTextAlignment];
+            [reaction setStringValue:reactionDisplay];
+            [row addSubview:reaction];
+        }
 
         id viewDate = [summary objectForKey:@"view_date"];
         if ([viewDate respondsToSelector:@selector(integerValue)] && [viewDate integerValue] > 0) {

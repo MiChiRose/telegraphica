@@ -2,6 +2,7 @@
 #import "TGAuthorizationFlow.h"
 #import "TGFormattedTextCodec.h"
 #import "TGReactionCatalog.h"
+#import "TGAddedReactionsParser.h"
 #import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
@@ -6937,16 +6938,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
+    BOOL canGetAddedReactions = [[(NSDictionary *)reactionsObject objectForKey:@"can_get_added_reactions"] boolValue];
     id reactions = [(NSDictionary *)reactionsObject objectForKey:@"reactions"];
-    if (![reactions isKindOfClass:[NSArray class]] || [(NSArray *)reactions count] == 0) {
+    NSArray *reactionArray = [reactions isKindOfClass:[NSArray class]] ? reactions : [NSArray array];
+    if ([reactionArray count] == 0 && !canGetAddedReactions) {
         return nil;
     }
 
     NSMutableArray *parts = [NSMutableArray array];
     NSMutableArray *chosenEmojis = [NSMutableArray array];
     NSUInteger index = 0;
-    for (index = 0; index < [(NSArray *)reactions count]; index++) {
-        id reactionObject = [(NSArray *)reactions objectAtIndex:index];
+    for (index = 0; index < [reactionArray count]; index++) {
+        id reactionObject = [reactionArray objectAtIndex:index];
         if (![reactionObject isKindOfClass:[NSDictionary class]]) {
             continue;
         }
@@ -6992,6 +6995,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    [info setObject:[NSNumber numberWithBool:canGetAddedReactions] forKey:@"can_get_added_reactions"];
     if ([parts count] > 0) {
         [info setObject:[parts componentsJoinedByString:@"  "] forKey:@"summary"];
     }
@@ -7349,6 +7353,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([chosenReactionEmojis isKindOfClass:[NSArray class]]) {
             [item setChosenReactionEmojis:chosenReactionEmojis];
         }
+        [item setCanGetAddedReactions:[[reactionInfo objectForKey:@"can_get_added_reactions"] boolValue]];
         id mediaAlbumID = [message objectForKey:@"media_album_id"];
         if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
             [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
@@ -11032,6 +11037,89 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     return TGReactionCatalogFromTDLibResponse(response);
+}
+
+- (NSDictionary *)addedReactionUsersForChatID:(NSNumber *)chatID
+                                      messageID:(NSNumber *)messageID
+                                         offset:(NSString *)offset
+                                          limit:(NSUInteger)limit
+                                        timeout:(NSTimeInterval)timeout
+                                          error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0 || [messageID longLongValue] <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing for reaction users." code:243];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error && !*error) {
+            *error = [self errorWithDescription:@"TDLib is not ready to load reaction users." code:244];
+        }
+        return nil;
+    }
+    NSUInteger safeLimit = (limit == 0U || limit > 100U) ? 50U : limit;
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getMessageAddedReactions", @"@type",
+                             [NSNumber numberWithLongLong:[chatID longLongValue]], @"chat_id",
+                             [NSNumber numberWithLongLong:[messageID longLongValue]], @"message_id",
+                             [NSNull null], @"reaction_type",
+                             ([offset isKindOfClass:[NSString class]] ? offset : @""), @"offset",
+                             [NSNumber numberWithUnsignedInteger:safeLimit], @"limit",
+                             nil];
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-added-reactions"
+                                                           timeout:timeout
+                                                         errorCode:245
+                                                             error:&requestError];
+    NSDictionary *page = response ? TGAddedReactionsPageFromTDLibResponse(response) : nil;
+    if (!page) {
+        if (error) {
+            *error = requestError ? requestError :
+                [self errorWithDescription:@"TDLib returned an unexpected reaction users response." code:246];
+        }
+        return nil;
+    }
+
+    NSArray *parsedItems = [page objectForKey:TGAddedReactionsItemsKey];
+    NSMutableArray *summaries = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [parsedItems count] && [summaries count] < safeLimit; index++) {
+        NSDictionary *parsedItem = [parsedItems objectAtIndex:index];
+        NSDictionary *sender = [parsedItem objectForKey:TGAddedReactionSenderKey];
+        NSDictionary *senderMessage = sender ?
+            [NSDictionary dictionaryWithObject:sender forKey:@"sender_id"] : nil;
+        NSDictionary *senderSummary = [self senderSummaryFromMessageObject:senderMessage
+                                                                    timeout:MIN(timeout, 1.0)];
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        if ([senderSummary count] > 0) {
+            [summary addEntriesFromDictionary:senderSummary];
+        } else {
+            [summary setObject:@"Unknown" forKey:@"display_name"];
+        }
+        NSString *emoji = [parsedItem objectForKey:TGAddedReactionEmojiKey];
+        if ([emoji length] > 0) {
+            [summary setObject:emoji forKey:@"reaction_display"];
+        } else if ([parsedItem objectForKey:TGAddedReactionCustomEmojiIDKey]) {
+            /* The UI replaces this stable placeholder when a cached custom emoji is available. */
+            [summary setObject:@"◇" forKey:@"reaction_display"];
+            [summary setObject:[parsedItem objectForKey:TGAddedReactionCustomEmojiIDKey]
+                         forKey:@"custom_emoji_id"];
+        }
+        id reactionDate = [parsedItem objectForKey:TGAddedReactionDateKey];
+        if (reactionDate) {
+            [summary setObject:reactionDate forKey:@"view_date"];
+        }
+        [summaries addObject:summary];
+    }
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            summaries, @"summaries",
+            ([page objectForKey:TGAddedReactionsNextOffsetKey]
+                ? [page objectForKey:TGAddedReactionsNextOffsetKey] : @""), @"next_offset",
+            nil];
 }
 
 - (NSString *)removeReactionFromChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error {
