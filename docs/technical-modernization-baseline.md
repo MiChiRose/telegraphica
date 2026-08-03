@@ -63,3 +63,10 @@ This inventory is an implementation surface, not a support claim. Before this mo
 - Several UI paths use local schema/property checks and fallback requests rather than a shared capability result.
 
 The first modernization increment replaces this scattered lane inference where it can do so safely, without changing the verified call transport or user session storage.
+
+## Incremental architecture progress
+
+Message-search request building, schema fallbacks and response validation have
+been moved from the main client into `TGTDLibClient+Search`. Transport ownership
+and message-model conversion stay in the main client, and a fixture probe locks
+the request contract before additional search surfaces are migrated.

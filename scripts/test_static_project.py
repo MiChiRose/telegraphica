@@ -2122,6 +2122,33 @@ def check_received_link_preview_contract(errors):
                           (hit_rel, fragment))
 
 
+def check_tdlib_search_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    search_rel = os.path.join("Sources", "Core", "TGTDLibClient+Search.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    search_text = read_text(os.path.join(ROOT, search_rel))
+    moved_selectors = [
+        "searchMessagesFilterForName:",
+        "searchMessagePreviewItemsForChatID:",
+        "globalSearchMessagePreviewItemsWithQuery:",
+    ]
+    for selector in moved_selectors:
+        if selector in main_text:
+            errors.append("%s: extracted search selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if selector not in search_text:
+            errors.append("%s: extracted search selector is missing: %s" %
+                          (search_rel, selector))
+    for fragment in [
+        "sendTDLibRequestAndWaitForExtra:",
+        "messagesFromSearchResponse:",
+        "messagePreviewItemsFromMessages:",
+    ]:
+        if fragment not in search_text:
+            errors.append("%s: search component does not use shared client contract `%s`" %
+                          (search_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -2156,6 +2183,7 @@ def main():
     check_contact_birthday_contract(errors)
     check_poll_management_contract(errors)
     check_received_link_preview_contract(errors)
+    check_tdlib_search_component_boundary(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

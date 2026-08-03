@@ -44,6 +44,7 @@
 		A5C000000000000000000001 /* TGStorageCleanupPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = A5C000000000000000000003 /* TGStorageCleanupPolicy.m */; };
 		A5D000000000000000000001 /* TGAnimatedImageLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = A5D000000000000000000003 /* TGAnimatedImageLoader.m */; };
 		A5E000000000000000000001 /* TGUtilityWindowLifetime.m in Sources */ = {isa = PBXBuildFile; fileRef = A5E000000000000000000003 /* TGUtilityWindowLifetime.m */; };
+		A5F000000000000000000001 /* TGTDLibClient+Search.m in Sources */ = {isa = PBXBuildFile; fileRef = A5F000000000000000000003 /* TGTDLibClient+Search.m */; };
 		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
 		111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */; };
 		111111111111111111111121 /* TGTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111236 /* TGTheme.m */; };
@@ -234,6 +235,8 @@
 		A5D000000000000000000003 /* TGAnimatedImageLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAnimatedImageLoader.m; sourceTree = "<group>"; };
 		A5E000000000000000000002 /* TGUtilityWindowLifetime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGUtilityWindowLifetime.h; sourceTree = "<group>"; };
 		A5E000000000000000000003 /* TGUtilityWindowLifetime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGUtilityWindowLifetime.m; sourceTree = "<group>"; };
+		A5F000000000000000000002 /* TGTDLibClient+Search.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Search.h"; sourceTree = "<group>"; };
+		A5F000000000000000000003 /* TGTDLibClient+Search.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+Search.m"; sourceTree = "<group>"; };
 		111111111111111111111229 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGInlineMediaPlaybackCoordinator.h; sourceTree = "<group>"; };
 		111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGInlineMediaPlaybackCoordinator.m; sourceTree = "<group>"; };
@@ -564,6 +567,8 @@
 				111111111111111111111394 /* TGTDLibClient+LocationMessages.m */,
 				111111111111111111111397 /* TGTDLibClient+ChatHistory.h */,
 				111111111111111111111398 /* TGTDLibClient+ChatHistory.m */,
+				A5F000000000000000000002 /* TGTDLibClient+Search.h */,
+				A5F000000000000000000003 /* TGTDLibClient+Search.m */,
 				555000000000000000000002 /* TGTDLibClient+MessageLinks.h */,
 				555000000000000000000003 /* TGTDLibClient+MessageLinks.m */,
 				111111111111111111111387 /* TGTDLibClient+Calls.h */,
@@ -1009,6 +1014,7 @@
 				111111111111111111111195 /* TGTDLibClient+LocationMessages.m in Sources */,
 				111111111111111111111196 /* TGLocationSearchService.m in Sources */,
 				111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */,
+				A5F000000000000000000001 /* TGTDLibClient+Search.m in Sources */,
 				111111111111111111111198 /* TGUpdateCheckScheduler.m in Sources */,
 				111111111111111111111192 /* TGTDLibClient+Calls.m in Sources */,
 				111111111111111111111193 /* TGCallAudioEngine.mm in Sources */,
