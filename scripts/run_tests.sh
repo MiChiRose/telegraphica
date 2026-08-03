@@ -184,6 +184,16 @@ echo "== Media playback speed preferences =="
     -o "$BUILD_DIR/media_playback_preferences_probe"
 HOME="$TEST_HOME" "$BUILD_DIR/media_playback_preferences_probe"
 
+echo "== Sequential audio playback =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/media_playback_sequence_probe.m \
+    Sources/Media/TGMediaPlaybackSequence.m \
+    Sources/Core/TGMessageItem.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/media_playback_sequence_probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media_playback_sequence_probe"
+
 echo "== Custom emoji descriptors =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \

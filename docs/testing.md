@@ -60,8 +60,11 @@ The script runs:
   legacy-safe identifier normalization.
 - a persistent download-queue probe covering interrupted-state restoration,
   bounded property-list serialization and TDLib file identifier retention.
-- a playback-speed preference probe covering bounded legacy-safe rates and
-  independent audio/video persistence.
+- a playback-speed preference probe covering bounded legacy-safe rates,
+  independent audio/video persistence, and the opt-in sequential-audio
+  preference;
+- a sequential-audio fixture probe covering same-chat ordering, video and
+  foreign-chat skips, identifier recovery, and end-of-sequence behavior;
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.

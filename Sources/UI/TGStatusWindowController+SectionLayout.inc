@@ -310,6 +310,7 @@
     [self showView:self.settingsAutoDownloadDocumentsButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVoiceButton visible:showSettings];
     [self showView:self.settingsLinkPreviewsButton visible:showSettings];
+    [self showView:self.settingsSequentialAudioButton visible:showSettings];
     [self showView:self.settingsAutoplayAnimatedStickersButton visible:showSettings];
     [self showView:self.settingsStopInactiveAnimationsButton visible:showSettings];
     [self showView:self.settingsMaxAutoDownloadLabel visible:showSettings];
@@ -1286,7 +1287,7 @@
     CGFloat savedCardHeight = 54.0;
     CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 104.0;
-    CGFloat resourceCardHeight = 334.0;
+    CGFloat resourceCardHeight = 366.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
     CGFloat filesCardHeight = 172.0;
@@ -1421,6 +1422,7 @@
     [self.settingsAutoDownloadDocumentsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 98.0, rowWidth, 22.0)];
     [self.settingsAutoDownloadVoiceButton setFrame:NSMakeRect(rowLeft, resourceCardY + 126.0, rowWidth, 22.0)];
     [self.settingsLinkPreviewsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 154.0, rowWidth, 22.0)];
+    [self.settingsSequentialAudioButton setFrame:NSMakeRect(rowLeft, resourceCardY + 182.0, rowWidth, 22.0)];
     CGFloat resourcePopupWidth = 190.0;
     if (resourcePopupWidth > rowWidth - 180.0) {
         resourcePopupWidth = rowWidth - 180.0;
@@ -1428,15 +1430,15 @@
     if (resourcePopupWidth < 120.0) {
         resourcePopupWidth = 120.0;
     }
-    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 186.0, 170.0, 22.0)];
-    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 182.0, resourcePopupWidth, 28.0)];
-    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 216.0, rowWidth, 22.0)];
-    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 246.0, 170.0, 22.0)];
-    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 242.0, resourcePopupWidth, 28.0)];
-    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 276.0, rowWidth, 22.0)];
-    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 306.0, 170.0, 22.0)];
-    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 302.0, resourcePopupWidth, 28.0)];
-    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 184.0, MAX(160.0, rowWidth - 390.0), 54.0)];
+    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 214.0, 170.0, 22.0)];
+    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 210.0, resourcePopupWidth, 28.0)];
+    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 244.0, rowWidth, 22.0)];
+    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 274.0, 170.0, 22.0)];
+    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 270.0, resourcePopupWidth, 28.0)];
+    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 304.0, rowWidth, 22.0)];
+    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 334.0, 170.0, 22.0)];
+    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 330.0, resourcePopupWidth, 28.0)];
+    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 212.0, MAX(160.0, rowWidth - 390.0), 54.0)];
     settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
@@ -1591,6 +1593,7 @@
     if ([notification object] == self.mediaPlaybackWindow) {
         [self cancelMediaPlaybackPreparation];
         [self resetMediaPlaybackState];
+        self.mediaPlaybackSourceMessageItem = nil;
         [self.mediaPlaybackWindow setDelegate:nil];
         self.mediaPlaybackContainerView = nil;
         self.mediaPlaybackTitleField = nil;

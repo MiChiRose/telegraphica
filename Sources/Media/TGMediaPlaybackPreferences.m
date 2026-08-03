@@ -3,6 +3,7 @@
 
 static NSString * const TGMediaPlaybackAudioRateDefaultsKey = @"TelegraphicaAudioPlaybackRate";
 static NSString * const TGMediaPlaybackVideoRateDefaultsKey = @"TelegraphicaVideoPlaybackRate";
+static NSString * const TGMediaPlaybackSequentialAudioDefaultsKey = @"TelegraphicaSequentialAudioPlaybackEnabled";
 
 NSArray *TGMediaPlaybackSupportedRates(void) {
     return [NSArray arrayWithObjects:
@@ -34,4 +35,13 @@ void TGMediaPlaybackSetPreferredRate(BOOL audioOnly, double rate) {
     NSString *key = audioOnly ? TGMediaPlaybackAudioRateDefaultsKey : TGMediaPlaybackVideoRateDefaultsKey;
     [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithDouble:TGMediaPlaybackNormalizedRate(rate)]
                                               forKey:key];
+}
+
+BOOL TGMediaPlaybackSequentialAudioEnabled(void) {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:TGMediaPlaybackSequentialAudioDefaultsKey];
+}
+
+void TGMediaPlaybackSetSequentialAudioEnabled(BOOL enabled) {
+    [[NSUserDefaults standardUserDefaults] setBool:enabled
+                                           forKey:TGMediaPlaybackSequentialAudioDefaultsKey];
 }
