@@ -110,10 +110,10 @@ NSButton *TGStickerPickerButtonWithFrame(NSRect frame, NSDictionary *item, NSInt
     NSString *localPath = loading ? nil : TGMediaItemLocalPath(item);
     NSImage *image = nil;
     if ([localPath length] > 0) {
-        image = TGImageWithCorrectOrientationFromFile(localPath);
-        if (!image) {
-            image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
-        }
+        // Drawing/rebuilding the picker must never decode a sticker from disk.
+        // The owning controller schedules a bounded background prefetch and
+        // asks this helper to rebuild/update the button after the cache fills.
+        image = TGMediaCachedThumbnailFromFile(localPath, 192);
     }
     if (!image) {
         NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(item);

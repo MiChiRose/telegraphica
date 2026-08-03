@@ -53,6 +53,9 @@ The script runs:
   source-version cache invalidation, main-thread delivery of asynchronous
   decode results, bounded message-thumbnail prefetch deduplication and cache
   reset invalidation.
+- a static sticker-thumbnail pipeline check ensuring that picker layout only
+  reads the bounded cache and that grid/rail jobs are cancellable and reject
+  stale generations.
 - a custom-emoji fixture probe covering identifier collection, TDLib sticker
   response parsing, completed-file gating, and fail-closed malformed data.
 - an advanced chat-folder fixture probe covering multiple invite-link parsing,
