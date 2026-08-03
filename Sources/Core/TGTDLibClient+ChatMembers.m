@@ -1,4 +1,5 @@
 #import "TGTDLibClient+ChatMembers.h"
+#import "TGTDLibClient+SecretChats.h"
 
 @interface TGTDLibClient (ChatMembersPrivate)
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request
@@ -199,6 +200,18 @@ static NSDictionary *TGMemberSenderObject(NSNumber *userID) {
         }
         [summary setObject:[typeName isEqualToString:@"chatTypeSecret"] ? @"secret" : @"private"
                     forKey:@"kind"];
+        if ([typeName isEqualToString:@"chatTypeSecret"]) {
+            NSNumber *secretChatID = TGMemberSafeID([type objectForKey:@"secret_chat_id"]);
+            if (secretChatID) {
+                [summary setObject:secretChatID forKey:@"secret_chat_id"];
+            }
+            NSDictionary *secretSummary = [self secretChatSummaryForChatID:safeChatID
+                                                                    timeout:MIN(timeout, 3.0)
+                                                                      error:NULL];
+            if (secretSummary) {
+                [summary setObject:secretSummary forKey:@"secret_chat"];
+            }
+        }
         return summary;
     }
 

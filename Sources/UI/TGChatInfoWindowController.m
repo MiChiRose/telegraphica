@@ -1,7 +1,11 @@
 #import "TGChatInfoWindowController.h"
 
 #import "../Core/TGTDLibClient+ChatMembers.h"
+#import "../Core/TGTDLibClient+ChatHistory.h"
 #import "../Core/TGTDLibClient+Privacy.h"
+#import "../Core/TGTDLibClient+SecretChats.h"
+#import "../Core/TGSecretChatKey.h"
+#import "../Core/TGTDLibCapabilities.h"
 #import "TGChatAdministrationWindowController.h"
 #import "TGBotInteractionWindowController.h"
 #import "TGLocalization.h"
@@ -18,6 +22,8 @@
 @property (nonatomic, retain) NSTextField *descriptionField;
 @property (nonatomic, retain) NSTextField *summaryField;
 @property (nonatomic, retain) NSTextField *statusField;
+@property (nonatomic, retain) NSTextField *membersLabel;
+@property (nonatomic, retain) NSScrollView *memberScrollView;
 @property (nonatomic, retain) NSTableView *memberTableView;
 @property (nonatomic, retain) NSPopUpButton *contactPopUpButton;
 @property (nonatomic, retain) NSPopUpButton *rolePopUpButton;
@@ -31,6 +37,11 @@
 @property (nonatomic, retain) NSPopUpButton *autoDeletePopUpButton;
 @property (nonatomic, retain) NSButton *applyAutoDeleteButton;
 @property (nonatomic, retain) NSProgressIndicator *spinner;
+@property (nonatomic, retain) NSImageView *secretKeyImageView;
+@property (nonatomic, retain) NSTextField *secretStateField;
+@property (nonatomic, retain) NSTextField *secretFingerprintField;
+@property (nonatomic, retain) NSButton *closeSecretChatButton;
+@property (nonatomic, retain) NSButton *deleteSecretHistoryButton;
 @property (nonatomic, copy) NSDictionary *chatSummary;
 @property (nonatomic, copy) NSArray *members;
 @property (nonatomic, copy) NSArray *contacts;
@@ -38,6 +49,34 @@
 @property (nonatomic, assign) NSUInteger requestGeneration;
 - (void)runMemberMutationForUserID:(NSNumber *)userID role:(NSString *)role;
 @end
+
+static NSColor *TGSecretChatKeyColor(NSUInteger index) {
+    switch (index) {
+        case 1: return [NSColor colorWithCalibratedRed:(213.0 / 255.0) green:(230.0 / 255.0) blue:(243.0 / 255.0) alpha:1.0];
+        case 2: return [NSColor colorWithCalibratedRed:(45.0 / 255.0) green:(87.0 / 255.0) blue:(117.0 / 255.0) alpha:1.0];
+        case 3: return [NSColor colorWithCalibratedRed:(47.0 / 255.0) green:(153.0 / 255.0) blue:(201.0 / 255.0) alpha:1.0];
+        default: return [NSColor whiteColor];
+    }
+}
+
+static NSImage *TGSecretChatKeyImage(NSData *keyHashData) {
+    NSArray *indexes = [TGSecretChatKey colorIndexesForKeyHashData:keyHashData];
+    if ([indexes count] != 144) {
+        return nil;
+    }
+    CGFloat pixelSize = 10.0;
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(120.0, 120.0)] autorelease];
+    [image lockFocus];
+    NSUInteger index = 0;
+    for (index = 0; index < [indexes count]; index++) {
+        NSUInteger row = index / 12;
+        NSUInteger column = index % 12;
+        [TGSecretChatKeyColor([[indexes objectAtIndex:index] unsignedIntegerValue]) set];
+        NSRectFill(NSMakeRect(column * pixelSize, (11 - row) * pixelSize, pixelSize, pixelSize));
+    }
+    [image unlockFocus];
+    return image;
+}
 
 @implementation TGChatInfoWindowController
 
@@ -48,6 +87,8 @@
 @synthesize descriptionField = _descriptionField;
 @synthesize summaryField = _summaryField;
 @synthesize statusField = _statusField;
+@synthesize membersLabel = _membersLabel;
+@synthesize memberScrollView = _memberScrollView;
 @synthesize memberTableView = _memberTableView;
 @synthesize contactPopUpButton = _contactPopUpButton;
 @synthesize rolePopUpButton = _rolePopUpButton;
@@ -61,6 +102,11 @@
 @synthesize autoDeletePopUpButton = _autoDeletePopUpButton;
 @synthesize applyAutoDeleteButton = _applyAutoDeleteButton;
 @synthesize spinner = _spinner;
+@synthesize secretKeyImageView = _secretKeyImageView;
+@synthesize secretStateField = _secretStateField;
+@synthesize secretFingerprintField = _secretFingerprintField;
+@synthesize closeSecretChatButton = _closeSecretChatButton;
+@synthesize deleteSecretHistoryButton = _deleteSecretHistoryButton;
 @synthesize chatSummary = _chatSummary;
 @synthesize members = _members;
 @synthesize contacts = _contacts;
@@ -98,6 +144,8 @@
     [_descriptionField release];
     [_summaryField release];
     [_statusField release];
+    [_membersLabel release];
+    [_memberScrollView release];
     [_memberTableView release];
     [_contactPopUpButton release];
     [_rolePopUpButton release];
@@ -113,6 +161,11 @@
     [_autoDeletePopUpButton release];
     [_applyAutoDeleteButton release];
     [_spinner release];
+    [_secretKeyImageView release];
+    [_secretStateField release];
+    [_secretFingerprintField release];
+    [_closeSecretChatButton release];
+    [_deleteSecretHistoryButton release];
     [_chatSummary release];
     [_members release];
     [_contacts release];
@@ -191,12 +244,12 @@
     [membersCard setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [root addSubview:membersCard];
 
-    NSTextField *membersLabel = [self labelWithFrame:NSMakeRect(38, 362, 300, 18)
-                                                font:[NSFont boldSystemFontOfSize:12.0]
-                                               color:TGClassicCardInkColor()];
-    [membersLabel setStringValue:TGLoc(@"chat.info.members")];
-    [membersLabel setAutoresizingMask:NSViewMinYMargin];
-    [root addSubview:membersLabel];
+    self.membersLabel = [self labelWithFrame:NSMakeRect(38, 362, 300, 18)
+                                         font:[NSFont boldSystemFontOfSize:12.0]
+                                        color:TGClassicCardInkColor()];
+    [self.membersLabel setStringValue:TGLoc(@"chat.info.members")];
+    [self.membersLabel setAutoresizingMask:NSViewMinYMargin];
+    [root addSubview:self.membersLabel];
 
     NSTextField *autoDeleteLabel = [self labelWithFrame:NSMakeRect(268, 362, 104, 18)
                                                    font:[NSFont systemFontOfSize:11.0]
@@ -224,12 +277,12 @@
     [self.applyAutoDeleteButton setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
     [root addSubview:self.applyAutoDeleteButton];
 
-    NSScrollView *scrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(34, 156, 652, 198)] autorelease];
-    [scrollView setHasVerticalScroller:YES];
-    [scrollView setBorderType:NSNoBorder];
-    [scrollView setDrawsBackground:NO];
-    [scrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    self.memberTableView = [[[NSTableView alloc] initWithFrame:[[scrollView contentView] bounds]] autorelease];
+    self.memberScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(34, 156, 652, 198)] autorelease];
+    [self.memberScrollView setHasVerticalScroller:YES];
+    [self.memberScrollView setBorderType:NSNoBorder];
+    [self.memberScrollView setDrawsBackground:NO];
+    [self.memberScrollView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    self.memberTableView = [[[NSTableView alloc] initWithFrame:[[self.memberScrollView contentView] bounds]] autorelease];
     NSTableColumn *column = [[[NSTableColumn alloc] initWithIdentifier:@"member"] autorelease];
     [column setWidth:640.0];
     [column setResizingMask:NSTableColumnAutoresizingMask];
@@ -239,8 +292,45 @@
     [self.memberTableView setAllowsEmptySelection:YES];
     [self.memberTableView setDelegate:self];
     [self.memberTableView setDataSource:self];
-    [scrollView setDocumentView:self.memberTableView];
-    [root addSubview:scrollView];
+    [self.memberScrollView setDocumentView:self.memberTableView];
+    [root addSubview:self.memberScrollView];
+
+    self.secretKeyImageView = [[[NSImageView alloc] initWithFrame:NSMakeRect(42, 190, 128, 128)] autorelease];
+    [self.secretKeyImageView setImageFrameStyle:NSImageFrameNone];
+    [self.secretKeyImageView setImageScaling:NSImageScaleProportionallyUpOrDown];
+    [self.secretKeyImageView setHidden:YES];
+    [root addSubview:self.secretKeyImageView];
+
+    self.secretStateField = [self labelWithFrame:NSMakeRect(190, 288, 474, 22)
+                                             font:[NSFont boldSystemFontOfSize:13.0]
+                                            color:TGClassicCardInkColor()];
+    [self.secretStateField setHidden:YES];
+    [root addSubview:self.secretStateField];
+
+    self.secretFingerprintField = [self labelWithFrame:NSMakeRect(190, 218, 474, 62)
+                                                   font:[NSFont userFixedPitchFontOfSize:11.0]
+                                                  color:TGClassicCardMutedInkColor()];
+    [self.secretFingerprintField setSelectable:YES];
+    [[self.secretFingerprintField cell] setWraps:YES];
+    [[self.secretFingerprintField cell] setLineBreakMode:NSLineBreakByWordWrapping];
+    [self.secretFingerprintField setHidden:YES];
+    [root addSubview:self.secretFingerprintField];
+
+    self.closeSecretChatButton = [[[NSButton alloc] initWithFrame:NSMakeRect(190, 170, 196, 30)] autorelease];
+    [self.closeSecretChatButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"secretChat.close")] autorelease]];
+    [self.closeSecretChatButton setTitle:TGLoc(@"secretChat.close")];
+    [self.closeSecretChatButton setTarget:self];
+    [self.closeSecretChatButton setAction:@selector(closeSecretChatPressed:)];
+    [self.closeSecretChatButton setHidden:YES];
+    [root addSubview:self.closeSecretChatButton];
+
+    self.deleteSecretHistoryButton = [[[NSButton alloc] initWithFrame:NSMakeRect(398, 170, 266, 30)] autorelease];
+    [self.deleteSecretHistoryButton setCell:[[[TGSecondaryTextButtonCell alloc] initTextCell:TGLoc(@"secretChat.deleteHistory")] autorelease]];
+    [self.deleteSecretHistoryButton setTitle:TGLoc(@"secretChat.deleteHistory")];
+    [self.deleteSecretHistoryButton setTarget:self];
+    [self.deleteSecretHistoryButton setAction:@selector(deleteSecretHistoryPressed:)];
+    [self.deleteSecretHistoryButton setHidden:YES];
+    [root addSubview:self.deleteSecretHistoryButton];
 
     self.contactPopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(34, 112, 248, 28) pullsDown:NO] autorelease];
     [self.contactPopUpButton addItemWithTitle:TGLoc(@"chat.info.selectContact")];
@@ -338,6 +428,10 @@
                   [[self.chatSummary objectForKey:@"kind"] isEqualToString:@"supergroup"]);
     BOOL bot = (!group && [[self.chatSummary objectForKey:@"kind"] isEqualToString:@"private"] &&
                 [[[self.chatSummary objectForKey:@"profile"] objectForKey:@"is_bot"] boolValue]);
+    BOOL secret = [[self.chatSummary objectForKey:@"kind"] isEqualToString:@"secret"];
+    NSString *secretState = [[[self.chatSummary objectForKey:@"secret_chat"] objectForKey:@"state"] isKindOfClass:[NSString class]]
+        ? [[self.chatSummary objectForKey:@"secret_chat"] objectForKey:@"state"] : @"";
+    BOOL secretClosed = [secretState isEqualToString:@"secretChatStateClosed"];
     BOOL canInvite = [[self.chatSummary objectForKey:@"can_invite_members"] boolValue];
     BOOL canManage = [[self.chatSummary objectForKey:@"can_manage_members"] boolValue];
     BOOL selected = ([self selectedMember] != nil);
@@ -347,12 +441,20 @@
     [self.rolePopUpButton setEnabled:(!self.loading && group && canManage && selected)];
     [self.applyRoleButton setEnabled:(!self.loading && group && canManage && selected &&
                                       ![[[self selectedMember] objectForKey:@"role"] isEqualToString:@"creator"])];
-    [self.autoDeletePopUpButton setEnabled:!self.loading];
-    [self.applyAutoDeleteButton setEnabled:!self.loading];
+    TGTDLibCapabilityState secretTTLState = [[self.client capabilities] supportStateForCapability:TGTDLibCapabilitySecretChatTTL];
+    BOOL secretTTLUnavailable = (secret && (secretTTLState == TGTDLibCapabilityStateUnsupported ||
+                                             secretTTLState == TGTDLibCapabilityStateForbidden));
+    [self.autoDeletePopUpButton setEnabled:(!self.loading && !secretTTLUnavailable && !secretClosed)];
+    [self.applyAutoDeleteButton setEnabled:(!self.loading && !secretTTLUnavailable && !secretClosed)];
+    NSString *ttlReason = secretTTLUnavailable ? [[self.client capabilities] reasonForCapability:TGTDLibCapabilitySecretChatTTL] : nil;
+    [self.autoDeletePopUpButton setToolTip:ttlReason];
+    [self.applyAutoDeleteButton setToolTip:ttlReason];
     [self.administrationButton setEnabled:(!self.loading && group && (canInvite || canManage))];
-    [self.administrationButton setHidden:bot];
+    [self.administrationButton setHidden:(bot || secret)];
     [self.botButton setHidden:!bot];
     [self.botButton setEnabled:(!self.loading && bot)];
+    [self.closeSecretChatButton setEnabled:(!self.loading && secret && !secretClosed)];
+    [self.deleteSecretHistoryButton setEnabled:(!self.loading && secret)];
 }
 
 - (void)setLoading:(BOOL)loading status:(NSString *)status {
@@ -373,6 +475,7 @@
         [[self window] setTitle:title];
     }
     NSString *kind = [self.chatSummary objectForKey:@"kind"];
+    BOOL secret = [kind isEqualToString:@"secret"];
     NSNumber *memberCount = [self.chatSummary objectForKey:@"member_count"];
     NSString *safeKind = [kind length] > 0 ? kind : @"unknown";
     NSString *kindText = TGLoc([@"chat.kind." stringByAppendingString:safeKind]);
@@ -385,6 +488,48 @@
         description = [profile objectForKey:@"bio"];
     }
     [self.descriptionField setStringValue:[description length] > 0 ? description : TGLoc(@"chat.info.noDescription")];
+    [self.membersLabel setStringValue:secret ? TGLoc(@"secretChat.encryptionKey") : TGLoc(@"chat.info.members")];
+    [self.memberScrollView setHidden:secret];
+    [self.contactPopUpButton setHidden:secret];
+    [self.addButton setHidden:secret];
+    [self.rolePopUpButton setHidden:secret];
+    [self.applyRoleButton setHidden:secret];
+    [self.secretKeyImageView setHidden:!secret];
+    [self.secretStateField setHidden:!secret];
+    [self.secretFingerprintField setHidden:!secret];
+    [self.closeSecretChatButton setHidden:!secret];
+    [self.deleteSecretHistoryButton setHidden:!secret];
+
+    [self.autoDeletePopUpButton removeAllItems];
+    NSArray *seconds = secret
+        ? [NSArray arrayWithObjects:@0, @1, @5, @10, @30, @60, @300, @3600, @86400, nil]
+        : [NSArray arrayWithObjects:@0, @86400, @604800, @2678400, @7776000, @31536000, nil];
+    NSArray *timeKeys = secret
+        ? [NSArray arrayWithObjects:@"off", @"second", @"fiveSeconds", @"tenSeconds", @"thirtySeconds", @"minute", @"fiveMinutes", @"hour", @"day", nil]
+        : [NSArray arrayWithObjects:@"off", @"day", @"week", @"month", @"threeMonths", @"year", nil];
+    NSUInteger timeIndex = 0;
+    for (timeIndex = 0; timeIndex < [seconds count]; timeIndex++) {
+        NSString *key = [@"privacy.time." stringByAppendingString:[timeKeys objectAtIndex:timeIndex]];
+        [self.autoDeletePopUpButton addItemWithTitle:TGLoc(key)];
+        [[self.autoDeletePopUpButton lastItem] setRepresentedObject:[seconds objectAtIndex:timeIndex]];
+    }
+    if (secret) {
+        NSDictionary *secretSummary = [[self.chatSummary objectForKey:@"secret_chat"] isKindOfClass:[NSDictionary class]]
+            ? [self.chatSummary objectForKey:@"secret_chat"] : [NSDictionary dictionary];
+        NSString *state = [secretSummary objectForKey:@"state"];
+        NSString *stateKey = [@"secretChat.state." stringByAppendingString:([state length] > 0 ? state : @"unknown")];
+        NSString *direction = [[secretSummary objectForKey:@"is_outbound"] boolValue]
+            ? TGLoc(@"secretChat.outbound") : TGLoc(@"secretChat.inbound");
+        [self.secretStateField setStringValue:[NSString stringWithFormat:TGLoc(@"secretChat.stateSummary"),
+                                                TGLoc(stateKey),
+                                                direction,
+                                                (long)[[secretSummary objectForKey:@"layer"] integerValue]]];
+        NSString *fingerprint = [secretSummary objectForKey:@"key_fingerprint"];
+        [self.secretFingerprintField setStringValue:[fingerprint length] > 0
+            ? [NSString stringWithFormat:TGLoc(@"secretChat.fingerprint"), fingerprint]
+            : TGLoc(@"secretChat.keyUnavailable")];
+        [self.secretKeyImageView setImage:TGSecretChatKeyImage([secretSummary objectForKey:@"key_hash_data"])];
+    }
     NSInteger autoDeleteTime = [[self.chatSummary objectForKey:@"message_auto_delete_time"] integerValue];
     NSArray *autoDeleteItems = [self.autoDeletePopUpButton itemArray];
     NSInteger selectedAutoDeleteIndex = 0;
@@ -542,6 +687,78 @@
             if (success) {
                 [self reloadChatInfo];
             }
+        });
+        [pool drain];
+    });
+}
+
+- (void)closeSecretChatPressed:(id)sender {
+    (void)sender;
+    if (self.loading || ![[self.chatSummary objectForKey:@"kind"] isEqualToString:@"secret"]) {
+        return;
+    }
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"secretChat.closeConfirmTitle")];
+    [alert setInformativeText:TGLoc(@"secretChat.closeConfirmBody")];
+    [alert addButtonWithTitle:TGLoc(@"secretChat.close")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+    [self setLoading:YES status:TGLoc(@"secretChat.closing")];
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *chatID = [self.chatID retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        BOOL success = [client closeSecretChatForChatID:chatID timeout:10.0 error:&error];
+        NSString *detail = [[error localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setLoading:NO status:success ? TGLoc(@"secretChat.closed") : (detail ? detail : TGLoc(@"secretChat.failed"))];
+            if (success) {
+                [self reloadChatInfo];
+            }
+            [detail release];
+            [chatID release];
+            [client release];
+        });
+        [pool drain];
+    });
+}
+
+- (void)deleteSecretHistoryPressed:(id)sender {
+    (void)sender;
+    if (self.loading || ![[self.chatSummary objectForKey:@"kind"] isEqualToString:@"secret"]) {
+        return;
+    }
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:TGLoc(@"secretChat.deleteConfirmTitle")];
+    [alert setInformativeText:TGLoc(@"secretChat.deleteConfirmBody")];
+    [alert addButtonWithTitle:TGLoc(@"secretChat.deleteHistory")];
+    [alert addButtonWithTitle:TGLoc(@"cancel")];
+    if ([alert runModal] != NSAlertFirstButtonReturn) {
+        return;
+    }
+    [self setLoading:YES status:TGLoc(@"secretChat.deleting")];
+    TGTDLibClient *client = [self.client retain];
+    NSNumber *chatID = [self.chatID retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *error = nil;
+        BOOL success = [client deleteChatHistoryForChatID:chatID
+                                       removeFromChatList:YES
+                                                    revoke:YES
+                                                   timeout:10.0
+                                                     error:&error];
+        NSString *detail = [[error localizedDescription] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setLoading:NO status:success ? TGLoc(@"secretChat.deleted") : (detail ? detail : TGLoc(@"secretChat.failed"))];
+            if (success) {
+                [[self window] performClose:self];
+            }
+            [detail release];
+            [chatID release];
+            [client release];
         });
         [pool drain];
     });

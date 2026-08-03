@@ -168,6 +168,18 @@ static NSString *TGActiveSessionIconName(NSDictionary *session) {
         NSBeep();
         return;
     }
+    if ([self.selectedChatTypeSummary isEqualToString:@"Secret"]) {
+        [[self.chatInfoWindowController window] close];
+        self.chatInfoWindowController = [[[TGChatInfoWindowController alloc]
+                                          initWithClient:self.client
+                                          chatID:self.selectedChatID
+                                          title:self.selectedChatTitle] autorelease];
+        [[self.chatInfoWindowController window] center];
+        [self.chatInfoWindowController showWindow:self];
+        [[self.chatInfoWindowController window] makeKeyAndOrderFront:self];
+        [self.chatInfoWindowController reloadChatInfo];
+        return;
+    }
     [self openMediaCenter:sender];
 }
 

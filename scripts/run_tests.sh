@@ -114,6 +114,16 @@ echo "== Formatted text codec =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/formatted_text_codec_probe"
 
+echo "== Secret chat key visualization =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/secret_chat_key_probe.m \
+    Sources/Core/TGSecretChatKey.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/secret_chat_key_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/secret_chat_key_probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \
