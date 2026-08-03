@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TDLIB_VERSION="${TDLIB_VERSION:-v1.8.0}"
 TDLIB_LABEL="${TDLIB_LABEL:-$TDLIB_VERSION}"
+TDLIB_RELEASE_STATUS="${TDLIB_RELEASE_STATUS:-experimental}"
 COMPILER_CC="${CC:-}"
 COMPILER_CXX="${CXX:-}"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
@@ -267,6 +268,32 @@ tdlib_mtproto_layer() {
             }
         }
     ' "$source_root/td/telegram/Version.h" 2>/dev/null || true
+}
+
+tdlib_source_tag() {
+    local source_root="$1"
+    local tag=""
+    if command -v git >/dev/null 2>&1 && [ -d "$source_root/.git" ]; then
+        tag="$(git -C "$source_root" describe --tags --exact-match 2>/dev/null || true)"
+    fi
+    if [ -n "$tag" ]; then
+        echo "$tag"
+    else
+        echo "$TDLIB_VERSION"
+    fi
+}
+
+tdlib_source_commit() {
+    local source_root="$1"
+    local commit=""
+    if command -v git >/dev/null 2>&1 && [ -d "$source_root/.git" ]; then
+        commit="$(git -C "$source_root" rev-parse HEAD 2>/dev/null || true)"
+    fi
+    if [ -n "$commit" ]; then
+        echo "$commit"
+    else
+        echo "unknown"
+    fi
 }
 
 check_prefix_file() {
@@ -1286,6 +1313,8 @@ fi
 
 TDLIB_PROJECT_VERSION="$(tdlib_project_version "$SOURCE_ROOT")"
 TDLIB_MTPROTO_LAYER="$(tdlib_mtproto_layer "$SOURCE_ROOT")"
+TDLIB_SOURCE_TAG="$(tdlib_source_tag "$SOURCE_ROOT")"
+TDLIB_SOURCE_COMMIT="$(tdlib_source_commit "$SOURCE_ROOT")"
 if [ -n "$TDLIB_PROJECT_VERSION" ]; then
     echo "Detected TDLib project version: $TDLIB_PROJECT_VERSION"
 fi
@@ -1422,9 +1451,28 @@ ditto "$TDJSON_BUILT" "$STAGE_DIR/Frameworks/libtdjson.dylib"
 
 "$SCRIPT_DIR/check_tdjson_legacy.sh" "$STAGE_DIR/Frameworks/libtdjson.dylib" | tee "$BUILD_DIR/validation.txt"
 
+TDLIB_LANE="mavericks-or-newer"
+if [ "$DEPLOYMENT_TARGET" = "10.8" ]; then
+    TDLIB_LANE="mountain-lion-fallback"
+fi
+"$SCRIPT_DIR/write_tdlib_build_metadata.sh" \
+    "$STAGE_DIR/Frameworks/libtdjson.dylib" \
+    "$STAGE_DIR/TDLibBuildMetadata.tsv" \
+    "$TDLIB_LANE" \
+    "${TDLIB_PROJECT_VERSION:-unknown}" \
+    "${TDLIB_SOURCE_TAG:-unknown}" \
+    "${TDLIB_SOURCE_COMMIT:-unknown}" \
+    "${TDLIB_MTPROTO_LAYER:-unknown}" \
+    "$TDLIB_RELEASE_STATUS"
+"$SCRIPT_DIR/check_tdlib_build_metadata.sh" \
+    "$STAGE_DIR/Frameworks/libtdjson.dylib" \
+    "$STAGE_DIR/TDLibBuildMetadata.tsv"
+
 echo
 echo "Created staged TDLib dylib:"
 echo "$STAGE_DIR/Frameworks/libtdjson.dylib"
+echo "$STAGE_DIR/TDLibBuildMetadata.tsv"
+echo "$STAGE_DIR/TDLibBuildMetadata.exports.txt"
 echo
 echo "Bundle it into Telegraphica with:"
 echo "TELEGRAPHICA_TDJSON_PATH=\"$STAGE_DIR/Frameworks/libtdjson.dylib\" ./build_legacy.sh"

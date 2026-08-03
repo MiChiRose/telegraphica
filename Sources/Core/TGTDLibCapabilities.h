@@ -41,6 +41,7 @@ extern NSString * const TGTDLibCapabilityMiniApps;
     NSString *_loadedLibraryPath;
     NSString *_tdlibVersion;
     NSString *_tdlibCommit;
+    NSString *_buildStatus;
     NSNumber *_mtprotoLayer;
     TGTDLibLane _lane;
 }
@@ -53,8 +54,12 @@ extern NSString * const TGTDLibCapabilityMiniApps;
 - (NSString *)loadedLibraryPath;
 - (NSString *)tdlibVersion;
 - (NSString *)tdlibCommit;
+- (NSString *)buildStatus;
 - (NSNumber *)mtprotoLayer;
-- (void)recordTDLibVersion:(NSString *)version commit:(NSString *)commit mtprotoLayer:(NSNumber *)mtprotoLayer;
+- (void)recordTDLibVersion:(NSString *)version
+                    commit:(NSString *)commit
+              mtprotoLayer:(NSNumber *)mtprotoLayer
+               buildStatus:(NSString *)buildStatus;
 
 - (void)recordProbeResponse:(NSDictionary *)response
                       error:(NSError *)error

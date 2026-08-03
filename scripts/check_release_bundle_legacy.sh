@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_PATH="${1:-}"
 DEPLOYMENT_TARGET="${2:-${MACOSX_DEPLOYMENT_TARGET:-10.8}}"
 ARCH="${TELEGRAPHICA_ARCH:-x86_64}"
@@ -194,6 +195,17 @@ EOF
     printf "%s\t%s\t%s\t%s\t%s\n" \
         "$checksum" "$architectures" "$minimum_os" "$install_name" "$relative_path" >> "$MANIFEST_PATH"
 done < "$MACHO_LIST"
+
+if [ -f "$APP_PATH/Contents/Frameworks/libtdjson.dylib" ]; then
+    "$SCRIPT_DIR/check_tdlib_build_metadata.sh" \
+        "$APP_PATH/Contents/Frameworks/libtdjson.dylib" \
+        "$APP_PATH/Contents/Resources/TelegraphicaTDLibMetadata.tsv"
+fi
+if [ -f "$APP_PATH/Contents/Frameworks/libtdjson-mountain-lion.dylib" ]; then
+    "$SCRIPT_DIR/check_tdlib_build_metadata.sh" \
+        "$APP_PATH/Contents/Frameworks/libtdjson-mountain-lion.dylib" \
+        "$APP_PATH/Contents/Resources/TelegraphicaTDLibMetadataMountainLion.tsv"
+fi
 
 echo "Legacy bundle audit passed for $(wc -l < "$MACHO_LIST" | tr -d ' ') Mach-O file(s)."
 echo "Binary manifest: $MANIFEST_PATH"

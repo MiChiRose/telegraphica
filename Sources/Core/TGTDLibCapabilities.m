@@ -108,6 +108,7 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
     [_loadedLibraryPath release];
     [_tdlibVersion release];
     [_tdlibCommit release];
+    [_buildStatus release];
     [_mtprotoLayer release];
     [super dealloc];
 }
@@ -167,9 +168,20 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
     return [value autorelease];
 }
 
-- (void)recordTDLibVersion:(NSString *)version commit:(NSString *)commit mtprotoLayer:(NSNumber *)mtprotoLayer {
+- (NSString *)buildStatus {
+    [_lock lock];
+    NSString *value = [_buildStatus copy];
+    [_lock unlock];
+    return [value autorelease];
+}
+
+- (void)recordTDLibVersion:(NSString *)version
+                    commit:(NSString *)commit
+              mtprotoLayer:(NSNumber *)mtprotoLayer
+               buildStatus:(NSString *)buildStatus {
     NSString *safeVersion = TGTDLibSafeCapabilityText(version);
     NSString *safeCommit = TGTDLibSafeCapabilityText(commit);
+    NSString *safeBuildStatus = TGTDLibSafeCapabilityText(buildStatus);
     NSNumber *safeLayer = [mtprotoLayer respondsToSelector:@selector(integerValue)] ? mtprotoLayer : nil;
 
     [_lock lock];
@@ -177,6 +189,8 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
     _tdlibVersion = [safeVersion length] > 0 ? [safeVersion copy] : nil;
     [_tdlibCommit release];
     _tdlibCommit = [safeCommit length] > 0 ? [safeCommit copy] : nil;
+    [_buildStatus release];
+    _buildStatus = [safeBuildStatus length] > 0 ? [safeBuildStatus copy] : nil;
     [_mtprotoLayer release];
     _mtprotoLayer = [safeLayer retain];
     [_lock unlock];
@@ -310,8 +324,9 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
             unresolved++;
         }
     }
-    return [NSString stringWithFormat:@"lane=%@; version=%@; commit=%@; layer=%@; supported=%lu; unsupported=%lu; unresolved=%lu",
+    return [NSString stringWithFormat:@"lane=%@; build=%@; version=%@; commit=%@; layer=%@; supported=%lu; unsupported=%lu; unresolved=%lu",
             [self laneName],
+            [self buildStatus] ? [self buildStatus] : @"unknown",
             [self tdlibVersion] ? [self tdlibVersion] : @"unknown",
             [self tdlibCommit] ? [self tdlibCommit] : @"unknown",
             [self mtprotoLayer] ? [[self mtprotoLayer] stringValue] : @"unknown",

@@ -28,10 +28,14 @@ static void TGTestLaneAndMetadata(void) {
         initWithLoadedLibraryPath:@"/Applications/Telegraphica.app/Contents/Frameworks/libtdjson.dylib"] autorelease];
     TGCapabilityAssert([mainLane lane] == TGTDLibLaneMavericksOrNewer,
                        @"ordinary tdjson dylib should select the Mavericks+ lane");
-    [mainLane recordTDLibVersion:@"1.8.65" commit:@"abc123" mtprotoLayer:[NSNumber numberWithInteger:201]];
+    [mainLane recordTDLibVersion:@"1.8.65"
+                         commit:@"abc123"
+                   mtprotoLayer:[NSNumber numberWithInteger:201]
+                    buildStatus:@"verified"];
     TGCapabilityAssert([[mainLane tdlibVersion] isEqualToString:@"1.8.65"], @"TDLib version should be cached");
     TGCapabilityAssert([[mainLane tdlibCommit] isEqualToString:@"abc123"], @"TDLib commit should be cached");
     TGCapabilityAssert([[mainLane mtprotoLayer] integerValue] == 201, @"MTProto layer should be cached");
+    TGCapabilityAssert([[mainLane buildStatus] isEqualToString:@"verified"], @"build status should be cached");
 }
 
 static void TGTestProbeClassification(void) {
