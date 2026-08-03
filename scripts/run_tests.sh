@@ -94,6 +94,16 @@ echo "== TDLib capability registry =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib_capabilities_probe"
 
+echo "== Authorization flow fixtures =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/authorization_flow_probe.m \
+    Sources/Core/TGAuthorizationFlow.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/authorization_flow_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/authorization_flow_probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \

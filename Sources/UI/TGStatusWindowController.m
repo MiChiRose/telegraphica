@@ -49,6 +49,7 @@
 #import "../Media/TGMediaItemSupport.h"
 #import "../Media/TGOpusVoiceTranscoder.h"
 #import "../Core/TGChatItem.h"
+#import "../Core/TGAuthorizationFlow.h"
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGMessagePollSupport.h"
 #import "../Core/TGOutgoingMessageTextChunker.h"
@@ -696,6 +697,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL authClientRecoveryInFlight;
 @property (nonatomic, assign) BOOL qrPhoneLoginRecoveryVisible;
 @property (nonatomic, assign) NSUInteger authClientRecoveryAttemptCount;
+@property (nonatomic, assign) BOOL authPasswordRecoveryMode;
+@property (nonatomic, retain) NSDate *authCodeResendAvailableAt;
 @property (nonatomic, assign) NSUInteger accountUnreadCount;
 @property (nonatomic, assign) BOOL hasAccountUnreadCount;
 @property (nonatomic, assign) BOOL backgroundChatRefreshInFlight;
@@ -1244,6 +1247,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize authClientRecoveryInFlight = _authClientRecoveryInFlight;
 @synthesize qrPhoneLoginRecoveryVisible = _qrPhoneLoginRecoveryVisible;
 @synthesize authClientRecoveryAttemptCount = _authClientRecoveryAttemptCount;
+@synthesize authPasswordRecoveryMode = _authPasswordRecoveryMode;
+@synthesize authCodeResendAvailableAt = _authCodeResendAvailableAt;
 @synthesize accountUnreadCount = _accountUnreadCount;
 @synthesize hasAccountUnreadCount = _hasAccountUnreadCount;
 @synthesize backgroundChatRefreshInFlight = _backgroundChatRefreshInFlight;
@@ -1708,25 +1713,22 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 - (void)refreshLoginLocalizedText {
     NSString *state = self.currentAuthState;
-    NSString *title = TGLoc(@"login.connecting.title");
-    NSString *hint = TGLoc(@"login.connecting.hint");
-    NSString *label = TGLoc(@"login.status");
+    NSDictionary *descriptor = [TGAuthorizationFlow descriptorForState:state];
+    NSString *title = TGLoc([descriptor objectForKey:TGAuthorizationFlowTitleLocalizationKey]);
+    NSString *hint = TGLoc([descriptor objectForKey:TGAuthorizationFlowHintLocalizationKey]);
+    NSString *label = TGLoc([descriptor objectForKey:TGAuthorizationFlowLabelLocalizationKey]);
 
-    if ([state isEqualToString:@"waitPhoneNumber"]) {
-        title = TGLoc(@"login.title");
-        hint = TGLoc(@"login.phone.hint");
-        label = TGLoc(@"login.phone.label");
-    } else if ([state isEqualToString:@"waitCode"]) {
-        title = TGLoc(@"login.code.title");
-        hint = TGLoc(@"login.code.hint");
-        label = TGLoc(@"login.code.label");
-    } else if ([state isEqualToString:@"waitPassword"]) {
-        title = TGLoc(@"login.password.title");
-        hint = TGLoc(@"login.password.hint");
-        label = TGLoc(@"login.password.label");
-    } else if ([state isEqualToString:@"waitApiCredentials"]) {
+    if ([state isEqualToString:@"waitApiCredentials"]) {
         title = TGLoc(@"login.config.title");
         hint = TGLoc(@"login.config.missing");
+    } else if (![TGAuthorizationFlow isInputState:state]) {
+        title = TGLoc(@"login.connecting.title");
+        hint = TGLoc(@"login.connecting.hint");
+        label = TGLoc(@"login.status");
+    } else if (self.authPasswordRecoveryMode && [state isEqualToString:@"waitPassword"]) {
+        title = TGLoc(@"login.recovery.title");
+        hint = TGLoc(@"login.recovery.hint");
+        label = TGLoc(@"login.recovery.label");
     }
 
     [self.loginTitleField setStringValue:title];
@@ -1736,12 +1738,13 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [[self.authTextField cell] setPlaceholderString:@"+123456789"];
         [self applyComposerPlaceholderStyle:self.authTextField];
-    } else if ([state isEqualToString:@"waitCode"]) {
+    } else if ([TGAuthorizationFlow isInputState:state] && ![state isEqualToString:@"waitPassword"]) {
         [[self.authTextField cell] setPlaceholderString:label];
         [self applyComposerPlaceholderStyle:self.authTextField];
     } else if ([state isEqualToString:@"waitPassword"]) {
-        [[self.authSecureField cell] setPlaceholderString:label];
-        [self applyComposerPlaceholderStyle:self.authSecureField];
+        NSTextField *field = self.authPasswordRecoveryMode ? self.authTextField : (NSTextField *)self.authSecureField;
+        [[field cell] setPlaceholderString:label];
+        [self applyComposerPlaceholderStyle:field];
     }
 }
 
@@ -4726,6 +4729,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_authTextFieldBackgroundView release];
     [_authTextField release];
     [_authSecureField release];
+    [_authCodeResendAvailableAt release];
     [_authButton release];
     [_qrLoginButton release];
     [_qrLoginWindowController release];
