@@ -2149,6 +2149,34 @@ def check_tdlib_search_component_boundary(errors):
                           (search_rel, fragment))
 
 
+def check_tdlib_storage_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    storage_rel = os.path.join("Sources", "Core", "TGTDLibClient+Storage.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    storage_text = read_text(os.path.join(ROOT, storage_rel))
+    moved_selectors = [
+        "storageUsageSummaryWithTimeout:",
+        "clearDownloadedMediaCacheForFileTypes:",
+        "clearDownloadedMediaCacheWithTimeout:",
+    ]
+    for selector in moved_selectors:
+        if selector in main_text:
+            errors.append("%s: extracted storage selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if selector not in storage_text:
+            errors.append("%s: extracted storage selector is missing: %s" %
+                          (storage_rel, selector))
+    for fragment in [
+        '"getStorageStatisticsFast"',
+        '"optimizeStorage"',
+        "TGStorageCleanupNormalizedChatIDs",
+        'forKey:@"return_deleted_file_statistics"',
+    ]:
+        if fragment not in storage_text:
+            errors.append("%s: storage request contract is missing `%s`" %
+                          (storage_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -2184,6 +2212,7 @@ def main():
     check_poll_management_contract(errors)
     check_received_link_preview_contract(errors)
     check_tdlib_search_component_boundary(errors)
+    check_tdlib_storage_component_boundary(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

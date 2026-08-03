@@ -130,6 +130,18 @@ echo "== TDLib message search requests =="
     -o "$BUILD_DIR/tdlib-search-request-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib-search-request-probe"
 
+echo "== TDLib storage requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_storage_request_probe.m \
+    Sources/Core/TGTDLibClient+Storage.m \
+    Sources/Services/TGStorageCleanupPolicy.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-storage-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-storage-request-probe"
+
 echo "== Authorization flow fixtures =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
