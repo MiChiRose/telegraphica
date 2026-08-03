@@ -61,6 +61,7 @@ gzip -c "$UNSAFE_REPEATER_JSON" > "$UNSAFE_REPEATER_TGS"
     "$ROOT_DIR/Sources/Media/TGTGSFileValidator.m" \
     "$ROOT_DIR/Sources/Media/TGTGSAnimationView.m" \
     "$ROOT_DIR/Sources/Media/TGWebMAnimationView.mm" \
+    "$ROOT_DIR/Sources/Media/TGAnimatedImageLoader.m" \
     "$ROOT_DIR/Sources/Media/TGInlineMediaPlaybackCoordinator.m" \
     "$RLOTTIE_LIBRARY" \
     "$VPX_LIBRARY" \
@@ -69,6 +70,7 @@ gzip -c "$UNSAFE_REPEATER_JSON" > "$UNSAFE_REPEATER_TGS"
     -framework Cocoa \
     -framework AVFoundation \
     -framework CoreMedia \
+    -framework ImageIO \
     -o "$BUILD_DIR/tgs_view_probe"
 
 "$BUILD_DIR/tgs_view_probe" "$FIXTURE_TGS" "$FIXTURE_JSON" "$UNSAFE_REPEATER_TGS"
