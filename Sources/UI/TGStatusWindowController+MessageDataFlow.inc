@@ -1264,6 +1264,9 @@
                 self.profileLastName = ([lastName length] > 0) ? lastName : nil;
                 self.profileUsername = ([username length] > 0) ? username : nil;
                 self.profilePhoneNumber = ([phoneNumber length] > 0) ? phoneNumber : nil;
+                id avatarFileID = [profile objectForKey:@"avatar_file_id"];
+                self.profileAvatarFileID = [avatarFileID respondsToSelector:@selector(longLongValue)]
+                    ? [NSNumber numberWithLongLong:[avatarFileID longLongValue]] : nil;
                 self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
                 self.profileBio = ([bio length] > 0) ? bio : nil;
                 [self refreshProfileDisplay];
@@ -1820,6 +1823,19 @@
 
         if ([kind isEqualToString:@"file_update"] && [[summary objectForKey:@"completed"] boolValue]) {
             NSNumber *fileID = [summary objectForKey:@"file_id"];
+            BOOL completedProfileAvatar = ([self.profileAvatarLocalPath length] == 0 &&
+                                           [fileID respondsToSelector:@selector(longLongValue)] &&
+                                           [self.profileAvatarFileID respondsToSelector:@selector(longLongValue)] &&
+                                           [fileID longLongValue] == [self.profileAvatarFileID longLongValue]);
+            if (completedProfileAvatar) {
+                self.profileSummaryLoaded = NO;
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(reloadProfileSummaryIfReady)
+                                                           object:nil];
+                [self performSelector:@selector(reloadProfileSummaryIfReady)
+                           withObject:nil
+                           afterDelay:0.1];
+            }
             NSUInteger messageIndex = 0;
             for (messageIndex = 0; messageIndex < [self.messageItems count]; messageIndex++) {
                 TGMessageItem *messageItem = [self.messageItems objectAtIndex:messageIndex];
