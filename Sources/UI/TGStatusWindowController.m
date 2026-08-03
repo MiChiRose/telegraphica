@@ -43,6 +43,7 @@
 #import "TGVideoNoteRecorderWindowController.h"
 #import "../Media/TGInlineMediaPlaybackCoordinator.h"
 #import "../Media/TGAttachmentDescriptor.h"
+#import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGFileTransferState.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaFileActions.h"
@@ -1412,6 +1413,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                  selector:@selector(documentDownloadManagerDidChange:)
                                                      name:TGDownloadManagerDidChangeNotification
                                                    object:[TGDownloadManager sharedManager]];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(customEmojiImageDidLoad:)
+                                                     name:TGCustomEmojiImageDidLoadNotification
+                                                   object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
         [self buildContentView];
         [self refreshUpdateAvailabilityBadge];
@@ -4542,6 +4547,11 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 #include "TGStatusWindowController+ComposerMedia.inc"
 
 #include "TGStatusWindowController+SessionLogout.inc"
+
+- (void)customEmojiImageDidLoad:(NSNotification *)notification {
+    (void)notification;
+    [self.messageTableView setNeedsDisplay:YES];
+}
 
 - (void)dealloc {
     if ([[NSUserNotificationCenter defaultUserNotificationCenter] delegate] == self) {

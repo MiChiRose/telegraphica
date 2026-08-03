@@ -1,0 +1,32 @@
+{
+  "@type": "stickers",
+  "stickers": [
+    {
+      "@type": "sticker",
+      "custom_emoji_id": 101,
+      "format": { "@type": "stickerFormatWebp" },
+      "sticker": {
+        "@type": "file",
+        "id": 501,
+        "local": {
+          "@type": "localFile",
+          "path": "/tmp/fixture-custom-emoji.webp",
+          "is_downloading_completed": true
+        }
+      }
+    },
+    {
+      "@type": "sticker",
+      "format": { "@type": "stickerFormatTgs" },
+      "sticker": {
+        "@type": "file",
+        "id": 502,
+        "local": {
+          "@type": "localFile",
+          "path": "",
+          "is_downloading_completed": false
+        }
+      }
+    }
+  ]
+}

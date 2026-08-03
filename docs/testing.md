@@ -52,6 +52,8 @@ The script runs:
 - a compiled media image-loader probe covering display-size downsampling,
   source-version cache invalidation and main-thread delivery of asynchronous
   decode results.
+- a custom-emoji fixture probe covering identifier collection, TDLib sticker
+  response parsing, completed-file gating, and fail-closed malformed data.
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.

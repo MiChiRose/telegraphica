@@ -1,6 +1,7 @@
 #import "TGStorageUsageWindowController.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Services/TGLogger.h"
 #import "TGIconAssets.h"
@@ -583,6 +584,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         NSDictionary *summary = [[client clearDownloadedMediaCacheWithTimeout:15.0 error:&error] retain];
         NSString *errorText = [[error localizedDescription] copy];
         if (summary) {
+            TGCustomEmojiImageLoaderClearCache();
             TGMediaImageLoaderClearCache();
             [[TGLogger sharedLogger] log:@"Storage cache cleanup completed."];
         } else {

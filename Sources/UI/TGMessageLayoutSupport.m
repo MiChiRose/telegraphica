@@ -5,6 +5,8 @@
 #import "TGTheme.h"
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGMessagePollSupport.h"
+#import "../Core/TGCustomEmojiParser.h"
+#import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMediaItemSupport.h"
 #import "../Services/TGResourcePolicy.h"
@@ -304,6 +306,10 @@ static void TGReplaceUnrenderableEmojiInAttributedString(NSMutableAttributedStri
     while (location < [text length]) {
         NSRange sequenceRange = [text rangeOfComposedCharacterSequenceAtIndex:location];
         NSString *sequence = [text substringWithRange:sequenceRange];
+        if ([sequence length] == 1 && [sequence characterAtIndex:0] == NSAttachmentCharacter) {
+            location = NSMaxRange(sequenceRange);
+            continue;
+        }
         NSFont *font = [attributed attribute:NSFontAttributeName
                                      atIndex:sequenceRange.location
                               effectiveRange:NULL];
@@ -478,6 +484,30 @@ static NSFont *TGFontByAddingTrait(NSFont *font, NSFontTraitMask trait) {
     return converted ? converted : baseFont;
 }
 
+static NSAttributedString *TGCustomEmojiReplacementForEntity(NSDictionary *entity,
+                                                              NSFont *baseFont,
+                                                              NSDictionary *baseAttributes) {
+    CGFloat pointSize = MAX(12.0, [baseFont pointSize] + 2.0);
+    NSUInteger pixelSize = (NSUInteger)ceil(pointSize * 2.0);
+    NSImage *cachedImage = TGCustomEmojiCachedImageForEntity(entity, pixelSize);
+    if (cachedImage) {
+        NSImage *displayImage = [[cachedImage copy] autorelease];
+        [displayImage setSize:NSMakeSize(pointSize, pointSize)];
+        NSTextAttachmentCell *cell = [[[NSTextAttachmentCell alloc] initImageCell:displayImage] autorelease];
+        NSTextAttachment *attachment = [[[NSTextAttachment alloc] initWithFileWrapper:nil] autorelease];
+        [attachment setAttachmentCell:cell];
+        return [NSAttributedString attributedStringWithAttachment:attachment];
+    }
+
+    if ([[entity objectForKey:TGCustomEmojiLocalPathKey] length] > 0) {
+        TGCustomEmojiRequestImageForEntity(entity, pixelSize);
+    }
+    NSMutableDictionary *attributes = [NSMutableDictionary dictionaryWithDictionary:
+        baseAttributes ? baseAttributes : [NSDictionary dictionary]];
+    [attributes setObject:baseFont forKey:NSFontAttributeName];
+    return [[[NSAttributedString alloc] initWithString:@"◇" attributes:attributes] autorelease];
+}
+
 NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
                                                      NSString *text,
                                                      NSDictionary *baseAttributes) {
@@ -494,6 +524,7 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
         baseFont = TGChatMessageBodyFont();
     }
     NSUInteger index = 0;
+    NSMutableArray *customEmojiEntities = [NSMutableArray array];
     for (index = 0; index < [entities count]; index++) {
         id entityObject = [entities objectAtIndex:index];
         if (![entityObject isKindOfClass:[NSDictionary class]]) {
@@ -517,7 +548,9 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
             ? [entity objectForKey:@"type"] : nil;
         NSString *typeName = [[type objectForKey:@"@type"] isKindOfClass:[NSString class]]
             ? [type objectForKey:@"@type"] : @"";
-        if ([typeName isEqualToString:@"textEntityTypeBold"]) {
+        if ([typeName isEqualToString:@"textEntityTypeCustomEmoji"]) {
+            [customEmojiEntities addObject:entity];
+        } else if ([typeName isEqualToString:@"textEntityTypeBold"]) {
             [attributed addAttribute:NSFontAttributeName value:TGFontByAddingTrait(baseFont, NSBoldFontMask) range:range];
         } else if ([typeName isEqualToString:@"textEntityTypeItalic"]) {
             [attributed addAttribute:NSFontAttributeName value:TGFontByAddingTrait(baseFont, NSItalicFontMask) range:range];
@@ -580,6 +613,24 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item,
                                    range:range];
             }
         }
+    }
+
+    NSArray *orderedCustomEmoji = [customEmojiEntities sortedArrayUsingDescriptors:
+        [NSArray arrayWithObject:[NSSortDescriptor sortDescriptorWithKey:@"offset" ascending:NO]]];
+    for (index = 0; index < [orderedCustomEmoji count]; index++) {
+        NSDictionary *entity = [orderedCustomEmoji objectAtIndex:index];
+        NSInteger offset = [[entity objectForKey:@"offset"] integerValue];
+        NSInteger length = [[entity objectForKey:@"length"] integerValue];
+        if (offset < 0 || length <= 0 || (NSUInteger)offset >= [[attributed string] length]) {
+            continue;
+        }
+        NSRange range = NSMakeRange((NSUInteger)offset,
+                                    MIN((NSUInteger)length,
+                                        [[attributed string] length] - (NSUInteger)offset));
+        NSAttributedString *replacement = TGCustomEmojiReplacementForEntity(entity,
+                                                                             baseFont,
+                                                                             baseAttributes);
+        [attributed replaceCharactersInRange:range withAttributedString:replacement];
     }
     TGReplaceUnrenderableEmojiInAttributedString(attributed, baseFont);
     return attributed;

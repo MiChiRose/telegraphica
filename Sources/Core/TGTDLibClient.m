@@ -3,6 +3,7 @@
 #import "TGFormattedTextCodec.h"
 #import "TGReactionCatalog.h"
 #import "TGAddedReactionsParser.h"
+#import "TGCustomEmojiParser.h"
 #import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
@@ -256,6 +257,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSMutableDictionary *_notificationScopeMutedByType;
     NSMutableDictionary *_savedMessagesTopicsByID;
+    NSCache *_customEmojiDescriptorCache;
     TGTDLibCapabilities *_capabilities;
     NSString *_latestAuthorizationStateSummary;
     NSDictionary *_latestAuthorizationSafeDetails;
@@ -330,6 +332,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
+- (NSDictionary *)customEmojiDescriptorsForMessages:(NSArray *)messages timeout:(NSTimeInterval)timeout;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (BOOL)isCommunityChatObject:(NSDictionary *)chatObject;
 - (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject;
@@ -419,6 +422,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
         _notificationScopeMutedByType = [[NSMutableDictionary alloc] init];
         _savedMessagesTopicsByID = [[NSMutableDictionary alloc] init];
+        _customEmojiDescriptorCache = [[NSCache alloc] init];
+        [_customEmojiDescriptorCache setCountLimit:192];
         _capabilities = [[TGTDLibCapabilities alloc] initWithLoadedLibraryPath:nil];
         _sendLock = [[NSLock alloc] init];
     }
@@ -560,6 +565,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_syntheticMediaAlbumIDByMessageKey release];
     [_notificationScopeMutedByType release];
     [_savedMessagesTopicsByID release];
+    [_customEmojiDescriptorCache release];
     [_capabilities release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
@@ -7132,8 +7138,105 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                   syntheticAlbumID]];
 }
 
+- (NSDictionary *)customEmojiDescriptorsForMessages:(NSArray *)messages timeout:(NSTimeInterval)timeout {
+    if (![messages isKindOfClass:[NSArray class]] || [messages count] == 0) {
+        return [NSDictionary dictionary];
+    }
+
+    NSMutableArray *identifiers = [NSMutableArray array];
+    NSUInteger messageIndex = 0;
+    for (messageIndex = 0; messageIndex < [messages count]; messageIndex++) {
+        id messageObject = [messages objectAtIndex:messageIndex];
+        NSDictionary *content = [messageObject isKindOfClass:[NSDictionary class]] &&
+            [[(NSDictionary *)messageObject objectForKey:@"content"] isKindOfClass:[NSDictionary class]]
+            ? [(NSDictionary *)messageObject objectForKey:@"content"] : nil;
+        if (!content) {
+            continue;
+        }
+        NSArray *formattedKeys = [NSArray arrayWithObjects:@"text", @"caption", nil];
+        NSUInteger keyIndex = 0;
+        for (keyIndex = 0; keyIndex < [formattedKeys count]; keyIndex++) {
+            NSDictionary *formatted = [[content objectForKey:[formattedKeys objectAtIndex:keyIndex]]
+                isKindOfClass:[NSDictionary class]]
+                ? [content objectForKey:[formattedKeys objectAtIndex:keyIndex]] : nil;
+            NSArray *entityIdentifiers = TGCustomEmojiIdentifiersFromEntities([formatted objectForKey:@"entities"]);
+            NSUInteger identifierIndex = 0;
+            for (identifierIndex = 0; identifierIndex < [entityIdentifiers count]; identifierIndex++) {
+                NSNumber *identifier = [entityIdentifiers objectAtIndex:identifierIndex];
+                if (![identifiers containsObject:identifier] && [identifiers count] < 100) {
+                    [identifiers addObject:identifier];
+                }
+            }
+        }
+    }
+    if ([identifiers count] == 0) {
+        return [NSDictionary dictionary];
+    }
+
+    NSMutableDictionary *resolved = [NSMutableDictionary dictionary];
+    NSMutableArray *missing = [NSMutableArray array];
+    NSUInteger identifierIndex = 0;
+    for (identifierIndex = 0; identifierIndex < [identifiers count]; identifierIndex++) {
+        NSNumber *identifier = [identifiers objectAtIndex:identifierIndex];
+        NSDictionary *cached = [_customEmojiDescriptorCache objectForKey:identifier];
+        if ([cached isKindOfClass:[NSDictionary class]]) {
+            [resolved setObject:cached forKey:identifier];
+        } else {
+            [missing addObject:identifier];
+        }
+    }
+    if ([missing count] == 0) {
+        return resolved;
+    }
+
+    TGTDLibCapabilityState capabilityState = [[self capabilities]
+        supportStateForCapability:TGTDLibCapabilityCustomEmoji];
+    if (capabilityState == TGTDLibCapabilityStateUnsupported ||
+        capabilityState == TGTDLibCapabilityStateForbidden ||
+        capabilityState == TGTDLibCapabilityStateTemporarilyUnavailable) {
+        return resolved;
+    }
+
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getCustomEmojiStickers", @"@type",
+                             missing, @"custom_emoji_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-custom-emoji"
+                                                           timeout:MIN(MAX(timeout, 0.8), 2.5)
+                                                         errorCode:196
+                                                             error:NULL];
+    NSDictionary *parsed = TGCustomEmojiDescriptorsFromResponse(response, missing);
+    NSUInteger maximumDownloads = TGResourcePolicyEconomyModeEnabled() ? 3 : 8;
+    NSUInteger downloadCount = 0;
+    for (identifierIndex = 0; identifierIndex < [missing count]; identifierIndex++) {
+        NSNumber *identifier = [missing objectAtIndex:identifierIndex];
+        NSDictionary *descriptor = [parsed objectForKey:identifier];
+        if (![descriptor isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSMutableDictionary *resolvedDescriptor = [NSMutableDictionary dictionaryWithDictionary:descriptor];
+        NSNumber *fileID = [resolvedDescriptor objectForKey:TGCustomEmojiFileIDKey];
+        if ([[resolvedDescriptor objectForKey:TGCustomEmojiLocalPathKey] length] == 0 &&
+            [fileID respondsToSelector:@selector(integerValue)] && [fileID integerValue] > 0 &&
+            downloadCount < maximumDownloads) {
+            NSString *path = [self downloadedLocalPathForFileID:fileID timeout:1.4 error:NULL];
+            downloadCount++;
+            if ([path length] > 0) {
+                [resolvedDescriptor setObject:path forKey:TGCustomEmojiLocalPathKey];
+            }
+        }
+        if ([[resolvedDescriptor objectForKey:TGCustomEmojiLocalPathKey] length] > 0) {
+            [_customEmojiDescriptorCache setObject:resolvedDescriptor forKey:identifier];
+        }
+        [resolved setObject:resolvedDescriptor forKey:identifier];
+    }
+    return resolved;
+}
+
 - (NSArray *)messagePreviewItemsFromMessages:(NSArray *)messages chatID:(NSNumber *)chatID {
     NSMutableArray *items = [NSMutableArray array];
+    NSDictionary *customEmojiDescriptors = [self customEmojiDescriptorsForMessages:messages timeout:2.0];
     NSUInteger index = 0;
     NSUInteger visualMediaDownloadsRemaining = 30;
     NSUInteger playableMediaDownloadsRemaining = 12;
@@ -7271,7 +7374,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             NSArray *entities = [self entitiesFromFormattedTextObject:formattedTextObject
                                                   alignedToDisplayText:formattedDisplayText];
             if ([entities count] > 0) {
-                [item setFormattedEntities:entities];
+                [item setFormattedEntities:TGEntitiesByApplyingCustomEmojiDescriptors(entities,
+                                                                                      customEmojiDescriptors)];
             }
         }
         if ([contentType isEqualToString:@"messageText"] && TGResourcePolicyLinkPreviewsEnabled()) {
