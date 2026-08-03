@@ -104,6 +104,16 @@ echo "== Authorization flow fixtures =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/authorization_flow_probe"
 
+echo "== Formatted text codec =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/formatted_text_codec_probe.m \
+    Sources/Core/TGFormattedTextCodec.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/formatted_text_codec_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/formatted_text_codec_probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \

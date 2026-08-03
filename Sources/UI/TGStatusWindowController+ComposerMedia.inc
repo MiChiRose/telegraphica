@@ -3082,6 +3082,17 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [formatMenu addItem:item];
     }
     [formatMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *quoteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format.quote")
+                                                          action:@selector(applyComposerBlockQuote:)
+                                                   keyEquivalent:@""] autorelease];
+    [quoteItem setTarget:self];
+    [formatMenu addItem:quoteItem];
+    NSMenuItem *expandableQuoteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format.expandableQuote")
+                                                                    action:@selector(applyComposerExpandableBlockQuote:)
+                                                             keyEquivalent:@""] autorelease];
+    [expandableQuoteItem setTarget:self];
+    [formatMenu addItem:expandableQuoteItem];
+    [formatMenu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *linkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.link.add")
                                                        action:@selector(applyComposerLink:)
                                                 keyEquivalent:@""] autorelease];
@@ -3113,6 +3124,57 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [selectAllItem setTarget:nil];
     [menu addItem:selectAllItem];
     return menu;
+}
+
+- (void)applyComposerQuoteExpandable:(BOOL)expandable {
+    NSTextView *textView = [self activeComposerTextView];
+    if (!textView) {
+        return;
+    }
+    NSString *currentText = [textView string];
+    NSRange selection = [textView selectedRange];
+    if (selection.length == 0 || NSMaxRange(selection) > [currentText length]) {
+        [self.statusField setStringValue:TGLoc(@"composer.format.select")];
+        return;
+    }
+    NSString *selectedText = [currentText substringWithRange:selection];
+    NSArray *lines = [selectedText componentsSeparatedByString:@"\n"];
+    NSMutableString *quoted = [NSMutableString string];
+    NSUInteger index = 0;
+    for (index = 0; index < [lines count]; index++) {
+        if (index > 0) {
+            [quoted appendString:@"\n"];
+        }
+        if (expandable && index == 0) {
+            [quoted appendString:@"**>"];
+        } else {
+            [quoted appendString:@">"];
+        }
+        [quoted appendString:[lines objectAtIndex:index]];
+    }
+    if (expandable) {
+        [quoted appendString:@"||"];
+    }
+    [textView replaceCharactersInRange:selection withString:quoted];
+    NSString *sentinel = @"\u2063";
+    NSUInteger selectedLocation = selection.location;
+    if (![[textView string] hasPrefix:sentinel]) {
+        [textView replaceCharactersInRange:NSMakeRange(0, 0) withString:sentinel];
+        selectedLocation += [sentinel length];
+    }
+    [textView setSelectedRange:NSMakeRange(selectedLocation, [quoted length])];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
+}
+
+- (void)applyComposerBlockQuote:(id)sender {
+    (void)sender;
+    [self applyComposerQuoteExpandable:NO];
+}
+
+- (void)applyComposerExpandableBlockQuote:(id)sender {
+    (void)sender;
+    [self applyComposerQuoteExpandable:YES];
 }
 
 - (void)applyComposerFormatting:(id)sender {

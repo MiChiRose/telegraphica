@@ -1,5 +1,6 @@
 #import "TGTDLibClient.h"
 #import "TGAuthorizationFlow.h"
+#import "TGFormattedTextCodec.h"
 #import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
@@ -296,6 +297,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)sendAuthorizationSideRequest:(NSDictionary *)request actionName:(NSString *)actionName extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSDictionary *)formattedTextForComposerText:(NSString *)text originalText:(NSString *)originalText originalEntities:(NSArray *)originalEntities timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationWithError:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationFromEnvironmentWithError:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationFromLocalConfigurationWithError:(NSError **)error;
@@ -8831,38 +8833,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSString *formatSentinel = @"\u2063";
-    NSDictionary *formattedText = nil;
-    if ([text hasPrefix:formatSentinel]) {
-        NSString *markdownText = [text substringFromIndex:[formatSentinel length]];
-        NSDictionary *parseMode = [NSDictionary dictionaryWithObjectsAndKeys:
-                                   @"textParseModeMarkdown", @"@type",
-                                   [NSNumber numberWithInt:2], @"version",
-                                   nil];
-        NSDictionary *parseRequest = [NSDictionary dictionaryWithObjectsAndKeys:
-                                      @"parseTextEntities", @"@type",
-                                      markdownText, @"text",
-                                      parseMode, @"parse_mode",
-                                      nil];
-        NSError *parseError = nil;
-        formattedText = [self sendTDLibRequestAndWaitForExtra:parseRequest
-                                                  extraPrefix:@"telegraphica-parse-composer-formatting"
-                                                      timeout:MIN(timeout, 4.0)
-                                                    errorCode:227
-                                                        error:&parseError];
-        if (![[formattedText objectForKey:@"@type"] isEqualToString:@"formattedText"]) {
-            if (error) {
-                *error = parseError ? parseError :
-                    [self errorWithDescription:@"TDLib could not parse the selected text formatting." code:228];
-            }
-            return nil;
-        }
-    } else {
-        formattedText = [NSDictionary dictionaryWithObjectsAndKeys:
-                         @"formattedText", @"@type",
-                         text, @"text",
-                         [NSArray array], @"entities",
-                         nil];
+    NSDictionary *formattedText = [self formattedTextForComposerText:text
+                                                         originalText:nil
+                                                     originalEntities:nil
+                                                              timeout:timeout
+                                                                error:error];
+    if (!formattedText) {
+        return nil;
     }
 
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
@@ -10760,7 +10737,63 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSDictionary *)formattedTextForComposerText:(NSString *)text
+                                  originalText:(NSString *)originalText
+                              originalEntities:(NSArray *)originalEntities
+                                       timeout:(NSTimeInterval)timeout
+                                         error:(NSError **)error {
+    NSString *formatSentinel = @"\u2063";
+    if ([text hasPrefix:formatSentinel]) {
+        NSString *markdownText = [text substringFromIndex:[formatSentinel length]];
+        NSDictionary *parseMode = [NSDictionary dictionaryWithObjectsAndKeys:
+                                   @"textParseModeMarkdown", @"@type",
+                                   [NSNumber numberWithInt:2], @"version",
+                                   nil];
+        NSDictionary *parseRequest = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      @"parseTextEntities", @"@type",
+                                      markdownText, @"text",
+                                      parseMode, @"parse_mode",
+                                      nil];
+        NSError *parseError = nil;
+        NSDictionary *parsed = [self sendTDLibRequestAndWaitForExtra:parseRequest
+                                                          extraPrefix:@"telegraphica-parse-composer-formatting"
+                                                              timeout:MIN(timeout, 4.0)
+                                                            errorCode:227
+                                                                error:&parseError];
+        if ([[parsed objectForKey:@"@type"] isEqualToString:@"formattedText"] &&
+            [[parsed objectForKey:@"text"] isKindOfClass:[NSString class]]) {
+            return TGTDLibFormattedTextObject([parsed objectForKey:@"text"], [parsed objectForKey:@"entities"]);
+        }
+        if (error) {
+            *error = parseError ? parseError :
+                [self errorWithDescription:@"TDLib could not parse the selected text formatting." code:228];
+        }
+        return nil;
+    }
+    NSArray *entities = ([originalText isKindOfClass:[NSString class]] &&
+                         [originalEntities isKindOfClass:[NSArray class]])
+        ? TGRebasedTDLibTextEntities(originalText, originalEntities, text)
+        : [NSArray array];
+    return TGTDLibFormattedTextObject(text, entities);
+}
+
 - (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self editTextMessageInChatID:chatID
+                               messageID:messageID
+                                    text:text
+                            originalText:nil
+                        originalEntities:nil
+                                 timeout:timeout
+                                   error:error];
+}
+
+- (NSString *)editTextMessageInChatID:(NSNumber *)chatID
+                            messageID:(NSNumber *)messageID
+                                 text:(NSString *)text
+                         originalText:(NSString *)originalText
+                     originalEntities:(NSArray *)originalEntities
+                              timeout:(NSTimeInterval)timeout
+                                error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Message target is missing." code:96];
@@ -10789,10 +10822,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
-    [formattedText setObject:@"formattedText" forKey:@"@type"];
-    [formattedText setObject:text forKey:@"text"];
-    [formattedText setObject:[NSArray array] forKey:@"entities"];
+    NSDictionary *formattedText = [self formattedTextForComposerText:text
+                                                         originalText:originalText
+                                                     originalEntities:originalEntities
+                                                              timeout:timeout
+                                                                error:error];
+    if (!formattedText) {
+        return nil;
+    }
 
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
     [content setObject:@"inputMessageText" forKey:@"@type"];
