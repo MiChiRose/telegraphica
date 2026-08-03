@@ -176,6 +176,21 @@
         }
         [(TGChatListCell *)cell setHighlighted:[tableView isRowSelected:row]];
         [(TGChatListCell *)cell setChatItem:chatItem];
+        if (chatItem) {
+            TGChatItem *representedChatItem = chatItem;
+            [self.messageThumbnailPrefetcher prefetchPath:[chatItem avatarLocalPath]
+                                         maximumPixelSize:128
+                                               completion:^{
+                NSUInteger currentIndex = [self.chatItems indexOfObjectIdenticalTo:representedChatItem];
+                NSInteger columnIndex = [self.chatTableView columnWithIdentifier:@"chat"];
+                if (currentIndex != NSNotFound && columnIndex >= 0 &&
+                    currentIndex < (NSUInteger)[self.chatTableView numberOfRows]) {
+                    NSIndexSet *rowIndexes = [NSIndexSet indexSetWithIndex:currentIndex];
+                    NSIndexSet *columnIndexes = [NSIndexSet indexSetWithIndex:(NSUInteger)columnIndex];
+                    [self.chatTableView reloadDataForRowIndexes:rowIndexes columnIndexes:columnIndexes];
+                }
+            }];
+        }
         return;
     }
     if (tableView == self.messageTableView && [identifier isEqual:@"bubble"] && [cell isKindOfClass:[TGMessageBubbleCell class]]) {
@@ -194,6 +209,19 @@
         }
         [(TGMessageBubbleCell *)cell setMessageItem:messageItem];
         [(TGMessageBubbleCell *)cell setShowSenderDetails:[self shouldShowGroupSenderDetailsForMessageItem:messageItem]];
+        if (messageItem) {
+            TGMessageItem *representedMessageItem = messageItem;
+            [self.messageThumbnailPrefetcher prefetchMessageItem:messageItem completion:^{
+                NSUInteger currentIndex = [self.messageItems indexOfObjectIdenticalTo:representedMessageItem];
+                NSInteger columnIndex = [self.messageTableView columnWithIdentifier:@"bubble"];
+                if (currentIndex != NSNotFound && columnIndex >= 0 &&
+                    currentIndex < (NSUInteger)[self.messageTableView numberOfRows]) {
+                    NSIndexSet *rowIndexes = [NSIndexSet indexSetWithIndex:currentIndex];
+                    NSIndexSet *columnIndexes = [NSIndexSet indexSetWithIndex:(NSUInteger)columnIndex];
+                    [self.messageTableView reloadDataForRowIndexes:rowIndexes columnIndexes:columnIndexes];
+                }
+            }];
+        }
         [self scheduleInlineMediaPlaybackRefresh];
         return;
     }

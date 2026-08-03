@@ -109,10 +109,7 @@ void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL 
     NSBezierPath *avatarPath = [NSBezierPath bezierPathWithOvalInRect:rect];
     NSImage *image = nil;
     if ([imagePath length] > 0) {
-        image = TGImageThumbnailFromFile(imagePath, 128);
-        if (!image) {
-            image = [[[NSImage alloc] initWithContentsOfFile:imagePath] autorelease];
-        }
+        image = TGMediaCachedThumbnailFromFile(imagePath, 128);
     }
 
     if (image) {
@@ -1110,10 +1107,7 @@ void TGDrawMediaItemInRect(NSDictionary *mediaItem, NSRect rect, BOOL outgoing, 
     NSString *localPath = TGMediaItemLocalPath(mediaItem);
     NSImage *image = nil;
     if ([localPath length] > 0) {
-        image = TGImageThumbnailFromFile(localPath, 768);
-        if (!image) {
-            image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
-        }
+        image = TGMediaCachedThumbnailFromFile(localPath, 768);
     }
 
     if (!image) {
@@ -1528,10 +1522,7 @@ void TGDrawLinkPreviewCardForItem(TGMessageItem *item,
     NSImage *image = nil;
     NSString *path = [media objectForKey:@"local_path"];
     if ([path length] > 0) {
-        image = TGImageThumbnailFromFile(path, 768);
-        if (!image) {
-            image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
-        }
+        image = TGMediaCachedThumbnailFromFile(path, 768);
     }
     if (!image) {
         NSData *miniThumbnailData = [media objectForKey:@"minithumbnail_data"];

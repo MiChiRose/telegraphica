@@ -1,5 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import "TGMediaImageLoader.h"
+#import "TGMessageThumbnailPrefetcher.h"
+#import "TGMessageItem.h"
 #import "TGWebPDecoder.h"
 #include <stdio.h>
 #include <math.h>
@@ -103,6 +105,77 @@ int main(void) {
                         fabs(asyncSize.width - 8.0) >= 0.5 || fabs(asyncSize.height - 16.0) >= 0.5)) {
         fprintf(stderr, "async thumbnail completion failed\n");
         result = 8;
+    }
+
+    NSString *avatarPath = [directory stringByAppendingPathComponent:@"avatar.png"];
+    NSString *mediaPath = [directory stringByAppendingPathComponent:@"media.png"];
+    NSString *previewPath = [directory stringByAppendingPathComponent:@"preview.png"];
+    if (result == 0 &&
+        (!TGWritePNG(avatarPath, 24, 24, [NSColor greenColor]) ||
+         !TGWritePNG(mediaPath, 80, 40, [NSColor orangeColor]) ||
+         !TGWritePNG(previewPath, 40, 80, [NSColor purpleColor]))) {
+        result = 9;
+    }
+    __block NSUInteger prefetchCompletionCount = 0;
+    TGMessageThumbnailPrefetcher *prefetcher = nil;
+    TGMessageItem *messageItem = nil;
+    if (result == 0) {
+        prefetcher = [[[TGMessageThumbnailPrefetcher alloc] init] autorelease];
+        messageItem = [[[TGMessageItem alloc] initWithChatID:@1
+                                                  messageID:@2
+                                                       date:@3
+                                                   outgoing:NO
+                                                    preview:@"Photo"] autorelease];
+        [messageItem setSenderAvatarLocalPath:avatarPath];
+        [messageItem setContentType:@"messagePhoto"];
+        [messageItem setMediaItems:[NSArray arrayWithObject:
+                                    [NSDictionary dictionaryWithObject:mediaPath forKey:@"local_path"]]];
+        [messageItem setLinkPreviewInfo:
+                     [NSDictionary dictionaryWithObject:
+                      [NSDictionary dictionaryWithObject:previewPath forKey:@"local_path"]
+                                                 forKey:@"media"]];
+        [prefetcher prefetchMessageItem:messageItem completion:^{
+            prefetchCompletionCount += 1;
+        }];
+    }
+    deadline = [NSDate dateWithTimeIntervalSinceNow:3.0];
+    while (result == 0 && prefetchCompletionCount < 3 && [deadline timeIntervalSinceNow] > 0.0) {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                 beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+    }
+    if (result == 0 && (prefetchCompletionCount != 3 ||
+                        !TGMediaCachedThumbnailFromFile(avatarPath, 128) ||
+                        !TGMediaCachedThumbnailFromFile(mediaPath, 768) ||
+                        !TGMediaCachedThumbnailFromFile(previewPath, 768))) {
+        fprintf(stderr, "message thumbnail prefetch failed\n");
+        result = 10;
+    }
+    if (result == 0) {
+        [prefetcher prefetchMessageItem:messageItem completion:^{
+            prefetchCompletionCount += 1;
+        }];
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                 beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+        if (prefetchCompletionCount != 3) {
+            fprintf(stderr, "completed message thumbnails were scheduled twice\n");
+            result = 11;
+        }
+    }
+
+    if (result == 0) {
+        TGMediaImageLoaderClearCache();
+        [prefetcher prefetchPath:avatarPath maximumPixelSize:128 completion:^{
+            prefetchCompletionCount += 1;
+        }];
+        deadline = [NSDate dateWithTimeIntervalSinceNow:3.0];
+        while (prefetchCompletionCount < 4 && [deadline timeIntervalSinceNow] > 0.0) {
+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+        }
+        if (prefetchCompletionCount != 4) {
+            fprintf(stderr, "cache clear did not invalidate completed prefetch keys\n");
+            result = 12;
+        }
     }
 
     TGMediaImageLoaderClearCache();

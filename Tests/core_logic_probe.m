@@ -36,6 +36,12 @@ NSImage *TGImageThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
     return nil;
 }
 
+NSImage *TGMediaCachedThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
+    (void)path;
+    (void)maximumPixelSize;
+    return nil;
+}
+
 NSImage *TGImageThumbnailFromData(NSData *data, NSUInteger maximumPixelSize) {
     (void)data;
     (void)maximumPixelSize;

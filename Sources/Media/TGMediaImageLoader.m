@@ -2,6 +2,8 @@
 #import "TGWebPDecoder.h"
 #import <ImageIO/ImageIO.h>
 
+NSString * const TGMediaImageLoaderCacheDidClearNotification = @"TGMediaImageLoaderCacheDidClearNotification";
+
 @interface TGMediaImageLoadToken ()
 @property (nonatomic, assign, getter=isCancelled) BOOL cancelled;
 @property (nonatomic, copy) TGMediaImageLoadCompletion completion;
@@ -237,6 +239,16 @@ void TGMediaImageLoaderSetCacheLimitBytes(NSUInteger bytes) {
 
 void TGMediaImageLoaderClearCache(void) {
     [TGMediaImageCache() removeAllObjects];
+    void (^notify)(void) = ^{
+        [[NSNotificationCenter defaultCenter]
+            postNotificationName:TGMediaImageLoaderCacheDidClearNotification
+                          object:nil];
+    };
+    if ([NSThread isMainThread]) {
+        notify();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), notify);
+    }
 }
 
 NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
