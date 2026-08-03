@@ -1889,6 +1889,10 @@ def check_qr_login_and_reaction_picker_contract(errors):
         errors.append("%s: password recovery must not reuse the QR login button" % auth_rel)
     if "[self.authSecondaryActionButton setTitle:(self.authPasswordRecoveryMode" not in auth_text:
         errors.append("%s: password recovery secondary action is not wired" % auth_rel)
+    if 'TGIconAssetImageNamed(@"qr-scan")' in (controller_text + auth_text):
+        errors.append("%s: full-size QR asset must not be assigned directly to a legacy NSButton" % auth_rel)
+    if 'TGTemplateIconAssetImage(@"qr-scan"' not in controller_text or "NSMakeSize(16.0, 16.0)" not in controller_text:
+        errors.append("%s: QR login button must use a bounded legacy-safe icon" % layout_rel)
     for fragment in ["authorizationRetryCount", 'TGLoc(@"contacts.authWaiting")']:
         if fragment not in contacts_text:
             errors.append("%s: post-authorization contact retry is missing `%s`" %

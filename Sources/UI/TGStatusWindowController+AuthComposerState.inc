@@ -960,7 +960,10 @@
         [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
         [self.qrLoginButton setTitle:TGLoc(@"login.qr.button")];
-        [self.qrLoginButton setImage:TGIconAssetImageNamed(@"qr-scan")];
+        [self.qrLoginButton setImage:TGTemplateIconAssetImage(@"qr-scan",
+                                                              NSMakeSize(16.0, 16.0),
+                                                              TGClassicInkColor(),
+                                                              0.88)];
         [self.qrLoginButton setImagePosition:NSImageLeft];
         [self.qrLoginButton setAction:@selector(openQRCodeLogin:)];
         [self.qrLoginButton setEnabled:authInputsEnabled];
@@ -983,7 +986,10 @@
         [self.authSecureField setEnabled:NO];
         [self.authButton setHidden:YES];
         [self.qrLoginButton setTitle:TGLoc(@"login.qr.show")];
-        [self.qrLoginButton setImage:TGIconAssetImageNamed(@"qr-scan")];
+        [self.qrLoginButton setImage:TGTemplateIconAssetImage(@"qr-scan",
+                                                              NSMakeSize(16.0, 16.0),
+                                                              TGClassicInkColor(),
+                                                              0.88)];
         [self.qrLoginButton setImagePosition:NSImageLeft];
         [self.qrLoginButton setAction:@selector(openQRCodeLogin:)];
         [self.qrLoginButton setEnabled:authInputsEnabled];

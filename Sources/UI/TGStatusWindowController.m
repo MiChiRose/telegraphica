@@ -2716,13 +2716,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
     self.qrLoginButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 366, 190, 32)] autorelease];
     [self.qrLoginButton setTitle:TGLoc(@"login.qr.button")];
-    [self.qrLoginButton setImage:TGIconAssetImageNamed(@"qr-scan")];
-    [self.qrLoginButton setImagePosition:NSImageLeft];
     [self.qrLoginButton setTarget:self];
     [self.qrLoginButton setAction:@selector(openQRCodeLogin:)];
     [self.qrLoginButton setEnabled:NO];
     [self.qrLoginButton setHidden:YES];
     [self applySkeuomorphicButtonStyle:self.qrLoginButton isPrimary:NO];
+    [self.qrLoginButton setImage:TGTemplateIconAssetImage(@"qr-scan",
+                                                          NSMakeSize(16.0, 16.0),
+                                                          TGClassicInkColor(),
+                                                          0.88)];
+    [self.qrLoginButton setImagePosition:NSImageLeft];
     [self.qrLoginButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.qrLoginButton];
 
