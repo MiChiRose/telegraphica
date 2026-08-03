@@ -606,6 +606,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, copy) NSString *profileUsername;
 @property (nonatomic, copy) NSString *profilePhoneNumber;
 @property (nonatomic, retain) NSNumber *profileUserID;
+@property (nonatomic, retain) NSNumber *profileAvatarFileID;
 @property (nonatomic, copy) NSString *profileAvatarLocalPath;
 @property (nonatomic, copy) NSString *profileBio;
 @property (nonatomic, copy) NSString *lastLogSection;
@@ -1154,6 +1155,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize profileUsername = _profileUsername;
 @synthesize profilePhoneNumber = _profilePhoneNumber;
 @synthesize profileUserID = _profileUserID;
+@synthesize profileAvatarFileID = _profileAvatarFileID;
 @synthesize profileAvatarLocalPath = _profileAvatarLocalPath;
 @synthesize profileBio = _profileBio;
 @synthesize lastLogSection = _lastLogSection;
@@ -2379,6 +2381,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     self.profileUsername = nil;
     self.profilePhoneNumber = nil;
     self.profileUserID = nil;
+    self.profileAvatarFileID = nil;
     self.profileAvatarLocalPath = nil;
     self.profileBio = nil;
     [self.profileStateField setStringValue:@""];
@@ -5034,6 +5037,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_profileUsername release];
     [_profilePhoneNumber release];
     [_profileUserID release];
+    [_profileAvatarFileID release];
     [_profileAvatarLocalPath release];
     [_profileBio release];
     [_lastLogSection release];

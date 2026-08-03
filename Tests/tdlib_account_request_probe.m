@@ -114,7 +114,10 @@
     if (didRequestDownload) {
         *didRequestDownload = NO;
     }
-    return [NSDictionary dictionary];
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            [NSNumber numberWithLongLong:314], @"file_id",
+            @"/tmp/telegraphica-profile-avatar.jpg", @"local_path",
+            nil];
 }
 
 @end
@@ -148,6 +151,10 @@ int main(void) {
                     @"active username fallback");
     TGAccountAssert([[profile objectForKey:@"bio"] isEqualToString:@"Legacy Telegram client"],
                     @"profile bio");
+    TGAccountAssert([[profile objectForKey:@"avatar_file_id"] longLongValue] == 314,
+                    @"profile avatar file identifier");
+    TGAccountAssert([[profile objectForKey:@"avatar_path"] isEqualToString:@"/tmp/telegraphica-profile-avatar.jpg"],
+                    @"profile avatar local path");
 
     BOOL updated = [client updateCurrentUserFirstName:@"New"
                                              lastName:@"Name"

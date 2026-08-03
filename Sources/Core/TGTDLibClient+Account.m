@@ -115,8 +115,14 @@ static BOOL TGAccountObjectIsBoolean(id object) {
     BOOL didRequestAvatarDownload = NO;
     NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[userResponse objectForKey:@"profile_photo"]
                                                   downloadMissing:YES
-                                                          timeout:1.5
+                                                          timeout:MIN(timeout, 4.0)
                                                didRequestDownload:&didRequestAvatarDownload];
+    NSNumber *avatarFileID = [avatarInfo objectForKey:@"file_id"];
+    if ([avatarFileID respondsToSelector:@selector(longLongValue)] &&
+        [avatarFileID longLongValue] > 0LL) {
+        [summary setObject:[NSNumber numberWithLongLong:[avatarFileID longLongValue]]
+                    forKey:@"avatar_file_id"];
+    }
     NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
     if ([avatarPath length] > 0) {
         [summary setObject:avatarPath forKey:@"avatar_path"];
@@ -408,4 +414,3 @@ static BOOL TGAccountObjectIsBoolean(id object) {
 }
 
 @end
-
