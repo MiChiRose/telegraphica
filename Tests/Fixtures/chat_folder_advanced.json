@@ -1,0 +1,51 @@
+{
+  "invite_links": {
+    "@type": "chatFolderInviteLinks",
+    "invite_links": [
+      {
+        "@type": "chatFolderInviteLink",
+        "invite_link": "https://t.me/addlist/example-one",
+        "name": "Family",
+        "chat_ids": [101, "202", null]
+      },
+      {
+        "@type": "chatFolderInviteLink",
+        "invite_link": "",
+        "name": "Ignored",
+        "chat_ids": [303]
+      }
+    ]
+  },
+  "recommended": {
+    "@type": "recommendedChatFolders",
+    "chat_folders": [
+      {
+        "@type": "recommendedChatFolder",
+        "folder": {
+          "@type": "chatFolder",
+          "name": {
+            "@type": "chatFolderName",
+            "text": {"@type": "formattedText", "text": "Unread", "entities": []},
+            "animate_custom_emoji": false
+          },
+          "icon": {"@type": "chatFolderIcon", "name": "Unread"},
+          "pinned_chat_ids": [],
+          "included_chat_ids": [404],
+          "excluded_chat_ids": [],
+          "exclude_muted": false,
+          "exclude_read": true,
+          "exclude_archived": false,
+          "include_contacts": true,
+          "include_non_contacts": false,
+          "include_bots": false,
+          "include_groups": true,
+          "include_channels": true,
+          "is_shareable": false
+        },
+        "description": "Chats with unread messages"
+      }
+    ]
+  },
+  "limit": {"@type": "optionValueInteger", "value": 10},
+  "malformed_limit": {"@type": "optionValueString", "value": "10"}
+}

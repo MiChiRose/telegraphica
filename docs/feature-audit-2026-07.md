@@ -106,7 +106,7 @@ remain deliberately disabled.
 | Topics and comments | Forum topic list, topic history, channel comment threads | Create/edit/close topics, topic tabs, topic permissions and admin actions |
 | Media | Per-chat media center plus shared Download Manager, filtering, pagination, progress, retry/cancel, Save As, Finder reveal, cache delete and preview/playback | Resumable partial downloads, streaming, speed, quality and playlists |
 | Notifications | OS notifications, app settings, server mute state, per-chat mute/sound/preview synchronization and exception management | Scheduled notification profiles and richer sound selection |
-| Folders | Read, create, edit, delete and create/reuse a share link on the capable TDLib lane | Reorder, manage invite links, import shared folders, process newly suggested chats, folder limits and recommendations |
+| Folders | Read, create, edit, delete, drag ordering, shared-folder import, multiple invite-link management, suggested/new-chat processing, recommendations and server-reported limits on the capable TDLib lane | Per-link selection of a subset of shareable chats still uses Telegram's complete eligible set when creating a new link |
 | Storage and sessions | Storage statistics, cache cleanup, active sessions and remote termination | Per-chat cache policy, auto-remove periods, session detail and passkey management |
 | Privacy | Server privacy rules, blocked users, account inactivity TTL and per-chat/default auto-delete | Passcode lock, exception editor and account deletion UX |
 | Secret chats | Creation and normal conversation opening | Dedicated secret-chat information, key visualization, TTL and destructive controls |
@@ -137,7 +137,7 @@ remain deliberately disabled.
 
 ### P1: highest daily value
 
-1. Folder ordering, shared-folder import and invite-link management.
+1. Folder ordering, shared-folder import and invite-link management are now implemented; retain them in the OS X 10.9/10.13 lifecycle HITL matrix.
 2. Topic creation/edit/close and topic permissions.
 3. Passcode lock for local Telegraphica data.
 4. Profile-photo history/removal and phone-number change.
@@ -187,7 +187,7 @@ Current examples:
   implemented across both paths;
 - shared folder links already use a normal-path capability and are disabled on
   the OS X 10.8 fallback;
-- scheduling, modern link-preview options, shared-folder import and newer
+- scheduling, modern link-preview options and newer
   message types need runtime request-shape probing before their UI is enabled;
 - 2025-2026 Telegram features must not be assumed available merely because
   they exist in current online TDLib documentation.
@@ -245,9 +245,9 @@ This is a native-product assessment adapted to AppKit rather than a web audit.
 
 ## Next Recommended Feature
 
-After HITL verification of this roadmap batch, implement a formal
-`TGTDLibCapabilities` registry, then use it for folder ordering/shared-folder
-import and topic administration.
+After HITL verification of this roadmap batch, continue the media and
+performance phase while retaining the completed `TGTDLibCapabilities` registry
+and advanced-folder gates as the model for newer TDLib features.
 
 It is the best next step because:
 

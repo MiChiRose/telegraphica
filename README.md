@@ -147,7 +147,9 @@ voice messages, and keep the app updated from GitHub Releases.
   including presence, username, phone number, biography, and avatar.
 - 🧭 Private-chat, group, channel, secret-chat, archive, invite-link, member,
   role, restriction, and channel-administration workflows.
-- 🗂 Telegram chat-folder creation, editing, deletion, and supported share-link
+- 🗂 Telegram chat-folder creation, editing, drag ordering, shared-folder
+  import, multiple invite-link management, suggested chats, recommendations,
+  and server-reported limits on capable TDLib lanes
   management.
 - 🔕 Per-chat server mute, sound, and preview synchronization.
 - ✨ Bold, italic, underline, strikethrough, spoiler, and monospace message
