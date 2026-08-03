@@ -5,7 +5,8 @@ extern NSString * const TGResourcePolicyDidChangeNotification;
 typedef enum {
     TGResourceAutoDownloadPhoto = 0,
     TGResourceAutoDownloadVideo = 1,
-    TGResourceAutoDownloadDocument = 2
+    TGResourceAutoDownloadDocument = 2,
+    TGResourceAutoDownloadVoice = 3
 } TGResourceAutoDownloadType;
 
 BOOL TGResourcePolicyEconomyModeEnabled(void);

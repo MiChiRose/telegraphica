@@ -84,6 +84,14 @@ if [ -n "$SDK_PATH" ]; then
     COMPILE_FLAGS+=("-isysroot" "$SDK_PATH")
 fi
 
+echo "== Persistent download queue =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/download_queue_store_probe.m \
+    Sources/Services/TGDownloadQueueStore.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/download-queue-store-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-queue-store-probe"
+
 echo "== TDLib capability registry =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \

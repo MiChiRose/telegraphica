@@ -308,6 +308,7 @@
     [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadDocumentsButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadVoiceButton visible:showSettings];
     [self showView:self.settingsLinkPreviewsButton visible:showSettings];
     [self showView:self.settingsAutoplayAnimatedStickersButton visible:showSettings];
     [self showView:self.settingsStopInactiveAnimationsButton visible:showSettings];
@@ -1285,7 +1286,7 @@
     CGFloat savedCardHeight = 54.0;
     CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 104.0;
-    CGFloat resourceCardHeight = 306.0;
+    CGFloat resourceCardHeight = 334.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
     CGFloat filesCardHeight = 172.0;
@@ -1418,7 +1419,8 @@
     [self.settingsAutoDownloadPhotosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 42.0, rowWidth, 22.0)];
     [self.settingsAutoDownloadVideosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 70.0, rowWidth, 22.0)];
     [self.settingsAutoDownloadDocumentsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 98.0, rowWidth, 22.0)];
-    [self.settingsLinkPreviewsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 126.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadVoiceButton setFrame:NSMakeRect(rowLeft, resourceCardY + 126.0, rowWidth, 22.0)];
+    [self.settingsLinkPreviewsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 154.0, rowWidth, 22.0)];
     CGFloat resourcePopupWidth = 190.0;
     if (resourcePopupWidth > rowWidth - 180.0) {
         resourcePopupWidth = rowWidth - 180.0;
@@ -1426,15 +1428,15 @@
     if (resourcePopupWidth < 120.0) {
         resourcePopupWidth = 120.0;
     }
-    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 158.0, 170.0, 22.0)];
-    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 154.0, resourcePopupWidth, 28.0)];
-    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 188.0, rowWidth, 22.0)];
-    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 218.0, 170.0, 22.0)];
-    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 214.0, resourcePopupWidth, 28.0)];
-    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 248.0, rowWidth, 22.0)];
-    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 278.0, 170.0, 22.0)];
-    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 274.0, resourcePopupWidth, 28.0)];
-    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 156.0, MAX(160.0, rowWidth - 390.0), 54.0)];
+    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 186.0, 170.0, 22.0)];
+    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 182.0, resourcePopupWidth, 28.0)];
+    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 216.0, rowWidth, 22.0)];
+    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 246.0, 170.0, 22.0)];
+    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 242.0, resourcePopupWidth, 28.0)];
+    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 276.0, rowWidth, 22.0)];
+    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 306.0, 170.0, 22.0)];
+    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 302.0, resourcePopupWidth, 28.0)];
+    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 184.0, MAX(160.0, rowWidth - 390.0), 54.0)];
     settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];

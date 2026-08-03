@@ -885,6 +885,7 @@
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
     } else if (![previousState isEqualToString:@"ready"]) {
+        [[TGDownloadManager sharedManager] resumePendingDownloads];
         self.activeSection = TGSectionChats;
         self.chatFilterRefreshRetryCount = 0;
         if (TGMountainLionSafeLoginModeEnabled()) {
