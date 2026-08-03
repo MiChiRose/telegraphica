@@ -675,6 +675,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSNumber *stickerPickerSelectedSetID;
 @property (nonatomic, retain) NSTextField *stickerPickerStatusField;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *stickerPickerPlaybackCoordinator;
+@property (nonatomic, retain) TGMessageThumbnailPrefetcher *stickerPickerGridThumbnailPrefetcher;
+@property (nonatomic, retain) TGMessageThumbnailPrefetcher *stickerPickerRailThumbnailPrefetcher;
 @property (nonatomic, assign) NSUInteger stickerPickerLoadGeneration;
 @property (nonatomic, assign) NSInteger stickerPickerMode;
 @property (nonatomic, retain) AVAudioRecorder *voiceRecorder;
@@ -1221,6 +1223,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize stickerPickerSelectedSetID = _stickerPickerSelectedSetID;
 @synthesize stickerPickerStatusField = _stickerPickerStatusField;
 @synthesize stickerPickerPlaybackCoordinator = _stickerPickerPlaybackCoordinator;
+@synthesize stickerPickerGridThumbnailPrefetcher = _stickerPickerGridThumbnailPrefetcher;
+@synthesize stickerPickerRailThumbnailPrefetcher = _stickerPickerRailThumbnailPrefetcher;
 @synthesize stickerPickerLoadGeneration = _stickerPickerLoadGeneration;
 @synthesize stickerPickerMode = _stickerPickerMode;
 @synthesize voiceRecorder = _voiceRecorder;
@@ -4604,6 +4608,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.updateCheckScheduler invalidate];
     [self.inlineMediaPlaybackCoordinator invalidate];
     [self.stickerPickerPlaybackCoordinator invalidate];
+    [self.stickerPickerGridThumbnailPrefetcher cancelAll];
+    [self.stickerPickerRailThumbnailPrefetcher cancelAll];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
     [_chatTableView setDataSource:nil];
@@ -5084,6 +5090,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_stickerPickerSelectedSetID release];
     [_stickerPickerStatusField release];
     [_stickerPickerPlaybackCoordinator release];
+    [_stickerPickerGridThumbnailPrefetcher release];
+    [_stickerPickerRailThumbnailPrefetcher release];
     [_voiceRecorder release];
     [_voicePreviewPlayer release];
     [_voiceRecordingPath release];

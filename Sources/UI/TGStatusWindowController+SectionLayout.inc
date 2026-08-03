@@ -1657,6 +1657,8 @@
     }
     if ([notification object] == self.stickerPickerWindow) {
         [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+        [self.stickerPickerGridThumbnailPrefetcher cancelAll];
+        [self.stickerPickerRailThumbnailPrefetcher cancelAll];
         [self scheduleInlineMediaPlaybackRefresh];
     }
 }

@@ -175,6 +175,9 @@ echo "== Media image loader =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
 
+echo "== Sticker thumbnail pipeline =="
+python3 scripts/test_sticker_thumbnail_pipeline.py
+
 echo "== Media playback speed preferences =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
