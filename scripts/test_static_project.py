@@ -271,6 +271,8 @@ def check_unified_legacy_contract(errors):
         "Preserved the existing generated Telegram connection provider.",
         "Found the existing Mavericks-and-newer TDLib JSON library.",
         "Found the existing Mountain Lion TDLib JSON library.",
+        "bundle_tdlib_build_metadata",
+        "TelegraphicaTDLibMetadataMountainLion.tsv",
     ]:
         if fragment not in build_text:
             errors.append("%s: unified legacy build contract is missing `%s`" %
@@ -284,6 +286,31 @@ def check_unified_legacy_contract(errors):
         if fragment not in package_text:
             errors.append("%s: dual TDLib release contract is missing `%s`" %
                           (package_rel, fragment))
+
+    tdlib_build_rel = os.path.join("scripts", "build_tdlib_legacy.sh")
+    tdlib_build_text = read_text(os.path.join(ROOT, tdlib_build_rel))
+    for fragment in [
+        "TDLIB_RELEASE_STATUS",
+        "tdlib_source_commit",
+        "TDLibBuildMetadata.tsv",
+        "write_tdlib_build_metadata.sh",
+        "check_tdlib_build_metadata.sh",
+    ]:
+        if fragment not in tdlib_build_text:
+            errors.append("%s: reproducible TDLib metadata contract is missing `%s`" %
+                          (tdlib_build_rel, fragment))
+
+    bundle_check_rel = os.path.join("scripts", "check_release_bundle_legacy.sh")
+    bundle_check_text = read_text(os.path.join(ROOT, bundle_check_rel))
+    for fragment in [
+        "LC_BUILD_VERSION",
+        "TelegraphicaTDLibMetadata.tsv",
+        "TelegraphicaTDLibMetadataMountainLion.tsv",
+        "check_tdlib_build_metadata.sh",
+    ]:
+        if fragment not in bundle_check_text:
+            errors.append("%s: bundled TDLib provenance check is missing `%s`" %
+                          (bundle_check_rel, fragment))
 
     recovery_rel = os.path.join("Sources", "Services", "TGTDLibStartupRecovery.m")
     if os.path.exists(os.path.join(ROOT, recovery_rel)):

@@ -24,6 +24,9 @@ capability registry probe described in
   heavier and remain separate from the fast default test run.
 - `build_legacy.sh` runs both policy scanners and
   `check_media_item_support.sh` before building the app.
+- `scripts/check_tdlib_build_metadata.sh` verifies that a TDLib build sidecar
+  matches the bundled binary and its recorded exported-C-ABI list. The release
+  bundle audit runs this check for both runtime lanes.
 - The Xcode scheme has an empty `TestAction`; there is no XCTest target yet.
 
 ## Fast local tests

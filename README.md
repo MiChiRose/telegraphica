@@ -291,8 +291,11 @@ and newer behavior.
 
 ## TDLib
 
-Telegraphica talks to Telegram through TDLib's C JSON API. The current practical
-legacy target is **TDLib v1.8.0**.
+Telegraphica talks to Telegram through TDLib's C JSON API. The unified app keeps
+a verified OS X 10.8 fallback lane and a separate OS X 10.9+ lane; exact
+version, source revision, MTProto layer, binary hash, and exported ABI are
+recorded for every newly built candidate. See
+[`docs/tdlib-update-and-rollback.md`](docs/tdlib-update-and-rollback.md).
 
 Useful scripts:
 

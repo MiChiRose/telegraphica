@@ -56,6 +56,36 @@ binary_contains_arch() {
     file "$binary_path" | grep -q "$expected_arch"
 }
 
+bundle_tdlib_build_metadata() {
+    local source_binary="$1"
+    local bundled_binary="$2"
+    local explicit_metadata="$3"
+    local lane="$4"
+    local output_metadata="$5"
+    local source_metadata="$explicit_metadata"
+    local source_exports=""
+    local output_exports="${output_metadata%.tsv}.exports.txt"
+
+    if [ -z "$source_metadata" ]; then
+        source_metadata="$(dirname "$(dirname "$source_binary")")/TDLibBuildMetadata.tsv"
+    fi
+    if [ -f "$source_metadata" ]; then
+        source_exports="${source_metadata%.tsv}.exports.txt"
+        scripts/check_tdlib_build_metadata.sh "$source_binary" "$source_metadata"
+        if [ ! -f "$source_exports" ]; then
+            echo "TDLib metadata exists, but its ABI export list is missing: $source_exports"
+            exit 1
+        fi
+        ditto "$source_metadata" "$output_metadata"
+        ditto "$source_exports" "$output_exports"
+    else
+        scripts/write_tdlib_build_metadata.sh \
+            "$bundled_binary" "$output_metadata" "$lane" \
+            "unknown" "unknown" "unknown" "unknown" "legacy-import"
+    fi
+    scripts/check_tdlib_build_metadata.sh "$bundled_binary" "$output_metadata"
+}
+
 PYTHON_BIN=""
 if command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="$(command -v python3)"
@@ -338,6 +368,9 @@ if [ -z "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
     done
 fi
 
+RESOURCES_DIR="$APP_NAME/Contents/Resources"
+mkdir -p "$RESOURCES_DIR"
+
 if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     if [ ! -f "$TELEGRAPHICA_TDJSON_PATH" ]; then
         echo "TELEGRAPHICA_TDJSON_PATH does not point to a file: $TELEGRAPHICA_TDJSON_PATH"
@@ -528,6 +561,19 @@ if strings -a "$BINARY_PATH" | grep -E -q "__llvm_prf|libclang_rt\\.profile|defa
     exit 1
 fi
 
+if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ] && [ -z "${TELEGRAPHICA_TDJSON_METADATA_PATH:-}" ]; then
+    TDJSON_METADATA_CANDIDATE="$(dirname "$(dirname "$TELEGRAPHICA_TDJSON_PATH")")/TDLibBuildMetadata.tsv"
+    if [ -f "$TDJSON_METADATA_CANDIDATE" ]; then
+        TELEGRAPHICA_TDJSON_METADATA_PATH="$TDJSON_METADATA_CANDIDATE"
+    fi
+fi
+if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ] && [ -z "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_METADATA_PATH:-}" ]; then
+    TDJSON_MOUNTAIN_LION_METADATA_CANDIDATE="$(dirname "$(dirname "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH")")/TDLibBuildMetadata.tsv"
+    if [ -f "$TDJSON_MOUNTAIN_LION_METADATA_CANDIDATE" ]; then
+        TELEGRAPHICA_TDJSON_MOUNTAIN_LION_METADATA_PATH="$TDJSON_MOUNTAIN_LION_METADATA_CANDIDATE"
+    fi
+fi
+
 if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     if [ ! -f "$TELEGRAPHICA_TDJSON_PATH" ]; then
         echo "TELEGRAPHICA_TDJSON_PATH does not point to a file: $TELEGRAPHICA_TDJSON_PATH"
@@ -540,6 +586,11 @@ if [ -n "${TELEGRAPHICA_TDJSON_PATH:-}" ]; then
     mkdir -p "$FRAMEWORKS_DIR"
     ditto "$TELEGRAPHICA_TDJSON_PATH" "$TDJSON_DEST"
     MACOSX_DEPLOYMENT_TARGET=10.9 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_DEST"
+    bundle_tdlib_build_metadata \
+        "$TELEGRAPHICA_TDJSON_PATH" "$TDJSON_DEST" \
+        "${TELEGRAPHICA_TDJSON_METADATA_PATH:-}" \
+        "mavericks-or-newer" \
+        "$RESOURCES_DIR/TelegraphicaTDLibMetadata.tsv"
 fi
 
 if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
@@ -554,6 +605,11 @@ if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
     mkdir -p "$FRAMEWORKS_DIR"
     ditto "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" "$TDJSON_MOUNTAIN_LION_DEST"
     MACOSX_DEPLOYMENT_TARGET=10.8 TELEGRAPHICA_REQUIRE_PORTABLE_TDJSON=1 scripts/check_tdjson_legacy.sh "$TDJSON_MOUNTAIN_LION_DEST"
+    bundle_tdlib_build_metadata \
+        "$TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH" "$TDJSON_MOUNTAIN_LION_DEST" \
+        "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_METADATA_PATH:-}" \
+        "mountain-lion-fallback" \
+        "$RESOURCES_DIR/TelegraphicaTDLibMetadataMountainLion.tsv"
 fi
 
 if [ -n "${TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH:-}" ]; then
@@ -612,7 +668,6 @@ else
     echo "Modern Telegram audio-call transport was not supplied; the Calls screen will show an unavailable state."
 fi
 
-RESOURCES_DIR="$APP_NAME/Contents/Resources"
 rm -f "$RESOURCES_DIR/TelegraphicaTDLibDefaults.plist"
 if [ -n "$BUNDLED_TDLIB_CONFIG_SOURCE" ] || [ -n "$BUNDLED_TDLIB_CREDENTIALS_SOURCE" ]; then
     RUNTIME_CONFIG_MARKER="$RESOURCES_DIR/TelegraphicaTDLibRuntimeDefaults.plist"

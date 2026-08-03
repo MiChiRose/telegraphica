@@ -305,7 +305,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)optionSummaryForName:(NSString *)name timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (id)valueFromTDLibOptionResponse:(NSDictionary *)response;
 - (id)executeOptionValueNamed:(NSString *)name;
-- (NSString *)bundledTDLibVersionFromManifest;
+- (NSDictionary *)bundledTDLibMetadata;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
 - (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
@@ -2772,12 +2772,26 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         id version = [self executeOptionValueNamed:@"version"];
         id commit = [self executeOptionValueNamed:@"commit_hash"];
         id layer = [self executeOptionValueNamed:@"mtproto_layer"];
+        NSDictionary *buildMetadata = [self bundledTDLibMetadata];
         if (![version isKindOfClass:[NSString class]] || [(NSString *)version length] == 0) {
-            version = [self bundledTDLibVersionFromManifest];
+            version = [buildMetadata objectForKey:@"tdlib_version"];
+        }
+        if (![commit isKindOfClass:[NSString class]] || [(NSString *)commit length] == 0) {
+            commit = [buildMetadata objectForKey:@"source_commit"];
+            if (![commit isKindOfClass:[NSString class]] || [(NSString *)commit length] == 0) {
+                commit = [buildMetadata objectForKey:@"source_tag"];
+            }
+        }
+        if (![layer isKindOfClass:[NSNumber class]]) {
+            NSString *layerText = [buildMetadata objectForKey:@"mtproto_layer"];
+            if ([layerText integerValue] > 0) {
+                layer = [NSNumber numberWithInteger:[layerText integerValue]];
+            }
         }
         [_capabilities recordTDLibVersion:([version isKindOfClass:[NSString class]] ? version : nil)
                                    commit:([commit isKindOfClass:[NSString class]] ? commit : nil)
-                             mtprotoLayer:([layer isKindOfClass:[NSNumber class]] ? layer : nil)];
+                             mtprotoLayer:([layer isKindOfClass:[NSNumber class]] ? layer : nil)
+                              buildStatus:[buildMetadata objectForKey:@"release_status"]];
         id entities = [dictionary objectForKey:@"entities"];
         if ([entities isKindOfClass:[NSArray class]]) {
             return [NSString stringWithFormat:@"sync execute OK (%lu text entities)", (unsigned long)[entities count]];
@@ -2814,41 +2828,36 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self valueFromTDLibOptionResponse:response];
 }
 
-- (NSString *)bundledTDLibVersionFromManifest {
-    NSString *manifestPath = [[NSBundle mainBundle] pathForResource:@"TelegraphicaLegacyBinaryManifest" ofType:@"tsv"];
-    if ([manifestPath length] == 0 || [_loadedPath length] == 0) {
-        return nil;
+- (NSDictionary *)bundledTDLibMetadata {
+    if ([_loadedPath length] == 0) {
+        return [NSDictionary dictionary];
     }
-    NSString *manifest = [NSString stringWithContentsOfFile:manifestPath encoding:NSUTF8StringEncoding error:NULL];
-    if ([manifest length] == 0) {
-        return nil;
+    NSString *resourceName = ([_capabilities lane] == TGTDLibLaneMountainLionFallback)
+        ? @"TelegraphicaTDLibMetadataMountainLion" : @"TelegraphicaTDLibMetadata";
+    NSString *metadataPath = [[NSBundle mainBundle] pathForResource:resourceName ofType:@"tsv"];
+    if ([metadataPath length] == 0) {
+        return [NSDictionary dictionary];
     }
-
-    NSString *loadedName = [_loadedPath lastPathComponent];
-    NSArray *lines = [manifest componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
-    NSUInteger lineIndex = 0;
-    for (lineIndex = 1; lineIndex < [lines count]; lineIndex++) {
-        NSArray *columns = [[lines objectAtIndex:lineIndex] componentsSeparatedByString:@"\t"];
-        if ([columns count] < 5) {
-            continue;
-        }
-        NSString *bundlePath = [columns objectAtIndex:4];
-        if (![[bundlePath lastPathComponent] isEqualToString:loadedName]) {
-            continue;
-        }
-        NSString *installName = [columns objectAtIndex:3];
-        NSRange prefix = [installName rangeOfString:@"libtdjson."];
-        NSRange suffix = [installName rangeOfString:@".dylib" options:NSBackwardsSearch];
-        if (prefix.location == NSNotFound || suffix.location == NSNotFound) {
-            return nil;
-        }
-        NSUInteger versionStart = NSMaxRange(prefix);
-        if (suffix.location <= versionStart) {
-            return nil;
-        }
-        return [installName substringWithRange:NSMakeRange(versionStart, suffix.location - versionStart)];
+    NSString *metadata = [NSString stringWithContentsOfFile:metadataPath encoding:NSUTF8StringEncoding error:NULL];
+    NSArray *lines = [metadata componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    if ([lines count] < 2) {
+        return [NSDictionary dictionary];
     }
-    return nil;
+    NSArray *headers = [[lines objectAtIndex:0] componentsSeparatedByString:@"\t"];
+    NSArray *values = [[lines objectAtIndex:1] componentsSeparatedByString:@"\t"];
+    if ([headers count] != [values count] || [headers count] == 0) {
+        return [NSDictionary dictionary];
+    }
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    NSUInteger index = 0;
+    for (index = 0; index < [headers count]; index++) {
+        NSString *key = [headers objectAtIndex:index];
+        NSString *value = [values objectAtIndex:index];
+        if ([key length] > 0 && [value length] > 0 && ![value isEqualToString:@"unknown"]) {
+            [result setObject:value forKey:key];
+        }
+    }
+    return result;
 }
 
 - (NSString *)configureNetworkProxyIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
