@@ -649,45 +649,46 @@
     NSString *state = self.currentAuthState;
     NSDictionary *details = [self.client currentAuthorizationSafeDetails];
     BOOL enabled = !(self.controlsBusy || self.authSubmissionInFlight);
-    [self.qrLoginButton setImage:nil];
+    [self.authSecondaryActionButton setImage:nil];
+    [self.authSecondaryActionButton setImagePosition:NSNoImage];
     if ([state isEqualToString:@"waitCode"] || [state isEqualToString:@"waitEmailCode"]) {
         BOOL canResend = [state isEqualToString:@"waitEmailCode"] || [[details objectForKey:@"can_resend"] boolValue];
         if (!canResend) {
-            [self.qrLoginButton setHidden:YES];
-            [self.qrLoginButton setEnabled:NO];
+            [self.authSecondaryActionButton setHidden:YES];
+            [self.authSecondaryActionButton setEnabled:NO];
             return;
         }
         NSTimeInterval remaining = self.authCodeResendAvailableAt
             ? [self.authCodeResendAvailableAt timeIntervalSinceNow] : 0.0;
         if (remaining > 0.5) {
-            [self.qrLoginButton setTitle:[NSString stringWithFormat:TGLoc(@"login.resend.wait"), (long)ceil(remaining)]];
+            [self.authSecondaryActionButton setTitle:[NSString stringWithFormat:TGLoc(@"login.resend.wait"), (long)ceil(remaining)]];
             enabled = NO;
         } else {
-            [self.qrLoginButton setTitle:TGLoc(@"login.resend")];
+            [self.authSecondaryActionButton setTitle:TGLoc(@"login.resend")];
         }
-        [self.qrLoginButton setAction:@selector(resendAuthenticationCode:)];
-        [self.qrLoginButton setHidden:NO];
-        [self.qrLoginButton setEnabled:enabled];
+        [self.authSecondaryActionButton setAction:@selector(resendAuthenticationCode:)];
+        [self.authSecondaryActionButton setHidden:NO];
+        [self.authSecondaryActionButton setEnabled:enabled];
         return;
     }
     if ([state isEqualToString:@"waitPassword"]) {
         if (!self.authPasswordRecoveryMode && ![[details objectForKey:@"can_recover_password"] boolValue]) {
-            [self.qrLoginButton setHidden:YES];
-            [self.qrLoginButton setEnabled:NO];
+            [self.authSecondaryActionButton setHidden:YES];
+            [self.authSecondaryActionButton setEnabled:NO];
             return;
         }
-        [self.qrLoginButton setTitle:(self.authPasswordRecoveryMode
+        [self.authSecondaryActionButton setTitle:(self.authPasswordRecoveryMode
             ? TGLoc(@"login.recovery.usePassword")
             : TGLoc(@"login.recovery.begin"))];
-        [self.qrLoginButton setAction:(self.authPasswordRecoveryMode
+        [self.authSecondaryActionButton setAction:(self.authPasswordRecoveryMode
             ? @selector(cancelAuthenticationPasswordRecovery:)
             : @selector(beginAuthenticationPasswordRecovery:))];
-        [self.qrLoginButton setHidden:NO];
-        [self.qrLoginButton setEnabled:enabled];
+        [self.authSecondaryActionButton setHidden:NO];
+        [self.authSecondaryActionButton setEnabled:enabled];
         return;
     }
-    [self.qrLoginButton setHidden:YES];
-    [self.qrLoginButton setEnabled:NO];
+    [self.authSecondaryActionButton setHidden:YES];
+    [self.authSecondaryActionButton setEnabled:NO];
 }
 
 - (void)performAuthenticationSideRequestWithBlock:(NSString *(^)(TGTDLibClient *, NSError **))requestBlock
@@ -815,6 +816,8 @@
     [self.qrLoginWindowController authorizationStateDidChange:state];
     [self.qrLoginButton setHidden:YES];
     [self.qrLoginButton setEnabled:NO];
+    [self.authSecondaryActionButton setHidden:YES];
+    [self.authSecondaryActionButton setEnabled:NO];
     if (authStateChanged) {
         [self setLoginErrorMessage:nil];
         [self.authTextField setStringValue:@""];
@@ -1114,6 +1117,7 @@
     if (busy) {
         [self.authButton setEnabled:NO];
         [self.qrLoginButton setEnabled:NO];
+        [self.authSecondaryActionButton setEnabled:NO];
         [self.authTextField setEnabled:NO];
         [self.authSecureField setEnabled:NO];
         [self.loadChatsButton setEnabled:NO];

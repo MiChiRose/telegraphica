@@ -688,7 +688,9 @@
     CGFloat secondaryInputY = loginY + 62.0;
     CGFloat loginErrorHeight = 28.0;
     CGFloat loginErrorGap = 4.0;
-    CGFloat loginErrorY = primaryInputY - loginErrorGap - loginErrorHeight;
+    CGFloat loginErrorY = phoneLoginLayout
+        ? (primaryInputY - loginErrorGap - loginErrorHeight)
+        : (loginY + 4.0);
     [self.authStateField setFrame:NSMakeRect(loginX + 54.0, loginErrorY, loginWidth - 108.0, loginErrorHeight)];
     [self.authTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, primaryInputY, loginInputWidth, 32.0)];
     [self.authTextField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
@@ -696,11 +698,16 @@
     [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
     CGFloat qrButtonWidth = phoneLoginLayout ? 220.0 : 190.0;
-    CGFloat qrButtonY = phoneLoginLayout ? (loginY + 166.0) : (loginY + 94.0);
+    CGFloat qrButtonY = phoneLoginLayout ? (loginY + 166.0) : (loginY + 82.0);
     [self.qrLoginButton setFrame:NSMakeRect(loginX + floor((loginWidth - qrButtonWidth) / 2.0),
                                             qrButtonY,
                                             qrButtonWidth,
                                             34.0)];
+    CGFloat secondaryActionButtonWidth = 220.0;
+    [self.authSecondaryActionButton setFrame:NSMakeRect(loginX + floor((loginWidth - secondaryActionButtonWidth) / 2.0),
+                                                        loginY + 36.0,
+                                                        secondaryActionButtonWidth,
+                                                        34.0)];
     [self.busySpinner setFrame:NSMakeRect(loginX + loginWidth - 36.0, primaryInputY + 8.0, 16.0, 16.0)];
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
     CGFloat loginLanguageX = margin;
