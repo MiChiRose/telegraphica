@@ -74,3 +74,7 @@ the request contract before additional search surfaces are migrated.
 Storage statistics and cache cleanup now live in `TGTDLibClient+Storage`.
 Filtered `optimizeStorage` construction, chat-scope normalization and the
 post-cleanup statistics refresh are locked by an account-free fixture probe.
+
+Download, cancellation and cache-file deletion now live in
+`TGTDLibClient+Files`; media and download surfaces import this focused API and
+an account-free fixture probe locks its TDLib request contract.
