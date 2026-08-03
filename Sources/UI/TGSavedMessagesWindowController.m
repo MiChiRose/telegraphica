@@ -2,6 +2,7 @@
 
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGTDLibClient+SavedMessages.h"
+#import "../Core/TGTDLibClient+Files.h"
 #import "TGLocalization.h"
 #import "TGSavedMessagesCell.h"
 #import "TGStatusButtonCells.h"

@@ -938,7 +938,7 @@ def check_call_transport_stability_contract(errors):
 
 
 def check_media_file_management_contract(errors):
-    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+Files.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
     for fragment in [
         "cancelDownloadForFileID:",
@@ -2177,6 +2177,39 @@ def check_tdlib_storage_component_boundary(errors):
                           (storage_rel, fragment))
 
 
+def check_tdlib_file_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    files_rel = os.path.join("Sources", "Core", "TGTDLibClient+Files.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    files_text = read_text(os.path.join(ROOT, files_rel))
+    moved_selectors = [
+        "downloadedFileInfoForFileID:",
+        "downloadedLocalPathForFileID:",
+        "cancelDownloadForFileID:",
+        "deleteCachedFileForFileID:",
+    ]
+    for selector in moved_selectors:
+        method_pattern = re.compile(
+            r"-\s*\([^)]+\)\s*%s(?:(?!;).){0,500}\{" % re.escape(selector),
+            re.S,
+        )
+        if method_pattern.search(main_text):
+            errors.append("%s: extracted file selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if not method_pattern.search(files_text):
+            errors.append("%s: extracted file selector is missing: %s" %
+                          (files_rel, selector))
+    for fragment in [
+        '@"downloadFile"',
+        '@"cancelDownloadFile"',
+        '@"deleteFile"',
+        'forKey:@"synchronous"',
+    ]:
+        if fragment not in files_text:
+            errors.append("%s: file request contract is missing `%s`" %
+                          (files_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -2213,6 +2246,7 @@ def main():
     check_received_link_preview_contract(errors)
     check_tdlib_search_component_boundary(errors)
     check_tdlib_storage_component_boundary(errors)
+    check_tdlib_file_component_boundary(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

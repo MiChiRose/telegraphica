@@ -1,6 +1,7 @@
 #import "TGDownloadManager.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+Files.h"
 #import "../Media/TGMediaFileActions.h"
 #import "../UI/TGStatusSupport.h"
 #import "TGResourcePolicy.h"

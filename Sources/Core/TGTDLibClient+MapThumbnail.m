@@ -1,4 +1,5 @@
 #import "TGTDLibClient+MapThumbnail.h"
+#import "TGTDLibClient+Files.h"
 
 @interface TGTDLibClient (MapThumbnailPrivate)
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request
