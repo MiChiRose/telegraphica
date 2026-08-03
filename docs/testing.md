@@ -53,6 +53,8 @@ The script runs:
   source-version cache invalidation, main-thread delivery of asynchronous
   decode results, bounded message-thumbnail prefetch deduplication and cache
   reset invalidation.
+- a compiled animated-image probe covering off-main GIF validation/decode,
+  main-thread delivery, bounded caching and cancellation suppression.
 - a static sticker-thumbnail pipeline check ensuring that picker layout only
   reads the bounded cache and that grid/rail jobs are cancellable and reject
   stale generations.

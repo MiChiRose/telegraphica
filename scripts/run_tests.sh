@@ -84,6 +84,15 @@ if [ -n "$SDK_PATH" ]; then
     COMPILE_FLAGS+=("-isysroot" "$SDK_PATH")
 fi
 
+echo "== Asynchronous animated image loader =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/animated_image_loader_probe.m \
+    Sources/Media/TGAnimatedImageLoader.m \
+    -framework Cocoa \
+    -framework ImageIO \
+    -o "$BUILD_DIR/animated-image-loader-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/animated-image-loader-probe"
+
 echo "== Persistent download queue =="
 "$CLANG" "${COMPILE_FLAGS[@]}" \
     Tests/download_queue_store_probe.m \

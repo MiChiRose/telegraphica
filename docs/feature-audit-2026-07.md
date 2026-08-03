@@ -237,7 +237,7 @@ This is a native-product assessment adapted to AppKit rather than a web audit.
 | Dimension | Score | Key finding |
 | --- | ---: | --- |
 | Accessibility | 2/4 | Good native-control foundation, but custom icon cells and keyboard coverage need an explicit pass |
-| Performance | 3/4 | Main chat image drawing and TDLib operations are now asynchronous and bounded; secondary surfaces and large controllers remain |
+| Performance | 3/4 | Main chat thumbnails, sticker previews and inline GIF decoding are now asynchronous and bounded; secondary surfaces and large controllers remain |
 | Responsive layout | 3/4 | Scrollable settings/drawer and snapped chat sidebar are strong; manual frames still create edge cases |
 | Theming | 3/4 | Central theme helpers are widely used, with some hard-coded colors and strings left |
 | Product consistency | 3/4 | The app has a coherent native vocabulary; utility windows still vary in lifecycle and polish |

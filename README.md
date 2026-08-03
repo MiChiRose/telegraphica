@@ -143,6 +143,8 @@ voice messages, and keep the app updated from GitHub Releases.
 - 🧩 Native sticker display with WEBP, TGS, and animated WEBM/VP9 sticker
   support on Mavericks; static picker thumbnails are decoded through a bounded
   background cache rather than during AppKit layout.
+- 🎞 Inline GIF validation and decoding use a bounded background queue with
+  cancellable viewport delivery instead of blocking message-list updates.
 - 🔍 Chat search/navigation with a native search field.
 - 🔗 Received link-preview cards and composer controls for link previews.
 - 👥 Contacts browser with search, direct chat opening, and profile details
