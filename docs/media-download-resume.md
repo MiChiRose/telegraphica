@@ -6,8 +6,11 @@ The resumed request keeps the TDLib `file_id` and requests the complete range. T
 
 Resource settings treat voice/audio messages as a separate auto-download category. Economy mode keeps voice messages enabled under the shared size limit while disabling automatic video and document downloads. Photos, videos, documents, and voice messages remain independently configurable.
 
+The media player offers bounded `1x`, `1.5x`, and `2x` speed choices. Audio and video remember independent preferences, and the selected rate is reapplied after pause/resume without relying on newer AVFoundation convenience APIs.
+
 ## Verification
 
 - `Tests/download_queue_store_probe.m` checks invalid-record rejection, interrupted-state recovery, `file_id` retention, and property-list safety.
 - `Tests/core_logic_probe.m` checks the independent voice policy and economy-mode behavior.
+- `Tests/media_playback_preferences_probe.m` checks the supported rate catalog, safe normalization, and independent audio/video persistence.
 - `./scripts/run_tests.sh` runs both probes with the OS X 10.8 deployment target.

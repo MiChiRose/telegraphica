@@ -1612,6 +1612,22 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [contentView addSubview:timeField];
     self.mediaPlaybackTimeField = timeField;
 
+    NSPopUpButton *ratePopUp = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(306, 18, 62, 30)
+                                                            pullsDown:NO] autorelease];
+    NSArray *rates = TGMediaPlaybackSupportedRates();
+    NSUInteger rateIndex = 0;
+    for (rateIndex = 0; rateIndex < [rates count]; rateIndex++) {
+        NSNumber *rate = [rates objectAtIndex:rateIndex];
+        [ratePopUp addItemWithTitle:[NSString stringWithFormat:@"%gx", [rate doubleValue]]];
+        [[ratePopUp lastItem] setRepresentedObject:rate];
+    }
+    [ratePopUp setTarget:self];
+    [ratePopUp setAction:@selector(mediaPlaybackRateChanged:)];
+    [ratePopUp setToolTip:TGLoc(@"media.playback.speed")];
+    [ratePopUp setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [contentView addSubview:ratePopUp];
+    self.mediaPlaybackRatePopUpButton = ratePopUp;
+
     NSButton *closeButton = [self modalCloseButtonWithFrame:NSMakeRect(376, 18, 120, 30)];
     [closeButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
     [contentView addSubview:closeButton];
@@ -1720,6 +1736,32 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     [self updateMediaPlaybackTimelineWithCurrentTime:value duration:duration];
 }
 
+- (void)selectMediaPlaybackRate:(double)rate {
+    NSArray *items = [self.mediaPlaybackRatePopUpButton itemArray];
+    NSUInteger index = 0;
+    for (index = 0; index < [items count]; index++) {
+        NSMenuItem *item = [items objectAtIndex:index];
+        if (fabs([[item representedObject] doubleValue] - rate) < 0.01) {
+            [self.mediaPlaybackRatePopUpButton selectItem:item];
+            return;
+        }
+    }
+    [self.mediaPlaybackRatePopUpButton selectItemAtIndex:0];
+}
+
+- (void)applyMediaPlaybackRateIfPlaying {
+    if (self.mediaPlaybackPlayer && self.mediaPlaybackPlaying) {
+        [self.mediaPlaybackPlayer setRate:(float)self.mediaPlaybackRate];
+    }
+}
+
+- (void)mediaPlaybackRateChanged:(id)sender {
+    NSNumber *representedRate = [[sender selectedItem] representedObject];
+    self.mediaPlaybackRate = TGMediaPlaybackNormalizedRate([representedRate doubleValue]);
+    TGMediaPlaybackSetPreferredRate(self.mediaPlaybackAudioOnly, self.mediaPlaybackRate);
+    [self applyMediaPlaybackRateIfPlaying];
+}
+
 - (NSString *)mediaPlaybackResumeIdentifierForPath:(NSString *)path {
     if ([path length] == 0) {
         return nil;
@@ -1811,7 +1853,9 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         CGFloat controlsX = 100.0;
         CGFloat closeWidth = 90.0;
         CGFloat closeX = MAX(controlsX + 150.0, width - closeWidth - 24.0);
-        CGFloat sliderWidth = MAX(140.0, closeX - controlsX - 16.0);
+        CGFloat rateWidth = 62.0;
+        CGFloat rateX = closeX - rateWidth - 8.0;
+        CGFloat sliderWidth = MAX(140.0, rateX - controlsX - 16.0);
         [self.mediaPlaybackTitleField setFrame:NSMakeRect(controlsX,
                                                           MAX(112.0, height - 50.0),
                                                           MAX(150.0, width - controlsX - 28.0),
@@ -1819,6 +1863,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
         [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(28.0, 56.0, 52.0, 52.0)];
         [self.mediaPlaybackProgressSlider setFrame:NSMakeRect(controlsX, 86.0, sliderWidth, 22.0)];
         [self.mediaPlaybackTimeField setFrame:NSMakeRect(controlsX, 62.0, sliderWidth, 18.0)];
+        [self.mediaPlaybackRatePopUpButton setFrame:NSMakeRect(rateX, 28.0, rateWidth, 30.0)];
         [self.mediaPlaybackCloseButton setFrame:NSMakeRect(closeX, 28.0, closeWidth, 30.0)];
     } else {
         [playbackCard setFrame:NSMakeRect(20.0,
@@ -1827,11 +1872,14 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                           MAX(120.0, height - 78.0))];
         CGFloat closeWidth = 120.0;
         CGFloat closeX = MAX(220.0, width - closeWidth - 24.0);
+        CGFloat rateWidth = 62.0;
+        CGFloat rateX = closeX - rateWidth - 8.0;
         CGFloat sliderX = 78.0;
-        CGFloat sliderWidth = MAX(120.0, closeX - sliderX - 16.0);
+        CGFloat sliderWidth = MAX(120.0, rateX - sliderX - 16.0);
         [self.mediaPlaybackPlayPauseButton setFrame:NSMakeRect(24.0, 18.0, 42.0, 30.0)];
         [self.mediaPlaybackProgressSlider setFrame:NSMakeRect(sliderX, 29.0, sliderWidth, 20.0)];
         [self.mediaPlaybackTimeField setFrame:NSMakeRect(sliderX, 10.0, sliderWidth, 18.0)];
+        [self.mediaPlaybackRatePopUpButton setFrame:NSMakeRect(rateX, 18.0, rateWidth, 30.0)];
         [self.mediaPlaybackCloseButton setFrame:NSMakeRect(closeX, 18.0, closeWidth, 30.0)];
     }
 }
@@ -1839,6 +1887,8 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
 - (void)layoutMediaPlaybackWindowForAudioOnly:(BOOL)audioOnly title:(NSString *)title {
     [self ensureMediaPlaybackWindow];
     self.mediaPlaybackAudioOnly = audioOnly;
+    self.mediaPlaybackRate = TGMediaPlaybackPreferredRate(audioOnly);
+    [self selectMediaPlaybackRate:self.mediaPlaybackRate];
 
     if (audioOnly) {
         [self.mediaPlaybackWindow setMinSize:NSMakeSize(440.0, 178.0)];
@@ -1928,6 +1978,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
             [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(0.0, 600)];
         }
         [self.mediaPlaybackPlayer play];
+        [self applyMediaPlaybackRateIfPlaying];
         self.mediaPlaybackPlaying = YES;
         [self startMediaPlaybackTimer];
     }
@@ -2011,6 +2062,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
         [self updateMediaPlaybackTimelineWithCurrentTime:resumePosition duration:resumeDuration];
     }
     [self.mediaPlaybackPlayer play];
+    [self applyMediaPlaybackRateIfPlaying];
     [self startMediaPlaybackTimer];
     return YES;
 }

@@ -38,6 +38,7 @@
 		111111111111111111111116 /* TGLocalization.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111219 /* TGLocalization.m */; };
 		111111111111111111111117 /* TGWebPDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111226 /* TGWebPDecoder.m */; };
 		111111111111111111111118 /* TGMediaImageLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111228 /* TGMediaImageLoader.m */; };
+		B8DB0BB00000000000000004 /* TGMediaPlaybackPreferences.m in Sources */ = {isa = PBXBuildFile; fileRef = B8DB0BB00000000000000006 /* TGMediaPlaybackPreferences.m */; };
 		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
 		111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */; };
 		111111111111111111111121 /* TGTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111236 /* TGTheme.m */; };
@@ -216,6 +217,8 @@
 		111111111111111111111226 /* TGWebPDecoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGWebPDecoder.m; sourceTree = "<group>"; };
 		111111111111111111111227 /* TGMediaImageLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaImageLoader.h; sourceTree = "<group>"; };
 		111111111111111111111228 /* TGMediaImageLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaImageLoader.m; sourceTree = "<group>"; };
+		B8DB0BB00000000000000005 /* TGMediaPlaybackPreferences.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaPlaybackPreferences.h; sourceTree = "<group>"; };
+		B8DB0BB00000000000000006 /* TGMediaPlaybackPreferences.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaPlaybackPreferences.m; sourceTree = "<group>"; };
 		111111111111111111111229 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGInlineMediaPlaybackCoordinator.h; sourceTree = "<group>"; };
 		111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGInlineMediaPlaybackCoordinator.m; sourceTree = "<group>"; };
@@ -730,6 +733,8 @@
 				111111111111111111111226 /* TGWebPDecoder.m */,
 				111111111111111111111227 /* TGMediaImageLoader.h */,
 				111111111111111111111228 /* TGMediaImageLoader.m */,
+				B8DB0BB00000000000000005 /* TGMediaPlaybackPreferences.h */,
+				B8DB0BB00000000000000006 /* TGMediaPlaybackPreferences.m */,
 				C0F300000000000000000002 /* TGCustomEmojiImageLoader.h */,
 				C0F300000000000000000003 /* TGCustomEmojiImageLoader.m */,
 			);
@@ -897,6 +902,7 @@
 				111111111111111111111116 /* TGLocalization.m in Sources */,
 				111111111111111111111117 /* TGWebPDecoder.m in Sources */,
 				111111111111111111111118 /* TGMediaImageLoader.m in Sources */,
+				B8DB0BB00000000000000004 /* TGMediaPlaybackPreferences.m in Sources */,
 				111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */,
 				111111111111111111111121 /* TGTheme.m in Sources */,
 				111111111111111111111156 /* TGVisualWorldThemeSpec.m in Sources */,
