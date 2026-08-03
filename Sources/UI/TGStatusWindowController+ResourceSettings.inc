@@ -104,6 +104,10 @@
                                                               action:@selector(resourceSettingChanged:)];
     [contentView addSubview:self.settingsLinkPreviewsButton];
 
+    self.settingsSequentialAudioButton = [self resourceSwitchWithTitle:@"Play voice messages one after another"
+                                                                  action:@selector(resourceSettingChanged:)];
+    [contentView addSubview:self.settingsSequentialAudioButton];
+
     self.settingsMaxAutoDownloadLabel = [self resourceLabelWithTitle:@"Max auto-download"];
     [contentView addSubview:self.settingsMaxAutoDownloadLabel];
 
@@ -150,6 +154,7 @@
     [self.settingsAutoDownloadDocumentsButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadDocument) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadVoiceButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVoice) ? NSOnState : NSOffState];
     [self.settingsLinkPreviewsButton setState:TGResourcePolicyLinkPreviewsEnabled() ? NSOnState : NSOffState];
+    [self.settingsSequentialAudioButton setState:TGMediaPlaybackSequentialAudioEnabled() ? NSOnState : NSOffState];
     [self.settingsAutoplayAnimatedStickersButton setState:TGResourcePolicyAutoplayAnimatedStickersEnabled() ? NSOnState : NSOffState];
     [self.settingsStopInactiveAnimationsButton setState:TGResourcePolicyStopAnimationsWhenInactiveEnabled() ? NSOnState : NSOffState];
     [self selectPopUp:self.settingsMaxAutoDownloadPopUpButton representedUnsignedLongLong:TGResourcePolicyMaxAutoDownloadBytes()];
@@ -200,6 +205,9 @@
                 [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
             }
         }
+        return;
+    } else if (sender == self.settingsSequentialAudioButton) {
+        TGMediaPlaybackSetSequentialAudioEnabled([self.settingsSequentialAudioButton state] == NSOnState);
         return;
     } else if (sender == self.settingsAutoplayAnimatedStickersButton) {
         TGResourcePolicySetAutoplayAnimatedStickersEnabled([self.settingsAutoplayAnimatedStickersButton state] == NSOnState);

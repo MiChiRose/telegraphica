@@ -1696,16 +1696,53 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     NSTimeInterval duration = [self currentMediaPlaybackDuration];
     NSTimeInterval currentTime = [self secondsFromMediaPlaybackTime:[self.mediaPlaybackPlayer currentTime]];
     if (duration > 0.0 && currentTime >= duration - 0.05 && [self.mediaPlaybackPlayer rate] == 0.0) {
-        [self clearRememberedMediaPlaybackPosition];
-        [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(0.0, 600)];
-        self.mediaPlaybackPlaying = NO;
-        [self updateMediaPlaybackButton];
-        [self invalidateMediaPlaybackTimer];
-        [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:duration];
+        [self completeCurrentMediaPlaybackAndAdvanceIfNeeded];
         return;
     }
     [self persistMediaPlaybackPositionIfNeededAtTime:currentTime duration:duration force:NO];
     [self updateMediaPlaybackTimelineWithCurrentTime:currentTime duration:duration];
+}
+
+- (void)mediaPlaybackItemDidFinish:(NSNotification *)notification {
+    if ([notification object] != [self.mediaPlaybackPlayer currentItem]) {
+        return;
+    }
+    [self completeCurrentMediaPlaybackAndAdvanceIfNeeded];
+}
+
+- (void)completeCurrentMediaPlaybackAndAdvanceIfNeeded {
+    if (self.mediaPlaybackCompletionHandled || !self.mediaPlaybackPlayer) {
+        return;
+    }
+    self.mediaPlaybackCompletionHandled = YES;
+    TGMessageItem *completedMessageItem = [[self.mediaPlaybackSourceMessageItem retain] autorelease];
+    NSTimeInterval duration = [self currentMediaPlaybackDuration];
+    [self clearRememberedMediaPlaybackPosition];
+    [self.mediaPlaybackPlayer seekToTime:CMTimeMakeWithSeconds(0.0, 600)];
+    self.mediaPlaybackPlaying = NO;
+    [self updateMediaPlaybackButton];
+    [self invalidateMediaPlaybackTimer];
+    [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:duration];
+    if ([self advanceSequentialAudioPlaybackAfterMessageItem:completedMessageItem]) {
+        return;
+    }
+    self.mediaPlaybackSourceMessageItem = nil;
+}
+
+- (BOOL)advanceSequentialAudioPlaybackAfterMessageItem:(TGMessageItem *)completedItem {
+    if (!TGMediaPlaybackSequentialAudioEnabled() ||
+        ![completedItem isKindOfClass:[TGMessageItem class]] ||
+        ![[completedItem chatID] isEqual:self.selectedChatID]) {
+        return NO;
+    }
+
+    TGMessageItem *candidate = TGNextSequentialAudioMessageItem(self.messageItems, completedItem);
+    if (!candidate) {
+        return NO;
+    }
+    self.mediaPlaybackSourceMessageItem = candidate;
+    [self openPlayableMediaForMessageItem:candidate];
+    return YES;
 }
 
 - (void)startMediaPlaybackTimer {
@@ -1950,6 +1987,12 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
                                            duration:outgoingDuration
                                               force:YES];
     [self invalidateMediaPlaybackTimer];
+    AVPlayerItem *outgoingItem = [self.mediaPlaybackPlayer currentItem];
+    if (outgoingItem) {
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                        name:AVPlayerItemDidPlayToEndTimeNotification
+                                                      object:outgoingItem];
+    }
     [self.mediaPlaybackPlayer pause];
     [self.mediaPlaybackLayer removeFromSuperlayer];
     self.mediaPlaybackPlayer = nil;
@@ -1958,6 +2001,7 @@ static NSImage *TGMediaCenterPreviewImageForItem(TGMessageItem *item) {
     self.mediaPlaybackKnownDuration = 0.0;
     self.mediaPlaybackResumeIdentifier = nil;
     self.mediaPlaybackLastPersistedPosition = 0.0;
+    self.mediaPlaybackCompletionHandled = NO;
     [self updateMediaPlaybackButton];
     [self updateMediaPlaybackTimelineWithCurrentTime:0.0 duration:0.0];
 }
@@ -2040,6 +2084,11 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     }
 
     self.mediaPlaybackPlayer = player;
+    self.mediaPlaybackCompletionHandled = NO;
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(mediaPlaybackItemDidFinish:)
+                                                 name:AVPlayerItemDidPlayToEndTimeNotification
+                                               object:[player currentItem]];
     if (!audioOnly) {
         AVPlayerLayer *layer = [AVPlayerLayer playerLayerWithPlayer:player];
         [layer setVideoGravity:AVLayerVideoGravityResizeAspect];
@@ -2213,6 +2262,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     if (![mediaItem isKindOfClass:[NSDictionary class]]) {
         return;
     }
+    self.mediaPlaybackSourceMessageItem = nil;
 
     NSString *path = TGMediaItemPlayableLocalPath(mediaItem);
     if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
@@ -2275,6 +2325,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     if (![item isKindOfClass:[TGMessageItem class]] || ![item isPlayableMediaMessage]) {
         return;
     }
+    self.mediaPlaybackSourceMessageItem = TGMessageItemIsAudioOnlyPlayableMedia(item) ? item : nil;
 
     NSDictionary *media = TGMediaCenterFirstMediaDictionaryForItem(item);
     NSString *path = media ? TGMediaItemPlayableLocalPath(media) : nil;

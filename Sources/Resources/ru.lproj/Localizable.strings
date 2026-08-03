@@ -42,6 +42,7 @@
 "saved.failed" = "Не удалось изменить тему.";
 "settings.forumTopicsTopBar" = "Показывать темы форума над сообщениями";
 "settings.resources.linkPreviews" = "Отображать предпросмотр ссылок";
+"settings.resources.sequentialAudio" = "Воспроизводить голосовые сообщения подряд";
 "settings.section.privacy" = "Приватность";
 "privacy.open" = "Приватность и хранение";
 "privacy.title" = "Приватность и хранение";

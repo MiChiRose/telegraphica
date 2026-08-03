@@ -48,6 +48,7 @@
 #import "../Media/TGMediaImageLoader.h"
 #import "../Media/TGMessageThumbnailPrefetcher.h"
 #import "../Media/TGMediaPlaybackPreferences.h"
+#import "../Media/TGMediaPlaybackSequence.h"
 #import "../Media/TGMediaFileActions.h"
 #import "../Media/TGMediaItemSupport.h"
 #import "../Media/TGOpusVoiceTranscoder.h"
@@ -537,6 +538,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsAutoDownloadDocumentsButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadVoiceButton;
 @property (nonatomic, retain) NSButton *settingsLinkPreviewsButton;
+@property (nonatomic, retain) NSButton *settingsSequentialAudioButton;
 @property (nonatomic, retain) NSButton *settingsAutoplayAnimatedStickersButton;
 @property (nonatomic, retain) NSButton *settingsStopInactiveAnimationsButton;
 @property (nonatomic, retain) NSTextField *settingsMaxAutoDownloadLabel;
@@ -636,6 +638,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
 @property (nonatomic, retain) NSTimer *mediaPlaybackTimer;
+@property (nonatomic, retain) TGMessageItem *mediaPlaybackSourceMessageItem;
+@property (nonatomic, assign) BOOL mediaPlaybackCompletionHandled;
 @property (nonatomic, retain) TGMessageViewersWindowController *messageViewersWindowController;
 @property (nonatomic, retain) NSWindow *photoSendPreviewWindow;
 @property (nonatomic, retain) NSImageView *photoSendPreviewImageView;
@@ -792,6 +796,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                              force:(BOOL)force;
 - (void)clearRememberedMediaPlaybackPosition;
 - (NSTimeInterval)rememberedMediaPlaybackPosition;
+- (BOOL)advanceSequentialAudioPlaybackAfterMessageItem:(TGMessageItem *)completedItem;
+- (void)completeCurrentMediaPlaybackAndAdvanceIfNeeded;
+- (void)mediaPlaybackItemDidFinish:(NSNotification *)notification;
 - (void)rebuildForumTopicTabs;
 - (void)refreshForumTopicTabSelection;
 - (void)selectForumTopicFromTab:(id)sender;
@@ -1077,6 +1084,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsAutoDownloadDocumentsButton = _settingsAutoDownloadDocumentsButton;
 @synthesize settingsAutoDownloadVoiceButton = _settingsAutoDownloadVoiceButton;
 @synthesize settingsLinkPreviewsButton = _settingsLinkPreviewsButton;
+@synthesize settingsSequentialAudioButton = _settingsSequentialAudioButton;
 @synthesize settingsAutoplayAnimatedStickersButton = _settingsAutoplayAnimatedStickersButton;
 @synthesize settingsStopInactiveAnimationsButton = _settingsStopInactiveAnimationsButton;
 @synthesize settingsMaxAutoDownloadLabel = _settingsMaxAutoDownloadLabel;
@@ -1176,6 +1184,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
 @synthesize mediaPlaybackTimer = _mediaPlaybackTimer;
+@synthesize mediaPlaybackSourceMessageItem = _mediaPlaybackSourceMessageItem;
+@synthesize mediaPlaybackCompletionHandled = _mediaPlaybackCompletionHandled;
 @synthesize messageViewersWindowController = _messageViewersWindowController;
 @synthesize photoSendPreviewWindow = _photoSendPreviewWindow;
 @synthesize photoSendPreviewImageView = _photoSendPreviewImageView;
@@ -1837,6 +1847,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsAutoDownloadDocumentsButton setTitle:TGLoc(@"settings.resources.documents")];
     [self.settingsAutoDownloadVoiceButton setTitle:TGLoc(@"settings.resources.voice")];
     [self.settingsLinkPreviewsButton setTitle:TGLoc(@"settings.resources.linkPreviews")];
+    [self.settingsSequentialAudioButton setTitle:TGLoc(@"settings.resources.sequentialAudio")];
     [self.settingsAutoplayAnimatedStickersButton setTitle:TGLoc(@"settings.resources.autoplay")];
     [self.settingsStopInactiveAnimationsButton setTitle:TGLoc(@"settings.resources.stopInactive")];
     [self.settingsMaxAutoDownloadLabel setStringValue:TGLoc(@"settings.resources.maxDownload")];
@@ -1997,6 +2008,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                       self.settingsAutoDownloadDocumentsButton,
                                       self.settingsAutoDownloadVoiceButton,
                                       self.settingsLinkPreviewsButton,
+                                      self.settingsSequentialAudioButton,
                                       self.settingsAutoplayAnimatedStickersButton,
                                       self.settingsStopInactiveAnimationsButton,
                                       nil];
@@ -3916,6 +3928,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsAutoDownloadDocumentsButton,
                                      self.settingsAutoDownloadVoiceButton,
                                      self.settingsLinkPreviewsButton,
+                                     self.settingsSequentialAudioButton,
                                      self.settingsAutoplayAnimatedStickersButton,
                                      self.settingsStopInactiveAnimationsButton,
                                      self.settingsMaxAutoDownloadLabel,
@@ -4885,6 +4898,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsAutoDownloadDocumentsButton release];
     [_settingsAutoDownloadVoiceButton release];
     [_settingsLinkPreviewsButton release];
+    [_settingsSequentialAudioButton release];
     [_settingsAutoplayAnimatedStickersButton release];
     [_settingsStopInactiveAnimationsButton release];
     [_settingsMaxAutoDownloadLabel release];
@@ -5033,6 +5047,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaPlaybackResumeIdentifier release];
     [_mediaPlaybackLayer release];
     [_mediaPlaybackTimer release];
+    [_mediaPlaybackSourceMessageItem release];
     [_mediaPlaybackPreparationQueue release];
     [_mediaPlaybackPreparationCancellationToken release];
     [_messageViewersWindowController release];

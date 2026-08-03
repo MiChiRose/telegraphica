@@ -19,6 +19,11 @@ int main(void) {
     TGMediaPlaybackSetPreferredRate(NO, 1.5);
     TGAssert(TGMediaPlaybackPreferredRate(YES) == 2.0, "audio rate should persist independently");
     TGAssert(TGMediaPlaybackPreferredRate(NO) == 1.5, "video rate should persist independently");
+    TGMediaPlaybackSetSequentialAudioEnabled(NO);
+    TGAssert(!TGMediaPlaybackSequentialAudioEnabled(), "sequential audio should be disabled");
+    TGMediaPlaybackSetSequentialAudioEnabled(YES);
+    TGAssert(TGMediaPlaybackSequentialAudioEnabled(), "sequential audio preference should persist");
+    TGMediaPlaybackSetSequentialAudioEnabled(NO);
     fprintf(stdout, "Media playback preferences probe passed.\n");
     [pool drain];
     return 0;

@@ -130,6 +130,7 @@ voice messages, and keep the app updated from GitHub Releases.
 - 📹 One-to-one Telegram video calls with local camera preview on OS X
   10.9 and newer.
 - 🖼 Grouped photo display, image preview, zoom controls, and pinch-to-zoom.
+- 🔊 Independent audio/video playback speeds and optional sequential voice-message playback.
 - 🎞 Video playback in a resizable native window.
 - 📎 Basic document display with filenames where TDLib exposes them.
 - 🔔 Notification Center alerts, Dock unread badges, sound, and click-through to
