@@ -710,6 +710,7 @@ static NSString *TGActiveSessionIconName(NSDictionary *session) {
     if (!self.storageUsageWindowController) {
         self.storageUsageWindowController = [[[TGStorageUsageWindowController alloc] initWithClient:self.client] autorelease];
     }
+    [self.storageUsageWindowController setSelectedChatID:self.selectedChatID title:self.selectedChatTitle];
     [self.storageUsageWindowController showWindow:sender];
 }
 

@@ -227,3 +227,16 @@
 "chat.clearingHistory" = "Очищаем историю…";
 "chat.historyCleared" = "История чата очищена";
 "chat.clearHistoryFailed" = "Не удалось очистить историю";
+"storage.clearSelected" = "Очистить выбранный кэш";
+"storage.type" = "Тип данных";
+"storage.type.all" = "Все медиа и файлы";
+"storage.type.photos" = "Фотографии";
+"storage.type.videos" = "Видео";
+"storage.type.documents" = "Документы";
+"storage.type.voice" = "Голосовые сообщения";
+"storage.type.audio" = "Аудиофайлы";
+"storage.scope" = "Область";
+"storage.scope.all" = "Все чаты";
+"storage.scope.current" = "Текущий чат";
+"storage.scope.chat" = "Чат: %@";
+"storage.confirm.filteredMessage" = "Будут удалены скачанные данные «%@» в области «%@». Они останутся в облаке Telegram и при необходимости загрузятся снова.";

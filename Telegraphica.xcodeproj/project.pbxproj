@@ -41,6 +41,7 @@
 		B8DB0BB00000000000000004 /* TGMediaPlaybackPreferences.m in Sources */ = {isa = PBXBuildFile; fileRef = B8DB0BB00000000000000006 /* TGMediaPlaybackPreferences.m */; };
 		A5A000000000000000000001 /* TGMessageThumbnailPrefetcher.m in Sources */ = {isa = PBXBuildFile; fileRef = A5A000000000000000000003 /* TGMessageThumbnailPrefetcher.m */; };
 		A5B000000000000000000001 /* TGMediaPlaybackSequence.m in Sources */ = {isa = PBXBuildFile; fileRef = A5B000000000000000000003 /* TGMediaPlaybackSequence.m */; };
+		A5C000000000000000000001 /* TGStorageCleanupPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = A5C000000000000000000003 /* TGStorageCleanupPolicy.m */; };
 		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
 		111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */; };
 		111111111111111111111121 /* TGTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111236 /* TGTheme.m */; };
@@ -225,6 +226,8 @@
 		A5A000000000000000000003 /* TGMessageThumbnailPrefetcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageThumbnailPrefetcher.m; sourceTree = "<group>"; };
 		A5B000000000000000000002 /* TGMediaPlaybackSequence.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMediaPlaybackSequence.h; sourceTree = "<group>"; };
 		A5B000000000000000000003 /* TGMediaPlaybackSequence.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMediaPlaybackSequence.m; sourceTree = "<group>"; };
+		A5C000000000000000000002 /* TGStorageCleanupPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGStorageCleanupPolicy.h; sourceTree = "<group>"; };
+		A5C000000000000000000003 /* TGStorageCleanupPolicy.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStorageCleanupPolicy.m; sourceTree = "<group>"; };
 		111111111111111111111229 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGInlineMediaPlaybackCoordinator.h; sourceTree = "<group>"; };
 		111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGInlineMediaPlaybackCoordinator.m; sourceTree = "<group>"; };
@@ -578,6 +581,8 @@
 		111111111111111111111405 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A5C000000000000000000002 /* TGStorageCleanupPolicy.h */,
+				A5C000000000000000000003 /* TGStorageCleanupPolicy.m */,
 				111111111111111111111206 /* TGKeychainHelper.h */,
 				111111111111111111111207 /* TGKeychainHelper.m */,
 				111111111111111111111208 /* TGLogger.h */,
@@ -915,6 +920,7 @@
 				B8DB0BB00000000000000004 /* TGMediaPlaybackPreferences.m in Sources */,
 				A5A000000000000000000001 /* TGMessageThumbnailPrefetcher.m in Sources */,
 				A5B000000000000000000001 /* TGMediaPlaybackSequence.m in Sources */,
+				A5C000000000000000000001 /* TGStorageCleanupPolicy.m in Sources */,
 				111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */,
 				111111111111111111111121 /* TGTheme.m in Sources */,
 				111111111111111111111156 /* TGVisualWorldThemeSpec.m in Sources */,

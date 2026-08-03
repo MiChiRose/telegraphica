@@ -227,3 +227,16 @@
 "chat.clearingHistory" = "Clearing history…";
 "chat.historyCleared" = "Chat history cleared";
 "chat.clearHistoryFailed" = "Could not clear chat history";
+"storage.clearSelected" = "Clear Selected Cache";
+"storage.type" = "Data type";
+"storage.type.all" = "All media and files";
+"storage.type.photos" = "Photos";
+"storage.type.videos" = "Videos";
+"storage.type.documents" = "Documents";
+"storage.type.voice" = "Voice messages";
+"storage.type.audio" = "Audio files";
+"storage.scope" = "Scope";
+"storage.scope.all" = "All chats";
+"storage.scope.current" = "Current chat";
+"storage.scope.chat" = "Chat: %@";
+"storage.confirm.filteredMessage" = "Downloaded “%@” data in “%@” will be removed from this Mac. It stays in Telegram cloud and can be downloaded again.";

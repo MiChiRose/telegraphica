@@ -15,6 +15,7 @@
 #import "../Services/TGLogger.h"
 #import "../Services/TGResourcePolicy.h"
 #import "../Services/TGSystemCompatibility.h"
+#import "../Services/TGStorageCleanupPolicy.h"
 #import <dlfcn.h>
 #import <Security/Security.h>
 #import <stdlib.h>
@@ -5718,7 +5719,12 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return summary;
 }
 
-- (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+- (NSDictionary *)clearDownloadedMediaCacheForFileTypes:(NSArray *)fileTypes
+                                                 chatIDs:(NSArray *)chatIDs
+                                                 timeout:(NSTimeInterval)timeout
+                                                   error:(NSError **)error {
+    NSArray *safeFileTypes = [fileTypes isKindOfClass:[NSArray class]] ? fileTypes : [NSArray array];
+    NSArray *safeChatIDs = TGStorageCleanupNormalizedChatIDs(chatIDs);
     NSMutableDictionary *request = [NSMutableDictionary dictionary];
     [request setObject:@"optimizeStorage" forKey:@"@type"];
     [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-storage-clear"] forKey:@"@extra"];
@@ -5726,11 +5732,11 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:[NSNumber numberWithInt:0] forKey:@"ttl"];
     [request setObject:[NSNumber numberWithInt:0] forKey:@"count"];
     [request setObject:[NSNumber numberWithInt:0] forKey:@"immunity_delay"];
-    [request setObject:[NSArray array] forKey:@"file_types"];
-    [request setObject:[NSArray array] forKey:@"chat_ids"];
+    [request setObject:safeFileTypes forKey:@"file_types"];
+    [request setObject:safeChatIDs forKey:@"chat_ids"];
     [request setObject:[NSArray array] forKey:@"exclude_chat_ids"];
     [request setObject:[NSNumber numberWithBool:NO] forKey:@"return_deleted_file_statistics"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"chat_limit"];
+    [request setObject:[NSNumber numberWithUnsignedInteger:[safeChatIDs count]] forKey:@"chat_limit"];
 
     NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
                                                        extraPrefix:@"telegraphica-storage-clear"
@@ -5747,6 +5753,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return summary;
     }
     return response;
+}
+
+- (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self clearDownloadedMediaCacheForFileTypes:[NSArray array]
+                                               chatIDs:[NSArray array]
+                                               timeout:timeout
+                                                 error:error];
 }
 
 - (NSDictionary *)photoInfoFromFileObject:(id)fileObject

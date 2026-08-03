@@ -116,6 +116,7 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (BOOL)cancelDownloadForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (BOOL)deleteCachedFileForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)storageUsageSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)clearDownloadedMediaCacheForFileTypes:(NSArray *)fileTypes chatIDs:(NSArray *)chatIDs timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
