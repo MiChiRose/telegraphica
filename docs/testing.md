@@ -63,6 +63,8 @@ The script runs:
   legacy-safe identifier normalization.
 - a persistent download-queue probe covering interrupted-state restoration,
   bounded property-list serialization and TDLib file identifier retention.
+- a storage-cleanup policy probe covering TDLib file-type objects, grouped
+  video categories, and bounded/deduplicated chat identifiers.
 - a playback-speed preference probe covering bounded legacy-safe rates,
   independent audio/video persistence, and the opt-in sequential-audio
   preference;

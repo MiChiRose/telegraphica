@@ -197,6 +197,15 @@ echo "== Sequential audio playback =="
     -o "$BUILD_DIR/media_playback_sequence_probe"
 HOME="$TEST_HOME" "$BUILD_DIR/media_playback_sequence_probe"
 
+echo "== Storage cleanup filters =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/storage_cleanup_policy_probe.m \
+    Sources/Services/TGStorageCleanupPolicy.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/storage_cleanup_policy_probe"
+HOME="$TEST_HOME" "$BUILD_DIR/storage_cleanup_policy_probe"
+
 echo "== Custom emoji descriptors =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
