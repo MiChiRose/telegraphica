@@ -2210,6 +2210,48 @@ def check_tdlib_file_component_boundary(errors):
                           (files_rel, fragment))
 
 
+def check_accessibility_and_keyboard_contract(errors):
+    helper_rel = os.path.join("Sources", "UI", "TGAccessibilitySupport.m")
+    main_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    navigation_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SearchNavigation.inc")
+    helper_text = read_text(os.path.join(ROOT, helper_rel))
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    navigation_text = read_text(os.path.join(ROOT, navigation_rel))
+    for fragment in [
+        "accessibilitySetOverrideValue:forAttribute:",
+        "NSAccessibilityButtonRole",
+        "NSAccessibilityTitleAttribute",
+        "NSAccessibilityHelpAttribute",
+        "NSAccessibilityEnabledAttribute",
+        "NSAccessibilityValueAttribute",
+        "NSAccessibilityListRole",
+    ]:
+        if fragment not in helper_text:
+            errors.append("%s: legacy accessibility contract is missing `%s`" %
+                          (helper_rel, fragment))
+    for fragment in [
+        "refreshAccessibilityDescriptions",
+        "TGAccessibilityConfigureButton",
+        "TGAccessibilityConfigureList",
+        "TGAccessibilityUpdateButtonState",
+    ]:
+        if fragment not in main_text:
+            errors.append("%s: main-window accessibility wiring is missing `%s`" %
+                          (main_rel, fragment))
+    for fragment in [
+        "key == 'n'",
+        "key == 'k'",
+        "key == ','",
+        "openNewChatWindow",
+        "openChatListSearch",
+        "navigationButtons objectAtIndex:3",
+        "key == 'f'",
+    ]:
+        if fragment not in navigation_text:
+            errors.append("%s: keyboard navigation contract is missing `%s`" %
+                          (navigation_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -2247,6 +2289,7 @@ def main():
     check_tdlib_search_component_boundary(errors)
     check_tdlib_storage_component_boundary(errors)
     check_tdlib_file_component_boundary(errors)
+    check_accessibility_and_keyboard_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:
