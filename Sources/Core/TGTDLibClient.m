@@ -1,6 +1,7 @@
 #import "TGTDLibClient.h"
 #import "TGAuthorizationFlow.h"
 #import "TGFormattedTextCodec.h"
+#import "TGReactionCatalog.h"
 #import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
@@ -10981,6 +10982,56 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     return @"reaction submitted";
+}
+
+- (NSDictionary *)availableReactionCatalogForChatID:(NSNumber *)chatID
+                                           messageID:(NSNumber *)messageID
+                                             rowSize:(NSUInteger)rowSize
+                                             timeout:(NSTimeInterval)timeout
+                                               error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0 || [messageID longLongValue] <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing for available reactions." code:239];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error && !*error) {
+            *error = [self errorWithDescription:@"TDLib is not ready to load available reactions." code:240];
+        }
+        return nil;
+    }
+    NSUInteger safeRowSize = MAX((NSUInteger)5U, MIN((NSUInteger)25U, rowSize));
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getMessageAvailableReactions", @"@type",
+                             [NSNumber numberWithLongLong:[chatID longLongValue]], @"chat_id",
+                             [NSNumber numberWithLongLong:[messageID longLongValue]], @"message_id",
+                             [NSNumber numberWithUnsignedInteger:safeRowSize], @"row_size",
+                             nil];
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-available-reactions"
+                                                           timeout:timeout
+                                                         errorCode:241
+                                                             error:&requestError];
+    if (!response) {
+        if (error) {
+            *error = requestError;
+        }
+        return nil;
+    }
+    NSString *responseType = [[response objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [response objectForKey:@"@type"] : @"";
+    if (![responseType isEqualToString:@"availableReactions"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib returned an unexpected available reactions response." code:242];
+        }
+        return nil;
+    }
+    return TGReactionCatalogFromTDLibResponse(response);
 }
 
 - (NSString *)removeReactionFromChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error {

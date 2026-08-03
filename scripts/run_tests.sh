@@ -124,6 +124,16 @@ echo "== Secret chat key visualization =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/secret_chat_key_probe"
 
+echo "== Server reaction catalog =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/reaction_catalog_probe.m \
+    Sources/Core/TGReactionCatalog.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/reaction_catalog_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/reaction_catalog_probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \
