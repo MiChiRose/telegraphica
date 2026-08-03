@@ -33,43 +33,50 @@
 
     if ([cacheKey length] > 0 &&
         ![self.availableReactionEmojisByMessageKey objectForKey:cacheKey] &&
-        ![self.availableReactionRequestsInFlight containsObject:cacheKey]) {
-        [self.availableReactionRequestsInFlight addObject:cacheKey];
-        NSNumber *chatID = [[item chatID] retain];
-        NSNumber *messageID = [[item messageID] retain];
-        NSString *requestKey = [cacheKey copy];
-        TGTDLibClient *client = [self.client retain];
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-            NSError *error = nil;
-            NSDictionary *catalog = [client availableReactionCatalogForChatID:chatID
-                                                                      messageID:messageID
-                                                                        rowSize:8U
-                                                                        timeout:5.0
-                                                                          error:&error];
-            NSArray *loadedEmojis = [[catalog objectForKey:TGReactionCatalogEmojiItemsKey] copy];
-            BOOL shouldCacheResult = (catalog != nil ||
-                [[client capabilities] supportStateForCapability:TGTDLibCapabilityAvailableReactions] ==
-                    TGTDLibCapabilityStateUnsupported);
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self.availableReactionRequestsInFlight removeObject:requestKey];
-                /* Unsupported/valid empty results are cached; transient failures may retry. */
-                if (shouldCacheResult) {
-                    [self.availableReactionEmojisByMessageKey setObject:(loadedEmojis ? loadedEmojis : [NSArray array])
-                                                                  forKey:requestKey];
-                }
-                while ([self.availableReactionEmojisByMessageKey count] > 80U) {
-                    id oldestKey = [[self.availableReactionEmojisByMessageKey allKeys] objectAtIndex:0];
-                    [self.availableReactionEmojisByMessageKey removeObjectForKey:oldestKey];
-                }
-                [loadedEmojis release];
-                [requestKey release];
-                [chatID release];
-                [messageID release];
-            });
-            [client release];
-            [pool drain];
-        });
+        ![self.availableReactionOperationsByMessageKey objectForKey:cacheKey]) {
+        NSNumber *chatID = [item chatID];
+        NSNumber *messageID = [item messageID];
+        NSString *requestKey = [[cacheKey copy] autorelease];
+        TGTDLibClient *client = self.client;
+        __block TGStatusWindowController *owner = self; /* MRC: deliberately non-retaining. */
+        TGTDLibOperation *operation = [[[TGTDLibOperation alloc]
+            initWithGeneration:0U
+                         timeout:5.5
+                      idempotent:YES
+               maximumRetryCount:0U
+                            work:^id(NSError **error) {
+                                return [client availableReactionCatalogForChatID:chatID
+                                                                             messageID:messageID
+                                                                               rowSize:8U
+                                                                               timeout:5.0
+                                                                                 error:error];
+                            }
+                 generationCheck:nil
+                      completion:^(id result, NSError *error) {
+                          (void)error;
+                          TGStatusWindowController *strongOwner = owner;
+                          if (!strongOwner) {
+                              return;
+                          }
+                          NSDictionary *catalog = [result isKindOfClass:[NSDictionary class]] ? result : nil;
+                          NSArray *loadedEmojis = [catalog objectForKey:TGReactionCatalogEmojiItemsKey];
+                          BOOL unsupported = ([[client capabilities]
+                              supportStateForCapability:TGTDLibCapabilityAvailableReactions] ==
+                              TGTDLibCapabilityStateUnsupported);
+                          [strongOwner.availableReactionOperationsByMessageKey removeObjectForKey:requestKey];
+                          /* Unsupported/valid empty results are cached; transient failures may retry. */
+                          if (catalog || unsupported) {
+                              [strongOwner.availableReactionEmojisByMessageKey
+                                  setObject:(loadedEmojis ? loadedEmojis : [NSArray array])
+                                     forKey:requestKey];
+                          }
+                          while ([strongOwner.availableReactionEmojisByMessageKey count] > 80U) {
+                              id oldestKey = [[strongOwner.availableReactionEmojisByMessageKey allKeys] objectAtIndex:0];
+                              [strongOwner.availableReactionEmojisByMessageKey removeObjectForKey:oldestKey];
+                          }
+                      }] autorelease];
+        [self.availableReactionOperationsByMessageKey setObject:operation forKey:cacheKey];
+        [operation start];
     }
 
     NSMutableArray *renderableEmojis = [NSMutableArray array];
