@@ -1717,7 +1717,8 @@ def check_chat_folder_management_contract(errors):
         "importChatFolderWithInviteLink:",
         "definitionHasInclusionRule:",
         "setObjectValue:",
-        "shareLinkForChatFolderID:",
+        "TGChatFolderSharingWindowController",
+        "configureWithFolderDefinition:",
         "TGChatFolderListCell",
         "@interface TGChatFolderListCell : TGRepresentedObjectCell",
         "@interface TGChatFolderChatCell : TGRepresentedObjectCell",
@@ -1729,6 +1730,22 @@ def check_chat_folder_management_contract(errors):
         if fragment not in controller_text:
             errors.append("%s: chat-folder management UI is missing `%s`" %
                           (controller_rel, fragment))
+    sharing_rel = os.path.join("Sources", "UI", "TGChatFolderSharingWindowController.m")
+    sharing_text = read_text(os.path.join(ROOT, sharing_rel))
+    for fragment in [
+        "chatFolderInviteLinksForFolderID:",
+        "createChatFolderInviteLinkForFolderID:",
+        "editChatFolderInviteLinkForFolderID:",
+        "deleteChatFolderInviteLinkForFolderID:",
+        "newChatIDsForChatFolderID:",
+        "processNewChatIDs:",
+        "recommendedChatFolderDefinitionsWithTimeout:",
+        "chatFolderServerLimitsWithTimeout:",
+        "windowWillClose:",
+    ]:
+        if fragment not in sharing_text:
+            errors.append("%s: advanced chat-folder UI is missing `%s`" %
+                          (sharing_rel, fragment))
     for fragment in [
         "showChatFolderManagementWindow:",
         "chatFolderManagementWindowControllerDidChangeFolders:",

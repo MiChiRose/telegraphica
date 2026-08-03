@@ -54,6 +54,9 @@ The script runs:
   decode results.
 - a custom-emoji fixture probe covering identifier collection, TDLib sticker
   response parsing, completed-file gating, and fail-closed malformed data.
+- an advanced chat-folder fixture probe covering multiple invite-link parsing,
+  recommended folder conversion, server-option limits, malformed responses and
+  legacy-safe identifier normalization.
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.

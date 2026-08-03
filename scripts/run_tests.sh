@@ -175,6 +175,16 @@ echo "== Custom emoji descriptors =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/custom_emoji_parser_probe" Tests/Fixtures/custom_emoji_stickers.json
 
+echo "== Advanced chat folders =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/chat_folder_support_probe.m \
+    Sources/Core/TGChatFolderSupport.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/chat_folder_support_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/chat_folder_support_probe" Tests/Fixtures/chat_folder_advanced.json
+
 echo "== Core logic probe =="
 
 "$CLANG" \

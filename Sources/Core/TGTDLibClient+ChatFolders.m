@@ -1,4 +1,5 @@
 #import "TGTDLibClient+ChatFolders.h"
+#import "TGChatFolderSupport.h"
 #import "TGTDLibCapabilities.h"
 
 @interface TGTDLibClient (ChatFoldersPrivate)
@@ -12,18 +13,7 @@
 @end
 
 static NSArray *TGChatFolderSafeIDArray(id value) {
-    if (![value isKindOfClass:[NSArray class]]) {
-        return [NSArray array];
-    }
-    NSMutableArray *result = [NSMutableArray array];
-    NSUInteger index = 0;
-    for (index = 0; index < [(NSArray *)value count]; index++) {
-        id identifier = [(NSArray *)value objectAtIndex:index];
-        if ([identifier respondsToSelector:@selector(longLongValue)]) {
-            [result addObject:[NSNumber numberWithLongLong:[identifier longLongValue]]];
-        }
-    }
-    return result;
+    return TGChatFolderSafeIdentifierArray(value);
 }
 
 static NSString *TGChatFolderSafeAPIKind(id value) {
@@ -38,6 +28,24 @@ static void TGChatFolderSetBoolean(NSMutableDictionary *dictionary, NSDictionary
 }
 
 @implementation TGTDLibClient (ChatFolders)
+
+- (BOOL)tg_canUseAdvancedSharedFoldersWithError:(NSError **)error {
+    TGTDLibCapabilities *capabilities = [self capabilities];
+    if ([capabilities lane] == TGTDLibLaneMountainLionFallback) {
+        if (error) {
+            *error = [self errorWithDescription:@"Shared folder links are unavailable in the OS X 10.8 fallback TDLib." code:356];
+        }
+        return NO;
+    }
+    if ([capabilities supportStateForCapability:TGTDLibCapabilitySharedChatFolders] == TGTDLibCapabilityStateUnsupported) {
+        if (error) {
+            NSString *reason = [capabilities reasonForCapability:TGTDLibCapabilitySharedChatFolders];
+            *error = [self errorWithDescription:([reason length] > 0 ? reason : @"The loaded TDLib does not support shared chat folders.") code:357];
+        }
+        return NO;
+    }
+    return YES;
+}
 
 - (NSString *)tg_preferredChatFolderAPIKind {
     if ([[self capabilities] lane] == TGTDLibLaneMountainLionFallback) {
@@ -554,6 +562,258 @@ static void TGChatFolderSetBoolean(NSMutableDictionary *dictionary, NSDictionary
         *error = [self errorWithDescription:@"TDLib returned an unexpected response while creating the folder link." code:344];
     }
     return nil;
+}
+
+- (NSArray *)chatFolderInviteLinksForFolderID:(NSNumber *)folderID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return nil;
+    }
+    if (![folderID respondsToSelector:@selector(integerValue)] || [folderID integerValue] <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Save the chat folder before managing its links." code:358];
+        }
+        return nil;
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getChatFolderInviteLinks", @"@type",
+                             folderID, @"chat_folder_id",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-links-all"
+                                                            timeout:timeout
+                                                          errorCode:359
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"chatFolderInviteLinks"]) {
+        return TGChatFolderNormalizeInviteLinks(response);
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib returned an unexpected folder-link list." code:360];
+    }
+    return nil;
+}
+
+- (NSArray *)shareableChatIDsForFolderID:(NSNumber *)folderID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return nil;
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getChatsForChatFolderInviteLink", @"@type",
+                             folderID, @"chat_folder_id",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-shareable-all"
+                                                            timeout:timeout
+                                                          errorCode:361
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"chats"]) {
+        return TGChatFolderSafeIdentifierArray([response objectForKey:@"chat_ids"]);
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib returned an unexpected shareable-chat list." code:362];
+    }
+    return nil;
+}
+
+- (NSDictionary *)createChatFolderInviteLinkForFolderID:(NSNumber *)folderID
+                                                    name:(NSString *)name
+                                                 chatIDs:(NSArray *)chatIDs
+                                                 timeout:(NSTimeInterval)timeout
+                                                   error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return nil;
+    }
+    NSString *safeName = [name isKindOfClass:[NSString class]] ? name : @"";
+    if ([safeName length] > 32) {
+        safeName = [safeName substringToIndex:32];
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"createChatFolderInviteLink", @"@type",
+                             folderID, @"chat_folder_id",
+                             safeName, @"name",
+                             TGChatFolderSafeIdentifierArray(chatIDs), @"chat_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-link-create"
+                                                            timeout:timeout
+                                                          errorCode:363
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"chatFolderInviteLink"]) {
+        NSArray *normalized = TGChatFolderNormalizeInviteLinks([NSDictionary dictionaryWithObjectsAndKeys:
+                                                                @"chatFolderInviteLinks", @"@type",
+                                                                [NSArray arrayWithObject:response], @"invite_links",
+                                                                nil]);
+        return [normalized count] > 0 ? [normalized objectAtIndex:0] : nil;
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib could not create the folder link." code:364];
+    }
+    return nil;
+}
+
+- (NSDictionary *)editChatFolderInviteLinkForFolderID:(NSNumber *)folderID
+                                            inviteLink:(NSString *)inviteLink
+                                                  name:(NSString *)name
+                                               chatIDs:(NSArray *)chatIDs
+                                               timeout:(NSTimeInterval)timeout
+                                                 error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return nil;
+    }
+    NSString *safeName = [name isKindOfClass:[NSString class]] ? name : @"";
+    if ([safeName length] > 32) {
+        safeName = [safeName substringToIndex:32];
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"editChatFolderInviteLink", @"@type",
+                             folderID, @"chat_folder_id",
+                             inviteLink, @"invite_link",
+                             safeName, @"name",
+                             TGChatFolderSafeIdentifierArray(chatIDs), @"chat_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-link-edit"
+                                                            timeout:timeout
+                                                          errorCode:365
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"chatFolderInviteLink"]) {
+        NSArray *normalized = TGChatFolderNormalizeInviteLinks([NSDictionary dictionaryWithObjectsAndKeys:
+                                                                @"chatFolderInviteLinks", @"@type",
+                                                                [NSArray arrayWithObject:response], @"invite_links",
+                                                                nil]);
+        return [normalized count] > 0 ? [normalized objectAtIndex:0] : nil;
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib could not update the folder link." code:366];
+    }
+    return nil;
+}
+
+- (BOOL)deleteChatFolderInviteLinkForFolderID:(NSNumber *)folderID
+                                   inviteLink:(NSString *)inviteLink
+                                      timeout:(NSTimeInterval)timeout
+                                        error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return NO;
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"deleteChatFolderInviteLink", @"@type",
+                             folderID, @"chat_folder_id",
+                             inviteLink, @"invite_link",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-link-delete"
+                                                            timeout:timeout
+                                                          errorCode:367
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"ok"]) {
+        return YES;
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib could not delete the folder link." code:368];
+    }
+    return NO;
+}
+
+- (NSArray *)newChatIDsForChatFolderID:(NSNumber *)folderID timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return nil;
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getChatFolderNewChats", @"@type",
+                             folderID, @"chat_folder_id",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-new-chats"
+                                                            timeout:timeout
+                                                          errorCode:369
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"chats"]) {
+        return TGChatFolderSafeIdentifierArray([response objectForKey:@"chat_ids"]);
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib returned an unexpected list of suggested chats." code:370];
+    }
+    return nil;
+}
+
+- (BOOL)processNewChatIDs:(NSArray *)chatIDs
+          forChatFolderID:(NSNumber *)folderID
+                  timeout:(NSTimeInterval)timeout
+                    error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return NO;
+    }
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"processChatFolderNewChats", @"@type",
+                             folderID, @"chat_folder_id",
+                             TGChatFolderSafeIdentifierArray(chatIDs), @"added_chat_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:@"telegraphica-chat-folder-new-chats-process"
+                                                            timeout:timeout
+                                                          errorCode:371
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"ok"]) {
+        return YES;
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib could not process the suggested chats." code:372];
+    }
+    return NO;
+}
+
+- (NSArray *)recommendedChatFolderDefinitionsWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    if (![self tg_canUseAdvancedSharedFoldersWithError:error]) {
+        return nil;
+    }
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:[NSDictionary dictionaryWithObject:@"getRecommendedChatFolders" forKey:@"@type"]
+                                                        extraPrefix:@"telegraphica-chat-folder-recommended"
+                                                            timeout:timeout
+                                                          errorCode:373
+                                                              error:error];
+    if ([[response objectForKey:@"@type"] isEqualToString:@"recommendedChatFolders"]) {
+        return TGChatFolderNormalizeRecommendedFolders(response);
+    }
+    if (error && response && !*error) {
+        *error = [self errorWithDescription:@"TDLib returned an unexpected recommended-folder list." code:374];
+    }
+    return nil;
+}
+
+- (NSDictionary *)chatFolderServerLimitsWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSArray *names = [NSArray arrayWithObjects:
+                      @"chat_folder_count_max",
+                      @"chat_folder_chosen_chat_count_max",
+                      @"chat_folder_invite_link_count_max",
+                      @"added_shareable_chat_folder_count_max",
+                      @"chat_folder_new_chats_update_period",
+                      nil];
+    NSMutableDictionary *limits = [NSMutableDictionary dictionary];
+    NSError *firstError = nil;
+    NSUInteger index = 0;
+    for (index = 0; index < [names count]; index++) {
+        NSString *name = [names objectAtIndex:index];
+        NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 @"getOption", @"@type",
+                                 name, @"name",
+                                 nil];
+        NSError *optionError = nil;
+        NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                            extraPrefix:@"telegraphica-chat-folder-limit"
+                                                                timeout:timeout
+                                                              errorCode:375
+                                                                  error:&optionError];
+        NSNumber *value = TGChatFolderOptionInteger(response);
+        if (value) {
+            [limits setObject:value forKey:name];
+        } else if (!firstError && optionError) {
+            firstError = optionError;
+        }
+    }
+    if ([limits count] == 0 && error) {
+        *error = firstError ? firstError : [self errorWithDescription:@"The loaded TDLib did not publish chat-folder limits." code:376];
+    }
+    return limits;
 }
 
 @end

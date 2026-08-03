@@ -20,6 +20,8 @@
 		C0F100000000000000000001 /* TGAddedReactionsParser.m in Sources */ = {isa = PBXBuildFile; fileRef = C0F100000000000000000003 /* TGAddedReactionsParser.m */; };
 		C0F200000000000000000001 /* TGCustomEmojiParser.m in Sources */ = {isa = PBXBuildFile; fileRef = C0F200000000000000000003 /* TGCustomEmojiParser.m */; };
 		C0F300000000000000000001 /* TGCustomEmojiImageLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = C0F300000000000000000003 /* TGCustomEmojiImageLoader.m */; };
+		C0F400000000000000000001 /* TGChatFolderSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = C0F400000000000000000003 /* TGChatFolderSupport.m */; };
+		C0F500000000000000000001 /* TGChatFolderSharingWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = C0F500000000000000000003 /* TGChatFolderSharingWindowController.m */; };
 		111111111111111111111104 /* TGKeychainHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111207 /* TGKeychainHelper.m */; };
 		111111111111111111111105 /* TGLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111209 /* TGLogger.m */; };
 		111111111111111111111106 /* TGStatusWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111211 /* TGStatusWindowController.m */; };
@@ -183,6 +185,10 @@
 		C0F200000000000000000003 /* TGCustomEmojiParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGCustomEmojiParser.m; sourceTree = "<group>"; };
 		C0F300000000000000000002 /* TGCustomEmojiImageLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGCustomEmojiImageLoader.h; sourceTree = "<group>"; };
 		C0F300000000000000000003 /* TGCustomEmojiImageLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGCustomEmojiImageLoader.m; sourceTree = "<group>"; };
+		C0F400000000000000000002 /* TGChatFolderSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatFolderSupport.h; sourceTree = "<group>"; };
+		C0F400000000000000000003 /* TGChatFolderSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatFolderSupport.m; sourceTree = "<group>"; };
+		C0F500000000000000000002 /* TGChatFolderSharingWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatFolderSharingWindowController.h; sourceTree = "<group>"; };
+		C0F500000000000000000003 /* TGChatFolderSharingWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatFolderSharingWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111206 /* TGKeychainHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGKeychainHelper.h; sourceTree = "<group>"; };
 		111111111111111111111207 /* TGKeychainHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGKeychainHelper.m; sourceTree = "<group>"; };
 		111111111111111111111208 /* TGLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLogger.h; sourceTree = "<group>"; };
@@ -509,6 +515,8 @@
 				C0F100000000000000000003 /* TGAddedReactionsParser.m */,
 				C0F200000000000000000002 /* TGCustomEmojiParser.h */,
 				C0F200000000000000000003 /* TGCustomEmojiParser.m */,
+				C0F400000000000000000002 /* TGChatFolderSupport.h */,
+				C0F400000000000000000003 /* TGChatFolderSupport.m */,
 				111111111111111111111335 /* TGTDLibClient+ChatFolders.h */,
 				111111111111111111111336 /* TGTDLibClient+ChatFolders.m */,
 				FA0000000000000000000002 /* TGTDLibClient+ForumTopics.h */,
@@ -613,6 +621,8 @@
 				111111111111111111111334 /* TGProfileEditWindowController.m */,
 				111111111111111111111337 /* TGChatFolderManagementWindowController.h */,
 				111111111111111111111338 /* TGChatFolderManagementWindowController.m */,
+				C0F500000000000000000002 /* TGChatFolderSharingWindowController.h */,
+				C0F500000000000000000003 /* TGChatFolderSharingWindowController.m */,
 				111111111111111111111341 /* TGNotificationSettingsWindowController.h */,
 				111111111111111111111342 /* TGNotificationSettingsWindowController.m */,
 				111111111111111111111345 /* TGChatInfoWindowController.h */,
@@ -870,6 +880,8 @@
 				C0F100000000000000000001 /* TGAddedReactionsParser.m in Sources */,
 				C0F200000000000000000001 /* TGCustomEmojiParser.m in Sources */,
 				C0F300000000000000000001 /* TGCustomEmojiImageLoader.m in Sources */,
+				C0F400000000000000000001 /* TGChatFolderSupport.m in Sources */,
+				C0F500000000000000000001 /* TGChatFolderSharingWindowController.m in Sources */,
 				C0D000000000000000000004 /* TGTDLibClient+SecretChats.m in Sources */,
 				111111111111111111111104 /* TGKeychainHelper.m in Sources */,
 				111111111111111111111105 /* TGLogger.m in Sources */,
