@@ -57,6 +57,8 @@ The script runs:
   main-thread delivery, bounded caching and cancellation suppression.
 - a utility-window lifetime probe covering close/reopen generation changes and
   stale-result suppression; the storage window is wired to this lifecycle.
+- a fixture-style TDLib message-search probe covering request types, bounded
+  limits, media filters, topic/thread routing, anchors and pagination offsets.
 - a static sticker-thumbnail pipeline check ensuring that picker layout only
   reads the bounded cache and that grid/rail jobs are cancellable and reject
   stale generations.

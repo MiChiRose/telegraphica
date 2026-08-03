@@ -119,6 +119,17 @@ echo "== TDLib capability registry =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib_capabilities_probe"
 
+echo "== TDLib message search requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_search_request_probe.m \
+    Sources/Core/TGTDLibClient+Search.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-search-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-search-request-probe"
+
 echo "== Authorization flow fixtures =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \

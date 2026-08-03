@@ -61,6 +61,7 @@
 #import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+Search.h"
 #import "../Core/TGTDLibCapabilities.h"
 #import "../Core/TGTDLibClient+ChatHistory.h"
 #import "../Core/TGTDLibClient+ChatMembers.h"
