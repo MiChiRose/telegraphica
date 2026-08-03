@@ -43,6 +43,7 @@
 		A5B000000000000000000001 /* TGMediaPlaybackSequence.m in Sources */ = {isa = PBXBuildFile; fileRef = A5B000000000000000000003 /* TGMediaPlaybackSequence.m */; };
 		A5C000000000000000000001 /* TGStorageCleanupPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = A5C000000000000000000003 /* TGStorageCleanupPolicy.m */; };
 		A5D000000000000000000001 /* TGAnimatedImageLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = A5D000000000000000000003 /* TGAnimatedImageLoader.m */; };
+		A5E000000000000000000001 /* TGUtilityWindowLifetime.m in Sources */ = {isa = PBXBuildFile; fileRef = A5E000000000000000000003 /* TGUtilityWindowLifetime.m */; };
 		111111111111111111111119 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111229 /* ThirdPartyNotices.txt */; };
 		111111111111111111111120 /* TGInlineMediaPlaybackCoordinator.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */; };
 		111111111111111111111121 /* TGTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111236 /* TGTheme.m */; };
@@ -231,6 +232,8 @@
 		A5C000000000000000000003 /* TGStorageCleanupPolicy.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGStorageCleanupPolicy.m; sourceTree = "<group>"; };
 		A5D000000000000000000002 /* TGAnimatedImageLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGAnimatedImageLoader.h; sourceTree = "<group>"; };
 		A5D000000000000000000003 /* TGAnimatedImageLoader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAnimatedImageLoader.m; sourceTree = "<group>"; };
+		A5E000000000000000000002 /* TGUtilityWindowLifetime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGUtilityWindowLifetime.h; sourceTree = "<group>"; };
+		A5E000000000000000000003 /* TGUtilityWindowLifetime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGUtilityWindowLifetime.m; sourceTree = "<group>"; };
 		111111111111111111111229 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		111111111111111111111233 /* TGInlineMediaPlaybackCoordinator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGInlineMediaPlaybackCoordinator.h; sourceTree = "<group>"; };
 		111111111111111111111234 /* TGInlineMediaPlaybackCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGInlineMediaPlaybackCoordinator.m; sourceTree = "<group>"; };
@@ -709,6 +712,8 @@
 				111111111111111111111266 /* TGUpdateSupport.m */,
 				111111111111111111111269 /* TGStorageUsageWindowController.h */,
 				111111111111111111111270 /* TGStorageUsageWindowController.m */,
+				A5E000000000000000000002 /* TGUtilityWindowLifetime.h */,
+				A5E000000000000000000003 /* TGUtilityWindowLifetime.m */,
 				111111111111111111111253 /* TGStatusViewCells.h */,
 				111111111111111111111254 /* TGStatusViewCells.m */,
 				111111111111111111111255 /* TGStatusSupport.h */,
@@ -947,6 +952,7 @@
 				111111111111111111111135 /* TGUpdateSupport.m in Sources */,
 				111111111111111111111136 /* TGWebMAnimationView.mm in Sources */,
 				111111111111111111111137 /* TGStorageUsageWindowController.m in Sources */,
+				A5E000000000000000000001 /* TGUtilityWindowLifetime.m in Sources */,
 				111111111111111111111138 /* TGIconDrawing.m in Sources */,
 				111111111111111111111139 /* TGAnimationSupport.m in Sources */,
 				111111111111111111111140 /* TGIconAssets.m in Sources */,

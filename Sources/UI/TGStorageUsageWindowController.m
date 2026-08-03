@@ -1,6 +1,8 @@
 #import "TGStorageUsageWindowController.h"
+#import "TGUtilityWindowLifetime.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibOperation.h"
 #import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Services/TGLogger.h"
@@ -278,7 +280,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
 @end
 
-@interface TGStorageUsageWindowController ()
+@interface TGStorageUsageWindowController () <NSWindowDelegate>
 
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, retain) NSTextField *titleField;
@@ -293,6 +295,8 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @property (nonatomic, retain) NSPopUpButton *scopePopUpButton;
 @property (nonatomic, retain) NSNumber *selectedChatID;
 @property (nonatomic, copy) NSString *selectedChatTitle;
+@property (nonatomic, retain) TGUtilityWindowLifetime *requestLifetime;
+@property (nonatomic, retain) TGTDLibOperation *refreshOperation;
 
 - (void)rebuildScopePopUpButton;
 
@@ -313,6 +317,8 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @synthesize scopePopUpButton = _scopePopUpButton;
 @synthesize selectedChatID = _selectedChatID;
 @synthesize selectedChatTitle = _selectedChatTitle;
+@synthesize requestLifetime = _requestLifetime;
+@synthesize refreshOperation = _refreshOperation;
 
 + (NSString *)displayStringForBytes:(long long)bytes {
     double value = (double)bytes;
@@ -380,6 +386,8 @@ static NSColor *TGStorageRowSeparatorColor(void) {
                                                      backing:NSBackingStoreBuffered
                                                        defer:NO] autorelease];
     [window setTitle:TGLoc(@"storage.title")];
+    [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
     [window center];
     [self setWindow:window];
 
@@ -492,12 +500,16 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     self = [super initWithWindow:nil];
     if (self) {
         _client = [client retain];
+        _requestLifetime = [[TGUtilityWindowLifetime alloc] init];
         [self buildWindow];
     }
     return self;
 }
 
 - (void)dealloc {
+    [[self window] setDelegate:nil];
+    [_requestLifetime invalidate];
+    [_refreshOperation cancel];
     [_client release];
     [_titleField release];
     [_subtitleField release];
@@ -511,6 +523,8 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [_scopePopUpButton release];
     [_selectedChatID release];
     [_selectedChatTitle release];
+    [_requestLifetime release];
+    [_refreshOperation release];
     [super dealloc];
 }
 
@@ -593,6 +607,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 }
 
 - (void)showWindow:(id)sender {
+    [self.requestLifetime beginPresentation];
     [super showWindow:sender];
     [[self window] makeKeyAndOrderFront:sender];
     [self refreshStorageUsage:sender];
@@ -600,35 +615,47 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
 - (void)refreshStorageUsage:(id)sender {
     (void)sender;
+    [self.refreshOperation cancel];
+    self.refreshOperation = nil;
+    NSUInteger generation = [self.requestLifetime beginOperation];
+    if (![self.requestLifetime isCurrentGeneration:generation]) {
+        return;
+    }
     [self setBusy:YES];
     [self.subtitleField setStringValue:TGLoc(@"storage.loading")];
     [self.chartView setCenterText:@"—"];
     [self.chartView setSegments:nil];
     [self.chartView setNeedsDisplay:YES];
 
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *error = nil;
-        NSDictionary *summary = [[client storageUsageSummaryWithTimeout:8.0 error:&error] retain];
-        NSString *errorText = [[error localizedDescription] copy];
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self setBusy:NO];
-            if (summary) {
-                [self applyStorageSummary:summary];
-            } else {
-                [self.subtitleField setStringValue:TGLoc(@"storage.unavailable")];
-                [self.chartView setCenterText:@"—"];
-                [self.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
-                [self.chartView setNeedsDisplay:YES];
-            }
-            [summary release];
-            [errorText release];
-            [client release];
-        });
-        [pool drain];
-    });
+    TGStorageUsageWindowController *owner = self;
+    TGTDLibClient *client = self.client;
+    TGTDLibOperation *operation = [[[TGTDLibOperation alloc]
+        initWithGeneration:generation
+                   timeout:9.0
+                idempotent:YES
+         maximumRetryCount:0U
+                      work:^id(NSError **error) {
+                          return [client storageUsageSummaryWithTimeout:8.0 error:error];
+                      }
+           generationCheck:^BOOL(NSUInteger candidateGeneration) {
+                          return [owner.requestLifetime isCurrentGeneration:candidateGeneration];
+                      }
+                completion:^(id result, NSError *error) {
+                          owner.refreshOperation = nil;
+                          [owner setBusy:NO];
+                          NSDictionary *summary = [result isKindOfClass:[NSDictionary class]] ? result : nil;
+                          if (summary) {
+                              [owner applyStorageSummary:summary];
+                          } else {
+                              [owner.subtitleField setStringValue:TGLoc(@"storage.unavailable")];
+                              [owner.chartView setCenterText:@"—"];
+                              NSString *errorText = [error localizedDescription];
+                              [owner.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
+                              [owner.chartView setNeedsDisplay:YES];
+                          }
+                      }] autorelease];
+    self.refreshOperation = operation;
+    [operation start];
 }
 
 - (void)clearStorageCache:(id)sender {
@@ -647,6 +674,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
     [self setBusy:YES];
     [self.subtitleField setStringValue:TGLoc(@"storage.clearing")];
+    NSUInteger generation = [self.requestLifetime beginOperation];
 
     NSString *typeSelection = [[[[self.typePopUpButton selectedItem] representedObject] description] copy];
     id scopeValue = [[self.scopePopUpButton selectedItem] representedObject];
@@ -656,6 +684,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
                         ? [NSArray arrayWithObject:self.selectedChatID]
                         : [NSArray array] retain];
 
+    TGStorageUsageWindowController *owner = self;
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -674,13 +703,15 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self setBusy:NO];
-            if (summary) {
-                [self applyStorageSummary:summary];
-                [self.hintField setStringValue:TGLoc(@"storage.clearDone")];
-            } else {
-                [self.subtitleField setStringValue:TGLoc(@"storage.clearFailed")];
-                [self.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
+            if ([owner.requestLifetime isCurrentGeneration:generation]) {
+                [owner setBusy:NO];
+                if (summary) {
+                    [owner applyStorageSummary:summary];
+                    [owner.hintField setStringValue:TGLoc(@"storage.clearDone")];
+                } else {
+                    [owner.subtitleField setStringValue:TGLoc(@"storage.clearFailed")];
+                    [owner.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
+                }
             }
             [summary release];
             [errorText release];
@@ -691,6 +722,16 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         });
         [pool drain];
     });
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    if ([notification object] != [self window]) {
+        return;
+    }
+    [self.requestLifetime invalidate];
+    [self.refreshOperation cancel];
+    self.refreshOperation = nil;
+    [self.progressIndicator stopAnimation:nil];
 }
 
 @end

@@ -55,6 +55,8 @@ The script runs:
   reset invalidation.
 - a compiled animated-image probe covering off-main GIF validation/decode,
   main-thread delivery, bounded caching and cancellation suppression.
+- a utility-window lifetime probe covering close/reopen generation changes and
+  stale-result suppression; the storage window is wired to this lifecycle.
 - a static sticker-thumbnail pipeline check ensuring that picker layout only
   reads the bounded cache and that grid/rail jobs are cancellable and reject
   stale generations.

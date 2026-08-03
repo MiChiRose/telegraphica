@@ -93,6 +93,14 @@ echo "== Asynchronous animated image loader =="
     -o "$BUILD_DIR/animated-image-loader-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/animated-image-loader-probe"
 
+echo "== Utility window request lifetime =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/utility_window_lifetime_probe.m \
+    Sources/UI/TGUtilityWindowLifetime.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/utility-window-lifetime-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/utility-window-lifetime-probe"
+
 echo "== Persistent download queue =="
 "$CLANG" "${COMPILE_FLAGS[@]}" \
     Tests/download_queue_store_probe.m \

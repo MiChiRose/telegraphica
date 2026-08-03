@@ -240,7 +240,7 @@ This is a native-product assessment adapted to AppKit rather than a web audit.
 | Performance | 3/4 | Main chat thumbnails, sticker previews and inline GIF decoding are now asynchronous and bounded; secondary surfaces and large controllers remain |
 | Responsive layout | 3/4 | Scrollable settings/drawer and snapped chat sidebar are strong; manual frames still create edge cases |
 | Theming | 3/4 | Central theme helpers are widely used, with some hard-coded colors and strings left |
-| Product consistency | 3/4 | The app has a coherent native vocabulary; utility windows still vary in lifecycle and polish |
+| Product consistency | 3/4 | The app has a coherent native vocabulary; storage now uses a tested close/reopen request lifetime while other utility windows still vary |
 | Total | 13/20 | Acceptable, with reliability and structural work needed before very large new subsystems |
 
 ## Next Recommended Feature
