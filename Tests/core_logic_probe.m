@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import "TGChatDisplayPreferences.h"
+#import "TGCustomEmojiImageLoader.h"
 #import "TGLocalization.h"
 #import "TGMediaItemSupport.h"
 #import "TGMediaSecurityLimits.h"
@@ -39,6 +40,17 @@ NSImage *TGImageThumbnailFromData(NSData *data, NSUInteger maximumPixelSize) {
     (void)data;
     (void)maximumPixelSize;
     return nil;
+}
+
+NSImage *TGCustomEmojiCachedImageForEntity(NSDictionary *entity, NSUInteger maximumPixelSize) {
+    (void)entity;
+    (void)maximumPixelSize;
+    return nil;
+}
+
+void TGCustomEmojiRequestImageForEntity(NSDictionary *entity, NSUInteger maximumPixelSize) {
+    (void)entity;
+    (void)maximumPixelSize;
 }
 
 NSImage *TGIconAssetImageNamed(NSString *name) {
@@ -357,6 +369,29 @@ static void TGTestMessageItemsAndLayout(void) {
     NSTextBlock *quoteBlock = [[quoteParagraph textBlocks] objectAtIndex:0];
     TGAssertTrue([quoteBlock widthForLayer:NSTextBlockBorder edge:NSMinXEdge] >= 3.0,
                  @"TDLib block quote entities should render a visible leading bar");
+
+    TGMessageItem *customEmojiItem = [[[TGMessageItem alloc] initWithChatID:@1
+                                                                  messageID:@3
+                                                                       date:nil
+                                                                   outgoing:NO
+                                                                    preview:@"xy"] autorelease];
+    NSDictionary *customEmojiType = [NSDictionary dictionaryWithObjectsAndKeys:
+                                     @"textEntityTypeCustomEmoji", @"@type",
+                                     @101, @"custom_emoji_id",
+                                     nil];
+    NSDictionary *customEmojiEntity = [NSDictionary dictionaryWithObjectsAndKeys:
+                                       @0, @"offset",
+                                       @1, @"length",
+                                       customEmojiType, @"type",
+                                       @101, @"custom_emoji_id",
+                                       @"stickerFormatTgs", @"custom_emoji_format",
+                                       nil];
+    [customEmojiItem setFormattedEntities:[NSArray arrayWithObject:customEmojiEntity]];
+    NSAttributedString *customEmojiText = TGAttributedMessageStringForItem(customEmojiItem,
+                                                                           [customEmojiItem preview],
+                                                                           nil);
+    TGAssertEqualObjects([customEmojiText string], @"◇y",
+                         @"unsupported custom emoji should render a stable visible placeholder");
 
     TGSetChatMessagesAsBlocksEnabled(YES);
     CGFloat blockHeight = TGMessageBubbleHeightForItem(textItem, 640.0, NO);

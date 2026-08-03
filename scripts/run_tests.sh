@@ -165,6 +165,16 @@ echo "== Media image loader =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
 
+echo "== Custom emoji descriptors =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/custom_emoji_parser_probe.m \
+    Sources/Core/TGCustomEmojiParser.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/custom_emoji_parser_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/custom_emoji_parser_probe" Tests/Fixtures/custom_emoji_stickers.json
+
 echo "== Core logic probe =="
 
 "$CLANG" \
@@ -173,6 +183,7 @@ echo "== Core logic probe =="
     Sources/Core/TGMessageItem.m \
     Sources/Core/TGMessagePollSupport.m \
     Sources/Core/TGOutgoingMessageTextChunker.m \
+    Sources/Core/TGCustomEmojiParser.m \
     Sources/Media/TGMediaItemSupport.m \
     Sources/Media/TGOpusVoiceTranscoder.m \
     Sources/Services/TGLogger.m \
