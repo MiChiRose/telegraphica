@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 
 @class TGMessageItem;
+@class TGTDLibCapabilities;
 
 extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 extern NSString * const TGTDLibCallDidUpdateNotification;
@@ -123,6 +124,8 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSArray *)drainSafeUpdateSummaries;
 - (NSString *)receiverStatusSummary;
 - (NSString *)loadedLibraryPath;
+- (TGTDLibCapabilities *)capabilities;
+- (NSString *)tdlibCapabilitiesSummary;
 - (BOOL)isAuthorizationNetworkTimeoutError:(NSError *)error;
 - (void)shutdownWithTimeout:(NSTimeInterval)timeout;
 

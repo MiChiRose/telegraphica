@@ -1953,7 +1953,9 @@
         NSString *postLoginProbeSummary = nil;
         NSString *proxySummary = nil;
         NSString *networkDiagnosticsSummary = nil;
+        NSString *capabilitiesSummary = nil;
         if (probeSummary) {
+            capabilitiesSummary = [client tdlibCapabilitiesSummary];
             proxySummary = [client configureNetworkProxyIfNeededWithTimeout:5.0 error:NULL];
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
@@ -2040,6 +2042,9 @@
         if (networkDiagnosticsSummary) {
             [uiState setObject:networkDiagnosticsSummary forKey:@"networkDiagnosticsSummary"];
         }
+        if (capabilitiesSummary) {
+            [uiState setObject:capabilitiesSummary forKey:@"capabilitiesSummary"];
+        }
         NSString *loadedPath = [client loadedLibraryPath];
         if (loadedPath) {
             [uiState setObject:loadedPath forKey:@"loadedPath"];
@@ -2059,6 +2064,7 @@
             NSString *postLoginProbeSummaryForUI = [uiState objectForKey:@"postLoginProbeSummary"];
             NSString *proxySummaryForUI = [uiState objectForKey:@"proxySummary"];
             NSString *networkDiagnosticsSummaryForUI = [uiState objectForKey:@"networkDiagnosticsSummary"];
+            NSString *capabilitiesSummaryForUI = [uiState objectForKey:@"capabilitiesSummary"];
             NSString *loadedPathForUI = [uiState objectForKey:@"loadedPath"];
             NSString *receiverSummaryForUI = [uiState objectForKey:@"receiverSummary"];
             if (self.client != client) {
@@ -2068,6 +2074,9 @@
                 [self.statusField setStringValue:[finalAuthorizationStateForUI isEqualToString:@"ready"] ? @"Connected" : @"Login required"];
                 [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPathForUI ? loadedPathForUI : @"unknown path"]];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummaryForUI]];
+                if (capabilitiesSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib capabilities: %@", capabilitiesSummaryForUI]];
+                }
                 if (receiverSummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib receiver: %@", receiverSummaryForUI]];
                 }

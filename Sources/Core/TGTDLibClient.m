@@ -1,4 +1,5 @@
 #import "TGTDLibClient.h"
+#import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
 #import "TGChatItem.h"
@@ -251,6 +252,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSMutableDictionary *_notificationScopeMutedByType;
     NSMutableDictionary *_savedMessagesTopicsByID;
+    TGTDLibCapabilities *_capabilities;
     NSString *_latestAuthorizationStateSummary;
     NSString *_latestAuthenticationQRCodeLink;
     NSString *_networkProxyBootstrapSummary;
@@ -302,6 +304,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (BOOL)boolValueFromObject:(id)value defaultValue:(BOOL)defaultValue;
 - (NSString *)optionSummaryForName:(NSString *)name timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (id)valueFromTDLibOptionResponse:(NSDictionary *)response;
+- (id)executeOptionValueNamed:(NSString *)name;
+- (NSString *)bundledTDLibVersionFromManifest;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
 - (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
@@ -408,6 +412,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
         _notificationScopeMutedByType = [[NSMutableDictionary alloc] init];
         _savedMessagesTopicsByID = [[NSMutableDictionary alloc] init];
+        _capabilities = [[TGTDLibCapabilities alloc] initWithLoadedLibraryPath:nil];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -546,6 +551,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_syntheticMediaAlbumIDByMessageKey release];
     [_notificationScopeMutedByType release];
     [_savedMessagesTopicsByID release];
+    [_capabilities release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
     [_latestAuthenticationQRCodeLink release];
@@ -557,6 +563,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (NSString *)loadedLibraryPath {
     return _loadedPath;
+}
+
+- (TGTDLibCapabilities *)capabilities {
+    return _capabilities;
+}
+
+- (NSString *)tdlibCapabilitiesSummary {
+    return [_capabilities diagnosticSummary];
 }
 
 - (BOOL)mainChatListExhausted {
@@ -1592,7 +1606,23 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         }
         [_sendLock unlock];
 
-        NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
+        NSError *capabilityError = nil;
+        NSDictionary *response = [self waitForResponseWithExtra:extra
+                                                        timeout:timeout
+                                                      errorCode:errorCode
+                                                          error:&capabilityError];
+        if (error) {
+            *error = capabilityError;
+        }
+        NSString *requestType = [[request objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [request objectForKey:@"@type"] : nil;
+        NSString *capability = [TGTDLibCapabilities capabilityIdentifierForRequestType:requestType];
+        if ([capability length] > 0) {
+            [_capabilities recordProbeResponse:response
+                                         error:capabilityError
+                                 forCapability:capability
+                                        source:requestType];
+        }
         if (!response) {
             return nil;
         }
@@ -2580,6 +2610,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
         _libraryHandle = handle;
         self.loadedPath = path;
+        [_capabilities updateLoadedLibraryPath:path];
         break;
     }
 
@@ -2734,6 +2765,19 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSDictionary *dictionary = (NSDictionary *)object;
     id type = [dictionary objectForKey:@"@type"];
     if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"textEntities"]) {
+        [_capabilities recordProbeResponse:dictionary
+                                     error:nil
+                             forCapability:TGTDLibCapabilityModernTextEntities
+                                    source:@"getTextEntities.execute"];
+        id version = [self executeOptionValueNamed:@"version"];
+        id commit = [self executeOptionValueNamed:@"commit_hash"];
+        id layer = [self executeOptionValueNamed:@"mtproto_layer"];
+        if (![version isKindOfClass:[NSString class]] || [(NSString *)version length] == 0) {
+            version = [self bundledTDLibVersionFromManifest];
+        }
+        [_capabilities recordTDLibVersion:([version isKindOfClass:[NSString class]] ? version : nil)
+                                   commit:([commit isKindOfClass:[NSString class]] ? commit : nil)
+                             mtprotoLayer:([layer isKindOfClass:[NSNumber class]] ? layer : nil)];
         id entities = [dictionary objectForKey:@"entities"];
         if ([entities isKindOfClass:[NSArray class]]) {
             return [NSString stringWithFormat:@"sync execute OK (%lu text entities)", (unsigned long)[entities count]];
@@ -2744,6 +2788,65 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (error) {
         NSString *message = [NSString stringWithFormat:@"TDLib synchronous probe returned unexpected response: %@", jsonString];
         *error = [self errorWithDescription:message code:10];
+    }
+    return nil;
+}
+
+- (id)executeOptionValueNamed:(NSString *)name {
+    if ([name length] == 0 || !_executeFunction || !_client) {
+        return nil;
+    }
+    NSDictionary *requestObject = [NSDictionary dictionaryWithObjectsAndKeys:
+                                   @"getOption", @"@type",
+                                   name, @"name",
+                                   nil];
+    NSString *requestJSON = [self JSONStringFromObject:requestObject error:NULL];
+    if ([requestJSON length] == 0) {
+        return nil;
+    }
+    const char *result = _executeFunction(_client, [requestJSON UTF8String]);
+    if (!result) {
+        return nil;
+    }
+    NSString *jsonString = [NSString stringWithUTF8String:result];
+    id responseObject = [self JSONObjectFromJSONString:jsonString error:NULL];
+    NSDictionary *response = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : nil;
+    return [self valueFromTDLibOptionResponse:response];
+}
+
+- (NSString *)bundledTDLibVersionFromManifest {
+    NSString *manifestPath = [[NSBundle mainBundle] pathForResource:@"TelegraphicaLegacyBinaryManifest" ofType:@"tsv"];
+    if ([manifestPath length] == 0 || [_loadedPath length] == 0) {
+        return nil;
+    }
+    NSString *manifest = [NSString stringWithContentsOfFile:manifestPath encoding:NSUTF8StringEncoding error:NULL];
+    if ([manifest length] == 0) {
+        return nil;
+    }
+
+    NSString *loadedName = [_loadedPath lastPathComponent];
+    NSArray *lines = [manifest componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    NSUInteger lineIndex = 0;
+    for (lineIndex = 1; lineIndex < [lines count]; lineIndex++) {
+        NSArray *columns = [[lines objectAtIndex:lineIndex] componentsSeparatedByString:@"\t"];
+        if ([columns count] < 5) {
+            continue;
+        }
+        NSString *bundlePath = [columns objectAtIndex:4];
+        if (![[bundlePath lastPathComponent] isEqualToString:loadedName]) {
+            continue;
+        }
+        NSString *installName = [columns objectAtIndex:3];
+        NSRange prefix = [installName rangeOfString:@"libtdjson."];
+        NSRange suffix = [installName rangeOfString:@".dylib" options:NSBackwardsSearch];
+        if (prefix.location == NSNotFound || suffix.location == NSNotFound) {
+            return nil;
+        }
+        NSUInteger versionStart = NSMaxRange(prefix);
+        if (suffix.location <= versionStart) {
+            return nil;
+        }
+        return [installName substringWithRange:NSMakeRange(versionStart, suffix.location - versionStart)];
     }
     return nil;
 }

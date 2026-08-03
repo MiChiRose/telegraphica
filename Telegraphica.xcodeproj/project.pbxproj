@@ -10,6 +10,7 @@
 		111111111111111111111101 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111201 /* main.m */; };
 		111111111111111111111102 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111203 /* AppDelegate.m */; };
 		111111111111111111111103 /* TGTDLibClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111205 /* TGTDLibClient.m */; };
+		C0A000000000000000000001 /* TGTDLibCapabilities.m in Sources */ = {isa = PBXBuildFile; fileRef = C0A000000000000000000003 /* TGTDLibCapabilities.m */; };
 		111111111111111111111104 /* TGKeychainHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111207 /* TGKeychainHelper.m */; };
 		111111111111111111111105 /* TGLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111209 /* TGLogger.m */; };
 		111111111111111111111106 /* TGStatusWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111211 /* TGStatusWindowController.m */; };
@@ -153,6 +154,8 @@
 		111111111111111111111203 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		111111111111111111111204 /* TGTDLibClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTDLibClient.h; sourceTree = "<group>"; };
 		111111111111111111111205 /* TGTDLibClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTDLibClient.m; sourceTree = "<group>"; };
+		C0A000000000000000000002 /* TGTDLibCapabilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTDLibCapabilities.h; sourceTree = "<group>"; };
+		C0A000000000000000000003 /* TGTDLibCapabilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTDLibCapabilities.m; sourceTree = "<group>"; };
 		111111111111111111111206 /* TGKeychainHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGKeychainHelper.h; sourceTree = "<group>"; };
 		111111111111111111111207 /* TGKeychainHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGKeychainHelper.m; sourceTree = "<group>"; };
 		111111111111111111111208 /* TGLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGLogger.h; sourceTree = "<group>"; };
@@ -461,6 +464,8 @@
 			children = (
 				111111111111111111111204 /* TGTDLibClient.h */,
 				111111111111111111111205 /* TGTDLibClient.m */,
+				C0A000000000000000000002 /* TGTDLibCapabilities.h */,
+				C0A000000000000000000003 /* TGTDLibCapabilities.m */,
 				111111111111111111111335 /* TGTDLibClient+ChatFolders.h */,
 				111111111111111111111336 /* TGTDLibClient+ChatFolders.m */,
 				FA0000000000000000000002 /* TGTDLibClient+ForumTopics.h */,
@@ -811,6 +816,7 @@
 				111111111111111111111101 /* main.m in Sources */,
 				111111111111111111111102 /* AppDelegate.m in Sources */,
 				111111111111111111111103 /* TGTDLibClient.m in Sources */,
+				C0A000000000000000000001 /* TGTDLibCapabilities.m in Sources */,
 				111111111111111111111104 /* TGKeychainHelper.m in Sources */,
 				111111111111111111111105 /* TGLogger.m in Sources */,
 				111111111111111111111106 /* TGStatusWindowController.m in Sources */,
