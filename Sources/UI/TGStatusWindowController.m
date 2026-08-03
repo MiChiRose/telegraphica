@@ -53,6 +53,7 @@
 #import "../Core/TGMessageItem.h"
 #import "../Core/TGMessagePollSupport.h"
 #import "../Core/TGReactionCatalog.h"
+#import "../Core/TGTDLibOperation.h"
 #import "../Core/TGOutgoingMessageTextChunker.h"
 #import "../Core/TGSearchResultItem.h"
 #import "../Core/TGTDLibClient.h"
@@ -712,7 +713,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSTimer *reactionAnimationTimer;
 @property (nonatomic, retain) NSMutableDictionary *reactionAnimations;
 @property (nonatomic, retain) NSMutableDictionary *availableReactionEmojisByMessageKey;
-@property (nonatomic, retain) NSMutableSet *availableReactionRequestsInFlight;
+@property (nonatomic, retain) NSMutableDictionary *availableReactionOperationsByMessageKey;
 @property (nonatomic, assign) NSUInteger chatPreviewLimit;
 @property (nonatomic, assign) BOOL chatsExhausted;
 @property (nonatomic, assign) BOOL olderMessagesExhausted;
@@ -1264,7 +1265,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize reactionAnimationTimer = _reactionAnimationTimer;
 @synthesize reactionAnimations = _reactionAnimations;
 @synthesize availableReactionEmojisByMessageKey = _availableReactionEmojisByMessageKey;
-@synthesize availableReactionRequestsInFlight = _availableReactionRequestsInFlight;
+@synthesize availableReactionOperationsByMessageKey = _availableReactionOperationsByMessageKey;
 @synthesize chatPreviewLimit = _chatPreviewLimit;
 @synthesize chatsExhausted = _chatsExhausted;
 @synthesize olderMessagesExhausted = _olderMessagesExhausted;
@@ -1343,7 +1344,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
         self.availableReactionEmojisByMessageKey = [NSMutableDictionary dictionary];
-        self.availableReactionRequestsInFlight = [NSMutableSet set];
+        self.availableReactionOperationsByMessageKey = [NSMutableDictionary dictionary];
         self.documentDownloadSpinnerViewsByKey = [NSMutableDictionary dictionary];
         self.mediaLoadingSpinnerViewsByKey = [NSMutableDictionary dictionary];
         self.visibleReadReceiptMessageIDs = [NSMutableSet set];
@@ -4786,7 +4787,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_reactionAnimationTimer release];
     [_reactionAnimations release];
     [_availableReactionEmojisByMessageKey release];
-    [_availableReactionRequestsInFlight release];
+    for (TGTDLibOperation *operation in [_availableReactionOperationsByMessageKey allValues]) {
+        [operation cancel];
+    }
+    [_availableReactionOperationsByMessageKey release];
     [_composerDraftsByTargetKey release];
     [_composerDraftSyncTimer invalidate];
     [_composerDraftSyncTimer release];

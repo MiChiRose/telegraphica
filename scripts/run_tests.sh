@@ -134,6 +134,16 @@ echo "== Server reaction catalog =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/reaction_catalog_probe"
 
+echo "== Cancellable TDLib operation =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/tdlib_operation_probe.m \
+    Sources/Core/TGTDLibOperation.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib_operation_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib_operation_probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \
