@@ -79,6 +79,11 @@ Download, cancellation and cache-file deletion now live in
 `TGTDLibClient+Files`; media and download surfaces import this focused API and
 an account-free fixture probe locks its TDLib request contract.
 
+Current-user profile reads and edits, profile-photo updates, active-session
+listing and session termination now live in `TGTDLibClient+Account`. The
+component preserves the established authorization and transport helpers while
+an account-free fixture probe locks request shapes and safe session parsing.
+
 Primary icon-only controls now receive legacy VoiceOver roles, localized names,
 help text and live enabled/selected values through `TGAccessibilitySupport`.
 Chat, message and search tables expose list roles, while Command+N, Command+K,

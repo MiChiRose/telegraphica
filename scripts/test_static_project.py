@@ -1258,6 +1258,8 @@ def check_primary_navigation_contract(errors):
     message_data_flow_text = read_text(os.path.join(ROOT, message_data_flow_rel))
     tdlib_client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     tdlib_client_text = read_text(os.path.join(ROOT, tdlib_client_rel))
+    account_client_rel = os.path.join("Sources", "Core", "TGTDLibClient+Account.m")
+    account_client_text = read_text(os.path.join(ROOT, account_client_rel))
     for fragment in [
         "setName",
         "setUsername",
@@ -1268,9 +1270,9 @@ def check_primary_navigation_contract(errors):
         "updateCurrentUserFirstName",
         "setCurrentUserProfilePhotoAtPath",
     ]:
-        if fragment not in client_text:
+        if fragment not in account_client_text:
             errors.append("%s: profile editing TDLib request is missing `%s`" %
-                          (client_rel, fragment))
+                          (account_client_rel, fragment))
     for fragment in [
         "TGProfileEditWindowController",
         "TGPrimaryTextButtonCell",
@@ -1861,7 +1863,7 @@ def check_qr_login_and_reaction_picker_contract(errors):
     client_cancel_start = client_text.find(
         "- (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:")
     client_cancel_end = client_text.find(
-        "- (NSDictionary *)currentUserProfileSummaryWithTimeout:",
+        "- (NSString *)postLoginProbeSummaryWithTimeout:",
         client_cancel_start)
     client_cancel_method = client_text[client_cancel_start:client_cancel_end]
     if (client_cancel_start < 0 or
@@ -2210,6 +2212,44 @@ def check_tdlib_file_component_boundary(errors):
                           (files_rel, fragment))
 
 
+def check_tdlib_account_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    account_rel = os.path.join("Sources", "Core", "TGTDLibClient+Account.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    account_text = read_text(os.path.join(ROOT, account_rel))
+    moved_selectors = [
+        "currentUserProfileSummaryWithTimeout:",
+        "updateCurrentUserFirstName:",
+        "setCurrentUserProfilePhotoAtPath:",
+        "activeSessionsSummaryWithTimeout:",
+        "terminateActiveSessionWithID:",
+    ]
+    for selector in moved_selectors:
+        method_pattern = re.compile(
+            r"-\s*\([^)]+\)\s*%s(?:(?!;).){0,500}\{" % re.escape(selector),
+            re.S,
+        )
+        if method_pattern.search(main_text):
+            errors.append("%s: extracted account selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if not method_pattern.search(account_text):
+            errors.append("%s: extracted account selector is missing: %s" %
+                          (account_rel, selector))
+    for fragment in [
+        '@"getMe"',
+        '@"getUserFullInfo"',
+        '@"setName"',
+        '@"setUsername"',
+        '@"setBio"',
+        '@"setProfilePhoto"',
+        '@"getActiveSessions"',
+        '@"terminateSession"',
+    ]:
+        if fragment not in account_text:
+            errors.append("%s: account request contract is missing `%s`" %
+                          (account_rel, fragment))
+
+
 def check_accessibility_and_keyboard_contract(errors):
     helper_rel = os.path.join("Sources", "UI", "TGAccessibilitySupport.m")
     main_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
@@ -2301,6 +2341,7 @@ def main():
     check_tdlib_search_component_boundary(errors)
     check_tdlib_storage_component_boundary(errors)
     check_tdlib_file_component_boundary(errors)
+    check_tdlib_account_component_boundary(errors)
     check_accessibility_and_keyboard_contract(errors)
     if errors:
         print("Static project tests failed:")
