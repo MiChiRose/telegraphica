@@ -1879,6 +1879,16 @@ def check_qr_login_and_reaction_picker_contract(errors):
         if fragment not in layout_text:
             errors.append("%s: QR/phone login layout is missing `%s`" %
                           (layout_rel, fragment))
+    controller_text = read_text(os.path.join(ROOT, "Sources", "UI", "TGStatusWindowController.m"))
+    for fragment in ["authSecondaryActionButton", "secondaryActionButtonWidth"]:
+        combined_auth_layout = controller_text + layout_text
+        if fragment not in combined_auth_layout:
+            errors.append("%s: auth secondary action layout is missing `%s`" %
+                          (layout_rel, fragment))
+    if "[self.qrLoginButton setTitle:(self.authPasswordRecoveryMode" in auth_text:
+        errors.append("%s: password recovery must not reuse the QR login button" % auth_rel)
+    if "[self.authSecondaryActionButton setTitle:(self.authPasswordRecoveryMode" not in auth_text:
+        errors.append("%s: password recovery secondary action is not wired" % auth_rel)
     for fragment in ["authorizationRetryCount", 'TGLoc(@"contacts.authWaiting")']:
         if fragment not in contacts_text:
             errors.append("%s: post-authorization contact retry is missing `%s`" %

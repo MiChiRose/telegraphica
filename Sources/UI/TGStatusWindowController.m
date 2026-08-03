@@ -449,6 +449,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSView *authSecondaryTextFieldBackgroundView;
 @property (nonatomic, retain) NSButton *authButton;
 @property (nonatomic, retain) NSButton *qrLoginButton;
+@property (nonatomic, retain) NSButton *authSecondaryActionButton;
 @property (nonatomic, retain) TGQRCodeLoginWindowController *qrLoginWindowController;
 @property (nonatomic, retain) TGTransparentSpinnerView *busySpinner;
 @property (nonatomic, retain) NSButton *loginLogsButton;
@@ -1003,6 +1004,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize authSecondaryTextFieldBackgroundView = _authSecondaryTextFieldBackgroundView;
 @synthesize authButton = _authButton;
 @synthesize qrLoginButton = _qrLoginButton;
+@synthesize authSecondaryActionButton = _authSecondaryActionButton;
 @synthesize qrLoginWindowController = _qrLoginWindowController;
 @synthesize busySpinner = _busySpinner;
 @synthesize loginLogsButton = _loginLogsButton;
@@ -2723,6 +2725,14 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self applySkeuomorphicButtonStyle:self.qrLoginButton isPrimary:NO];
     [self.qrLoginButton setAutoresizingMask:NSViewMaxYMargin];
     [contentView addSubview:self.qrLoginButton];
+
+    self.authSecondaryActionButton = [[[NSButton alloc] initWithFrame:NSMakeRect(484, 324, 220, 32)] autorelease];
+    [self.authSecondaryActionButton setTarget:self];
+    [self.authSecondaryActionButton setEnabled:NO];
+    [self.authSecondaryActionButton setHidden:YES];
+    [self applySkeuomorphicButtonStyle:self.authSecondaryActionButton isPrimary:NO];
+    [self.authSecondaryActionButton setAutoresizingMask:NSViewMaxYMargin];
+    [contentView addSubview:self.authSecondaryActionButton];
 
     self.busySpinner = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(760, 374, 16, 16)] autorelease];
     [self.busySpinner setDisplayedWhenStopped:NO];
@@ -4833,6 +4843,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_authCodeResendAvailableAt release];
     [_authButton release];
     [_qrLoginButton release];
+    [_authSecondaryActionButton release];
     [_qrLoginWindowController release];
     [_busySpinner release];
     [_loginLogsButton release];
