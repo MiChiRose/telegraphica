@@ -1,15 +1,15 @@
 #import "TGSavedMessagesCell.h"
 #import "TGTheme.h"
+#import "../Media/TGMediaImageLoader.h"
 
 @implementation TGSavedMessagesCell
 
-static NSCache *TGSavedMessagesImageCache(void) {
-    static NSCache *cache = nil;
-    if (!cache) {
-        cache = [[NSCache alloc] init];
-        [cache setCountLimit:80];
+static NSMutableSet *TGSavedMessagesPendingImagePaths(void) {
+    static NSMutableSet *paths = nil;
+    if (!paths) {
+        paths = [[NSMutableSet alloc] init];
     }
-    return cache;
+    return paths;
 }
 
 - (id)copyWithZone:(NSZone *)zone {
@@ -51,24 +51,42 @@ static NSCache *TGSavedMessagesImageCache(void) {
     CGFloat textX = NSMinX(cellFrame) + 7.0;
     CGFloat textWidth = NSWidth(cellFrame) - 14.0;
     if ([imagePath length] > 0) {
-        NSImage *image = [TGSavedMessagesImageCache() objectForKey:imagePath];
+        NSRect imageRect = NSMakeRect(NSMinX(cellFrame) + 6.0, NSMinY(cellFrame) + 6.0,
+                                      58.0, MAX(24.0, NSHeight(cellFrame) - 12.0));
+        textX = NSMaxX(imageRect) + 10.0;
+        textWidth = NSMaxX(cellFrame) - textX - 7.0;
+        NSImage *image = TGMediaCachedThumbnailFromFile(imagePath, 120);
         if (!image) {
-            image = [[[NSImage alloc] initWithContentsOfFile:imagePath] autorelease];
-            if (image) {
-                [TGSavedMessagesImageCache() setObject:image forKey:imagePath];
+            NSString *pendingKey = [NSString stringWithFormat:@"120:%@", [imagePath stringByStandardizingPath]];
+            BOOL shouldStart = NO;
+            @synchronized([TGSavedMessagesCell class]) {
+                if (![TGSavedMessagesPendingImagePaths() containsObject:pendingKey]) {
+                    [TGSavedMessagesPendingImagePaths() addObject:pendingKey];
+                    shouldStart = YES;
+                }
+            }
+            if (shouldStart) {
+                TGLoadImageThumbnailFromFileAsync(imagePath, 120, ^(NSImage *loadedImage) {
+                    (void)loadedImage;
+                    @synchronized([TGSavedMessagesCell class]) {
+                        [TGSavedMessagesPendingImagePaths() removeObject:pendingKey];
+                    }
+                    if ([controlView window]) {
+                        [controlView setNeedsDisplay:YES];
+                    }
+                });
             }
         }
         if (image) {
-            NSRect imageRect = NSMakeRect(NSMinX(cellFrame) + 6.0, NSMinY(cellFrame) + 6.0,
-                                          58.0, MAX(24.0, NSHeight(cellFrame) - 12.0));
             [image drawInRect:imageRect
                     fromRect:NSZeroRect
                    operation:NSCompositeSourceOver
                     fraction:1.0
               respectFlipped:YES
                        hints:nil];
-            textX = NSMaxX(imageRect) + 10.0;
-            textWidth = NSMaxX(cellFrame) - textX - 7.0;
+        } else {
+            [[TGClassicPanelStrokeColor() colorWithAlphaComponent:0.12] setFill];
+            [[NSBezierPath bezierPathWithRoundedRect:imageRect xRadius:5.0 yRadius:5.0] fill];
         }
     }
     NSRect titleRect = NSMakeRect(textX, NSMinY(cellFrame) + 7.0, textWidth, 18.0);

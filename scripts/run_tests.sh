@@ -154,6 +154,17 @@ echo "== Cancellable TDLib operation =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib_operation_probe"
 
+echo "== Media image loader =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/media_image_loader_probe.m \
+    Sources/Media/TGMediaImageLoader.m \
+    -framework Cocoa \
+    -framework ImageIO \
+    -o "$BUILD_DIR/media_image_loader_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \

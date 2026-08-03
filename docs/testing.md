@@ -49,6 +49,9 @@ The script runs:
 - a compiled Objective-C core logic probe covering themes, display preferences,
   resource policy limits, media type handling, outgoing text chunking,
   localization fallback, and message layout sizing.
+- a compiled media image-loader probe covering display-size downsampling,
+  source-version cache invalidation and main-thread delivery of asynchronous
+  decode results.
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.
