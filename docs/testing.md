@@ -5,6 +5,10 @@ This keeps the checks compatible with the Mavericks/Xcode 6.2 build lane and
 avoids requiring Telegram credentials, Keychain access, TDLib sessions, or real
 network calls.
 
+The default runner also compiles and runs the artificial-response TDLib
+capability registry probe described in
+[tdlib-capabilities.md](tdlib-capabilities.md).
+
 ## Existing checks
 
 - `scripts/check_legacy_compat.py` scans project source for legacy macOS/Xcode

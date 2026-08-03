@@ -1662,11 +1662,24 @@ def check_chat_folder_management_contract(errors):
         '"reorderChatFolders"',
         '"checkChatFolderInviteLink"',
         '"addChatFolderByInviteLink"',
-        '"mountain-lion"',
+        '[[self capabilities] lane] == TGTDLibLaneMountainLionFallback',
     ]:
         if fragment not in client_text:
             errors.append("%s: unified chat-folder TDLib contract is missing `%s`" %
                           (client_rel, fragment))
+
+    capabilities_rel = os.path.join("Sources", "Core", "TGTDLibCapabilities.m")
+    capabilities_text = read_text(os.path.join(ROOT, capabilities_rel))
+    for fragment in [
+        'TGTDLibCapabilitySharedChatFolders',
+        'TGTDLibCapabilityStateForbidden',
+        'TGTDLibCapabilityStateTemporarilyUnavailable',
+        'capabilityIdentifierForRequestType:',
+        'recordProbeResponse:',
+    ]:
+        if fragment not in capabilities_text:
+            errors.append("%s: capability registry contract is missing `%s`" %
+                          (capabilities_rel, fragment))
     for fragment in [
         'assetName:@"folder-add"',
         'assetName:@"folder-remove"',

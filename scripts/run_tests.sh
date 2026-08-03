@@ -70,7 +70,6 @@ Tests/Workshop/run_media_workbench_tests.sh
 echo "== Media preview gate =="
 scripts/check_media_item_support.sh "$ARCH" "$BUILD_DIR/media-item-support" "$SDK_NAME"
 
-echo "== Core logic probe =="
 COMPILE_FLAGS=(
     -arch "$ARCH"
     "-mmacosx-version-min=$DEPLOYMENT_TARGET"
@@ -84,6 +83,18 @@ COMPILE_FLAGS=(
 if [ -n "$SDK_PATH" ]; then
     COMPILE_FLAGS+=("-isysroot" "$SDK_PATH")
 fi
+
+echo "== TDLib capability registry =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/tdlib_capabilities_probe.m \
+    Sources/Core/TGTDLibCapabilities.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib_capabilities_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib_capabilities_probe"
+
+echo "== Core logic probe =="
 
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \

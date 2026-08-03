@@ -1,4 +1,5 @@
 #import "TGTDLibClient+ChatFolders.h"
+#import "TGTDLibCapabilities.h"
 
 @interface TGTDLibClient (ChatFoldersPrivate)
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request
@@ -39,8 +40,7 @@ static void TGChatFolderSetBoolean(NSMutableDictionary *dictionary, NSDictionary
 @implementation TGTDLibClient (ChatFolders)
 
 - (NSString *)tg_preferredChatFolderAPIKind {
-    NSString *loadedPath = [[self loadedLibraryPath] lowercaseString];
-    if ([loadedPath rangeOfString:@"mountain-lion"].location != NSNotFound) {
+    if ([[self capabilities] lane] == TGTDLibLaneMountainLionFallback) {
         return @"filter";
     }
     return @"folder";
