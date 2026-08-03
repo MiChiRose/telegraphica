@@ -101,6 +101,14 @@ echo "== Utility window request lifetime =="
     -o "$BUILD_DIR/utility-window-lifetime-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/utility-window-lifetime-probe"
 
+echo "== Legacy accessibility support =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/accessibility_support_probe.m \
+    Sources/UI/TGAccessibilitySupport.m \
+    -framework Cocoa \
+    -o "$BUILD_DIR/accessibility-support-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/accessibility-support-probe"
+
 echo "== Persistent download queue =="
 "$CLANG" "${COMPILE_FLAGS[@]}" \
     Tests/download_queue_store_probe.m \

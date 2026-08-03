@@ -1,5 +1,6 @@
 #import "TGStatusWindowController.h"
 #import "TGActiveSessionsPresentation.h"
+#import "TGAccessibilitySupport.h"
 #import "TGChatDisplayPreferences.h"
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
@@ -1912,6 +1913,43 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.contactsViewController refreshLocalizedText];
     [self.callsPlaceholderView refreshLocalizedText];
     [self refreshProfileDisplay];
+    [self refreshAccessibilityDescriptions];
+}
+
+- (void)refreshAccessibilityDescriptions {
+    TGAccessibilityConfigureButton(self.drawerButton,
+                                   TGLoc(@"settings.section.folders"),
+                                   TGLoc(@"folders.manage.open"));
+    TGAccessibilityConfigureButton(self.workshopDrawerButton,
+                                   TGLoc(@"workshop.title"),
+                                   TGLoc(@"workshop.openTooltip"));
+    TGAccessibilityConfigureButton(self.composeChatButton,
+                                   (self.showingForumTopicList ? TGLoc(@"forum.topic.create") : TGLoc(@"contacts.newChat")),
+                                   nil);
+    TGAccessibilityConfigureButton(self.chatSearchButton, TGLoc(@"search.chats.title"), nil);
+    TGAccessibilityConfigureButton(self.loadChatsButton, TGLoc(@"settings.sessions.refresh"), nil);
+    TGAccessibilityConfigureButton(self.mediaCenterButton, TGLoc(@"media.center.title"), nil);
+    TGAccessibilityConfigureButton(self.selectedChatCallButton, TGLoc(@"calls.start"), nil);
+    TGAccessibilityConfigureButton(self.selectedChatVideoCallButton, TGLoc(@"calls.video.start"), nil);
+    TGAccessibilityConfigureButton(self.selectedChatProfileButton, TGLoc(@"profile.title"), nil);
+    TGAccessibilityConfigureButton(self.topicBackButton, TGLoc(@"back"), nil);
+    TGAccessibilityConfigureButton(self.commentThreadBackButton, TGLoc(@"back"), nil);
+    TGAccessibilityConfigureButton(self.pinnedMessageButton, TGLoc(@"pinned.title"), nil);
+    TGAccessibilityConfigureButton(self.replyPanelCancelButton, TGLoc(@"close"), nil);
+    TGAccessibilityConfigureButton(self.attachPhotoButton, TGLoc(@"attach.photo"), nil);
+    TGAccessibilityConfigureButton(self.botActionButton, TGLoc(@"bot.composer.actions"), nil);
+    TGAccessibilityConfigureButton(self.stickerButton, TGLoc(@"stickers"), nil);
+    TGAccessibilityConfigureButton(self.voiceRecordButton, TGLoc(@"voice"), nil);
+    TGAccessibilityConfigureButton(self.sendMessageButton, TGLoc(@"send"), nil);
+
+    NSUInteger index = 0;
+    for (index = 0; index < [self.navigationButtons count]; index++) {
+        NSButton *button = [self.navigationButtons objectAtIndex:index];
+        TGAccessibilityConfigureButton(button, [button title], [button toolTip]);
+    }
+    TGAccessibilityConfigureList(self.chatTableView, TGLoc(@"chats"));
+    TGAccessibilityConfigureList(self.messageTableView, TGLoc(@"message"));
+    TGAccessibilityConfigureList(self.searchResultsTableView, TGLoc(@"search.chats.title"));
 }
 
 - (void)refreshThemeAppearance {
@@ -4406,6 +4444,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [button setEnabled:(enabled && ready)];
         [button setHidden:!ready];
         [button setState:([button tag] == selectedTag) ? NSOnState : NSOffState];
+        TGAccessibilityUpdateButtonState(button);
     }
     for (index = 0; index < [self.drawerFolderButtons count]; index++) {
         NSButton *button = [self.drawerFolderButtons objectAtIndex:index];
@@ -4415,6 +4454,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.workshopDrawerButton setEnabled:(enabled && ready)];
     [self.workshopDrawerButton setHidden:(!ready || drawerHidden || !self.drawerOpen)];
     [self.workshopDrawerButton setState:[section isEqualToString:TGSectionWorkshop] ? NSOnState : NSOffState];
+    TGAccessibilityUpdateButtonState(self.workshopDrawerButton);
     [self updateDrawerFolderButtonStates];
 }
 

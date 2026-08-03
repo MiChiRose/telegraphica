@@ -78,3 +78,9 @@ post-cleanup statistics refresh are locked by an account-free fixture probe.
 Download, cancellation and cache-file deletion now live in
 `TGTDLibClient+Files`; media and download surfaces import this focused API and
 an account-free fixture probe locks its TDLib request contract.
+
+Primary icon-only controls now receive legacy VoiceOver roles, localized names,
+help text and live enabled/selected values through `TGAccessibilitySupport`.
+Chat, message and search tables expose list roles, while Command+N, Command+K,
+Command+F, Command+Shift+F, Command+, and Escape provide a documented keyboard
+navigation foundation compatible with the shared 10.8 deployment target.

@@ -57,6 +57,8 @@ The script runs:
   main-thread delivery, bounded caching and cancellation suppression.
 - a utility-window lifetime probe covering close/reopen generation changes and
   stale-result suppression; the storage window is wired to this lifecycle.
+- a legacy accessibility probe covering VoiceOver roles, localized labels,
+  help text and live enabled/selected state without requiring a GUI session.
 - a fixture-style TDLib message-search probe covering request types, bounded
   limits, media filters, topic/thread routing, anchors and pagination offsets.
 - a fixture-style TDLib storage probe covering fast-statistics aggregation,
