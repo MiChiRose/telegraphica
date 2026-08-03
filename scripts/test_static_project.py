@@ -2213,9 +2213,11 @@ def check_tdlib_file_component_boundary(errors):
 def check_accessibility_and_keyboard_contract(errors):
     helper_rel = os.path.join("Sources", "UI", "TGAccessibilitySupport.m")
     main_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
     navigation_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SearchNavigation.inc")
     helper_text = read_text(os.path.join(ROOT, helper_rel))
     main_text = read_text(os.path.join(ROOT, main_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
     navigation_text = read_text(os.path.join(ROOT, navigation_rel))
     for fragment in [
         "accessibilitySetOverrideValue:forAttribute:",
@@ -2225,6 +2227,8 @@ def check_accessibility_and_keyboard_contract(errors):
         "NSAccessibilityEnabledAttribute",
         "NSAccessibilityValueAttribute",
         "NSAccessibilityListRole",
+        "TGAccessibilityDescriptionForChatItem",
+        "TGAccessibilityDescriptionForMessageItem",
     ]:
         if fragment not in helper_text:
             errors.append("%s: legacy accessibility contract is missing `%s`" %
@@ -2238,6 +2242,14 @@ def check_accessibility_and_keyboard_contract(errors):
         if fragment not in main_text:
             errors.append("%s: main-window accessibility wiring is missing `%s`" %
                           (main_rel, fragment))
+    for fragment in [
+        "TGAccessibilityDescriptionForChatItem",
+        "TGAccessibilityDescriptionForMessageItem",
+        "TGAccessibilityConfigureContent",
+    ]:
+        if fragment not in cells_text:
+            errors.append("%s: accessible cell content wiring is missing `%s`" %
+                          (cells_rel, fragment))
     for fragment in [
         "key == 'n'",
         "key == 'k'",
