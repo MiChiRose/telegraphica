@@ -57,6 +57,8 @@ The script runs:
 - an advanced chat-folder fixture probe covering multiple invite-link parsing,
   recommended folder conversion, server-option limits, malformed responses and
   legacy-safe identifier normalization.
+- a persistent download-queue probe covering interrupted-state restoration,
+  bounded property-list serialization and TDLib file identifier retention.
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.

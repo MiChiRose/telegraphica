@@ -7,6 +7,7 @@ static NSString * const TGResourcePolicyEconomyModeKey = @"TelegraphicaEconomyMo
 static NSString * const TGResourcePolicyAutoPhotoKey = @"TelegraphicaAutoDownloadPhotos";
 static NSString * const TGResourcePolicyAutoVideoKey = @"TelegraphicaAutoDownloadVideos";
 static NSString * const TGResourcePolicyAutoDocumentKey = @"TelegraphicaAutoDownloadDocuments";
+static NSString * const TGResourcePolicyAutoVoiceKey = @"TelegraphicaAutoDownloadVoiceMessages";
 static NSString * const TGResourcePolicyLinkPreviewsKey = @"TelegraphicaLinkPreviewsEnabled";
 static NSString * const TGResourcePolicyMaxAutoDownloadBytesKey = @"TelegraphicaMaxAutoDownloadBytes";
 static NSString * const TGResourcePolicyAutoplayAnimatedStickersKey = @"TelegraphicaAutoplayAnimatedStickers";
@@ -56,6 +57,7 @@ void TGResourcePolicyApplyDefaultsIfNeeded(void) {
     TGResourceSetBool(TGResourcePolicyAutoPhotoKey, YES);
     TGResourceSetBool(TGResourcePolicyAutoVideoKey, YES);
     TGResourceSetBool(TGResourcePolicyAutoDocumentKey, YES);
+    TGResourceSetBool(TGResourcePolicyAutoVoiceKey, YES);
     TGResourceSetBool(TGResourcePolicyLinkPreviewsKey, YES);
     TGResourceSetLongLong(TGResourcePolicyMaxAutoDownloadBytesKey, TGResourceMB(20));
     TGResourceSetBool(TGResourcePolicyAutoplayAnimatedStickersKey, YES);
@@ -78,6 +80,7 @@ void TGResourcePolicySetEconomyModeEnabled(BOOL enabled) {
         TGResourceSetBool(TGResourcePolicyAutoPhotoKey, YES);
         TGResourceSetBool(TGResourcePolicyAutoVideoKey, NO);
         TGResourceSetBool(TGResourcePolicyAutoDocumentKey, NO);
+        TGResourceSetBool(TGResourcePolicyAutoVoiceKey, YES);
         TGResourceSetLongLong(TGResourcePolicyMaxAutoDownloadBytesKey, TGResourceMB(2));
         TGResourceSetBool(TGResourcePolicyAutoplayAnimatedStickersKey, NO);
         TGResourceSetLongLong(TGResourcePolicyMaximumActiveAnimationsKey, 1);
@@ -87,6 +90,7 @@ void TGResourcePolicySetEconomyModeEnabled(BOOL enabled) {
         TGResourceSetBool(TGResourcePolicyAutoPhotoKey, YES);
         TGResourceSetBool(TGResourcePolicyAutoVideoKey, YES);
         TGResourceSetBool(TGResourcePolicyAutoDocumentKey, YES);
+        TGResourceSetBool(TGResourcePolicyAutoVoiceKey, YES);
         TGResourceSetLongLong(TGResourcePolicyMaxAutoDownloadBytesKey, TGResourceMB(20));
         TGResourceSetBool(TGResourcePolicyAutoplayAnimatedStickersKey, YES);
         TGResourceSetLongLong(TGResourcePolicyMaximumActiveAnimationsKey, 5);
@@ -105,6 +109,9 @@ BOOL TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadType type)
     if (type == TGResourceAutoDownloadDocument) {
         return TGResourceBoolForKey(TGResourcePolicyAutoDocumentKey, YES);
     }
+    if (type == TGResourceAutoDownloadVoice) {
+        return TGResourceBoolForKey(TGResourcePolicyAutoVoiceKey, YES);
+    }
     return TGResourceBoolForKey(TGResourcePolicyAutoPhotoKey, YES);
 }
 
@@ -122,9 +129,12 @@ BOOL TGResourcePolicyAutoDownloadTypeForMessageContent(NSString *contentType, TG
         *type = TGResourceAutoDownloadVideo;
         return YES;
     }
-    if ([contentType isEqualToString:@"messageDocument"] ||
-        [contentType isEqualToString:@"messageVoiceNote"] ||
+    if ([contentType isEqualToString:@"messageVoiceNote"] ||
         [contentType isEqualToString:@"messageAudio"]) {
+        *type = TGResourceAutoDownloadVoice;
+        return YES;
+    }
+    if ([contentType isEqualToString:@"messageDocument"]) {
         *type = TGResourceAutoDownloadDocument;
         return YES;
     }
@@ -162,6 +172,8 @@ void TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadType ty
         key = TGResourcePolicyAutoVideoKey;
     } else if (type == TGResourceAutoDownloadDocument) {
         key = TGResourcePolicyAutoDocumentKey;
+    } else if (type == TGResourceAutoDownloadVoice) {
+        key = TGResourcePolicyAutoVoiceKey;
     }
     TGResourceSetBool(key, enabled);
     [[NSUserDefaults standardUserDefaults] synchronize];

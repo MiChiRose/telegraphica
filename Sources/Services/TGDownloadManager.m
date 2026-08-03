@@ -4,6 +4,7 @@
 #import "../Media/TGMediaFileActions.h"
 #import "../UI/TGStatusSupport.h"
 #import "TGResourcePolicy.h"
+#import "TGDownloadQueueStore.h"
 
 NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDidChangeNotification";
 static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaCompletedDownloadPathsByFileID";
@@ -11,6 +12,7 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
 @interface TGDownloadManager () {
     dispatch_queue_t _downloadQueue;
     NSUInteger _identifierCounter;
+    BOOL _didResumePersistedRecords;
 }
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, retain) NSMutableArray *records;
@@ -33,7 +35,8 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
 - (id)init {
     self = [super init];
     if (self) {
-        self.records = [NSMutableArray array];
+        NSArray *storedRecords = [[NSUserDefaults standardUserDefaults] objectForKey:TGDownloadQueueRecordsDefaultsKey];
+        self.records = [NSMutableArray arrayWithArray:TGDownloadQueueNormalizedRecords(storedRecords)];
         _downloadQueue = dispatch_queue_create("org.telegraphica.downloads", DISPATCH_QUEUE_SERIAL);
     }
     return self;
@@ -58,10 +61,50 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
 }
 
 - (void)postChange {
+    NSArray *snapshot = nil;
+    @synchronized(self) {
+        snapshot = [[NSArray alloc] initWithArray:TGDownloadQueueSerializableRecords(self.records)];
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setObject:snapshot forKey:TGDownloadQueueRecordsDefaultsKey];
+        [defaults synchronize];
         [[NSNotificationCenter defaultCenter] postNotificationName:TGDownloadManagerDidChangeNotification
                                                             object:self];
+        [snapshot release];
     });
+}
+
+- (void)resumePendingDownloads {
+    NSMutableArray *recordsToResume = [NSMutableArray array];
+    @synchronized(self) {
+        if (_didResumePersistedRecords || !_client) {
+            return;
+        }
+        _didResumePersistedRecords = YES;
+        NSIndexSet *interruptedIndexes = [self.records indexesOfObjectsPassingTest:
+            ^BOOL(id object, NSUInteger index, BOOL *stop) {
+                (void)index;
+                (void)stop;
+                return [[object objectForKey:@"state"] isEqualToString:@"interrupted"];
+            }];
+        if ([interruptedIndexes count] > 0) {
+            [recordsToResume addObjectsFromArray:[self.records objectsAtIndexes:interruptedIndexes]];
+            [self.records removeObjectsAtIndexes:interruptedIndexes];
+        }
+    }
+    if ([recordsToResume count] == 0) {
+        return;
+    }
+    [self postChange];
+    NSUInteger index = 0;
+    for (index = 0; index < [recordsToResume count]; index++) {
+        NSDictionary *record = [recordsToResume objectAtIndex:index];
+        [self enqueueFileID:[record objectForKey:@"file_id"]
+          suggestedFileName:[record objectForKey:@"file_name"]
+          fallbackLocalPath:[record objectForKey:@"fallback_path"]
+                 completion:nil];
+    }
 }
 
 - (NSMutableDictionary *)recordForIdentifier:(NSString *)identifier {

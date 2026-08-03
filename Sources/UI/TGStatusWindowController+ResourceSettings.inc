@@ -96,6 +96,10 @@
                                                                       action:@selector(resourceSettingChanged:)];
     [contentView addSubview:self.settingsAutoDownloadDocumentsButton];
 
+    self.settingsAutoDownloadVoiceButton = [self resourceSwitchWithTitle:@"Auto-download voice messages"
+                                                                   action:@selector(resourceSettingChanged:)];
+    [contentView addSubview:self.settingsAutoDownloadVoiceButton];
+
     self.settingsLinkPreviewsButton = [self resourceSwitchWithTitle:@"Show link previews"
                                                               action:@selector(resourceSettingChanged:)];
     [contentView addSubview:self.settingsLinkPreviewsButton];
@@ -144,6 +148,7 @@
     [self.settingsAutoDownloadPhotosButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadPhoto) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadVideosButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadDocumentsButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadDocument) ? NSOnState : NSOffState];
+    [self.settingsAutoDownloadVoiceButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVoice) ? NSOnState : NSOffState];
     [self.settingsLinkPreviewsButton setState:TGResourcePolicyLinkPreviewsEnabled() ? NSOnState : NSOffState];
     [self.settingsAutoplayAnimatedStickersButton setState:TGResourcePolicyAutoplayAnimatedStickersEnabled() ? NSOnState : NSOffState];
     [self.settingsStopInactiveAnimationsButton setState:TGResourcePolicyStopAnimationsWhenInactiveEnabled() ? NSOnState : NSOffState];
@@ -182,6 +187,8 @@
         TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVideo, [self.settingsAutoDownloadVideosButton state] == NSOnState);
     } else if (sender == self.settingsAutoDownloadDocumentsButton) {
         TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadDocument, [self.settingsAutoDownloadDocumentsButton state] == NSOnState);
+    } else if (sender == self.settingsAutoDownloadVoiceButton) {
+        TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVoice, [self.settingsAutoDownloadVoiceButton state] == NSOnState);
     } else if (sender == self.settingsLinkPreviewsButton) {
         BOOL enabled = ([self.settingsLinkPreviewsButton state] == NSOnState);
         if (enabled != TGResourcePolicyLinkPreviewsEnabled()) {

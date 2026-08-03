@@ -108,6 +108,7 @@ static void TGClearProbeDefaults(void) {
                      @"TelegraphicaAutoDownloadPhotos",
                      @"TelegraphicaAutoDownloadVideos",
                      @"TelegraphicaAutoDownloadDocuments",
+                     @"TelegraphicaAutoDownloadVoiceMessages",
                      @"TelegraphicaLinkPreviewsEnabled",
                      @"TelegraphicaMaxAutoDownloadBytes",
                      @"TelegraphicaAutoplayAnimatedStickers",
@@ -225,12 +226,14 @@ static void TGTestResourcePolicy(void) {
     TGAssertTrue(!TGResourcePolicyEconomyModeEnabled(), @"economy mode should default off");
     TGAssertTrue(TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadPhoto), @"photos should auto-download by default");
     TGAssertTrue(TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo), @"videos should auto-download by default");
+    TGAssertTrue(TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVoice), @"voice messages should auto-download by default");
     TGAssertTrue(TGResourcePolicyLinkPreviewsEnabled(), @"link previews should default on");
     TGAssertTrue(TGResourcePolicyMaximumActiveAnimations() == 5, @"active animation default should be five");
 
     TGResourcePolicySetEconomyModeEnabled(YES);
     TGAssertTrue(TGResourcePolicyEconomyModeEnabled(), @"economy mode should save on");
     TGAssertTrue(!TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo), @"economy mode should disable video auto-download");
+    TGAssertTrue(TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVoice), @"economy mode should keep small voice messages available");
     TGAssertTrue(TGResourcePolicyMaximumActiveAnimations() == 1, @"economy mode should lower active animations");
 
     TGResourcePolicySetEconomyModeEnabled(NO);
@@ -241,6 +244,10 @@ static void TGTestResourcePolicy(void) {
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(nil, 1024), @"missing message type should fail closed");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messagePhoto", 21LL * 1024LL * 1024LL), @"oversized media should not auto-download");
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageUnknown", 1024), @"unknown message content should fail closed");
+    TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadDocument, NO);
+    TGAssertTrue(TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageVoiceNote", 1024), @"voice notes should have an independent auto-download category");
+    TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVoice, NO);
+    TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageVoiceNote", 1024), @"disabled voice category should not auto-download");
     TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVideo, NO);
     TGAssertTrue(!TGResourcePolicyAllowsAutoDownloadForMessageContent(@"messageVideo", 1024), @"disabled media category should not auto-download");
     TGResourcePolicySetLinkPreviewsEnabled(NO);

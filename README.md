@@ -149,8 +149,9 @@ voice messages, and keep the app updated from GitHub Releases.
   role, restriction, and channel-administration workflows.
 - 🗂 Telegram chat-folder creation, editing, drag ordering, shared-folder
   import, multiple invite-link management, suggested chats, recommendations,
-  and server-reported limits on capable TDLib lanes
-  management.
+  and server-reported limits on capable TDLib lanes.
+- 📥 Interrupted downloads restore after sign-in, with separate auto-download
+  controls for photos, videos, documents, and voice messages.
 - 🔕 Per-chat server mute, sound, and preview synchronization.
 - ✨ Bold, italic, underline, strikethrough, spoiler, and monospace message
   formatting.

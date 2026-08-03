@@ -93,6 +93,7 @@
 		111111111111111111111172 /* TGTDLibClient+ScheduledMessages.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111348 /* TGTDLibClient+ScheduledMessages.m */; };
 		111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111350 /* TGScheduledMessagesWindowController.m */; };
 		111111111111111111111174 /* TGDownloadManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111352 /* TGDownloadManager.m */; };
+		B8DB0BB00000000000000001 /* TGDownloadQueueStore.m in Sources */ = {isa = PBXBuildFile; fileRef = B8DB0BB00000000000000003 /* TGDownloadQueueStore.m */; };
 		111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111354 /* TGDownloadManagerWindowController.m */; };
 		111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111356 /* TGTDLibClient+Privacy.m */; };
 		111111111111111111111177 /* TGPrivacyWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111358 /* TGPrivacyWindowController.m */; };
@@ -326,6 +327,8 @@
 		111111111111111111111350 /* TGScheduledMessagesWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGScheduledMessagesWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111351 /* TGDownloadManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManager.h; sourceTree = "<group>"; };
 		111111111111111111111352 /* TGDownloadManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManager.m; sourceTree = "<group>"; };
+		B8DB0BB00000000000000002 /* TGDownloadQueueStore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadQueueStore.h; sourceTree = "<group>"; };
+		B8DB0BB00000000000000003 /* TGDownloadQueueStore.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadQueueStore.m; sourceTree = "<group>"; };
 		111111111111111111111353 /* TGDownloadManagerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManagerWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111354 /* TGDownloadManagerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManagerWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111355 /* TGTDLibClient+Privacy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Privacy.h"; sourceTree = "<group>"; };
@@ -574,6 +577,8 @@
 				111111111111111111111311 /* TGLocalDataReset.m */,
 				111111111111111111111351 /* TGDownloadManager.h */,
 				111111111111111111111352 /* TGDownloadManager.m */,
+				B8DB0BB00000000000000002 /* TGDownloadQueueStore.h */,
+				B8DB0BB00000000000000003 /* TGDownloadQueueStore.m */,
 				111111111111111111111280 /* TGResourcePolicy.h */,
 				111111111111111111111281 /* TGResourcePolicy.m */,
 				111111111111111111111409 /* TGUpdateCheckScheduler.h */,
@@ -946,6 +951,7 @@
 				111111111111111111111172 /* TGTDLibClient+ScheduledMessages.m in Sources */,
 				111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */,
 				111111111111111111111174 /* TGDownloadManager.m in Sources */,
+				B8DB0BB00000000000000001 /* TGDownloadQueueStore.m in Sources */,
 				111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */,
 				111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */,
 				111111111111111111111177 /* TGPrivacyWindowController.m in Sources */,

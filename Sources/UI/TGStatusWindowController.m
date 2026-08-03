@@ -532,6 +532,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *settingsAutoDownloadPhotosButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadVideosButton;
 @property (nonatomic, retain) NSButton *settingsAutoDownloadDocumentsButton;
+@property (nonatomic, retain) NSButton *settingsAutoDownloadVoiceButton;
 @property (nonatomic, retain) NSButton *settingsLinkPreviewsButton;
 @property (nonatomic, retain) NSButton *settingsAutoplayAnimatedStickersButton;
 @property (nonatomic, retain) NSButton *settingsStopInactiveAnimationsButton;
@@ -1068,6 +1069,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize settingsAutoDownloadPhotosButton = _settingsAutoDownloadPhotosButton;
 @synthesize settingsAutoDownloadVideosButton = _settingsAutoDownloadVideosButton;
 @synthesize settingsAutoDownloadDocumentsButton = _settingsAutoDownloadDocumentsButton;
+@synthesize settingsAutoDownloadVoiceButton = _settingsAutoDownloadVoiceButton;
 @synthesize settingsLinkPreviewsButton = _settingsLinkPreviewsButton;
 @synthesize settingsAutoplayAnimatedStickersButton = _settingsAutoplayAnimatedStickersButton;
 @synthesize settingsStopInactiveAnimationsButton = _settingsStopInactiveAnimationsButton;
@@ -1824,6 +1826,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self.settingsAutoDownloadPhotosButton setTitle:TGLoc(@"settings.resources.photos")];
     [self.settingsAutoDownloadVideosButton setTitle:TGLoc(@"settings.resources.videos")];
     [self.settingsAutoDownloadDocumentsButton setTitle:TGLoc(@"settings.resources.documents")];
+    [self.settingsAutoDownloadVoiceButton setTitle:TGLoc(@"settings.resources.voice")];
     [self.settingsLinkPreviewsButton setTitle:TGLoc(@"settings.resources.linkPreviews")];
     [self.settingsAutoplayAnimatedStickersButton setTitle:TGLoc(@"settings.resources.autoplay")];
     [self.settingsStopInactiveAnimationsButton setTitle:TGLoc(@"settings.resources.stopInactive")];
@@ -1983,6 +1986,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                       self.settingsAutoDownloadPhotosButton,
                                       self.settingsAutoDownloadVideosButton,
                                       self.settingsAutoDownloadDocumentsButton,
+                                      self.settingsAutoDownloadVoiceButton,
                                       self.settingsLinkPreviewsButton,
                                       self.settingsAutoplayAnimatedStickersButton,
                                       self.settingsStopInactiveAnimationsButton,
@@ -3901,6 +3905,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                      self.settingsAutoDownloadPhotosButton,
                                      self.settingsAutoDownloadVideosButton,
                                      self.settingsAutoDownloadDocumentsButton,
+                                     self.settingsAutoDownloadVoiceButton,
                                      self.settingsLinkPreviewsButton,
                                      self.settingsAutoplayAnimatedStickersButton,
                                      self.settingsStopInactiveAnimationsButton,
@@ -4867,6 +4872,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_settingsAutoDownloadPhotosButton release];
     [_settingsAutoDownloadVideosButton release];
     [_settingsAutoDownloadDocumentsButton release];
+    [_settingsAutoDownloadVoiceButton release];
     [_settingsLinkPreviewsButton release];
     [_settingsAutoplayAnimatedStickersButton release];
     [_settingsStopInactiveAnimationsButton release];
