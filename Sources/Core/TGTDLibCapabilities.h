@@ -19,6 +19,7 @@ extern NSString * const TGTDLibCapabilityEmailAuthentication;
 extern NSString * const TGTDLibCapabilityRegistration;
 extern NSString * const TGTDLibCapabilityPasswordRecovery;
 extern NSString * const TGTDLibCapabilityAvailableReactions;
+extern NSString * const TGTDLibCapabilityAddedReactionUsers;
 extern NSString * const TGTDLibCapabilityCustomEmoji;
 extern NSString * const TGTDLibCapabilityModernTextEntities;
 extern NSString * const TGTDLibCapabilityChatFolderManagement;

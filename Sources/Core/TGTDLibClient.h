@@ -107,6 +107,7 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSString *)addReactionToChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)removeReactionFromChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)availableReactionCatalogForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID rowSize:(NSUInteger)rowSize timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)addedReactionUsersForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID offset:(NSString *)offset limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)messageActionCapabilitiesForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text originalText:(NSString *)originalText originalEntities:(NSArray *)originalEntities timeout:(NSTimeInterval)timeout error:(NSError **)error;

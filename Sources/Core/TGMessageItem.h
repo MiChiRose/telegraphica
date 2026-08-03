@@ -26,6 +26,7 @@
 @property (nonatomic, copy) NSDictionary *linkPreviewInfo;
 @property (nonatomic, copy) NSString *reactionSummary;
 @property (nonatomic, copy) NSArray *chosenReactionEmojis;
+@property (nonatomic, assign) BOOL canGetAddedReactions;
 @property (nonatomic, copy) NSString *reactionAnimationDisplaySummary;
 @property (nonatomic, assign) CGFloat reactionAnimationProgress;
 @property (nonatomic, assign) BOOL reactionAnimationChangesHeight;

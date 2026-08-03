@@ -134,6 +134,16 @@ echo "== Server reaction catalog =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/reaction_catalog_probe"
 
+echo "== Added reaction users =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/added_reactions_probe.m \
+    Sources/Core/TGAddedReactionsParser.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/added_reactions_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/added_reactions_probe"
+
 echo "== Cancellable TDLib operation =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
