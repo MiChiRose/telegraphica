@@ -1038,6 +1038,8 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
 
     NSNumber *chatID = [[item chatID] retain];
     NSNumber *messageID = [[item messageID] retain];
+    NSString *originalText = [[item editableText] copy];
+    NSArray *originalEntities = [[item formattedEntities] copy];
     NSString *text = [editedText copy];
     TGTDLibClient *client = [self.client retain];
     [self.statusField setStringValue:@"Editing message..."];
@@ -1051,7 +1053,13 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         NSError *editError = nil;
         NSString *editSummary = nil;
         if (canEdit) {
-            editSummary = [client editTextMessageInChatID:chatID messageID:messageID text:text timeout:8.0 error:&editError];
+            editSummary = [client editTextMessageInChatID:chatID
+                                                 messageID:messageID
+                                                      text:text
+                                              originalText:originalText
+                                          originalEntities:originalEntities
+                                                   timeout:8.0
+                                                     error:&editError];
         }
         NSString *errorMessage = [[(canEdit ? editError : capabilitiesError) localizedDescription] copy];
         BOOL succeeded = ([editSummary length] > 0);
@@ -1070,6 +1078,8 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
             [errorMessage release];
             [chatID release];
             [messageID release];
+            [originalText release];
+            [originalEntities release];
             [text release];
             [client release];
         });
