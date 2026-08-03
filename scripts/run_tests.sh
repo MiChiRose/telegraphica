@@ -164,6 +164,17 @@ echo "== TDLib file requests =="
     -o "$BUILD_DIR/tdlib-file-request-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-request-probe"
 
+echo "== TDLib account requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_account_request_probe.m \
+    Sources/Core/TGTDLibClient+Account.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-account-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-account-request-probe"
+
 echo "== Authorization flow fixtures =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
