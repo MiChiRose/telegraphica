@@ -105,6 +105,9 @@ echo "== Legacy accessibility support =="
 "$CLANG" "${COMPILE_FLAGS[@]}" \
     Tests/accessibility_support_probe.m \
     Sources/UI/TGAccessibilitySupport.m \
+    Sources/UI/TGLocalization.m \
+    Sources/Core/TGChatItem.m \
+    Sources/Core/TGMessageItem.m \
     -framework Cocoa \
     -o "$BUILD_DIR/accessibility-support-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/accessibility-support-probe"

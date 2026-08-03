@@ -4,6 +4,7 @@
 #import "TGMessageLayoutSupport.h"
 #import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
+#import "TGAccessibilitySupport.h"
 #import "TGTheme.h"
 #import "TGLocalization.h"
 #import "../Core/TGChatItem.h"
@@ -50,6 +51,17 @@ static NSFont *TGReactionDisplayFont(void) {
 @implementation TGChatListCell
 
 @synthesize chatItem = _chatItem;
+
+- (void)setChatItem:(TGChatItem *)chatItem {
+    if (_chatItem == chatItem) {
+        TGAccessibilityConfigureContent(self, TGAccessibilityDescriptionForChatItem(chatItem));
+        return;
+    }
+    [chatItem retain];
+    [_chatItem release];
+    _chatItem = chatItem;
+    TGAccessibilityConfigureContent(self, TGAccessibilityDescriptionForChatItem(chatItem));
+}
 
 - (id)copyWithZone:(NSZone *)zone {
     TGChatListCell *cell = [super copyWithZone:zone];
@@ -516,6 +528,17 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
 
 @synthesize messageItem = _messageItem;
 @synthesize showSenderDetails = _showSenderDetails;
+
+- (void)setMessageItem:(TGMessageItem *)messageItem {
+    if (_messageItem == messageItem) {
+        TGAccessibilityConfigureContent(self, TGAccessibilityDescriptionForMessageItem(messageItem));
+        return;
+    }
+    [messageItem retain];
+    [_messageItem release];
+    _messageItem = messageItem;
+    TGAccessibilityConfigureContent(self, TGAccessibilityDescriptionForMessageItem(messageItem));
+}
 
 - (id)copyWithZone:(NSZone *)zone {
     TGMessageBubbleCell *cell = [super copyWithZone:zone];

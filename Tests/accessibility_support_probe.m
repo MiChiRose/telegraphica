@@ -1,5 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import "TGAccessibilitySupport.h"
+#import "TGChatItem.h"
+#import "TGMessageItem.h"
 
 @interface TGAccessibilityProbeButton : NSButton {
     NSMutableDictionary *_overrides;
@@ -66,6 +68,38 @@ int main(void) {
                           @"disabled state refresh");
     TGAccessibilityAssert(![[button.overrides objectForKey:NSAccessibilityValueAttribute] boolValue],
                           @"unselected state refresh");
+
+    TGChatItem *chat = [[[TGChatItem alloc] initWithChatID:[NSNumber numberWithInteger:7]
+                                                     title:@"Example"
+                                               typeSummary:@"Private"
+                                               unreadCount:[NSNumber numberWithInteger:3]] autorelease];
+    [chat setNotificationsMuted:YES];
+    [chat setPinned:YES];
+    NSString *chatDescription = TGAccessibilityDescriptionForChatItem(chat);
+    TGAccessibilityAssert([chatDescription rangeOfString:@"Example"].location != NSNotFound,
+                          @"chat title description");
+    TGAccessibilityAssert([chatDescription rangeOfString:@"3"].location != NSNotFound,
+                          @"chat unread description");
+
+    TGMessageItem *message = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInteger:7]
+                                                          messageID:[NSNumber numberWithInteger:9]
+                                                               date:[NSNumber numberWithInteger:1]
+                                                           outgoing:YES
+                                                            preview:@"Hello"] autorelease];
+    [message setOutgoingRead:YES];
+    [message setPinned:YES];
+    [message setReactionSummary:@"🔥 2"];
+    NSString *messageDescription = TGAccessibilityDescriptionForMessageItem(message);
+    TGAccessibilityAssert([messageDescription rangeOfString:@"Hello"].location != NSNotFound,
+                          @"message text description");
+    TGAccessibilityAssert([messageDescription rangeOfString:@"🔥 2"].location != NSNotFound,
+                          @"message reaction description");
+
+    TGAccessibilityConfigureContent(button, messageDescription);
+    TGAccessibilityAssert([[button.overrides objectForKey:NSAccessibilityRoleAttribute]
+                           isEqualToString:NSAccessibilityStaticTextRole], @"content role");
+    TGAccessibilityAssert([[button.overrides objectForKey:NSAccessibilityValueAttribute]
+                           isEqualToString:messageDescription], @"content value");
 
     printf("Accessibility support probe passed.\n");
     [pool drain];
