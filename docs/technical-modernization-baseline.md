@@ -31,6 +31,11 @@ Recorded before the first capability-registry implementation on 2026-08-03.
 
 Both libraries link only to the expected legacy system C++ and System libraries in the inspected release bundle. The existing release manifest already records architecture, minimum OS, install name, bundle path, and digest. It does not yet record the TDLib source commit/tag or MTProto layer; that belongs to the TDLib-build modernization stage.
 
+That baseline gap is now addressed for newly built candidates: TDLib sidecars
+record source provenance, MTProto layer, binary digest and the expected tdjson
+C ABI, and the release bundle audit validates the sidecars. Historical binaries
+without complete provenance remain legacy evidence and are not rewritten.
+
 ## Current code shape
 
 - `Sources/Core/TGTDLibClient.m`: 11,632 lines.

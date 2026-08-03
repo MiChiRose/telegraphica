@@ -327,6 +327,8 @@ More detail:
 - [`docs/mavericks-transfer.md`](docs/mavericks-transfer.md)
 - [`docs/feasibility.md`](docs/feasibility.md)
 - [`docs/security.md`](docs/security.md)
+- [`docs/compatibility-matrix.md`](docs/compatibility-matrix.md)
+- [`docs/release-checklist.md`](docs/release-checklist.md)
 
 ---
 
@@ -397,6 +399,8 @@ PRODUCT.md                     Product and design direction
 ## Roadmap
 
 - See the current [feature coverage and priority audit](docs/feature-audit-2026-07.md).
+- See the [technical modernization baseline](docs/technical-modernization-baseline.md)
+  for capability, architecture, performance and test progress.
 - Improve edge-case animated sticker playback and GIF handling.
 - More complete document download and preview handling.
 - Deeper group/channel profiles and member-management views.

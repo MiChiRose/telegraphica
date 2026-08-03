@@ -7,9 +7,10 @@ product
 ## Users
 
 Telegraphica is built for a user who deliberately keeps an Intel Mac on OS X
-10.9 Mavericks, with OS X 10.13 High Sierra as a secondary compatibility target.
-The user wants a practical Telegram client that works on older Mac hardware
-without requiring a system upgrade.
+10.8 Mountain Lion through macOS 10.13 High Sierra. These systems form one
+product and release lane: the user receives the same `x86_64` app bundle, with
+runtime capability gates providing safe fallbacks where the loaded TDLib or
+operating system cannot support a feature.
 
 ## Product Purpose
 

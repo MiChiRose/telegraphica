@@ -65,6 +65,9 @@ The script runs:
   filtered cleanup scope, normalized chat identifiers and the refresh request.
 - a fixture-style TDLib file probe covering download, completion-path,
   cancellation, cache deletion and invalid-identifier request contracts.
+- a fixture-style TDLib account probe covering current-profile parsing,
+  name/username/bio and profile-photo request shapes, safe active-session
+  normalization and explicit session termination.
 - a static sticker-thumbnail pipeline check ensuring that picker layout only
   reads the bounded cache and that grid/rail jobs are cancellable and reject
   stale generations.
@@ -109,6 +112,11 @@ Because Telegraphica is a GUI app and the production client may still attempt
 normal startup work, this smoke check is separate from the default fast tests.
 Manual HITL on Mavericks remains required for login, Keychain prompts, TDLib
 authorization, media playback, and real chat behavior.
+
+The complete unchanged release candidate must additionally follow
+[release-checklist.md](release-checklist.md). Current evidence and unverified
+systems are recorded in [compatibility-matrix.md](compatibility-matrix.md);
+building with a modern SDK and a 10.8 deployment target is not runtime proof.
 
 ## Telegram test DC
 
