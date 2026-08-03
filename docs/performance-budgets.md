@@ -34,9 +34,13 @@ the completion is delivered on the main thread. The returned token is
 cancellable, and controllers must cancel outstanding tokens when their content
 generation changes or they are destroyed.
 
-The reaction/viewer list and Saved Messages rows use this path. Saved Messages
-also reserves the thumbnail rectangle while loading, so late images do not
-shift text horizontally.
+The reaction/viewer list, Saved Messages rows, chat avatars, message media and
+link-preview cards use this path. Message drawing is cache-only: a bounded
+`TGMessageThumbnailPrefetcher` schedules at most 24 pending decodes, ignores
+stale completions, and reloads only the affected table row. Its completed-key
+history is capped at 256 entries and is invalidated together with the shared
+image cache. Saved Messages also reserves the thumbnail rectangle while
+loading, so late images do not shift text horizontally.
 
 ## Remaining manual measurements
 

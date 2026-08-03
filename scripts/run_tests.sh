@@ -167,6 +167,8 @@ echo "== Media image loader =="
     "${COMPILE_FLAGS[@]}" \
     Tests/media_image_loader_probe.m \
     Sources/Media/TGMediaImageLoader.m \
+    Sources/Media/TGMessageThumbnailPrefetcher.m \
+    Sources/Core/TGMessageItem.m \
     -framework Cocoa \
     -framework ImageIO \
     -o "$BUILD_DIR/media_image_loader_probe"

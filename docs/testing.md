@@ -50,8 +50,9 @@ The script runs:
   resource policy limits, media type handling, outgoing text chunking,
   localization fallback, and message layout sizing.
 - a compiled media image-loader probe covering display-size downsampling,
-  source-version cache invalidation and main-thread delivery of asynchronous
-  decode results.
+  source-version cache invalidation, main-thread delivery of asynchronous
+  decode results, bounded message-thumbnail prefetch deduplication and cache
+  reset invalidation.
 - a custom-emoji fixture probe covering identifier collection, TDLib sticker
   response parsing, completed-file gating, and fail-closed malformed data.
 - an advanced chat-folder fixture probe covering multiple invite-link parsing,

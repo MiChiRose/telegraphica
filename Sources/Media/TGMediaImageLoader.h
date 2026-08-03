@@ -2,6 +2,8 @@
 
 typedef void (^TGMediaImageLoadCompletion)(NSImage *image);
 
+extern NSString * const TGMediaImageLoaderCacheDidClearNotification;
+
 @interface TGMediaImageLoadToken : NSObject
 
 - (void)cancel;

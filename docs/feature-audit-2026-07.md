@@ -225,7 +225,7 @@ create/edit/delete/share. Each has both UI and a TDLib path in this snapshot.
 | P1 | Capability fallbacks are decentralized | Current and legacy request shapes are retried inside many individual methods | Introduce `TGTDLibCapabilities` and make availability a first-class input to UI |
 | P1 | UI lifecycle testing is mostly static | Utility windows can regress only after close/reopen on old AppKit | Add a no-network AppKit lifecycle probe for retained windows and their controller ownership |
 | P2 | Settings layout is manually repeated | Each section has separate properties, creation, visibility and frame code | Introduce a small settings-section model and shared card-row layout helper |
-| P2 | Images can be decoded repeatedly while drawing | Some custom cells load local avatar files inside `drawInteriorWithFrame:` | Add a bounded avatar image cache keyed by path and modification date |
+| P2 | Some secondary image surfaces can still decode while drawing | Chat/message avatars, message media and link-preview cards now use bounded async prefetch plus cache-only drawing; sticker and auxiliary views still need the same audit | Extend the shared loader contract to remaining secondary image surfaces |
 | P2 | Operations use many fixed synchronous wait timeouts | TDLib calls are dispatched off-main but each feature manages its own timeout/status | Add one cancellable operation wrapper with generation tokens and common error mapping |
 | P2 | Some user-facing strings remain hard-coded in English | Diagnostics, alerts and transient status strings are not all localized | Move daily-use strings to `TGLocalization`; keep developer-only diagnostics English |
 | P3 | Custom view state coverage is incomplete | Native controls provide accessibility, but many icon-only/custom cells rely mainly on tooltips | Add accessibility labels, keyboard actions and focus verification for custom controls |
@@ -237,7 +237,7 @@ This is a native-product assessment adapted to AppKit rather than a web audit.
 | Dimension | Score | Key finding |
 | --- | ---: | --- |
 | Accessibility | 2/4 | Good native-control foundation, but custom icon cells and keyboard coverage need an explicit pass |
-| Performance | 2/4 | Background TDLib work is good; image decoding, large controllers and operation duplication remain |
+| Performance | 3/4 | Main chat image drawing and TDLib operations are now asynchronous and bounded; secondary surfaces and large controllers remain |
 | Responsive layout | 3/4 | Scrollable settings/drawer and snapped chat sidebar are strong; manual frames still create edge cases |
 | Theming | 3/4 | Central theme helpers are widely used, with some hard-coded colors and strings left |
 | Product consistency | 3/4 | The app has a coherent native vocabulary; utility windows still vary in lifecycle and polish |

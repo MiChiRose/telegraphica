@@ -46,6 +46,7 @@
 #import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGFileTransferState.h"
 #import "../Media/TGMediaImageLoader.h"
+#import "../Media/TGMessageThumbnailPrefetcher.h"
 #import "../Media/TGMediaPlaybackPreferences.h"
 #import "../Media/TGMediaFileActions.h"
 #import "../Media/TGMediaItemSupport.h"
@@ -480,6 +481,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *messageJumpToNewestButton;
 @property (nonatomic, retain) TGInlineMediaPlaybackCoordinator *inlineMediaPlaybackCoordinator;
 @property (nonatomic, retain) NSMutableSet *inlineMediaPlaybackDiagnosticKeys;
+@property (nonatomic, retain) TGMessageThumbnailPrefetcher *messageThumbnailPrefetcher;
 @property (nonatomic, retain) TGDropOverlayView *messageDropOverlayView;
 @property (nonatomic, retain) NSMutableArray *messageItems;
 @property (nonatomic, retain) NSMutableDictionary *composerDraftsByTargetKey;
@@ -1019,6 +1021,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize messageJumpToNewestButton = _messageJumpToNewestButton;
 @synthesize inlineMediaPlaybackCoordinator = _inlineMediaPlaybackCoordinator;
 @synthesize inlineMediaPlaybackDiagnosticKeys = _inlineMediaPlaybackDiagnosticKeys;
+@synthesize messageThumbnailPrefetcher = _messageThumbnailPrefetcher;
 @synthesize messageDropOverlayView = _messageDropOverlayView;
 @synthesize messageItems = _messageItems;
 @synthesize composerDraftsByTargetKey = _composerDraftsByTargetKey;
@@ -1373,6 +1376,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.mediaCenterExhaustedFilterIdentifiers = [NSMutableSet set];
         self.mediaCenterSeenKeys = [NSMutableSet set];
         self.inlineMediaPlaybackDiagnosticKeys = [NSMutableSet set];
+        self.messageThumbnailPrefetcher = [[[TGMessageThumbnailPrefetcher alloc] init] autorelease];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
         self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
@@ -4803,6 +4807,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     }
     [_inlineMediaPlaybackCoordinator release];
     [_inlineMediaPlaybackDiagnosticKeys release];
+    [_messageThumbnailPrefetcher cancelAll];
+    [_messageThumbnailPrefetcher release];
     [_messageTableView release];
     [_messageDropOverlayView release];
     [_messageItems release];
