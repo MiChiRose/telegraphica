@@ -28,9 +28,7 @@
 }
 
 - (BOOL)isAuthInputState:(NSString *)state {
-    return [state isEqualToString:@"waitPhoneNumber"] ||
-           [state isEqualToString:@"waitCode"] ||
-           [state isEqualToString:@"waitPassword"];
+    return [TGAuthorizationFlow isInputState:state];
 }
 
 - (NSString *)authorizationPresentationState {
@@ -620,8 +618,17 @@
     if ([state isEqualToString:@"waitCode"]) {
         return @"login.error.code";
     }
+    if ([state isEqualToString:@"waitEmailAddress"]) {
+        return @"login.error.email";
+    }
+    if ([state isEqualToString:@"waitEmailCode"]) {
+        return @"login.error.emailCode";
+    }
+    if ([state isEqualToString:@"waitRegistration"]) {
+        return @"login.error.registration";
+    }
     if ([state isEqualToString:@"waitPassword"]) {
-        return @"login.error.password";
+        return self.authPasswordRecoveryMode ? @"login.error.recovery" : @"login.error.password";
     }
     return @"login.error.general";
 }
@@ -630,11 +637,133 @@
     if (self.controlsBusy || [self.currentAuthState isEqualToString:@"ready"]) {
         return;
     }
-    NSTextField *inputField = [self.currentAuthState isEqualToString:@"waitPassword"] ? (NSTextField *)self.authSecureField : self.authTextField;
+    BOOL usesSecureInput = [self.currentAuthState isEqualToString:@"waitPassword"] && !self.authPasswordRecoveryMode;
+    NSTextField *inputField = usesSecureInput ? (NSTextField *)self.authSecureField : self.authTextField;
     if (!inputField || [inputField isHidden] || ![inputField isEnabled]) {
         return;
     }
     [[self window] makeFirstResponder:inputField];
+}
+
+- (void)refreshAuthenticationSecondaryAction {
+    NSString *state = self.currentAuthState;
+    NSDictionary *details = [self.client currentAuthorizationSafeDetails];
+    BOOL enabled = !(self.controlsBusy || self.authSubmissionInFlight);
+    [self.qrLoginButton setImage:nil];
+    if ([state isEqualToString:@"waitCode"] || [state isEqualToString:@"waitEmailCode"]) {
+        BOOL canResend = [state isEqualToString:@"waitEmailCode"] || [[details objectForKey:@"can_resend"] boolValue];
+        if (!canResend) {
+            [self.qrLoginButton setHidden:YES];
+            [self.qrLoginButton setEnabled:NO];
+            return;
+        }
+        NSTimeInterval remaining = self.authCodeResendAvailableAt
+            ? [self.authCodeResendAvailableAt timeIntervalSinceNow] : 0.0;
+        if (remaining > 0.5) {
+            [self.qrLoginButton setTitle:[NSString stringWithFormat:TGLoc(@"login.resend.wait"), (long)ceil(remaining)]];
+            enabled = NO;
+        } else {
+            [self.qrLoginButton setTitle:TGLoc(@"login.resend")];
+        }
+        [self.qrLoginButton setAction:@selector(resendAuthenticationCode:)];
+        [self.qrLoginButton setHidden:NO];
+        [self.qrLoginButton setEnabled:enabled];
+        return;
+    }
+    if ([state isEqualToString:@"waitPassword"]) {
+        if (!self.authPasswordRecoveryMode && ![[details objectForKey:@"can_recover_password"] boolValue]) {
+            [self.qrLoginButton setHidden:YES];
+            [self.qrLoginButton setEnabled:NO];
+            return;
+        }
+        [self.qrLoginButton setTitle:(self.authPasswordRecoveryMode
+            ? TGLoc(@"login.recovery.usePassword")
+            : TGLoc(@"login.recovery.begin"))];
+        [self.qrLoginButton setAction:(self.authPasswordRecoveryMode
+            ? @selector(cancelAuthenticationPasswordRecovery:)
+            : @selector(beginAuthenticationPasswordRecovery:))];
+        [self.qrLoginButton setHidden:NO];
+        [self.qrLoginButton setEnabled:enabled];
+        return;
+    }
+    [self.qrLoginButton setHidden:YES];
+    [self.qrLoginButton setEnabled:NO];
+}
+
+- (void)performAuthenticationSideRequestWithBlock:(NSString *(^)(TGTDLibClient *, NSError **))requestBlock
+                                           label:(NSString *)label
+                                      completion:(void (^)(BOOL))completion {
+    if (!requestBlock || self.controlsBusy || self.authSubmissionInFlight) {
+        return;
+    }
+    self.authSubmissionInFlight = YES;
+    [self setControlsBusy:YES];
+    [self setLoginErrorMessage:nil];
+    TGTDLibClient *client = [self.client retain];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSError *requestError = nil;
+        NSString *summary = [requestBlock(client, &requestError) copy];
+        NSString *errorMessage = [[[requestError localizedDescription] description] copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.authSubmissionInFlight = NO;
+            [self setControlsBusy:NO];
+            if (summary) {
+                [self appendDetail:[NSString stringWithFormat:@"TDLib auth %@ accepted.", label ? label : @"action"]];
+                if (completion) {
+                    completion(YES);
+                }
+            } else {
+                [self setLoginErrorMessage:([errorMessage length] > 0 ? errorMessage : TGLoc(@"login.error.general"))];
+                if (completion) {
+                    completion(NO);
+                }
+            }
+            [self updateAuthControlsForState:self.currentAuthState];
+            [summary release];
+            [errorMessage release];
+        });
+        [client release];
+        [pool drain];
+    });
+}
+
+- (void)resendAuthenticationCode:(id)sender {
+    (void)sender;
+    if (self.authCodeResendAvailableAt && [self.authCodeResendAvailableAt timeIntervalSinceNow] > 0.5) {
+        return;
+    }
+    [self performAuthenticationSideRequestWithBlock:^NSString *(TGTDLibClient *client, NSError **error) {
+        return [client resendAuthenticationCodeWithTimeout:15.0 error:error];
+    } label:@"code resend" completion:^(BOOL succeeded) {
+        if (succeeded) {
+            NSDictionary *details = [self.client currentAuthorizationSafeDetails];
+            NSInteger timeout = [[details objectForKey:@"resend_timeout"] integerValue];
+            self.authCodeResendAvailableAt = timeout > 0 ? [NSDate dateWithTimeIntervalSinceNow:timeout] : nil;
+            [self.statusField setStringValue:TGLoc(@"login.resend.sent")];
+        }
+    }];
+}
+
+- (void)beginAuthenticationPasswordRecovery:(id)sender {
+    (void)sender;
+    [self.authSecureField setStringValue:@""];
+    [self performAuthenticationSideRequestWithBlock:^NSString *(TGTDLibClient *client, NSError **error) {
+        return [client requestAuthenticationPasswordRecoveryWithTimeout:15.0 error:error];
+    } label:@"password recovery request" completion:^(BOOL succeeded) {
+        if (succeeded) {
+            self.authPasswordRecoveryMode = YES;
+            [self.authTextField setStringValue:@""];
+            [self.statusField setStringValue:TGLoc(@"login.recovery.sent")];
+        }
+    }];
+}
+
+- (void)cancelAuthenticationPasswordRecovery:(id)sender {
+    (void)sender;
+    self.authPasswordRecoveryMode = NO;
+    [self.authTextField setStringValue:@""];
+    [self updateAuthControlsForState:self.currentAuthState];
 }
 
 - (void)scheduleLoginInputFocus {
@@ -663,6 +792,9 @@
     if (self.qrPhoneLoginRecoveryVisible &&
         ([transportState isEqualToString:@"waitPhoneNumber"] ||
          [transportState isEqualToString:@"waitCode"] ||
+         [transportState isEqualToString:@"waitEmailAddress"] ||
+         [transportState isEqualToString:@"waitEmailCode"] ||
+         [transportState isEqualToString:@"waitRegistration"] ||
          [transportState isEqualToString:@"waitPassword"] ||
          [transportState isEqualToString:@"ready"])) {
         self.qrPhoneLoginRecoveryVisible = NO;
@@ -687,6 +819,13 @@
         [self setLoginErrorMessage:nil];
         [self.authTextField setStringValue:@""];
         [self.authSecureField setStringValue:@""];
+        if (![transportState isEqualToString:@"waitPassword"]) {
+            self.authPasswordRecoveryMode = NO;
+        }
+        NSDictionary *authDetails = [self.client currentAuthorizationSafeDetails];
+        NSInteger resendTimeout = [[authDetails objectForKey:@"resend_timeout"] integerValue];
+        self.authCodeResendAvailableAt = resendTimeout > 0
+            ? [NSDate dateWithTimeIntervalSinceNow:resendTimeout] : nil;
     }
     [self.loadChatsButton setEnabled:NO];
     [self.composeChatButton setEnabled:NO];
@@ -817,6 +956,9 @@
         [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
         [self.qrLoginButton setTitle:TGLoc(@"login.qr.button")];
+        [self.qrLoginButton setImage:TGIconAssetImageNamed(@"qr-scan")];
+        [self.qrLoginButton setImagePosition:NSImageLeft];
+        [self.qrLoginButton setAction:@selector(openQRCodeLogin:)];
         [self.qrLoginButton setEnabled:authInputsEnabled];
         [self.qrLoginButton setHidden:NO];
         [self updateVisibleSection];
@@ -837,6 +979,9 @@
         [self.authSecureField setEnabled:NO];
         [self.authButton setHidden:YES];
         [self.qrLoginButton setTitle:TGLoc(@"login.qr.show")];
+        [self.qrLoginButton setImage:TGIconAssetImageNamed(@"qr-scan")];
+        [self.qrLoginButton setImagePosition:NSImageLeft];
+        [self.qrLoginButton setAction:@selector(openQRCodeLogin:)];
         [self.qrLoginButton setEnabled:authInputsEnabled];
         [self.qrLoginButton setHidden:NO];
         [self updateVisibleSection];
@@ -844,42 +989,47 @@
         return;
     }
 
-    if ([state isEqualToString:@"waitCode"]) {
-        [self.statusField setStringValue:@"Login code required"];
-        [self.loginTitleField setStringValue:TGLoc(@"login.code.title")];
-        [self.loginHintField setStringValue:TGLoc(@"login.code.hint")];
-        [self.authLabel setStringValue:TGLoc(@"login.code.label")];
-        [[self.authTextField cell] setPlaceholderString:@"12345"];
-        [[self.authSecureField cell] setPlaceholderString:@""];
+    if ([TGAuthorizationFlow isInputState:state] && ![state isEqualToString:@"waitPhoneNumber"]) {
+        NSDictionary *descriptor = [TGAuthorizationFlow descriptorForState:state];
+        BOOL secureInput = [[descriptor objectForKey:TGAuthorizationFlowSecureInputKey] boolValue];
+        if (self.authPasswordRecoveryMode && [state isEqualToString:@"waitPassword"]) {
+            secureInput = NO;
+        }
+        NSString *titleKey = [descriptor objectForKey:TGAuthorizationFlowTitleLocalizationKey];
+        NSString *hintKey = [descriptor objectForKey:TGAuthorizationFlowHintLocalizationKey];
+        NSString *labelKey = [descriptor objectForKey:TGAuthorizationFlowLabelLocalizationKey];
+        NSDictionary *authDetails = [self.client currentAuthorizationSafeDetails];
+        if (self.authPasswordRecoveryMode && [state isEqualToString:@"waitPassword"]) {
+            titleKey = @"login.recovery.title";
+            hintKey = @"login.recovery.hint";
+            labelKey = @"login.recovery.label";
+        }
+        [self.statusField setStringValue:TGLoc(@"login.input.required")];
+        [self.loginTitleField setStringValue:TGLoc(titleKey)];
+        NSString *hint = TGLoc(hintKey);
+        NSString *emailPattern = [authDetails objectForKey:@"email_pattern"];
+        if ([state isEqualToString:@"waitEmailCode"] && [emailPattern length] > 0) {
+            hint = [NSString stringWithFormat:TGLoc(@"login.emailCode.destination"), emailPattern];
+        }
+        [self.loginHintField setStringValue:hint];
+        [self.authLabel setStringValue:TGLoc(labelKey)];
+        NSNumber *codeLength = [authDetails objectForKey:@"code_length"];
+        NSString *placeholder = TGLoc(labelKey);
+        if (([state isEqualToString:@"waitCode"] || [state isEqualToString:@"waitEmailCode"]) &&
+            [codeLength integerValue] > 0 && [codeLength integerValue] <= 12) {
+            placeholder = [@"000000000000" substringToIndex:(NSUInteger)[codeLength integerValue]];
+        }
+        [[self.authTextField cell] setPlaceholderString:placeholder];
+        [[self.authSecureField cell] setPlaceholderString:TGLoc(labelKey)];
         [self.authStateField setHidden:YES];
-        [self.authTextField setHidden:NO];
-        [self.authSecureField setHidden:YES];
-        [self.authTextField setEnabled:authInputsEnabled];
-        [self.authSecureField setEnabled:NO];
+        [self.authTextField setHidden:secureInput];
+        [self.authSecureField setHidden:!secureInput];
+        [self.authTextField setEnabled:(authInputsEnabled && !secureInput)];
+        [self.authSecureField setEnabled:(authInputsEnabled && secureInput)];
         [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
         [self.authButton setEnabled:authInputsEnabled];
         [self.authButton setHidden:NO];
-        [self updateVisibleSection];
-        [self scheduleLoginInputFocus];
-        [previousState release];
-        return;
-    }
-
-    if ([state isEqualToString:@"waitPassword"]) {
-        [self.statusField setStringValue:@"Password required"];
-        [self.loginTitleField setStringValue:TGLoc(@"login.password.title")];
-        [self.loginHintField setStringValue:TGLoc(@"login.password.hint")];
-        [self.authLabel setStringValue:TGLoc(@"login.password.label")];
-        [[self.authTextField cell] setPlaceholderString:@""];
-        [[self.authSecureField cell] setPlaceholderString:TGLoc(@"login.password.label")];
-        [self.authStateField setHidden:YES];
-        [self.authTextField setHidden:YES];
-        [self.authSecureField setHidden:NO];
-        [self.authTextField setEnabled:NO];
-        [self.authSecureField setEnabled:authInputsEnabled];
-        [self.authButton setTitle:(self.authSubmissionInFlight ? TGLoc(@"login.sending") : TGLoc(@"login.send"))];
-        [self.authButton setEnabled:authInputsEnabled];
-        [self.authButton setHidden:NO];
+        [self refreshAuthenticationSecondaryAction];
         [self updateVisibleSection];
         [self scheduleLoginInputFocus];
         [previousState release];

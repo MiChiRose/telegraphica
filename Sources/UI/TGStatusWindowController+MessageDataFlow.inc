@@ -1783,6 +1783,12 @@
         return;
     }
 
+    if (([self.currentAuthState isEqualToString:@"waitCode"] ||
+         [self.currentAuthState isEqualToString:@"waitEmailCode"]) &&
+        self.authCodeResendAvailableAt) {
+        [self refreshAuthenticationSecondaryAction];
+    }
+
     NSArray *updates = [self.client drainSafeUpdateSummaries];
     if ([updates count] == 0) {
         return;
@@ -2159,15 +2165,15 @@
         return;
     }
 
-    NSTextField *inputField = [state isEqualToString:@"waitPassword"] ? (NSTextField *)self.authSecureField : self.authTextField;
+    BOOL passwordRecoverySubmission = ([state isEqualToString:@"waitPassword"] && self.authPasswordRecoveryMode);
+    NSTextField *inputField = ([state isEqualToString:@"waitPassword"] && !passwordRecoverySubmission)
+        ? (NSTextField *)self.authSecureField : self.authTextField;
     NSString *input = [[inputField stringValue] copy];
     if ([input length] == 0) {
-        NSString *emptyErrorKey = @"login.empty.password";
-        if ([state isEqualToString:@"waitPhoneNumber"]) {
-            emptyErrorKey = @"login.empty.phone";
-        } else if ([state isEqualToString:@"waitCode"]) {
-            emptyErrorKey = @"login.empty.code";
-        }
+        NSDictionary *descriptor = [TGAuthorizationFlow descriptorForState:state];
+        NSString *emptyErrorKey = passwordRecoverySubmission
+            ? @"login.empty.recovery"
+            : [descriptor objectForKey:TGAuthorizationFlowEmptyErrorLocalizationKey];
         [self setLoginErrorWithLocalizationKey:emptyErrorKey];
         [self updateVisibleSection];
         [input release];
@@ -2182,10 +2188,19 @@
     [self setControlsBusy:YES];
     [self.authButton setTitle:TGLoc(@"login.sending")];
     [self.statusField setStringValue:@"Signing in..."];
+    [inputField setStringValue:@""];
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self appendDetail:@"Submitting phone number to TDLib..."];
     } else if ([state isEqualToString:@"waitCode"]) {
         [self appendDetail:@"Submitting authentication code to TDLib..."];
+    } else if ([state isEqualToString:@"waitEmailAddress"]) {
+        [self appendDetail:@"Submitting authentication email address to TDLib..."];
+    } else if ([state isEqualToString:@"waitEmailCode"]) {
+        [self appendDetail:@"Submitting authentication email code to TDLib..."];
+    } else if ([state isEqualToString:@"waitRegistration"]) {
+        [self appendDetail:@"Submitting account registration details to TDLib..."];
+    } else if (passwordRecoverySubmission) {
+        [self appendDetail:@"Submitting password recovery code to TDLib..."];
     } else {
         [self appendDetail:@"Submitting authentication password to TDLib..."];
     }
@@ -2204,6 +2219,14 @@
             authSummary = [client submitAuthenticationPhoneNumber:input timeout:30.0 error:&authError];
         } else if ([state isEqualToString:@"waitCode"]) {
             authSummary = [client submitAuthenticationCode:input timeout:15.0 error:&authError];
+        } else if ([state isEqualToString:@"waitEmailAddress"]) {
+            authSummary = [client submitAuthenticationEmailAddress:input timeout:15.0 error:&authError];
+        } else if ([state isEqualToString:@"waitEmailCode"]) {
+            authSummary = [client submitAuthenticationEmailCode:input timeout:15.0 error:&authError];
+        } else if ([state isEqualToString:@"waitRegistration"]) {
+            authSummary = [client submitRegistrationName:input timeout:15.0 error:&authError];
+        } else if (passwordRecoverySubmission) {
+            authSummary = [client recoverAuthenticationPasswordWithCode:input timeout:15.0 error:&authError];
         } else if ([state isEqualToString:@"waitPassword"]) {
             authSummary = [client submitAuthenticationPassword:input timeout:15.0 error:&authError];
         }
@@ -2272,6 +2295,9 @@
             BOOL authNetworkTimeoutForUI = [[uiState objectForKey:@"authNetworkTimeout"] boolValue];
 
             self.authSubmissionInFlight = NO;
+            if (authSummaryForUI && passwordRecoverySubmission) {
+                self.authPasswordRecoveryMode = NO;
+            }
             if (!authSummaryForUI && [stateForUI isEqualToString:@"waitCode"]) {
                 [self.authTextField setStringValue:@""];
             } else if (!authSummaryForUI && [stateForUI isEqualToString:@"waitPassword"]) {

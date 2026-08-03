@@ -67,6 +67,10 @@
     BOOL showLogin = !ready;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
     BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
+    BOOL usesSecureAuthInput = ([authPresentationState isEqualToString:@"waitPassword"] &&
+                                !self.authPasswordRecoveryMode);
+    BOOL usesPlainAuthInput = ([self isAuthInputState:authPresentationState] &&
+                               !usesSecureAuthInput);
     CGFloat currentSidebarWidth = NSWidth([self.sidebarPanelView frame]);
     if (currentSidebarWidth <= 0.0) {
         currentSidebarWidth = self.chatSidebarPreferredWidth;
@@ -88,11 +92,11 @@
     [self showView:self.authLabel visible:showLogin];
     [self showView:self.authStateField visible:(showLogin && self.loginErrorVisible)];
     [self showView:self.authTextFieldBackgroundView visible:(showLogin && [self isAuthInputState:authPresentationState])];
-    [self showView:self.authTextField visible:(showLogin && ([authPresentationState isEqualToString:@"waitPhoneNumber"] || [authPresentationState isEqualToString:@"waitCode"]))];
+    [self showView:self.authTextField visible:(showLogin && usesPlainAuthInput)];
     [self showView:self.authSecondaryLabel
            visible:(showLogin && [authPresentationState isEqualToString:@"waitPhoneNumber"])];
     [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
-    [self showView:self.authSecureField visible:(showLogin && [authPresentationState isEqualToString:@"waitPassword"])];
+    [self showView:self.authSecureField visible:(showLogin && usesSecureAuthInput)];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:authPresentationState])];
     [self showView:self.busySpinner visible:(showLogin && self.controlsBusy)];
     [self showView:self.loginLogsButton visible:showLogin];

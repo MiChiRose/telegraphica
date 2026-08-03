@@ -1,4 +1,5 @@
 #import "TGTDLibClient.h"
+#import "TGAuthorizationFlow.h"
 #import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
@@ -254,6 +255,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_savedMessagesTopicsByID;
     TGTDLibCapabilities *_capabilities;
     NSString *_latestAuthorizationStateSummary;
+    NSDictionary *_latestAuthorizationSafeDetails;
     NSString *_latestAuthenticationQRCodeLink;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
@@ -293,6 +295,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)chatListIDKeyForType:(NSString *)chatListType;
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSString *)sendAuthorizationSideRequest:(NSDictionary *)request actionName:(NSString *)actionName extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationWithError:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationFromEnvironmentWithError:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationFromLocalConfigurationWithError:(NSError **)error;
@@ -521,6 +524,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     _networkProxyBootstrapAttempted = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
+    [_latestAuthorizationSafeDetails release];
+    _latestAuthorizationSafeDetails = nil;
     [_latestAuthenticationQRCodeLink release];
     _latestAuthenticationQRCodeLink = nil;
     _mainChatListExhausted = NO;
@@ -554,6 +559,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_capabilities release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
+    [_latestAuthorizationSafeDetails release];
     [_latestAuthenticationQRCodeLink release];
     [_sendLock release];
     [_receiverThread release];
@@ -1331,6 +1337,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (shouldSeedAuthorizationCache) {
         [_latestAuthorizationStateSummary release];
         _latestAuthorizationStateSummary = [authorizationSummary copy];
+        [_latestAuthorizationSafeDetails release];
+        _latestAuthorizationSafeDetails = [[TGAuthorizationFlow safeDetailsFromAuthorizationStateObject:authorizationStateObject] copy];
         [_latestAuthenticationQRCodeLink release];
         _latestAuthenticationQRCodeLink = [qrCodeLink copy];
         _authorizationStateGeneration++;
@@ -1485,6 +1493,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *summary = [_latestAuthorizationStateSummary copy];
     [_responseCondition unlock];
     return [summary autorelease];
+}
+
+- (NSDictionary *)currentAuthorizationSafeDetails {
+    [_responseCondition lock];
+    NSDictionary *details = [_latestAuthorizationSafeDetails copy];
+    [_responseCondition unlock];
+    return details ? [details autorelease] : [NSDictionary dictionary];
 }
 
 - (NSUInteger)authorizationStateGeneration {
@@ -3400,6 +3415,26 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return response;
+}
+
+- (NSString *)sendAuthorizationSideRequest:(NSDictionary *)request actionName:(NSString *)actionName extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:extraPrefix
+                                                            timeout:timeout
+                                                          errorCode:errorCode
+                                                              error:error];
+    if (!response) {
+        return nil;
+    }
+    NSString *responseType = [[response objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [response objectForKey:@"@type"] : nil;
+    if ([responseType isEqualToString:@"ok"]) {
+        return [NSString stringWithFormat:@"%@ accepted", actionName];
+    }
+    if (error) {
+        *error = [self errorWithTDLibErrorResponse:response code:errorCode];
+    }
+    return nil;
 }
 
 - (NSString *)prepareAuthorizationFlowWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -11739,6 +11774,132 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-auth-password"] forKey:@"@extra"];
     [request setObject:password forKey:@"password"];
     return [self sendAuthorizationRequest:request actionName:@"authentication password" waitingState:@"waitPassword" timeout:timeout errorCode:29 error:error];
+}
+
+- (NSString *)submitAuthenticationEmailAddress:(NSString *)emailAddress timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedEmail = [emailAddress stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedEmail length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Authentication email address is empty." code:233];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitEmailAddress"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"setAuthenticationEmailAddress", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-email"], @"@extra",
+        trimmedEmail, @"email_address",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"authentication email address" waitingState:@"waitEmailAddress" timeout:timeout errorCode:233 error:error];
+}
+
+- (NSString *)submitAuthenticationEmailCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedCode = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedCode length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Authentication email code is empty." code:234];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitEmailCode"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"checkAuthenticationEmailCode", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-email-code"], @"@extra",
+        [TGAuthorizationFlow emailCodeAuthenticationObjectForCode:trimmedCode], @"code",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"authentication email code" waitingState:@"waitEmailCode" timeout:timeout errorCode:234 error:error];
+}
+
+- (NSString *)submitRegistrationName:(NSString *)combinedName timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSError *nameError = nil;
+    NSDictionary *names = [TGAuthorizationFlow registrationNamesFromCombinedInput:combinedName error:&nameError];
+    if (!names) {
+        if (error) {
+            *error = nameError;
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitRegistration"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"registerUser", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-registration"], @"@extra",
+        [names objectForKey:@"first_name"], @"first_name",
+        [names objectForKey:@"last_name"], @"last_name",
+        [NSNumber numberWithBool:NO], @"disable_notification",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"account registration" waitingState:@"waitRegistration" timeout:timeout errorCode:235 error:error];
+}
+
+- (NSString *)resendAuthenticationCodeWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitCode"] && ![authorizationState isEqualToString:@"waitEmailCode"]) {
+        if (error && [authorizationState length] > 0) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"A login code can't be resent while TDLib is in %@.", authorizationState] code:236];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"resendAuthenticationCode", @"@type",
+        [TGAuthorizationFlow resendCodeReasonObject], @"reason",
+        nil];
+    return [self sendAuthorizationSideRequest:request actionName:@"authentication code resend" extraPrefix:@"telegraphica-auth-resend" timeout:timeout errorCode:236 error:error];
+}
+
+- (NSString *)requestAuthenticationPasswordRecoveryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPassword"]) {
+        if (error && [authorizationState length] > 0) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"Password recovery is unavailable while TDLib is in %@.", authorizationState] code:237];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"requestAuthenticationPasswordRecovery", @"@type",
+        nil];
+    return [self sendAuthorizationSideRequest:request actionName:@"password recovery request" extraPrefix:@"telegraphica-auth-recovery-request" timeout:timeout errorCode:237 error:error];
+}
+
+- (NSString *)recoverAuthenticationPasswordWithCode:(NSString *)recoveryCode timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedCode = [recoveryCode stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedCode length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Password recovery code is empty." code:238];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPassword"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"recoverAuthenticationPassword", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-recovery"], @"@extra",
+        trimmedCode, @"recovery_code",
+        @"", @"new_password",
+        @"", @"new_hint",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"password recovery code" waitingState:@"waitPassword" timeout:timeout errorCode:238 error:error];
 }
 
 @end

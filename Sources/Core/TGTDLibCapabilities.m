@@ -373,6 +373,7 @@ static TGTDLibCapabilityState TGTDLibProbeStateForError(NSInteger code, NSString
                     TGTDLibCapabilityEmailAuthentication, @"checkAuthenticationEmailCode",
                     TGTDLibCapabilityRegistration, @"registerUser",
                     TGTDLibCapabilityPasswordRecovery, @"requestAuthenticationPasswordRecovery",
+                    TGTDLibCapabilityPasswordRecovery, @"checkAuthenticationPasswordRecoveryCode",
                     TGTDLibCapabilityPasswordRecovery, @"recoverAuthenticationPassword",
                     TGTDLibCapabilityAvailableReactions, @"getMessageAvailableReactions",
                     TGTDLibCapabilityCustomEmoji, @"getCustomEmojiStickers",
