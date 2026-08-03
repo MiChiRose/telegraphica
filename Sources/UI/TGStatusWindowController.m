@@ -46,6 +46,7 @@
 #import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGFileTransferState.h"
 #import "../Media/TGMediaImageLoader.h"
+#import "../Media/TGMediaPlaybackPreferences.h"
 #import "../Media/TGMediaFileActions.h"
 #import "../Media/TGMediaItemSupport.h"
 #import "../Media/TGOpusVoiceTranscoder.h"
@@ -628,6 +629,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSButton *mediaPlaybackPlayPauseButton;
 @property (nonatomic, retain) NSSlider *mediaPlaybackProgressSlider;
 @property (nonatomic, retain) NSTextField *mediaPlaybackTimeField;
+@property (nonatomic, retain) NSPopUpButton *mediaPlaybackRatePopUpButton;
 @property (nonatomic, retain) NSButton *mediaPlaybackCloseButton;
 @property (nonatomic, retain) AVPlayer *mediaPlaybackPlayer;
 @property (nonatomic, retain) AVPlayerLayer *mediaPlaybackLayer;
@@ -757,6 +759,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackKnownDuration;
 @property (nonatomic, copy) NSString *mediaPlaybackResumeIdentifier;
 @property (nonatomic, assign) NSTimeInterval mediaPlaybackLastPersistedPosition;
+@property (nonatomic, assign) double mediaPlaybackRate;
 @property (nonatomic, assign) NSUInteger mediaPlaybackPreparationGeneration;
 @property (nonatomic, retain) NSOperationQueue *mediaPlaybackPreparationQueue;
 @property (nonatomic, retain) TGOpusVoiceTranscodeCancellationToken *mediaPlaybackPreparationCancellationToken;
@@ -1165,6 +1168,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPlayPauseButton = _mediaPlaybackPlayPauseButton;
 @synthesize mediaPlaybackProgressSlider = _mediaPlaybackProgressSlider;
 @synthesize mediaPlaybackTimeField = _mediaPlaybackTimeField;
+@synthesize mediaPlaybackRatePopUpButton = _mediaPlaybackRatePopUpButton;
 @synthesize mediaPlaybackCloseButton = _mediaPlaybackCloseButton;
 @synthesize mediaPlaybackPlayer = _mediaPlaybackPlayer;
 @synthesize mediaPlaybackLayer = _mediaPlaybackLayer;
@@ -1318,6 +1322,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackKnownDuration = _mediaPlaybackKnownDuration;
 @synthesize mediaPlaybackResumeIdentifier = _mediaPlaybackResumeIdentifier;
 @synthesize mediaPlaybackLastPersistedPosition = _mediaPlaybackLastPersistedPosition;
+@synthesize mediaPlaybackRate = _mediaPlaybackRate;
 @synthesize mediaPlaybackPreparationGeneration = _mediaPlaybackPreparationGeneration;
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
@@ -5016,6 +5021,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaPlaybackPlayPauseButton release];
     [_mediaPlaybackProgressSlider release];
     [_mediaPlaybackTimeField release];
+    [_mediaPlaybackRatePopUpButton release];
     [_mediaPlaybackCloseButton release];
     [_mediaPlaybackPlayer release];
     [_mediaPlaybackResumeIdentifier release];

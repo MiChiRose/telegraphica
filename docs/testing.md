@@ -59,6 +59,8 @@ The script runs:
   legacy-safe identifier normalization.
 - a persistent download-queue probe covering interrupted-state restoration,
   bounded property-list serialization and TDLib file identifier retention.
+- a playback-speed preference probe covering bounded legacy-safe rates and
+  independent audio/video persistence.
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.

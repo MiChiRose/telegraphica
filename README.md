@@ -152,6 +152,7 @@ voice messages, and keep the app updated from GitHub Releases.
   and server-reported limits on capable TDLib lanes.
 - 📥 Interrupted downloads restore after sign-in, with separate auto-download
   controls for photos, videos, documents, and voice messages.
+- ⏩ Voice/audio and video playback support independent 1x, 1.5x, and 2x speeds.
 - 🔕 Per-chat server mute, sound, and preview synchronization.
 - ✨ Bold, italic, underline, strikethrough, spoiler, and monospace message
   formatting.

@@ -173,6 +173,15 @@ echo "== Media image loader =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
 
+echo "== Media playback speed preferences =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/media_playback_preferences_probe.m \
+    Sources/Media/TGMediaPlaybackPreferences.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/media_playback_preferences_probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media_playback_preferences_probe"
+
 echo "== Custom emoji descriptors =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
