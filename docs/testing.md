@@ -59,6 +59,8 @@ The script runs:
   stale-result suppression; the storage window is wired to this lifecycle.
 - a fixture-style TDLib message-search probe covering request types, bounded
   limits, media filters, topic/thread routing, anchors and pagination offsets.
+- a fixture-style TDLib storage probe covering fast-statistics aggregation,
+  filtered cleanup scope, normalized chat identifiers and the refresh request.
 - a static sticker-thumbnail pipeline check ensuring that picker layout only
   reads the bounded cache and that grid/rail jobs are cancellable and reject
   stale generations.

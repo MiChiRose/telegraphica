@@ -2,6 +2,7 @@
 #import "TGUtilityWindowLifetime.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+Storage.h"
 #import "../Core/TGTDLibOperation.h"
 #import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGMediaImageLoader.h"

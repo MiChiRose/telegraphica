@@ -70,3 +70,7 @@ Message-search request building, schema fallbacks and response validation have
 been moved from the main client into `TGTDLibClient+Search`. Transport ownership
 and message-model conversion stay in the main client, and a fixture probe locks
 the request contract before additional search surfaces are migrated.
+
+Storage statistics and cache cleanup now live in `TGTDLibClient+Storage`.
+Filtered `optimizeStorage` construction, chat-scope normalization and the
+post-cleanup statistics refresh are locked by an account-free fixture probe.
