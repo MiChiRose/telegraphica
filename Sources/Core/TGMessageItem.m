@@ -85,6 +85,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize linkPreviewInfo = _linkPreviewInfo;
 @synthesize reactionSummary = _reactionSummary;
 @synthesize chosenReactionEmojis = _chosenReactionEmojis;
+@synthesize canGetAddedReactions = _canGetAddedReactions;
 @synthesize reactionAnimationDisplaySummary = _reactionAnimationDisplaySummary;
 @synthesize reactionAnimationProgress = _reactionAnimationProgress;
 @synthesize reactionAnimationChangesHeight = _reactionAnimationChangesHeight;
@@ -380,6 +381,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setLinkPreviewInfo:_linkPreviewInfo];
     [copy setReactionSummary:_reactionSummary];
     [copy setChosenReactionEmojis:_chosenReactionEmojis];
+    [copy setCanGetAddedReactions:_canGetAddedReactions];
     [copy setReactionAnimationDisplaySummary:_reactionAnimationDisplaySummary];
     [copy setReactionAnimationProgress:_reactionAnimationProgress];
     [copy setReactionAnimationChangesHeight:_reactionAnimationChangesHeight];

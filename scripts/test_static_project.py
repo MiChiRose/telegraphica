@@ -271,6 +271,8 @@ def check_unified_legacy_contract(errors):
         "Preserved the existing generated Telegram connection provider.",
         "Found the existing Mavericks-and-newer TDLib JSON library.",
         "Found the existing Mountain Lion TDLib JSON library.",
+        "bundle_tdlib_build_metadata",
+        "TelegraphicaTDLibMetadataMountainLion.tsv",
     ]:
         if fragment not in build_text:
             errors.append("%s: unified legacy build contract is missing `%s`" %
@@ -284,6 +286,31 @@ def check_unified_legacy_contract(errors):
         if fragment not in package_text:
             errors.append("%s: dual TDLib release contract is missing `%s`" %
                           (package_rel, fragment))
+
+    tdlib_build_rel = os.path.join("scripts", "build_tdlib_legacy.sh")
+    tdlib_build_text = read_text(os.path.join(ROOT, tdlib_build_rel))
+    for fragment in [
+        "TDLIB_RELEASE_STATUS",
+        "tdlib_source_commit",
+        "TDLibBuildMetadata.tsv",
+        "write_tdlib_build_metadata.sh",
+        "check_tdlib_build_metadata.sh",
+    ]:
+        if fragment not in tdlib_build_text:
+            errors.append("%s: reproducible TDLib metadata contract is missing `%s`" %
+                          (tdlib_build_rel, fragment))
+
+    bundle_check_rel = os.path.join("scripts", "check_release_bundle_legacy.sh")
+    bundle_check_text = read_text(os.path.join(ROOT, bundle_check_rel))
+    for fragment in [
+        "LC_BUILD_VERSION",
+        "TelegraphicaTDLibMetadata.tsv",
+        "TelegraphicaTDLibMetadataMountainLion.tsv",
+        "check_tdlib_build_metadata.sh",
+    ]:
+        if fragment not in bundle_check_text:
+            errors.append("%s: bundled TDLib provenance check is missing `%s`" %
+                          (bundle_check_rel, fragment))
 
     recovery_rel = os.path.join("Sources", "Services", "TGTDLibStartupRecovery.m")
     if os.path.exists(os.path.join(ROOT, recovery_rel)):
@@ -598,7 +625,7 @@ def check_call_transport_stability_contract(errors):
     verified_transport_text = read_text(
         os.path.join(ROOT, verified_transport_rel))
     expected_transport_sha = (
-        "d56dec30e80855fc9c2592d1f28293259a1289e3661c1b954302ccaece1419e4")
+        "41defe13e158664d47be8d18bb150aed09ca6a39895d1ddc8933f377a9cc497e")
     if expected_transport_sha not in verified_transport_text:
         errors.append(
             "%s: the HITL-approved audio-call transport hash changed" %
@@ -911,7 +938,7 @@ def check_call_transport_stability_contract(errors):
 
 
 def check_media_file_management_contract(errors):
-    client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    client_rel = os.path.join("Sources", "Core", "TGTDLibClient+Files.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
     for fragment in [
         "cancelDownloadForFileID:",
@@ -1231,6 +1258,8 @@ def check_primary_navigation_contract(errors):
     message_data_flow_text = read_text(os.path.join(ROOT, message_data_flow_rel))
     tdlib_client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     tdlib_client_text = read_text(os.path.join(ROOT, tdlib_client_rel))
+    account_client_rel = os.path.join("Sources", "Core", "TGTDLibClient+Account.m")
+    account_client_text = read_text(os.path.join(ROOT, account_client_rel))
     for fragment in [
         "setName",
         "setUsername",
@@ -1241,9 +1270,9 @@ def check_primary_navigation_contract(errors):
         "updateCurrentUserFirstName",
         "setCurrentUserProfilePhotoAtPath",
     ]:
-        if fragment not in client_text:
+        if fragment not in account_client_text:
             errors.append("%s: profile editing TDLib request is missing `%s`" %
-                          (client_rel, fragment))
+                          (account_client_rel, fragment))
     for fragment in [
         "TGProfileEditWindowController",
         "TGPrimaryTextButtonCell",
@@ -1662,11 +1691,24 @@ def check_chat_folder_management_contract(errors):
         '"reorderChatFolders"',
         '"checkChatFolderInviteLink"',
         '"addChatFolderByInviteLink"',
-        '"mountain-lion"',
+        '[[self capabilities] lane] == TGTDLibLaneMountainLionFallback',
     ]:
         if fragment not in client_text:
             errors.append("%s: unified chat-folder TDLib contract is missing `%s`" %
                           (client_rel, fragment))
+
+    capabilities_rel = os.path.join("Sources", "Core", "TGTDLibCapabilities.m")
+    capabilities_text = read_text(os.path.join(ROOT, capabilities_rel))
+    for fragment in [
+        'TGTDLibCapabilitySharedChatFolders',
+        'TGTDLibCapabilityStateForbidden',
+        'TGTDLibCapabilityStateTemporarilyUnavailable',
+        'capabilityIdentifierForRequestType:',
+        'recordProbeResponse:',
+    ]:
+        if fragment not in capabilities_text:
+            errors.append("%s: capability registry contract is missing `%s`" %
+                          (capabilities_rel, fragment))
     for fragment in [
         'assetName:@"folder-add"',
         'assetName:@"folder-remove"',
@@ -1677,7 +1719,8 @@ def check_chat_folder_management_contract(errors):
         "importChatFolderWithInviteLink:",
         "definitionHasInclusionRule:",
         "setObjectValue:",
-        "shareLinkForChatFolderID:",
+        "TGChatFolderSharingWindowController",
+        "configureWithFolderDefinition:",
         "TGChatFolderListCell",
         "@interface TGChatFolderListCell : TGRepresentedObjectCell",
         "@interface TGChatFolderChatCell : TGRepresentedObjectCell",
@@ -1689,6 +1732,22 @@ def check_chat_folder_management_contract(errors):
         if fragment not in controller_text:
             errors.append("%s: chat-folder management UI is missing `%s`" %
                           (controller_rel, fragment))
+    sharing_rel = os.path.join("Sources", "UI", "TGChatFolderSharingWindowController.m")
+    sharing_text = read_text(os.path.join(ROOT, sharing_rel))
+    for fragment in [
+        "chatFolderInviteLinksForFolderID:",
+        "createChatFolderInviteLinkForFolderID:",
+        "editChatFolderInviteLinkForFolderID:",
+        "deleteChatFolderInviteLinkForFolderID:",
+        "newChatIDsForChatFolderID:",
+        "processNewChatIDs:",
+        "recommendedChatFolderDefinitionsWithTimeout:",
+        "chatFolderServerLimitsWithTimeout:",
+        "windowWillClose:",
+    ]:
+        if fragment not in sharing_text:
+            errors.append("%s: advanced chat-folder UI is missing `%s`" %
+                          (sharing_rel, fragment))
     for fragment in [
         "showChatFolderManagementWindow:",
         "chatFolderManagementWindowControllerDidChangeFolders:",
@@ -1804,7 +1863,7 @@ def check_qr_login_and_reaction_picker_contract(errors):
     client_cancel_start = client_text.find(
         "- (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:")
     client_cancel_end = client_text.find(
-        "- (NSDictionary *)currentUserProfileSummaryWithTimeout:",
+        "- (NSString *)postLoginProbeSummaryWithTimeout:",
         client_cancel_start)
     client_cancel_method = client_text[client_cancel_start:client_cancel_end]
     if (client_cancel_start < 0 or
@@ -1820,6 +1879,20 @@ def check_qr_login_and_reaction_picker_contract(errors):
         if fragment not in layout_text:
             errors.append("%s: QR/phone login layout is missing `%s`" %
                           (layout_rel, fragment))
+    controller_text = read_text(os.path.join(ROOT, "Sources", "UI", "TGStatusWindowController.m"))
+    for fragment in ["authSecondaryActionButton", "secondaryActionButtonWidth"]:
+        combined_auth_layout = controller_text + layout_text
+        if fragment not in combined_auth_layout:
+            errors.append("%s: auth secondary action layout is missing `%s`" %
+                          (layout_rel, fragment))
+    if "[self.qrLoginButton setTitle:(self.authPasswordRecoveryMode" in auth_text:
+        errors.append("%s: password recovery must not reuse the QR login button" % auth_rel)
+    if "[self.authSecondaryActionButton setTitle:(self.authPasswordRecoveryMode" not in auth_text:
+        errors.append("%s: password recovery secondary action is not wired" % auth_rel)
+    if 'TGIconAssetImageNamed(@"qr-scan")' in (controller_text + auth_text):
+        errors.append("%s: full-size QR asset must not be assigned directly to a legacy NSButton" % auth_rel)
+    if 'TGTemplateIconAssetImage(@"qr-scan"' not in controller_text or "NSMakeSize(16.0, 16.0)" not in controller_text:
+        errors.append("%s: QR login button must use a bounded legacy-safe icon" % layout_rel)
     for fragment in ["authorizationRetryCount", 'TGLoc(@"contacts.authWaiting")']:
         if fragment not in contacts_text:
             errors.append("%s: post-authorization contact retry is missing `%s`" %
@@ -2065,6 +2138,186 @@ def check_received_link_preview_contract(errors):
                           (hit_rel, fragment))
 
 
+def check_tdlib_search_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    search_rel = os.path.join("Sources", "Core", "TGTDLibClient+Search.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    search_text = read_text(os.path.join(ROOT, search_rel))
+    moved_selectors = [
+        "searchMessagesFilterForName:",
+        "searchMessagePreviewItemsForChatID:",
+        "globalSearchMessagePreviewItemsWithQuery:",
+    ]
+    for selector in moved_selectors:
+        if selector in main_text:
+            errors.append("%s: extracted search selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if selector not in search_text:
+            errors.append("%s: extracted search selector is missing: %s" %
+                          (search_rel, selector))
+    for fragment in [
+        "sendTDLibRequestAndWaitForExtra:",
+        "messagesFromSearchResponse:",
+        "messagePreviewItemsFromMessages:",
+    ]:
+        if fragment not in search_text:
+            errors.append("%s: search component does not use shared client contract `%s`" %
+                          (search_rel, fragment))
+
+
+def check_tdlib_storage_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    storage_rel = os.path.join("Sources", "Core", "TGTDLibClient+Storage.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    storage_text = read_text(os.path.join(ROOT, storage_rel))
+    moved_selectors = [
+        "storageUsageSummaryWithTimeout:",
+        "clearDownloadedMediaCacheForFileTypes:",
+        "clearDownloadedMediaCacheWithTimeout:",
+    ]
+    for selector in moved_selectors:
+        if selector in main_text:
+            errors.append("%s: extracted storage selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if selector not in storage_text:
+            errors.append("%s: extracted storage selector is missing: %s" %
+                          (storage_rel, selector))
+    for fragment in [
+        '"getStorageStatisticsFast"',
+        '"optimizeStorage"',
+        "TGStorageCleanupNormalizedChatIDs",
+        'forKey:@"return_deleted_file_statistics"',
+    ]:
+        if fragment not in storage_text:
+            errors.append("%s: storage request contract is missing `%s`" %
+                          (storage_rel, fragment))
+
+
+def check_tdlib_file_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    files_rel = os.path.join("Sources", "Core", "TGTDLibClient+Files.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    files_text = read_text(os.path.join(ROOT, files_rel))
+    moved_selectors = [
+        "downloadedFileInfoForFileID:",
+        "downloadedLocalPathForFileID:",
+        "cancelDownloadForFileID:",
+        "deleteCachedFileForFileID:",
+    ]
+    for selector in moved_selectors:
+        method_pattern = re.compile(
+            r"-\s*\([^)]+\)\s*%s(?:(?!;).){0,500}\{" % re.escape(selector),
+            re.S,
+        )
+        if method_pattern.search(main_text):
+            errors.append("%s: extracted file selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if not method_pattern.search(files_text):
+            errors.append("%s: extracted file selector is missing: %s" %
+                          (files_rel, selector))
+    for fragment in [
+        '@"downloadFile"',
+        '@"cancelDownloadFile"',
+        '@"deleteFile"',
+        'forKey:@"synchronous"',
+    ]:
+        if fragment not in files_text:
+            errors.append("%s: file request contract is missing `%s`" %
+                          (files_rel, fragment))
+
+
+def check_tdlib_account_component_boundary(errors):
+    main_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
+    account_rel = os.path.join("Sources", "Core", "TGTDLibClient+Account.m")
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    account_text = read_text(os.path.join(ROOT, account_rel))
+    moved_selectors = [
+        "currentUserProfileSummaryWithTimeout:",
+        "updateCurrentUserFirstName:",
+        "setCurrentUserProfilePhotoAtPath:",
+        "activeSessionsSummaryWithTimeout:",
+        "terminateActiveSessionWithID:",
+    ]
+    for selector in moved_selectors:
+        method_pattern = re.compile(
+            r"-\s*\([^)]+\)\s*%s(?:(?!;).){0,500}\{" % re.escape(selector),
+            re.S,
+        )
+        if method_pattern.search(main_text):
+            errors.append("%s: extracted account selector returned to the monolith: %s" %
+                          (main_rel, selector))
+        if not method_pattern.search(account_text):
+            errors.append("%s: extracted account selector is missing: %s" %
+                          (account_rel, selector))
+    for fragment in [
+        '@"getMe"',
+        '@"getUserFullInfo"',
+        '@"setName"',
+        '@"setUsername"',
+        '@"setBio"',
+        '@"setProfilePhoto"',
+        '@"getActiveSessions"',
+        '@"terminateSession"',
+    ]:
+        if fragment not in account_text:
+            errors.append("%s: account request contract is missing `%s`" %
+                          (account_rel, fragment))
+
+
+def check_accessibility_and_keyboard_contract(errors):
+    helper_rel = os.path.join("Sources", "UI", "TGAccessibilitySupport.m")
+    main_rel = os.path.join("Sources", "UI", "TGStatusWindowController.m")
+    cells_rel = os.path.join("Sources", "UI", "TGStatusViewCells.m")
+    navigation_rel = os.path.join("Sources", "UI", "TGStatusWindowController+SearchNavigation.inc")
+    helper_text = read_text(os.path.join(ROOT, helper_rel))
+    main_text = read_text(os.path.join(ROOT, main_rel))
+    cells_text = read_text(os.path.join(ROOT, cells_rel))
+    navigation_text = read_text(os.path.join(ROOT, navigation_rel))
+    for fragment in [
+        "accessibilitySetOverrideValue:forAttribute:",
+        "NSAccessibilityButtonRole",
+        "NSAccessibilityTitleAttribute",
+        "NSAccessibilityHelpAttribute",
+        "NSAccessibilityEnabledAttribute",
+        "NSAccessibilityValueAttribute",
+        "NSAccessibilityListRole",
+        "TGAccessibilityDescriptionForChatItem",
+        "TGAccessibilityDescriptionForMessageItem",
+    ]:
+        if fragment not in helper_text:
+            errors.append("%s: legacy accessibility contract is missing `%s`" %
+                          (helper_rel, fragment))
+    for fragment in [
+        "refreshAccessibilityDescriptions",
+        "TGAccessibilityConfigureButton",
+        "TGAccessibilityConfigureList",
+        "TGAccessibilityUpdateButtonState",
+    ]:
+        if fragment not in main_text:
+            errors.append("%s: main-window accessibility wiring is missing `%s`" %
+                          (main_rel, fragment))
+    for fragment in [
+        "TGAccessibilityDescriptionForChatItem",
+        "TGAccessibilityDescriptionForMessageItem",
+        "TGAccessibilityConfigureContent",
+    ]:
+        if fragment not in cells_text:
+            errors.append("%s: accessible cell content wiring is missing `%s`" %
+                          (cells_rel, fragment))
+    for fragment in [
+        "key == 'n'",
+        "key == 'k'",
+        "key == ','",
+        "openNewChatWindow",
+        "openChatListSearch",
+        "navigationButtons objectAtIndex:3",
+        "key == 'f'",
+    ]:
+        if fragment not in navigation_text:
+            errors.append("%s: keyboard navigation contract is missing `%s`" %
+                          (navigation_rel, fragment))
+
+
 def main():
     errors = []
     if "--self-test-failure" in sys.argv:
@@ -2099,6 +2352,11 @@ def main():
     check_contact_birthday_contract(errors)
     check_poll_management_contract(errors)
     check_received_link_preview_contract(errors)
+    check_tdlib_search_component_boundary(errors)
+    check_tdlib_storage_component_boundary(errors)
+    check_tdlib_file_component_boundary(errors)
+    check_tdlib_account_component_boundary(errors)
+    check_accessibility_and_keyboard_contract(errors)
     if errors:
         print("Static project tests failed:")
         for error in errors:

@@ -1,6 +1,13 @@
 #import "TGTDLibClient.h"
+#import "TGAuthorizationFlow.h"
+#import "TGFormattedTextCodec.h"
+#import "TGReactionCatalog.h"
+#import "TGAddedReactionsParser.h"
+#import "TGCustomEmojiParser.h"
+#import "TGTDLibCapabilities.h"
 #import "TGTDLibBundledCredentials.h"
 #import "TGTDLibClient+LocationMessages.h"
+#import "TGTDLibClient+Files.h"
 #import "TGChatItem.h"
 #import "TGMessageItem.h"
 #import "TGMessagePollSupport.h"
@@ -251,7 +258,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSMutableDictionary *_syntheticMediaAlbumIDByMessageKey;
     NSMutableDictionary *_notificationScopeMutedByType;
     NSMutableDictionary *_savedMessagesTopicsByID;
+    NSCache *_customEmojiDescriptorCache;
+    TGTDLibCapabilities *_capabilities;
     NSString *_latestAuthorizationStateSummary;
+    NSDictionary *_latestAuthorizationSafeDetails;
     NSString *_latestAuthenticationQRCodeLink;
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
@@ -291,6 +301,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSString *)chatListIDKeyForType:(NSString *)chatListType;
 - (NSDictionary *)sendTDLibRequest:(NSDictionary *)request waitingForExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSString *)sendAuthorizationSideRequest:(NSDictionary *)request actionName:(NSString *)actionName extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
+- (NSDictionary *)formattedTextForComposerText:(NSString *)text originalText:(NSString *)originalText originalEntities:(NSArray *)originalEntities timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationWithError:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationFromEnvironmentWithError:(NSError **)error;
 - (NSDictionary *)networkProxyConfigurationFromLocalConfigurationWithError:(NSError **)error;
@@ -302,6 +314,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (BOOL)boolValueFromObject:(id)value defaultValue:(BOOL)defaultValue;
 - (NSString *)optionSummaryForName:(NSString *)name timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (id)valueFromTDLibOptionResponse:(NSDictionary *)response;
+- (id)executeOptionValueNamed:(NSString *)name;
+- (NSDictionary *)bundledTDLibMetadata;
 - (NSDictionary *)waitForResponseWithExtra:(NSString *)extra timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
 - (NSString *)waitForAuthorizationStateDifferentFromState:(NSString *)state afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout;
 - (NSString *)receiveAuthorizationResultForAction:(NSString *)actionName waitingState:(NSString *)waitingState afterGeneration:(NSUInteger)generation timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error;
@@ -319,6 +333,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (BOOL)isVisualDocumentObject:(NSDictionary *)documentObject;
 - (NSString *)documentVisualLabelFromObject:(NSDictionary *)documentObject;
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject;
+- (NSDictionary *)customEmojiDescriptorsForMessages:(NSArray *)messages timeout:(NSTimeInterval)timeout;
 - (BOOL)chatNotificationsMutedFromObject:(NSDictionary *)chatObject;
 - (BOOL)isCommunityChatObject:(NSDictionary *)chatObject;
 - (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject;
@@ -408,6 +423,9 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _syntheticMediaAlbumIDByMessageKey = [[NSMutableDictionary alloc] init];
         _notificationScopeMutedByType = [[NSMutableDictionary alloc] init];
         _savedMessagesTopicsByID = [[NSMutableDictionary alloc] init];
+        _customEmojiDescriptorCache = [[NSCache alloc] init];
+        [_customEmojiDescriptorCache setCountLimit:192];
+        _capabilities = [[TGTDLibCapabilities alloc] initWithLoadedLibraryPath:nil];
         _sendLock = [[NSLock alloc] init];
     }
     return self;
@@ -516,6 +534,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     _networkProxyBootstrapAttempted = NO;
     [_latestAuthorizationStateSummary release];
     _latestAuthorizationStateSummary = nil;
+    [_latestAuthorizationSafeDetails release];
+    _latestAuthorizationSafeDetails = nil;
     [_latestAuthenticationQRCodeLink release];
     _latestAuthenticationQRCodeLink = nil;
     _mainChatListExhausted = NO;
@@ -546,8 +566,11 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_syntheticMediaAlbumIDByMessageKey release];
     [_notificationScopeMutedByType release];
     [_savedMessagesTopicsByID release];
+    [_customEmojiDescriptorCache release];
+    [_capabilities release];
     [_networkProxyBootstrapSummary release];
     [_latestAuthorizationStateSummary release];
+    [_latestAuthorizationSafeDetails release];
     [_latestAuthenticationQRCodeLink release];
     [_sendLock release];
     [_receiverThread release];
@@ -557,6 +580,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
 - (NSString *)loadedLibraryPath {
     return _loadedPath;
+}
+
+- (TGTDLibCapabilities *)capabilities {
+    return _capabilities;
+}
+
+- (NSString *)tdlibCapabilitiesSummary {
+    return [_capabilities diagnosticSummary];
 }
 
 - (BOOL)mainChatListExhausted {
@@ -1317,6 +1348,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     if (shouldSeedAuthorizationCache) {
         [_latestAuthorizationStateSummary release];
         _latestAuthorizationStateSummary = [authorizationSummary copy];
+        [_latestAuthorizationSafeDetails release];
+        _latestAuthorizationSafeDetails = [[TGAuthorizationFlow safeDetailsFromAuthorizationStateObject:authorizationStateObject] copy];
         [_latestAuthenticationQRCodeLink release];
         _latestAuthenticationQRCodeLink = [qrCodeLink copy];
         _authorizationStateGeneration++;
@@ -1473,6 +1506,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [summary autorelease];
 }
 
+- (NSDictionary *)currentAuthorizationSafeDetails {
+    [_responseCondition lock];
+    NSDictionary *details = [_latestAuthorizationSafeDetails copy];
+    [_responseCondition unlock];
+    return details ? [details autorelease] : [NSDictionary dictionary];
+}
+
 - (NSUInteger)authorizationStateGeneration {
     [_responseCondition lock];
     NSUInteger generation = _authorizationStateGeneration;
@@ -1592,7 +1632,23 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         }
         [_sendLock unlock];
 
-        NSDictionary *response = [self waitForResponseWithExtra:extra timeout:timeout errorCode:errorCode error:error];
+        NSError *capabilityError = nil;
+        NSDictionary *response = [self waitForResponseWithExtra:extra
+                                                        timeout:timeout
+                                                      errorCode:errorCode
+                                                          error:&capabilityError];
+        if (error) {
+            *error = capabilityError;
+        }
+        NSString *requestType = [[request objectForKey:@"@type"] isKindOfClass:[NSString class]]
+            ? [request objectForKey:@"@type"] : nil;
+        NSString *capability = [TGTDLibCapabilities capabilityIdentifierForRequestType:requestType];
+        if ([capability length] > 0) {
+            [_capabilities recordProbeResponse:response
+                                         error:capabilityError
+                                 forCapability:capability
+                                        source:requestType];
+        }
         if (!response) {
             return nil;
         }
@@ -2580,6 +2636,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 
         _libraryHandle = handle;
         self.loadedPath = path;
+        [_capabilities updateLoadedLibraryPath:path];
         break;
     }
 
@@ -2734,6 +2791,33 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSDictionary *dictionary = (NSDictionary *)object;
     id type = [dictionary objectForKey:@"@type"];
     if ([type isKindOfClass:[NSString class]] && [type isEqualToString:@"textEntities"]) {
+        [_capabilities recordProbeResponse:dictionary
+                                     error:nil
+                             forCapability:TGTDLibCapabilityModernTextEntities
+                                    source:@"getTextEntities.execute"];
+        id version = [self executeOptionValueNamed:@"version"];
+        id commit = [self executeOptionValueNamed:@"commit_hash"];
+        id layer = [self executeOptionValueNamed:@"mtproto_layer"];
+        NSDictionary *buildMetadata = [self bundledTDLibMetadata];
+        if (![version isKindOfClass:[NSString class]] || [(NSString *)version length] == 0) {
+            version = [buildMetadata objectForKey:@"tdlib_version"];
+        }
+        if (![commit isKindOfClass:[NSString class]] || [(NSString *)commit length] == 0) {
+            commit = [buildMetadata objectForKey:@"source_commit"];
+            if (![commit isKindOfClass:[NSString class]] || [(NSString *)commit length] == 0) {
+                commit = [buildMetadata objectForKey:@"source_tag"];
+            }
+        }
+        if (![layer isKindOfClass:[NSNumber class]]) {
+            NSString *layerText = [buildMetadata objectForKey:@"mtproto_layer"];
+            if ([layerText integerValue] > 0) {
+                layer = [NSNumber numberWithInteger:[layerText integerValue]];
+            }
+        }
+        [_capabilities recordTDLibVersion:([version isKindOfClass:[NSString class]] ? version : nil)
+                                   commit:([commit isKindOfClass:[NSString class]] ? commit : nil)
+                             mtprotoLayer:([layer isKindOfClass:[NSNumber class]] ? layer : nil)
+                              buildStatus:[buildMetadata objectForKey:@"release_status"]];
         id entities = [dictionary objectForKey:@"entities"];
         if ([entities isKindOfClass:[NSArray class]]) {
             return [NSString stringWithFormat:@"sync execute OK (%lu text entities)", (unsigned long)[entities count]];
@@ -2746,6 +2830,60 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         *error = [self errorWithDescription:message code:10];
     }
     return nil;
+}
+
+- (id)executeOptionValueNamed:(NSString *)name {
+    if ([name length] == 0 || !_executeFunction || !_client) {
+        return nil;
+    }
+    NSDictionary *requestObject = [NSDictionary dictionaryWithObjectsAndKeys:
+                                   @"getOption", @"@type",
+                                   name, @"name",
+                                   nil];
+    NSString *requestJSON = [self JSONStringFromObject:requestObject error:NULL];
+    if ([requestJSON length] == 0) {
+        return nil;
+    }
+    const char *result = _executeFunction(_client, [requestJSON UTF8String]);
+    if (!result) {
+        return nil;
+    }
+    NSString *jsonString = [NSString stringWithUTF8String:result];
+    id responseObject = [self JSONObjectFromJSONString:jsonString error:NULL];
+    NSDictionary *response = [responseObject isKindOfClass:[NSDictionary class]] ? responseObject : nil;
+    return [self valueFromTDLibOptionResponse:response];
+}
+
+- (NSDictionary *)bundledTDLibMetadata {
+    if ([_loadedPath length] == 0) {
+        return [NSDictionary dictionary];
+    }
+    NSString *resourceName = ([_capabilities lane] == TGTDLibLaneMountainLionFallback)
+        ? @"TelegraphicaTDLibMetadataMountainLion" : @"TelegraphicaTDLibMetadata";
+    NSString *metadataPath = [[NSBundle mainBundle] pathForResource:resourceName ofType:@"tsv"];
+    if ([metadataPath length] == 0) {
+        return [NSDictionary dictionary];
+    }
+    NSString *metadata = [NSString stringWithContentsOfFile:metadataPath encoding:NSUTF8StringEncoding error:NULL];
+    NSArray *lines = [metadata componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    if ([lines count] < 2) {
+        return [NSDictionary dictionary];
+    }
+    NSArray *headers = [[lines objectAtIndex:0] componentsSeparatedByString:@"\t"];
+    NSArray *values = [[lines objectAtIndex:1] componentsSeparatedByString:@"\t"];
+    if ([headers count] != [values count] || [headers count] == 0) {
+        return [NSDictionary dictionary];
+    }
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    NSUInteger index = 0;
+    for (index = 0; index < [headers count]; index++) {
+        NSString *key = [headers objectAtIndex:index];
+        NSString *value = [values objectAtIndex:index];
+        if ([key length] > 0 && [value length] > 0 && ![value isEqualToString:@"unknown"]) {
+            [result setObject:value forKey:key];
+        }
+    }
+    return result;
 }
 
 - (NSString *)configureNetworkProxyIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -3288,6 +3426,26 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return response;
+}
+
+- (NSString *)sendAuthorizationSideRequest:(NSDictionary *)request actionName:(NSString *)actionName extraPrefix:(NSString *)extraPrefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)errorCode error:(NSError **)error {
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                        extraPrefix:extraPrefix
+                                                            timeout:timeout
+                                                          errorCode:errorCode
+                                                              error:error];
+    if (!response) {
+        return nil;
+    }
+    NSString *responseType = [[response objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [response objectForKey:@"@type"] : nil;
+    if ([responseType isEqualToString:@"ok"]) {
+        return [NSString stringWithFormat:@"%@ accepted", actionName];
+    }
+    if (error) {
+        *error = [self errorWithTDLibErrorResponse:response code:errorCode];
+    }
+    return nil;
 }
 
 - (NSString *)prepareAuthorizationFlowWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -5411,187 +5569,6 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 }
 
-- (NSDictionary *)downloadedFileInfoForFileID:(NSNumber *)fileID
-                                       timeout:(NSTimeInterval)timeout
-                                         error:(NSError **)error {
-    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"File identifier is missing." code:56];
-        }
-        return nil;
-    }
-
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"downloadFile" forKey:@"@type"];
-    [request setObject:fileID forKey:@"file_id"];
-    [request setObject:[NSNumber numberWithInt:16] forKey:@"priority"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"limit"];
-    [request setObject:[NSNumber numberWithBool:YES] forKey:@"synchronous"];
-
-    NSError *downloadError = nil;
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-download-file"
-                                                           timeout:timeout
-                                                         errorCode:56
-                                                             error:&downloadError];
-    if (![response isKindOfClass:[NSDictionary class]]) {
-        if (error) {
-            *error = downloadError ? downloadError :
-                [self errorWithDescription:@"TDLib did not return a file download response." code:56];
-        }
-        return nil;
-    }
-    id responseType = [response objectForKey:@"@type"];
-    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"file"]) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib returned an unexpected file download response." code:56];
-        }
-        return nil;
-    }
-    NSString *path = [self completedLocalPathFromFileObject:response];
-    if ([path length] == 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib did not finish the file download." code:56];
-        }
-        return nil;
-    }
-    return [NSDictionary dictionaryWithObjectsAndKeys:path, @"local_path", fileID, @"file_id", nil];
-}
-
-- (NSDictionary *)downloadedFileInfoForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout {
-    return [self downloadedFileInfoForFileID:fileID timeout:timeout error:NULL];
-}
-
-- (NSString *)downloadedLocalPathForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSDictionary *info = [self downloadedFileInfoForFileID:fileID timeout:timeout error:error];
-    NSString *path = [info objectForKey:@"local_path"];
-    return ([path isKindOfClass:[NSString class]] && [path length] > 0) ? path : nil;
-}
-
-- (BOOL)cancelDownloadForFileID:(NSNumber *)fileID
-                        timeout:(NSTimeInterval)timeout
-                          error:(NSError **)error {
-    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"File identifier is missing." code:182];
-        }
-        return NO;
-    }
-    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
-                             @"cancelDownloadFile", @"@type",
-                             fileID, @"file_id",
-                             [NSNumber numberWithBool:NO], @"only_if_pending",
-                             nil];
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-cancel-download"
-                                                           timeout:timeout
-                                                         errorCode:182
-                                                             error:error];
-    return [[response objectForKey:@"@type"] isEqualToString:@"ok"];
-}
-
-- (BOOL)deleteCachedFileForFileID:(NSNumber *)fileID
-                          timeout:(NSTimeInterval)timeout
-                            error:(NSError **)error {
-    if (![fileID respondsToSelector:@selector(integerValue)] || [fileID integerValue] <= 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"File identifier is missing." code:183];
-        }
-        return NO;
-    }
-    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
-                             @"deleteFile", @"@type",
-                             fileID, @"file_id",
-                             nil];
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-delete-cached-file"
-                                                           timeout:timeout
-                                                         errorCode:183
-                                                             error:error];
-    return [[response objectForKey:@"@type"] isEqualToString:@"ok"];
-}
-
-- (NSNumber *)longLongNumberFromDictionary:(NSDictionary *)dictionary key:(NSString *)key {
-    id value = [dictionary objectForKey:key];
-    if ([value respondsToSelector:@selector(longLongValue)]) {
-        return [NSNumber numberWithLongLong:[value longLongValue]];
-    }
-    return [NSNumber numberWithLongLong:0];
-}
-
-- (NSDictionary *)storageUsageSummaryFromFastStatistics:(NSDictionary *)statistics {
-    if (![statistics isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    long long filesSize = [[self longLongNumberFromDictionary:statistics key:@"files_size"] longLongValue];
-    long long databaseSize = [[self longLongNumberFromDictionary:statistics key:@"database_size"] longLongValue];
-    long long languagePackSize = [[self longLongNumberFromDictionary:statistics key:@"language_pack_database_size"] longLongValue];
-    long long logSize = [[self longLongNumberFromDictionary:statistics key:@"log_size"] longLongValue];
-    long long totalSize = filesSize + databaseSize + languagePackSize + logSize;
-
-    NSMutableDictionary *summary = [NSMutableDictionary dictionary];
-    [summary setObject:[NSNumber numberWithLongLong:filesSize] forKey:@"files_size"];
-    [summary setObject:[NSNumber numberWithLongLong:databaseSize] forKey:@"database_size"];
-    [summary setObject:[NSNumber numberWithLongLong:languagePackSize] forKey:@"language_pack_database_size"];
-    [summary setObject:[NSNumber numberWithLongLong:logSize] forKey:@"log_size"];
-    [summary setObject:[NSNumber numberWithLongLong:totalSize] forKey:@"total_size"];
-    return summary;
-}
-
-- (NSDictionary *)storageUsageSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"getStorageStatisticsFast" forKey:@"@type"];
-    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-storage-fast"] forKey:@"@extra"];
-
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-storage-fast"
-                                                           timeout:timeout
-                                                         errorCode:72
-                                                             error:error];
-    if (![response isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    NSDictionary *summary = [self storageUsageSummaryFromFastStatistics:response];
-    if (!summary && error) {
-        *error = [self errorWithDescription:@"TDLib returned an invalid storage statistics response." code:72];
-    }
-    return summary;
-}
-
-- (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"optimizeStorage" forKey:@"@type"];
-    [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-storage-clear"] forKey:@"@extra"];
-    [request setObject:[NSNumber numberWithLongLong:0] forKey:@"size"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"ttl"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"count"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"immunity_delay"];
-    [request setObject:[NSArray array] forKey:@"file_types"];
-    [request setObject:[NSArray array] forKey:@"chat_ids"];
-    [request setObject:[NSArray array] forKey:@"exclude_chat_ids"];
-    [request setObject:[NSNumber numberWithBool:NO] forKey:@"return_deleted_file_statistics"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"chat_limit"];
-
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-storage-clear"
-                                                           timeout:timeout
-                                                         errorCode:73
-                                                             error:error];
-    if (![response isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    NSError *refreshError = nil;
-    NSDictionary *summary = [self storageUsageSummaryWithTimeout:timeout error:&refreshError];
-    if (summary) {
-        return summary;
-    }
-    return response;
-}
-
 - (NSDictionary *)photoInfoFromFileObject:(id)fileObject
                                     width:(NSNumber *)width
                                    height:(NSNumber *)height
@@ -6787,16 +6764,18 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
+    BOOL canGetAddedReactions = [[(NSDictionary *)reactionsObject objectForKey:@"can_get_added_reactions"] boolValue];
     id reactions = [(NSDictionary *)reactionsObject objectForKey:@"reactions"];
-    if (![reactions isKindOfClass:[NSArray class]] || [(NSArray *)reactions count] == 0) {
+    NSArray *reactionArray = [reactions isKindOfClass:[NSArray class]] ? reactions : [NSArray array];
+    if ([reactionArray count] == 0 && !canGetAddedReactions) {
         return nil;
     }
 
     NSMutableArray *parts = [NSMutableArray array];
     NSMutableArray *chosenEmojis = [NSMutableArray array];
     NSUInteger index = 0;
-    for (index = 0; index < [(NSArray *)reactions count]; index++) {
-        id reactionObject = [(NSArray *)reactions objectAtIndex:index];
+    for (index = 0; index < [reactionArray count]; index++) {
+        id reactionObject = [reactionArray objectAtIndex:index];
         if (![reactionObject isKindOfClass:[NSDictionary class]]) {
             continue;
         }
@@ -6842,6 +6821,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    [info setObject:[NSNumber numberWithBool:canGetAddedReactions] forKey:@"can_get_added_reactions"];
     if ([parts count] > 0) {
         [info setObject:[parts componentsJoinedByString:@"  "] forKey:@"summary"];
     }
@@ -6978,8 +6958,105 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                   syntheticAlbumID]];
 }
 
+- (NSDictionary *)customEmojiDescriptorsForMessages:(NSArray *)messages timeout:(NSTimeInterval)timeout {
+    if (![messages isKindOfClass:[NSArray class]] || [messages count] == 0) {
+        return [NSDictionary dictionary];
+    }
+
+    NSMutableArray *identifiers = [NSMutableArray array];
+    NSUInteger messageIndex = 0;
+    for (messageIndex = 0; messageIndex < [messages count]; messageIndex++) {
+        id messageObject = [messages objectAtIndex:messageIndex];
+        NSDictionary *content = [messageObject isKindOfClass:[NSDictionary class]] &&
+            [[(NSDictionary *)messageObject objectForKey:@"content"] isKindOfClass:[NSDictionary class]]
+            ? [(NSDictionary *)messageObject objectForKey:@"content"] : nil;
+        if (!content) {
+            continue;
+        }
+        NSArray *formattedKeys = [NSArray arrayWithObjects:@"text", @"caption", nil];
+        NSUInteger keyIndex = 0;
+        for (keyIndex = 0; keyIndex < [formattedKeys count]; keyIndex++) {
+            NSDictionary *formatted = [[content objectForKey:[formattedKeys objectAtIndex:keyIndex]]
+                isKindOfClass:[NSDictionary class]]
+                ? [content objectForKey:[formattedKeys objectAtIndex:keyIndex]] : nil;
+            NSArray *entityIdentifiers = TGCustomEmojiIdentifiersFromEntities([formatted objectForKey:@"entities"]);
+            NSUInteger identifierIndex = 0;
+            for (identifierIndex = 0; identifierIndex < [entityIdentifiers count]; identifierIndex++) {
+                NSNumber *identifier = [entityIdentifiers objectAtIndex:identifierIndex];
+                if (![identifiers containsObject:identifier] && [identifiers count] < 100) {
+                    [identifiers addObject:identifier];
+                }
+            }
+        }
+    }
+    if ([identifiers count] == 0) {
+        return [NSDictionary dictionary];
+    }
+
+    NSMutableDictionary *resolved = [NSMutableDictionary dictionary];
+    NSMutableArray *missing = [NSMutableArray array];
+    NSUInteger identifierIndex = 0;
+    for (identifierIndex = 0; identifierIndex < [identifiers count]; identifierIndex++) {
+        NSNumber *identifier = [identifiers objectAtIndex:identifierIndex];
+        NSDictionary *cached = [_customEmojiDescriptorCache objectForKey:identifier];
+        if ([cached isKindOfClass:[NSDictionary class]]) {
+            [resolved setObject:cached forKey:identifier];
+        } else {
+            [missing addObject:identifier];
+        }
+    }
+    if ([missing count] == 0) {
+        return resolved;
+    }
+
+    TGTDLibCapabilityState capabilityState = [[self capabilities]
+        supportStateForCapability:TGTDLibCapabilityCustomEmoji];
+    if (capabilityState == TGTDLibCapabilityStateUnsupported ||
+        capabilityState == TGTDLibCapabilityStateForbidden ||
+        capabilityState == TGTDLibCapabilityStateTemporarilyUnavailable) {
+        return resolved;
+    }
+
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getCustomEmojiStickers", @"@type",
+                             missing, @"custom_emoji_ids",
+                             nil];
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-custom-emoji"
+                                                           timeout:MIN(MAX(timeout, 0.8), 2.5)
+                                                         errorCode:196
+                                                             error:NULL];
+    NSDictionary *parsed = TGCustomEmojiDescriptorsFromResponse(response, missing);
+    NSUInteger maximumDownloads = TGResourcePolicyEconomyModeEnabled() ? 3 : 8;
+    NSUInteger downloadCount = 0;
+    for (identifierIndex = 0; identifierIndex < [missing count]; identifierIndex++) {
+        NSNumber *identifier = [missing objectAtIndex:identifierIndex];
+        NSDictionary *descriptor = [parsed objectForKey:identifier];
+        if (![descriptor isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSMutableDictionary *resolvedDescriptor = [NSMutableDictionary dictionaryWithDictionary:descriptor];
+        NSNumber *fileID = [resolvedDescriptor objectForKey:TGCustomEmojiFileIDKey];
+        if ([[resolvedDescriptor objectForKey:TGCustomEmojiLocalPathKey] length] == 0 &&
+            [fileID respondsToSelector:@selector(integerValue)] && [fileID integerValue] > 0 &&
+            downloadCount < maximumDownloads) {
+            NSString *path = [self downloadedLocalPathForFileID:fileID timeout:1.4 error:NULL];
+            downloadCount++;
+            if ([path length] > 0) {
+                [resolvedDescriptor setObject:path forKey:TGCustomEmojiLocalPathKey];
+            }
+        }
+        if ([[resolvedDescriptor objectForKey:TGCustomEmojiLocalPathKey] length] > 0) {
+            [_customEmojiDescriptorCache setObject:resolvedDescriptor forKey:identifier];
+        }
+        [resolved setObject:resolvedDescriptor forKey:identifier];
+    }
+    return resolved;
+}
+
 - (NSArray *)messagePreviewItemsFromMessages:(NSArray *)messages chatID:(NSNumber *)chatID {
     NSMutableArray *items = [NSMutableArray array];
+    NSDictionary *customEmojiDescriptors = [self customEmojiDescriptorsForMessages:messages timeout:2.0];
     NSUInteger index = 0;
     NSUInteger visualMediaDownloadsRemaining = 30;
     NSUInteger playableMediaDownloadsRemaining = 12;
@@ -7117,7 +7194,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
             NSArray *entities = [self entitiesFromFormattedTextObject:formattedTextObject
                                                   alignedToDisplayText:formattedDisplayText];
             if ([entities count] > 0) {
-                [item setFormattedEntities:entities];
+                [item setFormattedEntities:TGEntitiesByApplyingCustomEmojiDescriptors(entities,
+                                                                                      customEmojiDescriptors)];
             }
         }
         if ([contentType isEqualToString:@"messageText"] && TGResourcePolicyLinkPreviewsEnabled()) {
@@ -7199,6 +7277,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         if ([chosenReactionEmojis isKindOfClass:[NSArray class]]) {
             [item setChosenReactionEmojis:chosenReactionEmojis];
         }
+        [item setCanGetAddedReactions:[[reactionInfo objectForKey:@"can_get_added_reactions"] boolValue]];
         id mediaAlbumID = [message objectForKey:@"media_album_id"];
         if ([mediaAlbumID respondsToSelector:@selector(longLongValue)] && [mediaAlbumID longLongValue] > 0) {
             [item setMediaAlbumID:[NSNumber numberWithLongLong:[mediaAlbumID longLongValue]]];
@@ -7802,38 +7881,6 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return [self messagePreviewItemsFromMessages:(NSArray *)messages chatID:chatID];
 }
 
-- (NSDictionary *)searchMessagesFilterForName:(NSString *)filterName {
-    if (![filterName isKindOfClass:[NSString class]] || [filterName length] == 0 || [filterName isEqualToString:@"all"]) {
-        return (NSDictionary *)[NSNull null];
-    }
-    NSString *type = nil;
-    if ([filterName isEqualToString:@"photos"]) {
-        type = @"searchMessagesFilterPhoto";
-    } else if ([filterName isEqualToString:@"videos"]) {
-        type = @"searchMessagesFilterVideo";
-    } else if ([filterName isEqualToString:@"documents"]) {
-        type = @"searchMessagesFilterDocument";
-    } else if ([filterName isEqualToString:@"links"]) {
-        type = @"searchMessagesFilterUrl";
-    } else if ([filterName isEqualToString:@"voice"]) {
-        type = @"searchMessagesFilterVoiceNote";
-    } else if ([filterName isEqualToString:@"audio"]) {
-        type = @"searchMessagesFilterAudio";
-    } else if ([filterName isEqualToString:@"animations"] || [filterName isEqualToString:@"gifs"]) {
-        type = @"searchMessagesFilterAnimation";
-    } else if ([filterName isEqualToString:@"videoNotes"]) {
-        type = @"searchMessagesFilterVideoNote";
-    } else if ([filterName isEqualToString:@"stickers"]) {
-        type = @"searchMessagesFilterSticker";
-    } else if ([filterName isEqualToString:@"polls"]) {
-        type = @"searchMessagesFilterPoll";
-    }
-    if ([type length] == 0) {
-        return (NSDictionary *)[NSNull null];
-    }
-    return [NSDictionary dictionaryWithObject:type forKey:@"@type"];
-}
-
 - (NSArray *)messagesFromSearchResponse:(NSDictionary *)response error:(NSError **)error {
     id responseType = [response objectForKey:@"@type"];
     id messages = [response objectForKey:@"messages"];
@@ -7848,127 +7895,6 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     return (NSArray *)messages;
-}
-
-- (NSArray *)searchMessagePreviewItemsForChatID:(NSNumber *)chatID
-                                messageThreadID:(NSNumber *)messageThreadID
-                               messageTopicKind:(NSString *)messageTopicKind
-                                          query:(NSString *)query
-                                         filter:(NSString *)filter
-                                  fromMessageID:(NSNumber *)fromMessageID
-                                          limit:(NSUInteger)limit
-                                        timeout:(NSTimeInterval)timeout
-                                          error:(NSError **)error {
-    if (![chatID respondsToSelector:@selector(longLongValue)]) {
-        if (error) {
-            *error = [self errorWithDescription:@"Chat identifier is missing for search." code:93];
-        }
-        return nil;
-    }
-    NSString *safeQuery = [query isKindOfClass:[NSString class]] ? query : @"";
-    NSUInteger safeLimit = limit;
-    if (safeLimit == 0 || safeLimit > 50) {
-        safeLimit = 30;
-    }
-
-    NSMutableArray *requests = [NSMutableArray array];
-    NSDictionary *filterObject = [self searchMessagesFilterForName:filter];
-    long long anchorMessageID = ([fromMessageID respondsToSelector:@selector(longLongValue)] ? [fromMessageID longLongValue] : 0LL);
-
-    NSMutableDictionary *baseRequest = [NSMutableDictionary dictionary];
-    [baseRequest setObject:@"searchChatMessages" forKey:@"@type"];
-    [baseRequest setObject:chatID forKey:@"chat_id"];
-    [baseRequest setObject:safeQuery forKey:@"query"];
-    [baseRequest setObject:[NSNull null] forKey:@"sender_id"];
-    [baseRequest setObject:[NSNumber numberWithLongLong:anchorMessageID] forKey:@"from_message_id"];
-    [baseRequest setObject:[NSNumber numberWithInt:0] forKey:@"offset"];
-    [baseRequest setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
-    [baseRequest setObject:filterObject forKey:@"filter"];
-
-    if ([messageThreadID respondsToSelector:@selector(longLongValue)]) {
-        if ([messageTopicKind isEqualToString:@"thread"]) {
-            NSMutableDictionary *topicRequest = [NSMutableDictionary dictionaryWithDictionary:baseRequest];
-            NSDictionary *messageThread = [NSDictionary dictionaryWithObjectsAndKeys:
-                                           @"messageTopicThread", @"@type",
-                                           [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"message_thread_id",
-                                           nil];
-            [topicRequest setObject:messageThread forKey:@"topic_id"];
-            [requests addObject:topicRequest];
-        }
-        NSMutableDictionary *forumRequest = [NSMutableDictionary dictionaryWithDictionary:baseRequest];
-        NSDictionary *forumTopic = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    @"messageTopicForum", @"@type",
-                                    [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"forum_topic_id",
-                                    nil];
-        [forumRequest setObject:forumTopic forKey:@"topic_id"];
-        [requests addObject:forumRequest];
-
-        NSMutableDictionary *legacyThreadRequest = [NSMutableDictionary dictionaryWithDictionary:baseRequest];
-        [legacyThreadRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
-        [requests addObject:legacyThreadRequest];
-    }
-    [requests addObject:baseRequest];
-
-    NSError *lastError = nil;
-    NSUInteger index = 0;
-    for (index = 0; index < [requests count]; index++) {
-        NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:[requests objectAtIndex:index]
-                                                            extraPrefix:@"telegraphica-search-chat-messages"
-                                                                timeout:timeout
-                                                              errorCode:93
-                                                                  error:&lastError];
-        NSArray *messages = response ? [self messagesFromSearchResponse:response error:&lastError] : nil;
-        if (messages) {
-            return [self messagePreviewItemsFromMessages:messages chatID:chatID];
-        }
-    }
-    if (error) {
-        *error = lastError;
-    }
-    return nil;
-}
-
-- (NSArray *)globalSearchMessagePreviewItemsWithQuery:(NSString *)query
-                                               filter:(NSString *)filter
-                                               offset:(NSString **)offset
-                                                limit:(NSUInteger)limit
-                                              timeout:(NSTimeInterval)timeout
-                                                error:(NSError **)error {
-    NSString *safeQuery = [query isKindOfClass:[NSString class]] ? query : @"";
-    if ([safeQuery length] == 0) {
-        return [NSArray array];
-    }
-    NSUInteger safeLimit = limit;
-    if (safeLimit == 0 || safeLimit > 50) {
-        safeLimit = 30;
-    }
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"searchMessages" forKey:@"@type"];
-    [request setObject:safeQuery forKey:@"query"];
-    [request setObject:(offset && [*offset length] > 0 ? *offset : @"") forKey:@"offset"];
-    [request setObject:[NSNumber numberWithInt:(int)safeLimit] forKey:@"limit"];
-    [request setObject:[self searchMessagesFilterForName:filter] forKey:@"filter"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"min_date"];
-    [request setObject:[NSNumber numberWithInt:0] forKey:@"max_date"];
-
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-search-global-messages"
-                                                           timeout:timeout
-                                                         errorCode:94
-                                                             error:error];
-    NSArray *messages = response ? [self messagesFromSearchResponse:response error:error] : nil;
-    if (!messages) {
-        return nil;
-    }
-    if (offset) {
-        id nextOffset = [response objectForKey:@"next_offset"];
-        if ([nextOffset isKindOfClass:[NSString class]]) {
-            *offset = [(NSString *)nextOffset copy];
-        } else {
-            *offset = [@"" copy];
-        }
-    }
-    return [self messagePreviewItemsFromMessages:messages chatID:nil];
 }
 
 - (TGMessageItem *)messagePreviewItemForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -8684,38 +8610,13 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSString *formatSentinel = @"\u2063";
-    NSDictionary *formattedText = nil;
-    if ([text hasPrefix:formatSentinel]) {
-        NSString *markdownText = [text substringFromIndex:[formatSentinel length]];
-        NSDictionary *parseMode = [NSDictionary dictionaryWithObjectsAndKeys:
-                                   @"textParseModeMarkdown", @"@type",
-                                   [NSNumber numberWithInt:2], @"version",
-                                   nil];
-        NSDictionary *parseRequest = [NSDictionary dictionaryWithObjectsAndKeys:
-                                      @"parseTextEntities", @"@type",
-                                      markdownText, @"text",
-                                      parseMode, @"parse_mode",
-                                      nil];
-        NSError *parseError = nil;
-        formattedText = [self sendTDLibRequestAndWaitForExtra:parseRequest
-                                                  extraPrefix:@"telegraphica-parse-composer-formatting"
-                                                      timeout:MIN(timeout, 4.0)
-                                                    errorCode:227
-                                                        error:&parseError];
-        if (![[formattedText objectForKey:@"@type"] isEqualToString:@"formattedText"]) {
-            if (error) {
-                *error = parseError ? parseError :
-                    [self errorWithDescription:@"TDLib could not parse the selected text formatting." code:228];
-            }
-            return nil;
-        }
-    } else {
-        formattedText = [NSDictionary dictionaryWithObjectsAndKeys:
-                         @"formattedText", @"@type",
-                         text, @"text",
-                         [NSArray array], @"entities",
-                         nil];
+    NSDictionary *formattedText = [self formattedTextForComposerText:text
+                                                         originalText:nil
+                                                     originalEntities:nil
+                                                              timeout:timeout
+                                                                error:error];
+    if (!formattedText) {
+        return nil;
     }
 
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
@@ -10613,7 +10514,63 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return nil;
 }
 
+- (NSDictionary *)formattedTextForComposerText:(NSString *)text
+                                  originalText:(NSString *)originalText
+                              originalEntities:(NSArray *)originalEntities
+                                       timeout:(NSTimeInterval)timeout
+                                         error:(NSError **)error {
+    NSString *formatSentinel = @"\u2063";
+    if ([text hasPrefix:formatSentinel]) {
+        NSString *markdownText = [text substringFromIndex:[formatSentinel length]];
+        NSDictionary *parseMode = [NSDictionary dictionaryWithObjectsAndKeys:
+                                   @"textParseModeMarkdown", @"@type",
+                                   [NSNumber numberWithInt:2], @"version",
+                                   nil];
+        NSDictionary *parseRequest = [NSDictionary dictionaryWithObjectsAndKeys:
+                                      @"parseTextEntities", @"@type",
+                                      markdownText, @"text",
+                                      parseMode, @"parse_mode",
+                                      nil];
+        NSError *parseError = nil;
+        NSDictionary *parsed = [self sendTDLibRequestAndWaitForExtra:parseRequest
+                                                          extraPrefix:@"telegraphica-parse-composer-formatting"
+                                                              timeout:MIN(timeout, 4.0)
+                                                            errorCode:227
+                                                                error:&parseError];
+        if ([[parsed objectForKey:@"@type"] isEqualToString:@"formattedText"] &&
+            [[parsed objectForKey:@"text"] isKindOfClass:[NSString class]]) {
+            return TGTDLibFormattedTextObject([parsed objectForKey:@"text"], [parsed objectForKey:@"entities"]);
+        }
+        if (error) {
+            *error = parseError ? parseError :
+                [self errorWithDescription:@"TDLib could not parse the selected text formatting." code:228];
+        }
+        return nil;
+    }
+    NSArray *entities = ([originalText isKindOfClass:[NSString class]] &&
+                         [originalEntities isKindOfClass:[NSArray class]])
+        ? TGRebasedTDLibTextEntities(originalText, originalEntities, text)
+        : [NSArray array];
+    return TGTDLibFormattedTextObject(text, entities);
+}
+
 - (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    return [self editTextMessageInChatID:chatID
+                               messageID:messageID
+                                    text:text
+                            originalText:nil
+                        originalEntities:nil
+                                 timeout:timeout
+                                   error:error];
+}
+
+- (NSString *)editTextMessageInChatID:(NSNumber *)chatID
+                            messageID:(NSNumber *)messageID
+                                 text:(NSString *)text
+                         originalText:(NSString *)originalText
+                     originalEntities:(NSArray *)originalEntities
+                              timeout:(NSTimeInterval)timeout
+                                error:(NSError **)error {
     if (![chatID respondsToSelector:@selector(longLongValue)] || ![messageID respondsToSelector:@selector(longLongValue)]) {
         if (error) {
             *error = [self errorWithDescription:@"Message target is missing." code:96];
@@ -10642,10 +10599,14 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
 
-    NSMutableDictionary *formattedText = [NSMutableDictionary dictionary];
-    [formattedText setObject:@"formattedText" forKey:@"@type"];
-    [formattedText setObject:text forKey:@"text"];
-    [formattedText setObject:[NSArray array] forKey:@"entities"];
+    NSDictionary *formattedText = [self formattedTextForComposerText:text
+                                                         originalText:originalText
+                                                     originalEntities:originalEntities
+                                                              timeout:timeout
+                                                                error:error];
+    if (!formattedText) {
+        return nil;
+    }
 
     NSMutableDictionary *content = [NSMutableDictionary dictionary];
     [content setObject:@"inputMessageText" forKey:@"@type"];
@@ -10797,6 +10758,139 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         return nil;
     }
     return @"reaction submitted";
+}
+
+- (NSDictionary *)availableReactionCatalogForChatID:(NSNumber *)chatID
+                                           messageID:(NSNumber *)messageID
+                                             rowSize:(NSUInteger)rowSize
+                                             timeout:(NSTimeInterval)timeout
+                                               error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0 || [messageID longLongValue] <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing for available reactions." code:239];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error && !*error) {
+            *error = [self errorWithDescription:@"TDLib is not ready to load available reactions." code:240];
+        }
+        return nil;
+    }
+    NSUInteger safeRowSize = MAX((NSUInteger)5U, MIN((NSUInteger)25U, rowSize));
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getMessageAvailableReactions", @"@type",
+                             [NSNumber numberWithLongLong:[chatID longLongValue]], @"chat_id",
+                             [NSNumber numberWithLongLong:[messageID longLongValue]], @"message_id",
+                             [NSNumber numberWithUnsignedInteger:safeRowSize], @"row_size",
+                             nil];
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-available-reactions"
+                                                           timeout:timeout
+                                                         errorCode:241
+                                                             error:&requestError];
+    if (!response) {
+        if (error) {
+            *error = requestError;
+        }
+        return nil;
+    }
+    NSString *responseType = [[response objectForKey:@"@type"] isKindOfClass:[NSString class]]
+        ? [response objectForKey:@"@type"] : @"";
+    if (![responseType isEqualToString:@"availableReactions"]) {
+        if (error) {
+            *error = [self errorWithDescription:@"TDLib returned an unexpected available reactions response." code:242];
+        }
+        return nil;
+    }
+    return TGReactionCatalogFromTDLibResponse(response);
+}
+
+- (NSDictionary *)addedReactionUsersForChatID:(NSNumber *)chatID
+                                      messageID:(NSNumber *)messageID
+                                         offset:(NSString *)offset
+                                          limit:(NSUInteger)limit
+                                        timeout:(NSTimeInterval)timeout
+                                          error:(NSError **)error {
+    if (![chatID respondsToSelector:@selector(longLongValue)] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] ||
+        [chatID longLongValue] == 0 || [messageID longLongValue] <= 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Message target is missing for reaction users." code:243];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"ready"]) {
+        if (error && !*error) {
+            *error = [self errorWithDescription:@"TDLib is not ready to load reaction users." code:244];
+        }
+        return nil;
+    }
+    NSUInteger safeLimit = (limit == 0U || limit > 100U) ? 50U : limit;
+    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
+                             @"getMessageAddedReactions", @"@type",
+                             [NSNumber numberWithLongLong:[chatID longLongValue]], @"chat_id",
+                             [NSNumber numberWithLongLong:[messageID longLongValue]], @"message_id",
+                             [NSNull null], @"reaction_type",
+                             ([offset isKindOfClass:[NSString class]] ? offset : @""), @"offset",
+                             [NSNumber numberWithUnsignedInteger:safeLimit], @"limit",
+                             nil];
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+                                                       extraPrefix:@"telegraphica-added-reactions"
+                                                           timeout:timeout
+                                                         errorCode:245
+                                                             error:&requestError];
+    NSDictionary *page = response ? TGAddedReactionsPageFromTDLibResponse(response) : nil;
+    if (!page) {
+        if (error) {
+            *error = requestError ? requestError :
+                [self errorWithDescription:@"TDLib returned an unexpected reaction users response." code:246];
+        }
+        return nil;
+    }
+
+    NSArray *parsedItems = [page objectForKey:TGAddedReactionsItemsKey];
+    NSMutableArray *summaries = [NSMutableArray array];
+    NSUInteger index = 0;
+    for (index = 0; index < [parsedItems count] && [summaries count] < safeLimit; index++) {
+        NSDictionary *parsedItem = [parsedItems objectAtIndex:index];
+        NSDictionary *sender = [parsedItem objectForKey:TGAddedReactionSenderKey];
+        NSDictionary *senderMessage = sender ?
+            [NSDictionary dictionaryWithObject:sender forKey:@"sender_id"] : nil;
+        NSDictionary *senderSummary = [self senderSummaryFromMessageObject:senderMessage
+                                                                    timeout:MIN(timeout, 1.0)];
+        NSMutableDictionary *summary = [NSMutableDictionary dictionary];
+        if ([senderSummary count] > 0) {
+            [summary addEntriesFromDictionary:senderSummary];
+        } else {
+            [summary setObject:@"Unknown" forKey:@"display_name"];
+        }
+        NSString *emoji = [parsedItem objectForKey:TGAddedReactionEmojiKey];
+        if ([emoji length] > 0) {
+            [summary setObject:emoji forKey:@"reaction_display"];
+        } else if ([parsedItem objectForKey:TGAddedReactionCustomEmojiIDKey]) {
+            /* The UI replaces this stable placeholder when a cached custom emoji is available. */
+            [summary setObject:@"◇" forKey:@"reaction_display"];
+            [summary setObject:[parsedItem objectForKey:TGAddedReactionCustomEmojiIDKey]
+                         forKey:@"custom_emoji_id"];
+        }
+        id reactionDate = [parsedItem objectForKey:TGAddedReactionDateKey];
+        if (reactionDate) {
+            [summary setObject:reactionDate forKey:@"view_date"];
+        }
+        [summaries addObject:summary];
+    }
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            summaries, @"summaries",
+            ([page objectForKey:TGAddedReactionsNextOffsetKey]
+                ? [page objectForKey:TGAddedReactionsNextOffsetKey] : @""), @"next_offset",
+            nil];
 }
 
 - (NSString *)removeReactionFromChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error {
@@ -11031,390 +11125,6 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     return @"QR authentication cancellation accepted; restarting authentication";
 }
 
-- (NSDictionary *)currentUserProfileSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
-    if (![authorizationState isEqualToString:@"ready"]) {
-        if (error) {
-            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load profile. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
-            *error = [self errorWithDescription:message code:48];
-        }
-        return nil;
-    }
-
-    NSMutableDictionary *getMeRequest = [NSMutableDictionary dictionary];
-    [getMeRequest setObject:@"getMe" forKey:@"@type"];
-    NSDictionary *userResponse = [self sendTDLibRequestAndWaitForExtra:getMeRequest
-                                                           extraPrefix:@"telegraphica-profile-get-me"
-                                                               timeout:timeout
-                                                             errorCode:49
-                                                                 error:error];
-    if (!userResponse) {
-        return nil;
-    }
-
-    id userType = [userResponse objectForKey:@"@type"];
-    if (![userType isKindOfClass:[NSString class]] || ![(NSString *)userType isEqualToString:@"user"]) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib getMe returned an unexpected profile response." code:49];
-        }
-        return nil;
-    }
-
-    id firstName = [userResponse objectForKey:@"first_name"];
-    id lastName = [userResponse objectForKey:@"last_name"];
-    id username = [userResponse objectForKey:@"username"];
-    if (![username isKindOfClass:[NSString class]] || [(NSString *)username length] == 0) {
-        id usernames = [userResponse objectForKey:@"usernames"];
-        if ([usernames isKindOfClass:[NSDictionary class]]) {
-            id activeUsernames = [(NSDictionary *)usernames objectForKey:@"active_usernames"];
-            if ([activeUsernames isKindOfClass:[NSArray class]] && [(NSArray *)activeUsernames count] > 0) {
-                id firstUsername = [(NSArray *)activeUsernames objectAtIndex:0];
-                if ([firstUsername isKindOfClass:[NSString class]]) {
-                    username = firstUsername;
-                }
-            }
-        }
-    }
-
-    NSMutableArray *nameParts = [NSMutableArray array];
-    if ([firstName isKindOfClass:[NSString class]] && [(NSString *)firstName length] > 0) {
-        [nameParts addObject:firstName];
-    }
-    if ([lastName isKindOfClass:[NSString class]] && [(NSString *)lastName length] > 0) {
-        [nameParts addObject:lastName];
-    }
-    NSString *displayName = ([nameParts count] > 0) ? [nameParts componentsJoinedByString:@" "] : @"Telegram account";
-
-    NSMutableDictionary *summary = [NSMutableDictionary dictionary];
-    [summary setObject:displayName forKey:@"display_name"];
-    if ([firstName isKindOfClass:[NSString class]] && [(NSString *)firstName length] > 0) {
-        [summary setObject:firstName forKey:@"first_name"];
-    }
-    if ([lastName isKindOfClass:[NSString class]] && [(NSString *)lastName length] > 0) {
-        [summary setObject:lastName forKey:@"last_name"];
-    }
-    if ([username isKindOfClass:[NSString class]] && [(NSString *)username length] > 0) {
-        [summary setObject:username forKey:@"username"];
-    }
-    id phoneNumber = [userResponse objectForKey:@"phone_number"];
-    if ([phoneNumber isKindOfClass:[NSString class]] && [(NSString *)phoneNumber length] > 0) {
-        [summary setObject:phoneNumber forKey:@"phone_number"];
-    }
-    id userID = [userResponse objectForKey:@"id"];
-    if ([userID respondsToSelector:@selector(longLongValue)]) {
-        NSNumber *safeUserID = [NSNumber numberWithLongLong:[userID longLongValue]];
-        [summary setObject:safeUserID forKey:@"id"];
-
-        NSMutableDictionary *fullInfoRequest = [NSMutableDictionary dictionary];
-        [fullInfoRequest setObject:@"getUserFullInfo" forKey:@"@type"];
-        [fullInfoRequest setObject:safeUserID forKey:@"user_id"];
-        NSDictionary *fullInfoResponse = [self sendTDLibRequestAndWaitForExtra:fullInfoRequest
-                                                                    extraPrefix:@"telegraphica-profile-full-info"
-                                                                        timeout:2.0
-                                                                      errorCode:61
-                                                                          error:NULL];
-        id fullInfoType = [fullInfoResponse objectForKey:@"@type"];
-        if ([fullInfoType isKindOfClass:[NSString class]] && [(NSString *)fullInfoType isEqualToString:@"userFullInfo"]) {
-            NSString *bio = [self textFromFormattedTextObject:[fullInfoResponse objectForKey:@"bio"]];
-            if ([bio length] > 0) {
-                [summary setObject:bio forKey:@"bio"];
-            }
-        }
-    }
-    BOOL didRequestAvatarDownload = NO;
-    NSDictionary *avatarInfo = [self photoInfoFromChatPhotoObject:[userResponse objectForKey:@"profile_photo"]
-                                                  downloadMissing:YES
-                                                          timeout:1.5
-                                               didRequestDownload:&didRequestAvatarDownload];
-    NSString *avatarPath = [avatarInfo objectForKey:@"local_path"];
-    if ([avatarPath length] > 0) {
-        [summary setObject:avatarPath forKey:@"avatar_path"];
-    }
-    return summary;
-}
-
-- (BOOL)updateCurrentUserFirstName:(NSString *)firstName
-                         lastName:(NSString *)lastName
-                         username:(NSString *)username
-                              bio:(NSString *)bio
-                          timeout:(NSTimeInterval)timeout
-                            error:(NSError **)error {
-    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
-    if (![authorizationState isEqualToString:@"ready"]) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib is not ready to update the profile." code:105];
-        }
-        return NO;
-    }
-
-    NSString *safeFirstName = [firstName isKindOfClass:[NSString class]] ? firstName : @"";
-    NSString *safeLastName = [lastName isKindOfClass:[NSString class]] ? lastName : @"";
-    NSString *safeUsername = [username isKindOfClass:[NSString class]] ? username : @"";
-    NSString *safeBio = [bio isKindOfClass:[NSString class]] ? bio : @"";
-    if ([safeFirstName length] == 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"First name is required." code:105];
-        }
-        return NO;
-    }
-
-    NSMutableDictionary *setNameRequest = [NSMutableDictionary dictionary];
-    [setNameRequest setObject:@"setName" forKey:@"@type"];
-    [setNameRequest setObject:safeFirstName forKey:@"first_name"];
-    [setNameRequest setObject:safeLastName forKey:@"last_name"];
-
-    NSMutableDictionary *setUsernameRequest = [NSMutableDictionary dictionary];
-    [setUsernameRequest setObject:@"setUsername" forKey:@"@type"];
-    [setUsernameRequest setObject:safeUsername forKey:@"username"];
-
-    NSMutableDictionary *setBioRequest = [NSMutableDictionary dictionary];
-    [setBioRequest setObject:@"setBio" forKey:@"@type"];
-    [setBioRequest setObject:safeBio forKey:@"bio"];
-
-    NSArray *requests = [NSArray arrayWithObjects:setNameRequest, setUsernameRequest, setBioRequest, nil];
-    NSArray *prefixes = [NSArray arrayWithObjects:@"telegraphica-profile-set-name",
-                                                  @"telegraphica-profile-set-username",
-                                                  @"telegraphica-profile-set-bio", nil];
-    NSUInteger requestIndex = 0;
-    for (requestIndex = 0; requestIndex < [requests count]; requestIndex++) {
-        NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:[requests objectAtIndex:requestIndex]
-                                                            extraPrefix:[prefixes objectAtIndex:requestIndex]
-                                                                timeout:timeout
-                                                              errorCode:(105 + (NSInteger)requestIndex)
-                                                                  error:error];
-        if (!response) {
-            return NO;
-        }
-        id responseType = [response objectForKey:@"@type"];
-        if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
-            if (error) {
-                *error = [self errorWithDescription:@"TDLib returned an unexpected profile update response."
-                                               code:(105 + (NSInteger)requestIndex)];
-            }
-            return NO;
-        }
-    }
-    return YES;
-}
-
-- (BOOL)setCurrentUserProfilePhotoAtPath:(NSString *)localPath
-                                 timeout:(NSTimeInterval)timeout
-                                   error:(NSError **)error {
-    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
-    if (![authorizationState isEqualToString:@"ready"]) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib is not ready to update the profile photo." code:108];
-        }
-        return NO;
-    }
-
-    BOOL isDirectory = NO;
-    if (![localPath isKindOfClass:[NSString class]] ||
-        [localPath length] == 0 ||
-        ![[NSFileManager defaultManager] fileExistsAtPath:localPath isDirectory:&isDirectory] ||
-        isDirectory) {
-        if (error) {
-            *error = [self errorWithDescription:@"The prepared profile photo file is unavailable." code:108];
-        }
-        return NO;
-    }
-
-    NSDictionary *inputFile = [NSDictionary dictionaryWithObjectsAndKeys:
-                               @"inputFileLocal", @"@type",
-                               localPath, @"path",
-                               nil];
-    NSDictionary *photo = [NSDictionary dictionaryWithObjectsAndKeys:
-                           @"inputChatPhotoStatic", @"@type",
-                           inputFile, @"photo",
-                           nil];
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"setProfilePhoto" forKey:@"@type"];
-    [request setObject:photo forKey:@"photo"];
-    [request setObject:[NSNumber numberWithBool:NO] forKey:@"is_public"];
-
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                        extraPrefix:@"telegraphica-profile-set-photo"
-                                                            timeout:timeout
-                                                          errorCode:108
-                                                              error:error];
-    id responseType = [response objectForKey:@"@type"];
-    if (![responseType isKindOfClass:[NSString class]] ||
-        ![(NSString *)responseType isEqualToString:@"ok"]) {
-        if (response && error) {
-            NSString *summary = [self summaryForAuthorizationStateObject:response];
-            *error = [self errorWithDescription:([summary length] > 0
-                                                    ? summary
-                                                    : @"TDLib returned an unexpected profile photo response.")
-                                           code:108];
-        }
-        return NO;
-    }
-    return YES;
-}
-
-- (NSDictionary *)activeSessionsSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSString *authorizationState = [self cachedAuthorizationStateSummary];
-    if (![authorizationState isEqualToString:@"ready"]) {
-        if (error) {
-            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to load active sessions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
-            *error = [self errorWithDescription:message code:92];
-        }
-        return nil;
-    }
-
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"getActiveSessions" forKey:@"@type"];
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                        extraPrefix:@"telegraphica-active-sessions"
-                                                            timeout:timeout
-                                                          errorCode:93
-                                                              error:error];
-    if (!response) {
-        return nil;
-    }
-
-    id responseType = [response objectForKey:@"@type"];
-    id sessionsObject = [response objectForKey:@"sessions"];
-    id inactiveSessionTTLDays = [response objectForKey:@"inactive_session_ttl_days"];
-    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"sessions"] ||
-        ![sessionsObject isKindOfClass:[NSArray class]]) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib getActiveSessions returned an unexpected response." code:93];
-        }
-        return nil;
-    }
-
-    NSArray *numberKeys = [NSArray arrayWithObjects:@"id", @"session_id", @"last_active_date", nil];
-    NSArray *booleanKeys = [NSArray arrayWithObjects:@"is_current", nil];
-    NSArray *stringKeys = [NSArray arrayWithObjects:@"application_name", @"application_version", @"device_model", @"platform", @"system_version", @"location", nil];
-    NSMutableArray *safeSessions = [NSMutableArray arrayWithCapacity:[(NSArray *)sessionsObject count]];
-    NSUInteger sessionIndex = 0;
-    for (sessionIndex = 0; sessionIndex < [(NSArray *)sessionsObject count]; sessionIndex++) {
-        id sessionObject = [(NSArray *)sessionsObject objectAtIndex:sessionIndex];
-        if (![sessionObject isKindOfClass:[NSDictionary class]]) {
-            if (error) {
-                NSString *message = [NSString stringWithFormat:@"TDLib getActiveSessions returned a non-dictionary session at index %lu.", (unsigned long)sessionIndex];
-                *error = [self errorWithDescription:message code:93];
-            }
-            return nil;
-        }
-
-        NSDictionary *session = (NSDictionary *)sessionObject;
-        NSMutableDictionary *safeSession = [NSMutableDictionary dictionary];
-        NSUInteger keyIndex = 0;
-        for (keyIndex = 0; keyIndex < [numberKeys count]; keyIndex++) {
-            NSString *key = [numberKeys objectAtIndex:keyIndex];
-            id value = [session objectForKey:key];
-            long long numberValue = 0;
-            BOOL hasNumberValue = NO;
-            if ([value isKindOfClass:[NSNumber class]] && !TGTDLibObjectIsBoolean(value)) {
-                numberValue = [value longLongValue];
-                hasNumberValue = YES;
-            } else if ([value isKindOfClass:[NSString class]]) {
-                NSString *stringValue = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                if ([stringValue length] > 0) {
-                    NSScanner *scanner = [NSScanner scannerWithString:stringValue];
-                    long long scannedValue = 0;
-                    if ([scanner scanLongLong:&scannedValue] && [scanner isAtEnd]) {
-                        numberValue = scannedValue;
-                        hasNumberValue = YES;
-                    }
-                }
-            }
-            if (!hasNumberValue) {
-                continue;
-            }
-            [safeSession setObject:[NSNumber numberWithLongLong:numberValue] forKey:key];
-        }
-        for (keyIndex = 0; keyIndex < [booleanKeys count]; keyIndex++) {
-            NSString *key = [booleanKeys objectAtIndex:keyIndex];
-            id value = [session objectForKey:key];
-            if (!TGTDLibObjectIsBoolean(value)) {
-                continue;
-            }
-            [safeSession setObject:[NSNumber numberWithBool:[value boolValue]] forKey:key];
-        }
-        for (keyIndex = 0; keyIndex < [stringKeys count]; keyIndex++) {
-            NSString *key = [stringKeys objectAtIndex:keyIndex];
-            id value = [session objectForKey:key];
-            if (![value isKindOfClass:[NSString class]]) {
-                continue;
-            }
-            [safeSession setObject:value forKey:key];
-        }
-        if (![[safeSession objectForKey:@"location"] length]) {
-            NSMutableArray *locationParts = [NSMutableArray array];
-            id region = [session objectForKey:@"region"];
-            id country = [session objectForKey:@"country"];
-            if ([region isKindOfClass:[NSString class]] && [(NSString *)region length] > 0) {
-                [locationParts addObject:region];
-            }
-            if ([country isKindOfClass:[NSString class]] && [(NSString *)country length] > 0 &&
-                ![country isEqual:region]) {
-                [locationParts addObject:country];
-            }
-            if ([locationParts count] > 0) {
-                [safeSession setObject:[locationParts componentsJoinedByString:@", "] forKey:@"location"];
-            }
-        }
-        [safeSessions addObject:[NSDictionary dictionaryWithDictionary:safeSession]];
-    }
-
-    NSMutableDictionary *safeSummary = [NSMutableDictionary dictionaryWithObject:[NSArray arrayWithArray:safeSessions]
-                                                                           forKey:@"sessions"];
-    if ([inactiveSessionTTLDays isKindOfClass:[NSNumber class]] &&
-        !TGTDLibObjectIsBoolean(inactiveSessionTTLDays)) {
-        [safeSummary setObject:[NSNumber numberWithInteger:[inactiveSessionTTLDays integerValue]]
-                        forKey:@"inactive_session_ttl_days"];
-    } else if ([inactiveSessionTTLDays isKindOfClass:[NSString class]]) {
-        NSString *ttlString = [(NSString *)inactiveSessionTTLDays stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        NSScanner *ttlScanner = [NSScanner scannerWithString:ttlString];
-        NSInteger ttlValue = 0;
-        if ([ttlScanner scanInteger:&ttlValue] && [ttlScanner isAtEnd]) {
-            [safeSummary setObject:[NSNumber numberWithInteger:ttlValue]
-                            forKey:@"inactive_session_ttl_days"];
-        }
-    }
-    return [NSDictionary dictionaryWithDictionary:safeSummary];
-}
-
-- (BOOL)terminateActiveSessionWithID:(NSNumber *)sessionID timeout:(NSTimeInterval)timeout error:(NSError **)error {
-    NSString *authorizationState = [self cachedAuthorizationStateSummary];
-    if (![authorizationState isEqualToString:@"ready"]) {
-        if (error) {
-            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to terminate active sessions. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
-            *error = [self errorWithDescription:message code:94];
-        }
-        return NO;
-    }
-    if (![sessionID respondsToSelector:@selector(longLongValue)] || [sessionID longLongValue] == 0) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib terminateSession requires a valid session id." code:94];
-        }
-        return NO;
-    }
-
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"terminateSession" forKey:@"@type"];
-    [request setObject:[NSNumber numberWithLongLong:[sessionID longLongValue]] forKey:@"session_id"];
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                        extraPrefix:@"telegraphica-terminate-session"
-                                                            timeout:timeout
-                                                          errorCode:94
-                                                              error:error];
-    if (!response) {
-        return NO;
-    }
-
-    id responseType = [response objectForKey:@"@type"];
-    if ([responseType isKindOfClass:[NSString class]] && [(NSString *)responseType isEqualToString:@"ok"]) {
-        return YES;
-    }
-    if (error) {
-        *error = [self errorWithDescription:@"TDLib terminateSession returned an unexpected response." code:94];
-    }
-    return NO;
-}
 
 - (NSString *)postLoginProbeSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
     NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
@@ -11627,6 +11337,132 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [request setObject:[self uniqueExtraWithPrefix:@"telegraphica-auth-password"] forKey:@"@extra"];
     [request setObject:password forKey:@"password"];
     return [self sendAuthorizationRequest:request actionName:@"authentication password" waitingState:@"waitPassword" timeout:timeout errorCode:29 error:error];
+}
+
+- (NSString *)submitAuthenticationEmailAddress:(NSString *)emailAddress timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedEmail = [emailAddress stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedEmail length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Authentication email address is empty." code:233];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitEmailAddress"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"setAuthenticationEmailAddress", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-email"], @"@extra",
+        trimmedEmail, @"email_address",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"authentication email address" waitingState:@"waitEmailAddress" timeout:timeout errorCode:233 error:error];
+}
+
+- (NSString *)submitAuthenticationEmailCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedCode = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedCode length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Authentication email code is empty." code:234];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitEmailCode"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"checkAuthenticationEmailCode", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-email-code"], @"@extra",
+        [TGAuthorizationFlow emailCodeAuthenticationObjectForCode:trimmedCode], @"code",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"authentication email code" waitingState:@"waitEmailCode" timeout:timeout errorCode:234 error:error];
+}
+
+- (NSString *)submitRegistrationName:(NSString *)combinedName timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSError *nameError = nil;
+    NSDictionary *names = [TGAuthorizationFlow registrationNamesFromCombinedInput:combinedName error:&nameError];
+    if (!names) {
+        if (error) {
+            *error = nameError;
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitRegistration"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"registerUser", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-registration"], @"@extra",
+        [names objectForKey:@"first_name"], @"first_name",
+        [names objectForKey:@"last_name"], @"last_name",
+        [NSNumber numberWithBool:NO], @"disable_notification",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"account registration" waitingState:@"waitRegistration" timeout:timeout errorCode:235 error:error];
+}
+
+- (NSString *)resendAuthenticationCodeWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitCode"] && ![authorizationState isEqualToString:@"waitEmailCode"]) {
+        if (error && [authorizationState length] > 0) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"A login code can't be resent while TDLib is in %@.", authorizationState] code:236];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"resendAuthenticationCode", @"@type",
+        [TGAuthorizationFlow resendCodeReasonObject], @"reason",
+        nil];
+    return [self sendAuthorizationSideRequest:request actionName:@"authentication code resend" extraPrefix:@"telegraphica-auth-resend" timeout:timeout errorCode:236 error:error];
+}
+
+- (NSString *)requestAuthenticationPasswordRecoveryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPassword"]) {
+        if (error && [authorizationState length] > 0) {
+            *error = [self errorWithDescription:[NSString stringWithFormat:@"Password recovery is unavailable while TDLib is in %@.", authorizationState] code:237];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"requestAuthenticationPasswordRecovery", @"@type",
+        nil];
+    return [self sendAuthorizationSideRequest:request actionName:@"password recovery request" extraPrefix:@"telegraphica-auth-recovery-request" timeout:timeout errorCode:237 error:error];
+}
+
+- (NSString *)recoverAuthenticationPasswordWithCode:(NSString *)recoveryCode timeout:(NSTimeInterval)timeout error:(NSError **)error {
+    NSString *trimmedCode = [recoveryCode stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([trimmedCode length] == 0) {
+        if (error) {
+            *error = [self errorWithDescription:@"Password recovery code is empty." code:238];
+        }
+        return nil;
+    }
+    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
+    if (![authorizationState isEqualToString:@"waitPassword"]) {
+        if ([authorizationState length] > 0) {
+            return [NSString stringWithFormat:@"skipped; auth state is %@", authorizationState];
+        }
+        return nil;
+    }
+    NSMutableDictionary *request = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        @"recoverAuthenticationPassword", @"@type",
+        [self uniqueExtraWithPrefix:@"telegraphica-auth-recovery"], @"@extra",
+        trimmedCode, @"recovery_code",
+        @"", @"new_password",
+        @"", @"new_hint",
+        nil];
+    return [self sendAuthorizationRequest:request actionName:@"password recovery code" waitingState:@"waitPassword" timeout:timeout errorCode:238 error:error];
 }
 
 @end

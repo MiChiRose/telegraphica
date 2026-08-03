@@ -3,6 +3,7 @@
 #import "TGKeychainHelper.h"
 #import "TGLogger.h"
 #import "../Core/TGTDLibClient.h"
+#import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGMediaImageLoader.h"
 
 NSString * const TGLocalDataResetRemovedCountKey = @"removedCount";
@@ -114,6 +115,7 @@ static void TGLocalDataResetClearDefaults(void) {
         TGLocalDataResetRemovePath([ownedPaths objectAtIndex:pathIndex], errors, &removedCount);
     }
 
+    TGCustomEmojiImageLoaderClearCache();
     TGMediaImageLoaderClearCache();
     TGLocalDataResetClearDefaults();
     [[TGLogger sharedLogger] clearLog];

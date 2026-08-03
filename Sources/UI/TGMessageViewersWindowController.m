@@ -1,5 +1,6 @@
 #import "TGMessageViewersWindowController.h"
 #import "TGLocalization.h"
+#import "../Media/TGMediaImageLoader.h"
 
 @interface TGMessageViewersWindowController ()
 @property (nonatomic, retain) NSTextField *titleField;
@@ -7,6 +8,7 @@
 @property (nonatomic, retain) NSScrollView *scrollView;
 @property (nonatomic, retain) NSView *contentView;
 @property (nonatomic, copy) NSString *messagePreview;
+@property (nonatomic, retain) NSMutableArray *imageLoadTokens;
 @end
 
 @implementation TGMessageViewersWindowController
@@ -16,6 +18,7 @@
 @synthesize scrollView = _scrollView;
 @synthesize contentView = _contentView;
 @synthesize messagePreview = _messagePreview;
+@synthesize imageLoadTokens = _imageLoadTokens;
 
 - (id)initWithMessagePreview:(NSString *)messagePreview {
     NSRect frame = NSMakeRect(0, 0, 420, 340);
@@ -26,6 +29,7 @@
     self = [super initWithWindow:window];
     if (self) {
         self.messagePreview = messagePreview;
+        self.imageLoadTokens = [NSMutableArray array];
         [[self window] setTitle:TGLoc(@"message.whoRead")];
         [self buildViews];
         [self showLoading];
@@ -39,6 +43,11 @@
     [_scrollView release];
     [_contentView release];
     [_messagePreview release];
+    NSUInteger index = 0;
+    for (index = 0; index < [_imageLoadTokens count]; index++) {
+        [[_imageLoadTokens objectAtIndex:index] cancel];
+    }
+    [_imageLoadTokens release];
     [super dealloc];
 }
 
@@ -83,6 +92,11 @@
 }
 
 - (void)clearContent {
+    NSUInteger tokenIndex = 0;
+    for (tokenIndex = 0; tokenIndex < [self.imageLoadTokens count]; tokenIndex++) {
+        [[self.imageLoadTokens objectAtIndex:tokenIndex] cancel];
+    }
+    [self.imageLoadTokens removeAllObjects];
     NSArray *subviews = [[self.contentView subviews] copy];
     NSUInteger index = 0;
     for (index = 0; index < [subviews count]; index++) {
@@ -104,6 +118,15 @@
 
 - (void)showLoading {
     [self setSingleMessage:TGLoc(@"message.viewers.loading") color:[NSColor colorWithCalibratedWhite:0.38 alpha:1.0]];
+}
+
+- (void)setContentTitle:(NSString *)title windowTitle:(NSString *)windowTitle {
+    if ([title length] > 0) {
+        [self.titleField setStringValue:title];
+    }
+    if ([windowTitle length] > 0) {
+        [[self window] setTitle:windowTitle];
+    }
 }
 
 - (void)showErrorMessage:(NSString *)message {
@@ -131,9 +154,19 @@
         NSString *avatarPath = [summary objectForKey:@"avatar_local_path"];
         NSImageView *avatarView = [[[NSImageView alloc] initWithFrame:NSMakeRect(10, 7, 32, 32)] autorelease];
         if ([avatarPath length] > 0) {
-            NSImage *avatar = [[[NSImage alloc] initWithContentsOfFile:avatarPath] autorelease];
+            NSImage *avatar = TGMediaCachedThumbnailFromFile(avatarPath, 64);
             if (avatar) {
                 [avatarView setImage:avatar];
+            } else {
+                __block TGMessageViewersWindowController *controller = self;
+                TGMediaImageLoadToken *token = TGLoadImageThumbnailFromFileAsync(avatarPath, 64, ^(NSImage *loadedImage) {
+                    if (loadedImage && [avatarView superview] && [[controller window] isVisible]) {
+                        [avatarView setImage:loadedImage];
+                    }
+                });
+                if (token) {
+                    [self.imageLoadTokens addObject:token];
+                }
             }
         }
         [avatarView setImageScaling:NSImageScaleProportionallyUpOrDown];
@@ -145,6 +178,16 @@
         NSString *displayName = [summary objectForKey:@"display_name"];
         [name setStringValue:([displayName length] > 0 ? displayName : @"Unknown")];
         [row addSubview:name];
+
+        NSString *reactionDisplay = [summary objectForKey:@"reaction_display"];
+        if ([reactionDisplay length] > 0) {
+            NSTextField *reaction = [self labelWithFrame:NSMakeRect(246, 14, 28, 22)
+                                                     font:[NSFont systemFontOfSize:16.0]
+                                                    color:[NSColor colorWithCalibratedWhite:0.18 alpha:1.0]];
+            [reaction setAlignment:NSCenterTextAlignment];
+            [reaction setStringValue:reactionDisplay];
+            [row addSubview:reaction];
+        }
 
         id viewDate = [summary objectForKey:@"view_date"];
         if ([viewDate respondsToSelector:@selector(integerValue)] && [viewDate integerValue] > 0) {

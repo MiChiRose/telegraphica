@@ -864,6 +864,18 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         [readByItem setSubmenu:[self messageViewersSubmenuForItem:item]];
         [menu addItem:readByItem];
     }
+    TGTDLibCapabilityState addedReactionUsersState = [[self.client capabilities]
+        supportStateForCapability:TGTDLibCapabilityAddedReactionUsers];
+    if ([item canGetAddedReactions] && [[item reactionSummary] length] > 0 &&
+        addedReactionUsersState != TGTDLibCapabilityStateUnsupported) {
+        NSMenuItem *reactionUsersItem = [[[NSMenuItem alloc]
+            initWithTitle:TGLoc(@"message.reactions.whoReacted")
+                   action:@selector(showMessageReactionUsersFromMenu:)
+            keyEquivalent:@""] autorelease];
+        [reactionUsersItem setRepresentedObject:item];
+        [reactionUsersItem setTarget:self];
+        [menu addItem:reactionUsersItem];
+    }
     BOOL canEdit = (([item capabilitiesKnown] && [item canBeEdited]) ||
                     (![item capabilitiesKnown] && [item outgoing]));
     if (canEdit && [[item editableText] length] > 0 && [[item contentType] isEqualToString:@"messageText"]) {
@@ -1038,6 +1050,8 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
 
     NSNumber *chatID = [[item chatID] retain];
     NSNumber *messageID = [[item messageID] retain];
+    NSString *originalText = [[item editableText] copy];
+    NSArray *originalEntities = [[item formattedEntities] copy];
     NSString *text = [editedText copy];
     TGTDLibClient *client = [self.client retain];
     [self.statusField setStringValue:@"Editing message..."];
@@ -1051,7 +1065,13 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         NSError *editError = nil;
         NSString *editSummary = nil;
         if (canEdit) {
-            editSummary = [client editTextMessageInChatID:chatID messageID:messageID text:text timeout:8.0 error:&editError];
+            editSummary = [client editTextMessageInChatID:chatID
+                                                 messageID:messageID
+                                                      text:text
+                                              originalText:originalText
+                                          originalEntities:originalEntities
+                                                   timeout:8.0
+                                                     error:&editError];
         }
         NSString *errorMessage = [[(canEdit ? editError : capabilitiesError) localizedDescription] copy];
         BOOL succeeded = ([editSummary length] > 0);
@@ -1070,6 +1090,8 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
             [errorMessage release];
             [chatID release];
             [messageID release];
+            [originalText release];
+            [originalEntities release];
             [text release];
             [client release];
         });
@@ -1120,6 +1142,63 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         });
         [pool drain];
     });
+}
+
+- (void)showMessageReactionUsersFromMenu:(id)sender {
+    TGMessageItem *item = [sender respondsToSelector:@selector(representedObject)] ? [sender representedObject] : nil;
+    if (![item isKindOfClass:[TGMessageItem class]] || ![item canGetAddedReactions] ||
+        ![item.chatID respondsToSelector:@selector(longLongValue)] ||
+        ![item.messageID respondsToSelector:@selector(longLongValue)] ||
+        ![self.currentAuthState isEqualToString:@"ready"]) {
+        return;
+    }
+
+    [self.reactionUsersOperation cancel];
+    self.reactionUsersOperation = nil;
+    self.messageViewersWindowController = [[[TGMessageViewersWindowController alloc]
+        initWithMessagePreview:[item preview]] autorelease];
+    [self.messageViewersWindowController setContentTitle:TGLoc(@"message.reactions.usersTitle")
+                                              windowTitle:TGLoc(@"message.reactions.whoReacted")];
+    [self.messageViewersWindowController showWindow:self];
+    [[self.messageViewersWindowController window] makeKeyAndOrderFront:self];
+    [self.messageViewersWindowController showLoading];
+
+    NSNumber *chatID = [item chatID];
+    NSNumber *messageID = [item messageID];
+    TGTDLibClient *client = self.client;
+    __block TGStatusWindowController *owner = self;
+    TGTDLibOperation *operation = [[[TGTDLibOperation alloc]
+        initWithGeneration:0U
+                     timeout:8.5
+                  idempotent:YES
+           maximumRetryCount:0U
+                        work:^id(NSError **error) {
+                            return [client addedReactionUsersForChatID:chatID
+                                                             messageID:messageID
+                                                                offset:@""
+                                                                 limit:100U
+                                                               timeout:8.0
+                                                                 error:error];
+                        }
+             generationCheck:nil
+                  completion:^(id result, NSError *error) {
+                      TGStatusWindowController *strongOwner = owner;
+                      if (!strongOwner) {
+                          return;
+                      }
+                      strongOwner.reactionUsersOperation = nil;
+                      NSArray *summaries = [result isKindOfClass:[NSDictionary class]]
+                          ? [result objectForKey:@"summaries"] : nil;
+                      if (summaries) {
+                          [strongOwner.messageViewersWindowController showViewerSummaries:summaries];
+                      } else {
+                          (void)error;
+                          [strongOwner.messageViewersWindowController
+                              showErrorMessage:TGLoc(@"message.reactions.usersUnavailable")];
+                      }
+                  }] autorelease];
+    self.reactionUsersOperation = operation;
+    [operation start];
 }
 
 - (void)toggleMessagePinnedFromMenu:(id)sender {

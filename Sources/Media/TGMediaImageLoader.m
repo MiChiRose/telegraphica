@@ -2,6 +2,62 @@
 #import "TGWebPDecoder.h"
 #import <ImageIO/ImageIO.h>
 
+NSString * const TGMediaImageLoaderCacheDidClearNotification = @"TGMediaImageLoaderCacheDidClearNotification";
+
+@interface TGMediaImageLoadToken ()
+@property (nonatomic, assign, getter=isCancelled) BOOL cancelled;
+@property (nonatomic, copy) TGMediaImageLoadCompletion completion;
+- (id)initWithCompletion:(TGMediaImageLoadCompletion)completion;
+- (void)finishWithImage:(NSImage *)image;
+@end
+
+@implementation TGMediaImageLoadToken
+
+@synthesize cancelled = _cancelled;
+@synthesize completion = _completion;
+
+- (id)initWithCompletion:(TGMediaImageLoadCompletion)completion {
+    self = [super init];
+    if (self) {
+        self.completion = completion;
+    }
+    return self;
+}
+
+- (void)dealloc {
+    [_completion release];
+    [super dealloc];
+}
+
+- (void)cancel {
+    @synchronized(self) {
+        _cancelled = YES;
+        self.completion = nil;
+    }
+}
+
+- (BOOL)isCancelled {
+    @synchronized(self) {
+        return _cancelled;
+    }
+}
+
+- (void)finishWithImage:(NSImage *)image {
+    TGMediaImageLoadCompletion completion = nil;
+    @synchronized(self) {
+        if (!_cancelled && _completion) {
+            completion = [_completion copy];
+        }
+        self.completion = nil;
+    }
+    if (completion) {
+        completion(image);
+        [completion release];
+    }
+}
+
+@end
+
 static NSCache *TGMediaImageCache(void) {
     static NSCache *cache = nil;
     @synchronized([NSImage class]) {
@@ -14,19 +70,42 @@ static NSCache *TGMediaImageCache(void) {
     return cache;
 }
 
-static NSImage *TGMediaCachedImage(NSString *path) {
-    NSImage *image = [TGMediaImageCache() objectForKey:path];
+static NSString *TGMediaFileCacheKey(NSString *path,
+                                     NSString *kind,
+                                     NSUInteger maximumPixelSize) {
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0) {
+        return nil;
+    }
+    NSString *resolvedPath = [path stringByStandardizingPath];
+    NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:resolvedPath error:NULL];
+    NSNumber *fileSize = [attributes objectForKey:NSFileSize];
+    NSDate *modificationDate = [attributes objectForKey:NSFileModificationDate];
+    NSNumber *fileNumber = [attributes objectForKey:NSFileSystemFileNumber];
+    return [NSString stringWithFormat:@"%@:%lu:%@:%@:%@:%0.6f",
+            ([kind length] > 0 ? kind : @"file"),
+            (unsigned long)maximumPixelSize,
+            resolvedPath,
+            (fileNumber ?: @0),
+            (fileSize ?: @0),
+            ([modificationDate isKindOfClass:[NSDate class]] ? [modificationDate timeIntervalSince1970] : 0.0)];
+}
+
+static NSImage *TGMediaCachedImage(NSString *cacheKey) {
+    if ([cacheKey length] == 0) {
+        return nil;
+    }
+    NSImage *image = [TGMediaImageCache() objectForKey:cacheKey];
     return [[image retain] autorelease];
 }
 
-static NSImage *TGMediaCacheImage(NSImage *image, NSString *path) {
-    if (image && [path length] > 0) {
+static NSImage *TGMediaCacheImage(NSImage *image, NSString *cacheKey) {
+    if (image && [cacheKey length] > 0) {
         NSSize imageSize = [image size];
         NSUInteger cost = 1;
         if (imageSize.width > 0.0 && imageSize.height > 0.0) {
             cost = (NSUInteger)MAX(1.0, imageSize.width * imageSize.height * 4.0);
         }
-        [TGMediaImageCache() setObject:image forKey:path cost:cost];
+        [TGMediaImageCache() setObject:image forKey:cacheKey cost:cost];
     }
     return image;
 }
@@ -66,9 +145,7 @@ NSImage *TGImageThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
     if ([resolvedPath length] == 0) {
         return nil;
     }
-    NSString *cacheKey = [NSString stringWithFormat:@"file-thumbnail:%lu:%@",
-                          (unsigned long)maximumPixelSize,
-                          resolvedPath];
+    NSString *cacheKey = TGMediaFileCacheKey(resolvedPath, @"file-thumbnail", maximumPixelSize);
     NSImage *cachedImage = TGMediaCachedImage(cacheKey);
     if (cachedImage) {
         return cachedImage;
@@ -92,6 +169,39 @@ NSImage *TGImageThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
         image = TGWebPImageFromFile(resolvedPath);
     }
     return TGMediaCacheImage(image, cacheKey);
+}
+
+NSImage *TGMediaCachedThumbnailFromFile(NSString *path, NSUInteger maximumPixelSize) {
+    if (maximumPixelSize == 0) {
+        return nil;
+    }
+    return TGMediaCachedImage(TGMediaFileCacheKey(path, @"file-thumbnail", maximumPixelSize));
+}
+
+TGMediaImageLoadToken *TGLoadImageThumbnailFromFileAsync(NSString *path,
+                                                         NSUInteger maximumPixelSize,
+                                                         TGMediaImageLoadCompletion completion) {
+    if (![path isKindOfClass:[NSString class]] || [path length] == 0 ||
+        maximumPixelSize == 0 || !completion) {
+        return nil;
+    }
+
+    TGMediaImageLoadToken *token = [[[TGMediaImageLoadToken alloc] initWithCompletion:completion] autorelease];
+    NSString *pathCopy = [path copy];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        NSImage *image = nil;
+        if (![token isCancelled]) {
+            image = [TGImageThumbnailFromFile(pathCopy, maximumPixelSize) retain];
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [token finishWithImage:image];
+        });
+        [image release];
+        [pool drain];
+    });
+    [pathCopy release];
+    return token;
 }
 
 NSImage *TGImageThumbnailFromData(NSData *data, NSUInteger maximumPixelSize) {
@@ -129,6 +239,16 @@ void TGMediaImageLoaderSetCacheLimitBytes(NSUInteger bytes) {
 
 void TGMediaImageLoaderClearCache(void) {
     [TGMediaImageCache() removeAllObjects];
+    void (^notify)(void) = ^{
+        [[NSNotificationCenter defaultCenter]
+            postNotificationName:TGMediaImageLoaderCacheDidClearNotification
+                          object:nil];
+    };
+    if ([NSThread isMainThread]) {
+        notify();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), notify);
+    }
 }
 
 NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
@@ -140,7 +260,8 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     if (![resolvedPath length]) {
         return nil;
     }
-    NSImage *cachedImage = TGMediaCachedImage(resolvedPath);
+    NSString *cacheKey = TGMediaFileCacheKey(resolvedPath, @"file-oriented", 2200);
+    NSImage *cachedImage = TGMediaCachedImage(cacheKey);
     if (cachedImage) {
         return cachedImage;
     }
@@ -157,7 +278,7 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
         CFRelease(fileURL);
     }
     if (!source) {
-        return TGMediaCacheImage(TGWebPImageFromFile(resolvedPath), resolvedPath);
+        return TGMediaCacheImage(TGWebPImageFromFile(resolvedPath), cacheKey);
     }
 
     properties = (NSDictionary *)CGImageSourceCopyPropertiesAtIndex(source, 0, NULL);
@@ -195,7 +316,7 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
             CFRelease(properties);
         }
         CFRelease(source);
-        return TGMediaCacheImage(TGWebPImageFromFile(resolvedPath), resolvedPath);
+        return TGMediaCacheImage(TGWebPImageFromFile(resolvedPath), cacheKey);
     }
 
     NSUInteger orientation = 1;
@@ -232,5 +353,5 @@ NSImage *TGImageWithCorrectOrientationFromFile(NSString *path) {
     NSImage *image = [[[NSImage alloc] initWithCGImage:imageRef size:size] autorelease];
     CGImageRelease(imageRef);
     CFRelease(source);
-    return TGMediaCacheImage(image, resolvedPath);
+    return TGMediaCacheImage(image, cacheKey);
 }

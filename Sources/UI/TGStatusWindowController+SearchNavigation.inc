@@ -716,6 +716,26 @@ static NSString *TGSearchFilterIdentifierForIndex(NSInteger index) {
     NSUInteger flags = [event modifierFlags];
     BOOL command = ((flags & NSCommandKeyMask) != 0);
     BOOL shift = ((flags & NSShiftKeyMask) != 0);
+    BOOL option = ((flags & NSAlternateKeyMask) != 0);
+    BOOL control = ((flags & NSControlKeyMask) != 0);
+    if (command && !option && !control && !shift && (key == 'n' || key == 'N')) {
+        if ([self.currentAuthState isEqualToString:@"ready"]) {
+            [self openNewChatWindow:self];
+        }
+        return YES;
+    }
+    if (command && !option && !control && !shift && (key == 'k' || key == 'K')) {
+        if ([self.currentAuthState isEqualToString:@"ready"]) {
+            [self openChatListSearch:self];
+        }
+        return YES;
+    }
+    if (command && !option && !control && !shift && key == ',') {
+        if ([self.currentAuthState isEqualToString:@"ready"] && [self.navigationButtons count] > 3) {
+            [self navigationChanged:[self.navigationButtons objectAtIndex:3]];
+        }
+        return YES;
+    }
     if (command && (key == 'f' || key == 'F')) {
         if (shift) {
             [self openGlobalSearch:self];

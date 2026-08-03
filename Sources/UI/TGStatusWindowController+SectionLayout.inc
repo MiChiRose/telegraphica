@@ -67,6 +67,10 @@
     BOOL showLogin = !ready;
     BOOL drawerHidden = TGUserDefaultBoolWithDefault(TGDrawerHiddenDefaultsKey, NO);
     BOOL showProfile = (ready && [section isEqualToString:TGSectionProfile]);
+    BOOL usesSecureAuthInput = ([authPresentationState isEqualToString:@"waitPassword"] &&
+                                !self.authPasswordRecoveryMode);
+    BOOL usesPlainAuthInput = ([self isAuthInputState:authPresentationState] &&
+                               !usesSecureAuthInput);
     CGFloat currentSidebarWidth = NSWidth([self.sidebarPanelView frame]);
     if (currentSidebarWidth <= 0.0) {
         currentSidebarWidth = self.chatSidebarPreferredWidth;
@@ -88,11 +92,11 @@
     [self showView:self.authLabel visible:showLogin];
     [self showView:self.authStateField visible:(showLogin && self.loginErrorVisible)];
     [self showView:self.authTextFieldBackgroundView visible:(showLogin && [self isAuthInputState:authPresentationState])];
-    [self showView:self.authTextField visible:(showLogin && ([authPresentationState isEqualToString:@"waitPhoneNumber"] || [authPresentationState isEqualToString:@"waitCode"]))];
+    [self showView:self.authTextField visible:(showLogin && usesPlainAuthInput)];
     [self showView:self.authSecondaryLabel
            visible:(showLogin && [authPresentationState isEqualToString:@"waitPhoneNumber"])];
     [self showView:self.authSecondaryTextFieldBackgroundView visible:NO];
-    [self showView:self.authSecureField visible:(showLogin && [authPresentationState isEqualToString:@"waitPassword"])];
+    [self showView:self.authSecureField visible:(showLogin && usesSecureAuthInput)];
     [self showView:self.authButton visible:(showLogin && [self isAuthInputState:authPresentationState])];
     [self showView:self.busySpinner visible:(showLogin && self.controlsBusy)];
     [self showView:self.loginLogsButton visible:showLogin];
@@ -304,7 +308,9 @@
     [self showView:self.settingsAutoDownloadPhotosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadVideosButton visible:showSettings];
     [self showView:self.settingsAutoDownloadDocumentsButton visible:showSettings];
+    [self showView:self.settingsAutoDownloadVoiceButton visible:showSettings];
     [self showView:self.settingsLinkPreviewsButton visible:showSettings];
+    [self showView:self.settingsSequentialAudioButton visible:showSettings];
     [self showView:self.settingsAutoplayAnimatedStickersButton visible:showSettings];
     [self showView:self.settingsStopInactiveAnimationsButton visible:showSettings];
     [self showView:self.settingsMaxAutoDownloadLabel visible:showSettings];
@@ -682,7 +688,9 @@
     CGFloat secondaryInputY = loginY + 62.0;
     CGFloat loginErrorHeight = 28.0;
     CGFloat loginErrorGap = 4.0;
-    CGFloat loginErrorY = primaryInputY - loginErrorGap - loginErrorHeight;
+    CGFloat loginErrorY = phoneLoginLayout
+        ? (primaryInputY - loginErrorGap - loginErrorHeight)
+        : (loginY + 4.0);
     [self.authStateField setFrame:NSMakeRect(loginX + 54.0, loginErrorY, loginWidth - 108.0, loginErrorHeight)];
     [self.authTextFieldBackgroundView setFrame:NSMakeRect(loginInputX, primaryInputY, loginInputWidth, 32.0)];
     [self.authTextField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
@@ -690,11 +698,16 @@
     [self.authSecureField setFrame:NSMakeRect(loginInputX + 9.0, primaryInputY + 7.0, loginInputWidth - 18.0, 18.0)];
     [self.authButton setFrame:NSMakeRect(loginButtonX, primaryInputY, loginButtonWidth, 32.0)];
     CGFloat qrButtonWidth = phoneLoginLayout ? 220.0 : 190.0;
-    CGFloat qrButtonY = phoneLoginLayout ? (loginY + 166.0) : (loginY + 94.0);
+    CGFloat qrButtonY = phoneLoginLayout ? (loginY + 166.0) : (loginY + 82.0);
     [self.qrLoginButton setFrame:NSMakeRect(loginX + floor((loginWidth - qrButtonWidth) / 2.0),
                                             qrButtonY,
                                             qrButtonWidth,
                                             34.0)];
+    CGFloat secondaryActionButtonWidth = 220.0;
+    [self.authSecondaryActionButton setFrame:NSMakeRect(loginX + floor((loginWidth - secondaryActionButtonWidth) / 2.0),
+                                                        loginY + 36.0,
+                                                        secondaryActionButtonWidth,
+                                                        34.0)];
     [self.busySpinner setFrame:NSMakeRect(loginX + loginWidth - 36.0, primaryInputY + 8.0, 16.0, 16.0)];
     [self.loginLogsButton setFrame:NSMakeRect(width - margin - 74.0, margin + 6.0, 74.0, 28.0)];
     CGFloat loginLanguageX = margin;
@@ -1281,7 +1294,7 @@
     CGFloat savedCardHeight = 54.0;
     CGFloat privacyCardHeight = 54.0;
     CGFloat drawerCardHeight = 104.0;
-    CGFloat resourceCardHeight = 306.0;
+    CGFloat resourceCardHeight = 366.0;
     CGFloat interfaceCardHeight = 184.0;
     CGFloat sessionsCardHeight = 72.0;
     CGFloat filesCardHeight = 172.0;
@@ -1414,7 +1427,9 @@
     [self.settingsAutoDownloadPhotosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 42.0, rowWidth, 22.0)];
     [self.settingsAutoDownloadVideosButton setFrame:NSMakeRect(rowLeft, resourceCardY + 70.0, rowWidth, 22.0)];
     [self.settingsAutoDownloadDocumentsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 98.0, rowWidth, 22.0)];
-    [self.settingsLinkPreviewsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 126.0, rowWidth, 22.0)];
+    [self.settingsAutoDownloadVoiceButton setFrame:NSMakeRect(rowLeft, resourceCardY + 126.0, rowWidth, 22.0)];
+    [self.settingsLinkPreviewsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 154.0, rowWidth, 22.0)];
+    [self.settingsSequentialAudioButton setFrame:NSMakeRect(rowLeft, resourceCardY + 182.0, rowWidth, 22.0)];
     CGFloat resourcePopupWidth = 190.0;
     if (resourcePopupWidth > rowWidth - 180.0) {
         resourcePopupWidth = rowWidth - 180.0;
@@ -1422,15 +1437,15 @@
     if (resourcePopupWidth < 120.0) {
         resourcePopupWidth = 120.0;
     }
-    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 158.0, 170.0, 22.0)];
-    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 154.0, resourcePopupWidth, 28.0)];
-    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 188.0, rowWidth, 22.0)];
-    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 218.0, 170.0, 22.0)];
-    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 214.0, resourcePopupWidth, 28.0)];
-    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 248.0, rowWidth, 22.0)];
-    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 278.0, 170.0, 22.0)];
-    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 274.0, resourcePopupWidth, 28.0)];
-    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 156.0, MAX(160.0, rowWidth - 390.0), 54.0)];
+    [self.settingsMaxAutoDownloadLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 214.0, 170.0, 22.0)];
+    [self.settingsMaxAutoDownloadPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 210.0, resourcePopupWidth, 28.0)];
+    [self.settingsAutoplayAnimatedStickersButton setFrame:NSMakeRect(rowLeft, resourceCardY + 244.0, rowWidth, 22.0)];
+    [self.settingsMaxAnimationsLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 274.0, 170.0, 22.0)];
+    [self.settingsMaxAnimationsPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 270.0, resourcePopupWidth, 28.0)];
+    [self.settingsStopInactiveAnimationsButton setFrame:NSMakeRect(rowLeft, resourceCardY + 304.0, rowWidth, 22.0)];
+    [self.settingsMediaCacheLimitLabel setFrame:NSMakeRect(rowLeft, resourceCardY + 334.0, 170.0, 22.0)];
+    [self.settingsMediaCacheLimitPopUpButton setFrame:NSMakeRect(rowLeft + 178.0, resourceCardY + 330.0, resourcePopupWidth, 28.0)];
+    [self.settingsResourceHintField setFrame:NSMakeRect(rowLeft + 390.0, resourceCardY + 212.0, MAX(160.0, rowWidth - 390.0), 54.0)];
     settingsNextY = resourceCardY + resourceCardHeight + settingsGroupGap;
 
     [self.settingsLibraryField setFrame:NSMakeRect(settingsGroupedX + 20.0, settingsNextY, settingsGroupedWidth - 40.0, settingsLabelHeight)];
@@ -1585,6 +1600,7 @@
     if ([notification object] == self.mediaPlaybackWindow) {
         [self cancelMediaPlaybackPreparation];
         [self resetMediaPlaybackState];
+        self.mediaPlaybackSourceMessageItem = nil;
         [self.mediaPlaybackWindow setDelegate:nil];
         self.mediaPlaybackContainerView = nil;
         self.mediaPlaybackTitleField = nil;
@@ -1648,6 +1664,8 @@
     }
     if ([notification object] == self.stickerPickerWindow) {
         [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+        [self.stickerPickerGridThumbnailPrefetcher cancelAll];
+        [self.stickerPickerRailThumbnailPrefetcher cancelAll];
         [self scheduleInlineMediaPlaybackRefresh];
     }
 }

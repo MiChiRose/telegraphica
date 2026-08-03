@@ -5,6 +5,10 @@ This keeps the checks compatible with the Mavericks/Xcode 6.2 build lane and
 avoids requiring Telegram credentials, Keychain access, TDLib sessions, or real
 network calls.
 
+The default runner also compiles and runs the artificial-response TDLib
+capability registry probe described in
+[tdlib-capabilities.md](tdlib-capabilities.md).
+
 ## Existing checks
 
 - `scripts/check_legacy_compat.py` scans project source for legacy macOS/Xcode
@@ -20,6 +24,9 @@ network calls.
   heavier and remain separate from the fast default test run.
 - `build_legacy.sh` runs both policy scanners and
   `check_media_item_support.sh` before building the app.
+- `scripts/check_tdlib_build_metadata.sh` verifies that a TDLib build sidecar
+  matches the bundled binary and its recorded exported-C-ABI list. The release
+  bundle audit runs this check for both runtime lanes.
 - The Xcode scheme has an empty `TestAction`; there is no XCTest target yet.
 
 ## Fast local tests
@@ -42,6 +49,42 @@ The script runs:
 - a compiled Objective-C core logic probe covering themes, display preferences,
   resource policy limits, media type handling, outgoing text chunking,
   localization fallback, and message layout sizing.
+- a compiled media image-loader probe covering display-size downsampling,
+  source-version cache invalidation, main-thread delivery of asynchronous
+  decode results, bounded message-thumbnail prefetch deduplication and cache
+  reset invalidation.
+- a compiled animated-image probe covering off-main GIF validation/decode,
+  main-thread delivery, bounded caching and cancellation suppression.
+- a utility-window lifetime probe covering close/reopen generation changes and
+  stale-result suppression; the storage window is wired to this lifecycle.
+- a legacy accessibility probe covering VoiceOver roles, localized labels,
+  help text and live enabled/selected state without requiring a GUI session.
+- a fixture-style TDLib message-search probe covering request types, bounded
+  limits, media filters, topic/thread routing, anchors and pagination offsets.
+- a fixture-style TDLib storage probe covering fast-statistics aggregation,
+  filtered cleanup scope, normalized chat identifiers and the refresh request.
+- a fixture-style TDLib file probe covering download, completion-path,
+  cancellation, cache deletion and invalid-identifier request contracts.
+- a fixture-style TDLib account probe covering current-profile parsing,
+  name/username/bio and profile-photo request shapes, safe active-session
+  normalization and explicit session termination.
+- a static sticker-thumbnail pipeline check ensuring that picker layout only
+  reads the bounded cache and that grid/rail jobs are cancellable and reject
+  stale generations.
+- a custom-emoji fixture probe covering identifier collection, TDLib sticker
+  response parsing, completed-file gating, and fail-closed malformed data.
+- an advanced chat-folder fixture probe covering multiple invite-link parsing,
+  recommended folder conversion, server-option limits, malformed responses and
+  legacy-safe identifier normalization.
+- a persistent download-queue probe covering interrupted-state restoration,
+  bounded property-list serialization and TDLib file identifier retention.
+- a storage-cleanup policy probe covering TDLib file-type objects, grouped
+  video categories, and bounded/deduplicated chat identifiers.
+- a playback-speed preference probe covering bounded legacy-safe rates,
+  independent audio/video persistence, and the opt-in sequential-audio
+  preference;
+- a sequential-audio fixture probe covering same-chat ordering, video and
+  foreign-chat skips, identifier recovery, and end-of-sequence behavior;
 
 The probe process uses a temporary `HOME` so `NSUserDefaults` writes do not touch
 the real Telegraphica profile.
@@ -69,6 +112,11 @@ Because Telegraphica is a GUI app and the production client may still attempt
 normal startup work, this smoke check is separate from the default fast tests.
 Manual HITL on Mavericks remains required for login, Keychain prompts, TDLib
 authorization, media playback, and real chat behavior.
+
+The complete unchanged release candidate must additionally follow
+[release-checklist.md](release-checklist.md). Current evidence and unverified
+systems are recorded in [compatibility-matrix.md](compatibility-matrix.md);
+building with a modern SDK and a 10.8 deployment target is not runtime proof.
 
 ## Telegram test DC
 

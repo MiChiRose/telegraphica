@@ -10,6 +10,7 @@ typedef void (^TGDownloadCompletionBlock)(NSString *savedPath, NSError *error, B
 
 + (TGDownloadManager *)sharedManager;
 - (void)setClient:(TGTDLibClient *)client;
+- (void)resumePendingDownloads;
 - (NSString *)enqueueFileID:(NSNumber *)fileID
           suggestedFileName:(NSString *)suggestedFileName
           fallbackLocalPath:(NSString *)fallbackLocalPath

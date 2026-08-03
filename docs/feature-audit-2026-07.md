@@ -1,10 +1,10 @@
 # Telegraphica Feature Audit
 
-Date: 2026-07-27
-Verified code snapshot: `b77e491` (`feature/chat-folder-management`)
+Originally recorded: 2026-07-27
+Modernization refresh: 2026-08-03
+Reviewed code snapshot: local `develop` at `4149524`
 
-Scope: the unified OS X 10.8-macOS 10.13 application on the
-`feature/chat-folder-management` branch.
+Scope: the unified OS X 10.8-macOS 10.13 application on `develop`.
 
 This audit compares the current Telegraphica code with the Telegram client
 surface and the current TDLib API. It distinguishes between:
@@ -92,25 +92,25 @@ remain deliberately disabled.
 
 | Area | Current status | Important remaining work |
 | --- | --- | --- |
-| Authorization | Phone number, code, 2FA password, session reuse, Keychain database key, logout | QR login, registration, email codes, recovery, passkeys, multiple accounts |
+| Authorization | Phone, code, 2FA, QR with cancellation/phone recovery, registration, email address/code states, resend and password recovery, session reuse, Keychain database key and logout | Passkeys use QR/other-device fallback; multiple accounts are intentionally excluded |
 | Chat navigation | Main list, archive, Telegram folders, compact and expanded sidebar, unread and mute presentation | Folder ordering, shared-folder import, richer chat list filters |
 | Chat lifecycle | Private chat, groups/channels, secret chat, invite-link join, leave, archive, chat information, participants and member-role management | Delete chat/history UX and ownership transfer |
 | Contacts | List, search, profile, add, remove, invite through Messages, send contact | Contact notes, birthday suggestions, bulk import and duplicate handling |
 | Profile | Name, surname, username, bio and avatar upload | Avatar history/removal, phone change, birthday, emoji status, profile music, default profile tab |
 | Messaging | Read, send, reply, forward, edit, delete, pin, drafts, long-text chunking, silent/scheduled/send-when-online and link-preview controls | Recurring messages and richer scheduled-media editing |
-| Formatting | Selection-based bold, italic, underline, strike, spoiler and monospace through TDLib entity parsing | Link editor, block quotes, expandable quotes, formatted editing and a visual rich-text editor |
+| Formatting | Selection-based bold, italic, underline, strike, spoiler, monospace, text links, block/expandable quote conversion and entity-preserving formatted editing | Further visual-editor polish and broader malformed-entity recovery |
 | Message types | Photo, album, GIF animation, video, audio, document, sticker, voice/video notes, contact, location/live location, venue, dice and polls | Free checklist handling; paid media is read-only/out of scope |
-| Reactions | Add and remove ordinary emoji reactions, reaction display | Server-provided free reaction picker, custom emoji display where available and reaction details; paid Star reactions are out of scope |
+| Reactions | Server-provided available-reaction catalog, add/remove, selected-state display, reaction-user details, incoming custom emoji with bounded cache and safe placeholder | Paid Star reactions are intentionally excluded; lane-specific unsupported custom emoji remain placeholders |
 | Polls | Display, vote, regular polls and quiz creation with correct-answer explanation | Poll media, option links, closing and scheduling |
 | Search | Chat search, public chat lookup, in-chat and global message search, media filters | Public post search, semantic filters, saved searches |
 | Topics and comments | Forum topic list, topic history, channel comment threads | Create/edit/close topics, topic tabs, topic permissions and admin actions |
-| Media | Per-chat media center plus shared Download Manager, filtering, pagination, progress, retry/cancel, Save As, Finder reveal, cache delete and preview/playback | Resumable partial downloads, streaming, speed, quality and playlists |
+| Media | Per-chat media center plus shared Download Manager, filtering, pagination, progress, retry/cancel, restart recovery through TDLib file IDs, Save As, Finder reveal, cache delete by data type and selected chat, preview/playback, independent 1x/1.5x/2x audio/video speeds, optional sequential voice/audio playback, and separate photo/video/document/voice auto-download controls | Progressive playback, quality, and broader playlists |
 | Notifications | OS notifications, app settings, server mute state, per-chat mute/sound/preview synchronization and exception management | Scheduled notification profiles and richer sound selection |
-| Folders | Read, create, edit, delete and create/reuse a share link on the capable TDLib lane | Reorder, manage invite links, import shared folders, process newly suggested chats, folder limits and recommendations |
+| Folders | Read, create, edit, delete, drag ordering, shared-folder import, multiple invite-link management, suggested/new-chat processing, recommendations and server-reported limits on the capable TDLib lane | Per-link selection of a subset of shareable chats still uses Telegram's complete eligible set when creating a new link |
 | Storage and sessions | Storage statistics, cache cleanup, active sessions and remote termination | Per-chat cache policy, auto-remove periods, session detail and passkey management |
 | Privacy | Server privacy rules, blocked users, account inactivity TTL and per-chat/default auto-delete | Passcode lock, exception editor and account deletion UX |
-| Secret chats | Creation and normal conversation opening | Dedicated secret-chat information, key visualization, TTL and destructive controls |
-| Calls | Navigation destination and prepared placeholder | All voice/video/group-call functionality |
+| Secret chats | Creation, conversation opening, dedicated information, encryption-key visualization, TTL and destructive close/delete controls | Broader media-expiry polish remains capability-dependent |
+| Calls | One-to-one audio and experimental video calls on the supported 10.9+ lane, with a clear 10.8 unavailable state | Group calls, voice chats, screen sharing and production-grade video tuning are separate projects |
 | Bots | Commands, inline results, callback buttons, text reply keyboards and confirmed Login URLs | Web Apps and explicit opt-in flows for personal-data keyboard buttons |
 | Administration | Members, roles, restrictions/bans, invite links, join requests, event log and slow mode | Full permission matrix, ownership transfer and bulk moderation |
 | Saved Messages | Topics, topic history, tags display and free-limit pinning | Premium tag search/editing is intentionally unavailable |
@@ -123,37 +123,28 @@ remain deliberately disabled.
 
 ### P0: reliability before more surface area
 
-1. Formal TDLib capability registry.
-   Schema fallbacks are currently spread across the large TDLib client. Add one
-   capability object that records the loaded TDLib version and probes support
-   for each optional request. UI actions should be hidden or disabled from this
-   registry instead of learning support only after an error.
-2. Lifecycle and window regression coverage.
-   Add automated checks for opening, closing and reopening every retained
-   utility window. The folder-window bug is a representative old-AppKit failure.
-3. Failure and cancellation consistency.
-   Long downloads and TDLib requests need one shared cancellable operation
-   model with stale-result protection and consistent status presentation.
+1. Extend the implemented `TGTDLibCapabilities` registry to remaining local
+   schema checks as each affected feature is touched.
+2. Extend the implemented generation/cancellation lifetime helper from storage
+   to every retained utility window, backed by reopen probes.
+3. Migrate additional idempotent reads to the implemented cancellable
+   `TGTDLibOperation`; never retry ambiguous send/edit/delete operations.
 
 ### P1: highest daily value
 
-1. Folder ordering, shared-folder import and invite-link management.
+1. Retain advanced folders, authorization, reactions, secret-chat controls and
+   rich text in the 10.8/10.9/10.13 regression matrix.
 2. Topic creation/edit/close and topic permissions.
-3. Passcode lock for local Telegraphica data.
-4. Profile-photo history/removal and phone-number change.
-5. Server-provided free-reaction picker and custom emoji display.
-6. Secret-chat key visualization, TTL and destructive controls.
-7. Rich-text link editor, quotes and formatted editing.
-8. Delete-history UX with explicit destructive confirmations.
+3. Profile-photo history/removal and phone-number change.
+4. Delete-history UX with explicit destructive confirmations.
+5. Complete utility-window lifecycle coverage and keyboard focus order.
 
 ### P2: useful expansion
 
-1. QR login and registration/recovery flows, subject to TDLib-lane support.
-2. Multiple accounts with isolated databases and Keychain keys.
-3. Poll closing/scheduling and poll media.
-4. Free checklist support where the loaded TDLib lane exposes it.
-5. Download streaming, playback speed and playlists.
-6. Stories viewing only, after a separate legacy-performance prototype.
+1. Poll closing/scheduling and poll media.
+2. Free checklist support where the loaded TDLib lane exposes it.
+3. Progressive media playback where the legacy AV stack is demonstrably safe.
+4. Stories viewing only, after a separate legacy-performance prototype.
 
 ### P3: large or modern projects
 
@@ -187,22 +178,23 @@ Current examples:
   implemented across both paths;
 - shared folder links already use a normal-path capability and are disabled on
   the OS X 10.8 fallback;
-- scheduling, modern link-preview options, shared-folder import and newer
+- scheduling, modern link-preview options and newer
   message types need runtime request-shape probing before their UI is enabled;
 - 2025-2026 Telegram features must not be assumed available merely because
   they exist in current online TDLib documentation.
 
 ## Verified Gaps in the Current Code
 
-The following are not guesses based on missing UI. Their TDLib write/read
-requests remain absent after the free-feature roadmap:
+The following remain intentionally absent or unimplemented after the
+modernization refresh:
 
-- QR authorization, registration, email authorization and password recovery;
-- profile-photo history/removal, phone-number change, birthdays and emoji status;
-- custom/paid reactions and server-provided available-reaction selection;
+- profile-photo history/removal, phone-number change and emoji status;
 - Stories, Business and free checklist workflows;
 - Mini Apps and automatic phone/location sharing from reply keyboards;
-- multiple accounts, passkeys and passcode lock.
+- group calls and screen sharing;
+- multiple accounts and local passcode lock by product decision;
+- passkeys on the legacy target, with QR/other-device fallback instead;
+- all paid reactions and Telegram commercial workflows by policy.
 
 The audit must not list notification synchronization, scheduled-message
 retrieval, member administration, invite links/join requests, blocked-user and
@@ -225,7 +217,7 @@ create/edit/delete/share. Each has both UI and a TDLib path in this snapshot.
 | P1 | Capability fallbacks are decentralized | Current and legacy request shapes are retried inside many individual methods | Introduce `TGTDLibCapabilities` and make availability a first-class input to UI |
 | P1 | UI lifecycle testing is mostly static | Utility windows can regress only after close/reopen on old AppKit | Add a no-network AppKit lifecycle probe for retained windows and their controller ownership |
 | P2 | Settings layout is manually repeated | Each section has separate properties, creation, visibility and frame code | Introduce a small settings-section model and shared card-row layout helper |
-| P2 | Images can be decoded repeatedly while drawing | Some custom cells load local avatar files inside `drawInteriorWithFrame:` | Add a bounded avatar image cache keyed by path and modification date |
+| P2 | Some auxiliary image surfaces can still decode while drawing | Chat/message avatars, message media, link-preview cards, and static sticker picker thumbnails now use bounded async prefetch plus cache-only drawing; auxiliary utility views still need the same audit | Extend the shared loader contract to remaining auxiliary image surfaces |
 | P2 | Operations use many fixed synchronous wait timeouts | TDLib calls are dispatched off-main but each feature manages its own timeout/status | Add one cancellable operation wrapper with generation tokens and common error mapping |
 | P2 | Some user-facing strings remain hard-coded in English | Diagnostics, alerts and transient status strings are not all localized | Move daily-use strings to `TGLocalization`; keep developer-only diagnostics English |
 | P3 | Custom view state coverage is incomplete | Native controls provide accessibility, but many icon-only/custom cells rely mainly on tooltips | Add accessibility labels, keyboard actions and focus verification for custom controls |
@@ -236,18 +228,18 @@ This is a native-product assessment adapted to AppKit rather than a web audit.
 
 | Dimension | Score | Key finding |
 | --- | ---: | --- |
-| Accessibility | 2/4 | Good native-control foundation, but custom icon cells and keyboard coverage need an explicit pass |
-| Performance | 2/4 | Background TDLib work is good; image decoding, large controllers and operation duplication remain |
+| Accessibility | 3/4 | Legacy VoiceOver roles, labels and content descriptions plus primary shortcuts are implemented; full focus order and every custom control still need real VoiceOver HITL |
+| Performance | 3/4 | Main chat thumbnails, sticker previews and inline GIF decoding are now asynchronous and bounded; secondary surfaces and large controllers remain |
 | Responsive layout | 3/4 | Scrollable settings/drawer and snapped chat sidebar are strong; manual frames still create edge cases |
 | Theming | 3/4 | Central theme helpers are widely used, with some hard-coded colors and strings left |
-| Product consistency | 3/4 | The app has a coherent native vocabulary; utility windows still vary in lifecycle and polish |
+| Product consistency | 3/4 | The app has a coherent native vocabulary; storage now uses a tested close/reopen request lifetime while other utility windows still vary |
 | Total | 13/20 | Acceptable, with reliability and structural work needed before very large new subsystems |
 
 ## Next Recommended Feature
 
-After HITL verification of this roadmap batch, implement a formal
-`TGTDLibCapabilities` registry, then use it for folder ordering/shared-folder
-import and topic administration.
+After HITL verification of this roadmap batch, continue the media and
+performance phase while retaining the completed `TGTDLibCapabilities` registry
+and advanced-folder gates as the model for newer TDLib features.
 
 It is the best next step because:
 

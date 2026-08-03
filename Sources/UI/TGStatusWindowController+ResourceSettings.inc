@@ -96,9 +96,17 @@
                                                                       action:@selector(resourceSettingChanged:)];
     [contentView addSubview:self.settingsAutoDownloadDocumentsButton];
 
+    self.settingsAutoDownloadVoiceButton = [self resourceSwitchWithTitle:@"Auto-download voice messages"
+                                                                   action:@selector(resourceSettingChanged:)];
+    [contentView addSubview:self.settingsAutoDownloadVoiceButton];
+
     self.settingsLinkPreviewsButton = [self resourceSwitchWithTitle:@"Show link previews"
                                                               action:@selector(resourceSettingChanged:)];
     [contentView addSubview:self.settingsLinkPreviewsButton];
+
+    self.settingsSequentialAudioButton = [self resourceSwitchWithTitle:@"Play voice messages one after another"
+                                                                  action:@selector(resourceSettingChanged:)];
+    [contentView addSubview:self.settingsSequentialAudioButton];
 
     self.settingsMaxAutoDownloadLabel = [self resourceLabelWithTitle:@"Max auto-download"];
     [contentView addSubview:self.settingsMaxAutoDownloadLabel];
@@ -144,7 +152,9 @@
     [self.settingsAutoDownloadPhotosButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadPhoto) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadVideosButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVideo) ? NSOnState : NSOffState];
     [self.settingsAutoDownloadDocumentsButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadDocument) ? NSOnState : NSOffState];
+    [self.settingsAutoDownloadVoiceButton setState:TGResourcePolicyAutoDownloadEnabledForType(TGResourceAutoDownloadVoice) ? NSOnState : NSOffState];
     [self.settingsLinkPreviewsButton setState:TGResourcePolicyLinkPreviewsEnabled() ? NSOnState : NSOffState];
+    [self.settingsSequentialAudioButton setState:TGMediaPlaybackSequentialAudioEnabled() ? NSOnState : NSOffState];
     [self.settingsAutoplayAnimatedStickersButton setState:TGResourcePolicyAutoplayAnimatedStickersEnabled() ? NSOnState : NSOffState];
     [self.settingsStopInactiveAnimationsButton setState:TGResourcePolicyStopAnimationsWhenInactiveEnabled() ? NSOnState : NSOffState];
     [self selectPopUp:self.settingsMaxAutoDownloadPopUpButton representedUnsignedLongLong:TGResourcePolicyMaxAutoDownloadBytes()];
@@ -182,6 +192,8 @@
         TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVideo, [self.settingsAutoDownloadVideosButton state] == NSOnState);
     } else if (sender == self.settingsAutoDownloadDocumentsButton) {
         TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadDocument, [self.settingsAutoDownloadDocumentsButton state] == NSOnState);
+    } else if (sender == self.settingsAutoDownloadVoiceButton) {
+        TGResourcePolicySetAutoDownloadEnabledForType(TGResourceAutoDownloadVoice, [self.settingsAutoDownloadVoiceButton state] == NSOnState);
     } else if (sender == self.settingsLinkPreviewsButton) {
         BOOL enabled = ([self.settingsLinkPreviewsButton state] == NSOnState);
         if (enabled != TGResourcePolicyLinkPreviewsEnabled()) {
@@ -193,6 +205,9 @@
                 [self reloadMessagesForChatID:self.selectedChatID interactive:NO];
             }
         }
+        return;
+    } else if (sender == self.settingsSequentialAudioButton) {
+        TGMediaPlaybackSetSequentialAudioEnabled([self.settingsSequentialAudioButton state] == NSOnState);
         return;
     } else if (sender == self.settingsAutoplayAnimatedStickersButton) {
         TGResourcePolicySetAutoplayAnimatedStickersEnabled([self.settingsAutoplayAnimatedStickersButton state] == NSOnState);

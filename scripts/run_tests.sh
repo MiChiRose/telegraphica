@@ -70,7 +70,6 @@ Tests/Workshop/run_media_workbench_tests.sh
 echo "== Media preview gate =="
 scripts/check_media_item_support.sh "$ARCH" "$BUILD_DIR/media-item-support" "$SDK_NAME"
 
-echo "== Core logic probe =="
 COMPILE_FLAGS=(
     -arch "$ARCH"
     "-mmacosx-version-min=$DEPLOYMENT_TARGET"
@@ -85,12 +84,230 @@ if [ -n "$SDK_PATH" ]; then
     COMPILE_FLAGS+=("-isysroot" "$SDK_PATH")
 fi
 
+echo "== Asynchronous animated image loader =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/animated_image_loader_probe.m \
+    Sources/Media/TGAnimatedImageLoader.m \
+    -framework Cocoa \
+    -framework ImageIO \
+    -o "$BUILD_DIR/animated-image-loader-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/animated-image-loader-probe"
+
+echo "== Utility window request lifetime =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/utility_window_lifetime_probe.m \
+    Sources/UI/TGUtilityWindowLifetime.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/utility-window-lifetime-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/utility-window-lifetime-probe"
+
+echo "== Legacy accessibility support =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/accessibility_support_probe.m \
+    Sources/UI/TGAccessibilitySupport.m \
+    Sources/UI/TGLocalization.m \
+    Sources/Core/TGChatItem.m \
+    Sources/Core/TGMessageItem.m \
+    -framework Cocoa \
+    -o "$BUILD_DIR/accessibility-support-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/accessibility-support-probe"
+
+echo "== Persistent download queue =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/download_queue_store_probe.m \
+    Sources/Services/TGDownloadQueueStore.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/download-queue-store-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-queue-store-probe"
+
+echo "== TDLib capability registry =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/tdlib_capabilities_probe.m \
+    Sources/Core/TGTDLibCapabilities.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib_capabilities_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib_capabilities_probe"
+
+echo "== TDLib message search requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_search_request_probe.m \
+    Sources/Core/TGTDLibClient+Search.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-search-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-search-request-probe"
+
+echo "== TDLib storage requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_storage_request_probe.m \
+    Sources/Core/TGTDLibClient+Storage.m \
+    Sources/Services/TGStorageCleanupPolicy.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-storage-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-storage-request-probe"
+
+echo "== TDLib file requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_file_request_probe.m \
+    Sources/Core/TGTDLibClient+Files.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-file-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-request-probe"
+
+echo "== TDLib account requests =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation \
+    -Wno-objc-protocol-method-implementation \
+    Tests/tdlib_account_request_probe.m \
+    Sources/Core/TGTDLibClient+Account.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib-account-request-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-account-request-probe"
+
+echo "== Authorization flow fixtures =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/authorization_flow_probe.m \
+    Sources/Core/TGAuthorizationFlow.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/authorization_flow_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/authorization_flow_probe"
+
+echo "== Formatted text codec =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/formatted_text_codec_probe.m \
+    Sources/Core/TGFormattedTextCodec.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/formatted_text_codec_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/formatted_text_codec_probe"
+
+echo "== Secret chat key visualization =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/secret_chat_key_probe.m \
+    Sources/Core/TGSecretChatKey.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/secret_chat_key_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/secret_chat_key_probe"
+
+echo "== Server reaction catalog =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/reaction_catalog_probe.m \
+    Sources/Core/TGReactionCatalog.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/reaction_catalog_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/reaction_catalog_probe"
+
+echo "== Added reaction users =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/added_reactions_probe.m \
+    Sources/Core/TGAddedReactionsParser.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/added_reactions_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/added_reactions_probe"
+
+echo "== Cancellable TDLib operation =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/tdlib_operation_probe.m \
+    Sources/Core/TGTDLibOperation.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/tdlib_operation_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib_operation_probe"
+
+echo "== Media image loader =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/media_image_loader_probe.m \
+    Sources/Media/TGMediaImageLoader.m \
+    Sources/Media/TGMessageThumbnailPrefetcher.m \
+    Sources/Core/TGMessageItem.m \
+    -framework Cocoa \
+    -framework ImageIO \
+    -o "$BUILD_DIR/media_image_loader_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
+
+echo "== Sticker thumbnail pipeline =="
+python3 scripts/test_sticker_thumbnail_pipeline.py
+
+echo "== Media playback speed preferences =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/media_playback_preferences_probe.m \
+    Sources/Media/TGMediaPlaybackPreferences.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/media_playback_preferences_probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media_playback_preferences_probe"
+
+echo "== Sequential audio playback =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/media_playback_sequence_probe.m \
+    Sources/Media/TGMediaPlaybackSequence.m \
+    Sources/Core/TGMessageItem.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/media_playback_sequence_probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media_playback_sequence_probe"
+
+echo "== Storage cleanup filters =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/storage_cleanup_policy_probe.m \
+    Sources/Services/TGStorageCleanupPolicy.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/storage_cleanup_policy_probe"
+HOME="$TEST_HOME" "$BUILD_DIR/storage_cleanup_policy_probe"
+
+echo "== Custom emoji descriptors =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/custom_emoji_parser_probe.m \
+    Sources/Core/TGCustomEmojiParser.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/custom_emoji_parser_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/custom_emoji_parser_probe" Tests/Fixtures/custom_emoji_stickers.json
+
+echo "== Advanced chat folders =="
+"$CLANG" \
+    "${COMPILE_FLAGS[@]}" \
+    Tests/chat_folder_support_probe.m \
+    Sources/Core/TGChatFolderSupport.m \
+    -framework Foundation \
+    -o "$BUILD_DIR/chat_folder_support_probe"
+
+HOME="$TEST_HOME" "$BUILD_DIR/chat_folder_support_probe" Tests/Fixtures/chat_folder_advanced.json
+
+echo "== Core logic probe =="
+
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
     Tests/core_logic_probe.m \
     Sources/Core/TGMessageItem.m \
     Sources/Core/TGMessagePollSupport.m \
     Sources/Core/TGOutgoingMessageTextChunker.m \
+    Sources/Core/TGCustomEmojiParser.m \
     Sources/Media/TGMediaItemSupport.m \
     Sources/Media/TGOpusVoiceTranscoder.m \
     Sources/Services/TGLogger.m \

@@ -2,6 +2,7 @@
 
 #import "../Core/TGChatItem.h"
 #import "../Core/TGTDLibClient+ChatFolders.h"
+#import "TGChatFolderSharingWindowController.h"
 #import "TGIconAssets.h"
 #import "TGLocalization.h"
 #import "TGMessageLayoutSupport.h"
@@ -127,6 +128,7 @@ static NSString * const TGChatFolderDragPasteboardType = @"com.telegraphica.chat
 @property (nonatomic, retain) NSButton *excludeMutedButton;
 @property (nonatomic, retain) NSButton *excludeReadButton;
 @property (nonatomic, retain) NSButton *excludeArchivedButton;
+@property (nonatomic, retain) TGChatFolderSharingWindowController *sharingWindowController;
 @property (nonatomic, copy) NSArray *folderDefinitions;
 @property (nonatomic, copy) NSArray *chatItems;
 @property (nonatomic, copy) NSArray *filteredChatItems;
@@ -160,6 +162,7 @@ static NSString * const TGChatFolderDragPasteboardType = @"com.telegraphica.chat
 @synthesize excludeMutedButton = _excludeMutedButton;
 @synthesize excludeReadButton = _excludeReadButton;
 @synthesize excludeArchivedButton = _excludeArchivedButton;
+@synthesize sharingWindowController = _sharingWindowController;
 @synthesize folderDefinitions = _folderDefinitions;
 @synthesize chatItems = _chatItems;
 @synthesize filteredChatItems = _filteredChatItems;
@@ -212,6 +215,7 @@ static NSString * const TGChatFolderDragPasteboardType = @"com.telegraphica.chat
     [_excludeMutedButton release];
     [_excludeReadButton release];
     [_excludeArchivedButton release];
+    [_sharingWindowController release];
     [_folderDefinitions release];
     [_chatItems release];
     [_filteredChatItems release];
@@ -1032,37 +1036,14 @@ writeRowsWithIndexes:(NSIndexSet *)rowIndexes
         NSBeep();
         return;
     }
-    self.loading = YES;
-    [self.statusField setStringValue:TGLoc(@"folders.sharing")];
-    TGTDLibClient *client = [self.client retain];
-    NSNumber *folderID = [[self.editingDefinition objectForKey:@"id"] retain];
-    NSString *title = [[self.editingDefinition objectForKey:@"title"] retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *error = nil;
-        NSString *link = [[client shareLinkForChatFolderID:folderID title:title timeout:5.0 error:&error] retain];
-        NSError *resultError = [error retain];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.client == client) {
-                self.loading = NO;
-                if ([link length] > 0) {
-                    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-                    [pasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
-                    [pasteboard setString:link forType:NSStringPboardType];
-                    [self.statusField setStringValue:TGLoc(@"folders.share.copied")];
-                } else {
-                    [self.statusField setStringValue:(resultError ? [resultError localizedDescription] : TGLoc(@"folders.error.share"))];
-                    NSBeep();
-                }
-            }
-            [link release];
-            [resultError release];
-            [folderID release];
-            [title release];
-            [client release];
-        });
-        [pool drain];
-    });
+    if (!self.sharingWindowController) {
+        self.sharingWindowController = [[[TGChatFolderSharingWindowController alloc] initWithClient:self.client] autorelease];
+    }
+    [self.sharingWindowController configureWithFolderDefinition:self.editingDefinition];
+    [self.sharingWindowController showWindow:nil];
+    [[self.sharingWindowController window] center];
+    [[self.sharingWindowController window] makeKeyAndOrderFront:nil];
+    [self.sharingWindowController reloadData];
 }
 
 @end

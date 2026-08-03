@@ -1264,6 +1264,9 @@
                 self.profileLastName = ([lastName length] > 0) ? lastName : nil;
                 self.profileUsername = ([username length] > 0) ? username : nil;
                 self.profilePhoneNumber = ([phoneNumber length] > 0) ? phoneNumber : nil;
+                id avatarFileID = [profile objectForKey:@"avatar_file_id"];
+                self.profileAvatarFileID = [avatarFileID respondsToSelector:@selector(longLongValue)]
+                    ? [NSNumber numberWithLongLong:[avatarFileID longLongValue]] : nil;
                 self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
                 self.profileBio = ([bio length] > 0) ? bio : nil;
                 [self refreshProfileDisplay];
@@ -1783,6 +1786,12 @@
         return;
     }
 
+    if (([self.currentAuthState isEqualToString:@"waitCode"] ||
+         [self.currentAuthState isEqualToString:@"waitEmailCode"]) &&
+        self.authCodeResendAvailableAt) {
+        [self refreshAuthenticationSecondaryAction];
+    }
+
     NSArray *updates = [self.client drainSafeUpdateSummaries];
     if ([updates count] == 0) {
         return;
@@ -1814,6 +1823,19 @@
 
         if ([kind isEqualToString:@"file_update"] && [[summary objectForKey:@"completed"] boolValue]) {
             NSNumber *fileID = [summary objectForKey:@"file_id"];
+            BOOL completedProfileAvatar = ([self.profileAvatarLocalPath length] == 0 &&
+                                           [fileID respondsToSelector:@selector(longLongValue)] &&
+                                           [self.profileAvatarFileID respondsToSelector:@selector(longLongValue)] &&
+                                           [fileID longLongValue] == [self.profileAvatarFileID longLongValue]);
+            if (completedProfileAvatar) {
+                self.profileSummaryLoaded = NO;
+                [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                                         selector:@selector(reloadProfileSummaryIfReady)
+                                                           object:nil];
+                [self performSelector:@selector(reloadProfileSummaryIfReady)
+                           withObject:nil
+                           afterDelay:0.1];
+            }
             NSUInteger messageIndex = 0;
             for (messageIndex = 0; messageIndex < [self.messageItems count]; messageIndex++) {
                 TGMessageItem *messageItem = [self.messageItems objectAtIndex:messageIndex];
@@ -1953,7 +1975,9 @@
         NSString *postLoginProbeSummary = nil;
         NSString *proxySummary = nil;
         NSString *networkDiagnosticsSummary = nil;
+        NSString *capabilitiesSummary = nil;
         if (probeSummary) {
+            capabilitiesSummary = [client tdlibCapabilitiesSummary];
             proxySummary = [client configureNetworkProxyIfNeededWithTimeout:5.0 error:NULL];
             authorizationState = [client authorizationStateSummaryWithTimeout:2.0 error:&authorizationError];
             if ([authorizationState isEqualToString:@"closed"]) {
@@ -2040,6 +2064,9 @@
         if (networkDiagnosticsSummary) {
             [uiState setObject:networkDiagnosticsSummary forKey:@"networkDiagnosticsSummary"];
         }
+        if (capabilitiesSummary) {
+            [uiState setObject:capabilitiesSummary forKey:@"capabilitiesSummary"];
+        }
         NSString *loadedPath = [client loadedLibraryPath];
         if (loadedPath) {
             [uiState setObject:loadedPath forKey:@"loadedPath"];
@@ -2059,6 +2086,7 @@
             NSString *postLoginProbeSummaryForUI = [uiState objectForKey:@"postLoginProbeSummary"];
             NSString *proxySummaryForUI = [uiState objectForKey:@"proxySummary"];
             NSString *networkDiagnosticsSummaryForUI = [uiState objectForKey:@"networkDiagnosticsSummary"];
+            NSString *capabilitiesSummaryForUI = [uiState objectForKey:@"capabilitiesSummary"];
             NSString *loadedPathForUI = [uiState objectForKey:@"loadedPath"];
             NSString *receiverSummaryForUI = [uiState objectForKey:@"receiverSummary"];
             if (self.client != client) {
@@ -2068,6 +2096,9 @@
                 [self.statusField setStringValue:[finalAuthorizationStateForUI isEqualToString:@"ready"] ? @"Connected" : @"Login required"];
                 [self appendDetail:[NSString stringWithFormat:@"Loaded: %@", loadedPathForUI ? loadedPathForUI : @"unknown path"]];
                 [self appendDetail:[NSString stringWithFormat:@"TDLib probe: %@", probeSummaryForUI]];
+                if (capabilitiesSummaryForUI) {
+                    [self appendDetail:[NSString stringWithFormat:@"TDLib capabilities: %@", capabilitiesSummaryForUI]];
+                }
                 if (receiverSummaryForUI) {
                     [self appendDetail:[NSString stringWithFormat:@"TDLib receiver: %@", receiverSummaryForUI]];
                 }
@@ -2150,15 +2181,15 @@
         return;
     }
 
-    NSTextField *inputField = [state isEqualToString:@"waitPassword"] ? (NSTextField *)self.authSecureField : self.authTextField;
+    BOOL passwordRecoverySubmission = ([state isEqualToString:@"waitPassword"] && self.authPasswordRecoveryMode);
+    NSTextField *inputField = ([state isEqualToString:@"waitPassword"] && !passwordRecoverySubmission)
+        ? (NSTextField *)self.authSecureField : self.authTextField;
     NSString *input = [[inputField stringValue] copy];
     if ([input length] == 0) {
-        NSString *emptyErrorKey = @"login.empty.password";
-        if ([state isEqualToString:@"waitPhoneNumber"]) {
-            emptyErrorKey = @"login.empty.phone";
-        } else if ([state isEqualToString:@"waitCode"]) {
-            emptyErrorKey = @"login.empty.code";
-        }
+        NSDictionary *descriptor = [TGAuthorizationFlow descriptorForState:state];
+        NSString *emptyErrorKey = passwordRecoverySubmission
+            ? @"login.empty.recovery"
+            : [descriptor objectForKey:TGAuthorizationFlowEmptyErrorLocalizationKey];
         [self setLoginErrorWithLocalizationKey:emptyErrorKey];
         [self updateVisibleSection];
         [input release];
@@ -2173,10 +2204,19 @@
     [self setControlsBusy:YES];
     [self.authButton setTitle:TGLoc(@"login.sending")];
     [self.statusField setStringValue:@"Signing in..."];
+    [inputField setStringValue:@""];
     if ([state isEqualToString:@"waitPhoneNumber"]) {
         [self appendDetail:@"Submitting phone number to TDLib..."];
     } else if ([state isEqualToString:@"waitCode"]) {
         [self appendDetail:@"Submitting authentication code to TDLib..."];
+    } else if ([state isEqualToString:@"waitEmailAddress"]) {
+        [self appendDetail:@"Submitting authentication email address to TDLib..."];
+    } else if ([state isEqualToString:@"waitEmailCode"]) {
+        [self appendDetail:@"Submitting authentication email code to TDLib..."];
+    } else if ([state isEqualToString:@"waitRegistration"]) {
+        [self appendDetail:@"Submitting account registration details to TDLib..."];
+    } else if (passwordRecoverySubmission) {
+        [self appendDetail:@"Submitting password recovery code to TDLib..."];
     } else {
         [self appendDetail:@"Submitting authentication password to TDLib..."];
     }
@@ -2195,6 +2235,14 @@
             authSummary = [client submitAuthenticationPhoneNumber:input timeout:30.0 error:&authError];
         } else if ([state isEqualToString:@"waitCode"]) {
             authSummary = [client submitAuthenticationCode:input timeout:15.0 error:&authError];
+        } else if ([state isEqualToString:@"waitEmailAddress"]) {
+            authSummary = [client submitAuthenticationEmailAddress:input timeout:15.0 error:&authError];
+        } else if ([state isEqualToString:@"waitEmailCode"]) {
+            authSummary = [client submitAuthenticationEmailCode:input timeout:15.0 error:&authError];
+        } else if ([state isEqualToString:@"waitRegistration"]) {
+            authSummary = [client submitRegistrationName:input timeout:15.0 error:&authError];
+        } else if (passwordRecoverySubmission) {
+            authSummary = [client recoverAuthenticationPasswordWithCode:input timeout:15.0 error:&authError];
         } else if ([state isEqualToString:@"waitPassword"]) {
             authSummary = [client submitAuthenticationPassword:input timeout:15.0 error:&authError];
         }
@@ -2263,6 +2311,9 @@
             BOOL authNetworkTimeoutForUI = [[uiState objectForKey:@"authNetworkTimeout"] boolValue];
 
             self.authSubmissionInFlight = NO;
+            if (authSummaryForUI && passwordRecoverySubmission) {
+                self.authPasswordRecoveryMode = NO;
+            }
             if (!authSummaryForUI && [stateForUI isEqualToString:@"waitCode"]) {
                 [self.authTextField setStringValue:@""];
             } else if (!authSummaryForUI && [stateForUI isEqualToString:@"waitPassword"]) {

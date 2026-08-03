@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 
 @class TGMessageItem;
+@class TGTDLibCapabilities;
 
 extern NSString * const TGTDLibChatFiltersDidChangeNotification;
 extern NSString * const TGTDLibCallDidUpdateNotification;
@@ -56,8 +57,6 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID fromMessageID:(NSNumber *)fromMessageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind fromMessageID:(NSNumber *)fromMessageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)messagePreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind aroundMessageID:(NSNumber *)messageID newerMessageCount:(NSUInteger)newerMessageCount limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (NSArray *)searchMessagePreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind query:(NSString *)query filter:(NSString *)filter fromMessageID:(NSNumber *)fromMessageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (NSArray *)globalSearchMessagePreviewItemsWithQuery:(NSString *)query filter:(NSString *)filter offset:(NSString **)offset limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (TGMessageItem *)messagePreviewItemForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (TGMessageItem *)messagePreviewItemForChatID:(NSNumber *)chatID unixDate:(NSInteger)unixDate timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSArray *)messageContextPreviewItemsForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind centerMessageID:(NSNumber *)messageID limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
@@ -105,14 +104,12 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSString *)sendVoiceMessageToChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind localPath:(NSString *)localPath duration:(NSNumber *)duration caption:(NSString *)caption timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)addReactionToChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)removeReactionFromChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID emoji:(NSString *)emoji timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)availableReactionCatalogForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID rowSize:(NSUInteger)rowSize timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)addedReactionUsersForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID offset:(NSString *)offset limit:(NSUInteger)limit timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)messageActionCapabilitiesForChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)editTextMessageInChatID:(NSNumber *)chatID messageID:(NSNumber *)messageID text:(NSString *)text originalText:(NSString *)originalText originalEntities:(NSArray *)originalEntities timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)deleteMessagesInChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs revoke:(BOOL)revoke timeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (NSString *)downloadedLocalPathForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (BOOL)cancelDownloadForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (BOOL)deleteCachedFileForFileID:(NSNumber *)fileID timeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (NSDictionary *)storageUsageSummaryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
-- (NSDictionary *)clearDownloadedMediaCacheWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)logOutWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)cancelPendingQRCodeAuthenticationWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)submitAuthenticationPhoneNumber:(NSString *)phoneNumber timeout:(NSTimeInterval)timeout error:(NSError **)error;
@@ -120,9 +117,18 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSString *)currentAuthenticationQRCodeLink;
 - (NSString *)submitAuthenticationCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)submitAuthenticationPassword:(NSString *)password timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)submitAuthenticationEmailAddress:(NSString *)emailAddress timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)submitAuthenticationEmailCode:(NSString *)code timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)submitRegistrationName:(NSString *)combinedName timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)resendAuthenticationCodeWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)requestAuthenticationPasswordRecoveryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSString *)recoverAuthenticationPasswordWithCode:(NSString *)recoveryCode timeout:(NSTimeInterval)timeout error:(NSError **)error;
+- (NSDictionary *)currentAuthorizationSafeDetails;
 - (NSArray *)drainSafeUpdateSummaries;
 - (NSString *)receiverStatusSummary;
 - (NSString *)loadedLibraryPath;
+- (TGTDLibCapabilities *)capabilities;
+- (NSString *)tdlibCapabilitiesSummary;
 - (BOOL)isAuthorizationNetworkTimeoutError:(NSError *)error;
 - (void)shutdownWithTimeout:(NSTimeInterval)timeout;
 

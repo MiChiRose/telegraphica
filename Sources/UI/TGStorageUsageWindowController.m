@@ -1,8 +1,13 @@
 #import "TGStorageUsageWindowController.h"
+#import "TGUtilityWindowLifetime.h"
 
 #import "../Core/TGTDLibClient.h"
+#import "../Core/TGTDLibClient+Storage.h"
+#import "../Core/TGTDLibOperation.h"
+#import "../Media/TGCustomEmojiImageLoader.h"
 #import "../Media/TGMediaImageLoader.h"
 #import "../Services/TGLogger.h"
+#import "../Services/TGStorageCleanupPolicy.h"
 #import "TGIconAssets.h"
 #import "TGIconDrawing.h"
 #import "TGLocalization.h"
@@ -276,7 +281,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
 @end
 
-@interface TGStorageUsageWindowController ()
+@interface TGStorageUsageWindowController () <NSWindowDelegate>
 
 @property (nonatomic, retain) TGTDLibClient *client;
 @property (nonatomic, retain) NSTextField *titleField;
@@ -287,6 +292,14 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @property (nonatomic, retain) NSButton *clearButton;
 @property (nonatomic, retain) NSButton *refreshButton;
 @property (nonatomic, retain) TGTransparentSpinnerView *progressIndicator;
+@property (nonatomic, retain) NSPopUpButton *typePopUpButton;
+@property (nonatomic, retain) NSPopUpButton *scopePopUpButton;
+@property (nonatomic, retain) NSNumber *selectedChatID;
+@property (nonatomic, copy) NSString *selectedChatTitle;
+@property (nonatomic, retain) TGUtilityWindowLifetime *requestLifetime;
+@property (nonatomic, retain) TGTDLibOperation *refreshOperation;
+
+- (void)rebuildScopePopUpButton;
 
 @end
 
@@ -301,6 +314,12 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 @synthesize clearButton = _clearButton;
 @synthesize refreshButton = _refreshButton;
 @synthesize progressIndicator = _progressIndicator;
+@synthesize typePopUpButton = _typePopUpButton;
+@synthesize scopePopUpButton = _scopePopUpButton;
+@synthesize selectedChatID = _selectedChatID;
+@synthesize selectedChatTitle = _selectedChatTitle;
+@synthesize requestLifetime = _requestLifetime;
+@synthesize refreshOperation = _refreshOperation;
 
 + (NSString *)displayStringForBytes:(long long)bytes {
     double value = (double)bytes;
@@ -363,11 +382,13 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 }
 
 - (void)buildWindow {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 640, 560)
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 640, 650)
                                                    styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                                      backing:NSBackingStoreBuffered
                                                        defer:NO] autorelease];
     [window setTitle:TGLoc(@"storage.title")];
+    [window setReleasedWhenClosed:NO];
+    [window setDelegate:self];
     [window center];
     [self setWindow:window];
 
@@ -375,17 +396,17 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [window setContentView:contentView];
 
-    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(18, 54, 604, 440)] autorelease];
+    TGUtilityPanelView *panelView = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(18, 54, 604, 530)] autorelease];
     [contentView addSubview:panelView];
 
-    self.titleField = [self labelWithFrame:NSMakeRect(34, 506, 572, 30)
+    self.titleField = [self labelWithFrame:NSMakeRect(34, 596, 572, 30)
                                       font:[NSFont boldSystemFontOfSize:20.0]];
     [self.titleField setStringValue:TGLoc(@"storage.title")];
     [self.titleField setAlignment:NSCenterTextAlignment];
     [self.titleField setTextColor:TGClassicHeaderTextColor(1.0)];
     [contentView addSubview:self.titleField];
 
-    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(28, 500, 34, 32)] autorelease];
+    self.refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(28, 590, 34, 32)] autorelease];
     [self.refreshButton setTitle:@""];
     [self.refreshButton setToolTip:TGLoc(@"storage.refresh")];
     [self styleRefreshButton:self.refreshButton];
@@ -393,17 +414,17 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [self.refreshButton setAction:@selector(refreshStorageUsage:)];
     [contentView addSubview:self.refreshButton];
 
-    self.chartView = [[[TGStoragePieChartView alloc] initWithFrame:NSMakeRect(220, 292, 200, 200)] autorelease];
+    self.chartView = [[[TGStoragePieChartView alloc] initWithFrame:NSMakeRect(220, 382, 200, 200)] autorelease];
     [self.chartView setCenterText:@"—"];
     [contentView addSubview:self.chartView];
 
-    self.subtitleField = [self labelWithFrame:NSMakeRect(54, 260, 532, 26)
+    self.subtitleField = [self labelWithFrame:NSMakeRect(54, 350, 532, 26)
                                          font:[NSFont boldSystemFontOfSize:18.0]];
     [self.subtitleField setStringValue:TGLoc(@"storage.loading")];
     [self.subtitleField setAlignment:NSCenterTextAlignment];
     [contentView addSubview:self.subtitleField];
 
-    TGStorageCardView *cardView = [[[TGStorageCardView alloc] initWithFrame:NSMakeRect(54, 112, 532, 142)] autorelease];
+    TGStorageCardView *cardView = [[[TGStorageCardView alloc] initWithFrame:NSMakeRect(54, 202, 532, 142)] autorelease];
     [contentView addSubview:cardView];
 
     NSArray *colors = [[self class] storageColors];
@@ -424,8 +445,40 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     }
     self.categoryRows = rows;
 
+    TGStorageCardView *filterCard = [[[TGStorageCardView alloc] initWithFrame:NSMakeRect(54, 112, 532, 76)] autorelease];
+    [contentView addSubview:filterCard];
+
+    NSTextField *typeLabel = [self labelWithFrame:NSMakeRect(18, 10, 102, 22)
+                                             font:[NSFont systemFontOfSize:12.0]];
+    [typeLabel setStringValue:TGLoc(@"storage.type")];
+    [typeLabel setTextColor:TGClassicMutedInkColor()];
+    [filterCard addSubview:typeLabel];
+    self.typePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(118, 7, 396, 28) pullsDown:NO] autorelease];
+    NSArray *typeRows = [NSArray arrayWithObjects:
+                         [NSArray arrayWithObjects:TGLoc(@"storage.type.all"), TGStorageCleanupSelectionAll, nil],
+                         [NSArray arrayWithObjects:TGLoc(@"storage.type.photos"), TGStorageCleanupSelectionPhotos, nil],
+                         [NSArray arrayWithObjects:TGLoc(@"storage.type.videos"), TGStorageCleanupSelectionVideos, nil],
+                         [NSArray arrayWithObjects:TGLoc(@"storage.type.documents"), TGStorageCleanupSelectionDocuments, nil],
+                         [NSArray arrayWithObjects:TGLoc(@"storage.type.voice"), TGStorageCleanupSelectionVoice, nil],
+                         [NSArray arrayWithObjects:TGLoc(@"storage.type.audio"), TGStorageCleanupSelectionAudio, nil],
+                         nil];
+    for (NSArray *row in typeRows) {
+        [self.typePopUpButton addItemWithTitle:[row objectAtIndex:0]];
+        [[self.typePopUpButton lastItem] setRepresentedObject:[row objectAtIndex:1]];
+    }
+    [filterCard addSubview:self.typePopUpButton];
+
+    NSTextField *scopeLabel = [self labelWithFrame:NSMakeRect(18, 42, 102, 22)
+                                              font:[NSFont systemFontOfSize:12.0]];
+    [scopeLabel setStringValue:TGLoc(@"storage.scope")];
+    [scopeLabel setTextColor:TGClassicMutedInkColor()];
+    [filterCard addSubview:scopeLabel];
+    self.scopePopUpButton = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(118, 39, 396, 28) pullsDown:NO] autorelease];
+    [filterCard addSubview:self.scopePopUpButton];
+    [self rebuildScopePopUpButton];
+
     self.clearButton = [[[NSButton alloc] initWithFrame:NSMakeRect(54, 62, 532, 36)] autorelease];
-    [self.clearButton setTitle:TGLoc(@"storage.clear")];
+    [self.clearButton setTitle:TGLoc(@"storage.clearSelected")];
     [self stylePrimaryButton:self.clearButton];
     [self.clearButton setTarget:self];
     [self.clearButton setAction:@selector(clearStorageCache:)];
@@ -439,7 +492,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [self.hintField setStringValue:TGLoc(@"storage.safeHint")];
     [contentView addSubview:self.hintField];
 
-    self.progressIndicator = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(308, 384, 24, 24)] autorelease];
+    self.progressIndicator = [[[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(308, 474, 24, 24)] autorelease];
     [self.progressIndicator setDisplayedWhenStopped:NO];
     [contentView addSubview:self.progressIndicator];
 }
@@ -448,12 +501,16 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     self = [super initWithWindow:nil];
     if (self) {
         _client = [client retain];
+        _requestLifetime = [[TGUtilityWindowLifetime alloc] init];
         [self buildWindow];
     }
     return self;
 }
 
 - (void)dealloc {
+    [[self window] setDelegate:nil];
+    [_requestLifetime invalidate];
+    [_refreshOperation cancel];
     [_client release];
     [_titleField release];
     [_subtitleField release];
@@ -463,16 +520,44 @@ static NSColor *TGStorageRowSeparatorColor(void) {
     [_clearButton release];
     [_refreshButton release];
     [_progressIndicator release];
+    [_typePopUpButton release];
+    [_scopePopUpButton release];
+    [_selectedChatID release];
+    [_selectedChatTitle release];
+    [_requestLifetime release];
+    [_refreshOperation release];
     [super dealloc];
 }
 
 - (void)setBusy:(BOOL)busy {
     [self.clearButton setEnabled:!busy];
     [self.refreshButton setEnabled:!busy];
+    [self.typePopUpButton setEnabled:!busy];
+    [self.scopePopUpButton setEnabled:!busy];
     if (busy) {
         [self.progressIndicator startAnimation:nil];
     } else {
         [self.progressIndicator stopAnimation:nil];
+    }
+}
+
+- (void)rebuildScopePopUpButton {
+    NSInteger previousIndex = [self.scopePopUpButton indexOfSelectedItem];
+    [self.scopePopUpButton removeAllItems];
+    [self.scopePopUpButton addItemWithTitle:TGLoc(@"storage.scope.all")];
+    [[self.scopePopUpButton lastItem] setRepresentedObject:[NSNumber numberWithBool:NO]];
+    NSString *chatTitle = [self.selectedChatTitle length] > 0 ? self.selectedChatTitle : TGLoc(@"storage.scope.current");
+    [self.scopePopUpButton addItemWithTitle:[NSString stringWithFormat:TGLoc(@"storage.scope.chat"), chatTitle]];
+    [[self.scopePopUpButton lastItem] setRepresentedObject:[NSNumber numberWithBool:YES]];
+    [[self.scopePopUpButton lastItem] setEnabled:(self.selectedChatID != nil)];
+    [self.scopePopUpButton selectItemAtIndex:(self.selectedChatID && previousIndex == 1 ? 1 : 0)];
+}
+
+- (void)setSelectedChatID:(NSNumber *)chatID title:(NSString *)title {
+    self.selectedChatID = ([chatID respondsToSelector:@selector(longLongValue)] && [chatID longLongValue] != 0LL) ? chatID : nil;
+    self.selectedChatTitle = title;
+    if (self.scopePopUpButton) {
+        [self rebuildScopePopUpButton];
     }
 }
 
@@ -523,6 +608,7 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 }
 
 - (void)showWindow:(id)sender {
+    [self.requestLifetime beginPresentation];
     [super showWindow:sender];
     [[self window] makeKeyAndOrderFront:sender];
     [self refreshStorageUsage:sender];
@@ -530,43 +616,57 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
 - (void)refreshStorageUsage:(id)sender {
     (void)sender;
+    [self.refreshOperation cancel];
+    self.refreshOperation = nil;
+    NSUInteger generation = [self.requestLifetime beginOperation];
+    if (![self.requestLifetime isCurrentGeneration:generation]) {
+        return;
+    }
     [self setBusy:YES];
     [self.subtitleField setStringValue:TGLoc(@"storage.loading")];
     [self.chartView setCenterText:@"—"];
     [self.chartView setSegments:nil];
     [self.chartView setNeedsDisplay:YES];
 
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *error = nil;
-        NSDictionary *summary = [[client storageUsageSummaryWithTimeout:8.0 error:&error] retain];
-        NSString *errorText = [[error localizedDescription] copy];
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self setBusy:NO];
-            if (summary) {
-                [self applyStorageSummary:summary];
-            } else {
-                [self.subtitleField setStringValue:TGLoc(@"storage.unavailable")];
-                [self.chartView setCenterText:@"—"];
-                [self.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
-                [self.chartView setNeedsDisplay:YES];
-            }
-            [summary release];
-            [errorText release];
-            [client release];
-        });
-        [pool drain];
-    });
+    TGStorageUsageWindowController *owner = self;
+    TGTDLibClient *client = self.client;
+    TGTDLibOperation *operation = [[[TGTDLibOperation alloc]
+        initWithGeneration:generation
+                   timeout:9.0
+                idempotent:YES
+         maximumRetryCount:0U
+                      work:^id(NSError **error) {
+                          return [client storageUsageSummaryWithTimeout:8.0 error:error];
+                      }
+           generationCheck:^BOOL(NSUInteger candidateGeneration) {
+                          return [owner.requestLifetime isCurrentGeneration:candidateGeneration];
+                      }
+                completion:^(id result, NSError *error) {
+                          owner.refreshOperation = nil;
+                          [owner setBusy:NO];
+                          NSDictionary *summary = [result isKindOfClass:[NSDictionary class]] ? result : nil;
+                          if (summary) {
+                              [owner applyStorageSummary:summary];
+                          } else {
+                              [owner.subtitleField setStringValue:TGLoc(@"storage.unavailable")];
+                              [owner.chartView setCenterText:@"—"];
+                              NSString *errorText = [error localizedDescription];
+                              [owner.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
+                              [owner.chartView setNeedsDisplay:YES];
+                          }
+                      }] autorelease];
+    self.refreshOperation = operation;
+    [operation start];
 }
 
 - (void)clearStorageCache:(id)sender {
     (void)sender;
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
     [alert setMessageText:TGLoc(@"storage.confirm.title")];
-    [alert setInformativeText:TGLoc(@"storage.confirm.message")];
-    [alert addButtonWithTitle:TGLoc(@"storage.clear")];
+    NSString *typeTitle = [[self.typePopUpButton selectedItem] title];
+    NSString *scopeTitle = [[self.scopePopUpButton selectedItem] title];
+    [alert setInformativeText:[NSString stringWithFormat:TGLoc(@"storage.confirm.filteredMessage"), typeTitle, scopeTitle]];
+    [alert addButtonWithTitle:TGLoc(@"storage.clearSelected")];
     [alert addButtonWithTitle:TGLoc(@"cancel")];
     NSInteger result = [alert runModal];
     if (result != NSAlertFirstButtonReturn) {
@@ -575,14 +675,28 @@ static NSColor *TGStorageRowSeparatorColor(void) {
 
     [self setBusy:YES];
     [self.subtitleField setStringValue:TGLoc(@"storage.clearing")];
+    NSUInteger generation = [self.requestLifetime beginOperation];
 
+    NSString *typeSelection = [[[[self.typePopUpButton selectedItem] representedObject] description] copy];
+    id scopeValue = [[self.scopePopUpButton selectedItem] representedObject];
+    BOOL currentChatOnly = [scopeValue respondsToSelector:@selector(boolValue)] && [scopeValue boolValue];
+    NSArray *fileTypes = [TGStorageCleanupFileTypeObjectsForSelection(typeSelection) retain];
+    NSArray *chatIDs = [(currentChatOnly && self.selectedChatID)
+                        ? [NSArray arrayWithObject:self.selectedChatID]
+                        : [NSArray array] retain];
+
+    TGStorageUsageWindowController *owner = self;
     TGTDLibClient *client = [self.client retain];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         NSError *error = nil;
-        NSDictionary *summary = [[client clearDownloadedMediaCacheWithTimeout:15.0 error:&error] retain];
+        NSDictionary *summary = [[client clearDownloadedMediaCacheForFileTypes:fileTypes
+                                                                        chatIDs:chatIDs
+                                                                        timeout:15.0
+                                                                          error:&error] retain];
         NSString *errorText = [[error localizedDescription] copy];
         if (summary) {
+            TGCustomEmojiImageLoaderClearCache();
             TGMediaImageLoaderClearCache();
             [[TGLogger sharedLogger] log:@"Storage cache cleanup completed."];
         } else {
@@ -590,20 +704,35 @@ static NSColor *TGStorageRowSeparatorColor(void) {
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self setBusy:NO];
-            if (summary) {
-                [self applyStorageSummary:summary];
-                [self.hintField setStringValue:TGLoc(@"storage.clearDone")];
-            } else {
-                [self.subtitleField setStringValue:TGLoc(@"storage.clearFailed")];
-                [self.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
+            if ([owner.requestLifetime isCurrentGeneration:generation]) {
+                [owner setBusy:NO];
+                if (summary) {
+                    [owner applyStorageSummary:summary];
+                    [owner.hintField setStringValue:TGLoc(@"storage.clearDone")];
+                } else {
+                    [owner.subtitleField setStringValue:TGLoc(@"storage.clearFailed")];
+                    [owner.hintField setStringValue:([errorText length] > 0 ? errorText : TGLoc(@"settings.sessions.unknownError"))];
+                }
             }
             [summary release];
             [errorText release];
             [client release];
+            [fileTypes release];
+            [chatIDs release];
+            [typeSelection release];
         });
         [pool drain];
     });
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    if ([notification object] != [self window]) {
+        return;
+    }
+    [self.requestLifetime invalidate];
+    [self.refreshOperation cancel];
+    self.refreshOperation = nil;
+    [self.progressIndicator stopAnimation:nil];
 }
 
 @end

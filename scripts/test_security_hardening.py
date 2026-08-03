@@ -76,14 +76,20 @@ def main():
     require_before(errors, "Sources/Media/TGWebPDecoder.m",
                    "TGMediaDimensionsFitDecodedBudget", "WebPDecodeRGBA")
 
-    require(errors, "Sources/Media/TGInlineMediaPlaybackCoordinator.m", [
+    require(errors, "Sources/Media/TGAnimatedImageLoader.m", [
         "CGImageSourceGetCount",
         "TGMediaMaximumAnimatedFrameCount",
         "TGMediaDimensionsFitDecodedBudget",
+        "TGAnimatedImageDecodeQueue",
+        "[token isCancelled]",
+    ])
+    require_before(errors, "Sources/Media/TGAnimatedImageLoader.m",
+                   "TGAnimatedImageInspectBudget", "initWithContentsOfFile:pathCopy")
+    require(errors, "Sources/Media/TGInlineMediaPlaybackCoordinator.m", [
+        "TGLoadAnimatedImageFromFileAsync",
+        "[self.animatedImageLoadToken cancel]",
         "[view invalidate]",
     ])
-    require_before(errors, "Sources/Media/TGInlineMediaPlaybackCoordinator.m",
-                   "TGInlineMediaGIFIsWithinBudget", "initWithContentsOfFile:mediaPath")
 
     require(errors, "Sources/Media/TGWebMAnimationView.mm", [
         "TGMediaMaximumCompressedWebMFrameBytes",

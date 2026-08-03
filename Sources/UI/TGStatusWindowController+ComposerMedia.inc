@@ -1188,6 +1188,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     self.stickerPickerPlaybackCoordinator = nil;
     self.stickerPickerSetCache = [NSMutableDictionary dictionary];
     self.stickerPickerRailPreviewState = [NSMutableDictionary dictionary];
+    self.stickerPickerGridThumbnailPrefetcher = [[[TGMessageThumbnailPrefetcher alloc] init] autorelease];
+    self.stickerPickerRailThumbnailPrefetcher = [[[TGMessageThumbnailPrefetcher alloc] init] autorelease];
     self.stickerPickerMode = 0;
     self.stickerPickerWindow = window;
 }
@@ -1237,20 +1239,10 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     }
     NSString *localPath = TGMediaItemLocalPath(item);
     if ([localPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:localPath]) {
-        NSImage *image = TGImageWithCorrectOrientationFromFile(localPath);
-        if (!image) {
-            image = [[[NSImage alloc] initWithContentsOfFile:localPath] autorelease];
-        }
-        if (image) {
-            return YES;
-        }
+        return YES;
     }
     NSData *miniThumbnailData = TGMediaItemMiniThumbnailData(item);
-    if ([miniThumbnailData length] > 0) {
-        NSImage *image = [[[NSImage alloc] initWithData:miniThumbnailData] autorelease];
-        return (image != nil);
-    }
-    return NO;
+    return ([miniThumbnailData length] > 0);
 }
 
 - (NSDictionary *)stickerPickerRenderableRailItemFromItem:(NSDictionary *)item client:(TGTDLibClient *)client {
@@ -1490,6 +1482,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
     NSArray *oldSubviews = [[setView subviews] copy];
+    [self.stickerPickerRailThumbnailPrefetcher cancelAll];
     NSUInteger removeIndex = 0;
     for (removeIndex = 0; removeIndex < [oldSubviews count]; removeIndex++) {
         [[oldSubviews objectAtIndex:removeIndex] removeFromSuperview];
@@ -1554,6 +1547,30 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
             [button setToolTip:tooltip];
         }
         [setView addSubview:button];
+        NSString *thumbnailPath = TGMediaItemLocalPath(buttonItem);
+        if ([thumbnailPath length] > 0 && ![button image]) {
+            NSUInteger generation = self.stickerPickerLoadGeneration;
+            NSInteger expectedTag = [button tag];
+            __block TGStatusWindowController *blockSelf = self;
+            NSButton *targetButton = button;
+            NSView *targetSetView = setView;
+            [self.stickerPickerRailThumbnailPrefetcher prefetchPath:thumbnailPath
+                                                  maximumPixelSize:192
+                                                        completion:^{
+                if (!blockSelf || generation != blockSelf.stickerPickerLoadGeneration ||
+                    [targetButton superview] != targetSetView ||
+                    [targetButton tag] != expectedTag) {
+                    return;
+                }
+                NSImage *image = TGMediaCachedThumbnailFromFile(thumbnailPath, 192);
+                if (image) {
+                    [targetButton setImage:image];
+                    [targetButton setImageScaling:NSImageScaleProportionallyUpOrDown];
+                    [targetButton setImagePosition:NSImageOnly];
+                    [targetButton setNeedsDisplay:YES];
+                }
+            }];
+        }
         if (TGStickerPickerItemNeedsLoadingIndicator(buttonItem)) {
             TGStickerPickerLoadingView *spinner = [[[TGStickerPickerLoadingView alloc] initWithFrame:NSMakeRect(NSMidX(buttonFrame) - 11.0,
                                                                                                                 NSMidY(buttonFrame) - 11.0,
@@ -1700,6 +1717,7 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         return;
     }
     NSArray *oldSubviews = [[gridView subviews] copy];
+    [self.stickerPickerGridThumbnailPrefetcher cancelAll];
     NSUInteger removeIndex = 0;
     for (removeIndex = 0; removeIndex < [oldSubviews count]; removeIndex++) {
         [[oldSubviews objectAtIndex:removeIndex] removeFromSuperview];
@@ -1751,6 +1769,30 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
                                                           self,
                                                           @selector(sendStickerFromPickerButton:));
         [gridView addSubview:button];
+        NSString *thumbnailPath = TGMediaItemLocalPath(item);
+        if ([thumbnailPath length] > 0 && ![button image]) {
+            NSUInteger generation = self.stickerPickerLoadGeneration;
+            NSInteger expectedTag = [button tag];
+            __block TGStatusWindowController *blockSelf = self;
+            NSButton *targetButton = button;
+            NSView *targetGridView = gridView;
+            [self.stickerPickerGridThumbnailPrefetcher prefetchPath:thumbnailPath
+                                                  maximumPixelSize:192
+                                                        completion:^{
+                if (!blockSelf || generation != blockSelf.stickerPickerLoadGeneration ||
+                    [targetButton superview] != targetGridView ||
+                    [targetButton tag] != expectedTag) {
+                    return;
+                }
+                NSImage *image = TGMediaCachedThumbnailFromFile(thumbnailPath, 192);
+                if (image) {
+                    [targetButton setImage:image];
+                    [targetButton setImageScaling:NSImageScaleProportionallyUpOrDown];
+                    [targetButton setImagePosition:NSImageOnly];
+                    [targetButton setNeedsDisplay:YES];
+                }
+            }];
+        }
     }
     [self refreshStickerPickerPlayback];
 }
@@ -1978,6 +2020,8 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     NSNumber *height = [[sticker objectForKey:@"height"] retain];
     [self.stickerPickerWindow orderOut:nil];
     [self.stickerPickerPlaybackCoordinator removeAllPlayback];
+    [self.stickerPickerGridThumbnailPrefetcher cancelAll];
+    [self.stickerPickerRailThumbnailPrefetcher cancelAll];
     [self scheduleInlineMediaPlaybackRefresh];
     [self setControlsBusy:YES];
     [self.statusField setStringValue:@"Sending sticker..."];
@@ -3082,6 +3126,17 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
         [formatMenu addItem:item];
     }
     [formatMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *quoteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format.quote")
+                                                          action:@selector(applyComposerBlockQuote:)
+                                                   keyEquivalent:@""] autorelease];
+    [quoteItem setTarget:self];
+    [formatMenu addItem:quoteItem];
+    NSMenuItem *expandableQuoteItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.format.expandableQuote")
+                                                                    action:@selector(applyComposerExpandableBlockQuote:)
+                                                             keyEquivalent:@""] autorelease];
+    [expandableQuoteItem setTarget:self];
+    [formatMenu addItem:expandableQuoteItem];
+    [formatMenu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *linkItem = [[[NSMenuItem alloc] initWithTitle:TGLoc(@"composer.link.add")
                                                        action:@selector(applyComposerLink:)
                                                 keyEquivalent:@""] autorelease];
@@ -3113,6 +3168,57 @@ static NSArray *TGAttachmentMediaAlbumItemsFromDescriptors(NSArray *descriptors)
     [selectAllItem setTarget:nil];
     [menu addItem:selectAllItem];
     return menu;
+}
+
+- (void)applyComposerQuoteExpandable:(BOOL)expandable {
+    NSTextView *textView = [self activeComposerTextView];
+    if (!textView) {
+        return;
+    }
+    NSString *currentText = [textView string];
+    NSRange selection = [textView selectedRange];
+    if (selection.length == 0 || NSMaxRange(selection) > [currentText length]) {
+        [self.statusField setStringValue:TGLoc(@"composer.format.select")];
+        return;
+    }
+    NSString *selectedText = [currentText substringWithRange:selection];
+    NSArray *lines = [selectedText componentsSeparatedByString:@"\n"];
+    NSMutableString *quoted = [NSMutableString string];
+    NSUInteger index = 0;
+    for (index = 0; index < [lines count]; index++) {
+        if (index > 0) {
+            [quoted appendString:@"\n"];
+        }
+        if (expandable && index == 0) {
+            [quoted appendString:@"**>"];
+        } else {
+            [quoted appendString:@">"];
+        }
+        [quoted appendString:[lines objectAtIndex:index]];
+    }
+    if (expandable) {
+        [quoted appendString:@"||"];
+    }
+    [textView replaceCharactersInRange:selection withString:quoted];
+    NSString *sentinel = @"\u2063";
+    NSUInteger selectedLocation = selection.location;
+    if (![[textView string] hasPrefix:sentinel]) {
+        [textView replaceCharactersInRange:NSMakeRange(0, 0) withString:sentinel];
+        selectedLocation += [sentinel length];
+    }
+    [textView setSelectedRange:NSMakeRange(selectedLocation, [quoted length])];
+    [self controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                              object:self.sendTextField]];
+}
+
+- (void)applyComposerBlockQuote:(id)sender {
+    (void)sender;
+    [self applyComposerQuoteExpandable:NO];
+}
+
+- (void)applyComposerExpandableBlockQuote:(id)sender {
+    (void)sender;
+    [self applyComposerQuoteExpandable:YES];
 }
 
 - (void)applyComposerFormatting:(id)sender {

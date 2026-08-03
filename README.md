@@ -4,7 +4,7 @@
   <img src="readme-assets/app-icon.png" alt="Telegraphica app icon" width="120" />
   <p><b>An experimental, unofficial Telegram client for OS X 10.8 through macOS 10.13 on Intel Macs.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v0.5.6.1-blue" alt="version v0.5.6.1" />
+    <img src="https://img.shields.io/badge/version-v0.5.7-blue" alt="version v0.5.7" />
     <img src="https://img.shields.io/badge/macOS-10.8--10.13-black" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/Objective--C-AppKit-lightgrey" alt="Objective-C AppKit" />
     <img src="https://img.shields.io/badge/Telegram-TDLib%20JSON-2CA5E0" alt="TDLib JSON" />
@@ -105,7 +105,7 @@ In plain language, the goal is:
 
 ---
 
-## Current Open Beta: `v0.5.6.1`
+## Current Open Beta: `v0.5.7`
 
 This open beta is ready for broader legacy-Mac testing. Telegraphica is still
 young software, but the everyday loop is now useful enough for real feedback:
@@ -130,6 +130,7 @@ voice messages, and keep the app updated from GitHub Releases.
 - 📹 One-to-one Telegram video calls with local camera preview on OS X
   10.9 and newer.
 - 🖼 Grouped photo display, image preview, zoom controls, and pinch-to-zoom.
+- 🔊 Independent audio/video playback speeds and optional sequential voice-message playback.
 - 🎞 Video playback in a resizable native window.
 - 📎 Basic document display with filenames where TDLib exposes them.
 - 🔔 Notification Center alerts, Dock unread badges, sound, and click-through to
@@ -140,15 +141,24 @@ voice messages, and keep the app updated from GitHub Releases.
 - 📌 Pinned dialogs stay at the top of the chat list and can be pinned or
   unpinned from the chat context menu.
 - 🧩 Native sticker display with WEBP, TGS, and animated WEBM/VP9 sticker
-  support on Mavericks.
+  support on Mavericks; static picker thumbnails are decoded through a bounded
+  background cache rather than during AppKit layout.
+- 🎞 Inline GIF validation and decoding use a bounded background queue with
+  cancellable viewport delivery instead of blocking message-list updates.
 - 🔍 Chat search/navigation with a native search field.
 - 🔗 Received link-preview cards and composer controls for link previews.
 - 👥 Contacts browser with search, direct chat opening, and profile details
   including presence, username, phone number, biography, and avatar.
 - 🧭 Private-chat, group, channel, secret-chat, archive, invite-link, member,
   role, restriction, and channel-administration workflows.
-- 🗂 Telegram chat-folder creation, editing, deletion, and supported share-link
-  management.
+- 🗂 Telegram chat-folder creation, editing, drag ordering, shared-folder
+  import, multiple invite-link management, suggested chats, recommendations,
+  and server-reported limits on capable TDLib lanes.
+- 📥 Interrupted downloads restore after sign-in, with separate auto-download
+  controls for photos, videos, documents, and voice messages.
+- 🧹 Storage cleanup can target a media type and either all chats or the chat
+  currently open, while leaving cloud content and Downloads copies intact.
+- ⏩ Voice/audio and video playback support independent 1x, 1.5x, and 2x speeds.
 - 🔕 Per-chat server mute, sound, and preview synchronization.
 - ✨ Bold, italic, underline, strikethrough, spoiler, and monospace message
   formatting.
@@ -291,8 +301,11 @@ and newer behavior.
 
 ## TDLib
 
-Telegraphica talks to Telegram through TDLib's C JSON API. The current practical
-legacy target is **TDLib v1.8.0**.
+Telegraphica talks to Telegram through TDLib's C JSON API. The unified app keeps
+a verified OS X 10.8 fallback lane and a separate OS X 10.9+ lane; exact
+version, source revision, MTProto layer, binary hash, and exported ABI are
+recorded for every newly built candidate. See
+[`docs/tdlib-update-and-rollback.md`](docs/tdlib-update-and-rollback.md).
 
 Useful scripts:
 
@@ -314,6 +327,8 @@ More detail:
 - [`docs/mavericks-transfer.md`](docs/mavericks-transfer.md)
 - [`docs/feasibility.md`](docs/feasibility.md)
 - [`docs/security.md`](docs/security.md)
+- [`docs/compatibility-matrix.md`](docs/compatibility-matrix.md)
+- [`docs/release-checklist.md`](docs/release-checklist.md)
 
 ---
 
@@ -384,6 +399,8 @@ PRODUCT.md                     Product and design direction
 ## Roadmap
 
 - See the current [feature coverage and priority audit](docs/feature-audit-2026-07.md).
+- See the [technical modernization baseline](docs/technical-modernization-baseline.md)
+  for capability, architecture, performance and test progress.
 - Improve edge-case animated sticker playback and GIF handling.
 - More complete document download and preview handling.
 - Deeper group/channel profiles and member-management views.
