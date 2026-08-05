@@ -438,6 +438,22 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue(largeTextHeight > normalHeight,
                  @"large message text should increase the row height instead of clipping metadata");
     TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+    TGAssertTrue(TGMessageUsesSeparateMetadataFooter(),
+                 @"normal message text should keep time and delivery checks in a non-wrapping footer");
+
+    NSDictionary *idleMedia = [NSDictionary dictionaryWithObjectsAndKeys:
+                               [NSNumber numberWithInt:42], @"file_id",
+                               @"Image", @"placeholder",
+                               nil];
+    NSDictionary *loadingMedia = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  [NSNumber numberWithInt:42], @"file_id",
+                                  [NSNumber numberWithBool:YES], @"loading",
+                                  @"Image", @"placeholder",
+                                  nil];
+    TGAssertTrue(!TGMediaItemNeedsLoadingSpinner(idleMedia),
+                 @"downloadable media should not spin until a download is actually active");
+    TGAssertTrue(TGMediaItemNeedsLoadingSpinner(loadingMedia),
+                 @"actively loading media should keep its progress spinner");
 
     TGMessageItem *photoA = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
                                                          messageID:[NSNumber numberWithInt:4]

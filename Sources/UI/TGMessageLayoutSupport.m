@@ -652,7 +652,10 @@ CGFloat TGMessageTopAccessoryHeightForItem(TGMessageItem *item) {
 }
 
 BOOL TGMessageUsesSeparateMetadataFooter(void) {
-    return TGChatMessageBodyFontSize() >= 16.0;
+    // Message metadata must remain a single, non-wrapping unit anchored to the
+    // lower-right corner of the bubble. Appending it to the message text lets
+    // 12-hour suffixes such as "AM" wrap independently on narrow bubbles.
+    return YES;
 }
 
 NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -705,6 +708,10 @@ BOOL TGMediaItemIsSticker(NSDictionary *mediaItem) {
 
 BOOL TGMediaItemNeedsLoadingSpinner(NSDictionary *mediaItem) {
     if (![mediaItem isKindOfClass:[NSDictionary class]] || TGMediaItemIsSticker(mediaItem)) {
+        return NO;
+    }
+    id loading = [mediaItem objectForKey:@"loading"];
+    if (![loading respondsToSelector:@selector(boolValue)] || ![loading boolValue]) {
         return NO;
     }
     if ([TGMediaItemLocalPath(mediaItem) length] > 0 ||
