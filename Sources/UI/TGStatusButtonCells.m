@@ -31,6 +31,12 @@ static CGFloat TGButtonPressedOffset(BOOL highlighted, BOOL flipped) {
     return flipped ? 1.0 : -1.0;
 }
 
+static NSRect TGButtonContentRectWithPressedOffset(NSRect rect,
+                                                   BOOL highlighted,
+                                                   BOOL flipped) {
+    return NSOffsetRect(rect, 0.0, TGButtonPressedOffset(highlighted, flipped));
+}
+
 static void TGDrawCenteredTextButtonTitle(NSButtonCell *cell,
                                           NSRect cellFrame,
                                           NSView *controlView,
@@ -274,10 +280,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect sendRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
-                                 NSMidY(buttonRect) - 9.0,
-                                 18.0,
-                                 18.0);
+    NSRect sendRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 9.0,
+                                                                      NSMidY(buttonRect) - 9.0,
+                                                                      18.0,
+                                                                      18.0),
+                                                             highlighted,
+                                                             [controlView isFlipped]);
     TGDrawTemplateIconAsset(@"send", sendRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
@@ -297,10 +305,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 10.5,
-                                 NSMidY(buttonRect) - 10.5,
-                                 21.0,
-                                 21.0);
+    NSRect iconRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 10.5,
+                                                                      NSMidY(buttonRect) - 10.5,
+                                                                      21.0,
+                                                                      21.0),
+                                                             highlighted,
+                                                             [controlView isFlipped]);
     TGDrawTemplateIconAsset(@"attach", iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
@@ -324,17 +334,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSColor *iconColor = TGClassicHeaderTextColor(alpha);
     [iconColor set];
     if ([title isEqualToString:@"mic"]) {
-        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
+        NSRect micRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 11.0,
+                                                                         NSMidY(buttonRect) - 11.0,
+                                                                         22.0,
+                                                                         22.0),
+                                                                highlighted,
+                                                                flipped);
         TGDrawTemplateIconAsset(@"microphone", micRect, iconColor, 1.0, flipped);
         return;
     }
     if ([title isEqualToString:@"video"] || [title isEqualToString:@"video-off"]) {
-        NSRect videoRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
+        NSRect videoRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 11.0,
+                                                                           NSMidY(buttonRect) - 11.0,
+                                                                           22.0,
+                                                                           22.0),
+                                                                  highlighted,
+                                                                  flipped);
         TGDrawTemplateIconAsset(title, videoRect, iconColor, 1.0, flipped);
         return;
     }
     if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
-        NSRect smileRect = NSMakeRect(NSMidX(buttonRect) - 12.0, NSMidY(buttonRect) - 12.0, 24.0, 24.0);
+        NSRect smileRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 12.0,
+                                                                           NSMidY(buttonRect) - 12.0,
+                                                                           24.0,
+                                                                           24.0),
+                                                                  highlighted,
+                                                                  flipped);
         TGDrawTemplateIconAsset(@"emoji-smile", smileRect, iconColor, 1.0, flipped);
         return;
     }
@@ -345,10 +370,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                 nil];
     NSString *symbol = ([title length] > 0) ? title : @"☺";
     NSSize size = [symbol sizeWithAttributes:attributes];
-    NSRect symbolRect = NSMakeRect(NSMidX(buttonRect) - floor(size.width / 2.0),
-                                   NSMidY(buttonRect) - floor(size.height / 2.0) - 1.0,
-                                   size.width + 2.0,
-                                   size.height + 2.0);
+    NSRect symbolRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - floor(size.width / 2.0),
+                                                                        NSMidY(buttonRect) - floor(size.height / 2.0) - 1.0,
+                                                                        size.width + 2.0,
+                                                                        size.height + 2.0),
+                                                               highlighted,
+                                                               flipped);
     [symbol drawInRect:symbolRect withAttributes:attributes];
 }
 
