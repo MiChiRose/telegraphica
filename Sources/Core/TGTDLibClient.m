@@ -7346,6 +7346,12 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
                                       [photoInfo count] > 0);
         if ([photoInfo count] > 0 && (hasDisplayablePhotoInfo || canKeepVisualFallback)) {
             NSMutableDictionary *mediaInfo = [NSMutableDictionary dictionaryWithDictionary:photoInfo];
+            if (didRequestMediaDownload &&
+                [[photoInfo objectForKey:@"local_path"] length] == 0 &&
+                [[photoInfo objectForKey:@"full_local_path"] length] == 0 &&
+                [[photoInfo objectForKey:@"minithumbnail_data"] length] == 0) {
+                [mediaInfo setObject:[NSNumber numberWithBool:YES] forKey:@"loading"];
+            }
             if ([contentType length] > 0) {
                 [mediaInfo setObject:contentType forKey:@"content_type"];
             }
