@@ -82,3 +82,8 @@ These project rules apply to Codex work in this repository.
 - For refactors of oversized files, prefer substantial cohesive moves of complete method groups or helper responsibilities over tiny cosmetic reductions. Verify with local checks and, when relevant, the applicable unified legacy HITL checks.
 - Do not commit Telegram `api_id`, `api_hash`, sessions, phone numbers, login codes, TDLib databases, generated database keys, or local credentials.
 - Periodically clean `dist` from obsolete Telegraphica build archives and scratch artifacts after newer verified builds replace them, using narrow exact-path cleanup only.
+
+## Private Development Context
+
+- Read `LOCAL_CONTEXT.md`, when present, after these rules. It contains local working state, verification results, and pending HITL/release steps; keep it out of GitHub and tracked-source archives.
+- Update the local context after implementation and GitHub changes with the date, revision, behavioral impact, verification evidence, and remaining work. Never store credentials or private account data there.

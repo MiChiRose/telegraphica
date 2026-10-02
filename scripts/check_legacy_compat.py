@@ -8,7 +8,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 DEPLOYMENT_TARGET = os.environ.get("TELEGRAPHICA_DEPLOYMENT_TARGET") or os.environ.get("MACOSX_DEPLOYMENT_TARGET") or "10.8"
 
-SOURCE_EXTENSIONS = (".h", ".m", ".mm", ".c", ".cpp", ".hpp", ".plist", ".pbxproj", ".sh")
+SOURCE_EXTENSIONS = (".h", ".m", ".mm", ".inc", ".c", ".cpp", ".hpp", ".plist", ".pbxproj", ".sh")
 
 FORBIDDEN_TEXT = [
     ("SwiftUI", "SwiftUI is outside the Objective-C/AppKit target."),

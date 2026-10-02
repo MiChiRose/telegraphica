@@ -58,9 +58,12 @@ NSInteger TGPollOptionIndexForPoint(TGMessageItem *item, NSRect bubbleRect, NSPo
 NSRect TGPollConfirmRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 BOOL TGPollPointIsInConfirmRect(TGMessageItem *item, NSRect bubbleRect, NSPoint point, BOOL flipped);
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
+CGFloat TGReactionBandHeightForMessageItemWidth(TGMessageItem *item, CGFloat bubbleWidth);
+NSRect TGMessageContentRectByRemovingFooter(NSRect rect, CGFloat footerHeight, BOOL flipped);
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails);
 CGFloat TGMessageContextHeaderHeightForItem(TGMessageItem *item);
 BOOL TGMessageItemHasCommentThread(TGMessageItem *item);
+NSString *TGMessageCommentTitleForItem(TGMessageItem *item);
 CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item);
 NSRect TGMessageCommentBarRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 CGFloat TGOutgoingStatusDotsWidthForItem(TGMessageItem *item);

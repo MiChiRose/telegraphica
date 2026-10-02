@@ -3,28 +3,29 @@
 #import "../Core/TGMessageItem.h"
 
 static NSUInteger const TGMessageThumbnailMaximumPendingCount = 24;
-static NSUInteger const TGMessageThumbnailMaximumCompletedCount = 256;
+static NSUInteger const TGMessageThumbnailMaximumFailedCount = 256;
+static NSTimeInterval const TGMessageThumbnailFailureRetryInterval = 5.0;
 
 @interface TGMessageThumbnailPrefetcher ()
 @property (nonatomic, retain) NSMutableDictionary *tokensByKey;
-@property (nonatomic, retain) NSMutableSet *completedKeys;
-@property (nonatomic, retain) NSMutableArray *completedKeyOrder;
+@property (nonatomic, retain) NSMutableDictionary *failureDatesByKey;
+@property (nonatomic, retain) NSMutableArray *failedKeyOrder;
 @property (nonatomic, assign) NSUInteger generation;
 @end
 
 @implementation TGMessageThumbnailPrefetcher
 
 @synthesize tokensByKey = _tokensByKey;
-@synthesize completedKeys = _completedKeys;
-@synthesize completedKeyOrder = _completedKeyOrder;
+@synthesize failureDatesByKey = _failureDatesByKey;
+@synthesize failedKeyOrder = _failedKeyOrder;
 @synthesize generation = _generation;
 
 - (id)init {
     self = [super init];
     if (self) {
         self.tokensByKey = [NSMutableDictionary dictionary];
-        self.completedKeys = [NSMutableSet set];
-        self.completedKeyOrder = [NSMutableArray array];
+        self.failureDatesByKey = [NSMutableDictionary dictionary];
+        self.failedKeyOrder = [NSMutableArray array];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(mediaImageCacheDidClear:)
                                                      name:TGMediaImageLoaderCacheDidClearNotification
@@ -37,8 +38,8 @@ static NSUInteger const TGMessageThumbnailMaximumCompletedCount = 256;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self cancelAll];
     [_tokensByKey release];
-    [_completedKeys release];
-    [_completedKeyOrder release];
+    [_failureDatesByKey release];
+    [_failedKeyOrder release];
     [super dealloc];
 }
 
@@ -56,16 +57,17 @@ static NSUInteger const TGMessageThumbnailMaximumCompletedCount = 256;
             [path stringByStandardizingPath]];
 }
 
-- (void)rememberCompletedKey:(NSString *)key {
-    if ([key length] == 0 || [self.completedKeys containsObject:key]) {
+- (void)rememberFailedKey:(NSString *)key {
+    if ([key length] == 0) {
         return;
     }
-    [self.completedKeys addObject:key];
-    [self.completedKeyOrder addObject:key];
-    while ([self.completedKeyOrder count] > TGMessageThumbnailMaximumCompletedCount) {
-        NSString *oldestKey = [self.completedKeyOrder objectAtIndex:0];
-        [self.completedKeys removeObject:oldestKey];
-        [self.completedKeyOrder removeObjectAtIndex:0];
+    [self.failureDatesByKey setObject:[NSDate date] forKey:key];
+    [self.failedKeyOrder removeObject:key];
+    [self.failedKeyOrder addObject:key];
+    while ([self.failedKeyOrder count] > TGMessageThumbnailMaximumFailedCount) {
+        NSString *oldestKey = [self.failedKeyOrder objectAtIndex:0];
+        [self.failureDatesByKey removeObjectForKey:oldestKey];
+        [self.failedKeyOrder removeObjectAtIndex:0];
     }
 }
 
@@ -73,9 +75,18 @@ static NSUInteger const TGMessageThumbnailMaximumCompletedCount = 256;
     maximumPixelSize:(NSUInteger)maximumPixelSize
           completion:(TGMessageThumbnailPrefetchCompletion)completion {
     NSString *key = [self keyForPath:path maximumPixelSize:maximumPixelSize];
-    if ([key length] == 0 || [self.completedKeys containsObject:key] ||
-        [self.tokensByKey objectForKey:key] != nil ||
+    if ([key length] == 0 || [self.tokensByKey objectForKey:key] != nil ||
         [self.tokensByKey count] >= TGMessageThumbnailMaximumPendingCount) {
+        return;
+    }
+
+    // NSCache may evict images at any time. A successful decode is not proof
+    // that its thumbnail is still cached (or that the source is unchanged).
+    if (TGMediaCachedThumbnailFromFile(path, maximumPixelSize)) {
+        return;
+    }
+    NSDate *failureDate = [self.failureDatesByKey objectForKey:key];
+    if (failureDate && -[failureDate timeIntervalSinceNow] < TGMessageThumbnailFailureRetryInterval) {
         return;
     }
 
@@ -88,7 +99,13 @@ static NSUInteger const TGMessageThumbnailMaximumCompletedCount = 256;
             return;
         }
         [prefetcher.tokensByKey removeObjectForKey:key];
-        [prefetcher rememberCompletedKey:key];
+        if (image) {
+            [prefetcher.failureDatesByKey removeObjectForKey:key];
+            [prefetcher.failedKeyOrder removeObject:key];
+        } else {
+            // Corrupt or not-yet-present files must not decode on every redraw.
+            [prefetcher rememberFailedKey:key];
+        }
         if (image && completion) {
             completion();
         }
@@ -128,8 +145,8 @@ static NSUInteger const TGMessageThumbnailMaximumCompletedCount = 256;
         [token cancel];
     }
     [self.tokensByKey removeAllObjects];
-    [self.completedKeys removeAllObjects];
-    [self.completedKeyOrder removeAllObjects];
+    [self.failureDatesByKey removeAllObjects];
+    [self.failedKeyOrder removeAllObjects];
 }
 
 @end

@@ -171,7 +171,17 @@ on run argv
 end run
 APPLESCRIPT
 
-osascript "$LAYOUT_SCRIPT" "$VOLUME_NAME"
+LAYOUT_TEMPLATE="${TELEGRAPHICA_INSTALLER_LAYOUT_TEMPLATE:-}"
+if [ -n "$LAYOUT_TEMPLATE" ]; then
+    if [ ! -f "$LAYOUT_TEMPLATE" ]; then
+        echo "Installer layout template was not found: $LAYOUT_TEMPLATE"
+        exit 1
+    fi
+    # Reuse the approved Finder layout without controlling a user's windows.
+    ditto "$LAYOUT_TEMPLATE" "$MOUNT_DIR/.DS_Store"
+else
+    osascript "$LAYOUT_SCRIPT" "$VOLUME_NAME"
+fi
 sync
 sleep 2
 

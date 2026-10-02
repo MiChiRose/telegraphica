@@ -7,6 +7,7 @@
 #import "TGOpusVoiceTranscoder.h"
 #import "TGMessageItem.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGReactionChipLayout.h"
 #import "TGMessagePollSupport.h"
 #import "TGOutgoingMessageTextChunker.h"
 #import "TGResourcePolicy.h"
@@ -438,6 +439,22 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue(largeTextHeight > normalHeight,
                  @"large message text should increase the row height instead of clipping metadata");
     TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+    TGAssertTrue(TGMessageUsesSeparateMetadataFooter(),
+                 @"normal message text should keep time and delivery checks in a non-wrapping footer");
+
+    NSDictionary *idleMedia = [NSDictionary dictionaryWithObjectsAndKeys:
+                               [NSNumber numberWithInt:42], @"file_id",
+                               @"Image", @"placeholder",
+                               nil];
+    NSDictionary *loadingMedia = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  [NSNumber numberWithInt:42], @"file_id",
+                                  [NSNumber numberWithBool:YES], @"loading",
+                                  @"Image", @"placeholder",
+                                  nil];
+    TGAssertTrue(!TGMediaItemNeedsLoadingSpinner(idleMedia),
+                 @"downloadable media should not spin until a download is actually active");
+    TGAssertTrue(TGMediaItemNeedsLoadingSpinner(loadingMedia),
+                 @"actively loading media should keep its progress spinner");
 
     TGMessageItem *photoA = [[[TGMessageItem alloc] initWithChatID:[NSNumber numberWithInt:1]
                                                          messageID:[NSNumber numberWithInt:4]
@@ -591,6 +608,155 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue([[chunks objectAtIndex:0] length] <= TGOutgoingTextMessageMaximumLength, @"first text chunk should respect the Telegram limit");
 }
 
+static void TGTestCommentPresentation(void) {
+    TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@0 outgoing:NO preview:@"Comments"] autorelease];
+    [item setCanGetMessageThread:YES];
+    NSArray *counts = [NSArray arrayWithObjects:@1, @2, @4, @5, @11, @12, @14, @21, @22, @111, @112, nil];
+    NSArray *languages = [NSArray arrayWithObjects:@"en", @"ru", @"be", nil];
+    NSArray *expectedByLanguage = [NSArray arrayWithObjects:
+        [NSArray arrayWithObjects:@"1 comment", @"2 comments", @"4 comments", @"5 comments", @"11 comments", @"12 comments", @"14 comments", @"21 comments", @"22 comments", @"111 comments", @"112 comments", nil],
+        [NSArray arrayWithObjects:@"1 комментарий", @"2 комментария", @"4 комментария", @"5 комментариев", @"11 комментариев", @"12 комментариев", @"14 комментариев", @"21 комментарий", @"22 комментария", @"111 комментариев", @"112 комментариев", nil],
+        [NSArray arrayWithObjects:@"1 каментар", @"2 каментары", @"4 каментары", @"5 каментароў", @"11 каментароў", @"12 каментароў", @"14 каментароў", @"21 каментар", @"22 каментары", @"111 каментароў", @"112 каментароў", nil], nil];
+    NSUInteger languageIndex = 0;
+    for (languageIndex = 0; languageIndex < [languages count]; languageIndex++) {
+        TGSetLanguageCode([languages objectAtIndex:languageIndex]);
+        NSUInteger index = 0;
+        for (index = 0; index < [counts count]; index++) {
+            [item setMessageThreadReplyCount:[counts objectAtIndex:index]];
+            TGAssertEqualObjects(TGMessageCommentTitleForItem(item), [[expectedByLanguage objectAtIndex:languageIndex] objectAtIndex:index], @"comment titles must follow the selected language's plural forms");
+        }
+        [item setMessageThreadReplyCount:@0];
+        TGAssertEqualObjects(TGMessageCommentTitleForItem(item), TGLoc(@"message.comments.add"), @"zero comments should invite adding one");
+    }
+    TGSetLanguageCode(@"ru"); [item setMessageThreadReplyCount:@22];
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+    CGFloat normalHeight = TGMessageCommentBarHeightForItem(item);
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeVeryLarge);
+    CGFloat largeHeight = TGMessageCommentBarHeightForItem(item);
+    CGFloat measuredTitleHeight = ceil([TGMessageCommentTitleForItem(item) sizeWithAttributes:
+        [NSDictionary dictionaryWithObject:TGChatMessageBoldSecondaryFont() forKey:NSFontAttributeName]].height);
+    TGAssertTrue(largeHeight >= normalHeight, @"large text must not shrink the comment bar");
+    NSRect bubble = NSMakeRect(0.0, 0.0, 320.0, 180.0);
+    NSRect flippedBar = TGMessageCommentBarRectForItem(item, bubble, YES);
+    NSRect unflippedBar = TGMessageCommentBarRectForItem(item, bubble, NO);
+    TGAssertTrue(NSHeight(flippedBar) >= measuredTitleHeight + 8.0 && NSHeight(unflippedBar) >= measuredTitleHeight + 8.0, @"comment title must fit the actual largest secondary font with vertical padding in both coordinate systems");
+    TGAssertTrue(NSContainsRect(bubble, flippedBar) && NSContainsRect(bubble, unflippedBar), @"expanded comment bar should remain inside its bubble");
+    [item setCanGetMessageThread:NO]; [item setMessageThreadReplyCount:nil];
+    TGAssertTrue(TGMessageCommentBarHeightForItem(item) == 0.0, @"messages without discussions must reserve no comment bar space");
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+}
+
+static void TGTestReactionGeometry(void) {
+    TGClearProbeDefaults();
+    TGSetChatMessagesAsBlocksEnabled(NO);
+    TGMessageItem *chipItem = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@0 outgoing:NO preview:@"Hi"] autorelease];
+    [chipItem setReactionSummary:@"❤️ 48  😁 20  👍 7"];
+    NSArray *chips = TGReactionChipLayoutForItem(chipItem, 400.0);
+    TGAssertTrue([chips count] == 3, @"reaction summary must produce one chip for each emoji/count pair");
+    if ([chips count] == 3) {
+        TGAssertEqualObjects([[chips objectAtIndex:0] objectForKey:@"count"], @"48", @"reaction count must preserve the complete decimal number");
+        TGAssertEqualObjects([[chips objectAtIndex:1] objectForKey:@"count"], @"20", @"count must not be split into individual glyphs");
+        TGAssertEqualObjects([[chips objectAtIndex:2] objectForKey:@"count"], @"7", @"single digit reaction count must remain visible");
+        NSString *heart = [[chips objectAtIndex:0] objectForKey:@"display_emoji"];
+        TGAssertTrue([heart length] > 0 && [heart rangeOfString:@"?"].location == NSNotFound, @"stock heart emoji must normalize its presentation selector without a question-mark fallback");
+    }
+    [chipItem setReactionSummary:@"👍 1  ❤️ 48  🔥 7  🎉 6  👏 5  😁 20"];
+    chips = TGReactionChipLayoutForItem(chipItem, 80.0);
+    TGAssertTrue([chips count] == 6, @"narrow layout must retain every reaction chip");
+    NSUInteger chipIndex = 0;
+    for (chipIndex = 0; chipIndex < [chips count]; chipIndex++) {
+        NSRect frame = [[[chips objectAtIndex:chipIndex] objectForKey:@"frame"] rectValue];
+        TGAssertTrue(NSMinX(frame) >= 0.0 && NSMaxX(frame) <= 80.0 && NSHeight(frame) == 24.0, @"wrapped chips must stay within the available band width");
+        NSUInteger previous = 0;
+        for (previous = 0; previous < chipIndex; previous++) {
+            NSRect previousFrame = [[[chips objectAtIndex:previous] objectForKey:@"frame"] rectValue];
+            TGAssertTrue(!NSIntersectsRect(frame, previousFrame), @"wrapped chips must never overlap");
+        }
+    }
+    if ([chips count] > 0) {
+        TGAssertEqualObjects([[chips objectAtIndex:0] objectForKey:@"count"], @"1", @"a single reaction must still show its numeric count");
+        TGAssertTrue(NSMinY([[[chips lastObject] objectForKey:@"frame"] rectValue]) > 0.0, @"narrow chip layout must wrap beyond its first row");
+    }
+    [chipItem setReactionSummary:@"👍 123456789012"];
+    NSRect wideCountBubble = TGMessageBubbleRectForItem(chipItem, NSMakeRect(0.0, 0.0, 640.0, 1000.0), NO);
+    TGAssertTrue(NSWidth(wideCountBubble) >= TGReactionChipsMinimumWidthForItem(chipItem) + 20.0, @"short text bubble must widen enough to fit a whole large reaction count");
+    NSString *summary = @"👍 12  ❤️ 8  🔥 7  🎉 6  👏 5  😁 4  🤔 3  👎 2";
+    NSArray *types = [NSArray arrayWithObjects:@"messageText", @"messageVoiceNote", @"messageDocument", @"messagePoll", @"messageCall", @"messagePhoto", nil];
+    for (NSString *type in types) {
+        TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@0 outgoing:NO preview:@"Hi"] autorelease];
+        [item setContentType:type];
+        NSRect frame = NSMakeRect(0.0, 0.0, 360.0, 1000.0);
+        CGFloat contentHeight = NSHeight(TGMessageBubbleRectForItem(item, frame, NO));
+        CGFloat playableHeight = TGPlayableMediaBubbleHeightForItem(item);
+        [item setReactionSummary:summary];
+        NSRect bubble = TGMessageBubbleRectForItem(item, frame, NO);
+        CGFloat band = TGReactionBandHeightForMessageItemWidth(item, NSWidth(bubble));
+        TGAssertTrue(band >= 58.0, @"several chips in a narrow bubble should wrap into multiple rows");
+        TGAssertTrue(fabs(NSHeight(bubble) - contentHeight - band) < 0.01, @"every content type must reserve the reaction band exactly once");
+        CGFloat rowHeight = TGMessageBubbleHeightForItem(item, NSWidth(frame), NO);
+        TGAssertTrue(fabs(rowHeight - NSHeight(bubble) - 10.0 - TGMessageExtraBlockVerticalPadding() - TGMessageTopAccessoryHeightForItem(item)) < 0.01, @"row height must match the bubble geometry used for drawing and hit testing");
+        TGAssertTrue(fabs(playableHeight - TGPlayableMediaBubbleHeightForItem(item)) < 0.01, @"playable content height must not include reactions already removed by its owning cell");
+        [item setCanGetMessageThread:YES];
+        [item setMessageThreadReplyCount:@4];
+        bubble = TGMessageBubbleRectForItem(item, frame, NO);
+        NSRect flippedBar = TGMessageCommentBarRectForItem(item, bubble, YES);
+        NSRect unflippedBar = TGMessageCommentBarRectForItem(item, bubble, NO);
+        TGAssertTrue(NSContainsRect(bubble, flippedBar) && NSContainsRect(bubble, unflippedBar), @"comments must remain within the enlarged bubble");
+        TGAssertTrue(NSMaxY(flippedBar) <= NSMaxY(bubble) - band && NSMinY(unflippedBar) >= NSMinY(bubble) + band, @"comments and wrapped reactions must not overlap in either coordinate system");
+        CGFloat footerHeight = band + TGMessageCommentBarHeightForItem(item);
+        NSRect flippedContent = TGMessageContentRectByRemovingFooter(bubble, footerHeight, YES);
+        NSRect unflippedContent = TGMessageContentRectByRemovingFooter(bubble, footerHeight, NO);
+        TGAssertTrue(fabs(NSMinY(flippedContent) - NSMinY(bubble)) < 0.01 &&
+            fabs(NSMaxY(unflippedContent) - NSMaxY(bubble)) < 0.01,
+            @"footer cropping must preserve the body top in both coordinate systems");
+        TGAssertTrue(NSHeight(flippedContent) > 0.0 && NSHeight(unflippedContent) > 0.0 &&
+            NSContainsRect(bubble, flippedContent) && NSContainsRect(bubble, unflippedContent),
+            @"removing wrapped reactions and comments must leave body content inside the bubble");
+        TGAssertTrue(!NSIntersectsRect(NSInsetRect(flippedContent, 0.0, 4.0), flippedBar) &&
+            !NSIntersectsRect(NSInsetRect(unflippedContent, 0.0, 4.0), unflippedBar),
+            @"body drawing inside its existing padding must not overlap comment controls after footer cropping");
+        NSRect flippedBand = NSMakeRect(NSMinX(bubble), NSMaxY(bubble) - band, NSWidth(bubble), band);
+        NSRect unflippedBand = NSMakeRect(NSMinX(bubble), NSMinY(bubble), NSWidth(bubble), band);
+        TGAssertTrue(!NSIntersectsRect(flippedContent, flippedBand) && !NSIntersectsRect(unflippedContent, unflippedBand),
+            @"body content must never extend into wrapped reaction chips");
+        if ([type isEqualToString:@"messageDocument"]) {
+            NSRect icon = TGDocumentIconRectForBubbleRect(unflippedContent);
+            TGAssertTrue(NSContainsRect(unflippedContent, icon) && !NSIntersectsRect(icon, unflippedBar) && !NSIntersectsRect(icon, unflippedBand),
+                @"unflipped document icon and download spinner target must remain above footer controls");
+        }
+        if ([type isEqualToString:@"messagePoll"]) {
+            NSRect option = TGPollOptionRectForItem(item, unflippedContent, 0, NO);
+            TGAssertTrue(!NSIsEmptyRect(option) && NSContainsRect(unflippedContent, option) &&
+                !NSIntersectsRect(option, unflippedBar) && !NSIntersectsRect(option, unflippedBand),
+                @"unflipped poll hit targets must remain above comments and wrapped reactions");
+        }
+    }
+    TGMessageItem *compact = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@0 outgoing:NO preview:@"Compact"] autorelease];
+    TGSetChatMessagesAsBlocksEnabled(YES);
+    CGFloat compactHeight = TGMessageBubbleHeightForItem(compact, 250.0, NO);
+    [compact setReactionSummary:summary];
+    CGFloat compactBand = TGReactionChipsHeightForItem(compact, 250.0 - 86.0);
+    TGAssertTrue(fabs(TGMessageBubbleHeightForItem(compact, 250.0, NO) - compactHeight - compactBand) < 0.01, @"compact rows must measure reactions using the renderer's available content width");
+    [compact setCanGetMessageThread:YES];
+    [compact setMessageThreadReplyCount:@4];
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeVeryLarge);
+    CGFloat compactRowHeight = TGMessageBubbleHeightForItem(compact, 250.0, NO);
+    NSRect compactRect = TGMessageBubbleRectForItem(compact, NSMakeRect(0.0, 0.0, 250.0, compactRowHeight), NO);
+    NSRect compactComment = TGMessageCommentBarRectForItem(compact, compactRect, YES);
+    TGAssertTrue(fabs(NSWidth(compactComment) - (250.0 - 86.0)) < 0.01, @"compact comment hit testing must share the reaction content width");
+    TGAssertTrue(NSContainsRect(compactRect, compactComment) && NSMaxY(compactComment) <= NSMaxY(compactRect) - compactBand, @"compact comment hit testing must stay above all wrapped reaction rows");
+    [compact setReactionAnimationDisplaySummary:summary];
+    [compact setReactionAnimationChangesHeight:YES];
+    [compact setReactionAnimationRemoving:NO];
+    [compact setReactionAnimationProgress:0.0];
+    TGAssertTrue(TGReactionChipsHeightForItem(compact, 164.0) == 0.0, @"reaction insertion must start without reserving its final band height");
+    [compact setReactionAnimationProgress:1.0];
+    TGAssertTrue(fabs(TGReactionChipsHeightForItem(compact, 164.0) - compactBand) < 0.01, @"reaction insertion must end at the full wrapped band height");
+    [compact setReactionAnimationRemoving:YES];
+    TGAssertTrue(TGReactionChipsHeightForItem(compact, 164.0) == 0.0, @"reaction removal must release all wrapped row space");
+    TGClearProbeDefaults();
+}
+
 static void TGTestLocalization(void) {
     TGSetLanguageCode(@"ru");
     TGAssertEqualObjects(TGLanguageCode(), @"ru", @"Russian language should be saved");
@@ -615,6 +781,8 @@ int main(int argc, const char **argv) {
     TGTestMediaSecurityLimits();
     TGTestMessageItemsAndLayout();
     TGTestLocalization();
+    TGTestCommentPresentation();
+    TGTestReactionGeometry();
     TGClearProbeDefaults();
     [pool drain];
     if (TGProbeFailures > 0) {

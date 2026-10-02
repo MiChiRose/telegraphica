@@ -24,6 +24,43 @@ static NSPoint TGIconPoint(NSRect rect, CGFloat x, CGFloat y, BOOL flipped) {
     return NSMakePoint(NSMinX(rect) + x, flipped ? (NSMaxY(rect) - y) : (NSMinY(rect) + y));
 }
 
+static CGFloat TGButtonPressedOffset(BOOL highlighted, BOOL flipped) {
+    if (!highlighted) {
+        return 0.0;
+    }
+    return flipped ? 1.0 : -1.0;
+}
+
+static NSRect TGButtonContentRectWithPressedOffset(NSRect rect,
+                                                   BOOL highlighted,
+                                                   BOOL flipped) {
+    return NSOffsetRect(rect, 0.0, TGButtonPressedOffset(highlighted, flipped));
+}
+
+static void TGDrawCenteredTextButtonTitle(NSButtonCell *cell,
+                                          NSRect cellFrame,
+                                          NSView *controlView,
+                                          NSFont *font,
+                                          NSColor *textColor,
+                                          CGFloat horizontalPadding) {
+    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
+    [paragraph setAlignment:NSCenterTextAlignment];
+    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                font, NSFontAttributeName,
+                                textColor, NSForegroundColorAttributeName,
+                                paragraph, NSParagraphStyleAttributeName,
+                                nil];
+    NSString *title = [cell title] ? [cell title] : @"";
+    NSSize titleSize = [title sizeWithAttributes:attributes];
+    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + horizontalPadding,
+                                  floor(NSMidY(cellFrame) - (titleSize.height / 2.0)) - 1.0 +
+                                      TGButtonPressedOffset([cell isHighlighted], [controlView isFlipped]),
+                                  MAX(0.0, NSWidth(cellFrame) - (horizontalPadding * 2.0)),
+                                  titleSize.height + 2.0);
+    [title drawInRect:titleRect withAttributes:attributes];
+}
+
 void TGDrawMutedSpeakerIconInRect(NSRect iconRect, NSColor *color, BOOL flipped) {
     [color set];
     NSBezierPath *speakerPath = [NSBezierPath bezierPath];
@@ -243,10 +280,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect sendRect = NSMakeRect(NSMidX(buttonRect) - 9.0,
-                                 NSMidY(buttonRect) - 9.0,
-                                 18.0,
-                                 18.0);
+    NSRect sendRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 9.0,
+                                                                      NSMidY(buttonRect) - 9.0,
+                                                                      18.0,
+                                                                      18.0),
+                                                             highlighted,
+                                                             [controlView isFlipped]);
     TGDrawTemplateIconAsset(@"send", sendRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
@@ -266,10 +305,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [buttonPath setLineWidth:1.0];
     [buttonPath stroke];
 
-    NSRect iconRect = NSMakeRect(NSMidX(buttonRect) - 10.5,
-                                 NSMidY(buttonRect) - 10.5,
-                                 21.0,
-                                 21.0);
+    NSRect iconRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 10.5,
+                                                                      NSMidY(buttonRect) - 10.5,
+                                                                      21.0,
+                                                                      21.0),
+                                                             highlighted,
+                                                             [controlView isFlipped]);
     TGDrawTemplateIconAsset(@"attach", iconRect, TGClassicHeaderTextColor(alpha), 1.0, [controlView isFlipped]);
 }
 
@@ -293,17 +334,32 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSColor *iconColor = TGClassicHeaderTextColor(alpha);
     [iconColor set];
     if ([title isEqualToString:@"mic"]) {
-        NSRect micRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
+        NSRect micRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 11.0,
+                                                                         NSMidY(buttonRect) - 11.0,
+                                                                         22.0,
+                                                                         22.0),
+                                                                highlighted,
+                                                                flipped);
         TGDrawTemplateIconAsset(@"microphone", micRect, iconColor, 1.0, flipped);
         return;
     }
     if ([title isEqualToString:@"video"] || [title isEqualToString:@"video-off"]) {
-        NSRect videoRect = NSMakeRect(NSMidX(buttonRect) - 11.0, NSMidY(buttonRect) - 11.0, 22.0, 22.0);
+        NSRect videoRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 11.0,
+                                                                           NSMidY(buttonRect) - 11.0,
+                                                                           22.0,
+                                                                           22.0),
+                                                                  highlighted,
+                                                                  flipped);
         TGDrawTemplateIconAsset(title, videoRect, iconColor, 1.0, flipped);
         return;
     }
     if ([title isEqualToString:@"☺"] || [title isEqualToString:@"stickers"]) {
-        NSRect smileRect = NSMakeRect(NSMidX(buttonRect) - 12.0, NSMidY(buttonRect) - 12.0, 24.0, 24.0);
+        NSRect smileRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - 12.0,
+                                                                           NSMidY(buttonRect) - 12.0,
+                                                                           24.0,
+                                                                           24.0),
+                                                                  highlighted,
+                                                                  flipped);
         TGDrawTemplateIconAsset(@"emoji-smile", smileRect, iconColor, 1.0, flipped);
         return;
     }
@@ -314,10 +370,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
                                 nil];
     NSString *symbol = ([title length] > 0) ? title : @"☺";
     NSSize size = [symbol sizeWithAttributes:attributes];
-    NSRect symbolRect = NSMakeRect(NSMidX(buttonRect) - floor(size.width / 2.0),
-                                   NSMidY(buttonRect) - floor(size.height / 2.0) - 1.0,
-                                   size.width + 2.0,
-                                   size.height + 2.0);
+    NSRect symbolRect = TGButtonContentRectWithPressedOffset(NSMakeRect(NSMidX(buttonRect) - floor(size.width / 2.0),
+                                                                        NSMidY(buttonRect) - floor(size.height / 2.0) - 1.0,
+                                                                        size.width + 2.0,
+                                                                        size.height + 2.0),
+                                                               highlighted,
+                                                               flipped);
     [symbol drawInRect:symbolRect withAttributes:attributes];
 }
 
@@ -420,21 +478,12 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     [path setLineWidth:(enabled ? 1.25 : 1.0)];
     [path stroke];
 
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setAlignment:NSCenterTextAlignment];
-    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
-    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                [NSFont boldSystemFontOfSize:13.0], NSFontAttributeName,
-                                (enabled ? TGClassicHeaderTextColor(1.0) : TGClassicNavigationTextColor(alpha)), NSForegroundColorAttributeName,
-                                paragraph, NSParagraphStyleAttributeName,
-                                nil];
-    NSString *title = [self title] ? [self title] : @"";
-    NSSize titleSize = [title sizeWithAttributes:attributes];
-    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + 12.0,
-                                  floor(NSMidY(cellFrame) - (titleSize.height / 2.0)) - 1.0,
-                                  MAX(0.0, NSWidth(cellFrame) - 24.0),
-                                  titleSize.height + 2.0);
-    [title drawInRect:titleRect withAttributes:attributes];
+    TGDrawCenteredTextButtonTitle(self,
+                                  cellFrame,
+                                  controlView,
+                                  [NSFont boldSystemFontOfSize:13.0],
+                                  (enabled ? TGClassicHeaderTextColor(1.0) : TGClassicNavigationTextColor(alpha)),
+                                  12.0);
 }
 
 @end
@@ -448,28 +497,22 @@ static void TGDrawNavigationIcon(NSString *title, NSRect iconRect, NSColor *colo
     NSRect buttonRect = NSInsetRect(cellFrame, 0.5, 0.5);
     NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:buttonRect xRadius:9.0 yRadius:9.0];
     NSColor *backgroundColor = highlighted ? TGClassicSelectedRowColor() : TGClassicTablePaperColor();
+    if (!enabled) {
+        backgroundColor = [backgroundColor colorWithAlphaComponent:0.58];
+    }
     [backgroundColor set];
     [path fill];
-    [TGClassicTableGridColor() set];
+    [(enabled ? TGClassicTableGridColor() : [TGClassicTableGridColor() colorWithAlphaComponent:0.48]) set];
     [path setLineWidth:1.0];
     [path stroke];
 
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setAlignment:NSCenterTextAlignment];
-    [paragraph setLineBreakMode:NSLineBreakByTruncatingTail];
     NSColor *textColor = highlighted ? TGClassicSelectedRowTextColor() : TGClassicCardInkColor();
-    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
-                                [textColor colorWithAlphaComponent:alpha], NSForegroundColorAttributeName,
-                                paragraph, NSParagraphStyleAttributeName,
-                                nil];
-    NSString *title = [self title] ? [self title] : @"";
-    NSSize titleSize = [title sizeWithAttributes:attributes];
-    NSRect titleRect = NSMakeRect(NSMinX(cellFrame) + 10.0,
-                                  floor(NSMidY(cellFrame) - (titleSize.height / 2.0)) - 1.0,
-                                  MAX(0.0, NSWidth(cellFrame) - 20.0),
-                                  titleSize.height + 2.0);
-    [title drawInRect:titleRect withAttributes:attributes];
+    TGDrawCenteredTextButtonTitle(self,
+                                  cellFrame,
+                                  controlView,
+                                  [NSFont boldSystemFontOfSize:12.0],
+                                  [textColor colorWithAlphaComponent:alpha],
+                                  10.0);
 }
 
 @end

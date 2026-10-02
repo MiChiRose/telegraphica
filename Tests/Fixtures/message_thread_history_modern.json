@@ -1,0 +1,7 @@
+{
+  "@type": "foundChatMessages", "total_count": 1, "next_from_message_id": 0,
+  "messages": [
+    {"@type": "message", "chat_id": -999, "id": 701,
+     "topic_id": {"@type": "messageTopicThread", "message_thread_id": 700}}
+  ]
+}

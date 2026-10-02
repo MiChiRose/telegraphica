@@ -305,9 +305,13 @@ fi
 
 TDJSON_STAGED_PATH=""
 TDJSON_MOUNTAIN_LION_STAGED_PATH=""
+CALL_TRANSPORT_STAGED_PATH=""
 BUNDLED_TDLIB_CONFIG_TEMP=""
 BUNDLED_TDLIB_CREDENTIALS_TEMP=""
 cleanup_legacy_build_inputs() {
+    if [ -n "$CALL_TRANSPORT_STAGED_PATH" ]; then
+        rm -f "$CALL_TRANSPORT_STAGED_PATH"
+    fi
     if [ -n "$TDJSON_STAGED_PATH" ]; then
         rm -f "$TDJSON_STAGED_PATH"
     fi
@@ -393,6 +397,20 @@ if [ -n "${TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH:-}" ]; then
     chmod 0644 "$TDJSON_MOUNTAIN_LION_STAGED_PATH"
     TELEGRAPHICA_TDJSON_MOUNTAIN_LION_PATH="$TDJSON_MOUNTAIN_LION_STAGED_PATH"
     echo "Staged Mountain Lion TDLib JSON library for rebuild."
+fi
+
+# The verified transport may be supplied from the previous output bundle,
+# which the rebuild removes below. Preserve its exact bytes before that cleanup.
+if [ -n "${TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH:-}" ]; then
+    if [ ! -f "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" ]; then
+        echo "TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH does not point to a file: $TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH"
+        exit 1
+    fi
+    CALL_TRANSPORT_STAGED_PATH="$(mktemp /tmp/telegraphica-call-transport.XXXXXX)"
+    ditto "$TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH" "$CALL_TRANSPORT_STAGED_PATH"
+    chmod 0755 "$CALL_TRANSPORT_STAGED_PATH"
+    TELEGRAPHICA_MODERN_CALL_TRANSPORT_PATH="$CALL_TRANSPORT_STAGED_PATH"
+    echo "Staged the supplied audio-call transport for rebuild."
 fi
 
 rm -rf "$BUILD_ROOT" "$APP_NAME"

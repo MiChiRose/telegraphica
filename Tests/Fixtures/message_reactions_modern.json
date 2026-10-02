@@ -1,0 +1,18 @@
+{
+  "@type": "message",
+  "interaction_info": {
+    "@type": "messageInteractionInfo",
+    "reactions": {
+      "@type": "messageReactions",
+      "can_get_added_reactions": true,
+      "reactions": [
+        {"@type":"messageReaction","type":{"@type":"reactionTypeEmoji","emoji":"❤️"},"total_count":48,"is_chosen":false},
+        {"@type":"messageReaction","type":{"@type":"reactionTypeEmoji","emoji":"👍"},"total_count":122,"is_chosen":false},
+        {"@type":"messageReaction","type":{"@type":"reactionTypeEmoji","emoji":"🔥"},"total_count":1,"is_chosen":false},
+        {"@type":"messageReaction","type":{"@type":"reactionTypeEmoji","emoji":"😁"},"total_count":7,"is_chosen":false},
+        {"@type":"messageReaction","type":{"@type":"reactionTypeEmoji","emoji":"😢"},"total_count":2,"is_chosen":false},
+        {"@type":"messageReaction","type":{"@type":"reactionTypeEmoji","emoji":"🤔"},"total_count":17,"is_chosen":true}
+      ]
+    }
+  }
+}

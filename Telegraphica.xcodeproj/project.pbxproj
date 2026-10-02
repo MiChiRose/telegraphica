@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A65300000000000000000001 /* TGChatOpenState.m in Sources */ = {isa = PBXBuildFile; fileRef = A65300000000000000000003 /* TGChatOpenState.m */; };
+		A65200000000000000000001 /* TGMessageReactionParser.m in Sources */ = {isa = PBXBuildFile; fileRef = A65200000000000000000003 /* TGMessageReactionParser.m */; };
+		A65100000000000000000001 /* TGReactionChipLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = A65100000000000000000003 /* TGReactionChipLayout.m */; };
+		A66000000000000000000001 /* TGTDLibClient+MessageThreads.m in Sources */ = {isa = PBXBuildFile; fileRef = A66000000000000000000003 /* TGTDLibClient+MessageThreads.m */; };
+		A65000000000000000000001 /* TGMessageThreadSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = A65000000000000000000003 /* TGMessageThreadSupport.m */; };
 		111111111111111111111101 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111201 /* main.m */; };
 		111111111111111111111102 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111203 /* AppDelegate.m */; };
 		111111111111111111111103 /* TGTDLibClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111205 /* TGTDLibClient.m */; };
@@ -171,6 +176,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A65300000000000000000002 /* TGChatOpenState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGChatOpenState.h; sourceTree = "<group>"; };
+		A65300000000000000000003 /* TGChatOpenState.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGChatOpenState.m; sourceTree = "<group>"; };
+		A65200000000000000000002 /* TGMessageReactionParser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageReactionParser.h; sourceTree = "<group>"; };
+		A65200000000000000000003 /* TGMessageReactionParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageReactionParser.m; sourceTree = "<group>"; };
+		A65100000000000000000002 /* TGReactionChipLayout.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGReactionChipLayout.h; sourceTree = "<group>"; };
+		A65100000000000000000003 /* TGReactionChipLayout.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGReactionChipLayout.m; sourceTree = "<group>"; };
+		A66000000000000000000002 /* TGTDLibClient+MessageThreads.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MessageThreads.h"; sourceTree = "<group>"; };
+		A66000000000000000000003 /* TGTDLibClient+MessageThreads.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MessageThreads.m"; sourceTree = "<group>"; };
+		A65000000000000000000002 /* TGMessageThreadSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGMessageThreadSupport.h"; sourceTree = "<group>"; };
+		A65000000000000000000003 /* TGMessageThreadSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGMessageThreadSupport.m"; sourceTree = "<group>"; };
 		111111111111111111111200 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		111111111111111111111201 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		111111111111111111111202 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -581,6 +596,14 @@
 				111111111111111111111398 /* TGTDLibClient+ChatHistory.m */,
 				A5F000000000000000000002 /* TGTDLibClient+Search.h */,
 				A5F000000000000000000003 /* TGTDLibClient+Search.m */,
+				A66000000000000000000002 /* TGTDLibClient+MessageThreads.h */,
+				A66000000000000000000003 /* TGTDLibClient+MessageThreads.m */,
+				A65000000000000000000002 /* TGMessageThreadSupport.h */,
+				A65000000000000000000003 /* TGMessageThreadSupport.m */,
+				A65300000000000000000002 /* TGChatOpenState.h */,
+				A65300000000000000000003 /* TGChatOpenState.m */,
+				A65200000000000000000002 /* TGMessageReactionParser.h */,
+				A65200000000000000000003 /* TGMessageReactionParser.m */,
 				A60000000000000000000002 /* TGTDLibClient+Storage.h */,
 				A60000000000000000000003 /* TGTDLibClient+Storage.m */,
 				A61000000000000000000002 /* TGTDLibClient+Files.h */,
@@ -721,6 +744,8 @@
 				111111111111111111111299 /* TGChatDisplayPreferences.m */,
 				111111111111111111111247 /* TGMessageLayoutSupport.h */,
 				111111111111111111111248 /* TGMessageLayoutSupport.m */,
+				A65100000000000000000002 /* TGReactionChipLayout.h */,
+				A65100000000000000000003 /* TGReactionChipLayout.m */,
 				111111111111111111111249 /* TGStatusViewComponents.h */,
 				111111111111111111111250 /* TGStatusViewComponents.m */,
 				111111111111111111111251 /* TGStatusButtonCells.h */,
@@ -1036,6 +1061,11 @@
 				111111111111111111111196 /* TGLocationSearchService.m in Sources */,
 				111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */,
 				A5F000000000000000000001 /* TGTDLibClient+Search.m in Sources */,
+				A66000000000000000000001 /* TGTDLibClient+MessageThreads.m in Sources */,
+				A65000000000000000000001 /* TGMessageThreadSupport.m in Sources */,
+				A65300000000000000000001 /* TGChatOpenState.m in Sources */,
+				A65200000000000000000001 /* TGMessageReactionParser.m in Sources */,
+				A65100000000000000000001 /* TGReactionChipLayout.m in Sources */,
 				A60000000000000000000001 /* TGTDLibClient+Storage.m in Sources */,
 				A61000000000000000000001 /* TGTDLibClient+Files.m in Sources */,
 				A63000000000000000000001 /* TGTDLibClient+Account.m in Sources */,

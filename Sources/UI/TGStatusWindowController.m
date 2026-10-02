@@ -2,6 +2,7 @@
 #import "TGActiveSessionsPresentation.h"
 #import "TGAccessibilitySupport.h"
 #import "TGChatDisplayPreferences.h"
+#import "TGForumTopicRefreshSupport.h"
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
 #import "TGDatePickerDialog.h"
@@ -56,6 +57,7 @@
 #import "../Core/TGChatItem.h"
 #import "../Core/TGAuthorizationFlow.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGMessageThreadSupport.h"
 #import "../Core/TGMessagePollSupport.h"
 #import "../Core/TGReactionCatalog.h"
 #import "../Core/TGTDLibOperation.h"
@@ -71,6 +73,7 @@
 #import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+ForumTopics.h"
 #import "../Core/TGTDLibClient+MessageLinks.h"
+#import "../Core/TGTDLibClient+MessageThreads.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Core/TGTDLibClient+MessageTypes.h"
 #import "../Services/TGLocalDataReset.h"
@@ -85,6 +88,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
 #include <math.h>
+#include <stdlib.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
@@ -593,9 +597,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableSet *visibleReadReceiptMessageIDs;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
-@property (nonatomic, copy) NSString *commentThreadParentTitle;
-@property (nonatomic, copy) NSString *commentThreadParentTypeSummary;
-@property (nonatomic, copy) NSString *commentThreadParentAvatarLocalPath;
+@property (nonatomic, retain) NSMutableArray *commentThreadNavigationStack;
+@property (nonatomic, assign) BOOL commentThreadOpenInFlight;
 @property (nonatomic, retain) NSNumber *topicParentChatID;
 @property (nonatomic, copy) NSString *topicParentTitle;
 @property (nonatomic, copy) NSString *topicParentAvatarLocalPath;
@@ -1143,9 +1146,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize visibleReadReceiptMessageIDs = _visibleReadReceiptMessageIDs;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
-@synthesize commentThreadParentTitle = _commentThreadParentTitle;
-@synthesize commentThreadParentTypeSummary = _commentThreadParentTypeSummary;
-@synthesize commentThreadParentAvatarLocalPath = _commentThreadParentAvatarLocalPath;
+@synthesize commentThreadNavigationStack = _commentThreadNavigationStack;
+@synthesize commentThreadOpenInFlight = _commentThreadOpenInFlight;
 @synthesize topicParentChatID = _topicParentChatID;
 @synthesize topicParentTitle = _topicParentTitle;
 @synthesize topicParentAvatarLocalPath = _topicParentAvatarLocalPath;
@@ -1353,12 +1355,45 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
 
+- (void)synchronizeUserOpenedChat {
+    BOOL chatVisible = (!self.activeSection || [self.activeSection isEqualToString:TGSectionChats]);
+    NSNumber *chatID = ([self.currentAuthState isEqualToString:@"ready"] && chatVisible)
+        ? self.selectedChatID : nil;
+    [self.client setUserOpenedChatID:chatID];
+}
+
+- (void)setSelectedChatID:(NSNumber *)chatID {
+    if (_selectedChatID != chatID) {
+        [_selectedChatID release];
+        _selectedChatID = [chatID retain];
+    }
+    [self synchronizeUserOpenedChat];
+}
+
+- (void)setCurrentAuthState:(NSString *)state {
+    if (_currentAuthState != state) {
+        [_currentAuthState release];
+        _currentAuthState = [state copy];
+    }
+    [self synchronizeUserOpenedChat];
+}
+
+- (void)setActiveSection:(NSString *)section {
+    if (_activeSection != section) {
+        [_activeSection release];
+        _activeSection = [section copy];
+    }
+    [self synchronizeUserOpenedChat];
+}
+
 - (void)setClient:(TGTDLibClient *)client {
     if (_client != client) {
+        [_client setUserOpenedChatID:nil];
         [_client release];
         _client = [client retain];
     }
     [[TGDownloadManager sharedManager] setClient:_client];
+    [self synchronizeUserOpenedChat];
 }
 
 - (instancetype)init {
@@ -1456,26 +1491,32 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [self refreshUpdateAvailabilityBadge];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
-        if (TGMountainLionSafeLoginModeEnabled()) {
-            [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling will drain updates without automatic chat refresh."];
+        // Smoke launch verifies window construction and clean exit only. Starting
+        // authentication here races its exit and may prompt for real Keychain data.
+        if (!getenv("TELEGRAPHICA_SMOKE_LAUNCH")) {
+            if (TGMountainLionSafeLoginModeEnabled()) {
+                [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling will drain updates without automatic chat refresh."];
+            }
+            [self startLiveUpdateTimerIfNeeded];
+            [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+            NSTimeInterval lastUpdateCheck = [[NSUserDefaults standardUserDefaults]
+                doubleForKey:TGLastUpdateCheckDefaultsKey];
+            NSTimeInterval initialUpdateCheckDelay = 3.0;
+            if (lastUpdateCheck > 0.0 && now >= lastUpdateCheck &&
+                (now - lastUpdateCheck) < TGBackgroundUpdateCheckInterval) {
+                initialUpdateCheckDelay = MAX(3.0,
+                                              TGBackgroundUpdateCheckInterval -
+                                              (now - lastUpdateCheck));
+            }
+            self.updateCheckScheduler = [[[TGUpdateCheckScheduler alloc]
+                initWithTarget:self
+                      selector:@selector(checkForUpdatesOnLaunch)
+                      interval:TGBackgroundUpdateCheckInterval] autorelease];
+            [self.updateCheckScheduler startWithInitialDelay:initialUpdateCheckDelay];
+        } else {
+            [[TGLogger sharedLogger] log:@"Smoke launch mode: skipped TDLib connection and background service startup."];
         }
-        [self startLiveUpdateTimerIfNeeded];
-        [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
-        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-        NSTimeInterval lastUpdateCheck = [[NSUserDefaults standardUserDefaults]
-            doubleForKey:TGLastUpdateCheckDefaultsKey];
-        NSTimeInterval initialUpdateCheckDelay = 3.0;
-        if (lastUpdateCheck > 0.0 && now >= lastUpdateCheck &&
-            (now - lastUpdateCheck) < TGBackgroundUpdateCheckInterval) {
-            initialUpdateCheckDelay = MAX(3.0,
-                                          TGBackgroundUpdateCheckInterval -
-                                          (now - lastUpdateCheck));
-        }
-        self.updateCheckScheduler = [[[TGUpdateCheckScheduler alloc]
-            initWithTarget:self
-                  selector:@selector(checkForUpdatesOnLaunch)
-                  interval:TGBackgroundUpdateCheckInterval] autorelease];
-        [self.updateCheckScheduler startWithInitialDelay:initialUpdateCheckDelay];
     }
     return self;
 }
@@ -4611,6 +4652,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+MessageMediaHitTesting.inc"
 
+#include "TGStatusWindowController+MessageThreads.inc"
+
 #include "TGStatusWindowController+MessagingActions.inc"
 
 #include "TGStatusWindowController+ForumTopicManagement.inc"
@@ -4645,6 +4688,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)dealloc {
+    [_client setUserOpenedChatID:nil];
     if ([[NSUserNotificationCenter defaultUserNotificationCenter] delegate] == self) {
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:nil];
     }
@@ -5033,9 +5077,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_visibleReadReceiptMessageIDs release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
-    [_commentThreadParentTitle release];
-    [_commentThreadParentTypeSummary release];
-    [_commentThreadParentAvatarLocalPath release];
+    [_commentThreadNavigationStack release];
     [_topicParentChatID release];
     [_topicParentTitle release];
     [_topicParentAvatarLocalPath release];

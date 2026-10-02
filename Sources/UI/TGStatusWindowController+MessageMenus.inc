@@ -431,7 +431,8 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
             }
             documentRect.size.height -= contextHeaderHeight;
         }
-        documentRect.size.height -= (TGMessageCommentBarHeightForItem(item) + TGReactionBandHeightForMessageItem(item));
+        documentRect = TGMessageContentRectByRemovingFooter(documentRect,
+            TGMessageCommentBarHeightForItem(item) + TGReactionBandHeightForMessageItemWidth(item, NSWidth(documentRect)), flipped);
         NSRect iconRect = TGDocumentIconRectForBubbleRect(documentRect);
         NSRect spinnerRect = NSMakeRect(NSMidX(iconRect) - 10.0,
                                         NSMidY(iconRect) - 10.0,

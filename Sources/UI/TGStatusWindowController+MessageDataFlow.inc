@@ -833,6 +833,14 @@
         return NO;
     }
 
+    // Bounds alone are not reliable enough on older AppKit versions while a
+    // table view is being tiled or rubber-banded. Only the first visible rows
+    // can legitimately trigger an older-history request.
+    NSRange visibleRows = [self.messageTableView rowsInRect:visibleRect];
+    if (visibleRows.location == NSNotFound || visibleRows.length == 0 || visibleRows.location > 1) {
+        return NO;
+    }
+
     NSRect documentBounds = [documentView bounds];
     CGFloat distanceFromTop = NSMinY(visibleRect) - NSMinY(documentBounds);
     return (distanceFromTop <= 48.0);
@@ -1847,6 +1855,11 @@
                     break;
                 }
             }
+            continue;
+        }
+
+        if ([kind isEqualToString:@"message_interaction_update"]) {
+            [self applyMessageInteractionUpdateSummary:summary];
             continue;
         }
 
