@@ -124,6 +124,8 @@ extern NSString * const TGTDLibCallSignalingDataDidUpdateNotification;
 - (NSString *)requestAuthenticationPasswordRecoveryWithTimeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSString *)recoverAuthenticationPasswordWithCode:(NSString *)recoveryCode timeout:(NSTimeInterval)timeout error:(NSError **)error;
 - (NSDictionary *)currentAuthorizationSafeDetails;
+// Main conversation owner only; asynchronous, never loads TDLib or starts auth.
+- (void)setUserOpenedChatID:(NSNumber *)chatID;
 - (NSArray *)drainSafeUpdateSummaries;
 - (NSString *)receiverStatusSummary;
 - (NSString *)loadedLibraryPath;

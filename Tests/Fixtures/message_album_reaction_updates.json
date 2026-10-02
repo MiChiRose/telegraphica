@@ -1,0 +1,10 @@
+{
+  "members": [
+    {"message_id":200,"summary":"❤️ 43  👍 11  🔥 7  😁 4  😢 3  🤔","chosen_emojis":["🤔"],"can_get_added_reactions":true},
+    {"message_id":100,"summary":"❤️","chosen_emojis":["❤️"],"can_get_added_reactions":true}
+  ],
+  "display_member_update": {"@type":"updateMessageInteractionInfo","chat_id":42,"message_id":100},
+  "display_member_reactions": {"summary":"❤️"},
+  "other_member_update": {"@type":"updateMessageInteractionInfo","chat_id":42,"message_id":200},
+  "other_member_reactions": {"summary":"❤️ 50  👍 11  🔥 7  😁 4  😢 3  🤔","chosen_emojis":["👍"],"can_get_added_reactions":false}
+}

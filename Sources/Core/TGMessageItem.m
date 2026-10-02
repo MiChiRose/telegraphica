@@ -59,6 +59,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     return ([parts count] > 0) ? [parts componentsJoinedByString:@"  "] : leftSummary;
 }
 
+@interface TGMessageItem ()
+- (void)rebuildAlbumReactionMetadata;
+@end
+
 @implementation TGMessageItem
 
 @synthesize chatID = _chatID;
@@ -259,6 +263,10 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     if ([self.reactionSummary length] > 0) {
         [media setObject:self.reactionSummary forKey:@"reaction_summary"];
     }
+    if ([self.chosenReactionEmojis count] > 0) {
+        [media setObject:self.chosenReactionEmojis forKey:@"chosen_reaction_emojis"];
+    }
+    [media setObject:[NSNumber numberWithBool:self.canGetAddedReactions] forKey:@"can_get_added_reactions"];
     if ([self.mediaFileID respondsToSelector:@selector(integerValue)]) {
         [media setObject:self.mediaFileID forKey:@"playable_file_id"];
     }
@@ -316,10 +324,63 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     NSSortDescriptor *messageIDSort = [[[NSSortDescriptor alloc] initWithKey:@"message_id" ascending:YES] autorelease];
     self.mediaItems = [items sortedArrayUsingDescriptors:[NSArray arrayWithObject:messageIDSort]];
 
-    NSString *incomingReaction = [item reactionSummary];
-    if ([incomingReaction length] > 0) {
-        self.reactionSummary = TGReactionSummaryByMergingSummaries(self.reactionSummary, incomingReaction);
+    [self rebuildAlbumReactionMetadata];
+}
+
+- (void)rebuildAlbumReactionMetadata {
+    NSString *summary = nil;
+    NSMutableArray *chosen = [NSMutableArray array];
+    BOOL canGetAdded = NO;
+    for (id media in self.mediaItems) {
+        if (![media isKindOfClass:[NSDictionary class]]) { continue; }
+        id text = [media objectForKey:@"reaction_summary"];
+        if ([text isKindOfClass:[NSString class]] && [text length] > 0) {
+            summary = TGReactionSummaryByMergingSummaries(summary, text);
+        }
+        id memberChosen = [media objectForKey:@"chosen_reaction_emojis"];
+        if ([memberChosen isKindOfClass:[NSArray class]]) {
+            for (id emoji in memberChosen) {
+                if ([emoji isKindOfClass:[NSString class]] && ![chosen containsObject:emoji]) { [chosen addObject:emoji]; }
+            }
+        }
+        id capability = [media objectForKey:@"can_get_added_reactions"];
+        canGetAdded = canGetAdded || ([capability respondsToSelector:@selector(boolValue)] && [capability boolValue]);
     }
+    self.reactionSummary = summary;
+    self.chosenReactionEmojis = [chosen count] > 0 ? chosen : nil;
+    self.canGetAddedReactions = canGetAdded;
+}
+
+- (BOOL)updateAlbumReactionInfo:(NSDictionary *)reactionInfo forMessageID:(NSNumber *)messageID {
+    if (![reactionInfo isKindOfClass:[NSDictionary class]] ||
+        ![messageID respondsToSelector:@selector(longLongValue)] || [messageID longLongValue] <= 0 ||
+        [self.mediaItems count] == 0) { return NO; }
+    NSMutableArray *updated = [NSMutableArray arrayWithCapacity:[self.mediaItems count]];
+    BOOL matched = NO;
+    for (id media in self.mediaItems) {
+        id memberID = [media isKindOfClass:[NSDictionary class]] ? [media objectForKey:@"message_id"] : nil;
+        if ([memberID respondsToSelector:@selector(longLongValue)] && [memberID longLongValue] == [messageID longLongValue]) {
+            NSMutableDictionary *member = [NSMutableDictionary dictionaryWithDictionary:media];
+            id summary = [reactionInfo objectForKey:@"summary"];
+            if ([summary isKindOfClass:[NSString class]] && [summary length] > 0) {
+                [member setObject:summary forKey:@"reaction_summary"];
+            } else { [member removeObjectForKey:@"reaction_summary"]; }
+            id chosen = [reactionInfo objectForKey:@"chosen_emojis"];
+            if ([chosen isKindOfClass:[NSArray class]] && [chosen count] > 0) {
+                [member setObject:chosen forKey:@"chosen_reaction_emojis"];
+            } else { [member removeObjectForKey:@"chosen_reaction_emojis"]; }
+            id capability = [reactionInfo objectForKey:@"can_get_added_reactions"];
+            if ([capability respondsToSelector:@selector(boolValue)]) {
+                [member setObject:[NSNumber numberWithBool:[capability boolValue]] forKey:@"can_get_added_reactions"];
+            }
+            [updated addObject:member];
+            matched = YES;
+        } else { [updated addObject:media]; }
+    }
+    if (!matched) { return NO; }
+    self.mediaItems = updated;
+    [self rebuildAlbumReactionMetadata];
+    return YES;
 }
 
 - (NSString *)visualMediaPlaceholderTitle {

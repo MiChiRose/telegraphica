@@ -1,4 +1,5 @@
 #import "TGTDLibClient.h"
+#import "TGChatOpenState.h"
 #import "TGAuthorizationFlow.h"
 #import "TGFormattedTextCodec.h"
 #import "TGReactionCatalog.h"
@@ -238,6 +239,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
+    TGChatOpenState *_chatOpenState;
+    dispatch_queue_t _chatOpenQueue;
     NSThread *_receiverThread;
     BOOL _receiverRunning;
     BOOL _receiverShouldStop;
@@ -399,6 +402,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_customEmojiDescriptorCache setCountLimit:192];
         _capabilities = [[TGTDLibCapabilities alloc] initWithLoadedLibraryPath:nil];
         _sendLock = [[NSLock alloc] init];
+        _chatOpenState = [[TGChatOpenState alloc] init];
+        _chatOpenQueue = dispatch_queue_create("org.telegraphica.opened-chat", DISPATCH_QUEUE_SERIAL);
     }
     return self;
 }
@@ -519,6 +524,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _destroyFunction(_client);
     }
     _client = NULL;
+    [_chatOpenState resetTransport];
     [_sendLock unlock];
 }
 
@@ -544,6 +550,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_latestAuthorizationStateSummary release];
     [_latestAuthorizationSafeDetails release];
     [_latestAuthenticationQRCodeLink release];
+    [_chatOpenState release];
+    if (_chatOpenQueue) { dispatch_release(_chatOpenQueue); }
     [_sendLock release];
     [_receiverThread release];
     [_loadedPath release];
@@ -1278,7 +1286,36 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 }
 
+- (void)flushUserOpenedChatState {
+    // This is deliberately a fire-and-forget operation on a serial queue. It
+    // must not call ensureClient or wait for an acknowledgement on the UI thread.
+    [_sendLock lock];
+    if (_client && _sendFunction && ![self isShutdownStarted]) {
+        for (NSDictionary *request in [_chatOpenState requestsForCurrentSelection]) {
+            NSString *json = [self JSONStringFromObject:request error:NULL];
+            if (json) { _sendFunction(_client, [json UTF8String]); }
+        }
+    }
+    [_sendLock unlock];
+}
+
+- (void)setUserOpenedChatID:(NSNumber *)chatID {
+    [_chatOpenState setDesiredChatID:chatID];
+    dispatch_async(_chatOpenQueue, ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        [self flushUserOpenedChatState];
+        [pool drain];
+    });
+}
+
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary {
+    if ([_chatOpenState handleOpenResponse:dictionary]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), _chatOpenQueue, ^{
+            NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+            [self flushUserOpenedChatState];
+            [pool drain];
+        });
+    }
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
     NSString *objectType = [[dictionary objectForKey:@"@type"] isKindOfClass:[NSString class]]
         ? [dictionary objectForKey:@"@type"] : @"";

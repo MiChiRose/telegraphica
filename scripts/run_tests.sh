@@ -153,6 +153,12 @@ echo "== Message comments and thread navigation =="
     -framework Foundation -o "$BUILD_DIR/message-thread-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/message-thread-probe"
 
+echo "== Open chat subscription lifecycle =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/chat_open_state_probe.m Sources/Core/TGChatOpenState.m \
+    -framework Foundation -o "$BUILD_DIR/chat-open-state-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/chat-open-state-probe"
+
 echo "== Message reaction schemas =="
 "$CLANG" "${COMPILE_FLAGS[@]}" \
     Tests/message_reactions_probe.m Sources/Core/TGMessageReactionParser.m \

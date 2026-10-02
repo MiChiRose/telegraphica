@@ -127,7 +127,10 @@ void TGDrawReactionChipsForItem(TGMessageItem *item, NSRect bandRect, BOOL flipp
         NSString *emoji = [entry objectForKey:@"display_emoji"], *count = [entry objectForKey:@"count"];
         NSSize emojiSize = [emoji sizeWithAttributes:emojiAttributes], countSize = [count sizeWithAttributes:countAttributes];
         CGFloat emojiWidth = [[entry objectForKey:@"emoji_width"] doubleValue];
-        [emoji drawInRect:NSMakeRect(NSMinX(rect) + 8.0, NSMidY(rect) - floor(emojiSize.height / 2.0), emojiWidth, emojiSize.height + 1.0) withAttributes:emojiAttributes];
+        // Apple Color Emoji's line box places its visible glyph below the
+        // centre of ordinary numeric text on legacy AppKit.
+        CGFloat emojiY = NSMidY(rect) - floor(emojiSize.height / 2.0) + (flipped ? -2.0 : 2.0);
+        [emoji drawInRect:NSMakeRect(NSMinX(rect) + 8.0, emojiY, emojiWidth, emojiSize.height + 1.0) withAttributes:emojiAttributes];
         [count drawInRect:NSMakeRect(NSMinX(rect) + 8.0 + emojiWidth + 4.0, NSMidY(rect) - floor(countSize.height / 2.0), MAX(0.0, NSWidth(rect) - emojiWidth - 20.0), countSize.height + 1.0) withAttributes:countAttributes];
     }
     [NSGraphicsContext restoreGraphicsState];
