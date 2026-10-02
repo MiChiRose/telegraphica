@@ -607,6 +607,44 @@ static void TGTestMessageItemsAndLayout(void) {
     TGAssertTrue([[chunks objectAtIndex:0] length] <= TGOutgoingTextMessageMaximumLength, @"first text chunk should respect the Telegram limit");
 }
 
+static void TGTestCommentPresentation(void) {
+    TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@0 outgoing:NO preview:@"Comments"] autorelease];
+    [item setCanGetMessageThread:YES];
+    NSArray *counts = [NSArray arrayWithObjects:@1, @2, @4, @5, @11, @12, @14, @21, @22, @111, @112, nil];
+    NSArray *languages = [NSArray arrayWithObjects:@"en", @"ru", @"be", nil];
+    NSArray *expectedByLanguage = [NSArray arrayWithObjects:
+        [NSArray arrayWithObjects:@"1 comment", @"2 comments", @"4 comments", @"5 comments", @"11 comments", @"12 comments", @"14 comments", @"21 comments", @"22 comments", @"111 comments", @"112 comments", nil],
+        [NSArray arrayWithObjects:@"1 комментарий", @"2 комментария", @"4 комментария", @"5 комментариев", @"11 комментариев", @"12 комментариев", @"14 комментариев", @"21 комментарий", @"22 комментария", @"111 комментариев", @"112 комментариев", nil],
+        [NSArray arrayWithObjects:@"1 каментар", @"2 каментары", @"4 каментары", @"5 каментароў", @"11 каментароў", @"12 каментароў", @"14 каментароў", @"21 каментар", @"22 каментары", @"111 каментароў", @"112 каментароў", nil], nil];
+    NSUInteger languageIndex = 0;
+    for (languageIndex = 0; languageIndex < [languages count]; languageIndex++) {
+        TGSetLanguageCode([languages objectAtIndex:languageIndex]);
+        NSUInteger index = 0;
+        for (index = 0; index < [counts count]; index++) {
+            [item setMessageThreadReplyCount:[counts objectAtIndex:index]];
+            TGAssertEqualObjects(TGMessageCommentTitleForItem(item), [[expectedByLanguage objectAtIndex:languageIndex] objectAtIndex:index], @"comment titles must follow the selected language's plural forms");
+        }
+        [item setMessageThreadReplyCount:@0];
+        TGAssertEqualObjects(TGMessageCommentTitleForItem(item), TGLoc(@"message.comments.add"), @"zero comments should invite adding one");
+    }
+    TGSetLanguageCode(@"ru"); [item setMessageThreadReplyCount:@22];
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+    CGFloat normalHeight = TGMessageCommentBarHeightForItem(item);
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeVeryLarge);
+    CGFloat largeHeight = TGMessageCommentBarHeightForItem(item);
+    CGFloat measuredTitleHeight = ceil([TGMessageCommentTitleForItem(item) sizeWithAttributes:
+        [NSDictionary dictionaryWithObject:TGChatMessageBoldSecondaryFont() forKey:NSFontAttributeName]].height);
+    TGAssertTrue(largeHeight >= normalHeight, @"large text must not shrink the comment bar");
+    NSRect bubble = NSMakeRect(0.0, 0.0, 320.0, 180.0);
+    NSRect flippedBar = TGMessageCommentBarRectForItem(item, bubble, YES);
+    NSRect unflippedBar = TGMessageCommentBarRectForItem(item, bubble, NO);
+    TGAssertTrue(NSHeight(flippedBar) >= measuredTitleHeight + 8.0 && NSHeight(unflippedBar) >= measuredTitleHeight + 8.0, @"comment title must fit the actual largest secondary font with vertical padding in both coordinate systems");
+    TGAssertTrue(NSContainsRect(bubble, flippedBar) && NSContainsRect(bubble, unflippedBar), @"expanded comment bar should remain inside its bubble");
+    [item setCanGetMessageThread:NO]; [item setMessageThreadReplyCount:nil];
+    TGAssertTrue(TGMessageCommentBarHeightForItem(item) == 0.0, @"messages without discussions must reserve no comment bar space");
+    TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+}
+
 static void TGTestLocalization(void) {
     TGSetLanguageCode(@"ru");
     TGAssertEqualObjects(TGLanguageCode(), @"ru", @"Russian language should be saved");
@@ -631,6 +669,7 @@ int main(int argc, const char **argv) {
     TGTestMediaSecurityLimits();
     TGTestMessageItemsAndLayout();
     TGTestLocalization();
+    TGTestCommentPresentation();
     TGClearProbeDefaults();
     [pool drain];
     if (TGProbeFailures > 0) {

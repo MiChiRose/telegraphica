@@ -1276,8 +1276,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                                                      reactionFont);
     NSString *commentTitle = nil;
     if (TGMessageItemHasCommentThread(item)) {
-        NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
-        commentTitle = (replyCount > 0) ? [NSString stringWithFormat:TGLoc(replyCount == 1 ? @"message.comments.count.one" : @"message.comments.count.many"), (long)replyCount] : TGLoc(@"message.comments.add");
+        commentTitle = TGMessageCommentTitleForItem(item);
     }
     if ([reactionSummary length] > 0 || [commentTitle length] > 0) {
         NSString *footer = ([reactionSummary length] > 0 && [commentTitle length] > 0) ? [NSString stringWithFormat:@"%@    %@", reactionSummary, commentTitle] : (([reactionSummary length] > 0) ? reactionSummary : commentTitle);
@@ -1288,13 +1287,15 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                           TGClassicNavigationSelectedColor(0.92), NSForegroundColorAttributeName,
                                           footerParagraph, NSParagraphStyleAttributeName,
                                           nil];
+        CGFloat footerHeight = MAX(16.0, ceil([footer sizeWithAttributes:footerAttributes].height) + 2.0);
+        if (!flipped) { footerY = NSMinY(textRect) - footerHeight - 4.0; }
         CGFloat footerMaxY = NSMaxY(rowRect) - 5.0;
-        if (flipped && footerY + 16.0 > footerMaxY) {
-            footerY = footerMaxY - 16.0;
+        if (flipped && footerY + footerHeight > footerMaxY) {
+            footerY = footerMaxY - footerHeight;
         } else if (!flipped && footerY < NSMinY(rowRect) + 5.0) {
             footerY = NSMinY(rowRect) + 5.0;
         }
-        [footer drawInRect:NSMakeRect(textX, footerY, MAX(40.0, textWidth), 16.0) withAttributes:footerAttributes];
+        [footer drawInRect:NSMakeRect(textX, footerY, MAX(40.0, textWidth), footerHeight) withAttributes:footerAttributes];
     }
 }
 

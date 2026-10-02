@@ -40,6 +40,7 @@ trap cleanup EXIT
 echo "== Telegraphica static compatibility =="
 "$PYTHON_BIN" scripts/check_legacy_compat.py
 "$PYTHON_BIN" Tests/legacy_include_scanner_probe.py
+"$PYTHON_BIN" scripts/test_call_transport_staging.py
 "$PYTHON_BIN" scripts/check_free_feature_policy.py
 "$PYTHON_BIN" scripts/test_static_project.py
 "$PYTHON_BIN" scripts/test_security_hardening.py
@@ -279,7 +280,7 @@ echo "== Media image loader =="
 HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
 
 echo "== Sticker thumbnail pipeline =="
-python3 scripts/test_sticker_thumbnail_pipeline.py
+"$PYTHON_BIN" scripts/test_sticker_thumbnail_pipeline.py
 
 echo "== Media playback speed preferences =="
 "$CLANG" \
