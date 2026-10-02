@@ -240,3 +240,5 @@
 "storage.scope.current" = "Текущий чат";
 "storage.scope.chat" = "Чат: %@";
 "storage.confirm.filteredMessage" = "Будут удалены скачанные данные «%@» в области «%@». Они останутся в облаке Telegram и при необходимости загрузятся снова.";
+
+"message.comments.unavailable" = "Комментарии недоступны";

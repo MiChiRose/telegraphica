@@ -2,6 +2,7 @@
 #import "TGActiveSessionsPresentation.h"
 #import "TGAccessibilitySupport.h"
 #import "TGChatDisplayPreferences.h"
+#import "TGForumTopicRefreshSupport.h"
 #import "TGChatFolderManagementWindowController.h"
 #import "TGChatInfoWindowController.h"
 #import "TGDatePickerDialog.h"
@@ -56,6 +57,7 @@
 #import "../Core/TGChatItem.h"
 #import "../Core/TGAuthorizationFlow.h"
 #import "../Core/TGMessageItem.h"
+#import "../Core/TGMessageThreadSupport.h"
 #import "../Core/TGMessagePollSupport.h"
 #import "../Core/TGReactionCatalog.h"
 #import "../Core/TGTDLibOperation.h"
@@ -71,6 +73,7 @@
 #import "../Core/TGTDLibClient+ChatMembers.h"
 #import "../Core/TGTDLibClient+ForumTopics.h"
 #import "../Core/TGTDLibClient+MessageLinks.h"
+#import "../Core/TGTDLibClient+MessageThreads.h"
 #import "../Core/TGTDLibClient+Notifications.h"
 #import "../Core/TGTDLibClient+MessageTypes.h"
 #import "../Services/TGLocalDataReset.h"
@@ -593,9 +596,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableSet *visibleReadReceiptMessageIDs;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
-@property (nonatomic, copy) NSString *commentThreadParentTitle;
-@property (nonatomic, copy) NSString *commentThreadParentTypeSummary;
-@property (nonatomic, copy) NSString *commentThreadParentAvatarLocalPath;
+@property (nonatomic, retain) NSMutableArray *commentThreadNavigationStack;
+@property (nonatomic, assign) BOOL commentThreadOpenInFlight;
 @property (nonatomic, retain) NSNumber *topicParentChatID;
 @property (nonatomic, copy) NSString *topicParentTitle;
 @property (nonatomic, copy) NSString *topicParentAvatarLocalPath;
@@ -1143,9 +1145,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize visibleReadReceiptMessageIDs = _visibleReadReceiptMessageIDs;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
-@synthesize commentThreadParentTitle = _commentThreadParentTitle;
-@synthesize commentThreadParentTypeSummary = _commentThreadParentTypeSummary;
-@synthesize commentThreadParentAvatarLocalPath = _commentThreadParentAvatarLocalPath;
+@synthesize commentThreadNavigationStack = _commentThreadNavigationStack;
+@synthesize commentThreadOpenInFlight = _commentThreadOpenInFlight;
 @synthesize topicParentChatID = _topicParentChatID;
 @synthesize topicParentTitle = _topicParentTitle;
 @synthesize topicParentAvatarLocalPath = _topicParentAvatarLocalPath;
@@ -4611,6 +4612,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+MessageMediaHitTesting.inc"
 
+#include "TGStatusWindowController+MessageThreads.inc"
+
 #include "TGStatusWindowController+MessagingActions.inc"
 
 #include "TGStatusWindowController+ForumTopicManagement.inc"
@@ -5033,9 +5036,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_visibleReadReceiptMessageIDs release];
     [_selectedMessageThreadID release];
     [_selectedMessageTopicKind release];
-    [_commentThreadParentTitle release];
-    [_commentThreadParentTypeSummary release];
-    [_commentThreadParentAvatarLocalPath release];
+    [_commentThreadNavigationStack release];
     [_topicParentChatID release];
     [_topicParentTitle release];
     [_topicParentAvatarLocalPath release];

@@ -64,3 +64,6 @@ WorkshopModules/packages/
 
 # macOS
 .DS_Store
+
+# Private development context (keep out of source archives and GitHub)
+LOCAL_CONTEXT.md
