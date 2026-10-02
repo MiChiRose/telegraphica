@@ -2,12 +2,17 @@
 from __future__ import print_function
 
 import os
-import runpy
 import shutil
 import tempfile
 
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-scanner = runpy.run_path(os.path.join(root, "scripts", "check_legacy_compat.py"))
+scanner_path = os.path.join(root, "scripts", "check_legacy_compat.py")
+# Python 2.7 runpy clears its temporary module after returning a copy of the
+# namespace, leaving returned functions with cleared globals. Keep the executed
+# scanner's namespace alive for its helper functions throughout this probe.
+scanner = {"__name__": "telegraphica_legacy_scanner_probe", "__file__": scanner_path}
+with open(scanner_path, "rb") as handle:
+    eval(compile(handle.read(), scanner_path, "exec"), scanner)
 fixture_root = tempfile.mkdtemp(prefix="telegraphica-legacy-scanner-")
 try:
     sources = os.path.join(fixture_root, "Sources")
@@ -17,7 +22,7 @@ try:
         handle.write('id view = [[NSVisualEffectView alloc] init];\n')
         handle.write('NSArray<NSString *> *items;\n')
         handle.write('id api_hash = @"fixture-secret-value";\n')
-    scanner["check_sources"].__globals__["ROOT"] = fixture_root
+    scanner["ROOT"] = fixture_root
     errors = []
     scanner["check_sources"](errors)
     assert len(errors) == 3, "implementation includes must undergo API, compiler and secret checks: %r" % errors
