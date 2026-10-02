@@ -2042,9 +2042,6 @@ def check_standard_reaction_picker_contract(errors):
         if fragment not in layout_text:
             errors.append("%s: message emoji fallback is missing `%s`" %
                           (layout_rel, fragment))
-    if "TGStringByReplacingUnrenderableEmoji([item reactionSummary]" not in cells_text:
-        errors.append("%s: rendered reaction summaries do not use the legacy emoji fallback" %
-                      cells_rel)
 
 
 def check_contact_birthday_contract(errors):

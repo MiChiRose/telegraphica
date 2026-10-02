@@ -126,7 +126,11 @@ int main(void) {
     [legacy setReactionSummary:@"A 2"]; [legacy setChosenReactionEmojis:[NSArray arrayWithObject:@"A"]]; [legacy setCanGetAddedReactions:YES];
     [update setObject:@100 forKey:@"message_id"];
     summary = TGMessageInteractionUpdateSummary(update, nil);
-    TGAssert(TGApplyMessageInteractionSummaryToItem(legacy, summary) && ![legacy reactionSummary] && ![legacy chosenReactionEmojis] && ![legacy canGetAddedReactions], "empty reactions clear previously displayed reaction metadata");
+    TGAssert(TGApplyMessageInteractionSummaryToItem(legacy, summary) && ![legacy reactionSummary] && ![legacy chosenReactionEmojis], "empty reactions clear previously displayed reaction metadata");
+    TGAssert([legacy canGetAddedReactions], "absent interaction capability preserves previously learned legacy sender-list access");
+    NSDictionary *explicitUnavailable = [NSDictionary dictionaryWithObject:@NO forKey:@"can_get_added_reactions"];
+    summary = TGMessageInteractionUpdateSummary(update, explicitUnavailable);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(legacy, summary) && ![legacy canGetAddedReactions], "explicit false interaction capability clears sender-list access");
     TGAssert([legacy canGetMessageThread], "reaction-only update preserves direct legacy capability");
     TGAssert(!TGApplyMessageInteractionSummaryToItem(legacy, summary), "view-count-only update with unchanged empty metadata avoids redraw");
 

@@ -2,6 +2,7 @@
 #import "TGChatDisplayPreferences.h"
 #import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
+#import "TGReactionChipLayout.h"
 #import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
 #import "TGAccessibilitySupport.h"
@@ -12,18 +13,6 @@
 
 static CGFloat const TGPanelCornerRadius = 8.0;
 static CGFloat const TGPanelHeaderHeight = 40.0;
-
-static NSFont *TGReactionDisplayFont(void) {
-    static NSFont *reactionFont = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        reactionFont = [[NSFont fontWithName:@"Apple Color Emoji" size:14.0] retain];
-        if (!reactionFont) {
-            reactionFont = [[NSFont boldSystemFontOfSize:11.0] retain];
-        }
-    });
-    return reactionFont;
-}
 
 @implementation TGRepresentedObjectCell
 
@@ -587,7 +576,6 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     BOOL outgoing = [item outgoing];
     CGFloat sidePadding = 14.0;
     BOOL showSenderDetails = self.showSenderDetails;
-    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
 
     BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
@@ -635,85 +623,11 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     }
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
 
-    CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
-    if (nonVisualPlayable) {
-        bubbleWidth = TGPlayableMediaBubbleWidthForItem(item, maximumBubbleWidth);
-    }
-    if (nonVisualDocument) {
-        bubbleWidth = TGDocumentBubbleWidthForItem(item, maximumBubbleWidth);
-    }
-    if (pollContent) {
-        bubbleWidth = TGPollBubbleWidthForItem(item, maximumBubbleWidth);
-    }
-    if (callContent) {
-        bubbleWidth = TGCallBubbleWidthForItem(item, maximumBubbleWidth);
-    }
-    if (visualMediaMessage) {
-        CGFloat photoBubbleWidth = photoSize.width + 16.0;
-        if (photoBubbleWidth > bubbleWidth) {
-            bubbleWidth = photoBubbleWidth;
-        }
-    }
-    if (TGMessageItemHasLinkPreview(item)) {
-        CGFloat previewBubbleWidth = MIN(maximumBubbleWidth, 316.0);
-        if (previewBubbleWidth > bubbleWidth) {
-            bubbleWidth = previewBubbleWidth;
-        }
-    }
-    if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
-        NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
-        CGFloat footerWidth = ceil(timeSize.width) + TGOutgoingStatusDotsWidthForItem(item) + 29.0;
-        if (footerWidth > bubbleWidth) {
-            bubbleWidth = footerWidth;
-        }
-    }
-    if (bubbleWidth < 96.0) {
-        bubbleWidth = 96.0;
-    }
-    if (bubbleWidth > maximumBubbleWidth) {
-        bubbleWidth = maximumBubbleWidth;
-    }
+    NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
     CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight + contextHeaderHeight;
-    if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
-        if (NSHeight(measuredRect) > 0.0) {
-            bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
-        }
-    }
-    if (nonVisualPlayable) {
-        bubbleHeight = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (nonVisualDocument) {
-        bubbleHeight = TGDocumentBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (pollContent) {
-        bubbleHeight = TGPollBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (callContent) {
-        bubbleHeight = TGCallBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (TGMessageItemHasLinkPreview(item)) {
-        bubbleHeight += TGLinkPreviewCardHeightForItem(item, bubbleWidth - 16.0) + 8.0;
-    }
-    if ([messageText length] > 0 && separateMetadataFooter && [timeString length] > 0) {
-        bubbleHeight += 17.0;
-    }
-    if (bubbleHeight < 42.0) {
-        bubbleHeight = 42.0;
-    }
-    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    bubbleHeight += reactionBandHeight;
+    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItemWidth(item, NSWidth(bubbleRect));
     CGFloat commentBarHeight = TGMessageCommentBarHeightForItem(item);
-    bubbleHeight += commentBarHeight;
-
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
-    CGFloat blockOffset = floor(TGMessageExtraBlockVerticalPadding() / 2.0);
-    NSRect bubbleRect = NSMakeRect(bubbleX,
-                                   NSMinY(cellFrame) + 5.0 + blockOffset + topAccessoryHeight,
-                                   bubbleWidth,
-                                   bubbleHeight);
     if (TGChatMessagesAsBlocksEnabled()) {
         NSRect blockRect = NSInsetRect(bubbleRect, -5.0, -4.0);
         NSBezierPath *blockPath = [NSBezierPath bezierPathWithRoundedRect:blockRect xRadius:15.0 yRadius:15.0];
@@ -838,7 +752,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             }
             playableRect.size.height -= contextHeaderHeight;
         }
-        playableRect.size.height -= (commentBarHeight + reactionBandHeight);
+        playableRect = TGMessageContentRectByRemovingFooter(playableRect, commentBarHeight + reactionBandHeight, flipped);
         TGDrawPlayableMediaContentForItem(item, playableRect, flipped);
     }
 
@@ -856,7 +770,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             }
             documentRect.size.height -= contextHeaderHeight;
         }
-        documentRect.size.height -= (commentBarHeight + reactionBandHeight);
+        documentRect = TGMessageContentRectByRemovingFooter(documentRect, commentBarHeight + reactionBandHeight, flipped);
         TGDrawDocumentContentForItem(item, documentRect, outgoing, flipped);
     }
 
@@ -874,7 +788,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             }
             pollRect.size.height -= contextHeaderHeight;
         }
-        pollRect.size.height -= (commentBarHeight + reactionBandHeight);
+        pollRect = TGMessageContentRectByRemovingFooter(pollRect, commentBarHeight + reactionBandHeight, flipped);
         TGDrawPollContentForItem(item, pollRect, outgoing, flipped);
     }
 
@@ -892,13 +806,10 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
             }
             callRect.size.height -= contextHeaderHeight;
         }
-        callRect.size.height -= (commentBarHeight + reactionBandHeight);
+        callRect = TGMessageContentRectByRemovingFooter(callRect, commentBarHeight + reactionBandHeight, flipped);
         TGDrawCallContentForItem(item, callRect, outgoing, flipped);
     }
 
-    if (!flipped && reactionBandHeight > 0.0) {
-        contentTop -= reactionBandHeight;
-    }
     if (!flipped && visualMediaMessage && [messageText length] == 0 && mediaFooterHeight > 0.0) {
         contentTop -= mediaFooterHeight;
     }
@@ -987,76 +898,13 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         TGDrawOutgoingStatusDotsForItem(item, timeRect, [controlView isFlipped]);
     }
 
-    NSString *reactionSummary = [[item reactionAnimationDisplaySummary] length] > 0
-        ? [item reactionAnimationDisplaySummary]
-        : [item reactionSummary];
-    NSFont *reactionFont = TGReactionDisplayFont();
-    reactionSummary = TGStringByReplacingUnrenderableEmoji(reactionSummary, reactionFont);
-    if ([reactionSummary length] > 0) {
-        BOOL animatingReaction = [[item reactionAnimationDisplaySummary] length] > 0;
-        CGFloat rawProgress = animatingReaction
-            ? MAX(0.0, MIN(1.0, [item reactionAnimationProgress]))
-            : 1.0;
-        BOOL removingReaction = animatingReaction && [item reactionAnimationRemoving];
-        CGFloat visualProgress = 1.0;
-        if (animatingReaction) {
-            if (removingReaction) {
-                visualProgress = MAX(0.0, 1.0 - MIN(1.0, rawProgress / 0.55));
-            } else {
-                visualProgress = MAX(0.0, MIN(1.0, (rawProgress - 0.46) / 0.54));
-            }
-        }
-        CGFloat inverseVisualProgress = 1.0 - visualProgress;
-        CGFloat easedVisualProgress = 1.0 -
-            (inverseVisualProgress * inverseVisualProgress * inverseVisualProgress);
-        CGFloat reactionOpacity = removingReaction ? visualProgress : easedVisualProgress;
-        CGFloat reactionScale = removingReaction
-            ? (0.90 + (0.10 * visualProgress))
-            : easedVisualProgress;
-        NSDictionary *reactionAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                            reactionFont, NSFontAttributeName,
-                                            [TGClassicSelectedRowTextColor() colorWithAlphaComponent:reactionOpacity], NSForegroundColorAttributeName,
-                                            nil];
-        NSSize reactionSize = [reactionSummary sizeWithAttributes:reactionAttributes];
-        CGFloat fullReactionWidth = ceil(reactionSize.width) + 16.0;
-        CGFloat maximumReactionWidth = NSWidth(bubbleRect) - 24.0;
-        if (fullReactionWidth > maximumReactionWidth) {
-            fullReactionWidth = maximumReactionWidth;
-        }
-        if (fullReactionWidth > 20.0 && reactionScale > 0.01) {
-            CGFloat reactionWidth = fullReactionWidth * reactionScale;
-            CGFloat fullReactionHeight = 24.0;
-            CGFloat reactionHeight = fullReactionHeight * reactionScale;
-            CGFloat reactionY = [controlView isFlipped] ? (NSMaxY(bubbleRect) - reactionHeight - 5.0)
-                                                        : (NSMinY(bubbleRect) + 5.0);
-            NSRect reactionRect = NSMakeRect(NSMinX(bubbleRect) + 10.0 +
-                                                 ((fullReactionWidth - reactionWidth) / 2.0),
-                                             reactionY,
-                                             reactionWidth,
-                                             reactionHeight);
-            CGFloat reactionRadius = floor(NSHeight(reactionRect) / 2.0);
-            NSBezierPath *reactionPath = [NSBezierPath bezierPathWithRoundedRect:reactionRect
-                                                                         xRadius:reactionRadius
-                                                                         yRadius:reactionRadius];
-            [[TGClassicNavigationSelectedColor(0.82) colorWithAlphaComponent:reactionOpacity] set];
-            [reactionPath fill];
-            [[TGClassicNavigationSelectedStrokeColor(0.72) colorWithAlphaComponent:reactionOpacity] set];
-            [reactionPath setLineWidth:1.0];
-            [reactionPath stroke];
-
-            NSMutableParagraphStyle *reactionParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-            [reactionParagraph setAlignment:NSCenterTextAlignment];
-            NSMutableDictionary *centeredAttributes = [NSMutableDictionary dictionaryWithDictionary:reactionAttributes];
-            [centeredAttributes setObject:reactionParagraph forKey:NSParagraphStyleAttributeName];
-            CGFloat opticalOffset = [controlView isFlipped] ? -4.0 : 4.0;
-            CGFloat reactionTextY = NSMidY(reactionRect) - floor(reactionSize.height / 2.0) + opticalOffset;
-            NSRect reactionTextRect = NSMakeRect(NSMinX(reactionRect) + 4.0,
-                                                 reactionTextY,
-                                                 NSWidth(reactionRect) - 8.0,
-                                                 reactionSize.height + 2.0);
-            [reactionSummary drawInRect:reactionTextRect withAttributes:centeredAttributes];
-        }
+    if (reactionBandHeight > 0.0) {
+        NSRect band = NSMakeRect(NSMinX(bubbleRect) + 10.0,
+            [controlView isFlipped] ? NSMaxY(bubbleRect) - reactionBandHeight : NSMinY(bubbleRect),
+            MAX(1.0, NSWidth(bubbleRect) - 20.0), reactionBandHeight);
+        TGDrawReactionChipsForItem(item, band, [controlView isFlipped]);
     }
+
 }
 
 - (void)drawListMessageItem:(TGMessageItem *)item withFrame:(NSRect)cellFrame inView:(NSView *)controlView {
@@ -1270,33 +1118,23 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         TGDrawLinkPreviewCardForItem(item, linkPreviewRect, outgoing, flipped);
     }
 
-    CGFloat footerY = flipped ? (NSMaxY(textRect) + 4.0) : (NSMinY(textRect) - 20.0);
-    NSFont *reactionFont = TGReactionDisplayFont();
-    NSString *reactionSummary = TGStringByReplacingUnrenderableEmoji([item reactionSummary],
-                                                                     reactionFont);
-    NSString *commentTitle = nil;
+    CGFloat reactionWidth = MAX(40.0, NSWidth(cellFrame) - 86.0);
+    CGFloat reactionHeight = TGReactionChipsHeightForItem(item, reactionWidth);
+    CGFloat reactionY = flipped ? NSMaxY(rowRect) - reactionHeight - 3.0 : NSMinY(rowRect) + 3.0;
+    if (reactionHeight > 0.0) {
+        TGDrawReactionChipsForItem(item, NSMakeRect(textX, reactionY, reactionWidth, reactionHeight), flipped);
+    }
     if (TGMessageItemHasCommentThread(item)) {
-        commentTitle = TGMessageCommentTitleForItem(item);
+        NSString *title = TGMessageCommentTitleForItem(item);
+        NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+            TGChatMessageSecondaryFont(), NSFontAttributeName,
+            TGClassicNavigationSelectedColor(1.0), NSForegroundColorAttributeName, nil];
+        CGFloat titleHeight = ceil([title sizeWithAttributes:attributes].height) + 2.0;
+        NSRect commentRect = TGMessageCommentBarRectForItem(item, rowRect, flipped);
+        NSRect titleRect = NSMakeRect(NSMinX(commentRect), NSMidY(commentRect) - floor(titleHeight / 2.0), NSWidth(commentRect), titleHeight);
+        [title drawInRect:titleRect withAttributes:attributes];
     }
-    if ([reactionSummary length] > 0 || [commentTitle length] > 0) {
-        NSString *footer = ([reactionSummary length] > 0 && [commentTitle length] > 0) ? [NSString stringWithFormat:@"%@    %@", reactionSummary, commentTitle] : (([reactionSummary length] > 0) ? reactionSummary : commentTitle);
-        NSMutableParagraphStyle *footerParagraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-        [footerParagraph setLineBreakMode:NSLineBreakByTruncatingTail];
-        NSDictionary *footerAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                          reactionFont, NSFontAttributeName,
-                                          TGClassicNavigationSelectedColor(0.92), NSForegroundColorAttributeName,
-                                          footerParagraph, NSParagraphStyleAttributeName,
-                                          nil];
-        CGFloat footerHeight = MAX(16.0, ceil([footer sizeWithAttributes:footerAttributes].height) + 2.0);
-        if (!flipped) { footerY = NSMinY(textRect) - footerHeight - 4.0; }
-        CGFloat footerMaxY = NSMaxY(rowRect) - 5.0;
-        if (flipped && footerY + footerHeight > footerMaxY) {
-            footerY = footerMaxY - footerHeight;
-        } else if (!flipped && footerY < NSMinY(rowRect) + 5.0) {
-            footerY = NSMinY(rowRect) + 5.0;
-        }
-        [footer drawInRect:NSMakeRect(textX, footerY, MAX(40.0, textWidth), footerHeight) withAttributes:footerAttributes];
-    }
+
 }
 
 - (void)dealloc {

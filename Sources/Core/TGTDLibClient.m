@@ -2,6 +2,7 @@
 #import "TGAuthorizationFlow.h"
 #import "TGFormattedTextCodec.h"
 #import "TGReactionCatalog.h"
+#import "TGMessageReactionParser.h"
 #import "TGAddedReactionsParser.h"
 #import "TGCustomEmojiParser.h"
 #import "TGTDLibCapabilities.h"
@@ -6725,85 +6726,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject {
-    if (![messageObject isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    id interactionInfo = [messageObject objectForKey:@"interaction_info"];
-    if (![interactionInfo isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    id reactionsObject = [(NSDictionary *)interactionInfo objectForKey:@"reactions"];
-    if (![reactionsObject isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    BOOL canGetAddedReactions = [[(NSDictionary *)reactionsObject objectForKey:@"can_get_added_reactions"] boolValue];
-    id reactions = [(NSDictionary *)reactionsObject objectForKey:@"reactions"];
-    NSArray *reactionArray = [reactions isKindOfClass:[NSArray class]] ? reactions : [NSArray array];
-    if ([reactionArray count] == 0 && !canGetAddedReactions) {
-        return nil;
-    }
-
-    NSMutableArray *parts = [NSMutableArray array];
-    NSMutableArray *chosenEmojis = [NSMutableArray array];
-    NSUInteger index = 0;
-    for (index = 0; index < [reactionArray count]; index++) {
-        id reactionObject = [reactionArray objectAtIndex:index];
-        if (![reactionObject isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-        NSDictionary *reaction = (NSDictionary *)reactionObject;
-        id typeObject = [reaction objectForKey:@"type"];
-        NSString *emoji = nil;
-        if ([typeObject isKindOfClass:[NSDictionary class]]) {
-            id reactionType = [(NSDictionary *)typeObject objectForKey:@"@type"];
-            id emojiObject = [(NSDictionary *)typeObject objectForKey:@"emoji"];
-            if ([reactionType isKindOfClass:[NSString class]] &&
-                [(NSString *)reactionType isEqualToString:@"reactionTypeEmoji"] &&
-                [emojiObject isKindOfClass:[NSString class]] &&
-                [(NSString *)emojiObject length] > 0) {
-                emoji = (NSString *)emojiObject;
-            }
-        }
-        if ([emoji length] == 0) {
-            continue;
-        }
-
-        NSInteger count = 1;
-        id countObject = [reaction objectForKey:@"total_count"];
-        if ([countObject respondsToSelector:@selector(integerValue)] && [countObject integerValue] > 0) {
-            count = [countObject integerValue];
-        }
-        if ([parts count] < 3) {
-            if (count == 1) {
-                [parts addObject:emoji];
-            } else {
-                [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
-            }
-        }
-
-        id chosenObject = [reaction objectForKey:@"is_chosen"];
-        if ([chosenObject respondsToSelector:@selector(boolValue)] &&
-            [chosenObject boolValue] &&
-            ![chosenEmojis containsObject:emoji]) {
-            [chosenEmojis addObject:emoji];
-        }
-    }
-
-    if ([parts count] == 0 && [chosenEmojis count] == 0) {
-        return nil;
-    }
-    NSMutableDictionary *info = [NSMutableDictionary dictionary];
-    [info setObject:[NSNumber numberWithBool:canGetAddedReactions] forKey:@"can_get_added_reactions"];
-    if ([parts count] > 0) {
-        [info setObject:[parts componentsJoinedByString:@"  "] forKey:@"summary"];
-    }
-    if ([chosenEmojis count] > 0) {
-        [info setObject:chosenEmojis forKey:@"chosen_emojis"];
-    }
-    return info;
+    return TGMessageReactionInfoFromObject(messageObject);
 }
 
 - (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject {

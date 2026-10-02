@@ -155,7 +155,7 @@ BOOL TGApplyMessageInteractionSummaryToItem(TGMessageItem *item, NSDictionary *s
             id canGet = [reactions objectForKey:@"can_get_added_reactions"];
             [item setReactionSummary:[reactionText isKindOfClass:[NSString class]] ? reactionText : nil];
             [item setChosenReactionEmojis:[chosen isKindOfClass:[NSArray class]] ? chosen : nil];
-            [item setCanGetAddedReactions:[canGet respondsToSelector:@selector(boolValue)] && [canGet boolValue]];
+            if ([canGet respondsToSelector:@selector(boolValue)]) { [item setCanGetAddedReactions:[canGet boolValue]]; }
         }
     }
     return ![previous isEqual:TGInteractionDisplayState(item)];

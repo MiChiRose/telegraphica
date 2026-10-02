@@ -133,9 +133,6 @@
                               : -TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
         contentTop += flipped ? TGMessageContextHeaderHeightForItem(item)
                               : -TGMessageContextHeaderHeightForItem(item);
-        if (!flipped) {
-            contentTop -= TGReactionBandHeightForMessageItem(item);
-        }
         if ([item isVisualMediaMessage]) {
             NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, NSWidth(bubbleRect) - 16.0);
             NSRect imageRect = NSMakeRect(NSMinX(bubbleRect) + floor((NSWidth(bubbleRect) - photoSize.width) / 2.0),
@@ -190,79 +187,17 @@
     }
 
     NSString *messageText = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item)) ? @"" : TGDisplayTextForMessageItem(item);
-    BOOL outgoing = [item outgoing];
-    CGFloat sidePadding = 14.0;
     BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
-    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
-    CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
     BOOL flipped = [self.messageTableView isFlipped];
-
-    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
-    NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
-                                    TGClassicInkColor(), NSForegroundColorAttributeName,
-                                    paragraph, NSParagraphStyleAttributeName,
-                                    nil];
-    NSString *timeString = TGShortTimeStringFromDateValue([item date]);
-    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
-                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
-                                    nil];
-    NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
-    if ([messageText length] > 0) {
-        NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
-        [composedMessageText appendAttributedString:baseText];
-        if ([timeString length] > 0) {
-            NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
-            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
-            [composedMessageText appendAttributedString:timeSuffixText];
-            NSAttributedString *statusSuffix = TGOutgoingStatusInlineAttributedStringForItem(item);
-            if ([statusSuffix length] > 0) {
-                [composedMessageText appendAttributedString:statusSuffix];
-            }
-        }
-    }
-
-    NSRect measuredRect = NSZeroRect;
-    if ([messageText length] > 0) {
-        measuredRect = [composedMessageText boundingRectWithSize:NSMakeSize(maximumBubbleWidth - 24.0, 12000.0)
-                                                         options:NSStringDrawingUsesLineFragmentOrigin];
-    }
-
+    NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
+    CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
     NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
-    CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
-    CGFloat photoBubbleWidth = photoSize.width + 16.0;
-    if (photoBubbleWidth > bubbleWidth) {
-        bubbleWidth = photoBubbleWidth;
-    }
-    if (bubbleWidth < 96.0) {
-        bubbleWidth = 96.0;
-    }
-    if (bubbleWidth > maximumBubbleWidth) {
-        bubbleWidth = maximumBubbleWidth;
-    }
-
     CGFloat mediaFooterHeight = TGMessageMediaFooterHeightForItem(item);
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
     CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
-    CGFloat bubbleHeight = photoSize.height + 24.0 + mediaFooterHeight + senderHeaderHeight + contextHeaderHeight;
-    if (NSHeight(measuredRect) > 0.0) {
-        bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
-    }
-    if (bubbleHeight < 42.0) {
-        bubbleHeight = 42.0;
-    }
-    bubbleHeight += TGReactionBandHeightForMessageItem(item);
-
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
-    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
     CGFloat contentTop = flipped ? (NSMinY(bubbleRect) + 9.0) : (NSMaxY(bubbleRect) - 9.0);
     contentTop += flipped ? senderHeaderHeight : -senderHeaderHeight;
     contentTop += flipped ? contextHeaderHeight : -contextHeaderHeight;
-    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    if (!flipped) {
-        contentTop -= reactionBandHeight;
-    }
     if (!flipped && [messageText length] == 0 && mediaFooterHeight > 0.0) {
         contentTop -= mediaFooterHeight;
     }
@@ -443,12 +378,8 @@
         return nil;
     }
 
-    BOOL outgoing = [item outgoing];
-    CGFloat sidePadding = 14.0;
     BOOL showSenderDetails = [self shouldShowGroupSenderDetailsForMessageItem:item];
-    CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
-
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSFont systemFontOfSize:12.0], NSFontAttributeName,
@@ -484,35 +415,8 @@
         photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumBubbleWidth - 16.0);
     }
 
-    CGFloat bubbleWidth = ceil(NSWidth(measuredRect)) + 28.0;
-    if (visualMediaMessage) {
-        CGFloat photoBubbleWidth = photoSize.width + 16.0;
-        if (photoBubbleWidth > bubbleWidth) {
-            bubbleWidth = photoBubbleWidth;
-        }
-    }
-    if (bubbleWidth < 96.0) {
-        bubbleWidth = 96.0;
-    }
-    if (bubbleWidth > maximumBubbleWidth) {
-        bubbleWidth = maximumBubbleWidth;
-    }
-
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat bubbleHeight = ceil(NSHeight(measuredRect)) + 26.0 + senderHeaderHeight;
-    if (visualMediaMessage) {
-        bubbleHeight = photoSize.height + 24.0 + senderHeaderHeight;
-        if (NSHeight(measuredRect) > 0.0) {
-            bubbleHeight += ceil(NSHeight(measuredRect)) + 8.0;
-        }
-    }
-    if (bubbleHeight < 42.0) {
-        bubbleHeight = 42.0;
-    }
-    bubbleHeight += TGReactionBandHeightForMessageItem(item);
-
-    CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
-    NSRect bubbleRect = NSMakeRect(bubbleX, NSMinY(cellFrame) + 5.0, bubbleWidth, bubbleHeight);
+    NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
     CGFloat contentTop = NSMaxY(bubbleRect) - 9.0;
     contentTop -= senderHeaderHeight;
     if (visualMediaMessage) {
@@ -604,8 +508,10 @@
             }
             pollRect.size.height -= contextHeaderHeight;
         }
-        pollRect.size.height -= (TGMessageCommentBarHeightForItem((TGMessageItem *)item) +
-                                 TGReactionBandHeightForMessageItem((TGMessageItem *)item));
+        pollRect = TGMessageContentRectByRemovingFooter(pollRect,
+            TGMessageCommentBarHeightForItem((TGMessageItem *)item) +
+            TGReactionBandHeightForMessageItemWidth((TGMessageItem *)item, NSWidth(bubbleRect)),
+            [self.messageTableView isFlipped]);
         if (TGPollPointIsInConfirmRect((TGMessageItem *)item, pollRect, tablePoint, [self.messageTableView isFlipped])) {
             NSArray *pendingPollOptions = [(TGMessageItem *)item pendingPollOptionIndexes];
             if ([pendingPollOptions count] > 0) {

@@ -153,6 +153,12 @@ echo "== Message comments and thread navigation =="
     -framework Foundation -o "$BUILD_DIR/message-thread-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/message-thread-probe"
 
+echo "== Message reaction schemas =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/message_reactions_probe.m Sources/Core/TGMessageReactionParser.m \
+    -framework Foundation -o "$BUILD_DIR/message-reactions-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/message-reactions-probe"
+
 echo "== Forum refresh navigation =="
 "$CLANG" "${COMPILE_FLAGS[@]}" \
     Tests/forum_topic_refresh_probe.m Sources/Core/TGChatItem.m \
@@ -346,6 +352,7 @@ echo "== Core logic probe =="
     Sources/UI/TGChatDisplayPreferences.m \
     Sources/UI/TGLocalization.m \
     Sources/UI/TGMessageLayoutSupport.m \
+    Sources/UI/TGReactionChipLayout.m \
     Sources/UI/TGTheme.m \
     Sources/UI/TGVisualWorldThemeSpec.m \
     -framework Cocoa \
