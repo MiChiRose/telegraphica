@@ -3,6 +3,15 @@
 #import "TGMessageItem.h"
 #import "TGTDLibClient+MessageThreads.h"
 
+static NSDictionary *TGThreadFixture(NSString *name) {
+    NSString *path = [@"Tests/Fixtures" stringByAppendingPathComponent:name];
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    if (!data) { fprintf(stderr, "Missing thread fixture: %s\n", [path UTF8String]); exit(1); }
+    id fixture = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+    if (![fixture isKindOfClass:[NSDictionary class]]) { fprintf(stderr, "Invalid thread fixture\n"); exit(1); }
+    return fixture;
+}
+
 @implementation TGTDLibClient
 @end
 
@@ -10,11 +19,12 @@
 @property (nonatomic, retain) NSMutableArray *requests;
 @property (nonatomic, retain) NSDictionary *response;
 @property (nonatomic, copy) NSString *failType;
+@property (nonatomic, copy) NSString *fixtureRuntime;
 @end
 @implementation TGThreadProbeClient
-@synthesize requests = _requests, response = _response, failType = _failType;
+@synthesize requests = _requests, response = _response, failType = _failType, fixtureRuntime = _fixtureRuntime;
 - (id)init { self = [super init]; if (self) { self.requests = [NSMutableArray array]; } return self; }
-- (void)dealloc { [_requests release]; [_response release]; [_failType release]; [super dealloc]; }
+- (void)dealloc { [_requests release]; [_response release]; [_failType release]; [_fixtureRuntime release]; [super dealloc]; }
 - (NSString *)currentAuthorizationStatePreparingIfNeededWithTimeout:(NSTimeInterval)timeout error:(NSError **)error { (void)timeout; (void)error; return @"ready"; }
 - (NSError *)errorWithDescription:(NSString *)description code:(NSInteger)code { return [NSError errorWithDomain:@"TGThreadProbe" code:code userInfo:[NSDictionary dictionaryWithObject:description forKey:NSLocalizedDescriptionKey]]; }
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request extraPrefix:(NSString *)prefix timeout:(NSTimeInterval)timeout errorCode:(NSInteger)code error:(NSError **)error {
@@ -23,6 +33,19 @@
     if ([[request objectForKey:@"@type"] isEqual:self.failType]) {
         if (error) { *error = [self errorWithDescription:@"Unsupported fixture schema" code:400]; }
         return nil;
+    }
+    if ([self.fixtureRuntime length] > 0) {
+        // Exercise actual JSON fields, as tdjson sees them. The legacy fixture
+        // ignores topic_id; the modern fixture ignores message_thread_id.
+        NSData *json = [NSJSONSerialization dataWithJSONObject:request options:0 error:NULL];
+        NSDictionary *serialized = [NSJSONSerialization JSONObjectWithData:json options:0 error:NULL];
+        BOOL modern = [self.fixtureRuntime isEqualToString:@"modern"];
+        id scope = modern ? [[serialized objectForKey:@"topic_id"] objectForKey:@"message_thread_id"]
+                          : [serialized objectForKey:@"message_thread_id"];
+        BOOL scoped = [scope respondsToSelector:@selector(longLongValue)] && [scope longLongValue] == 700;
+        if ([self.fixtureRuntime isEqualToString:@"unscoped"]) { scoped = NO; }
+        return TGThreadFixture(scoped ? (modern ? @"message_thread_history_modern.json" : @"message_thread_history_legacy.json")
+                                     : @"message_thread_history_unscoped.json");
     }
     return self.response;
 }
@@ -132,5 +155,37 @@ int main(void) {
     [client recentMessagePreviewItemsForChatID:@42 messageThreadID:@77 messageTopicKind:@"thread" limit:20 timeout:1 error:NULL];
     request = [client.requests lastObject];
     TGAssert([[[request objectForKey:@"topic_id"] objectForKey:@"@type"] isEqual:@"messageTopicThread"], "thread fallback must not accidentally load a forum");
+    // These nonempty fixtures reproduce a legacy tdjson parser silently
+    // ignoring an unknown newer topic_id and returning another discussion.
+    client.failType = @"getMessageThreadHistory";
+    client.fixtureRuntime = @"legacy"; [client.requests removeAllObjects];
+    NSArray *legacyHistory = [client recentMessagePreviewItemsForChatID:@-999 messageThreadID:@700 messageTopicKind:@"thread" limit:20 timeout:1 error:NULL];
+    TGAssert([legacyHistory count] == 2 && [[[legacyHistory objectAtIndex:0] objectForKey:@"message_thread_id"] longLongValue] == 700, "legacy fallback must use its recognized JSON field, never unrelated group history");
+    request = [client.requests lastObject];
+    TGAssert([[request objectForKey:@"message_thread_id"] longLongValue] == 700 && [[[request objectForKey:@"topic_id"] objectForKey:@"message_thread_id"] longLongValue] == 700, "fallback request supplies matching scope in both schema generations");
+    client.fixtureRuntime = @"modern"; [client.requests removeAllObjects];
+    NSArray *modernHistory = [client recentMessagePreviewItemsForChatID:@-999 messageThreadID:@700 messageTopicKind:@"thread" limit:20 timeout:1 error:NULL];
+    TGAssert([modernHistory count] == 1 && [[[[modernHistory objectAtIndex:0] objectForKey:@"topic_id"] objectForKey:@"message_thread_id"] longLongValue] == 700, "modern fallback remains scoped by topic_id");
+    client.fixtureRuntime = @"unscoped"; [client.requests removeAllObjects]; error = nil;
+    TGAssert(![client recentMessagePreviewItemsForChatID:@-999 messageThreadID:@700 messageTopicKind:@"thread" limit:20 timeout:1 error:&error] && error, "unscoped nonempty fallback response must fail rather than display another discussion");
+    TGAssert([client.requests count] == 3, "invalid topic fallback must try the next legacy schema before failing");
+    NSDictionary *unscoped = TGThreadFixture(@"message_thread_history_unscoped.json");
+    TGAssert(!TGMessageThreadHistoryResponseIsScoped(unscoped, @-999, @700, @"thread"), "another root's serialized messages are rejected");
+    TGAssert(TGMessageThreadHistoryResponseIsScoped(TGThreadFixture(@"message_thread_history_legacy.json"), @-999, @700, @"thread"), "legacy exact root with zero thread metadata is a valid anchor");
+    TGAssert(!TGMessageThreadHistoryResponseIsScoped(TGThreadFixture(@"message_thread_history_legacy.json"), @-123, @700, @"thread"), "colliding thread IDs in another chat cannot pass validation");
+    NSMutableDictionary *mixedResponse = [NSMutableDictionary dictionaryWithDictionary:TGThreadFixture(@"message_thread_history_modern.json")];
+    [mixedResponse setObject:[NSArray arrayWithObjects:
+        [[TGThreadFixture(@"message_thread_history_modern.json") objectForKey:@"messages"] objectAtIndex:0],
+        [[unscoped objectForKey:@"messages"] objectAtIndex:0], nil] forKey:@"messages"];
+    TGAssert(!TGMessageThreadHistoryResponseIsScoped(mixedResponse, @-999, @700, @"thread"), "mixed correct and unrelated results must not be accepted as a scoped page");
+
+    NSDictionary *forumMessage = [NSDictionary dictionaryWithObjectsAndKeys:
+        @"message", @"@type", @-999, @"chat_id", @701, @"id",
+        [NSDictionary dictionaryWithObjectsAndKeys:@"messageTopicForum", @"@type", @700, @"forum_topic_id", nil], @"topic_id", nil];
+    NSDictionary *forumResponse = [NSDictionary dictionaryWithObjectsAndKeys:@"foundChatMessages", @"@type", [NSArray arrayWithObject:forumMessage], @"messages", nil];
+    TGAssert(TGMessageThreadHistoryResponseIsScoped(forumResponse, @-999, @700, @"forum"), "matching fresh forum metadata remains supported");
+    TGAssert(!TGMessageThreadHistoryResponseIsScoped(forumResponse, @-999, @700, @"thread"), "equal numeric IDs with a different topic kind must not pass validation");
+    TGAssert(!TGMessageThreadHistoryResponseIsScoped(TGThreadFixture(@"message_thread_history_modern.json"), @-999, @700, @"forum"), "forum fallback must not accept another kind of topic with the same ID");
+
     printf("Message thread probe passed.\n"); [pool drain]; return 0;
 }

@@ -1,0 +1,7 @@
+{
+  "@type": "messages", "total_count": 2,
+  "messages": [
+    {"@type": "message", "chat_id": -999, "id": 701, "message_thread_id": 700},
+    {"@type": "message", "chat_id": -999, "id": 700, "message_thread_id": 0}
+  ]
+}

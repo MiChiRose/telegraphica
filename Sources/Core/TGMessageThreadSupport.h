@@ -12,3 +12,5 @@ NSDictionary *TGMessageThreadDestinationFromInfo(NSDictionary *threadInfo);
 NSDictionary *TGMessageInteractionUpdateSummary(NSDictionary *update, NSDictionary *reactionInfo);
 // Applies a matching update; returns YES only when visible metadata changed.
 BOOL TGApplyMessageInteractionSummaryToItem(TGMessageItem *item, NSDictionary *summary);
+// Search schema fallbacks must prove they returned the requested topic.
+BOOL TGMessageThreadHistoryResponseIsScoped(NSDictionary *response, NSNumber *chatID, NSNumber *threadID, NSString *topicKind);

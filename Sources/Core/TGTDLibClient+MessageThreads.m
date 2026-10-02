@@ -176,11 +176,16 @@
                                     [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"forum_topic_id",
                                     nil];
         [searchRequest setObject:forumTopic forKey:@"topic_id"];
+        [searchRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
         response = [self sendTDLibRequestAndWaitForExtra:searchRequest
                                                extraPrefix:@"telegraphica-thread-search-history"
                                                    timeout:timeout
                                                  errorCode:40
                                                      error:&primaryHistoryError];
+        if (response && !TGMessageThreadHistoryResponseIsScoped(response, chatID, messageThreadID, safeTopicKind)) {
+            response = nil;
+            primaryHistoryError = [self errorWithDescription:@"TDLib search returned messages outside the requested discussion." code:41];
+        }
     }
     if (!response && threadHistory && allowThreadSchema) {
         NSMutableDictionary *searchRequest = [NSMutableDictionary dictionary];
@@ -197,11 +202,16 @@
                                        [NSNumber numberWithLongLong:[messageThreadID longLongValue]], @"message_thread_id",
                                        nil];
         [searchRequest setObject:messageThread forKey:@"topic_id"];
+        [searchRequest setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
         response = [self sendTDLibRequestAndWaitForExtra:searchRequest
                                              extraPrefix:@"telegraphica-message-thread-search-history"
                                                  timeout:timeout
                                                errorCode:40
                                                    error:&primaryHistoryError];
+        if (response && !TGMessageThreadHistoryResponseIsScoped(response, chatID, messageThreadID, safeTopicKind)) {
+            response = nil;
+            primaryHistoryError = [self errorWithDescription:@"TDLib search returned messages outside the requested discussion." code:41];
+        }
     }
     if (!response && threadHistory && allowLegacyThreadSchema) {
         NSMutableDictionary *legacySearchRequest = [NSMutableDictionary dictionary];
@@ -219,6 +229,10 @@
                                                  timeout:timeout
                                                errorCode:40
                                                    error:&primaryHistoryError];
+        if (response && !TGMessageThreadHistoryResponseIsScoped(response, chatID, messageThreadID, safeTopicKind)) {
+            response = nil;
+            primaryHistoryError = [self errorWithDescription:@"TDLib search returned messages outside the requested discussion." code:41];
+        }
     }
     if (!response) {
         if (error) {
