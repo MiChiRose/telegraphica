@@ -1,4 +1,5 @@
 #import "TGMessageLayoutSupport.h"
+#import "TGReactionChipLayout.h"
 #import "TGChatDisplayPreferences.h"
 #import "TGIconAssets.h"
 #import "TGLocalization.h"
@@ -1640,7 +1641,6 @@ CGFloat TGPlayableMediaBubbleWidthForItem(TGMessageItem *item, CGFloat maximumWi
 
 CGFloat TGPlayableMediaBubbleHeightForItem(TGMessageItem *item) {
     CGFloat height = ([item isVoiceNoteMessage] ? 58.0 : 62.0) + MAX(0.0, TGChatMessageBodyFontSize() - 12.0);
-    height += TGReactionBandHeightForMessageItem(item);
     return height;
 }
 
@@ -1819,28 +1819,21 @@ BOOL TGPollPointIsInConfirmRect(TGMessageItem *item, NSRect bubbleRect, NSPoint 
     return (!NSIsEmptyRect(confirmRect) && NSPointInRect(point, confirmRect));
 }
 
+NSRect TGMessageContentRectByRemovingFooter(NSRect rect, CGFloat footerHeight, BOOL flipped) {
+    CGFloat removedHeight = MIN(NSHeight(rect), MAX(0.0, footerHeight));
+    if (!flipped) {
+        rect.origin.y += removedHeight;
+    }
+    rect.size.height -= removedHeight;
+    return rect;
+}
+
+CGFloat TGReactionBandHeightForMessageItemWidth(TGMessageItem *item, CGFloat bubbleWidth) {
+    return TGReactionChipsHeightForItem(item, MAX(40.0, bubbleWidth - 20.0));
+}
+
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item) {
-    NSString *displaySummary = [[item reactionAnimationDisplaySummary] length] > 0
-        ? [item reactionAnimationDisplaySummary]
-        : [item reactionSummary];
-    if ([displaySummary length] == 0) {
-        return 0.0;
-    }
-    if (![item reactionAnimationChangesHeight]) {
-        return 26.0;
-    }
-    CGFloat rawProgress = MAX(0.0, MIN(1.0, [item reactionAnimationProgress]));
-    CGFloat phaseProgress = 0.0;
-    if ([item reactionAnimationRemoving]) {
-        phaseProgress = (rawProgress <= 0.45)
-            ? 1.0
-            : MAX(0.0, 1.0 - ((rawProgress - 0.45) / 0.55));
-    } else {
-        phaseProgress = MIN(1.0, rawProgress / 0.50);
-    }
-    CGFloat inverse = 1.0 - phaseProgress;
-    CGFloat easedProgress = 1.0 - (inverse * inverse * inverse);
-    return 26.0 * easedProgress;
+    return TGReactionBandHeightForMessageItemWidth(item, 96.0);
 }
 
 CGFloat TGMessageSenderHeaderHeightForItem(TGMessageItem *item, BOOL showSenderDetails) {
@@ -1899,14 +1892,19 @@ CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item) {
 }
 
 NSRect TGMessageCommentBarRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
-    CGFloat height = TGMessageCommentBarHeightForItem(item);
+    BOOL blocks = TGChatMessagesAsBlocksEnabled();
+    CGFloat height = blocks
+        ? (TGMessageItemHasCommentThread(item) ? MAX(24.0, TGMessageCommentTitleLineHeight() + 8.0) : 0.0)
+        : TGMessageCommentBarHeightForItem(item);
     if (height <= 0.0 || NSIsEmptyRect(bubbleRect)) {
         return NSZeroRect;
     }
-    CGFloat reactionHeight = TGReactionBandHeightForMessageItem(item);
+    CGFloat innerWidth = blocks ? MAX(40.0, NSWidth(bubbleRect) - 74.0) : NSWidth(bubbleRect) - 20.0;
+    CGFloat reactionHeight = TGReactionChipsHeightForItem(item, innerWidth);
     CGFloat y = flipped ? (NSMaxY(bubbleRect) - reactionHeight - height - 4.0)
                         : (NSMinY(bubbleRect) + reactionHeight + 4.0);
-    return NSMakeRect(NSMinX(bubbleRect) + 10.0, y, NSWidth(bubbleRect) - 20.0, height - 6.0);
+    CGFloat inset = blocks ? 50.0 : 10.0;
+    return NSMakeRect(NSMinX(bubbleRect) + inset, y, innerWidth, height - 6.0);
 }
 
 void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL outgoing, BOOL flipped) {
@@ -2180,75 +2178,16 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
         if (TGMessageItemHasCommentThread(item)) {
             rowHeight += MAX(24.0, TGMessageCommentTitleLineHeight() + 8.0);
         }
-        rowHeight += TGReactionBandHeightForMessageItem(item);
+        rowHeight += TGReactionBandHeightForMessageItemWidth(item, MAX(60.0, availableWidth - 66.0));
         if (rowHeight < 44.0) {
             rowHeight = 44.0;
         }
         return ceil(rowHeight + TGMessageTopAccessoryHeightForItem(item));
     }
-    CGFloat maximumTextWidth = TGMaximumBubbleWidthForItem(item, availableWidth);
-
-    BOOL nonVisualDocument = TGMessageItemIsNonVisualDocument(item);
-    BOOL callContent = TGMessageItemIsCallContent(item);
-    NSString *text = ([item isStickerMessage] || TGMessageItemIsNonVisualPlayableMedia(item) || nonVisualDocument || TGMessageItemIsPollContent(item) || callContent) ? @"" : TGDisplayTextForMessageItem(item);
-    NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
-    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                TGChatMessageBodyFont(), NSFontAttributeName,
-                                paragraph, NSParagraphStyleAttributeName,
-                                nil];
-    NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    TGChatMessageMetaFont(), NSFontAttributeName,
-                                    nil];
-    CGFloat textHeight = 0.0;
-    BOOL separateMetadataFooter = TGMessageUsesSeparateMetadataFooter();
-    if ([text length] > 0) {
-        NSMutableAttributedString *composedText = [[TGAttributedMessageStringForItem(item, text, attributes) mutableCopy] autorelease];
-        NSString *timeString = TGShortTimeStringFromDateValue([item date]);
-        if ([timeString length] > 0 && !separateMetadataFooter) {
-            NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"  %@", timeString]
-                                                                                  attributes:timeAttributes] autorelease];
-            [composedText appendAttributedString:timeSuffixText];
-            NSAttributedString *statusSuffix = TGOutgoingStatusInlineAttributedStringForItem(item);
-            if ([statusSuffix length] > 0) {
-                [composedText appendAttributedString:statusSuffix];
-            }
-        }
-        NSRect textRect = [composedText boundingRectWithSize:NSMakeSize(maximumTextWidth - 24.0, 12000.0)
-                                                     options:NSStringDrawingUsesLineFragmentOrigin];
-        textHeight = ceil(NSHeight(textRect));
-    }
-
-    CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
-    CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
-    CGFloat height = textHeight + 26.0 + senderHeaderHeight + contextHeaderHeight;
-    if (TGMessageItemIsNonVisualPlayableMedia(item)) {
-        height = TGPlayableMediaBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (nonVisualDocument) {
-        height = TGDocumentBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (TGMessageItemIsPollContent(item)) {
-        height = TGPollBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if (callContent) {
-        height = TGCallBubbleHeightForItem(item) + senderHeaderHeight + contextHeaderHeight;
-    }
-    if ([item isVisualMediaMessage]) {
-        NSSize photoSize = TGPhotoDisplaySizeForMessageItem(item, maximumTextWidth - 16.0);
-        height = photoSize.height + 24.0 + TGMessageMediaFooterHeightForItem(item) + senderHeaderHeight + contextHeaderHeight + ((textHeight > 0.0) ? (textHeight + 8.0) : 0.0);
-    }
-    if (TGMessageItemHasLinkPreview(item)) {
-        height += TGLinkPreviewCardHeightForItem(item, maximumTextWidth - 16.0) + 8.0;
-    }
-    if ([text length] > 0 && separateMetadataFooter && [[item date] integerValue] > 0) {
-        height += 17.0;
-    }
-    if (height < 42.0) {
-        height = 42.0;
-    }
-    height += TGReactionBandHeightForMessageItem(item);
-    height += TGMessageCommentBarHeightForItem(item);
-    return height + 10.0 + TGMessageExtraBlockVerticalPadding() +
+    // Use the same width and content geometry as drawing and hit testing. The
+    // reaction chips may wrap even when the message text occupies one line.
+    NSRect bubbleRect = TGMessageBubbleRectForItem(item, NSMakeRect(0.0, 0.0, availableWidth, 1.0), showSenderDetails);
+    return NSHeight(bubbleRect) + 10.0 + TGMessageExtraBlockVerticalPadding() +
         TGMessageTopAccessoryHeightForItem(item);
 }
 
@@ -2339,6 +2278,8 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
             bubbleWidth = footerWidth;
         }
     }
+    CGFloat reactionMinimumWidth = TGReactionChipsMinimumWidthForItem(item) + 20.0;
+    bubbleWidth = MAX(bubbleWidth, MIN(maximumBubbleWidth, reactionMinimumWidth));
     if (bubbleWidth < 96.0) {
         bubbleWidth = 96.0;
     }
@@ -2376,9 +2317,7 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
-    if (!nonVisualPlayable && !nonVisualDocument && !TGMessageItemIsPollContent(item)) {
-        bubbleHeight += TGReactionBandHeightForMessageItem(item);
-    }
+    bubbleHeight += TGReactionBandHeightForMessageItemWidth(item, bubbleWidth);
     bubbleHeight += TGMessageCommentBarHeightForItem(item);
 
     CGFloat bubbleX = outgoing ? (NSMaxX(cellFrame) - bubbleWidth - sidePadding) : (NSMinX(cellFrame) + sidePadding + avatarGutter);
@@ -2667,15 +2606,8 @@ void TGDrawPlayableMediaContentForItem(TGMessageItem *item, NSRect bubbleRect, B
         return;
     }
 
-    CGFloat reactionBandHeight = TGReactionBandHeightForMessageItem(item);
-    CGFloat usableHeight = NSHeight(bubbleRect) - reactionBandHeight;
-    if (usableHeight < 42.0) {
-        usableHeight = NSHeight(bubbleRect);
-    }
-    NSRect playableRect = NSMakeRect(NSMinX(bubbleRect),
-                                     flipped ? NSMinY(bubbleRect) : (NSMaxY(bubbleRect) - usableHeight),
-                                     NSWidth(bubbleRect),
-                                     usableHeight);
+    // The owning cell has already removed headers, comments and reactions.
+    NSRect playableRect = bubbleRect;
     CGFloat circleSide = 34.0;
     NSRect playCircleRect = NSMakeRect(NSMinX(playableRect) + 12.0,
                                        NSMidY(playableRect) - (circleSide / 2.0),

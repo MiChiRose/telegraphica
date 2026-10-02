@@ -1355,12 +1355,45 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
 
+- (void)synchronizeUserOpenedChat {
+    BOOL chatVisible = (!self.activeSection || [self.activeSection isEqualToString:TGSectionChats]);
+    NSNumber *chatID = ([self.currentAuthState isEqualToString:@"ready"] && chatVisible)
+        ? self.selectedChatID : nil;
+    [self.client setUserOpenedChatID:chatID];
+}
+
+- (void)setSelectedChatID:(NSNumber *)chatID {
+    if (_selectedChatID != chatID) {
+        [_selectedChatID release];
+        _selectedChatID = [chatID retain];
+    }
+    [self synchronizeUserOpenedChat];
+}
+
+- (void)setCurrentAuthState:(NSString *)state {
+    if (_currentAuthState != state) {
+        [_currentAuthState release];
+        _currentAuthState = [state copy];
+    }
+    [self synchronizeUserOpenedChat];
+}
+
+- (void)setActiveSection:(NSString *)section {
+    if (_activeSection != section) {
+        [_activeSection release];
+        _activeSection = [section copy];
+    }
+    [self synchronizeUserOpenedChat];
+}
+
 - (void)setClient:(TGTDLibClient *)client {
     if (_client != client) {
+        [_client setUserOpenedChatID:nil];
         [_client release];
         _client = [client retain];
     }
     [[TGDownloadManager sharedManager] setClient:_client];
+    [self synchronizeUserOpenedChat];
 }
 
 - (instancetype)init {
@@ -4655,6 +4688,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)dealloc {
+    [_client setUserOpenedChatID:nil];
     if ([[NSUserNotificationCenter defaultUserNotificationCenter] delegate] == self) {
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:nil];
     }

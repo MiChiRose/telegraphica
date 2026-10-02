@@ -91,6 +91,8 @@
 - (BOOL)isMediaAlbumMessage;
 - (NSArray *)visualMediaItems;
 - (void)addVisualMediaFromMessageItem:(TGMessageItem *)item;
+// Replaces one album member's reaction snapshot, then rebuilds its aggregate.
+- (BOOL)updateAlbumReactionInfo:(NSDictionary *)reactionInfo forMessageID:(NSNumber *)messageID;
 - (NSString *)visualMediaPlaceholderTitle;
 - (NSString *)directionSummary;
 - (id)valueForTableColumnIdentifier:(id)identifier;

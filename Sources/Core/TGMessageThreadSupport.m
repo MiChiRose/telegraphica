@@ -147,15 +147,16 @@ BOOL TGApplyMessageInteractionSummaryToItem(TGMessageItem *item, NSDictionary *s
         // Keep the capability learned from the complete legacy/modern message.
     }
 
-    if (displayMessage) {
-        id reactions = [summary objectForKey:@"reaction_info"];
-        if ([reactions isKindOfClass:[NSDictionary class]]) {
+    id reactions = [summary objectForKey:@"reaction_info"];
+    if ([reactions isKindOfClass:[NSDictionary class]]) {
+        BOOL updatedAlbum = albumMember && [item updateAlbumReactionInfo:reactions forMessageID:messageID];
+        if (displayMessage && !updatedAlbum) {
             id reactionText = [reactions objectForKey:@"summary"];
             id chosen = [reactions objectForKey:@"chosen_emojis"];
             id canGet = [reactions objectForKey:@"can_get_added_reactions"];
             [item setReactionSummary:[reactionText isKindOfClass:[NSString class]] ? reactionText : nil];
             [item setChosenReactionEmojis:[chosen isKindOfClass:[NSArray class]] ? chosen : nil];
-            [item setCanGetAddedReactions:[canGet respondsToSelector:@selector(boolValue)] && [canGet boolValue]];
+            if ([canGet respondsToSelector:@selector(boolValue)]) { [item setCanGetAddedReactions:[canGet boolValue]]; }
         }
     }
     return ![previous isEqual:TGInteractionDisplayState(item)];

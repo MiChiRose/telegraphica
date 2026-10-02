@@ -126,9 +126,56 @@ int main(void) {
     [legacy setReactionSummary:@"A 2"]; [legacy setChosenReactionEmojis:[NSArray arrayWithObject:@"A"]]; [legacy setCanGetAddedReactions:YES];
     [update setObject:@100 forKey:@"message_id"];
     summary = TGMessageInteractionUpdateSummary(update, nil);
-    TGAssert(TGApplyMessageInteractionSummaryToItem(legacy, summary) && ![legacy reactionSummary] && ![legacy chosenReactionEmojis] && ![legacy canGetAddedReactions], "empty reactions clear previously displayed reaction metadata");
+    TGAssert(TGApplyMessageInteractionSummaryToItem(legacy, summary) && ![legacy reactionSummary] && ![legacy chosenReactionEmojis], "empty reactions clear previously displayed reaction metadata");
+    TGAssert([legacy canGetAddedReactions], "absent interaction capability preserves previously learned legacy sender-list access");
+    NSDictionary *explicitUnavailable = [NSDictionary dictionaryWithObject:@NO forKey:@"can_get_added_reactions"];
+    summary = TGMessageInteractionUpdateSummary(update, explicitUnavailable);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(legacy, summary) && ![legacy canGetAddedReactions], "explicit false interaction capability clears sender-list access");
     TGAssert([legacy canGetMessageThread], "reaction-only update preserves direct legacy capability");
     TGAssert(!TGApplyMessageInteractionSummaryToItem(legacy, summary), "view-count-only update with unchanged empty metadata avoids redraw");
+
+    // TDLib updates are per source message, even when the UI displays an
+    // aggregate album under its earliest message ID. Keep each source intact.
+    NSDictionary *albumFixture = TGThreadFixture(@"message_album_reaction_updates.json");
+    TGMessageItem *reactionAlbum = nil;
+    for (NSDictionary *member in [albumFixture objectForKey:@"members"]) {
+        TGMessageItem *photo = [[[TGMessageItem alloc] initWithChatID:@42 messageID:[member objectForKey:@"message_id"] date:@0 outgoing:NO preview:@"Photo"] autorelease];
+        [photo setContentType:@"messagePhoto"];
+        [photo setMediaLocalPath:@"/tmp/synthetic-album-photo.jpg"];
+        [photo setReactionSummary:[member objectForKey:@"summary"]];
+        [photo setChosenReactionEmojis:[member objectForKey:@"chosen_emojis"]];
+        [photo setCanGetAddedReactions:[[member objectForKey:@"can_get_added_reactions"] boolValue]];
+        if (!reactionAlbum) {
+            reactionAlbum = [[photo copy] autorelease];
+            [reactionAlbum setMediaItems:[photo visualMediaItems]];
+        } else { [reactionAlbum addVisualMediaFromMessageItem:photo]; }
+    }
+    [reactionAlbum setMessageID:@100];
+    NSString *sixReactions = @"❤️ 44  👍 11  🔥 7  😁 4  😢 3  🤔";
+    TGAssert([[reactionAlbum reactionSummary] isEqual:sixReactions], "initial album aggregation keeps six complete reaction totals");
+    TGAssert([[reactionAlbum chosenReactionEmojis] containsObject:@"❤️"] && [[reactionAlbum chosenReactionEmojis] containsObject:@"🤔"], "initial album chosen identities include all members");
+    NSDictionary *displayUpdate = [albumFixture objectForKey:@"display_member_update"];
+    NSDictionary *displayReactions = [albumFixture objectForKey:@"display_member_reactions"];
+    summary = TGMessageInteractionUpdateSummary(displayUpdate, displayReactions);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(reactionAlbum, summary), "display-member update applies its chosen metadata");
+    TGAssert([[reactionAlbum reactionSummary] isEqual:sixReactions], "single-reaction display-member update must not replace six-reaction album aggregate");
+    TGAssert([[reactionAlbum chosenReactionEmojis] isEqual:[NSArray arrayWithObject:@"🤔"]] && [reactionAlbum canGetAddedReactions], "chosen removal affects one member; absent capability preserves snapshot");
+    TGAssert(!TGApplyMessageInteractionSummaryToItem(reactionAlbum, summary), "repeating member update does not double counts or redraw");
+    NSDictionary *otherUpdate = [albumFixture objectForKey:@"other_member_update"];
+    NSDictionary *otherReactions = [albumFixture objectForKey:@"other_member_reactions"];
+    summary = TGMessageInteractionUpdateSummary(otherUpdate, otherReactions);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(reactionAlbum, summary), "non-display album member update must reach its row");
+    TGAssert([[reactionAlbum reactionSummary] isEqual:@"❤️ 51  👍 11  🔥 7  😁 4  😢 3  🤔"], "changed member replaces its old count instead of adding both snapshots");
+    TGAssert([[reactionAlbum chosenReactionEmojis] isEqual:[NSArray arrayWithObject:@"👍"]] && [reactionAlbum canGetAddedReactions], "another member's capability remains after explicit false on updated member");
+    TGMessageItem *albumCopy = [[reactionAlbum copy] autorelease];
+    summary = TGMessageInteractionUpdateSummary(displayUpdate, nil);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(reactionAlbum, summary) && [[reactionAlbum reactionSummary] isEqual:[otherReactions objectForKey:@"summary"]], "member removal subtracts only its reaction count");
+    TGAssert([[albumCopy reactionSummary] isEqual:@"❤️ 51  👍 11  🔥 7  😁 4  😢 3  🤔"], "updating album snapshots does not mutate a copied item");
+    TGAssert([reactionAlbum canGetAddedReactions], "missing capability on removal preserves available member flag");
+    summary = TGMessageInteractionUpdateSummary(displayUpdate, explicitUnavailable);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(reactionAlbum, summary) && ![reactionAlbum canGetAddedReactions], "sender-list capability clears when no member permits it");
+    summary = TGMessageInteractionUpdateSummary(otherUpdate, explicitUnavailable);
+    TGAssert(TGApplyMessageInteractionSummaryToItem(reactionAlbum, summary) && ![reactionAlbum reactionSummary] && ![reactionAlbum chosenReactionEmojis], "removing last member reactions clears aggregate and chosen identities");
 
     TGThreadProbeClient *client = [[[TGThreadProbeClient alloc] init] autorelease];
     client.response = [NSDictionary dictionaryWithObjectsAndKeys:@"messageThreadInfo", @"@type", @-999, @"chat_id", @700, @"message_thread_id", nil];

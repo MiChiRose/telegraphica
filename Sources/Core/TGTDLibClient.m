@@ -1,7 +1,9 @@
 #import "TGTDLibClient.h"
+#import "TGChatOpenState.h"
 #import "TGAuthorizationFlow.h"
 #import "TGFormattedTextCodec.h"
 #import "TGReactionCatalog.h"
+#import "TGMessageReactionParser.h"
 #import "TGAddedReactionsParser.h"
 #import "TGCustomEmojiParser.h"
 #import "TGTDLibCapabilities.h"
@@ -237,6 +239,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     NSString *_networkProxyBootstrapSummary;
     NSUInteger _authorizationStateGeneration;
     NSLock *_sendLock;
+    TGChatOpenState *_chatOpenState;
+    dispatch_queue_t _chatOpenQueue;
     NSThread *_receiverThread;
     BOOL _receiverRunning;
     BOOL _receiverShouldStop;
@@ -398,6 +402,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         [_customEmojiDescriptorCache setCountLimit:192];
         _capabilities = [[TGTDLibCapabilities alloc] initWithLoadedLibraryPath:nil];
         _sendLock = [[NSLock alloc] init];
+        _chatOpenState = [[TGChatOpenState alloc] init];
+        _chatOpenQueue = dispatch_queue_create("org.telegraphica.opened-chat", DISPATCH_QUEUE_SERIAL);
     }
     return self;
 }
@@ -518,6 +524,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
         _destroyFunction(_client);
     }
     _client = NULL;
+    [_chatOpenState resetTransport];
     [_sendLock unlock];
 }
 
@@ -543,6 +550,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_latestAuthorizationStateSummary release];
     [_latestAuthorizationSafeDetails release];
     [_latestAuthenticationQRCodeLink release];
+    [_chatOpenState release];
+    if (_chatOpenQueue) { dispatch_release(_chatOpenQueue); }
     [_sendLock release];
     [_receiverThread release];
     [_loadedPath release];
@@ -1277,7 +1286,36 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 }
 
+- (void)flushUserOpenedChatState {
+    // This is deliberately a fire-and-forget operation on a serial queue. It
+    // must not call ensureClient or wait for an acknowledgement on the UI thread.
+    [_sendLock lock];
+    if (_client && _sendFunction && ![self isShutdownStarted]) {
+        for (NSDictionary *request in [_chatOpenState requestsForCurrentSelection]) {
+            NSString *json = [self JSONStringFromObject:request error:NULL];
+            if (json) { _sendFunction(_client, [json UTF8String]); }
+        }
+    }
+    [_sendLock unlock];
+}
+
+- (void)setUserOpenedChatID:(NSNumber *)chatID {
+    [_chatOpenState setDesiredChatID:chatID];
+    dispatch_async(_chatOpenQueue, ^{
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+        [self flushUserOpenedChatState];
+        [pool drain];
+    });
+}
+
 - (void)handleReceivedTDLibObject:(NSDictionary *)dictionary {
+    if ([_chatOpenState handleOpenResponse:dictionary]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), _chatOpenQueue, ^{
+            NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+            [self flushUserOpenedChatState];
+            [pool drain];
+        });
+    }
     NSString *authorizationSummary = [self summaryForAuthorizationStateObject:dictionary];
     NSString *objectType = [[dictionary objectForKey:@"@type"] isKindOfClass:[NSString class]]
         ? [dictionary objectForKey:@"@type"] : @"";
@@ -6725,85 +6763,7 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSDictionary *)reactionInfoFromMessageObject:(NSDictionary *)messageObject {
-    if (![messageObject isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    id interactionInfo = [messageObject objectForKey:@"interaction_info"];
-    if (![interactionInfo isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    id reactionsObject = [(NSDictionary *)interactionInfo objectForKey:@"reactions"];
-    if (![reactionsObject isKindOfClass:[NSDictionary class]]) {
-        return nil;
-    }
-
-    BOOL canGetAddedReactions = [[(NSDictionary *)reactionsObject objectForKey:@"can_get_added_reactions"] boolValue];
-    id reactions = [(NSDictionary *)reactionsObject objectForKey:@"reactions"];
-    NSArray *reactionArray = [reactions isKindOfClass:[NSArray class]] ? reactions : [NSArray array];
-    if ([reactionArray count] == 0 && !canGetAddedReactions) {
-        return nil;
-    }
-
-    NSMutableArray *parts = [NSMutableArray array];
-    NSMutableArray *chosenEmojis = [NSMutableArray array];
-    NSUInteger index = 0;
-    for (index = 0; index < [reactionArray count]; index++) {
-        id reactionObject = [reactionArray objectAtIndex:index];
-        if (![reactionObject isKindOfClass:[NSDictionary class]]) {
-            continue;
-        }
-        NSDictionary *reaction = (NSDictionary *)reactionObject;
-        id typeObject = [reaction objectForKey:@"type"];
-        NSString *emoji = nil;
-        if ([typeObject isKindOfClass:[NSDictionary class]]) {
-            id reactionType = [(NSDictionary *)typeObject objectForKey:@"@type"];
-            id emojiObject = [(NSDictionary *)typeObject objectForKey:@"emoji"];
-            if ([reactionType isKindOfClass:[NSString class]] &&
-                [(NSString *)reactionType isEqualToString:@"reactionTypeEmoji"] &&
-                [emojiObject isKindOfClass:[NSString class]] &&
-                [(NSString *)emojiObject length] > 0) {
-                emoji = (NSString *)emojiObject;
-            }
-        }
-        if ([emoji length] == 0) {
-            continue;
-        }
-
-        NSInteger count = 1;
-        id countObject = [reaction objectForKey:@"total_count"];
-        if ([countObject respondsToSelector:@selector(integerValue)] && [countObject integerValue] > 0) {
-            count = [countObject integerValue];
-        }
-        if ([parts count] < 3) {
-            if (count == 1) {
-                [parts addObject:emoji];
-            } else {
-                [parts addObject:[NSString stringWithFormat:@"%@ %ld", emoji, (long)count]];
-            }
-        }
-
-        id chosenObject = [reaction objectForKey:@"is_chosen"];
-        if ([chosenObject respondsToSelector:@selector(boolValue)] &&
-            [chosenObject boolValue] &&
-            ![chosenEmojis containsObject:emoji]) {
-            [chosenEmojis addObject:emoji];
-        }
-    }
-
-    if ([parts count] == 0 && [chosenEmojis count] == 0) {
-        return nil;
-    }
-    NSMutableDictionary *info = [NSMutableDictionary dictionary];
-    [info setObject:[NSNumber numberWithBool:canGetAddedReactions] forKey:@"can_get_added_reactions"];
-    if ([parts count] > 0) {
-        [info setObject:[parts componentsJoinedByString:@"  "] forKey:@"summary"];
-    }
-    if ([chosenEmojis count] > 0) {
-        [info setObject:chosenEmojis forKey:@"chosen_emojis"];
-    }
-    return info;
+    return TGMessageReactionInfoFromObject(messageObject);
 }
 
 - (NSString *)notificationScopeTypeForChatTypeObject:(id)chatTypeObject {
