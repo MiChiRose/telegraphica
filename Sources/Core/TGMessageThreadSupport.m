@@ -160,3 +160,41 @@ BOOL TGApplyMessageInteractionSummaryToItem(TGMessageItem *item, NSDictionary *s
     }
     return ![previous isEqual:TGInteractionDisplayState(item)];
 }
+
+BOOL TGMessageThreadHistoryResponseIsScoped(NSDictionary *response, NSNumber *chatID, NSNumber *threadID, NSString *topicKind) {
+    if (![response isKindOfClass:[NSDictionary class]] ||
+        ![chatID respondsToSelector:@selector(longLongValue)] || [chatID longLongValue] == 0 ||
+        ![threadID respondsToSelector:@selector(longLongValue)] || [threadID longLongValue] <= 0) { return NO; }
+    id responseType = [response objectForKey:@"@type"];
+    id messages = [response objectForKey:@"messages"];
+    if ((![@"messages" isEqual:responseType] && ![@"foundChatMessages" isEqual:responseType]) ||
+        ![messages isKindOfClass:[NSArray class]]) { return NO; }
+    BOOL wantsThread = [topicKind isEqualToString:@"thread"];
+    BOOL wantsForum = [topicKind isEqualToString:@"forum"] || [topicKind isEqualToString:@"forum_legacy"];
+    id message = nil;
+    for (message in messages) {
+        if (![message isKindOfClass:[NSDictionary class]] || ![@"message" isEqual:[message objectForKey:@"@type"]]) { return NO; }
+        id messageChat = [message objectForKey:@"chat_id"];
+        if (![messageChat respondsToSelector:@selector(longLongValue)] ||
+            [messageChat longLongValue] != [chatID longLongValue]) { return NO; }
+        id messageID = [message objectForKey:@"id"];
+        // The thread's root can have topic/thread ID zero in older TDLib.
+        if ([messageID respondsToSelector:@selector(longLongValue)] &&
+            [messageID longLongValue] == [threadID longLongValue]) { continue; }
+        id topic = [message objectForKey:@"topic_id"];
+        if ([topic isKindOfClass:[NSDictionary class]]) {
+            id type = [topic objectForKey:@"@type"];
+            BOOL threadTopic = [@"messageTopicThread" isEqual:type];
+            BOOL forumTopic = [@"messageTopicForum" isEqual:type];
+            if ((!threadTopic && !forumTopic) || (wantsThread && !threadTopic) || (wantsForum && !forumTopic)) { return NO; }
+            id topicID = [topic objectForKey:threadTopic ? @"message_thread_id" : @"forum_topic_id"];
+            if (![topicID respondsToSelector:@selector(longLongValue)] ||
+                [topicID longLongValue] != [threadID longLongValue]) { return NO; }
+        } else {
+            id legacyThreadID = [message objectForKey:@"message_thread_id"];
+            if (![legacyThreadID respondsToSelector:@selector(longLongValue)] ||
+                [legacyThreadID longLongValue] != [threadID longLongValue]) { return NO; }
+        }
+    }
+    return YES;
+}
