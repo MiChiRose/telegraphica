@@ -1174,6 +1174,7 @@ def check_primary_navigation_contract(errors):
         errors.append("%s: chat rows must switch to compact rendering with the sidebar shell" % chat_cells_rel)
     client_rel = os.path.join("Sources", "Core", "TGTDLibClient.m")
     client_text = read_text(os.path.join(ROOT, client_rel))
+    client_text += read_text(os.path.join(ROOT, "Sources", "Core", "TGTDLibClient+MessageThreads.m"))
     for fragment in [
         "getScopeNotificationSettings",
         "use_default_mute_for",

@@ -107,6 +107,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
 @synthesize formattedEntities = _formattedEntities;
 @synthesize canGetMessageThread = _canGetMessageThread;
 @synthesize messageThreadReplyCount = _messageThreadReplyCount;
+@synthesize commentThreadMessageID = _commentThreadMessageID;
 @synthesize retryMessageThreadID = _retryMessageThreadID;
 @synthesize retryMessageTopicKind = _retryMessageTopicKind;
 @synthesize retryText = _retryText;
@@ -403,6 +404,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [copy setFormattedEntities:_formattedEntities];
     [copy setCanGetMessageThread:_canGetMessageThread];
     [copy setMessageThreadReplyCount:_messageThreadReplyCount];
+    [copy setCommentThreadMessageID:_commentThreadMessageID];
     [copy setRetryMessageThreadID:_retryMessageThreadID];
     [copy setRetryMessageTopicKind:_retryMessageTopicKind];
     [copy setRetryText:_retryText];
@@ -480,6 +482,7 @@ static NSString *TGReactionSummaryByMergingSummaries(NSString *leftSummary, NSSt
     [_editableText release];
     [_formattedEntities release];
     [_messageThreadReplyCount release];
+    [_commentThreadMessageID release];
     [_retryMessageThreadID release];
     [_retryMessageTopicKind release];
     [_retryText release];

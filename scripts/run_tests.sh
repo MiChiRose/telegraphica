@@ -39,6 +39,8 @@ trap cleanup EXIT
 
 echo "== Telegraphica static compatibility =="
 "$PYTHON_BIN" scripts/check_legacy_compat.py
+"$PYTHON_BIN" Tests/legacy_include_scanner_probe.py
+"$PYTHON_BIN" scripts/test_call_transport_staging.py
 "$PYTHON_BIN" scripts/check_free_feature_policy.py
 "$PYTHON_BIN" scripts/test_static_project.py
 "$PYTHON_BIN" scripts/test_security_hardening.py
@@ -140,6 +142,35 @@ echo "== TDLib message search requests =="
     -framework Foundation \
     -o "$BUILD_DIR/tdlib-search-request-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib-search-request-probe"
+
+echo "== Message comments and thread navigation =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    -Wno-incomplete-implementation -Wno-objc-protocol-method-implementation \
+    Tests/message_thread_probe.m \
+    Sources/Core/TGMessageThreadSupport.m \
+    Sources/Core/TGMessageItem.m \
+    Sources/Core/TGTDLibClient+MessageThreads.m \
+    -framework Foundation -o "$BUILD_DIR/message-thread-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/message-thread-probe"
+
+echo "== Forum refresh navigation =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/forum_topic_refresh_probe.m Sources/Core/TGChatItem.m \
+    -framework Foundation -o "$BUILD_DIR/forum-topic-refresh-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/forum-topic-refresh-probe"
+
+echo "== Thumbnail cache eviction recovery =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/thumbnail_prefetcher_probe.m \
+    Sources/Media/TGMessageThumbnailPrefetcher.m Sources/Core/TGMessageItem.m \
+    -framework Cocoa -o "$BUILD_DIR/thumbnail-prefetcher-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/thumbnail-prefetcher-probe"
+
+echo "== Logger redaction =="
+"$CLANG" "${COMPILE_FLAGS[@]}" \
+    Tests/logger_redaction_probe.m Sources/Services/TGLogger.m \
+    -framework Cocoa -o "$BUILD_DIR/logger-redaction-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/logger-redaction-probe"
 
 echo "== TDLib storage requests =="
 "$CLANG" \
@@ -249,7 +280,7 @@ echo "== Media image loader =="
 HOME="$TEST_HOME" "$BUILD_DIR/media_image_loader_probe"
 
 echo "== Sticker thumbnail pipeline =="
-python3 scripts/test_sticker_thumbnail_pipeline.py
+"$PYTHON_BIN" scripts/test_sticker_thumbnail_pipeline.py
 
 echo "== Media playback speed preferences =="
 "$CLANG" \

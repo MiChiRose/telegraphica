@@ -1858,6 +1858,11 @@
             continue;
         }
 
+        if ([kind isEqualToString:@"message_interaction_update"]) {
+            [self applyMessageInteractionUpdateSummary:summary];
+            continue;
+        }
+
         if ([kind isEqualToString:@"new_message"] || [kind isEqualToString:@"chat_update"] || [kind isEqualToString:@"message_update"]) {
             if (!mountainLionSafeLoginMode) {
                 needsChatRefresh = YES;

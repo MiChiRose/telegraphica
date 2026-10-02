@@ -240,3 +240,5 @@
 "storage.scope.current" = "Current chat";
 "storage.scope.chat" = "Chat: %@";
 "storage.confirm.filteredMessage" = "Downloaded “%@” data in “%@” will be removed from this Mac. It stays in Telegram cloud and can be downloaded again.";
+
+"message.comments.unavailable" = "Comments unavailable";

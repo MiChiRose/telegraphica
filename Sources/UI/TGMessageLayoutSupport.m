@@ -1870,8 +1870,32 @@ BOOL TGMessageItemHasCommentThread(TGMessageItem *item) {
             [[item messageID] respondsToSelector:@selector(longLongValue)]);
 }
 
+NSString *TGMessageCommentTitleForItem(TGMessageItem *item) {
+    NSInteger count = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)]
+        ? [[item messageThreadReplyCount] integerValue] : 0);
+    if (count <= 0) { return TGLoc(@"message.comments.add"); }
+    NSString *language = TGLanguageCode();
+    NSString *key = @"message.comments.count.many";
+    if ([language isEqualToString:@"ru"] || [language isEqualToString:@"be"]) {
+        NSInteger lastTwoDigits = count % 100;
+        NSInteger lastDigit = count % 10;
+        if (lastTwoDigits < 11 || lastTwoDigits > 14) {
+            if (lastDigit == 1) { key = @"message.comments.count.one"; }
+            else if (lastDigit >= 2 && lastDigit <= 4) { key = @"message.comments.count.few"; }
+        }
+    } else if (count == 1) {
+        key = @"message.comments.count.one";
+    }
+    return [NSString stringWithFormat:TGLoc(key), (long)count];
+}
+
+static CGFloat TGMessageCommentTitleLineHeight(void) {
+    NSFont *font = TGChatMessageBoldSecondaryFont();
+    return MAX(16.0, ceil([font ascender] - [font descender] + [font leading]) + 2.0);
+}
+
 CGFloat TGMessageCommentBarHeightForItem(TGMessageItem *item) {
-    return TGMessageItemHasCommentThread(item) ? 34.0 : 0.0;
+    return TGMessageItemHasCommentThread(item) ? MAX(34.0, TGMessageCommentTitleLineHeight() + 18.0) : 0.0;
 }
 
 NSRect TGMessageCommentBarRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
@@ -1901,8 +1925,7 @@ void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL
     [barPath setLineWidth:0.8];
     [barPath stroke];
 
-    NSInteger replyCount = ([[item messageThreadReplyCount] respondsToSelector:@selector(integerValue)] ? [[item messageThreadReplyCount] integerValue] : 0);
-    NSString *title = (replyCount > 0) ? [NSString stringWithFormat:TGLoc(replyCount == 1 ? @"message.comments.count.one" : @"message.comments.count.many"), (long)replyCount] : TGLoc(@"message.comments.add");
+    NSString *title = TGMessageCommentTitleForItem(item);
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                 TGChatMessageBoldSecondaryFont(), NSFontAttributeName,
                                 TGClassicNavigationSelectedColor(0.96), NSForegroundColorAttributeName,
@@ -1913,10 +1936,11 @@ void TGDrawMessageCommentBarForItem(TGMessageItem *item, NSRect bubbleRect, BOOL
                                  iconSide,
                                  iconSide);
     TGDrawTemplateIconAsset(@"route-arrow", iconRect, TGClassicNavigationSelectedColor(0.98), 0.95, flipped);
+    CGFloat titleHeight = TGMessageCommentTitleLineHeight();
     NSRect textRect = NSMakeRect(NSMaxX(iconRect) + 7.0,
-                                 NSMinY(barRect) + floor((NSHeight(barRect) - 14.0) / 2.0) - 1.0,
-                                 NSWidth(barRect) - iconSide - 27.0,
-                                 16.0);
+                                 NSMinY(barRect) + floor((NSHeight(barRect) - titleHeight) / 2.0),
+                                 MAX(0.0, NSWidth(barRect) - iconSide - 27.0),
+                                 titleHeight);
     [title drawInRect:textRect withAttributes:attributes];
 }
 
@@ -2154,7 +2178,7 @@ CGFloat TGMessageBubbleHeightForItem(TGMessageItem *item, CGFloat availableWidth
             rowHeight = MAX(rowHeight, 92.0);
         }
         if (TGMessageItemHasCommentThread(item)) {
-            rowHeight += 24.0;
+            rowHeight += MAX(24.0, TGMessageCommentTitleLineHeight() + 8.0);
         }
         rowHeight += TGReactionBandHeightForMessageItem(item);
         if (rowHeight < 44.0) {

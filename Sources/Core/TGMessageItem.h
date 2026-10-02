@@ -48,6 +48,8 @@
 @property (nonatomic, copy) NSArray *formattedEntities;
 @property (nonatomic, assign) BOOL canGetMessageThread;
 @property (nonatomic, retain) NSNumber *messageThreadReplyCount;
+// Original post that owns a grouped album's comments.
+@property (nonatomic, retain) NSNumber *commentThreadMessageID;
 @property (nonatomic, retain) NSNumber *retryMessageThreadID;
 @property (nonatomic, copy) NSString *retryMessageTopicKind;
 @property (nonatomic, copy) NSString *retryText;

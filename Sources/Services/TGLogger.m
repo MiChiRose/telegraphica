@@ -29,11 +29,27 @@ static NSString *TGLoggerRedactedByPattern(NSString *message, NSString *pattern,
     if (![message isKindOfClass:[NSString class]] || [message length] == 0) {
         return @"";
     }
-    NSError *error = nil;
-    NSRegularExpression *regularExpression = [NSRegularExpression regularExpressionWithPattern:pattern
-                                                                                       options:NSRegularExpressionCaseInsensitive
-                                                                                         error:&error];
-    if (!regularExpression || error) {
+    // Redaction patterns are fixed and immutable; compile each once for all
+    // caller threads instead of rebuilding every expression for every log line.
+    static NSMutableDictionary *expressions = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        expressions = [[NSMutableDictionary alloc] init];
+    });
+    NSRegularExpression *regularExpression = nil;
+    @synchronized(expressions) {
+        id cachedExpression = [expressions objectForKey:pattern];
+        if (!cachedExpression) {
+            cachedExpression = [NSRegularExpression regularExpressionWithPattern:pattern
+                                                                        options:NSRegularExpressionCaseInsensitive
+                                                                          error:NULL];
+            [expressions setObject:(cachedExpression ?: (id)[NSNull null]) forKey:pattern];
+        }
+        if ([cachedExpression isKindOfClass:[NSRegularExpression class]]) {
+            regularExpression = cachedExpression;
+        }
+    }
+    if (!regularExpression) {
         return message;
     }
     return [regularExpression stringByReplacingMatchesInString:message

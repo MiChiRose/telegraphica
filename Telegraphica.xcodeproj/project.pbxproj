@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A66000000000000000000001 /* TGTDLibClient+MessageThreads.m in Sources */ = {isa = PBXBuildFile; fileRef = A66000000000000000000003 /* TGTDLibClient+MessageThreads.m */; };
+		A65000000000000000000001 /* TGMessageThreadSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = A65000000000000000000003 /* TGMessageThreadSupport.m */; };
 		111111111111111111111101 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111201 /* main.m */; };
 		111111111111111111111102 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111203 /* AppDelegate.m */; };
 		111111111111111111111103 /* TGTDLibClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111205 /* TGTDLibClient.m */; };
@@ -171,6 +173,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A66000000000000000000002 /* TGTDLibClient+MessageThreads.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+MessageThreads.h"; sourceTree = "<group>"; };
+		A66000000000000000000003 /* TGTDLibClient+MessageThreads.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGTDLibClient+MessageThreads.m"; sourceTree = "<group>"; };
+		A65000000000000000000002 /* TGMessageThreadSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGMessageThreadSupport.h"; sourceTree = "<group>"; };
+		A65000000000000000000003 /* TGMessageThreadSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TGMessageThreadSupport.m"; sourceTree = "<group>"; };
 		111111111111111111111200 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		111111111111111111111201 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		111111111111111111111202 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -581,6 +587,10 @@
 				111111111111111111111398 /* TGTDLibClient+ChatHistory.m */,
 				A5F000000000000000000002 /* TGTDLibClient+Search.h */,
 				A5F000000000000000000003 /* TGTDLibClient+Search.m */,
+				A66000000000000000000002 /* TGTDLibClient+MessageThreads.h */,
+				A66000000000000000000003 /* TGTDLibClient+MessageThreads.m */,
+				A65000000000000000000002 /* TGMessageThreadSupport.h */,
+				A65000000000000000000003 /* TGMessageThreadSupport.m */,
 				A60000000000000000000002 /* TGTDLibClient+Storage.h */,
 				A60000000000000000000003 /* TGTDLibClient+Storage.m */,
 				A61000000000000000000002 /* TGTDLibClient+Files.h */,
@@ -1036,6 +1046,8 @@
 				111111111111111111111196 /* TGLocationSearchService.m in Sources */,
 				111111111111111111111197 /* TGTDLibClient+ChatHistory.m in Sources */,
 				A5F000000000000000000001 /* TGTDLibClient+Search.m in Sources */,
+				A66000000000000000000001 /* TGTDLibClient+MessageThreads.m in Sources */,
+				A65000000000000000000001 /* TGMessageThreadSupport.m in Sources */,
 				A60000000000000000000001 /* TGTDLibClient+Storage.m in Sources */,
 				A61000000000000000000001 /* TGTDLibClient+Files.m in Sources */,
 				A63000000000000000000001 /* TGTDLibClient+Account.m in Sources */,
