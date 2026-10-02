@@ -88,6 +88,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
 #include <math.h>
+#include <stdlib.h>
 
 static NSUInteger const TGStatusChatPreviewInitialLimit = 40;
 static NSUInteger const TGStatusChatPreviewStep = 40;
@@ -1457,26 +1458,32 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [self refreshUpdateAvailabilityBadge];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
-        if (TGMountainLionSafeLoginModeEnabled()) {
-            [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling will drain updates without automatic chat refresh."];
+        // Smoke launch verifies window construction and clean exit only. Starting
+        // authentication here races its exit and may prompt for real Keychain data.
+        if (!getenv("TELEGRAPHICA_SMOKE_LAUNCH")) {
+            if (TGMountainLionSafeLoginModeEnabled()) {
+                [[TGLogger sharedLogger] log:@"Mountain Lion safe login mode: live update polling will drain updates without automatic chat refresh."];
+            }
+            [self startLiveUpdateTimerIfNeeded];
+            [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
+            NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+            NSTimeInterval lastUpdateCheck = [[NSUserDefaults standardUserDefaults]
+                doubleForKey:TGLastUpdateCheckDefaultsKey];
+            NSTimeInterval initialUpdateCheckDelay = 3.0;
+            if (lastUpdateCheck > 0.0 && now >= lastUpdateCheck &&
+                (now - lastUpdateCheck) < TGBackgroundUpdateCheckInterval) {
+                initialUpdateCheckDelay = MAX(3.0,
+                                              TGBackgroundUpdateCheckInterval -
+                                              (now - lastUpdateCheck));
+            }
+            self.updateCheckScheduler = [[[TGUpdateCheckScheduler alloc]
+                initWithTarget:self
+                      selector:@selector(checkForUpdatesOnLaunch)
+                      interval:TGBackgroundUpdateCheckInterval] autorelease];
+            [self.updateCheckScheduler startWithInitialDelay:initialUpdateCheckDelay];
+        } else {
+            [[TGLogger sharedLogger] log:@"Smoke launch mode: skipped TDLib connection and background service startup."];
         }
-        [self startLiveUpdateTimerIfNeeded];
-        [self performSelector:@selector(connectOnLaunch:) withObject:nil afterDelay:0.15];
-        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-        NSTimeInterval lastUpdateCheck = [[NSUserDefaults standardUserDefaults]
-            doubleForKey:TGLastUpdateCheckDefaultsKey];
-        NSTimeInterval initialUpdateCheckDelay = 3.0;
-        if (lastUpdateCheck > 0.0 && now >= lastUpdateCheck &&
-            (now - lastUpdateCheck) < TGBackgroundUpdateCheckInterval) {
-            initialUpdateCheckDelay = MAX(3.0,
-                                          TGBackgroundUpdateCheckInterval -
-                                          (now - lastUpdateCheck));
-        }
-        self.updateCheckScheduler = [[[TGUpdateCheckScheduler alloc]
-            initWithTarget:self
-                  selector:@selector(checkForUpdatesOnLaunch)
-                  interval:TGBackgroundUpdateCheckInterval] autorelease];
-        [self.updateCheckScheduler startWithInitialDelay:initialUpdateCheckDelay];
     }
     return self;
 }
