@@ -76,35 +76,32 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
     return result;
 }
 
-NSArray *TGDownloadQueueNormalizedRecords(id storedValue) {
-    if (![storedValue isKindOfClass:[NSArray class]]) {
-        return [NSArray array];
-    }
-    NSMutableArray *result = [NSMutableArray array];
-    NSUInteger limit = MIN([(NSArray *)storedValue count], (NSUInteger)100);
-    NSUInteger index = 0;
-    for (index = 0; index < limit; index++) {
-        NSDictionary *record = TGDownloadQueueSanitizedRecord([(NSArray *)storedValue objectAtIndex:index], YES);
-        if (record) {
-            [result addObject:record];
-        }
-    }
-    return result;
-}
-
-NSArray *TGDownloadQueueSerializableRecords(NSArray *records) {
+static NSArray *TGDownloadQueueSanitizedRecords(id records, BOOL restoring) {
     if (![records isKindOfClass:[NSArray class]]) {
         return [NSArray array];
     }
     NSMutableArray *result = [NSMutableArray array];
-    NSUInteger limit = MIN([records count], (NSUInteger)100);
+    NSUInteger finishedCount = 0;
     NSUInteger index = 0;
-    for (index = 0; index < limit; index++) {
-        NSDictionary *record = TGDownloadQueueSanitizedRecord([records objectAtIndex:index], NO);
-        if (record) {
-            [result addObject:record];
-        }
+    for (index = 0; index < [(NSArray *)records count]; index++) {
+        NSDictionary *record = TGDownloadQueueSanitizedRecord([(NSArray *)records objectAtIndex:index], restoring);
+        if (!record) { continue; }
+        NSString *state = [record objectForKey:@"state"];
+        BOOL finished = [state isEqualToString:@"completed"] || [state isEqualToString:@"failed"] ||
+                        [state isEqualToString:@"cancelled"];
+        // Rows are newest first. Bound completed history without losing an
+        // older large transfer or Pause decision behind newer completions.
+        if (finished && finishedCount >= 100) { continue; }
+        if (finished) { finishedCount++; }
+        [result addObject:record];
     }
     return result;
 }
 
+NSArray *TGDownloadQueueNormalizedRecords(id storedValue) {
+    return TGDownloadQueueSanitizedRecords(storedValue, YES);
+}
+
+NSArray *TGDownloadQueueSerializableRecords(NSArray *records) {
+    return TGDownloadQueueSanitizedRecords(records, NO);
+}

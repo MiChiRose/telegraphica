@@ -630,6 +630,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     NSRect bubbleRect = TGMessageBubbleRectForItem(item, cellFrame, showSenderDetails);
     CGFloat senderHeaderHeight = TGMessageSenderHeaderHeightForItem(item, showSenderDetails);
     CGFloat contextHeaderHeight = TGMessageContextHeaderHeightForItem(item);
+    BOOL inlineMetadata = TGMessageUsesInlineMetadataForItem(item, maximumBubbleWidth, showSenderDetails);
     CGFloat reactionBandHeight = TGReactionBandHeightForMessageItemWidth(item, NSWidth(bubbleRect));
     CGFloat commentBarHeight = TGMessageCommentBarHeightForItem(item);
     if (TGChatMessagesAsBlocksEnabled()) {
@@ -877,6 +878,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                      flipped ? contentTop : (contentTop - textHeight),
                                      NSWidth(bubbleRect) - 24.0,
                                      textHeight + 2.0);
+        if (inlineMetadata) { textRect = TGMessageInlineTextRectForItem(item, bubbleRect, flipped); }
         [attributedMessageText drawWithRect:textRect
                                     options:NSStringDrawingUsesLineFragmentOrigin];
     }
@@ -898,6 +900,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                      timeY,
                                      timeSize.width,
                                      metaHeight);
+        if (inlineMetadata) { timeRect = TGMessageInlineTimeRectForItem(item, bubbleRect, flipped); }
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
         TGDrawOutgoingStatusDotsForItem(item, timeRect, [controlView isFlipped]);
     }

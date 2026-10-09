@@ -145,6 +145,9 @@
                               flipped ? contentTop : (contentTop - textHeight),
                               NSWidth(bubbleRect) - 24.0,
                               textHeight + 2.0);
+        if (TGMessageUsesInlineMetadataForItem(item, TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame)), showSenderDetails)) {
+            textRect = TGMessageInlineTextRectForItem(item, bubbleRect, flipped);
+        }
     }
 
     if (NSIsEmptyRect(textRect) || !NSPointInRect(tablePoint, textRect)) {
@@ -382,20 +385,20 @@
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:12.0], NSFontAttributeName,
+                                    TGChatMessageBodyFont(), NSFontAttributeName,
                                     TGClassicInkColor(), NSForegroundColorAttributeName,
                                     paragraph, NSParagraphStyleAttributeName,
                                     nil];
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [NSFont systemFontOfSize:9.0], NSFontAttributeName,
+                                    TGChatMessageMetaFont(), NSFontAttributeName,
                                     TGClassicTimeTextColor(), NSForegroundColorAttributeName,
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
         NSMutableAttributedString *baseText = [[TGAttributedMessageStringForItem(item, messageText, textAttributes) mutableCopy] autorelease];
         [composedMessageText appendAttributedString:baseText];
-        if ([timeString length] > 0) {
+        if ([timeString length] > 0 && !TGMessageUsesSeparateMetadataFooter()) {
             NSString *timeSuffix = [NSString stringWithFormat:@"  %@", timeString];
             NSAttributedString *timeSuffixText = [[[NSAttributedString alloc] initWithString:timeSuffix attributes:timeAttributes] autorelease];
             [composedMessageText appendAttributedString:timeSuffixText];
@@ -435,6 +438,8 @@
                                  contentTop - textHeight,
                                  NSWidth(bubbleRect) - 24.0,
                                  textHeight + 2.0);
+    BOOL inlineMetadata = TGMessageUsesInlineMetadataForItem(item, maximumBubbleWidth, showSenderDetails);
+    if (inlineMetadata) { textRect = TGMessageInlineTextRectForItem(item, bubbleRect, [self.messageTableView isFlipped]); }
     if (!NSPointInRect(tablePoint, textRect)) {
         return nil;
     }
@@ -448,6 +453,9 @@
     [layoutManager glyphRangeForTextContainer:textContainer];
 
     NSPoint textPoint = NSMakePoint(tablePoint.x - NSMinX(textRect), tablePoint.y - NSMinY(textRect));
+    if (inlineMetadata && ![self.messageTableView isFlipped]) {
+        textPoint.y = NSMaxY(textRect) - tablePoint.y;
+    }
     CGFloat fraction = 0.0;
     NSUInteger glyphIndex = [layoutManager glyphIndexForPoint:textPoint
                                                inTextContainer:textContainer

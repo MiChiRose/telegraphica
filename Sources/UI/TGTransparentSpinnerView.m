@@ -26,6 +26,14 @@
         [center addObserver:self selector:@selector(animationPolicyDidChange:) name:TGResourcePolicyDidChangeNotification object:nil];
         [center addObserver:self selector:@selector(animationPolicyDidChange:) name:NSApplicationDidResignActiveNotification object:nil];
         [center addObserver:self selector:@selector(animationPolicyDidChange:) name:NSApplicationDidBecomeActiveNotification object:nil];
+        [center addObserver:self selector:@selector(animationPolicyDidChange:) name:NSApplicationDidHideNotification object:nil];
+        [center addObserver:self selector:@selector(animationPolicyDidChange:) name:NSApplicationDidUnhideNotification object:nil];
+        [center addObserver:self selector:@selector(windowVisibilityDidChange:) name:NSWindowWillMiniaturizeNotification object:nil];
+        [center addObserver:self selector:@selector(windowVisibilityDidChange:) name:NSWindowDidMiniaturizeNotification object:nil];
+        [center addObserver:self selector:@selector(windowVisibilityDidChange:) name:NSWindowDidDeminiaturizeNotification object:nil];
+        [center addObserver:self selector:@selector(windowVisibilityDidChange:) name:NSWindowDidBecomeKeyNotification object:nil];
+        [center addObserver:self selector:@selector(windowVisibilityDidChange:) name:NSWindowDidExposeNotification object:nil];
+        [center addObserver:self selector:@selector(windowVisibilityDidChange:) name:NSWindowWillCloseNotification object:nil];
     }
     return self;
 }
@@ -88,7 +96,9 @@
 }
 
 - (void)updateAnimationTimer {
-    BOOL shouldTick = (self.animating && [self window] && ![self isHiddenOrHasHiddenAncestor] &&
+    NSWindow *window = [self window];
+    BOOL shouldTick = (self.animating && [window isVisible] && ![window isMiniaturized] &&
+                       ![NSApp isHidden] && ![self isHiddenOrHasHiddenAncestor] &&
                        !TGResourcePolicyEconomyModeEnabled() &&
                        (!TGResourcePolicyStopAnimationsWhenInactive() || [NSApp isActive]));
     if (!shouldTick) {
@@ -100,6 +110,20 @@
                                                   userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer:self.animationTimer forMode:NSRunLoopCommonModes];
     }
+}
+
+- (void)windowVisibilityDidChange:(NSNotification *)notification {
+    if ([notification object] != [self window]) return;
+    NSString *name = [notification name];
+    if ([name isEqualToString:NSWindowWillMiniaturizeNotification] ||
+        [name isEqualToString:NSWindowWillCloseNotification]) {
+        // These notifications arrive before the native visibility flags change.
+        [self.animationTimer invalidate];
+        self.animationTimer = nil;
+        return;
+    }
+    [self updateAnimationTimer];
+    [self invalidateSpinnerSurface];
 }
 
 - (void)animationPolicyDidChange:(NSNotification *)notification {

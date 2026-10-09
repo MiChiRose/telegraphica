@@ -22,3 +22,21 @@ void TGRemoveConfirmedReadNotifications(id center, TGNotificationReadState *read
     }
     [delivered release];
 }
+
+void TGRemoveMessageNotificationsAfterLogout(id center) {
+    if (![center respondsToSelector:@selector(deliveredNotifications)] ||
+        ![center respondsToSelector:@selector(removeDeliveredNotification:)]) { return; }
+    NSArray *delivered = [[center deliveredNotifications] copy];
+    for (id notification in delivered) {
+        if (![notification respondsToSelector:@selector(userInfo)]) { continue; }
+        id info = [notification userInfo];
+        if (![info isKindOfClass:[NSDictionary class]]) { continue; }
+        id chatID = [info objectForKey:@"chat_id"];
+        id messageID = [info objectForKey:@"message_id"];
+        if ([chatID isKindOfClass:[NSNumber class]] && [chatID longLongValue] != 0 &&
+            [messageID isKindOfClass:[NSNumber class]] && [messageID longLongValue] > 0) {
+            [center removeDeliveredNotification:notification];
+        }
+    }
+    [delivered release];
+}

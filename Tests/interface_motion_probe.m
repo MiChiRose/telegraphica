@@ -55,6 +55,65 @@ static void Check(BOOL condition, NSString *message) {
 - (NSWindow *)window { return (NSWindow *)_probeWindow; }
 @end
 
+@interface SpinnerVisibilityWindow : NSWindow {
+    BOOL _probeVisible;
+    BOOL _probeMiniaturized;
+}
+@property (nonatomic, assign) BOOL probeVisible;
+@property (nonatomic, assign) BOOL probeMiniaturized;
+@end
+@implementation SpinnerVisibilityWindow
+@synthesize probeVisible = _probeVisible;
+@synthesize probeMiniaturized = _probeMiniaturized;
+- (BOOL)isVisible { return _probeVisible; }
+- (BOOL)isMiniaturized { return _probeMiniaturized; }
+@end
+
+static void CheckSpinnerWindowVisibility(void) {
+    [NSApplication sharedApplication];
+    TGResourcePolicySetEconomyModeEnabled(NO);
+    // Hidden/minimized windows must not tick even if background animation is allowed.
+    TGResourcePolicySetStopAnimationsWhenInactive(NO);
+    SpinnerVisibilityWindow *window = [[SpinnerVisibilityWindow alloc]
+        initWithContentRect:NSMakeRect(0, 0, 180, 120) styleMask:NSTitledWindowMask
+        backing:NSBackingStoreBuffered defer:NO];
+    TGTransparentSpinnerView *spinner = [[TGTransparentSpinnerView alloc] initWithFrame:NSMakeRect(10, 10, 24, 24)];
+    [[window contentView] addSubview:spinner];
+    [spinner startAnimation:nil];
+    Check([spinner valueForKey:@"animationTimer"] == nil, @"ordered-out window does not allocate a spinner timer");
+    window.probeVisible = YES;
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    [center postNotificationName:NSWindowDidExposeNotification object:window];
+    NSTimer *timer = [spinner valueForKey:@"animationTimer"];
+    Check(timer != nil, @"exposing visible window resumes an existing loading indicator");
+    [center postNotificationName:NSWindowDidExposeNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] == timer, @"repeated exposure retains one timer");
+    [center postNotificationName:NSWindowWillMiniaturizeNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] == nil && ![spinner isHidden], @"will-miniaturize stops before flags change and preserves loading feedback");
+    window.probeMiniaturized = YES;
+    [center postNotificationName:NSWindowDidMiniaturizeNotification object:window];
+    [center postNotificationName:NSWindowDidBecomeKeyNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] == nil, @"minimized window stays timer-free");
+    window.probeMiniaturized = NO;
+    [center postNotificationName:NSWindowDidDeminiaturizeNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] != nil, @"restoring the window resumes only the still-loading spinner");
+    [center postNotificationName:NSWindowWillCloseNotification object:[[[NSObject alloc] init] autorelease]];
+    Check([spinner valueForKey:@"animationTimer"] != nil, @"another window cannot stop this loading indicator");
+    [center postNotificationName:NSWindowWillCloseNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] == nil, @"will-close immediately releases the spinner timer");
+    window.probeVisible = NO;
+    [center postNotificationName:NSWindowDidExposeNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] == nil, @"closed window cannot resume its timer");
+    window.probeVisible = YES;
+    [center postNotificationName:NSWindowDidBecomeKeyNotification object:window];
+    Check([spinner valueForKey:@"animationTimer"] != nil, @"reopened window resumes still-running loading work");
+    [spinner removeFromSuperview];
+    Check([spinner valueForKey:@"animationTimer"] == nil, @"detaching from the window invalidates the timer");
+    [spinner release];
+    [center postNotificationName:NSWindowDidExposeNotification object:window];
+    [window release];
+}
+
 int main(void) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     TGResourcePolicySetEconomyModeEnabled(NO);
@@ -124,6 +183,7 @@ int main(void) {
     Check([spinner isHidden] && [spinner valueForKey:@"animationTimer"] == nil, @"stopped indicator is hidden and timer-free");
     [spinner removeFromSuperview]; [spinner release]; [panel release];
     [motion release]; [table release];
+    CheckSpinnerWindowVisibility();
     puts("PASS: bounded transcript motion, cancellation, economy, panel reversal and transparent spinner repaint");
     [pool drain];
     return 0;

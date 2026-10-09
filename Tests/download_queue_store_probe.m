@@ -58,6 +58,57 @@ int main(void) {
     TGAssert([[restoredPause objectForKey:@"remote_id"] isEqual:@"synthetic-remote"] &&
              [[restoredPause objectForKey:@"remote_unique_id"] isEqual:@"synthetic-unique"] &&
              [[restoredPause objectForKey:@"account_id"] integerValue] == 1, @"stable file identity and account scope must survive queue restoration");
+
+    // An old large download can stay active while the second queue slot
+    // completes many newer files. The history cap must never discard that job.
+    NSMutableArray *busyHistory = [NSMutableArray arrayWithObject:invalid];
+    NSArray *terminalStates = [NSArray arrayWithObjects:@"completed", @"failed", @"cancelled", nil];
+    for (NSUInteger index = 0; index < 105; index++) {
+        NSMutableDictionary *finished = [NSMutableDictionary dictionaryWithDictionary:active];
+        [finished setObject:[NSString stringWithFormat:@"finished-%lu", (unsigned long)index] forKey:@"identifier"];
+        [finished setObject:[terminalStates objectAtIndex:index % 3] forKey:@"state"];
+        [busyHistory addObject:finished];
+    }
+    NSArray *unfinishedStates = [NSArray arrayWithObjects:@"downloading", @"queued", @"paused", @"interrupted", nil];
+    for (NSString *state in unfinishedStates) {
+        NSMutableDictionary *unfinished = [NSMutableDictionary dictionaryWithDictionary:paused];
+        [unfinished setObject:state forKey:@"identifier"];
+        [unfinished setObject:state forKey:@"state"];
+        [busyHistory addObject:unfinished];
+    }
+    NSArray *busySerialized = TGDownloadQueueSerializableRecords(busyHistory);
+    TGAssert([busySerialized count] == 104, @"cap terminal history at100 while preserving all unfinished jobs");
+    TGAssert([[[busySerialized objectAtIndex:99] objectForKey:@"identifier"] isEqual:@"finished-99"],
+             @"invalid records do not consume terminal history quota and newest history order is retained");
+    NSArray *busyRestored = TGDownloadQueueNormalizedRecords(busySerialized);
+    NSArray *directRestored = TGDownloadQueueNormalizedRecords(busyHistory);
+    TGAssert([busyRestored isEqual:directRestored] && [busyRestored count] == 104,
+             @"normalization also preserves unfinished jobs beyond the terminal history cap");
+    for (NSUInteger index = 0; index < [unfinishedStates count]; index++) {
+        NSDictionary *unfinished = [busyRestored objectAtIndex:100 + index];
+        NSString *oldState = [unfinishedStates objectAtIndex:index];
+        NSString *newState = ([oldState isEqual:@"downloading"] || [oldState isEqual:@"queued"]) ? @"interrupted" : oldState;
+        TGAssert([[unfinished objectForKey:@"identifier"] isEqual:oldState] &&
+                 [[unfinished objectForKey:@"state"] isEqual:newState], @"unfinished order and Pause decisions survive restoration");
+        TGAssert([[unfinished objectForKey:@"requires_remote_resolution"] boolValue] &&
+                 [[unfinished objectForKey:@"remote_id"] isEqual:@"synthetic-remote"] &&
+                 [[unfinished objectForKey:@"remote_unique_id"] isEqual:@"synthetic-unique"] &&
+                 [[unfinished objectForKey:@"account_id"] integerValue] == 1 &&
+                 [unfinished objectForKey:@"client"] == nil && [unfinished objectForKey:@"attempt"] == nil &&
+                 [unfinished objectForKey:@"completions"] == nil && [unfinished objectForKey:@"operation"] == nil,
+                 @"unfinished identity proof persists without runtime objects or trusted stale numeric IDs");
+    }
+    TGAssert([NSPropertyListSerialization propertyList:busySerialized isValidForFormat:NSPropertyListBinaryFormat_v1_0],
+             @"expanded unfinished queue remains a valid property list");
+
+    NSMutableArray *onlyUnfinished = [NSMutableArray array];
+    for (NSUInteger index = 0; index < 105; index++) {
+        NSMutableDictionary *unfinished = [NSMutableDictionary dictionaryWithDictionary:paused];
+        [unfinished setObject:[NSString stringWithFormat:@"paused-%lu", (unsigned long)index] forKey:@"identifier"];
+        [onlyUnfinished addObject:unfinished];
+    }
+    TGAssert([TGDownloadQueueNormalizedRecords(TGDownloadQueueSerializableRecords(onlyUnfinished)) count] == 105,
+             @"the history cap never limits the number of valid unfinished jobs");
     fprintf(stdout, "Download queue store probe passed.\n");
     [pool drain];
     return 0;

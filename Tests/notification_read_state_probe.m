@@ -114,6 +114,22 @@ int main(void) {
     for (NSInteger i=1;i<=600;i++) { [state recordReadInboxMessageID:@10 chatID:[NSNumber numberWithInteger:i]]; }
     Require(![state isReadNotificationInfo:Info(1,1,0)] && [state isReadNotificationInfo:Info(600,1,0)], @"chat watermark evidence bounded");
     TGRemoveConfirmedReadNotifications(nil, state);
+    NSDictionary *callInfo = [NSDictionary dictionaryWithObjectsAndKeys:@"call", @"kind", @-100, @"chat_id", @12, @"call_id", nil];
+    NSDictionary *updateInfo = [NSDictionary dictionaryWithObject:@"update" forKey:@"kind"];
+    NSDictionary *malformedMessage = [NSDictionary dictionaryWithObjectsAndKeys:@"-100", @"chat_id", @500, @"message_id", nil];
+    NSDictionary *zeroMessage = Info(-100, 0, 0);
+    ProbeCenter *logoutCenter = [[[ProbeCenter alloc] initWithInfos:[NSArray arrayWithObjects:
+        Info(-100,500,0), Info(-100,501,20), Info(10,600,0),
+        callInfo, updateInfo, malformedMessage, zeroMessage, nil]] autorelease];
+    TGRemoveMessageNotificationsAfterLogout(logoutCenter);
+    Require([[logoutCenter deliveredNotifications] count] == 4,
+        @"successful logout removes only app message notifications, preserves call/update/malformed entries");
+    [state reset];
+    [state recordReadInboxMessageID:@550 chatID:@-100];
+    TGRemoveConfirmedReadNotifications(logoutCenter, state);
+    Require([[logoutCenter deliveredNotifications] count] == 4,
+        @"next-account confirmed reads cannot match departed-account notifications after explicit logout cleanup");
+    TGRemoveMessageNotificationsAfterLogout(nil);
     [state resetAtUnixTime:1000000.5];
     NSUInteger replayAlerts = 0;
     for (NSInteger i=1; i<=100; i++) {

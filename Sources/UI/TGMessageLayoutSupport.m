@@ -652,10 +652,85 @@ CGFloat TGMessageTopAccessoryHeightForItem(TGMessageItem *item) {
 }
 
 BOOL TGMessageUsesSeparateMetadataFooter(void) {
-    // Message metadata must remain a single, non-wrapping unit anchored to the
-    // lower-right corner of the bubble. Appending it to the message text lets
-    // 12-hour suffixes such as "AM" wrap independently on narrow bubbles.
+    // The normal layout keeps metadata in a separate lower-right footer.
+    // Compact single-line messages draw the same indivisible unit beside the
+    // body; neither path appends AM/PM or delivery icons to wrapping text.
     return YES;
+}
+
+// Keep the body and metadata separate: AM/PM and delivery icons must never wrap
+// into the message. The same rectangles are used by drawing and hit testing.
+static CGFloat TGMessageInlineMetadataWidth(TGMessageItem *item) {
+    NSString *time = TGShortTimeStringFromDateValue([item date]);
+    if ([time length] == 0) { return 0.0; }
+    CGFloat status = TGOutgoingStatusDotsWidthForItem(item);
+    return ceil([time sizeWithAttributes:[NSDictionary dictionaryWithObject:TGChatMessageMetaFont()
+                                                                     forKey:NSFontAttributeName]].width)
+           + status + (status > 0.0 ? 5.0 : 0.0);
+}
+
+static NSSize TGMessageSingleLineTextSize(TGMessageItem *item) {
+    NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+        TGChatMessageBodyFont(), NSFontAttributeName,
+        TGMessageTextParagraphStyle(), NSParagraphStyleAttributeName, nil];
+    NSAttributedString *text = TGAttributedMessageStringForItem(item, TGDisplayTextForMessageItem(item), attributes);
+    NSRect bounds = [text boundingRectWithSize:NSMakeSize(12000.0, 12000.0)
+                                      options:NSStringDrawingUsesLineFragmentOrigin];
+    return NSMakeSize(ceil(NSWidth(bounds)), ceil(NSHeight(bounds)));
+}
+
+static BOOL TGMessageCanUseSingleLineBody(TGMessageItem *item, CGFloat maximumBubbleWidth, BOOL showSenderDetails, BOOL inlineMetadata) {
+    if (![item isKindOfClass:[TGMessageItem class]] || TGChatMessagesAsBlocksEnabled() ||
+        [item isPinned] || [item isVisualMediaMessage] || TGMessageItemIsNonVisualPlayableMedia(item) ||
+        TGMessageItemIsNonVisualDocument(item) || TGMessageItemIsPollContent(item) || TGMessageItemIsCallContent(item) ||
+        TGMessageItemHasLinkPreview(item) || TGMessageItemHasCommentThread(item) ||
+        TGMessageSenderHeaderHeightForItem(item, showSenderDetails) > 0.0 ||
+        TGMessageContextHeaderHeightForItem(item) > 0.0 || (inlineMetadata && TGReactionChipsMinimumWidthForItem(item) > 0.0)) {
+        return NO;
+    }
+    NSString *type = [item contentType];
+    if ([type length] > 0 && ![type isEqualToString:@"messageText"]) { return NO; }
+    NSString *text = TGDisplayTextForMessageItem(item);
+    if ([text length] == 0 || [text rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]].location != NSNotFound) {
+        return NO;
+    }
+    // Paragraph blocks and code can carry their own insets/line geometry.
+    for (NSDictionary *entity in [item formattedEntities]) {
+        NSString *kind = [[entity objectForKey:@"type"] objectForKey:@"@type"];
+        if ([kind isEqualToString:@"textEntityTypeBlockQuote"] ||
+            [kind isEqualToString:@"textEntityTypeExpandableBlockQuote"] ||
+            [kind isEqualToString:@"textEntityTypePre"] || [kind isEqualToString:@"textEntityTypePreCode"]) {
+            return NO;
+        }
+    }
+    NSSize body = TGMessageSingleLineTextSize(item);
+    CGFloat metadata = inlineMetadata ? TGMessageInlineMetadataWidth(item) : 0.0;
+    CGFloat width = body.width + 24.0 + metadata + (metadata > 0.0 ? 8.0 : 0.0);
+    return body.width > 0.0 && body.height > 0.0 && width <= maximumBubbleWidth;
+}
+
+BOOL TGMessageUsesInlineMetadataForItem(TGMessageItem *item, CGFloat maximumBubbleWidth, BOOL showSenderDetails) {
+    return TGMessageCanUseSingleLineBody(item, maximumBubbleWidth, showSenderDetails, YES);
+}
+
+NSRect TGMessageInlineTextRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
+    NSSize body = TGMessageSingleLineTextSize(item);
+    CGFloat metadata = TGMessageInlineMetadataWidth(item);
+    CGFloat available = NSWidth(bubbleRect) - 24.0 - metadata - (metadata > 0.0 ? 8.0 : 0.0);
+    return NSMakeRect(NSMinX(bubbleRect) + 12.0,
+                      flipped ? NSMinY(bubbleRect) + 9.0 : NSMaxY(bubbleRect) - 9.0 - body.height,
+                      MAX(1.0, available), body.height + 2.0);
+}
+
+NSRect TGMessageInlineTimeRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped) {
+    NSString *time = TGShortTimeStringFromDateValue([item date]);
+    if ([time length] == 0) { return NSZeroRect; }
+    NSSize size = [time sizeWithAttributes:[NSDictionary dictionaryWithObject:TGChatMessageMetaFont() forKey:NSFontAttributeName]];
+    NSRect textRect = TGMessageInlineTextRectForItem(item, bubbleRect, flipped);
+    CGFloat height = ceil(size.height) + 2.0;
+    CGFloat baselineOffset = MAX(0.0, [TGChatMessageBodyFont() ascender] - [TGChatMessageMetaFont() ascender]);
+    CGFloat y = flipped ? NSMinY(textRect) + baselineOffset : NSMaxY(textRect) - baselineOffset - height;
+    return NSMakeRect(NSMaxX(bubbleRect) - 12.0 - TGMessageInlineMetadataWidth(item), y, ceil(size.width), height);
 }
 
 NSString *TGDurationStringFromSecondsValue(id durationValue) {
@@ -1848,8 +1923,12 @@ NSRect TGMessageReactionTimeRect(TGMessageItem *item, NSRect bandRect, BOOL flip
     CGFloat centerY = flipped ? NSMinY(bandRect) + 2.0 + NSMidY(lastChip)
                              : NSMaxY(bandRect) - 2.0 - NSMidY(lastChip);
     CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
-    return NSMakeRect(NSMaxX(bandRect) - timeSize.width - statusWidth - (statusWidth > 0.0 ? 5.0 : 0.0) - 2.0,
-                      centerY - floor(timeSize.height / 2.0), timeSize.width, ceil(timeSize.height) + 2.0);
+    NSRect timeRect = NSMakeRect(NSMaxX(bandRect) - timeSize.width - statusWidth - (statusWidth > 0.0 ? 5.0 : 0.0) - 2.0,
+                                centerY - floor(timeSize.height / 2.0), timeSize.width, ceil(timeSize.height) + 2.0);
+    // A growing/shrinking reaction band can be shorter than its final wrapped
+    // chip layout. Keep metadata out of the body and neighbouring message until
+    // its complete line fits; reaction chips already clip to the current band.
+    return NSContainsRect(bandRect, timeRect) ? timeRect : NSZeroRect;
 }
 
 CGFloat TGReactionBandHeightForMessageItemWidth(TGMessageItem *item, CGFloat bubbleWidth) {
@@ -2228,6 +2307,15 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
     CGFloat sidePadding = 14.0;
     CGFloat avatarGutter = (!outgoing && showSenderDetails) ? 34.0 : 0.0;
     CGFloat maximumBubbleWidth = TGMaximumBubbleWidthForItem(item, NSWidth(cellFrame));
+    if (TGMessageUsesInlineMetadataForItem(item, maximumBubbleWidth, showSenderDetails)) {
+        NSSize body = TGMessageSingleLineTextSize(item);
+        CGFloat metadata = TGMessageInlineMetadataWidth(item);
+        CGFloat width = body.width + 24.0 + metadata + (metadata > 0.0 ? 8.0 : 0.0);
+        CGFloat height = MAX(32.0, body.height + 18.0);
+        CGFloat x = outgoing ? NSMaxX(cellFrame) - width - sidePadding : NSMinX(cellFrame) + sidePadding + avatarGutter;
+        CGFloat y = NSMinY(cellFrame) + 5.0 + floor(TGMessageExtraBlockVerticalPadding() / 2.0) + TGMessageTopAccessoryHeightForItem(item);
+        return NSMakeRect(x, y, width, height);
+    }
     NSMutableParagraphStyle *paragraph = TGMessageTextParagraphStyle();
     NSDictionary *textAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageBodyFont(), NSFontAttributeName,
@@ -2338,7 +2426,11 @@ NSRect TGMessageBubbleRectForItem(TGMessageItem *item, NSRect cellFrame, BOOL sh
         TGReactionChipsMinimumWidthForItem(item) <= 0.0) {
         bubbleHeight += 17.0;
     }
-    if (bubbleHeight < 42.0) {
+    BOOL compactReactionBody = TGReactionChipsMinimumWidthForItem(item) > 0.0 &&
+        TGMessageCanUseSingleLineBody(item, maximumBubbleWidth, showSenderDetails, NO);
+    if (compactReactionBody) {
+        bubbleHeight = MAX(32.0, ceil(NSHeight(measuredRect)) + 18.0);
+    } else if (bubbleHeight < 42.0) {
         bubbleHeight = 42.0;
     }
     bubbleHeight += TGReactionBandHeightForMessageItemWidth(item, bubbleWidth);

@@ -1459,6 +1459,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         [self.mediaCenterSaveRequests removeAllObjects];
         [self.mediaCenterDownloadingFileIDs removeAllObjects];
         [self.notificationReadState reset];
+        // A rejected old-owner enrichment callback must not leave a pending
+        // token that permanently blocks lookups on the replacement client.
+        [self.notificationChatInfoByChatID removeAllObjects];
         [_client setUserOpenedChatID:nil];
         [_client release];
         _client = [client retain];

@@ -23,6 +23,10 @@ NSAttributedString *TGAttributedMessageStringForItem(TGMessageItem *item, NSStri
 CGFloat TGMessageExtraBlockVerticalPadding(void);
 CGFloat TGMessageTopAccessoryHeightForItem(TGMessageItem *item);
 BOOL TGMessageUsesSeparateMetadataFooter(void);
+// Short, unadorned text reserves one indivisible time/status unit beside the body.
+BOOL TGMessageUsesInlineMetadataForItem(TGMessageItem *item, CGFloat maximumBubbleWidth, BOOL showSenderDetails);
+NSRect TGMessageInlineTextRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
+NSRect TGMessageInlineTimeRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 NSString *TGDurationStringFromSecondsValue(id durationValue);
 NSString *TGVoicePreviewTimeString(NSTimeInterval seconds);
 NSString *TGMediaItemPlaceholder(NSDictionary *mediaItem);

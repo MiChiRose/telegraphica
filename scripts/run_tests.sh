@@ -44,6 +44,7 @@ echo "== Telegraphica static compatibility =="
 "$PYTHON_BIN" scripts/check_free_feature_policy.py
 "$PYTHON_BIN" scripts/test_static_project.py
 "$PYTHON_BIN" scripts/test_security_hardening.py
+"$PYTHON_BIN" Tests/notification_logout_routing_probe.py
 
 echo "== Shell syntax =="
 bash -n build_legacy.sh
@@ -409,6 +410,14 @@ HOME="$TEST_HOME" "$BUILD_DIR/automatic-read-visibility-integration-probe"
 echo "== Notification read cleanup =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/Core/TGChatItem.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/notification-read-state-probe"
+
+echo "== Notification enrichment ownership =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_chat_info_probe.m Sources/Core/TGChatItem.m -framework Foundation -o "$BUILD_DIR/notification-chat-info-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/notification-chat-info-probe"
+
+echo "== Notification logout completion ownership =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_logout_completion_probe.m -framework Foundation -o "$BUILD_DIR/notification-logout-completion-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/notification-logout-completion-probe"
 
 echo "== Core logic probe =="
 
