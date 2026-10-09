@@ -41,14 +41,23 @@ int main(void) {
              @"persisted queue must be a property list");
     NSMutableDictionary *paused = [NSMutableDictionary dictionaryWithDictionary:active];
     [paused setObject:@"paused" forKey:@"state"];
+    [paused setObject:@"synthetic-remote" forKey:@"remote_id"];
+    [paused setObject:@"synthetic-unique" forKey:@"remote_unique_id"];
+    [paused setObject:[NSNumber numberWithInt:1] forKey:@"account_id"];
     [paused setObject:[[[NSObject alloc] init] autorelease] forKey:@"client"];
     [paused setObject:[NSMutableDictionary dictionary] forKey:@"attempt"];
     [paused setObject:[NSArray arrayWithObject:@"runtime-only"] forKey:@"completions"];
+    [paused setObject:[[[NSObject alloc] init] autorelease] forKey:@"operation"];
     NSDictionary *restoredPause = [TGDownloadQueueNormalizedRecords(TGDownloadQueueSerializableRecords(
         [NSArray arrayWithObject:paused])) objectAtIndex:0];
     TGAssert([[restoredPause objectForKey:@"state"] isEqualToString:@"paused"], @"paused jobs must not become auto-resumable interrupted jobs");
     TGAssert([restoredPause objectForKey:@"client"] == nil && [restoredPause objectForKey:@"attempt"] == nil &&
-             [restoredPause objectForKey:@"completions"] == nil, @"runtime clients, attempt identities and callbacks must never enter persisted queue");
+             [restoredPause objectForKey:@"completions"] == nil && [restoredPause objectForKey:@"operation"] == nil,
+             @"runtime clients, attempt identities, operations and callbacks must never enter persisted queue");
+    TGAssert([[restoredPause objectForKey:@"requires_remote_resolution"] boolValue], @"restored numeric file identifiers must never be trusted as current session IDs");
+    TGAssert([[restoredPause objectForKey:@"remote_id"] isEqual:@"synthetic-remote"] &&
+             [[restoredPause objectForKey:@"remote_unique_id"] isEqual:@"synthetic-unique"] &&
+             [[restoredPause objectForKey:@"account_id"] integerValue] == 1, @"stable file identity and account scope must survive queue restoration");
     fprintf(stdout, "Download queue store probe passed.\n");
     [pool drain];
     return 0;

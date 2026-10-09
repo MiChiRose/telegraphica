@@ -8,12 +8,13 @@
 #import "TGDownloadQueueStore.h"
 
 NSString * const TGDownloadManagerDidChangeNotification = @"TGDownloadManagerDidChangeNotification";
-static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaCompletedDownloadPathsByFileID";
 
 @interface TGDownloadManager () {
     NSOperationQueue *_downloadQueue;
     NSObject *_exportLock;
     NSMutableDictionary *_fileOperations;
+    NSMutableDictionary *_completedPathsByFileID;
+    NSNumber *_clientAccountID;
     NSUInteger _identifierCounter;
     BOOL _didResumePersistedRecords;
 }
@@ -44,6 +45,7 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         [_downloadQueue setMaxConcurrentOperationCount:2];
         _exportLock = [[NSObject alloc] init];
         _fileOperations = [[NSMutableDictionary alloc] init];
+        _completedPathsByFileID = [[NSMutableDictionary alloc] init];
     }
     return self;
 }
@@ -54,6 +56,8 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
     [_downloadQueue release];
     [_exportLock release];
     [_fileOperations release];
+    [_completedPathsByFileID release];
+    [_clientAccountID release];
     [super dealloc];
 }
 
@@ -63,6 +67,9 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         if (_client != client) {
             changed = YES;
             for (NSMutableDictionary *record in self.records) {
+                if (_client && [[record objectForKey:@"file_id"] longLongValue] > 0) {
+                    [record setObject:[NSNumber numberWithBool:YES] forKey:@"requires_remote_resolution"];
+                }
                 NSString *state = [record objectForKey:@"state"];
                 BOOL unfinished = [state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"] ||
                                   [state isEqualToString:@"paused"] || [state isEqualToString:@"interrupted"];
@@ -76,6 +83,8 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
             }
             [_client release];
             _client = [client retain];
+            [_clientAccountID release]; _clientAccountID = nil;
+            [_completedPathsByFileID removeAllObjects];
             _didResumePersistedRecords = NO;
         }
     }
@@ -127,7 +136,7 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         [self enqueueFileID:[record objectForKey:@"file_id"]
           suggestedFileName:[record objectForKey:@"file_name"]
           fallbackLocalPath:[record objectForKey:@"fallback_path"]
-                 completion:nil];
+             identityRecord:record completion:nil];
     }
 }
 
@@ -149,7 +158,7 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         for (index = 0; index < [self.records count]; index++) {
             NSMutableDictionary *record = [self.records objectAtIndex:index];
             NSMutableDictionary *visible = [NSMutableDictionary dictionaryWithDictionary:record];
-            [visible removeObjectForKey:@"client"]; [visible removeObjectForKey:@"attempt"]; [visible removeObjectForKey:@"completions"];
+            [visible removeObjectForKey:@"client"]; [visible removeObjectForKey:@"attempt"]; [visible removeObjectForKey:@"completions"]; [visible removeObjectForKey:@"operation"];
             NSString *state = [record objectForKey:@"state"];
             BOOL active = [state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"];
             BOOL paused = [state isEqualToString:@"paused"];
@@ -179,7 +188,8 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         NSUInteger index = 0;
         for (index = 0; index < [self.records count]; index++) {
             NSDictionary *record = [self.records objectAtIndex:index];
-            if ([[record objectForKey:@"file_id"] longLongValue] != [fileID longLongValue]) {
+            if ([[record objectForKey:@"requires_remote_resolution"] boolValue] ||
+                [[record objectForKey:@"file_id"] longLongValue] != [fileID longLongValue]) {
                 continue;
             }
             state = [[record objectForKey:@"state"] copy];
@@ -196,12 +206,11 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         savedPath = nil;
     }
     if (!state) {
-        NSDictionary *completedPaths = [[NSUserDefaults standardUserDefaults]
-            dictionaryForKey:TGCompletedDownloadPathsDefaultsKey];
-        NSString *persistedPath = [completedPaths objectForKey:[fileID stringValue]];
-        if ([persistedPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:persistedPath]) {
-            state = [@"completed" copy];
-            savedPath = [persistedPath copy];
+        @synchronized(self) {
+            NSString *path = [_completedPathsByFileID objectForKey:[fileID stringValue]];
+            if ([path length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+                state = [@"completed" copy]; savedPath = [path copy];
+            }
         }
     }
     if (savedPathOut && [savedPath length] > 0) {
@@ -266,12 +275,23 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
     NSNumber *fileID = [[record objectForKey:@"file_id"] retain];
     NSString *fileName = [[record objectForKey:@"file_name"] copy];
     NSString *fallback = [[record objectForKey:@"fallback_path"] copy];
+    NSString *remoteID = [[record objectForKey:@"remote_id"] copy];
+    NSString *uniqueID = [[record objectForKey:@"remote_unique_id"] copy];
+    NSNumber *accountID = [[record objectForKey:@"account_id"] retain];
+    BOOL needsResolution = [[record objectForKey:@"requires_remote_resolution"] boolValue];
+    NSOperation *previousRecordOperation = [record objectForKey:@"operation"];
     TGTDLibClient *originClient = [_client retain];
     NSMutableDictionary *attempt = [[NSMutableDictionary alloc] init];
     [record setObject:attempt forKey:@"attempt"];
     if (originClient) { [record setObject:originClient forKey:@"client"]; }
-    NSString *operationKey = [([fileID longLongValue] > 0 ?
-        [NSString stringWithFormat:@"%p:%lld", originClient, [fileID longLongValue]] : identifier) copy];
+    NSString *operationKey = nil;
+    if ([remoteID length] > 0) {
+        operationKey = [[NSString stringWithFormat:@"remote:%p:%@", originClient, remoteID] copy];
+    } else if ([fileID longLongValue] > 0 && !needsResolution) {
+        operationKey = [[NSString stringWithFormat:@"%p:%lld", originClient, [fileID longLongValue]] copy];
+    } else {
+        operationKey = [identifier copy];
+    }
     NSBlockOperation *operation = [NSBlockOperation blockOperationWithBlock:^{
         NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         BOOL current = NO, startedNetwork = NO;
@@ -283,9 +303,72 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         [self postChange];
         NSError *error = nil;
         NSString *sourcePath = nil;
+        NSNumber *resolvedFileID = nil;
         if (current && [fileID longLongValue] > 0 && originClient) {
+            if (needsResolution && ([remoteID length] == 0 || !accountID)) {
+                error = [NSError errorWithDomain:@"Telegraphica.Downloads" code:4 userInfo:
+                         [NSDictionary dictionaryWithObject:@"Reopen this file's message and download it again. This older download has no safe identity for restoring after a restart." forKey:NSLocalizedDescriptionKey]];
+            } else {
+                NSNumber *readyAccount = nil;
+                @synchronized(self) { readyAccount = [_clientAccountID retain]; }
+                if (!readyAccount) { readyAccount = [[originClient downloadAccountIDWithError:&error] retain]; }
+                @synchronized(self) {
+                    current = [self record:[self recordForIdentifier:identifier] ownsAttempt:attempt client:originClient];
+                    if (current && readyAccount && !_clientAccountID) { _clientAccountID = [readyAccount retain]; }
+                }
+                if (current && readyAccount && (!accountID || [accountID isEqual:readyAccount])) {
+                    NSDictionary *identity = [originClient downloadFileIdentityForFileID:fileID remoteFileID:remoteID error:&error];
+                    NSDictionary *remote = [[identity objectForKey:@"remote"] isKindOfClass:[NSDictionary class]] ?
+                                            [identity objectForKey:@"remote"] : nil;
+                    NSString *resolvedRemote = [[remote objectForKey:@"id"] isKindOfClass:[NSString class]] ? [remote objectForKey:@"id"] : nil;
+                    NSString *resolvedUnique = [[remote objectForKey:@"unique_id"] isKindOfClass:[NSString class]] ? [remote objectForKey:@"unique_id"] : nil;
+                    NSNumber *resolvedID = [[identity objectForKey:@"id"] isKindOfClass:[NSNumber class]] ? [identity objectForKey:@"id"] : nil;
+                    BOOL validIdentity = [resolvedID longLongValue] > 0 &&
+                        ([uniqueID length] == 0 || ([resolvedUnique length] > 0 && [uniqueID isEqualToString:resolvedUnique]));
+                    @synchronized(self) {
+                        NSMutableDictionary *found = [self recordForIdentifier:identifier];
+                        current = [self record:found ownsAttempt:attempt client:originClient];
+                        if (current && validIdentity) {
+                            NSString *freshKey = [NSString stringWithFormat:@"%p:%lld", originClient, [resolvedID longLongValue]];
+                            NSDictionary *other = [_fileOperations objectForKey:freshKey];
+                            if (other && [other objectForKey:@"attempt"] != attempt && ![[other objectForKey:@"operation"] isFinished]) {
+                                validIdentity = NO;
+                                error = [NSError errorWithDomain:@"Telegraphica.Downloads" code:6 userInfo:
+                                    [NSDictionary dictionaryWithObject:@"This file already has another active download." forKey:NSLocalizedDescriptionKey]];
+                            } else {
+                                resolvedFileID = [resolvedID retain];
+                                [found setObject:resolvedID forKey:@"file_id"];
+                                [found setObject:readyAccount forKey:@"account_id"];
+                                [found setObject:[NSNumber numberWithBool:NO] forKey:@"requires_remote_resolution"];
+                                if ([resolvedRemote length] > 0) { [found setObject:resolvedRemote forKey:@"remote_id"]; }
+                                if ([resolvedUnique length] > 0) { [found setObject:resolvedUnique forKey:@"remote_unique_id"]; }
+                                [_fileOperations setObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                    [attempt objectForKey:@"operation"], @"operation", attempt, @"attempt", nil] forKey:freshKey];
+                                if ([resolvedRemote length] > 0) {
+                                    NSString *stableKey = [NSString stringWithFormat:@"remote:%p:%@", originClient, resolvedRemote];
+                                    [_fileOperations setObject:[NSDictionary dictionaryWithObjectsAndKeys:
+                                        [attempt objectForKey:@"operation"], @"operation", attempt, @"attempt", nil] forKey:stableKey];
+                                }
+                            }
+                        }
+                    }
+                    if (!validIdentity && !error) {
+                        error = [NSError errorWithDomain:@"Telegraphica.Downloads" code:5 userInfo:
+                            [NSDictionary dictionaryWithObject:@"The saved file identity no longer matches. Reopen the file's message and download it again." forKey:NSLocalizedDescriptionKey]];
+                    }
+                } else if (current && accountID && readyAccount) {
+                    error = [NSError errorWithDomain:@"Telegraphica.Downloads" code:7 userInfo:
+                        [NSDictionary dictionaryWithObject:@"This download belongs to another Telegram account. Reopen the file's message in the current account." forKey:NSLocalizedDescriptionKey]];
+                }
+                [readyAccount release];
+            }
+        }
+        if (current && resolvedFileID) {
+            // Publish the restart-safe identity even if the first transfer RPC
+            // times out before reporting any byte progress.
+            [self postChange];
             startedNetwork = YES;
-            sourcePath = [originClient persistentDownloadedLocalPathForFileID:fileID cancelled:^BOOL {
+            sourcePath = [originClient persistentDownloadedLocalPathForFileID:resolvedFileID cancelled:^BOOL {
                 @synchronized(self) {
                     return ![self record:[self recordForIdentifier:identifier] ownsAttempt:attempt client:originClient];
                 }
@@ -336,13 +419,8 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
                     [found setObject:@"completed" forKey:@"state"];
                     [found setObject:savedPath forKey:@"saved_path"];
                     [found setObject:[NSDate date] forKey:@"finished_at"];
-                    if ([fileID longLongValue] > 0) {
-                        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-                        NSMutableDictionary *paths = [NSMutableDictionary dictionaryWithDictionary:
-                            ([defaults dictionaryForKey:TGCompletedDownloadPathsDefaultsKey] ?: [NSDictionary dictionary])];
-                        [paths setObject:savedPath forKey:[fileID stringValue]];
-                        [defaults setObject:paths forKey:TGCompletedDownloadPathsDefaultsKey];
-                        [defaults synchronize];
+                    if ([resolvedFileID longLongValue] > 0) {
+                        [_completedPathsByFileID setObject:savedPath forKey:[resolvedFileID stringValue]];
                     }
                     [self deliverRecordCompletions:found savedPath:savedPath error:nil cancelled:NO];
                 } else {
@@ -358,24 +436,32 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         }
         // This finishes before the operation dependency releases a new attempt.
         // TDLib retains its already downloaded chunks; Cancel does not delete it.
-        if (stopNetwork) { [originClient cancelDownloadForFileID:fileID timeout:5.0 error:NULL]; }
+        if (stopNetwork) { [originClient cancelDownloadForFileID:resolvedFileID timeout:5.0 error:NULL]; }
         @synchronized(self) {
             NSMutableDictionary *found = [self recordForIdentifier:identifier];
             if ([found objectForKey:@"attempt"] == attempt) {
                 [found removeObjectForKey:@"attempt"];
+                [found removeObjectForKey:@"operation"];
                 if (![[found objectForKey:@"state"] isEqualToString:@"paused"]) { [found removeObjectForKey:@"client"]; }
             }
-            if ([[_fileOperations objectForKey:operationKey] objectForKey:@"attempt"] == attempt) {
-                [_fileOperations removeObjectForKey:operationKey];
+            NSArray *operationKeys = [[_fileOperations allKeys] copy];
+            for (NSString *key in operationKeys) {
+                if ([[_fileOperations objectForKey:key] objectForKey:@"attempt"] == attempt) { [_fileOperations removeObjectForKey:key]; }
             }
+            [operationKeys release];
+            [attempt removeObjectForKey:@"operation"];
         }
         [self postChange];
         [identifier release]; [fileID release]; [fileName release]; [fallback release];
         [originClient release]; [attempt release]; [operationKey release];
+        [resolvedFileID release]; [remoteID release]; [uniqueID release]; [accountID release];
         [pool drain];
     }];
     NSOperation *previous = [[_fileOperations objectForKey:operationKey] objectForKey:@"operation"];
     if (previous) { [operation addDependency:previous]; }
+    if (previousRecordOperation && previousRecordOperation != previous) { [operation addDependency:previousRecordOperation]; }
+    [record setObject:operation forKey:@"operation"];
+    [attempt setObject:operation forKey:@"operation"];
     [_fileOperations setObject:[NSDictionary dictionaryWithObjectsAndKeys:operation, @"operation", attempt, @"attempt", nil]
                        forKey:operationKey];
     [_downloadQueue addOperation:operation];
@@ -383,6 +469,13 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
 
 - (NSString *)enqueueFileID:(NSNumber *)fileID suggestedFileName:(NSString *)suggestedFileName
           fallbackLocalPath:(NSString *)fallbackLocalPath completion:(TGDownloadCompletionBlock)completion {
+    return [self enqueueFileID:fileID suggestedFileName:suggestedFileName fallbackLocalPath:fallbackLocalPath
+                identityRecord:nil completion:completion];
+}
+
+- (NSString *)enqueueFileID:(NSNumber *)fileID suggestedFileName:(NSString *)suggestedFileName
+          fallbackLocalPath:(NSString *)fallbackLocalPath identityRecord:(NSDictionary *)identityRecord
+                 completion:(TGDownloadCompletionBlock)completion {
     BOOL hasID = [fileID respondsToSelector:@selector(longLongValue)] && [fileID longLongValue] > 0;
     BOOL hasLocal = [fallbackLocalPath length] > 0 && [[NSFileManager defaultManager] fileExistsAtPath:fallbackLocalPath];
     if (!hasID && !hasLocal) {
@@ -398,7 +491,13 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         if (hasID) {
             for (NSDictionary *existing in self.records) {
                 NSString *state = [existing objectForKey:@"state"];
-                if ([[existing objectForKey:@"file_id"] longLongValue] == [fileID longLongValue] &&
+                BOOL sameRemote = [[identityRecord objectForKey:@"remote_id"] length] > 0 &&
+                    [[identityRecord objectForKey:@"remote_id"] isEqual:[existing objectForKey:@"remote_id"]] &&
+                    [[identityRecord objectForKey:@"account_id"] isEqual:[existing objectForKey:@"account_id"]];
+                BOOL sameCurrentID = ![[existing objectForKey:@"requires_remote_resolution"] boolValue] &&
+                    ![[identityRecord objectForKey:@"requires_remote_resolution"] boolValue] &&
+                    [[existing objectForKey:@"file_id"] longLongValue] == [fileID longLongValue];
+                if ((sameRemote || sameCurrentID) &&
                     ([state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"] || [state isEqualToString:@"paused"])) {
                     return [existing objectForKey:@"identifier"];
                 }
@@ -411,6 +510,9 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
             name, @"file_name", @"queued", @"state", [NSDate date], @"created_at", [NSNumber numberWithBool:NO], @"cancelled", nil];
         if (hasID) { [record setObject:fileID forKey:@"file_id"]; }
         if ([fallbackLocalPath length] > 0) { [record setObject:fallbackLocalPath forKey:@"fallback_path"]; }
+        for (NSString *key in [NSArray arrayWithObjects:@"remote_id", @"remote_unique_id", @"account_id", @"requires_remote_resolution", nil]) {
+            id value = [identityRecord objectForKey:key]; if (value) { [record setObject:value forKey:key]; }
+        }
         [self appendCompletion:completion toRecord:record];
         [self.records insertObject:record atIndex:0];
         [self startRecord:record];
@@ -467,7 +569,8 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
         for (index = 0; index < [self.records count]; index++) {
             NSDictionary *record = [self.records objectAtIndex:index];
             NSString *state = [record objectForKey:@"state"];
-            if ([[record objectForKey:@"file_id"] longLongValue] == [fileID longLongValue] &&
+            if (![[record objectForKey:@"requires_remote_resolution"] boolValue] &&
+                [[record objectForKey:@"file_id"] longLongValue] == [fileID longLongValue] &&
                 ([state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"] || [state isEqualToString:@"paused"])) {
                 [identifiers addObject:[record objectForKey:@"identifier"]];
             }
@@ -479,23 +582,22 @@ static NSString * const TGCompletedDownloadPathsDefaultsKey = @"TelegraphicaComp
     }
 }
 
-- (void)retryDownloadWithIdentifier:(NSString *)identifier
-                         completion:(TGDownloadCompletionBlock)completion {
+- (NSString *)enqueueRetryDownloadWithIdentifier:(NSString *)identifier completion:(TGDownloadCompletionBlock)completion {
     NSDictionary *record = nil;
     @synchronized(self) {
         NSMutableDictionary *found = [self recordForIdentifier:identifier];
-        if (found) {
-            record = [[NSDictionary alloc] initWithDictionary:found];
-        }
+        if (found) { record = [[NSDictionary alloc] initWithDictionary:found]; }
     }
-    if (!record) {
-        return;
-    }
-    [self enqueueFileID:[record objectForKey:@"file_id"]
-      suggestedFileName:[record objectForKey:@"file_name"]
-      fallbackLocalPath:[record objectForKey:@"fallback_path"]
-             completion:completion];
-    [record release];
+    if (!record) { return nil; }
+    NSString *result = [self enqueueFileID:[record objectForKey:@"file_id"]
+                       suggestedFileName:[record objectForKey:@"file_name"]
+                       fallbackLocalPath:[record objectForKey:@"fallback_path"]
+                          identityRecord:record completion:completion];
+    [record release]; return result;
+}
+
+- (void)retryDownloadWithIdentifier:(NSString *)identifier completion:(TGDownloadCompletionBlock)completion {
+    [self enqueueRetryDownloadWithIdentifier:identifier completion:completion];
 }
 
 - (void)clearFinishedDownloads {

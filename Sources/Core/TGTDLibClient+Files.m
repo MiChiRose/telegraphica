@@ -1,4 +1,11 @@
 #import "TGTDLibClient+Files.h"
+#include <limits.h>
+
+static BOOL TGDownloadIdentityHasValidNumericValue(id value, long long maximum) {
+    if (![value isKindOfClass:[NSNumber class]]) { return NO; }
+    long long number = [value longLongValue];
+    return number > 0 && number <= maximum && [value doubleValue] == (double)number;
+}
 
 @interface TGTDLibClient (FilesPrivate)
 - (NSDictionary *)sendTDLibRequestAndWaitForExtra:(NSDictionary *)request
@@ -11,6 +18,70 @@
 @end
 
 @implementation TGTDLibClient (Files)
+
+- (NSNumber *)downloadAccountIDWithError:(NSError **)error {
+    if (error) { *error = nil; }
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:
+        [NSDictionary dictionaryWithObject:@"getMe" forKey:@"@type"]
+        extraPrefix:@"telegraphica-download-account" timeout:3.0 errorCode:56 error:&requestError];
+    id accountID = [response isKindOfClass:[NSDictionary class]] ? [response objectForKey:@"id"] : nil;
+    if (![response isKindOfClass:[NSDictionary class]] || ![[response objectForKey:@"@type"] isEqual:@"user"] ||
+        !TGDownloadIdentityHasValidNumericValue(accountID, 9007199254740991LL)) {
+        if (error) { *error = [self errorWithDescription:@"TDLib could not confirm the download account. Please retry after signing in."
+            code:requestError ? [requestError code] : 56]; }
+        return nil;
+    }
+    return [NSNumber numberWithLongLong:[accountID longLongValue]];
+}
+
+- (NSDictionary *)downloadFileIdentityForFileID:(NSNumber *)fileID
+                                  remoteFileID:(NSString *)remoteID
+                                         error:(NSError **)error {
+    if (error) { *error = nil; }
+    if (remoteID && ![remoteID isKindOfClass:[NSString class]]) {
+        if (error) { *error = [self errorWithDescription:@"Remote file identity is invalid." code:56]; }
+        return nil;
+    }
+    BOOL resolvingRemote = [remoteID length] > 0;
+    if (!resolvingRemote && !TGDownloadIdentityHasValidNumericValue(fileID, INT_MAX)) {
+        if (error) { *error = [self errorWithDescription:@"File identifier is missing or invalid." code:56]; }
+        return nil;
+    }
+    NSDictionary *request = resolvingRemote ? [NSDictionary dictionaryWithObjectsAndKeys:
+        @"getRemoteFile", @"@type", remoteID, @"remote_file_id",
+        [NSDictionary dictionaryWithObject:@"fileTypeUnknown" forKey:@"@type"], @"file_type", nil] :
+        [NSDictionary dictionaryWithObjectsAndKeys:@"getFile", @"@type", fileID, @"file_id", nil];
+    NSError *requestError = nil;
+    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
+        extraPrefix:@"telegraphica-file-identity" timeout:3.0 errorCode:56 error:&requestError];
+    if (!response) {
+        // Protocol descriptions can contain the remote identifier; expose only
+        // a fixed explanation and the failure code to download presentation.
+        if (error) { *error = [self errorWithDescription:@"TDLib could not resolve this file. Retry or reopen its source message."
+            code:requestError ? [requestError code] : 56]; }
+        return nil;
+    }
+    id responseID = [response isKindOfClass:[NSDictionary class]] ? [response objectForKey:@"id"] : nil;
+    NSDictionary *local = [response isKindOfClass:[NSDictionary class]] ? [response objectForKey:@"local"] : nil;
+    NSDictionary *remote = [response isKindOfClass:[NSDictionary class]] ? [response objectForKey:@"remote"] : nil;
+    BOOL valid = [response isKindOfClass:[NSDictionary class]] &&
+        [[response objectForKey:@"@type"] isEqual:@"file"] && TGDownloadIdentityHasValidNumericValue(responseID, INT_MAX) &&
+        (resolvingRemote || [responseID longLongValue] == [fileID longLongValue]) &&
+        [local isKindOfClass:[NSDictionary class]] && [[local objectForKey:@"path"] isKindOfClass:[NSString class]] &&
+        [remote isKindOfClass:[NSDictionary class]] && [[remote objectForKey:@"id"] isKindOfClass:[NSString class]];
+    if (valid && resolvingRemote) { valid = [[remote objectForKey:@"id"] length] > 0; }
+    if (valid && [remote objectForKey:@"unique_id"]) {
+        valid = [[remote objectForKey:@"unique_id"] isKindOfClass:[NSString class]];
+    }
+    if (!valid) {
+        if (error) { *error = [self errorWithDescription:@"TDLib returned invalid file identity information." code:56]; }
+        return nil;
+    }
+    // getRemoteFile is correlated by the request helper. Do not compare its
+    // canonical remote ID with the input: one file can have multiple aliases.
+    return response;
+}
 
 - (NSString *)persistentDownloadedLocalPathForFileID:(NSNumber *)fileID
                                           cancelled:(TGFileDownloadCancellationBlock)cancelled

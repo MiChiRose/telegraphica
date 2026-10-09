@@ -32,6 +32,13 @@ NSString *TGConfiguredDownloadFolderPath(void) { return TGProbeDirectory; }
 - (void)dealloc { [_sourcePath release]; [super dealloc]; }
 - (NSUInteger)requests { @synchronized(self) { return _requests; } }
 - (NSUInteger)cancellations { @synchronized(self) { return _cancellations; } }
+- (NSNumber *)downloadAccountIDWithError:(NSError **)error { (void)error; return @1; }
+- (NSDictionary *)downloadFileIdentityForFileID:(NSNumber *)fileID remoteFileID:(NSString *)remoteID error:(NSError **)error {
+    (void)error;
+    NSString *stableID = [remoteID length] > 0 ? remoteID : [NSString stringWithFormat:@"remote-%lld", [fileID longLongValue]];
+    return [NSDictionary dictionaryWithObjectsAndKeys:@"file", @"@type", fileID, @"id",
+            [NSDictionary dictionaryWithObjectsAndKeys:stableID, @"id", [NSString stringWithFormat:@"unique-%lld", [fileID longLongValue]], @"unique_id", nil], @"remote", nil];
+}
 - (NSString *)persistentDownloadedLocalPathForFileID:(NSNumber *)fileID cancelled:(TGFileDownloadCancellationBlock)cancelled
                                           progress:(TGFileDownloadProgressBlock)progress error:(NSError **)error {
     @synchronized(self) { _requests++; }

@@ -132,6 +132,14 @@ echo "== Download cancellation and client ownership =="
 HOME="$TEST_HOME" "$BUILD_DIR/download-manager-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/download-pause-probe"
 
+echo "== Download identity after restart =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_restart_identity_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-restart-identity-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-restart-identity-probe"
+
+echo "== Download manager layout and themes =="
+"$CLANG" "${COMPILE_FLAGS[@]}" -I"$ROOT_DIR/Sources/UI" -I"$ROOT_DIR/Sources/Services" -I"$ROOT_DIR/Sources/Media" Tests/download_manager_presentation_probe.m Sources/UI/TGDownloadManagerPresentation.m Sources/UI/TGDownloadManagerWindowController.m Sources/UI/TGLocalization.m Sources/UI/TGTheme.m Sources/UI/TGVisualWorldThemeSpec.m Sources/UI/TGStatusButtonCells.m Sources/UI/TGIconAssets.m Sources/UI/TGIconDrawing.m -framework Cocoa -framework CoreGraphics -o "$BUILD_DIR/download-manager-presentation-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-manager-presentation-probe"
+
 echo "== Nonblocking download progress presentation =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_progress_presentation_probe.m Sources/UI/TGDownloadProgressWindowController.m -framework Cocoa -o "$BUILD_DIR/download-progress-presentation-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/download-progress-presentation-probe"
@@ -229,6 +237,10 @@ echo "== TDLib file requests =="
     -framework Foundation \
     -o "$BUILD_DIR/tdlib-file-request-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-request-probe"
+
+echo "== TDLib stable file identity =="
+"$CLANG" "${COMPILE_FLAGS[@]}" -I"$ROOT_DIR/Sources/Core" -Wno-incomplete-implementation -Wno-objc-protocol-method-implementation Tests/tdlib_file_identity_probe.m Sources/Core/TGTDLibClient+Files.m Sources/Core/TGPersistentFileDownload.m -framework Foundation -o "$BUILD_DIR/tdlib-file-identity-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-identity-probe"
 
 echo "== TDLib account requests =="
 "$CLANG" \
