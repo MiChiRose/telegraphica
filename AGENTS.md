@@ -4,13 +4,11 @@ These project rules apply to Codex work in this repository.
 
 ## Git Flow
 
-- Use git-flow style branches.
-- `main` is the protected release/base branch.
-- Create `develop` from `main`.
-- Create task branches from `develop`; do implementation and verification there.
-- Name task branches by work type, for example `feature/...`, `fix/...`, `hotfix/...`, or `test/...`.
-- Do not use AI assistant, model, or tool names in branch names, including `codex`, `gemini`, `claude`, `groq`, or similar prefixes.
-- After local checks pass and the code does not crash in the available smoke tests, merge the task branch into `develop`.
+- Keep exactly three branches locally and on GitHub: `main`, `develop`, and `demo`.
+- `main` is the protected release branch; keep the published release code there.
+- Implement, verify, commit, and push all unreleased work on `develop`.
+- Do not create or push additional task, feature, fix, release, or OS-specific branches unless the user explicitly authorizes an exception.
+- Leave `demo` unchanged unless the user explicitly requests work on it.
 - The user performs HITL/live validation from `develop`.
 - Merge `develop` into `main` only after HITL approval, and use a teamlead/reviewer subagent for that final merge review when subagents are available.
 - Codex owns git operations for the project: branching, commits, merges, comments, and pushes.
@@ -24,13 +22,13 @@ These project rules apply to Codex work in this repository.
   - worker agents may implement bounded tasks;
   - verifier agents should review worker output;
   - additional reviewer agents may cross-check verification when the risk is meaningful.
-- Keep branch write scopes clear when multiple agents are active.
+- Keep file write scopes clear when multiple agents work on `develop`.
 - Ask the user questions during development when product, credential, legacy-machine, or HITL decisions are genuinely unclear.
 
 ## Unified Legacy Release
 
 - Treat OS X 10.8 through macOS 10.13 as one product and release lane. The canonical deliverable is one Intel `x86_64` application built from one source tree, one application target, and one build/package pipeline.
-- Do not split compatibility work into separate Mountain Lion and Mavericks source trees, long-lived OS-specific branches, duplicated project files, generated source variants, app bundles, DMGs, or ZIPs. Historical `mountain-lion/*` branches are reference-only; start all new work from `develop`.
+- Do not split compatibility work into separate Mountain Lion and Mavericks source trees, long-lived OS-specific branches, duplicated project files, generated source variants, app bundles, DMGs, or ZIPs. Historical OS-specific revisions remain in Git history; do all new work on `develop`.
 - Keep the shared deployment target at OS X 10.8. Implement unavoidable OS differences inside the common codebase with runtime capability/version checks and focused compatibility helpers. Use conditional compilation only when an SDK or compiler difference cannot be handled at runtime.
 - Preserve the normal 10.9-10.13 feature path while providing 10.8-safe fallbacks. If a feature or optional Workshop module requires 10.9 or newer, express that through availability metadata and runtime gating instead of forking the host application or release.
 - Treat platform checks as complementary validation of the same deliverable. Release candidates and changes that touch runtime gating, packaging, dependencies, or shared compatibility code should cover both the OS X 10.8 fallback and the 10.9-10.13 normal path. Ordinary feature iterations may use the relevant available legacy Mac unless the change affects the other path.
