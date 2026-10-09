@@ -888,6 +888,7 @@
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
     } else if (![previousState isEqualToString:@"ready"]) {
+        [[TGDownloadManager sharedManager] setClient:self.client];
         [[TGDownloadManager sharedManager] resumePendingDownloads];
         self.activeSection = TGSectionChats;
         self.chatFilterRefreshRetryCount = 0;
@@ -1202,21 +1203,18 @@
         }
         return NO;
     }
-    if (control == self.sendTextField &&
-        (commandSelector == @selector(insertNewline:) ||
-         commandSelector == @selector(insertLineBreak:) ||
-         commandSelector == @selector(insertNewlineIgnoringFieldEditor:))) {
-        NSUInteger modifierFlags = [[[NSApplication sharedApplication] currentEvent] modifierFlags];
-        BOOL wantsLineBreak = (commandSelector == @selector(insertLineBreak:) ||
-                               (modifierFlags & NSShiftKeyMask) != 0);
-        if (wantsLineBreak) {
-            [textView insertNewline:nil];
-            [self layoutContentView];
-            [self updateSendControls];
+    if (control == self.sendTextField) {
+        NSUInteger flags = [[[NSApplication sharedApplication] currentEvent] modifierFlags];
+        TGComposerKeyboardCommand command = TGComposerCommandForSelector(commandSelector, flags);
+        if (command == TGComposerKeyboardCommandLineBreak) {
+            BOOL inserted = TGComposerInsertLineBreak(textView);
+            if (inserted) { [self layoutContentView]; [self updateSendControls]; }
+            return inserted;
+        }
+        if (command == TGComposerKeyboardCommandSend && ![textView hasMarkedText]) {
+            [self sendMessage:control];
             return YES;
         }
-        [self sendMessage:control];
-        return YES;
     }
     if ((control == self.authTextField || control == self.authSecureField) && commandSelector == @selector(insertNewline:)) {
         [self submitAuthInput:control];

@@ -554,7 +554,7 @@ def check_additional_message_types_contract(errors):
     bot_composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BotComposer.inc")
     bot_composer_text = read_text(os.path.join(ROOT, bot_composer_rel))
     for fragment in ["setBotComposerVisible", "replyMarkupShowKeyboard",
-                     "setBotCommandPanelVisible", "setDuration:0.16"]:
+                     "setBotCommandPanelVisible", "TGSetViewVisibleAnimated"]:
         if fragment not in bot_composer_text:
             errors.append("%s: bot composer integration is missing `%s`" %
                           (bot_composer_rel, fragment))
@@ -971,6 +971,7 @@ def check_media_file_management_contract(errors):
 
     media_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MediaWindows.inc")
     media_text = read_text(os.path.join(ROOT, media_rel))
+    media_text += read_text(os.path.join(ROOT, "Sources", "UI", "TGStatusWindowController+MediaCenterSave.inc"))
     for fragment in [
         "mediaCenterDownloadingFileIDs",
         "cancelMediaCenterDownload:",
@@ -1188,6 +1189,7 @@ def check_primary_navigation_contract(errors):
                           (client_rel, fragment))
     message_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
     message_flow_text = read_text(os.path.join(ROOT, message_flow_rel))
+    message_flow_text += read_text(os.path.join(ROOT, "Sources", "UI", "TGStatusWindowController+AutomaticReadVisibility.inc"))
     for fragment in [
         "scrollMessagesToInitialUnreadIfAvailable",
         "visibleUnreadMessageItemsAwaitingReceipt",

@@ -3,5 +3,6 @@
 @interface TGDownloadManagerWindowController : NSWindowController
 
 - (void)reloadDownloads;
+- (void)refreshPresentation;
 
 @end

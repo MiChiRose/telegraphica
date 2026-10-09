@@ -13,6 +13,7 @@
 #import "TGChatLifecycleWindowController.h"
 #import "TGContactsViewController.h"
 #import "TGDownloadManagerWindowController.h"
+#import "TGDownloadProgressWindowController.h"
 #import "TGCallsPlaceholderView.h"
 #import "../Calls/TGCallCoordinator.h"
 #import "TGLocalization.h"
@@ -22,6 +23,12 @@
 #import "TGMessageViewersWindowController.h"
 #import "TGNotificationSettingsWindowController.h"
 #import "TGAnimationSupport.h"
+#import "TGSectionTransition.h"
+#import "TGConversationVisibility.h"
+#import "TGKeyboardInputSupport.h"
+#import "TGTranscriptMotion.h"
+#import "TGNotificationReadState.h"
+#import "TGNotificationDeliverySupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
 #import "TGProfileEditWindowController.h"
@@ -320,6 +327,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) TGSavedMessagesWindowController *savedMessagesWindowController;
 @property (nonatomic, retain) TGScheduledMessagesWindowController *scheduledMessagesWindowController;
 @property (nonatomic, retain) TGDownloadManagerWindowController *downloadManagerWindowController;
+@property (nonatomic, retain) TGDownloadProgressWindowController *downloadProgressWindowController;
 @property (nonatomic, retain) TGGroupedCardView *aboutCardView;
 @property (nonatomic, retain) TGGroupedCardView *logsCardView;
 @property (nonatomic, retain) TGSectionTitleField *settingsProfileSectionField;
@@ -403,6 +411,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableSet *mediaCenterExhaustedFilterIdentifiers;
 @property (nonatomic, retain) NSMutableSet *mediaCenterSeenKeys;
 @property (nonatomic, retain) NSMutableSet *mediaCenterDownloadingFileIDs;
+@property (nonatomic, retain) NSMutableDictionary *mediaCenterSaveRequests;
 @property (nonatomic, retain) NSMutableDictionary *mediaCenterSavedPathsByFileID;
 @property (nonatomic, retain) NSMutableSet *mediaCenterThumbnailLoadingFileIDs;
 @property (nonatomic, retain) NSMutableSet *mediaCenterThumbnailAttemptedFileIDs;
@@ -595,6 +604,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, assign) BOOL initialUnreadPositionPending;
 @property (nonatomic, assign) BOOL unreadSeparatorDismissedForCurrentSelection;
 @property (nonatomic, retain) NSMutableSet *visibleReadReceiptMessageIDs;
+@property (nonatomic, assign) NSUInteger automaticReadGeneration;
+- (BOOL)conversationAllowsAutomaticRead;
+- (void)invalidateAutomaticReadRequests;
+- (void)conversationVisibilityDidChange:(NSNotification *)notification;
 @property (nonatomic, retain) NSNumber *selectedMessageThreadID;
 @property (nonatomic, copy) NSString *selectedMessageTopicKind;
 @property (nonatomic, retain) NSMutableArray *commentThreadNavigationStack;
@@ -787,6 +800,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSNumber *pendingNotificationChatID;
 @property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
 @property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
+@property (nonatomic, retain) TGNotificationReadState *notificationReadState;
+@property (nonatomic, retain) TGTranscriptMotionController *transcriptMotionController;
+@property (nonatomic, retain) TGSectionTransitionController *sectionTransitionController;
+@property (nonatomic, retain) NSMutableSet *pendingArrivalMessageIDs;
+- (void)rememberLiveArrivalFromSummary:(NSDictionary *)summary;
+- (void)animatePendingLiveArrivals:(BOOL)nearNewest;
+- (BOOL)animateConfirmedRemovalWithID:(NSNumber *)messageID chatID:(NSNumber *)chatID;
+- (void)removeConfirmedReadNotifications;
+- (void)recordReadNotificationMessageIDs:(NSArray *)messageIDs chatID:(NSNumber *)chatID;
+- (void)handleReadInboxNotificationSummary:(NSDictionary *)summary;
 @property (nonatomic, retain) NSMutableDictionary *localMuteUnreadCountsByChatID;
 - (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item;
 - (void)clearReplyTarget;
@@ -957,6 +980,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaCenterExhaustedFilterIdentifiers = _mediaCenterExhaustedFilterIdentifiers;
 @synthesize mediaCenterSeenKeys = _mediaCenterSeenKeys;
 @synthesize mediaCenterDownloadingFileIDs = _mediaCenterDownloadingFileIDs;
+@synthesize mediaCenterSaveRequests = _mediaCenterSaveRequests;
 @synthesize mediaCenterSavedPathsByFileID = _mediaCenterSavedPathsByFileID;
 @synthesize mediaCenterThumbnailLoadingFileIDs = _mediaCenterThumbnailLoadingFileIDs;
 @synthesize mediaCenterThumbnailAttemptedFileIDs = _mediaCenterThumbnailAttemptedFileIDs;
@@ -1144,6 +1168,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize initialUnreadPositionPending = _initialUnreadPositionPending;
 @synthesize unreadSeparatorDismissedForCurrentSelection = _unreadSeparatorDismissedForCurrentSelection;
 @synthesize visibleReadReceiptMessageIDs = _visibleReadReceiptMessageIDs;
+@synthesize automaticReadGeneration = _automaticReadGeneration;
 @synthesize selectedMessageThreadID = _selectedMessageThreadID;
 @synthesize selectedMessageTopicKind = _selectedMessageTopicKind;
 @synthesize commentThreadNavigationStack = _commentThreadNavigationStack;
@@ -1273,6 +1298,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize savedMessagesWindowController = _savedMessagesWindowController;
 @synthesize scheduledMessagesWindowController = _scheduledMessagesWindowController;
 @synthesize downloadManagerWindowController = _downloadManagerWindowController;
+@synthesize downloadProgressWindowController = _downloadProgressWindowController;
 @synthesize mediaPreviewPath = _mediaPreviewPath;
 @synthesize mediaPreviewRequestGeneration = _mediaPreviewRequestGeneration;
 @synthesize logsWindowDetailsView = _logsWindowDetailsView;
@@ -1335,6 +1361,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize pendingNotificationChatID = _pendingNotificationChatID;
 @synthesize pendingNotificationThreadID = _pendingNotificationThreadID;
 @synthesize notificationChatInfoByChatID = _notificationChatInfoByChatID;
+@synthesize notificationReadState = _notificationReadState;
+@synthesize transcriptMotionController = _transcriptMotionController;
+@synthesize sectionTransitionController = _sectionTransitionController;
+@synthesize pendingArrivalMessageIDs = _pendingArrivalMessageIDs;
 @synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
@@ -1355,14 +1385,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize mediaPlaybackPreparationQueue = _mediaPlaybackPreparationQueue;
 @synthesize mediaPlaybackPreparationCancellationToken = _mediaPlaybackPreparationCancellationToken;
 
-- (void)synchronizeUserOpenedChat {
-    BOOL chatVisible = (!self.activeSection || [self.activeSection isEqualToString:TGSectionChats]);
-    NSNumber *chatID = ([self.currentAuthState isEqualToString:@"ready"] && chatVisible)
-        ? self.selectedChatID : nil;
-    [self.client setUserOpenedChatID:chatID];
-}
-
 - (void)setSelectedChatID:(NSNumber *)chatID {
+    if (_selectedChatID != chatID && ![_selectedChatID isEqual:chatID]) {
+        [self.mediaCenterSaveRequests removeAllObjects];
+        [self.mediaCenterDownloadingFileIDs removeAllObjects];
+    }
+    if (![_selectedChatID isEqual:chatID]) {
+        [self invalidateAutomaticReadRequests];
+        [self.transcriptMotionController cancelAllAnimations];
+        [self.pendingArrivalMessageIDs removeAllObjects];
+    }
     if (_selectedChatID != chatID) {
         [_selectedChatID release];
         _selectedChatID = [chatID retain];
@@ -1371,6 +1403,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)setCurrentAuthState:(NSString *)state {
+    if (![_currentAuthState isEqualToString:state]) {
+        [self invalidateAutomaticReadRequests];
+        [self.sectionTransitionController reset];
+    }
+    if ([_currentAuthState isEqualToString:@"ready"] && ![state isEqualToString:@"ready"]) {
+        [self.mediaCenterSaveRequests removeAllObjects];
+        [self.mediaCenterDownloadingFileIDs removeAllObjects];
+        [self.notificationReadState reset];
+        [[TGDownloadManager sharedManager] setClient:nil];
+    }
     if (_currentAuthState != state) {
         [_currentAuthState release];
         _currentAuthState = [state copy];
@@ -1378,7 +1420,31 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [self synchronizeUserOpenedChat];
 }
 
+- (void)setSelectedMessageThreadID:(NSNumber *)threadID {
+    if (_selectedMessageThreadID != threadID && ![_selectedMessageThreadID isEqual:threadID]) {
+        [self.mediaCenterSaveRequests removeAllObjects];
+        [self.mediaCenterDownloadingFileIDs removeAllObjects];
+    }
+    if (![_selectedMessageThreadID isEqual:threadID]) [self invalidateAutomaticReadRequests];
+    if (_selectedMessageThreadID != threadID) {
+        [_selectedMessageThreadID release];
+        _selectedMessageThreadID = [threadID retain];
+    }
+}
+
+- (void)setSelectedMessageTopicKind:(NSString *)topicKind {
+    if (![_selectedMessageTopicKind isEqual:topicKind]) [self invalidateAutomaticReadRequests];
+    if (_selectedMessageTopicKind != topicKind) {
+        [_selectedMessageTopicKind release];
+        _selectedMessageTopicKind = [topicKind copy];
+    }
+}
+
 - (void)setActiveSection:(NSString *)section {
+    if (![_activeSection isEqualToString:section]) {
+        [self invalidateAutomaticReadRequests];
+        [self.sectionTransitionController cancelAnimation];
+    }
     if (_activeSection != section) {
         [_activeSection release];
         _activeSection = [section copy];
@@ -1388,11 +1454,19 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 - (void)setClient:(TGTDLibClient *)client {
     if (_client != client) {
+        [self invalidateAutomaticReadRequests];
+        [self.sectionTransitionController reset];
+        [self.mediaCenterSaveRequests removeAllObjects];
+        [self.mediaCenterDownloadingFileIDs removeAllObjects];
+        [self.notificationReadState reset];
+        // A rejected old-owner enrichment callback must not leave a pending
+        // token that permanently blocks lookups on the replacement client.
+        [self.notificationChatInfoByChatID removeAllObjects];
         [_client setUserOpenedChatID:nil];
         [_client release];
         _client = [client retain];
     }
-    [[TGDownloadManager sharedManager] setClient:_client];
+    [[TGDownloadManager sharedManager] setClient:([_currentAuthState isEqualToString:@"ready"] ? _client : nil)];
     [self synchronizeUserOpenedChat];
 }
 
@@ -1414,6 +1488,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.pendingArrivalMessageIDs = [NSMutableSet set];
         self.availableReactionEmojisByMessageKey = [NSMutableDictionary dictionary];
         self.availableReactionOperationsByMessageKey = [NSMutableDictionary dictionary];
         self.documentDownloadSpinnerViewsByKey = [NSMutableDictionary dictionary];
@@ -1424,6 +1499,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.chatSearchWindowResultButtons = [NSMutableArray array];
         self.mediaCenterItems = [NSMutableArray array];
         self.mediaCenterDownloadingFileIDs = [NSMutableSet set];
+        self.mediaCenterSaveRequests = [NSMutableDictionary dictionary];
         self.mediaCenterSavedPathsByFileID = [NSMutableDictionary dictionary];
         self.mediaCenterThumbnailLoadingFileIDs = [NSMutableSet set];
         self.mediaCenterThumbnailAttemptedFileIDs = [NSMutableSet set];
@@ -1437,6 +1513,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.messageThumbnailPrefetcher = [[[TGMessageThumbnailPrefetcher alloc] init] autorelease];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
+        self.notificationReadState = [[[TGNotificationReadState alloc] init] autorelease];
         self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
         self.closedChatSuggestionViews = [NSArray array];
@@ -1487,7 +1564,18 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                      name:TGCustomEmojiImageDidLoadNotification
                                                    object:nil];
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:self];
+        for (NSString *name in [NSArray arrayWithObjects:NSApplicationDidBecomeActiveNotification,
+                               NSApplicationDidResignActiveNotification, NSApplicationWillResignActiveNotification,
+                               NSApplicationDidHideNotification, NSApplicationWillHideNotification,
+                               NSApplicationDidUnhideNotification, nil]) {
+            [[NSNotificationCenter defaultCenter] addObserver:self
+                         selector:@selector(conversationVisibilityDidChange:) name:name object:NSApp];
+        }
         [self buildContentView];
+        self.downloadProgressWindowController = [[[TGDownloadProgressWindowController alloc]
+            initWithDownloadManager:[TGDownloadManager sharedManager]] autorelease];
+        [self.downloadProgressWindowController attachToWindow:[self window]];
+        [self.downloadProgressWindowController setDownloadsTarget:self action:@selector(showDownloadManagerWindow:)];
         [self refreshUpdateAvailabilityBadge];
         [self applyPointingHandCursorToButtonsInView:[[self window] contentView]];
         [self applyResourcePolicyToMediaSubsystems];
@@ -1999,6 +2087,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)refreshThemeAppearance {
+    [self.sectionTransitionController cancelAnimation];
+    [self.downloadManagerWindowController refreshPresentation];
     NSColor *cardInkColor = TGClassicCardInkColor();
     NSColor *cardMutedColor = TGClassicCardMutedInkColor();
 
@@ -2439,6 +2529,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     TGChromeView *contentView = [[[TGChromeView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:contentView];
+    self.sectionTransitionController = [[[TGSectionTransitionController alloc] initWithContentView:contentView] autorelease];
     [contentView setAutoresizesSubviews:YES];
 
     self.topPanelView = [[[TGRailView alloc] initWithFrame:NSMakeRect(16, 628, 948, 56)] autorelease];
@@ -3057,6 +3148,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     TGMessageTableView *messageTableView = [[[TGMessageTableView alloc] initWithFrame:[[self.messageScrollView contentView] bounds]] autorelease];
     [messageTableView setDropOverlayTarget:self];
     self.messageTableView = messageTableView;
+    self.transcriptMotionController = [[[TGTranscriptMotionController alloc] initWithTableView:messageTableView] autorelease];
     [self.messageTableView setDataSource:self];
     [self.messageTableView setDelegate:self];
     [self.messageTableView setAllowsColumnReordering:NO];
@@ -4676,6 +4768,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+TableForumFlow.inc"
 
+#include "TGStatusWindowController+TranscriptMotion.inc"
+
+#include "TGStatusWindowController+AutomaticReadVisibility.inc"
+
 #include "TGStatusWindowController+MessageDataFlow.inc"
 
 #include "TGStatusWindowController+ComposerMedia.inc"
@@ -4688,6 +4784,16 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)dealloc {
+    [self invalidateAutomaticReadRequests];
+    [_sectionTransitionController reset];
+    [_sectionTransitionController release];
+    _sectionTransitionController = nil;
+    [_downloadProgressWindowController invalidate];
+    [_downloadProgressWindowController release];
+    [_transcriptMotionController cancelAllAnimations];
+    [_transcriptMotionController release];
+    _transcriptMotionController = nil;
+    [_pendingArrivalMessageIDs release];
     [_client setUserOpenedChatID:nil];
     if ([[NSUserNotificationCenter defaultUserNotificationCenter] delegate] == self) {
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:nil];
@@ -4700,9 +4806,6 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
                                                object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(refreshSelectedMessagesAfterMediaSend)
-                                               object:nil];
-    [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                             selector:@selector(markCurrentSelectionReadAfterNotification)
                                                object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self
                                              selector:@selector(refreshInlineMediaPlayback)
@@ -4844,6 +4947,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_mediaCenterExhaustedFilterIdentifiers release];
     [_mediaCenterSeenKeys release];
     [_mediaCenterDownloadingFileIDs release];
+    [_mediaCenterSaveRequests release];
     [_mediaCenterSavedPathsByFileID release];
     [_mediaCenterThumbnailLoadingFileIDs release];
     [_mediaCenterThumbnailAttemptedFileIDs release];
@@ -4954,6 +5058,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_composerDraftSyncText release];
     [_composerDraftSyncReplyMessageID release];
     [_notificationChatInfoByChatID release];
+    [_notificationReadState release];
     [_localMuteUnreadCountsByChatID release];
     [_profileTitleField release];
     [_profileNameField release];

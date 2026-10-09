@@ -646,6 +646,248 @@ static void TGTestCommentPresentation(void) {
     TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
 }
 
+static CGFloat TGProbeColorLuminance(NSColor *color) {
+    NSColor *rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    CGFloat channels[] = {[rgb redComponent], [rgb greenComponent], [rgb blueComponent]};
+    NSUInteger index = 0;
+    for (index = 0; index < 3; index++) {
+        channels[index] = channels[index] <= 0.04045 ? channels[index] / 12.92 : pow((channels[index] + 0.055) / 1.055, 2.4);
+    }
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+static void TGTestCompactMessageGeometry(void) {
+    TGClearProbeDefaults();
+    TGSetChatMessagesAsBlocksEnabled(NO);
+    for (NSNumber *outgoing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+        TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@1700000000
+                                                          outgoing:[outgoing boolValue] preview:@"конечно буду)"] autorelease];
+        [item setContentType:@"messageText"];
+        for (NSNumber *level in [NSArray arrayWithObjects:@0, @1, @2, @3, nil]) {
+            TGSetChatMessageTextSizeLevel([level integerValue]);
+            CGFloat maximum = TGMaximumBubbleWidthForItem(item, 640.0);
+            TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, maximum, NO), @"short text must put complete metadata beside body at every text size");
+            NSRect bubble = TGMessageBubbleRectForItem(item, NSMakeRect(0.0, 0.0, 640.0, 1000.0), NO);
+            TGAssertTrue(NSHeight(bubble) < 50.0 && NSWidth(bubble) <= maximum, @"one-line bubble must be compact without exceeding width budget");
+            TGAssertTrue(TGMessageBubbleHeightForItem(item, 640.0, NO) >= 42.0, @"compact bubbles retain a safe full row hit area");
+            NSRect bodyFrame = TGMessageInlineTextRectForItem(item, bubble, YES);
+            NSAttributedString *bodyString = TGAttributedMessageStringForItem(item, [item preview],
+                [NSDictionary dictionaryWithObjectsAndKeys:TGChatMessageBodyFont(), NSFontAttributeName,
+                 TGMessageTextParagraphStyle(), NSParagraphStyleAttributeName, nil]);
+            NSTextStorage *bodyStorage = [[[NSTextStorage alloc] initWithAttributedString:bodyString] autorelease];
+            NSLayoutManager *bodyLayout = [[[NSLayoutManager alloc] init] autorelease];
+            NSTextContainer *bodyContainer = [[[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(bodyFrame), 12000.0)] autorelease];
+            [bodyContainer setLineFragmentPadding:0.0];
+            [bodyLayout addTextContainer:bodyContainer]; [bodyStorage addLayoutManager:bodyLayout];
+            NSRange bodyGlyphs = [bodyLayout glyphRangeForTextContainer:bodyContainer];
+            NSRange lineGlyphs = NSMakeRange(0, 0);
+            [bodyLayout lineFragmentRectForGlyphAtIndex:bodyGlyphs.location effectiveRange:&lineGlyphs];
+            TGAssertTrue(NSMaxRange(lineGlyphs) >= NSMaxRange(bodyGlyphs), @"actual text-container glyph layout must occupy one visual line");
+            NSRect usedBody = [bodyLayout usedRectForTextContainer:bodyContainer];
+            TGAssertTrue(NSHeight(usedBody) <= NSHeight(bodyFrame) + 0.5, @"measured body must contain actual rendered line height");
+            for (NSNumber *flip in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                NSRect body = TGMessageInlineTextRectForItem(item, bubble, [flip boolValue]);
+                NSRect time = TGMessageInlineTimeRectForItem(item, bubble, [flip boolValue]);
+                TGAssertTrue(NSContainsRect(bubble, body) && NSContainsRect(bubble, time), @"body and complete 12/24-hour time fit both coordinate orientations");
+                TGAssertTrue(NSMaxX(body) + 7.9 <= NSMinX(time), @"text selection must exclude timestamp with a real gap");
+                TGAssertTrue(NSIntersectsRect(NSMakeRect(NSMinX(body), NSMinY(body), NSMaxX(time) - NSMinX(body), NSHeight(body)), time), @"time must share the body line");
+                CGFloat statusRight = NSMaxX(time) + (TGOutgoingStatusDotsWidthForItem(item) > 0.0 ? 5.0 + TGOutgoingStatusDotsWidthForItem(item) : 0.0);
+                TGAssertTrue(statusRight <= NSMaxX(bubble) - 11.9, @"delivery status must retain right inset");
+                TGAssertTrue(!NSPointInRect(NSMakePoint(NSMidX(time), NSMidY(time)), body), @"time hit cannot begin selecting message text");
+            }
+            // Exact measurement boundary: body+metadata either fit as one unit or
+            // all metadata move to the normal footer; no AM/PM suffix wrapping.
+            TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, NSWidth(bubble), NO), @"exact measured width should fit");
+            TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, NSWidth(bubble) - 0.5, NO), @"a narrower budget must use a separate footer");
+        }
+        TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
+        NSRect compact = TGMessageBubbleRectForItem(item, NSMakeRect(0.0, 0.0, 640.0, 1000.0), NO);
+        [item setSending:YES];
+        TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"sending status does not make a short body wrap");
+        [item setSending:NO]; [item setOutgoingRead:YES];
+        TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"read status remains inside the inline metadata unit");
+        [item setFailedToSend:YES];
+        TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"failed-send status keeps compact body geometry");
+        [item setFailedToSend:NO];
+        [item setReactionSummary:@"👍 1"];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"any reaction requires footer below text");
+        NSRect reacted = TGMessageBubbleRectForItem(item, NSMakeRect(0.0, 0.0, 640.0, 1000.0), NO);
+        TGAssertTrue(NSHeight(reacted) > NSHeight(compact), @"adding a reaction creates a separate lower row");
+        CGFloat bandHeight = TGReactionBandHeightForMessageItemWidth(item, NSWidth(reacted));
+        for (NSNumber *flip in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+            BOOL flipped = [flip boolValue];
+            NSRect band = NSMakeRect(NSMinX(reacted) + 10.0, flipped ? NSMaxY(reacted) - bandHeight : NSMinY(reacted), NSWidth(reacted) - 20.0, bandHeight);
+            NSRect time = TGMessageReactionTimeRect(item, band, flipped);
+            TGAssertTrue(NSContainsRect(band, time), @"reaction and time share the separate footer");
+            TGAssertTrue(flipped ? NSMinY(time) > NSMinY(reacted) + 25.0 : NSMaxY(time) < NSMaxY(reacted) - 25.0, @"reaction time sits below the body in both orientations");
+        }
+        [item setReactionSummary:nil];
+        [item setSenderDisplayName:@"Sender"];
+        TGAssertTrue([item outgoing] || !TGMessageUsesInlineMetadataForItem(item, 400.0, YES), @"incoming author heading keeps ordinary header space");
+        [item setReplyPreview:@"Reply context"];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"reply block must retain separate geometry");
+        [item setReplyPreview:nil]; [item setForwardSourceDisplayName:@"Forward"];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"forward block must retain separate geometry");
+        [item setForwardSourceDisplayName:nil]; [item setCanGetMessageThread:YES];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"comment control must retain separate geometry");
+        [item setCanGetMessageThread:NO]; [item setPinned:YES];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"pinned icon must not overlap compact body");
+        [item setPinned:NO]; [item setPreview:@"line one\nline two"];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"explicit multiline messages keep normal wrapping");
+        [item setPreview:[@"wide message " stringByPaddingToLength:200 withString:@"wide message " startingAtIndex:0]];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"long visual wrapping stays on normal layout");
+        [item setPreview:@"https://a.co"];
+        TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"plain short link remains compact");
+        NSRect linkBubble = TGMessageBubbleRectForItem(item, NSMakeRect(0, 0, 640, 1000), NO);
+        NSRect linkBody = TGMessageInlineTextRectForItem(item, linkBubble, YES);
+        NSRect linkTime = TGMessageInlineTimeRectForItem(item, linkBubble, YES);
+        TGAssertTrue(TGURLAtCharacterIndexInString([item preview], 2) != nil, @"body retains actual clickable URL characters");
+        TGAssertTrue(!NSPointInRect(NSMakePoint(NSMidX(linkTime), NSMidY(linkTime)), linkBody), @"metadata hit is outside compact clickable link body");
+        [item setLinkPreviewInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"https://a.co", @"url", @"Preview", @"title", nil]];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"link card keeps its complete separate geometry");
+        [item setLinkPreviewInfo:nil];
+        [item setFormattedEntities:[NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
+            @0, @"offset", @3, @"length", [NSDictionary dictionaryWithObject:@"textEntityTypeBlockQuote" forKey:@"@type"], @"type", nil]]];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"quote paragraph must retain block padding");
+        [item setFormattedEntities:[NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
+            @0, @"offset", @3, @"length", [NSDictionary dictionaryWithObject:@"textEntityTypeBold" forKey:@"@type"], @"type", nil]]];
+        TGAssertTrue(TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"one-line bold text uses actual attributed glyph measurement");
+        [item setFormattedEntities:nil];
+        [item setContentType:@"messageDocument"];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"document controls keep existing layout");
+        [item setContentType:@"messagePhoto"];
+        TGAssertTrue(!TGMessageUsesInlineMetadataForItem(item, 400.0, NO), @"media captions retain existing layout");
+    }
+    TGMessageItem *tiny = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:nil outgoing:NO preview:@"1"] autorelease];
+    NSRect tinyBubble = TGMessageBubbleRectForItem(tiny, NSMakeRect(0, 0, 640, 1000), NO);
+    TGAssertTrue(NSWidth(tinyBubble) < 60.0 && NSHeight(tinyBubble) >= 32.0, @"one character does not inherit the old 96pt bubble width floor");
+    TGAssertTrue(NSIsEmptyRect(TGMessageInlineTimeRectForItem(tiny, tinyBubble, YES)), @"missing timestamp does not allocate phantom footer text");
+    TGSetChatMessagesAsBlocksEnabled(YES);
+    TGAssertTrue(!TGMessageUsesInlineMetadataForItem(tiny, 400.0, NO), @"full-width list layout remains unchanged");
+    TGClearProbeDefaults();
+}
+
+static void TGTestReactionFooter(void) {
+    TGClearProbeDefaults();
+    TGSetChatMessagesAsBlocksEnabled(NO);
+    for (NSString *theme in TGThemeIdentifiers()) {
+        TGSetActiveThemeIdentifier(theme);
+        for (NSNumber *outgoing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+            TGMessageItem *sample = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@1700000000 outgoing:[outgoing boolValue] preview:@"Theme"] autorelease];
+            for (NSNumber *blocks in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                TGSetChatMessagesAsBlocksEnabled([blocks boolValue]);
+                for (NSNumber *flipped in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                    CGFloat surface = TGProbeColorLuminance(TGMessageMetadataSurfaceColor(sample, [flipped boolValue]));
+                    CGFloat ink = TGProbeColorLuminance(TGMessageMetadataInkColor(sample, [flipped boolValue]));
+                    CGFloat contrast = (MAX(surface, ink) + 0.05) / (MIN(surface, ink) + 0.05);
+                    TGAssertTrue(contrast >= 4.5, [NSString stringWithFormat:@"small timestamp needs readable contrast in %@", theme]);
+                    for (NSNumber *active in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                        CGFloat statusInk = TGProbeColorLuminance(TGMessageDeliveryStatusInkColor(sample, [active boolValue], [flipped boolValue]));
+                        CGFloat statusContrast = (MAX(surface, statusInk) + 0.05) / (MIN(surface, statusInk) + 0.05);
+                        TGAssertTrue(statusContrast >= ([active boolValue] ? 4.5 : 3.0), @"delivery state must stay visible on every footer surface");
+                    }
+                }
+            }
+        }
+        TGSetChatMessagesAsBlocksEnabled(NO);
+        NSUInteger chosen = 0;
+        for (chosen = 0; chosen < 2; chosen++) {
+            CGFloat background = TGProbeColorLuminance(TGReactionChipBackgroundColor(chosen != 0));
+            CGFloat ink = TGProbeColorLuminance(TGReactionChipInkColor(chosen != 0));
+            CGFloat contrast = (MAX(background, ink) + 0.05) / (MIN(background, ink) + 0.05);
+            TGAssertTrue(contrast >= 4.5, [NSString stringWithFormat:@"reaction digits need readable contrast in %@", theme]);
+        }
+    }
+    for (NSNumber *outgoing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+        TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@1700000000 outgoing:[outgoing boolValue] preview:@"Hello"] autorelease];
+        [item setReactionSummary:@"👍 1  ❤️ 23  😱 104  🔥 5  🎉 3  👏 6"];
+        [item setCanGetMessageThread:YES];
+        [item setMessageThreadReplyCount:@4];
+        for (NSNumber *width in [NSArray arrayWithObjects:@280, @400, @640, nil]) {
+            NSRect bubble = TGMessageBubbleRectForItem(item, NSMakeRect(0, 0, [width doubleValue], 1000), NO);
+            CGFloat bandHeight = TGReactionBandHeightForMessageItemWidth(item, NSWidth(bubble));
+            for (NSNumber *flipped in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                BOOL flip = [flipped boolValue];
+                NSRect band = NSMakeRect(NSMinX(bubble) + 10.0, flip ? NSMaxY(bubble) - bandHeight : NSMinY(bubble), NSWidth(bubble) - 20.0, bandHeight);
+                CGFloat chipWidth = TGMessageReactionContentWidth(item, NSWidth(band));
+                NSArray *chips = TGReactionChipLayoutForItem(item, chipWidth);
+                NSRect time = TGMessageReactionTimeRect(item, band, flip);
+                TGAssertTrue([chips count] == 6 && NSContainsRect(band, time), @"complete reactions and timestamp must stay inside footer");
+                NSRect lastChip = [[[chips lastObject] objectForKey:@"frame"] rectValue];
+                CGFloat lastCenter = flip ? NSMinY(band) + 2.0 + NSMidY(lastChip) : NSMaxY(band) - 2.0 - NSMidY(lastChip);
+                TGAssertTrue(fabs(lastCenter - NSMidY(time)) <= 2.0, @"timestamp must share the last reaction row baseline");
+                for (NSDictionary *chip in chips) {
+                    NSRect local = [[chip objectForKey:@"frame"] rectValue];
+                    NSRect actual = NSMakeRect(NSMinX(band) + NSMinX(local), flip ? NSMinY(band) + 2.0 + NSMinY(local) : NSMaxY(band) - 2.0 - NSMaxY(local), NSWidth(local), NSHeight(local));
+                    TGAssertTrue(!NSIntersectsRect(actual, time), @"timestamp and every reaction chip must remain separate");
+                }
+                NSRect comment = TGMessageCommentBarRectForItem(item, bubble, flip);
+                TGAssertTrue(!NSIntersectsRect(comment, time), @"comment control must not overlap shared reaction/time footer");
+            }
+        }
+    }
+    TGClearProbeDefaults();
+}
+
+static void TGTestAnimatedReactionFooterBounds(void) {
+    TGClearProbeDefaults();
+    NSString *summary = @"👍 9999999  ❤️ 123  😱 10  🔥 5  🎉 3  👏 6";
+    for (NSString *language in [NSArray arrayWithObjects:@"ru", @"be", @"en", nil]) {
+        TGSetLanguageCode(language);
+        for (NSInteger level = 0; level <= 3; level++) {
+            TGSetChatMessageTextSizeLevel(level);
+            for (NSNumber *blocks in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                BOOL list = [blocks boolValue];
+                TGSetChatMessagesAsBlocksEnabled(list);
+                for (NSNumber *outgoing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                    TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2
+                        date:@1700000000 outgoing:[outgoing boolValue] preview:@"Animated footer"] autorelease];
+                    [item setCanGetMessageThread:YES];
+                    [item setMessageThreadReplyCount:@1234];
+                    [item setReactionAnimationDisplaySummary:summary];
+                    [item setReactionAnimationChangesHeight:YES];
+                    for (NSNumber *width in [NSArray arrayWithObjects:@280, @320, @400, @640, nil]) {
+                        CGFloat available = [width doubleValue];
+                        for (NSNumber *flipped in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                            BOOL flip = [flipped boolValue];
+                            for (NSNumber *removing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                                [item setReactionAnimationRemoving:[removing boolValue]];
+                                [item setReactionSummary:[removing boolValue] ? @"" : summary];
+                                for (NSUInteger step = 0; step <= 20; step++) {
+                                    [item setReactionAnimationProgress:(CGFloat)step / 20.0];
+                                    NSRect owner = list
+                                        ? NSInsetRect(NSMakeRect(0, 0, available,
+                                            TGMessageBubbleHeightForItem(item, available, NO)), 6.0, 2.0)
+                                        : TGMessageBubbleRectForItem(item, NSMakeRect(0, 0, available, 1000), NO);
+                                    CGFloat reactionWidth = list ? MAX(40.0, available - 86.0) : NSWidth(owner) - 20.0;
+                                    CGFloat height = TGReactionChipsHeightForItem(item,
+                                        TGMessageReactionContentWidth(item, reactionWidth));
+                                    CGFloat inset = list ? 3.0 : 0.0;
+                                    NSRect band = NSMakeRect(NSMinX(owner) + (list ? 50.0 : 10.0),
+                                        flip ? NSMaxY(owner) - height - inset : NSMinY(owner) + inset,
+                                        reactionWidth, height);
+                                    NSRect time = TGMessageReactionTimeRect(item, band, flip);
+                                    TGAssertTrue(NSIsEmptyRect(time) || NSContainsRect(band, time),
+                                        @"animated timestamp must remain inside the allocated reaction band");
+                                    TGAssertTrue(NSIsEmptyRect(time) || NSContainsRect(owner, time),
+                                        @"animated timestamp must not enter a neighbouring message");
+                                    NSRect comment = TGMessageCommentBarRectForItem(item, owner, flip);
+                                    TGAssertTrue(NSIsEmptyRect(time) || !NSIntersectsRect(comment, time),
+                                        @"animated timestamp must not overlap the comment action");
+                                    if (![removing boolValue] && step == 20) {
+                                        TGAssertTrue(!NSIsEmptyRect(time), @"fully expanded footer must display its timestamp");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    TGClearProbeDefaults();
+}
+
 static void TGTestReactionGeometry(void) {
     TGClearProbeDefaults();
     TGSetChatMessagesAsBlocksEnabled(NO);
@@ -783,6 +1025,9 @@ int main(int argc, const char **argv) {
     TGTestLocalization();
     TGTestCommentPresentation();
     TGTestReactionGeometry();
+    TGTestCompactMessageGeometry();
+    TGTestReactionFooter();
+    TGTestAnimatedReactionFooterBounds();
     TGClearProbeDefaults();
     [pool drain];
     if (TGProbeFailures > 0) {

@@ -124,6 +124,7 @@ static NSString *TGActiveSessionIconName(NSDictionary *session) {
 }
 
 - (void)showDownloadManagerWindow:(id)sender {
+    [self.downloadProgressWindowController showProgress:sender];
     (void)sender;
     if (!self.downloadManagerWindowController) {
         self.downloadManagerWindowController = [[[TGDownloadManagerWindowController alloc] init] autorelease];

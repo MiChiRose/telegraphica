@@ -37,7 +37,7 @@ def method_body(text, signature, next_signature):
     start = text.find(signature)
     if start < 0:
         return ""
-    end = text.find(next_signature, start + len(signature))
+    end = text.find(next_signature, start + len(signature)) if next_signature else -1
     return text[start:] if end < 0 else text[start:end]
 
 
@@ -139,7 +139,10 @@ def main():
             "- (void)prepareOpusVoicePlaybackInBackground:"):
         errors.append("Sources/UI/TGStatusWindowController+MediaWindows.inc: synchronous player entry point still transcodes Opus")
 
-    notifications = require(errors, "Sources/UI/TGStatusWindowController+Notifications.inc", [
+    require(errors, "Sources/UI/TGStatusWindowController+Notifications.inc", [
+        '#include "TGStatusWindowController+NotificationChatInfo.inc"',
+    ])
+    notifications = require(errors, "Sources/UI/TGStatusWindowController+NotificationChatInfo.inc", [
         "fetchNotificationChatInfoInBackground:",
         "performSelectorInBackground:@selector(fetchNotificationChatInfoInBackground:)",
         "fetch_pending",
@@ -149,9 +152,9 @@ def main():
     notification_lookup = method_body(
         notifications,
         "- (NSDictionary *)notificationChatInfoForChatID:",
-        "- (NSString *)chatMuteDefaultsKeyForChatID:")
+        None)
     if "chatSummaryForChatID:chatID" in notification_lookup:
-        errors.append("Sources/UI/TGStatusWindowController+Notifications.inc: notification lookup still blocks on TDLib")
+        errors.append("Sources/UI/TGStatusWindowController+NotificationChatInfo.inc: notification lookup still blocks on TDLib")
 
     vp9 = require(errors, "Vendor/libvpx/vp9/decoder/vp9_decodeframe.c", [
         "idx < 0 || idx >= FRAME_BUFFERS",

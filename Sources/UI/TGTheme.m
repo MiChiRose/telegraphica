@@ -1445,15 +1445,7 @@ void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlig
     [NSGraphicsContext restoreGraphicsState];
 }
 
-void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoing, BOOL flipped) {
-    (void)flipped;
-    if (!TGThemeUsesLayeredMaterials()) {
-        [(outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor()) set];
-        [path fill];
-        return;
-    }
-    [NSGraphicsContext saveGraphicsState];
-    [path addClip];
+static NSGradient *TGThemeMessageBubbleGradient(BOOL outgoing) {
     NSGradient *gradient = nil;
     if (TGThemeIsVisualWorld()) {
         gradient = [[[NSGradient alloc] initWithStartingColor:(outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor())
@@ -1481,6 +1473,32 @@ void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoi
                                          outgoing ? TGColorFromHex(0xe5eef4) : TGColorFromHex(0xfffbf2),
                                          outgoing ? TGColorFromHex(0xc7dcea) : TGColorFromHex(0xeee5d5));
     }
+    return gradient;
+}
+
+NSColor *TGThemeMessageBubbleFooterColor(BOOL outgoing, BOOL flipped) {
+    if (!TGThemeUsesLayeredMaterials()) {
+        return outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor();
+    }
+    NSColor *color = [[TGThemeMessageBubbleGradient(outgoing) interpolatedColorAtLocation:(flipped ? 0.92 : 0.08)]
+                      colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    NSColor *paper = [TGClassicTablePaperColor() colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    CGFloat alpha = [color alphaComponent];
+    return [NSColor colorWithCalibratedRed:[color redComponent] * alpha + [paper redComponent] * (1.0 - alpha)
+                                   green:[color greenComponent] * alpha + [paper greenComponent] * (1.0 - alpha)
+                                    blue:[color blueComponent] * alpha + [paper blueComponent] * (1.0 - alpha) alpha:1.0];
+}
+
+void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoing, BOOL flipped) {
+    (void)flipped;
+    if (!TGThemeUsesLayeredMaterials()) {
+        [(outgoing ? TGClassicOutgoingBubbleBottomColor() : TGClassicIncomingBubbleBottomColor()) set];
+        [path fill];
+        return;
+    }
+    [NSGraphicsContext saveGraphicsState];
+    [path addClip];
+    NSGradient *gradient = TGThemeMessageBubbleGradient(outgoing);
     [gradient drawInRect:rect angle:90.0];
     if (TGThemeIsVisualWorld()) {
         TGVisualWorldDrawSurfacePattern(TGCurrentThemeIdentifier(), rect, outgoing ? 0.08 : 0.12);

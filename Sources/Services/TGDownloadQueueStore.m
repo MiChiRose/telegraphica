@@ -17,7 +17,7 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
     NSNumber *fileID = TGDownloadQueueValue(record, @"file_id", [NSNumber class]);
     NSString *fallbackPath = TGDownloadQueueValue(record, @"fallback_path", [NSString class]);
     if ([identifier length] == 0 || [fileName length] == 0 || [state length] == 0 ||
-        (![fileID respondsToSelector:@selector(integerValue)] && [fallbackPath length] == 0)) {
+        (![fileID respondsToSelector:@selector(longLongValue)] && [fallbackPath length] == 0)) {
         return nil;
     }
 
@@ -25,7 +25,7 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
         state = @"interrupted";
     }
     NSArray *allowedStates = [NSArray arrayWithObjects:@"queued", @"downloading", @"interrupted",
-                              @"completed", @"failed", @"cancelled", nil];
+                              @"completed", @"failed", @"cancelled", @"paused", nil];
     if (![allowedStates containsObject:state]) {
         return nil;
     }
@@ -36,11 +36,11 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
                                    state, @"state",
                                    [NSNumber numberWithBool:NO], @"cancelled",
                                    nil];
-    if ([fileID respondsToSelector:@selector(integerValue)] && [fileID integerValue] > 0) {
-        [result setObject:[NSNumber numberWithInteger:[fileID integerValue]] forKey:@"file_id"];
+    if ([fileID respondsToSelector:@selector(longLongValue)] && [fileID longLongValue] > 0) {
+        [result setObject:[NSNumber numberWithLongLong:[fileID longLongValue]] forKey:@"file_id"];
     }
 
-    NSArray *stringKeys = [NSArray arrayWithObjects:@"fallback_path", @"saved_path", @"error", nil];
+    NSArray *stringKeys = [NSArray arrayWithObjects:@"fallback_path", @"saved_path", @"error", @"remote_id", @"remote_unique_id", nil];
     NSUInteger index = 0;
     for (index = 0; index < [stringKeys count]; index++) {
         NSString *key = [stringKeys objectAtIndex:index];
@@ -49,6 +49,19 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
             [result setObject:value forKey:key];
         }
     }
+    NSNumber *accountID = TGDownloadQueueValue(record, @"account_id", [NSNumber class]);
+    if ([accountID longLongValue] > 0) { [result setObject:accountID forKey:@"account_id"]; }
+    BOOL untrusted = restoring && [fileID longLongValue] > 0;
+    NSNumber *storedUntrusted = TGDownloadQueueValue(record, @"requires_remote_resolution", [NSNumber class]);
+    if (untrusted || [storedUntrusted boolValue]) {
+        [result setObject:[NSNumber numberWithBool:YES] forKey:@"requires_remote_resolution"];
+    }
+    for (NSString *key in [NSArray arrayWithObjects:@"downloaded_bytes", @"total_bytes", nil]) {
+        NSNumber *value = TGDownloadQueueValue(record, key, [NSNumber class]);
+        if (value && [value longLongValue] >= 0) { [result setObject:value forKey:key]; }
+    }
+    NSNumber *reconnecting = TGDownloadQueueValue(record, @"reconnecting", [NSNumber class]);
+    if (reconnecting) { [result setObject:reconnecting forKey:@"reconnecting"]; }
     NSArray *dateKeys = [NSArray arrayWithObjects:@"created_at", @"finished_at", nil];
     for (index = 0; index < [dateKeys count]; index++) {
         NSString *key = [dateKeys objectAtIndex:index];
@@ -63,35 +76,32 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
     return result;
 }
 
-NSArray *TGDownloadQueueNormalizedRecords(id storedValue) {
-    if (![storedValue isKindOfClass:[NSArray class]]) {
-        return [NSArray array];
-    }
-    NSMutableArray *result = [NSMutableArray array];
-    NSUInteger limit = MIN([(NSArray *)storedValue count], (NSUInteger)100);
-    NSUInteger index = 0;
-    for (index = 0; index < limit; index++) {
-        NSDictionary *record = TGDownloadQueueSanitizedRecord([(NSArray *)storedValue objectAtIndex:index], YES);
-        if (record) {
-            [result addObject:record];
-        }
-    }
-    return result;
-}
-
-NSArray *TGDownloadQueueSerializableRecords(NSArray *records) {
+static NSArray *TGDownloadQueueSanitizedRecords(id records, BOOL restoring) {
     if (![records isKindOfClass:[NSArray class]]) {
         return [NSArray array];
     }
     NSMutableArray *result = [NSMutableArray array];
-    NSUInteger limit = MIN([records count], (NSUInteger)100);
+    NSUInteger finishedCount = 0;
     NSUInteger index = 0;
-    for (index = 0; index < limit; index++) {
-        NSDictionary *record = TGDownloadQueueSanitizedRecord([records objectAtIndex:index], NO);
-        if (record) {
-            [result addObject:record];
-        }
+    for (index = 0; index < [(NSArray *)records count]; index++) {
+        NSDictionary *record = TGDownloadQueueSanitizedRecord([(NSArray *)records objectAtIndex:index], restoring);
+        if (!record) { continue; }
+        NSString *state = [record objectForKey:@"state"];
+        BOOL finished = [state isEqualToString:@"completed"] || [state isEqualToString:@"failed"] ||
+                        [state isEqualToString:@"cancelled"];
+        // Rows are newest first. Bound completed history without losing an
+        // older large transfer or Pause decision behind newer completions.
+        if (finished && finishedCount >= 100) { continue; }
+        if (finished) { finishedCount++; }
+        [result addObject:record];
     }
     return result;
 }
 
+NSArray *TGDownloadQueueNormalizedRecords(id storedValue) {
+    return TGDownloadQueueSanitizedRecords(storedValue, YES);
+}
+
+NSArray *TGDownloadQueueSerializableRecords(NSArray *records) {
+    return TGDownloadQueueSanitizedRecords(records, NO);
+}

@@ -94,3 +94,6 @@ void TGThemeDrawRecessedBackgroundInPath(NSBezierPath *path, NSRect rect, BOOL f
 void TGThemeDrawGroupedCardInPath(NSBezierPath *path, NSRect rect, BOOL flipped);
 void TGThemeDrawEnamelButtonInPath(NSBezierPath *path, NSRect rect, BOOL highlighted, BOOL selected, BOOL enabled, BOOL flipped);
 void TGThemeDrawMessageBubbleInPath(NSBezierPath *path, NSRect rect, BOOL outgoing, BOOL flipped);
+
+// Representative color under the bottom metadata row of the shared bubble renderer.
+NSColor *TGThemeMessageBubbleFooterColor(BOOL outgoing, BOOL flipped);

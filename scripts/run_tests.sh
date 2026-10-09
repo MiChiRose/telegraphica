@@ -44,6 +44,7 @@ echo "== Telegraphica static compatibility =="
 "$PYTHON_BIN" scripts/check_free_feature_policy.py
 "$PYTHON_BIN" scripts/test_static_project.py
 "$PYTHON_BIN" scripts/test_security_hardening.py
+"$PYTHON_BIN" Tests/notification_logout_routing_probe.py
 
 echo "== Shell syntax =="
 bash -n build_legacy.sh
@@ -121,6 +122,36 @@ echo "== Persistent download queue =="
     -framework Foundation \
     -o "$BUILD_DIR/download-queue-store-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/download-queue-store-probe"
+
+echo "== Persistent full-file downloads =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/persistent_file_download_probe.m Sources/Core/TGPersistentFileDownload.m -framework Foundation -o "$BUILD_DIR/persistent-file-download-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/persistent-file-download-probe"
+
+echo "== Download cancellation and client ownership =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_manager_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-manager-probe"
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_pause_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-pause-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-manager-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-pause-probe"
+
+echo "== Download identity after restart =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_restart_identity_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-restart-identity-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-restart-identity-probe"
+
+echo "== Download manager layout and themes =="
+"$CLANG" "${COMPILE_FLAGS[@]}" -I"$ROOT_DIR/Sources/UI" -I"$ROOT_DIR/Sources/Services" -I"$ROOT_DIR/Sources/Media" Tests/download_manager_presentation_probe.m Sources/UI/TGDownloadManagerPresentation.m Sources/UI/TGDownloadManagerWindowController.m Sources/UI/TGLocalization.m Sources/UI/TGTheme.m Sources/UI/TGVisualWorldThemeSpec.m Sources/UI/TGStatusButtonCells.m Sources/UI/TGIconAssets.m Sources/UI/TGIconDrawing.m -framework Cocoa -framework CoreGraphics -o "$BUILD_DIR/download-manager-presentation-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-manager-presentation-probe"
+
+echo "== Nonblocking download progress presentation =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_progress_presentation_probe.m Sources/UI/TGDownloadProgressWindowController.m -framework Cocoa -o "$BUILD_DIR/download-progress-presentation-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-progress-presentation-probe"
+
+echo "== Media Center save lifecycle =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/media_center_save_probe.m -framework Cocoa -o "$BUILD_DIR/media-center-save-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media-center-save-probe"
+
+echo "== Guarded modal file export =="
+"$CLANG" "${COMPILE_FLAGS[@]}" -I"$ROOT_DIR/Sources/Media" Tests/media_file_guarded_save_probe.m Sources/Media/TGMediaFileActions.m -framework Cocoa -o "$BUILD_DIR/media-file-guarded-save-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media-file-guarded-save-probe"
 
 echo "== TDLib capability registry =="
 "$CLANG" \
@@ -203,9 +234,14 @@ echo "== TDLib file requests =="
     -Wno-objc-protocol-method-implementation \
     Tests/tdlib_file_request_probe.m \
     Sources/Core/TGTDLibClient+Files.m \
+    Sources/Core/TGPersistentFileDownload.m \
     -framework Foundation \
     -o "$BUILD_DIR/tdlib-file-request-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-request-probe"
+
+echo "== TDLib stable file identity =="
+"$CLANG" "${COMPILE_FLAGS[@]}" -I"$ROOT_DIR/Sources/Core" -Wno-incomplete-implementation -Wno-objc-protocol-method-implementation Tests/tdlib_file_identity_probe.m Sources/Core/TGTDLibClient+Files.m Sources/Core/TGPersistentFileDownload.m -framework Foundation -o "$BUILD_DIR/tdlib-file-identity-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-identity-probe"
 
 echo "== TDLib account requests =="
 "$CLANG" \
@@ -342,6 +378,47 @@ echo "== Advanced chat folders =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/chat_folder_support_probe" Tests/Fixtures/chat_folder_advanced.json
 
+echo "== Composer keyboard and image Escape =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/keyboard_input_probe.m Sources/UI/TGKeyboardInputSupport.m -framework Cocoa -o "$BUILD_DIR/keyboard-input-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/keyboard-input-probe"
+
+echo "== Account avatar presentation =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/avatar_image_presentation_probe.m Sources/UI/TGAvatarImagePresentation.m Sources/Media/TGMediaImageLoader.m -framework Cocoa -framework ImageIO -o "$BUILD_DIR/avatar-image-presentation-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/avatar-image-presentation-probe"
+
+echo "== Interface motion and transparent spinner =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/interface_motion_probe.m Sources/UI/TGAnimationSupport.m Sources/UI/TGTranscriptMotion.m Sources/UI/TGTransparentSpinnerView.m Sources/Services/TGResourcePolicy.m -framework Cocoa -o "$BUILD_DIR/interface-motion-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/interface-motion-probe"
+
+echo "== Main section transitions =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/section_transition_probe.m Sources/UI/TGSectionTransition.m Sources/UI/TGAnimationSupport.m Sources/Services/TGResourcePolicy.m -framework Cocoa -o "$BUILD_DIR/section-transition-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/section-transition-probe"
+
+echo "== Visible conversation automatic-read gate =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/conversation_visibility_probe.m Sources/UI/TGConversationVisibility.m -framework Cocoa -o "$BUILD_DIR/conversation-visibility-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/conversation-visibility-probe"
+
+echo "== Automatic TDLib read receipts =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/automatic_read_probe.m Sources/Core/TGTDLibClient+ReadReceipts.m Sources/Core/TGChatOpenState.m -framework Foundation -o "$BUILD_DIR/automatic-read-probe"
+
+echo "== Automatic read visibility integration =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/automatic_read_visibility_integration_probe.m Sources/UI/TGConversationVisibility.m -framework Cocoa -o "$BUILD_DIR/automatic-read-visibility-integration-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/automatic-read-visibility-integration-probe"
+
+"$BUILD_DIR/automatic-read-probe"
+
+echo "== Notification read cleanup =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/Core/TGChatItem.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/notification-read-state-probe"
+
+echo "== Notification enrichment ownership =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_chat_info_probe.m Sources/Core/TGChatItem.m -framework Foundation -o "$BUILD_DIR/notification-chat-info-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/notification-chat-info-probe"
+
+echo "== Notification logout completion ownership =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_logout_completion_probe.m -framework Foundation -o "$BUILD_DIR/notification-logout-completion-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/notification-logout-completion-probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \
@@ -358,6 +435,7 @@ echo "== Core logic probe =="
     Sources/UI/TGChatDisplayPreferences.m \
     Sources/UI/TGLocalization.m \
     Sources/UI/TGMessageLayoutSupport.m \
+    Sources/UI/TGMessageFooterAppearance.m \
     Sources/UI/TGReactionChipLayout.m \
     Sources/UI/TGTheme.m \
     Sources/UI/TGVisualWorldThemeSpec.m \

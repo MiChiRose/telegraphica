@@ -1,3 +1,32 @@
+- (void)removeConfirmedReadNotifications {
+    Class centerClass = NSClassFromString(@"NSUserNotificationCenter");
+    if (!centerClass) { return; }
+    NSUserNotificationCenter *center = [centerClass defaultUserNotificationCenter];
+    TGRemoveConfirmedReadNotifications(center, self.notificationReadState);
+}
+
+- (void)resetNotificationDeliveryAfterLogout {
+    /* Read evidence is account-local; system-delivered entries must not survive
+       an explicit account departure and be matched against the next login. */
+    Class centerClass = NSClassFromString(@"NSUserNotificationCenter");
+    if (centerClass) {
+        TGRemoveMessageNotificationsAfterLogout([centerClass defaultUserNotificationCenter]);
+    }
+    [self.notificationChatInfoByChatID removeAllObjects];
+    [self.notificationReadState reset];
+}
+
+- (void)recordReadNotificationMessageIDs:(NSArray *)messageIDs chatID:(NSNumber *)chatID {
+    [self.notificationReadState recordReadMessageIDs:messageIDs chatID:chatID];
+    [self removeConfirmedReadNotifications];
+}
+
+- (void)handleReadInboxNotificationSummary:(NSDictionary *)summary {
+    [self.notificationReadState recordReadInboxMessageID:[summary objectForKey:@"last_read_inbox_message_id"]
+                                               chatID:[summary objectForKey:@"chat_id"]];
+    [self removeConfirmedReadNotifications];
+}
+
 - (NSNumber *)notificationChatIDForChatItem:(TGChatItem *)item {
     if (![item isKindOfClass:[TGChatItem class]]) {
         return nil;
@@ -48,142 +77,7 @@
     return nil;
 }
 
-- (void)requestNotificationChatInfoFetchForChatID:(NSNumber *)chatID cacheKey:(NSString *)cacheKey {
-    NSDictionary *cached = [self.notificationChatInfoByChatID objectForKey:cacheKey];
-    if ([[cached objectForKey:@"fetch_pending"] boolValue] || [[cached objectForKey:@"fetch_complete"] boolValue]) {
-        return;
-    }
-    id retryAfterObject = [cached objectForKey:@"fetch_retry_after"];
-    if ([retryAfterObject respondsToSelector:@selector(doubleValue)] &&
-        [retryAfterObject doubleValue] > [[NSDate date] timeIntervalSince1970]) {
-        return;
-    }
-    NSMutableDictionary *pending = [NSMutableDictionary dictionary];
-    if ([cached isKindOfClass:[NSDictionary class]]) {
-        [pending addEntriesFromDictionary:cached];
-    }
-    [pending setObject:[NSNumber numberWithBool:YES] forKey:@"fetch_pending"];
-    [self.notificationChatInfoByChatID setObject:pending forKey:cacheKey];
-    NSDictionary *request = [NSDictionary dictionaryWithObjectsAndKeys:
-                             chatID, @"chatID",
-                             cacheKey, @"cacheKey",
-                             nil];
-    [self performSelectorInBackground:@selector(fetchNotificationChatInfoInBackground:)
-                           withObject:request];
-}
-
-- (void)fetchNotificationChatInfoInBackground:(NSDictionary *)request {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    NSNumber *chatID = [request objectForKey:@"chatID"];
-    NSError *chatInfoError = nil;
-    NSDictionary *fetchedInfo = nil;
-    if ([self.client respondsToSelector:@selector(chatSummaryForChatID:downloadAvatar:timeout:error:)]) {
-        fetchedInfo = [self.client chatSummaryForChatID:chatID
-                                         downloadAvatar:YES
-                                                timeout:1.2
-                                                  error:&chatInfoError];
-    }
-    NSMutableDictionary *result = [NSMutableDictionary dictionaryWithDictionary:request];
-    if ([fetchedInfo isKindOfClass:[NSDictionary class]] && [fetchedInfo count] > 0) {
-        [result setObject:fetchedInfo forKey:@"info"];
-    }
-    NSString *errorMessage = [chatInfoError localizedDescription];
-    if ([errorMessage length] > 0) {
-        [result setObject:errorMessage forKey:@"error"];
-    }
-    [self performSelectorOnMainThread:@selector(applyFetchedNotificationChatInfo:)
-                           withObject:result
-                        waitUntilDone:NO];
-    [pool drain];
-}
-
-- (void)applyFetchedNotificationChatInfo:(NSDictionary *)result {
-    NSString *cacheKey = [result objectForKey:@"cacheKey"];
-    if ([cacheKey length] == 0) {
-        return;
-    }
-    NSMutableDictionary *merged = [NSMutableDictionary dictionary];
-    NSDictionary *cached = [self.notificationChatInfoByChatID objectForKey:cacheKey];
-    if ([cached isKindOfClass:[NSDictionary class]]) {
-        [merged addEntriesFromDictionary:cached];
-    }
-    [merged removeObjectForKey:@"fetch_pending"];
-    NSDictionary *fetchedInfo = [result objectForKey:@"info"];
-    if ([fetchedInfo isKindOfClass:[NSDictionary class]]) {
-        [merged setObject:[NSNumber numberWithBool:YES] forKey:@"fetch_complete"];
-        [merged removeObjectForKey:@"fetch_retry_after"];
-        for (NSString *key in [NSArray arrayWithObjects:@"title", @"avatar_local_path", @"notifications_muted", nil]) {
-            id value = [fetchedInfo objectForKey:key];
-            if (value) {
-                [merged setObject:value forKey:key];
-            }
-        }
-    } else {
-        [merged removeObjectForKey:@"fetch_complete"];
-        [merged setObject:[NSNumber numberWithDouble:[[NSDate date] timeIntervalSince1970] + 5.0]
-                   forKey:@"fetch_retry_after"];
-    }
-    [self.notificationChatInfoByChatID setObject:merged forKey:cacheKey];
-    NSString *errorMessage = [result objectForKey:@"error"];
-    if ([errorMessage length] > 0) {
-        [self appendDetail:[NSString stringWithFormat:@"Notification chat info fallback: %@", errorMessage]];
-    }
-}
-
-- (NSDictionary *)notificationChatInfoForChatID:(NSNumber *)chatID {
-    NSString *cacheKey = [self notificationCacheKeyForChatID:chatID];
-    if ([cacheKey length] == 0) {
-        return nil;
-    }
-
-    NSMutableDictionary *info = [NSMutableDictionary dictionary];
-    TGChatItem *item = [self chatItemForNotificationChatID:chatID];
-    if ([item isKindOfClass:[TGChatItem class]]) {
-        NSString *title = [item title];
-        NSString *avatarPath = [item avatarLocalPath];
-        if ([title length] > 0) {
-            [info setObject:title forKey:@"title"];
-        }
-        if ([avatarPath length] > 0) {
-            [info setObject:avatarPath forKey:@"avatar_local_path"];
-        }
-    }
-
-    NSDictionary *cachedInfo = [self.notificationChatInfoByChatID objectForKey:cacheKey];
-    if ([cachedInfo isKindOfClass:[NSDictionary class]]) {
-        NSString *cachedTitle = [cachedInfo objectForKey:@"title"];
-        NSString *cachedAvatarPath = [cachedInfo objectForKey:@"avatar_local_path"];
-        id cachedMuted = [cachedInfo objectForKey:@"notifications_muted"];
-        if ([[info objectForKey:@"title"] length] == 0 && [cachedTitle length] > 0) {
-            [info setObject:cachedTitle forKey:@"title"];
-        }
-        if ([[info objectForKey:@"avatar_local_path"] length] == 0 && [cachedAvatarPath length] > 0) {
-            [info setObject:cachedAvatarPath forKey:@"avatar_local_path"];
-        }
-        if (cachedMuted) {
-            [info setObject:cachedMuted forKey:@"notifications_muted"];
-        }
-    }
-
-    BOOL needsFetch = ([[info objectForKey:@"title"] length] == 0 || [[info objectForKey:@"avatar_local_path"] length] == 0);
-    if (needsFetch && [self.client respondsToSelector:@selector(chatSummaryForChatID:downloadAvatar:timeout:error:)]) {
-        [self requestNotificationChatInfoFetchForChatID:chatID cacheKey:cacheKey];
-    }
-
-    if ([info count] > 0) {
-        NSMutableDictionary *storedInfo = [NSMutableDictionary dictionaryWithDictionary:info];
-        NSDictionary *latestCachedInfo = [self.notificationChatInfoByChatID objectForKey:cacheKey];
-        for (NSString *stateKey in [NSArray arrayWithObjects:@"fetch_pending", @"fetch_complete", @"fetch_retry_after", nil]) {
-            id stateValue = [latestCachedInfo objectForKey:stateKey];
-            if (stateValue) {
-                [storedInfo setObject:stateValue forKey:stateKey];
-            }
-        }
-        [self.notificationChatInfoByChatID setObject:storedInfo forKey:cacheKey];
-        return info;
-    }
-    return nil;
-}
+#include "TGStatusWindowController+NotificationChatInfo.inc"
 
 - (NSString *)chatMuteDefaultsKeyForChatID:(NSNumber *)chatID {
     if (![chatID respondsToSelector:@selector(longLongValue)]) {
@@ -842,14 +736,22 @@
 
 - (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
     (void)center;
-    (void)notification;
+    if ([self.notificationReadState isReadNotificationInfo:[notification userInfo]]) { return NO; }
     if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
         return NO;
     }
-    if ([NSApp isActive]) {
+    NSWindow *hostWindow = [self window];
+    if ([NSApp isActive] && [hostWindow isVisible] && ![hostWindow isMiniaturized]) {
         return TGUserDefaultBoolWithDefault(TGNotificationsWhenActiveDefaultsKey, NO);
     }
     return YES;
+}
+
+- (void)userNotificationCenter:(NSUserNotificationCenter *)center didDeliverNotification:(NSUserNotification *)notification {
+    /* Delivery may finish after the successful read callback scanned the center. */
+    if ([self.notificationReadState isReadNotificationInfo:[notification userInfo]]) {
+        [center removeDeliveredNotification:notification];
+    }
 }
 
 - (BOOL)selectChatFromNotificationWithChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID {
@@ -898,30 +800,9 @@
     if (alreadySelected && self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
         [self reloadMessagesForChatID:chatID interactive:NO];
     }
-    [self clearUnreadCountForChatID:chatID messageThreadID:messageThreadID];
-    [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                             selector:@selector(markCurrentSelectionReadAfterNotification)
-                                               object:nil];
-    [self performSelector:@selector(markCurrentSelectionReadAfterNotification) withObject:nil afterDelay:1.2];
+    [self synchronizeUserOpenedChat];
+    [self scheduleVisibleMessageItemsRead];
     return YES;
-}
-
-- (void)markCurrentSelectionReadAfterNotification {
-    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
-        return;
-    }
-    NSNumber *chatID = [self.selectedChatID retain];
-    NSNumber *threadID = [self.selectedMessageThreadID retain];
-    NSString *topicKind = [self.selectedMessageTopicKind copy];
-    NSArray *items = [self.messageItems copy];
-    [self clearUnreadCountForChatID:chatID messageThreadID:threadID];
-    if ([items count] > 0) {
-        [self markMessageItemsReadForChatID:chatID messageThreadID:threadID messageTopicKind:topicKind items:items];
-    }
-    [items release];
-    [topicKind release];
-    [threadID release];
-    [chatID release];
 }
 
 - (void)openChatFromNotification:(NSUserNotification *)notification {
@@ -1014,6 +895,9 @@
     if ([self isChatIDMutedForNotifications:chatID]) {
         return;
     }
+    /* Reject replay before chat/avatar enrichment can schedule background work. */
+    if (![self.notificationReadState consumeIncomingNotificationSummary:summary
+                                                            atUnixTime:[[NSDate date] timeIntervalSince1970]]) { return; }
     NSDictionary *notificationChatInfo = [self notificationChatInfoForChatID:chatID];
     id serverMuted = [notificationChatInfo objectForKey:@"notifications_muted"];
     if ([serverMuted respondsToSelector:@selector(boolValue)] && [serverMuted boolValue]) {
@@ -1045,6 +929,7 @@
     if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
         [userInfo setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
     }
+    if ([self.notificationReadState isReadNotificationInfo:userInfo]) { return; }
     if ([userInfo count] > 0) {
         [notification setUserInfo:userInfo];
     }

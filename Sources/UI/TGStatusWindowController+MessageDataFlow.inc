@@ -190,6 +190,7 @@
 }
 
 - (BOOL)removeDisplayedMessageWithID:(NSNumber *)messageID chatID:(NSNumber *)chatID {
+    [self.transcriptMotionController cancelAllAnimations];
     if (![messageID respondsToSelector:@selector(longLongValue)] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         return NO;
     }
@@ -208,6 +209,7 @@
             [itemMessageID longLongValue] == targetMessageID &&
             [itemChatID longLongValue] == targetChatID) {
             [self.messageItems removeObjectAtIndex:index];
+            [self refreshMessageHistorySeparators];
             [self.inlineMediaPlaybackCoordinator removeAllPlayback];
             [self.messageTableView reloadData];
             [self scheduleInlineMediaPlaybackRefresh];
@@ -438,6 +440,7 @@
 - (void)beginReactionAnimationForMessageItem:(TGMessageItem *)item
                                  fromSummary:(NSString *)oldSummary
                                    toSummary:(NSString *)newSummary {
+    if (!TGInterfaceAnimationsEnabledForView(self.messageTableView)) { return; }
     NSString *key = [self reactionAnimationKeyForMessageItem:item];
     if ([key length] == 0) {
         return;
@@ -486,7 +489,8 @@
         NSString *key = [keys objectAtIndex:keyIndex];
         NSDictionary *animation = [self.reactionAnimations objectForKey:key];
         NSTimeInterval elapsed = now - [[animation objectForKey:@"started_at"] doubleValue];
-        CGFloat linearProgress = (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.32));
+        CGFloat linearProgress = TGInterfaceAnimationsEnabledForView(self.messageTableView)
+            ? (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.32)) : 1.0;
 
         NSUInteger row = NSNotFound;
         TGMessageItem *item = [self displayedMessageItemForReactionAnimationKey:key row:&row];
@@ -523,10 +527,12 @@
 }
 
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
+    [self.transcriptMotionController cancelAllAnimations];
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     BOOL forceScrollToNewest = self.forceMessageScrollToNewest;
     self.forceMessageScrollToNewest = NO;
     if (!preserveOlder || [self.messageItems count] == 0) {
+        [self.pendingArrivalMessageIDs removeAllObjects];
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:orderedItems]];
         [self refreshMessageHistorySeparators];
@@ -595,9 +601,11 @@
     } else {
         [self updateMessageJumpToNewestButtonVisibility];
     }
+    [self animatePendingLiveArrivals:shouldScrollToNewest];
 }
 
 - (NSUInteger)appendOlderMessageItems:(NSArray *)items preservingVisiblePosition:(BOOL)preserveVisiblePosition {
+    [self.transcriptMotionController cancelAllAnimations];
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     NSInteger firstVisibleRow = 0;
     if (preserveVisiblePosition) {
@@ -847,6 +855,7 @@
 }
 
 - (void)messageScrollViewDidScroll:(NSNotification *)notification {
+    [self.transcriptMotionController cancelAllAnimations];
     if ([notification object] != [self.messageScrollView contentView]) {
         return;
     }
@@ -1050,116 +1059,6 @@
     }
 }
 
-- (NSArray *)visibleUnreadMessageItemsAwaitingReceipt {
-    if (!self.selectedChatID || [self.messageItems count] == 0) {
-        return [NSArray array];
-    }
-
-    NSClipView *clipView = [self.messageScrollView contentView];
-    NSRange visibleRows = [self.messageTableView rowsInRect:[clipView bounds]];
-    if (visibleRows.length == 0 || visibleRows.location == NSNotFound) {
-        return [NSArray array];
-    }
-
-    long long lastReadMessageID = [self.selectedChatLastReadInboxMessageID respondsToSelector:@selector(longLongValue)] ? [self.selectedChatLastReadInboxMessageID longLongValue] : 0;
-    NSMutableArray *visibleUnreadItems = [NSMutableArray array];
-    NSUInteger lastRow = MIN(NSMaxRange(visibleRows), [self.messageItems count]);
-    NSUInteger row = visibleRows.location;
-    for (row = visibleRows.location; row < lastRow; row++) {
-        TGMessageItem *item = [self.messageItems objectAtIndex:row];
-        NSNumber *messageID = [item messageID];
-        if ([item outgoing] ||
-            ![messageID respondsToSelector:@selector(longLongValue)] ||
-            [messageID longLongValue] <= lastReadMessageID ||
-            [self.visibleReadReceiptMessageIDs containsObject:messageID]) {
-            continue;
-        }
-        [visibleUnreadItems addObject:item];
-    }
-    return visibleUnreadItems;
-}
-
-- (void)scheduleVisibleMessageItemsRead {
-    if (![self.currentAuthState isEqualToString:@"ready"] ||
-        !self.selectedChatID ||
-        self.initialUnreadPositionPending ||
-        [self.messageScrollView window] == nil ||
-        [self.messageScrollView isHidden]) {
-        return;
-    }
-
-    NSArray *items = [self visibleUnreadMessageItemsAwaitingReceipt];
-    if ([items count] == 0) {
-        return;
-    }
-
-    NSUInteger index = 0;
-    for (index = 0; index < [items count]; index++) {
-        NSNumber *messageID = [[items objectAtIndex:index] messageID];
-        if (messageID) {
-            [self.visibleReadReceiptMessageIDs addObject:messageID];
-        }
-    }
-    [self markVisibleMessageItemsReadForChatID:self.selectedChatID
-                               messageThreadID:self.selectedMessageThreadID
-                              messageTopicKind:self.selectedMessageTopicKind
-                                         items:items];
-}
-
-- (void)markVisibleMessageItemsReadForChatID:(NSNumber *)chatID
-                              messageThreadID:(NSNumber *)messageThreadID
-                             messageTopicKind:(NSString *)messageTopicKind
-                                        items:(NSArray *)items {
-    NSArray *messageIDs = [self readReceiptMessageIDsFromItems:items];
-    if ([messageIDs count] == 0) {
-        return;
-    }
-
-    NSNumber *chatIDCopy = [chatID retain];
-    NSNumber *messageThreadIDCopy = [messageThreadID retain];
-    NSString *messageTopicKindCopy = [messageTopicKind copy];
-    NSArray *messageIDsCopy = [messageIDs copy];
-    TGTDLibClient *client = [self.client retain];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-        NSError *readError = nil;
-        BOOL success = [client markMessagesAsReadForChatID:chatIDCopy
-                                           messageThreadID:messageThreadIDCopy
-                                          messageTopicKind:messageTopicKindCopy
-                                                messageIDs:messageIDsCopy
-                                                   timeout:4.0
-                                                     error:&readError];
-        NSString *readErrorMessage = [[readError localizedDescription] copy];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL sameSelection = (self.selectedChatID && [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
-            BOOL sameThread = ((!messageThreadIDCopy && !self.selectedMessageThreadID) ||
-                               (messageThreadIDCopy && self.selectedMessageThreadID &&
-                                [messageThreadIDCopy longLongValue] == [self.selectedMessageThreadID longLongValue]));
-            if (!success && sameSelection) {
-                [self.visibleReadReceiptMessageIDs minusSet:[NSSet setWithArray:messageIDsCopy]];
-            }
-            if (success && sameSelection && sameThread) {
-                [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                                         selector:@selector(dismissCurrentUnreadSeparator)
-                                                           object:nil];
-                [self performSelector:@selector(dismissCurrentUnreadSeparator)
-                           withObject:nil
-                           afterDelay:1.25];
-            }
-            if (!success && [readErrorMessage length] > 0) {
-                [self appendDetail:[NSString stringWithFormat:@"TDLib visible read state: %@", readErrorMessage]];
-            }
-            [readErrorMessage release];
-            [chatIDCopy release];
-            [messageThreadIDCopy release];
-            [messageTopicKindCopy release];
-            [messageIDsCopy release];
-            [client release];
-        });
-        [pool drain];
-    });
-}
-
 - (void)markMessageItemsReadForChatID:(NSNumber *)chatID items:(NSArray *)items {
     [self markMessageItemsReadForChatID:chatID messageThreadID:nil items:items];
 }
@@ -1195,7 +1094,8 @@
         NSString *readErrorMessage = [[readError localizedDescription] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (success) {
+            if (success && self.client == client) {
+                [self recordReadNotificationMessageIDs:messageIDsCopy chatID:chatIDCopy];
                 [self clearUnreadCountForChatID:chatIDCopy messageThreadID:messageThreadIDCopy];
                 BOOL sameSelection = (self.selectedChatID &&
                                       [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
@@ -1255,6 +1155,9 @@
             }
 
             if (profile) {
+                BOOL sameProfile = ([self.profileUserID respondsToSelector:@selector(longLongValue)] &&
+                                    [[profile objectForKey:@"id"] respondsToSelector:@selector(longLongValue)] &&
+                                    [self.profileUserID longLongValue] == [[profile objectForKey:@"id"] longLongValue]);
                 NSString *displayName = [profile objectForKey:@"display_name"];
                 NSString *firstName = [profile objectForKey:@"first_name"];
                 NSString *lastName = [profile objectForKey:@"last_name"];
@@ -1273,9 +1176,14 @@
                 self.profileUsername = ([username length] > 0) ? username : nil;
                 self.profilePhoneNumber = ([phoneNumber length] > 0) ? phoneNumber : nil;
                 id avatarFileID = [profile objectForKey:@"avatar_file_id"];
-                self.profileAvatarFileID = [avatarFileID respondsToSelector:@selector(longLongValue)]
+                NSNumber *nextAvatarFileID = [avatarFileID respondsToSelector:@selector(longLongValue)]
                     ? [NSNumber numberWithLongLong:[avatarFileID longLongValue]] : nil;
-                self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
+                NSString *nextAvatarPath = [profile objectForKey:@"avatar_path"];
+                BOOL preservesKnownPhoto = (sameProfile && [nextAvatarFileID longLongValue] > 0 &&
+                                           [nextAvatarFileID isEqual:self.profileAvatarFileID] &&
+                                           [nextAvatarPath length] == 0 && [self.profileAvatarLocalPath length] > 0);
+                self.profileAvatarFileID = nextAvatarFileID;
+                if (!preservesKnownPhoto) { self.profileAvatarLocalPath = nextAvatarPath; }
                 self.profileBio = ([bio length] > 0) ? bio : nil;
                 [self refreshProfileDisplay];
                 [self updateSavedMessagesPresentationForChatItems];
@@ -1388,7 +1296,10 @@
                 filterStillCurrent = YES;
             }
 
-            if (!filterStillCurrent) {
+            BOOL clientStillCurrent = self.client == client && [self.currentAuthState isEqualToString:@"ready"];
+            if (!clientStillCurrent) {
+                [self appendDetail:@"TDLib chats: ignored stale account result."];
+            } else if (!filterStillCurrent) {
                 if (interactive) {
                     [self appendDetail:@"TDLib chats: ignored stale folder result after selection changed."];
                 } else {
@@ -1457,7 +1368,7 @@
                 }
                 [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
             }
-            if ([authorizationState length] > 0 &&
+            if (self.client == client && [authorizationState length] > 0 &&
                 ![authorizationState isEqualToString:self.currentAuthState]) {
                 [self updateAuthControlsForState:authorizationState];
             }
@@ -1763,6 +1674,7 @@
 }
 
 - (void)handlePendingLiveRefreshesIfPossible {
+    if ([self.transcriptMotionController activeRemovalCount] > 0) { return; }
     if (TGMountainLionSafeLoginModeEnabled()) {
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
@@ -1801,6 +1713,8 @@
     }
 
     NSArray *updates = [self.client drainSafeUpdateSummaries];
+    [self.notificationReadState prepareForUpdateBatch:updates
+                                         atUnixTime:[[NSDate date] timeIntervalSince1970]];
     if ([updates count] == 0) {
         return;
     }
@@ -1829,10 +1743,15 @@
             continue;
         }
 
+        if ([kind isEqualToString:@"chat_read_inbox"]) {
+            [self handleReadInboxNotificationSummary:summary];
+            if (!mountainLionSafeLoginMode) { needsChatRefresh = YES; }
+            continue;
+        }
+
         if ([kind isEqualToString:@"file_update"] && [[summary objectForKey:@"completed"] boolValue]) {
             NSNumber *fileID = [summary objectForKey:@"file_id"];
-            BOOL completedProfileAvatar = ([self.profileAvatarLocalPath length] == 0 &&
-                                           [fileID respondsToSelector:@selector(longLongValue)] &&
+            BOOL completedProfileAvatar = ([fileID respondsToSelector:@selector(longLongValue)] &&
                                            [self.profileAvatarFileID respondsToSelector:@selector(longLongValue)] &&
                                            [fileID longLongValue] == [self.profileAvatarFileID longLongValue]);
             if (completedProfileAvatar) {
@@ -1870,6 +1789,7 @@
                 [self.client invalidateMainChatListExhaustion];
             }
             if ([kind isEqualToString:@"new_message"]) {
+                [self rememberLiveArrivalFromSummary:summary];
                 id direction = [summary objectForKey:@"direction"];
                 id incomingChatID = [summary objectForKey:@"chat_id"];
                 NSString *incomingChatKey = [self chatMuteDefaultsKeyForChatID:incomingChatID];
