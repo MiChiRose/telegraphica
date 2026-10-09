@@ -1,4 +1,5 @@
 #import "TGStatusViewComponents.h"
+#import "TGAvatarImagePresentation.h"
 #import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGTheme.h"
@@ -506,10 +507,14 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 - (void)setAvatarLocalPath:(NSString *)avatarLocalPath {
     if (_avatarLocalPath == avatarLocalPath || [_avatarLocalPath isEqualToString:avatarLocalPath]) {
+        [_avatarPresentation setPath:avatarLocalPath];
+        [self setNeedsDisplay:YES];
         return;
     }
     [_avatarLocalPath release];
     _avatarLocalPath = [avatarLocalPath copy];
+    if (!_avatarPresentation) { _avatarPresentation = [[TGAvatarImagePresentation alloc] initWithView:self]; }
+    [_avatarPresentation setPath:_avatarLocalPath];
     [self setNeedsDisplay:YES];
 }
 
@@ -540,7 +545,7 @@ static CGFloat const TGPanelCornerRadius = 8.0;
                                    floor(NSMidY(bounds) - (avatarSide / 2.0)),
                                    avatarSide,
                                    avatarSide);
-    TGDrawAvatarInRect(self.avatarLocalPath, self.displayName, avatarRect, NO, [self isFlipped]);
+    TGDrawAvatarImageInRect([_avatarPresentation imageForDrawing], self.displayName, avatarRect, NO, [self isFlipped]);
 
     NSRect statusRect = NSMakeRect(NSMaxX(avatarRect) - 11.0, NSMinY(avatarRect) + 2.0, 12.0, 12.0);
     NSBezierPath *outerDot = [NSBezierPath bezierPathWithOvalInRect:statusRect];
@@ -555,6 +560,7 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 }
 
 - (void)dealloc {
+    [_avatarPresentation release];
     [_displayName release];
     [_avatarLocalPath release];
     [super dealloc];
@@ -578,10 +584,14 @@ static CGFloat const TGPanelCornerRadius = 8.0;
 
 - (void)setAvatarLocalPath:(NSString *)avatarLocalPath {
     if (_avatarLocalPath == avatarLocalPath || [_avatarLocalPath isEqualToString:avatarLocalPath]) {
+        [_avatarPresentation setPath:avatarLocalPath];
+        [self setNeedsDisplay:YES];
         return;
     }
     [_avatarLocalPath release];
     _avatarLocalPath = [avatarLocalPath copy];
+    if (!_avatarPresentation) { _avatarPresentation = [[TGAvatarImagePresentation alloc] initWithView:self]; }
+    [_avatarPresentation setPath:_avatarLocalPath];
     [self setNeedsDisplay:YES];
 }
 
@@ -599,10 +609,11 @@ static CGFloat const TGPanelCornerRadius = 8.0;
                                    floor(NSMidY(bounds) - (avatarSide / 2.0)),
                                    avatarSide,
                                    avatarSide);
-    TGDrawAvatarInRect(self.avatarLocalPath, self.displayName, avatarRect, NO, [self isFlipped]);
+    TGDrawAvatarImageInRect([_avatarPresentation imageForDrawing], self.displayName, avatarRect, NO, [self isFlipped]);
 }
 
 - (void)dealloc {
+    [_avatarPresentation release];
     [_displayName release];
     [_avatarLocalPath release];
     [super dealloc];

@@ -1,5 +1,6 @@
 #import "TGTransparentSpinnerView.h"
 #import <math.h>
+#import "TGResourcePolicy.h"
 
 @interface TGTransparentSpinnerView ()
 @property (nonatomic, retain) NSTimer *animationTimer;
@@ -21,11 +22,16 @@
         _displayedWhenStopped = NO;
         _animationStep = 0;
         _tintColor = [[NSColor colorWithCalibratedWhite:0.18 alpha:1.0] retain];
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+        [center addObserver:self selector:@selector(animationPolicyDidChange:) name:TGResourcePolicyDidChangeNotification object:nil];
+        [center addObserver:self selector:@selector(animationPolicyDidChange:) name:NSApplicationDidResignActiveNotification object:nil];
+        [center addObserver:self selector:@selector(animationPolicyDidChange:) name:NSApplicationDidBecomeActiveNotification object:nil];
     }
     return self;
 }
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_animationTimer invalidate];
     [_animationTimer release];
     [_tintColor release];
@@ -41,37 +47,89 @@
     return nil;
 }
 
+/* Transparent ticking must repaint the surface behind the spinner. Otherwise
+   accelerated NSClipView scrolling can copy old spokes into its backing store. */
+- (void)invalidateSurfaceInSuperview:(NSView *)parent frame:(NSRect)frame {
+    if (!parent) return;
+    NSRect dirty = NSInsetRect(frame, -2.0, -2.0);
+    NSView *surface = parent;
+    while (![surface isOpaque] && [surface superview]) {
+        dirty = [[surface superview] convertRect:dirty fromView:surface];
+        surface = [surface superview];
+    }
+    [surface setNeedsDisplayInRect:dirty];
+}
+
+- (void)invalidateSpinnerSurface {
+    [self invalidateSurfaceInSuperview:[self superview] frame:[self frame]];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setFrame:(NSRect)frame {
+    [self invalidateSurfaceInSuperview:[self superview] frame:[self frame]];
+    [super setFrame:frame];
+    [self invalidateSpinnerSurface];
+}
+
+- (void)setHidden:(BOOL)hidden {
+    [self invalidateSurfaceInSuperview:[self superview] frame:[self frame]];
+    [super setHidden:hidden];
+    [self updateAnimationTimer];
+}
+
+- (void)viewWillMoveToSuperview:(NSView *)newSuperview {
+    [self invalidateSurfaceInSuperview:[self superview] frame:[self frame]];
+    [super viewWillMoveToSuperview:newSuperview];
+}
+
+- (void)viewDidMoveToWindow {
+    [super viewDidMoveToWindow];
+    [self updateAnimationTimer];
+}
+
+- (void)updateAnimationTimer {
+    BOOL shouldTick = (self.animating && [self window] && ![self isHiddenOrHasHiddenAncestor] &&
+                       !TGResourcePolicyEconomyModeEnabled() &&
+                       (!TGResourcePolicyStopAnimationsWhenInactive() || [NSApp isActive]));
+    if (!shouldTick) {
+        [self.animationTimer invalidate];
+        self.animationTimer = nil;
+    } else if (!self.animationTimer) {
+        self.animationTimer = [NSTimer timerWithTimeInterval:(1.0 / 15.0)
+                                                    target:self selector:@selector(advanceAnimation:)
+                                                  userInfo:nil repeats:YES];
+        [[NSRunLoop mainRunLoop] addTimer:self.animationTimer forMode:NSRunLoopCommonModes];
+    }
+}
+
+- (void)animationPolicyDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self updateAnimationTimer];
+    [self invalidateSpinnerSurface];
+}
+
 - (void)startAnimation:(id)sender {
     (void)sender;
-    if (self.animating) {
-        return;
-    }
     self.animating = YES;
     [self setHidden:NO];
-    self.animationTimer = [NSTimer scheduledTimerWithTimeInterval:(1.0 / 15.0)
-                                                           target:self
-                                                         selector:@selector(advanceAnimation:)
-                                                         userInfo:nil
-                                                          repeats:YES];
-    [[NSRunLoop mainRunLoop] addTimer:self.animationTimer forMode:NSEventTrackingRunLoopMode];
-    [self setNeedsDisplay:YES];
+    [self updateAnimationTimer];
+    [self invalidateSpinnerSurface];
 }
 
 - (void)stopAnimation:(id)sender {
     (void)sender;
     self.animating = NO;
-    [self.animationTimer invalidate];
-    self.animationTimer = nil;
-    if (!self.displayedWhenStopped) {
-        [self setHidden:YES];
-    }
-    [self setNeedsDisplay:YES];
+    [self updateAnimationTimer];
+    if (!self.displayedWhenStopped) [self setHidden:YES];
+    [self invalidateSpinnerSurface];
 }
 
 - (void)advanceAnimation:(NSTimer *)timer {
     (void)timer;
+    [self updateAnimationTimer];
+    if (!self.animationTimer) return;
     self.animationStep = (self.animationStep + 1) % 12;
-    [self setNeedsDisplay:YES];
+    [self invalidateSpinnerSurface];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {

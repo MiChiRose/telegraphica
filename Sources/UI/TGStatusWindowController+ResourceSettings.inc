@@ -166,6 +166,7 @@
     (void)notification;
     [self refreshResourceSettingsControls];
     [self applyResourcePolicyToMediaSubsystems];
+    [self updateReactionAnimations:nil];
 }
 
 - (void)applyResourcePolicyToMediaSubsystems {

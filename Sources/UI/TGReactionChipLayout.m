@@ -74,8 +74,17 @@ CGFloat TGReactionChipsMinimumWidthForItem(TGMessageItem *item) {
     return width;
 }
 
-static NSColor *TGReactionChosenInk(NSColor *background) {
-    NSColor *rgb = [background colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+NSColor *TGReactionChipBackgroundColor(BOOL chosen) {
+    if (chosen) { return TGClassicNavigationSelectedColor(1.0); }
+    NSColor *surface = [TGClassicIncomingBubbleBottomColor() colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    NSColor *accent = [TGClassicNavigationSelectedColor(1.0) colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    return [NSColor colorWithCalibratedRed:[surface redComponent] * 0.85 + [accent redComponent] * 0.15
+                                   green:[surface greenComponent] * 0.85 + [accent greenComponent] * 0.15
+                                    blue:[surface blueComponent] * 0.85 + [accent blueComponent] * 0.15 alpha:1.0];
+}
+
+NSColor *TGReactionChipInkColor(BOOL chosen) {
+    NSColor *rgb = [TGReactionChipBackgroundColor(chosen) colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
     CGFloat r = [rgb redComponent], g = [rgb greenComponent], b = [rgb blueComponent];
     r = r <= 0.04045 ? r / 12.92 : pow((r + 0.055) / 1.055, 2.4);
     g = g <= 0.04045 ? g / 12.92 : pow((g + 0.055) / 1.055, 2.4);
@@ -114,10 +123,8 @@ void TGDrawReactionChipsForItem(TGMessageItem *item, NSRect bandRect, BOOL flipp
             flipped ? NSMinY(bandRect) + 2.0 + NSMinY(local) : NSMaxY(bandRect) - 2.0 - NSMaxY(local),
             NSWidth(local), NSHeight(local));
         BOOL chosen = [[item chosenReactionEmojis] containsObject:[entry objectForKey:@"emoji"]];
-        NSColor *background = chosen ? TGClassicNavigationSelectedColor(1.0)
-            : [NSColor colorWithCalibratedRed:0.86 green:0.92 blue:0.97 alpha:1.0];
-        NSColor *ink = chosen ? TGReactionChosenInk(background)
-            : [NSColor colorWithCalibratedRed:0.12 green:0.35 blue:0.57 alpha:1.0];
+        NSColor *background = TGReactionChipBackgroundColor(chosen);
+        NSColor *ink = TGReactionChipInkColor(chosen);
         [[background colorWithAlphaComponent:opacity] set];
         [[NSBezierPath bezierPathWithRoundedRect:rect xRadius:12.0 yRadius:12.0] fill];
         NSDictionary *emojiAttributes = [NSDictionary dictionaryWithObjectsAndKeys:

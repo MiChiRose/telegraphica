@@ -2515,7 +2515,7 @@ static BOOL TGMediaPlaybackMimeLooksUnsupportedOnMavericks(NSString *mimeType, B
     }
 
     NSRect frame = NSMakeRect(0, 0, 520, 420);
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:frame
+    NSWindow *window = [[[TGEscapeCloseWindow alloc] initWithContentRect:frame
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];

@@ -1313,10 +1313,17 @@ static NSString *TGMessageViewerMenuTitle(NSDictionary *summary) {
         BOOL succeeded = ([deleteSummary length] > 0);
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.client != client) {
+                [errorMessage release];
+                [chatID release];
+                [messageIDs release];
+                [client release];
+                return;
+            }
             if (succeeded) {
                 BOOL removedDisplayedMessage = NO;
                 for (NSNumber *messageID in messageIDs) {
-                    if ([self removeDisplayedMessageWithID:messageID chatID:chatID]) {
+                    if ([self animateConfirmedRemovalWithID:messageID chatID:chatID]) {
                         removedDisplayedMessage = YES;
                     }
                 }

@@ -342,6 +342,22 @@ echo "== Advanced chat folders =="
 
 HOME="$TEST_HOME" "$BUILD_DIR/chat_folder_support_probe" Tests/Fixtures/chat_folder_advanced.json
 
+echo "== Composer keyboard and image Escape =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/keyboard_input_probe.m Sources/UI/TGKeyboardInputSupport.m -framework Cocoa -o "$BUILD_DIR/keyboard-input-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/keyboard-input-probe"
+
+echo "== Account avatar presentation =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/avatar_image_presentation_probe.m Sources/UI/TGAvatarImagePresentation.m Sources/Media/TGMediaImageLoader.m -framework Cocoa -framework ImageIO -o "$BUILD_DIR/avatar-image-presentation-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/avatar-image-presentation-probe"
+
+echo "== Interface motion and transparent spinner =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/interface_motion_probe.m Sources/UI/TGAnimationSupport.m Sources/UI/TGTranscriptMotion.m Sources/UI/TGTransparentSpinnerView.m Sources/Services/TGResourcePolicy.m -framework Cocoa -o "$BUILD_DIR/interface-motion-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/interface-motion-probe"
+
+echo "== Notification read cleanup =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/notification-read-state-probe"
+
 echo "== Core logic probe =="
 
 "$CLANG" \
@@ -358,6 +374,7 @@ echo "== Core logic probe =="
     Sources/UI/TGChatDisplayPreferences.m \
     Sources/UI/TGLocalization.m \
     Sources/UI/TGMessageLayoutSupport.m \
+    Sources/UI/TGMessageFooterAppearance.m \
     Sources/UI/TGReactionChipLayout.m \
     Sources/UI/TGTheme.m \
     Sources/UI/TGVisualWorldThemeSpec.m \
