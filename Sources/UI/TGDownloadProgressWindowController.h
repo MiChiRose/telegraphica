@@ -4,7 +4,11 @@
 
 // Zero means that showing a separate panel would cover the conversation.
 NSRect TGDownloadProgressPanelFrame(NSRect mainFrame, NSRect visibleFrame, CGFloat panelHeight);
+NSRect TGDownloadProgressReservedMainFrame(NSRect mainFrame, NSRect visibleFrame, NSSize minimumMainSize, CGFloat panelHeight);
+NSRect TGDownloadProgressRestoredMainFrame(NSRect originalFrame, NSRect reservedFrame, NSRect currentFrame,
+                                         NSRect visibleFrame, NSSize minimumMainSize);
 double TGDownloadProgressFraction(NSDictionary *record);
+BOOL TGDownloadProgressCanPerformAction(NSDictionary *record, NSString *action);
 
 // Presentation state is separate from the window so hide/new-job behavior can
 // be verified without a screen, timers, or a live Telegram account.
@@ -34,6 +38,13 @@ double TGDownloadProgressFraction(NSDictionary *record);
     NSProgressIndicator *_progressBar;
     NSButton *_collapseButton;
     NSButton *_downloadsButton;
+    NSButton *_pauseButton;
+    NSButton *_cancelButton;
+    NSRect _originalMainFrame;
+    NSRect _reservedMainFrame;
+    BOOL _hasReservedMainFrame;
+    BOOL _changingMainFrame;
+    BOOL _mayReserveSpace;
     BOOL _collapsed;
     BOOL _invalidated;
 }

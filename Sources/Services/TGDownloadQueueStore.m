@@ -25,7 +25,7 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
         state = @"interrupted";
     }
     NSArray *allowedStates = [NSArray arrayWithObjects:@"queued", @"downloading", @"interrupted",
-                              @"completed", @"failed", @"cancelled", nil];
+                              @"completed", @"failed", @"cancelled", @"paused", nil];
     if (![allowedStates containsObject:state]) {
         return nil;
     }

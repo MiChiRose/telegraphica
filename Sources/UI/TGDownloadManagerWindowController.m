@@ -65,6 +65,7 @@
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSButton *cancelButton;
+@property (nonatomic, retain) NSButton *pauseButton;
 @property (nonatomic, retain) NSButton *retryButton;
 @property (nonatomic, retain) NSButton *revealButton;
 @property (nonatomic, retain) NSButton *clearButton;
@@ -76,6 +77,7 @@
 @synthesize tableView = _tableView;
 @synthesize statusField = _statusField;
 @synthesize cancelButton = _cancelButton;
+@synthesize pauseButton = _pauseButton;
 @synthesize retryButton = _retryButton;
 @synthesize revealButton = _revealButton;
 @synthesize clearButton = _clearButton;
@@ -107,6 +109,7 @@
     [_tableView release];
     [_statusField release];
     [_cancelButton release];
+    [_pauseButton release];
     [_retryButton release];
     [_revealButton release];
     [_clearButton release];
@@ -188,23 +191,28 @@
     [scroll setDocumentView:self.tableView];
     [root addSubview:scroll];
 
-    self.cancelButton = [self buttonWithFrame:NSMakeRect(32, 78, 112, 30)
+    self.pauseButton = [self buttonWithFrame:NSMakeRect(24, 78, 112, 30)
+                                       title:TGLoc(@"downloads.pause")
+                                      action:@selector(pauseResumePressed:)
+                                     primary:YES];
+    self.cancelButton = [self buttonWithFrame:NSMakeRect(144, 78, 96, 30)
                                         title:TGLoc(@"downloads.cancel")
                                        action:@selector(cancelPressed:)
                                       primary:NO];
-    self.retryButton = [self buttonWithFrame:NSMakeRect(152, 78, 112, 30)
+    self.retryButton = [self buttonWithFrame:NSMakeRect(248, 78, 84, 30)
                                        title:TGLoc(@"downloads.retry")
                                       action:@selector(retryPressed:)
                                      primary:YES];
-    self.revealButton = [self buttonWithFrame:NSMakeRect(272, 78, 132, 30)
+    self.revealButton = [self buttonWithFrame:NSMakeRect(340, 78, 132, 30)
                                         title:TGLoc(@"downloads.reveal")
                                        action:@selector(revealPressed:)
                                       primary:NO];
-    self.clearButton = [self buttonWithFrame:NSMakeRect(500, 78, 148, 30)
+    self.clearButton = [self buttonWithFrame:NSMakeRect(540, 78, 120, 30)
                                        title:TGLoc(@"downloads.clear")
                                       action:@selector(clearPressed:)
                                      primary:NO];
     [self.clearButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+    [root addSubview:self.pauseButton];
     [root addSubview:self.cancelButton];
     [root addSubview:self.retryButton];
     [root addSubview:self.revealButton];
@@ -235,8 +243,8 @@
     NSString *state = [item objectForKey:@"state"];
     NSString *safeState = [state length] > 0 ? state : @"failed";
     NSString *stateText = TGLoc([@"downloads.state." stringByAppendingString:safeState]);
-    if ([safeState isEqualToString:@"downloading"]) {
-        if ([[item objectForKey:@"reconnecting"] boolValue]) {
+    if ([safeState isEqualToString:@"downloading"] || [safeState isEqualToString:@"paused"]) {
+        if ([safeState isEqualToString:@"downloading"] && [[item objectForKey:@"reconnecting"] boolValue]) {
             stateText = TGLoc(@"downloads.waitingNetwork");
         }
         long long downloaded = MAX(0LL, [[item objectForKey:@"downloaded_bytes"] longLongValue]);
@@ -289,15 +297,31 @@
 - (void)updateControls {
     NSDictionary *item = [self selectedDownload];
     NSString *state = [item objectForKey:@"state"];
-    [self.cancelButton setEnabled:([state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"])];
+    BOOL paused = [state isEqualToString:@"paused"];
+    [self.pauseButton setTitle:TGLoc(paused ? @"downloads.resume" : @"downloads.pause")];
+    [self.pauseButton setEnabled:[[item objectForKey:(paused ? @"can_resume" : @"can_pause")] boolValue]];
+    [self.cancelButton setEnabled:[[item objectForKey:@"can_cancel"] boolValue]];
     [self.retryButton setEnabled:([state isEqualToString:@"failed"] || [state isEqualToString:@"cancelled"])];
     [self.revealButton setEnabled:[[item objectForKey:@"saved_path"] length] > 0];
     [self.clearButton setEnabled:[self.downloads count] > 0];
 }
 
 - (void)reloadDownloads {
+    NSString *selectedID = [[[self selectedDownload] objectForKey:@"identifier"] copy];
     self.downloads = [[TGDownloadManager sharedManager] itemsSnapshot];
     [self.tableView reloadData];
+    NSInteger selection = -1, activeSelection = -1;
+    for (NSUInteger index = 0; index < [self.downloads count]; index++) {
+        NSDictionary *item = [self.downloads objectAtIndex:index];
+        if ([[item objectForKey:@"identifier"] isEqualToString:selectedID]) { selection = (NSInteger)index; }
+        if (activeSelection < 0 && [[item objectForKey:@"can_cancel"] boolValue]) { activeSelection = (NSInteger)index; }
+    }
+    if (selection < 0) { selection = activeSelection; }
+    if (selection < 0 && [self.downloads count] > 0) { selection = 0; }
+    if (selection >= 0) {
+        [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)selection] byExtendingSelection:NO];
+    }
+    [selectedID release];
     [self.statusField setStringValue:[self.downloads count] > 0
         ? [NSString stringWithFormat:TGLoc(@"downloads.count"), (unsigned long)[self.downloads count]]
         : TGLoc(@"downloads.empty")];
@@ -307,6 +331,17 @@
 - (void)downloadManagerChanged:(NSNotification *)notification {
     (void)notification;
     [self reloadDownloads];
+}
+
+- (void)pauseResumePressed:(id)sender {
+    (void)sender;
+    NSDictionary *item = [self selectedDownload];
+    NSString *identifier = [item objectForKey:@"identifier"];
+    if ([[item objectForKey:@"state"] isEqualToString:@"paused"]) {
+        [[TGDownloadManager sharedManager] resumeDownloadWithIdentifier:identifier completion:nil];
+    } else {
+        [[TGDownloadManager sharedManager] pauseDownloadWithIdentifier:identifier];
+    }
 }
 
 - (void)cancelPressed:(id)sender {

@@ -128,7 +128,9 @@ HOME="$TEST_HOME" "$BUILD_DIR/persistent-file-download-probe"
 
 echo "== Download cancellation and client ownership =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_manager_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-manager-probe"
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_pause_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-pause-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/download-manager-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-pause-probe"
 
 echo "== Nonblocking download progress presentation =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_progress_presentation_probe.m Sources/UI/TGDownloadProgressWindowController.m -framework Cocoa -o "$BUILD_DIR/download-progress-presentation-probe"
@@ -376,7 +378,7 @@ echo "== Interface motion and transparent spinner =="
 HOME="$TEST_HOME" "$BUILD_DIR/interface-motion-probe"
 
 echo "== Notification read cleanup =="
-"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/Core/TGChatItem.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/notification-read-state-probe"
 
 echo "== Core logic probe =="

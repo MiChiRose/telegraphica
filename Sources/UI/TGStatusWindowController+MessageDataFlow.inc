@@ -1409,7 +1409,10 @@
                 filterStillCurrent = YES;
             }
 
-            if (!filterStillCurrent) {
+            BOOL clientStillCurrent = self.client == client && [self.currentAuthState isEqualToString:@"ready"];
+            if (!clientStillCurrent) {
+                [self appendDetail:@"TDLib chats: ignored stale account result."];
+            } else if (!filterStillCurrent) {
                 if (interactive) {
                     [self appendDetail:@"TDLib chats: ignored stale folder result after selection changed."];
                 } else {
@@ -1478,7 +1481,7 @@
                 }
                 [[TGLogger sharedLogger] log:@"TDLib chat preview load failed."];
             }
-            if ([authorizationState length] > 0 &&
+            if (self.client == client && [authorizationState length] > 0 &&
                 ![authorizationState isEqualToString:self.currentAuthState]) {
                 [self updateAuthControlsForState:authorizationState];
             }

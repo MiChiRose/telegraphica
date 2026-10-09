@@ -18,6 +18,9 @@ typedef void (^TGDownloadCompletionBlock)(NSString *savedPath, NSError *error, B
 - (NSArray *)itemsSnapshot;
 - (NSString *)presentationStateForFileID:(NSNumber *)fileID
                                savedPath:(NSString **)savedPathOut;
+- (void)pauseDownloadWithIdentifier:(NSString *)identifier;
+- (void)resumeDownloadWithIdentifier:(NSString *)identifier
+                         completion:(TGDownloadCompletionBlock)completion;
 - (void)cancelDownloadWithIdentifier:(NSString *)identifier;
 - (void)cancelDownloadsForFileID:(NSNumber *)fileID;
 - (void)retryDownloadWithIdentifier:(NSString *)identifier

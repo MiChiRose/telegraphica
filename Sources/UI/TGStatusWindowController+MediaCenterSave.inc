@@ -45,7 +45,7 @@
     for (NSDictionary *record in [manager itemsSnapshot]) {
         NSString *state = [record objectForKey:@"state"];
         if ([[record objectForKey:@"file_id"] longLongValue] == [fileID longLongValue] &&
-            ([state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"])) {
+            ([state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"] || [state isEqualToString:@"paused"])) {
             [self.mediaCenterStatusField setStringValue:TGLoc(@"media.center.alreadyDownloading")];
             return;
         }

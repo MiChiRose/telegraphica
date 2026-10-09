@@ -50,20 +50,65 @@ int main(void) {
              TGDownloadProgressFraction(TGRecord(@"x", @"downloading", 100, 50)) == 1.0,
              "unknown and malformed totals cannot overflow a progress bar");
 
+    NSDictionary *pausedRecord = TGRecord(@"pause", @"paused", 2500000000LL, 5000000000LL);
+    [presentation updateWithRecords:[NSArray arrayWithObject:pausedRecord]];
+    TGAssert([presentation hidden] && [presentation activeCount] == 0, "persisted paused work must not auto-start or auto-show");
+    [presentation show]; [presentation updateWithRecords:[NSArray arrayWithObject:pausedRecord]];
+    TGAssert(![presentation hidden] && [[[presentation displayedRecord] objectForKey:@"state"] isEqualToString:@"paused"],
+             "pausing keeps the current job visible for explicit resume");
+    NSMutableDictionary *controls = [NSMutableDictionary dictionaryWithDictionary:pausedRecord];
+    TGAssert(!TGDownloadProgressCanPerformAction(controls, @"resume"), "paused work without a ready client cannot resume");
+    [controls setObject:[NSNumber numberWithBool:YES] forKey:@"can_resume"];
+    [controls setObject:[NSNumber numberWithBool:YES] forKey:@"can_cancel"];
+    TGAssert(TGDownloadProgressCanPerformAction(controls, @"resume") && TGDownloadProgressCanPerformAction(controls, @"cancel") &&
+             !TGDownloadProgressCanPerformAction(controls, @"pause"), "paused controls reflect manager readiness rather than guessing auth");
+    [controls setObject:@"downloading" forKey:@"state"]; [controls setObject:[NSNumber numberWithBool:YES] forKey:@"can_pause"];
+    TGAssert(TGDownloadProgressCanPerformAction(controls, @"pause") && !TGDownloadProgressCanPerformAction(controls, @"resume"),
+             "an active download offers pause and cancellation");
+    [controls setObject:@"completed" forKey:@"state"];
+    TGAssert(!TGDownloadProgressCanPerformAction(controls, @"pause") && !TGDownloadProgressCanPerformAction(controls, @"resume") &&
+             !TGDownloadProgressCanPerformAction(controls, @"cancel"), "terminal work disables even stale capability flags");
+
     NSRect screen = NSMakeRect(0, 23, 1280, 777);
-    NSRect mainFrame = NSMakeRect(150, 100, 980, 620);
+    NSSize minimumMainSize = NSMakeSize(760, 620);
+    NSRect original = NSMakeRect(150, 100, 980, 620);
+    TGAssert(NSIsEmptyRect(TGDownloadProgressPanelFrame(original, screen, 170.0)), "the old 134-point gap cannot squeeze the wider panel");
+    NSRect mainFrame = TGDownloadProgressReservedMainFrame(original, screen, minimumMainSize, 170.0);
     NSRect expanded = TGDownloadProgressPanelFrame(mainFrame, screen, 170.0);
     NSRect collapsed = TGDownloadProgressPanelFrame(mainFrame, screen, 116.0);
-    TGCheckFrame(expanded, mainFrame, screen, "1280 display has a narrow external right panel");
+    TGCheckFrame(expanded, mainFrame, screen, "1280 display reserves a readable external right panel");
     TGCheckFrame(collapsed, mainFrame, screen, "collapsed panel remains outside the conversation");
-    TGAssert(NSWidth(expanded) >= 128.0 && NSWidth(expanded) <= 142.0 &&
-             NSMaxY(expanded) == NSMaxY(collapsed), "collapse retains top alignment and fits the actual side gap");
-    mainFrame = NSMakeRect(300, 100, 970, 620);
+    TGAssert(NSWidth(expanded) == 340.0 && NSWidth(mainFrame) == 916.0 && NSWidth(mainFrame) >= minimumMainSize.width &&
+             NSContainsRect(screen, mainFrame) && NSMaxY(expanded) == NSMaxY(collapsed),
+             "reservation respects chat minimum, preferred width and collapse alignment");
+    TGAssert(NSEqualRects(TGDownloadProgressReservedMainFrame(mainFrame, screen, minimumMainSize, 170.0), mainFrame),
+             "repeated placement never repeatedly shrinks the main window");
+    TGAssert(NSEqualRects(TGDownloadProgressRestoredMainFrame(original, mainFrame, mainFrame, screen, minimumMainSize), original),
+             "closing restores the original frame while the reservation is owned");
+    NSRect edited = mainFrame; edited.origin.x += 20.0;
+    TGAssert(NSIsEmptyRect(TGDownloadProgressRestoredMainFrame(original, mainFrame, edited, screen, minimumMainSize)),
+             "a user move must never be undone when closing");
+    edited = mainFrame; edited.size.width -= 10.0;
+    TGAssert(NSIsEmptyRect(TGDownloadProgressRestoredMainFrame(original, mainFrame, edited, screen, minimumMainSize)),
+             "a user resize must never be undone when closing");
+    NSRect relocatedScreen = NSMakeRect(-1920, 23, 1920, 1057);
+    TGAssert(NSContainsRect(relocatedScreen, TGDownloadProgressRestoredMainFrame(original, mainFrame, mainFrame, relocatedScreen, minimumMainSize)),
+             "restoration clamps onto the actual current display after a screen change");
+    mainFrame = NSMakeRect(400, 100, 870, 620);
     TGCheckFrame(TGDownloadProgressPanelFrame(mainFrame, screen, 170.0), mainFrame, screen, "left-side free room is used when right side is full");
+    TGAssert(NSEqualRects(TGDownloadProgressReservedMainFrame(mainFrame, screen, minimumMainSize, 170.0), mainFrame),
+             "existing room preserves the user's main frame");
     mainFrame = NSMakeRect(0, 250, 1280, 550);
     TGCheckFrame(TGDownloadProgressPanelFrame(mainFrame, screen, 170.0), mainFrame, screen, "bottom free room supports a full-width main window");
     mainFrame = NSMakeRect(0, 23, 1280, 777);
-    TGAssert(NSIsEmptyRect(TGDownloadProgressPanelFrame(mainFrame, screen, 170.0)), "no-room fullscreen must not cover the conversation");
+    NSRect reserved = TGDownloadProgressReservedMainFrame(mainFrame, screen, minimumMainSize, 170.0);
+    TGCheckFrame(TGDownloadProgressPanelFrame(reserved, screen, 170.0), reserved, screen, "a maximized main window gets an external lane");
+    screen = NSMakeRect(0, 23, 1100, 777); mainFrame = NSMakeRect(60, 100, 980, 620);
+    reserved = TGDownloadProgressReservedMainFrame(mainFrame, screen, minimumMainSize, 170.0);
+    TGAssert(NSWidth(TGDownloadProgressPanelFrame(reserved, screen, 170.0)) == 300.0 && NSWidth(reserved) >= 760.0,
+             "smaller displays use 300-point minimum without violating the chat minimum");
+    TGAssert(NSIsEmptyRect(TGDownloadProgressReservedMainFrame(mainFrame, NSMakeRect(0, 23, 1000, 777), minimumMainSize, 170.0)),
+             "physically insufficient width cannot violate the chat minimum or overlap it");
     screen = NSMakeRect(-1920, 23, 1920, 1057); mainFrame = NSMakeRect(-1770, 100, 980, 800);
     TGCheckFrame(TGDownloadProgressPanelFrame(mainFrame, screen, 170.0), mainFrame, screen, "positioning uses the actual negative-origin display");
     screen = NSMakeRect(0, 23, 1280, 777); mainFrame = NSMakeRect(-1200, 100, 980, 620);
