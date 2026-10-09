@@ -1823,6 +1823,8 @@
     }
 
     NSArray *updates = [self.client drainSafeUpdateSummaries];
+    [self.notificationReadState prepareForUpdateBatch:updates
+                                         atUnixTime:[[NSDate date] timeIntervalSince1970]];
     if ([updates count] == 0) {
         return;
     }

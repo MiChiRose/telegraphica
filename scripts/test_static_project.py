@@ -971,6 +971,7 @@ def check_media_file_management_contract(errors):
 
     media_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MediaWindows.inc")
     media_text = read_text(os.path.join(ROOT, media_rel))
+    media_text += read_text(os.path.join(ROOT, "Sources", "UI", "TGStatusWindowController+MediaCenterSave.inc"))
     for fragment in [
         "mediaCenterDownloadingFileIDs",
         "cancelMediaCenterDownload:",

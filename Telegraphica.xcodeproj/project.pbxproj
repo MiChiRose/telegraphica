@@ -179,6 +179,8 @@
 		5BD6DF79AED7F69400C01E03 /* TGAvatarImagePresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = D9135315DC497A0ACF54AB57 /* TGAvatarImagePresentation.m */; };
 		1E45A5AE25733499D84F76EB /* TGMessageFooterAppearance.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0CF5E3D69E3E92CEACDB33 /* TGMessageFooterAppearance.m */; };
 		1E3B31050F232518D90F2B08 /* TGNotificationDeliverySupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 712EC2CDFCD982936C8A8B3E /* TGNotificationDeliverySupport.m */; };
+		D05900000000000000000001 /* TGPersistentFileDownload.m in Sources */ = {isa = PBXBuildFile; fileRef = D05900000000000000000003 /* TGPersistentFileDownload.m */; };
+		D05900000000000000000011 /* TGDownloadProgressWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = D05900000000000000000013 /* TGDownloadProgressWindowController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -491,6 +493,10 @@
 		AA0CF5E3D69E3E92CEACDB33 /* TGMessageFooterAppearance.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageFooterAppearance.m; sourceTree = "<group>"; };
 		B64C6530EA18C4456450072F /* TGNotificationDeliverySupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGNotificationDeliverySupport.h; sourceTree = "<group>"; };
 		712EC2CDFCD982936C8A8B3E /* TGNotificationDeliverySupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGNotificationDeliverySupport.m; sourceTree = "<group>"; };
+		D05900000000000000000002 /* TGPersistentFileDownload.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGPersistentFileDownload.h; sourceTree = "<group>"; };
+		D05900000000000000000003 /* TGPersistentFileDownload.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGPersistentFileDownload.m; sourceTree = "<group>"; };
+		D05900000000000000000012 /* TGDownloadProgressWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadProgressWindowController.h; sourceTree = "<group>"; };
+		D05900000000000000000013 /* TGDownloadProgressWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadProgressWindowController.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -564,6 +570,8 @@
 		111111111111111111111404 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				D05900000000000000000002 /* TGPersistentFileDownload.h */,
+				D05900000000000000000003 /* TGPersistentFileDownload.m */,
 				371996A673D37570278D5DC3 /* TGNotificationReadState.h */,
 				BF83988A2AD49D8EDDBD5490 /* TGNotificationReadState.m */,
 				111111111111111111111204 /* TGTDLibClient.h */,
@@ -732,6 +740,8 @@
 				111111111111111111111346 /* TGChatInfoWindowController.m */,
 				111111111111111111111349 /* TGScheduledMessagesWindowController.h */,
 				111111111111111111111350 /* TGScheduledMessagesWindowController.m */,
+				D05900000000000000000012 /* TGDownloadProgressWindowController.h */,
+				D05900000000000000000013 /* TGDownloadProgressWindowController.m */,
 				111111111111111111111353 /* TGDownloadManagerWindowController.h */,
 				111111111111111111111354 /* TGDownloadManagerWindowController.m */,
 				111111111111111111111357 /* TGPrivacyWindowController.h */,
@@ -983,6 +993,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D05900000000000000000001 /* TGPersistentFileDownload.m in Sources */,
 				A09A829D79AEFA57AE4B4B56 /* TGNotificationReadState.m in Sources */,
 				A9F915173C8705BF4A9662B0 /* TGKeyboardInputSupport.m in Sources */,
 				CEA174337527B5C2050164A7 /* TGTranscriptMotion.m in Sources */,
@@ -1075,6 +1086,7 @@
 				111111111111111111111173 /* TGScheduledMessagesWindowController.m in Sources */,
 				111111111111111111111174 /* TGDownloadManager.m in Sources */,
 				B8DB0BB00000000000000001 /* TGDownloadQueueStore.m in Sources */,
+				D05900000000000000000011 /* TGDownloadProgressWindowController.m in Sources */,
 				111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */,
 				111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */,
 				111111111111111111111177 /* TGPrivacyWindowController.m in Sources */,
