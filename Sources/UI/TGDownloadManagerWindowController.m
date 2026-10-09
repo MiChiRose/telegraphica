@@ -9,6 +9,21 @@
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
+static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
+    bytes = MAX(0LL, bytes);
+    Class formatter = NSClassFromString(@"NSByteCountFormatter");
+    if ([formatter respondsToSelector:@selector(stringFromByteCount:countStyle:)]) {
+        return [formatter stringFromByteCount:bytes countStyle:NSByteCountFormatterCountStyleBinary];
+    }
+    // Keep the same 1024-based units if a legacy runtime lacks the formatter.
+    const char *units[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
+    double value = (double)bytes;
+    NSUInteger unit = 0;
+    while (value >= 1024.0 && unit < 6) { value /= 1024.0; unit++; }
+    return unit == 0 ? [NSString stringWithFormat:@"%lld B", bytes] :
+                      [NSString stringWithFormat:@"%.1f %s", value, units[unit]];
+}
+
 @interface TGDownloadListCell : TGRepresentedObjectCell
 @end
 
@@ -249,10 +264,10 @@
         }
         long long downloaded = MAX(0LL, [[item objectForKey:@"downloaded_bytes"] longLongValue]);
         long long total = MAX(0LL, [[item objectForKey:@"total_bytes"] longLongValue]);
-        NSString *bytes = [NSByteCountFormatter stringFromByteCount:downloaded countStyle:NSByteCountFormatterCountStyleFile];
+        NSString *bytes = TGDownloadManagerBinaryByteCount(downloaded);
         if (total > 0) {
             stateText = [NSString stringWithFormat:@"%@ · %@ / %@", stateText, bytes,
-                         [NSByteCountFormatter stringFromByteCount:total countStyle:NSByteCountFormatterCountStyleFile]];
+                         TGDownloadManagerBinaryByteCount(total)];
         } else if (downloaded > 0) {
             stateText = [NSString stringWithFormat:@"%@ · %@", stateText, bytes];
         }
@@ -351,8 +366,22 @@
 
 - (void)retryPressed:(id)sender {
     (void)sender;
-    [[TGDownloadManager sharedManager] retryDownloadWithIdentifier:[[self selectedDownload] objectForKey:@"identifier"]
-                                                       completion:nil];
+    NSDictionary *item = [self selectedDownload];
+    NSString *state = [item objectForKey:@"state"];
+    if (![state isEqualToString:@"failed"] && ![state isEqualToString:@"cancelled"]) { return; }
+    NSString *identifier = [[[TGDownloadManager sharedManager] enqueueFileID:[item objectForKey:@"file_id"]
+                                                         suggestedFileName:[item objectForKey:@"file_name"]
+                                                         fallbackLocalPath:[item objectForKey:@"fallback_path"]
+                                                                completion:nil] copy];
+    [self reloadDownloads];
+    for (NSUInteger index = 0; index < [self.downloads count]; index++) {
+        if ([[[self.downloads objectAtIndex:index] objectForKey:@"identifier"] isEqualToString:identifier]) {
+            [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
+            break;
+        }
+    }
+    [identifier release];
+    [self updateControls];
 }
 
 - (void)revealPressed:(id)sender {
