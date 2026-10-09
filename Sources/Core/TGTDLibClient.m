@@ -1304,6 +1304,10 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     [_sendLock unlock];
 }
 
+- (NSNumber *)userOpenedChatSelectionGenerationForChatID:(NSNumber *)chatID {
+    return [_chatOpenState selectionGenerationForDesiredChatID:chatID];
+}
+
 - (void)setUserOpenedChatID:(NSNumber *)chatID {
     [_chatOpenState setDesiredChatID:chatID];
     dispatch_async(_chatOpenQueue, ^{
@@ -7869,92 +7873,6 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
     }
 
     return viewers;
-}
-
-- (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error {
-    return [self markMessagesAsReadForChatID:chatID messageThreadID:nil messageIDs:messageIDs timeout:timeout error:error];
-}
-
-- (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error {
-    return [self markMessagesAsReadForChatID:chatID messageThreadID:messageThreadID messageTopicKind:nil messageIDs:messageIDs timeout:timeout error:error];
-}
-
-- (BOOL)markMessagesAsReadForChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID messageTopicKind:(NSString *)messageTopicKind messageIDs:(NSArray *)messageIDs timeout:(NSTimeInterval)timeout error:(NSError **)error {
-    (void)messageTopicKind;
-    if (![chatID respondsToSelector:@selector(longLongValue)]) {
-        if (error) {
-            *error = [self errorWithDescription:@"Chat identifier is missing." code:57];
-        }
-        return NO;
-    }
-    if (![messageIDs isKindOfClass:[NSArray class]] || [messageIDs count] == 0) {
-        return YES;
-    }
-
-    NSMutableArray *safeMessageIDs = [NSMutableArray array];
-    NSUInteger index = 0;
-    for (index = 0; index < [messageIDs count]; index++) {
-        id messageID = [messageIDs objectAtIndex:index];
-        if ([messageID respondsToSelector:@selector(longLongValue)] && [messageID longLongValue] > 0) {
-            [safeMessageIDs addObject:[NSNumber numberWithLongLong:[messageID longLongValue]]];
-        }
-    }
-    if ([safeMessageIDs count] == 0) {
-        return YES;
-    }
-
-    NSString *authorizationState = [self currentAuthorizationStatePreparingIfNeededWithTimeout:timeout error:error];
-    if (![authorizationState isEqualToString:@"ready"]) {
-        if (error) {
-            NSString *message = [NSString stringWithFormat:@"TDLib is not ready to mark messages read. Current auth state: %@", authorizationState ? authorizationState : @"unknown"];
-            *error = [self errorWithDescription:message code:58];
-        }
-        return NO;
-    }
-
-    NSMutableDictionary *request = [NSMutableDictionary dictionary];
-    [request setObject:@"viewMessages" forKey:@"@type"];
-    [request setObject:chatID forKey:@"chat_id"];
-    [request setObject:safeMessageIDs forKey:@"message_ids"];
-    [request setObject:[NSDictionary dictionaryWithObject:@"messageSourceChatHistory" forKey:@"@type"] forKey:@"source"];
-    [request setObject:[NSNumber numberWithBool:YES] forKey:@"force_read"];
-
-    NSError *currentSchemaError = nil;
-    NSDictionary *response = [self sendTDLibRequestAndWaitForExtra:request
-                                                       extraPrefix:@"telegraphica-view-messages"
-                                                           timeout:timeout
-                                                         errorCode:59
-                                                             error:&currentSchemaError];
-    if (!response) {
-        NSMutableDictionary *legacyRequest = [NSMutableDictionary dictionaryWithDictionary:request];
-        [legacyRequest removeObjectForKey:@"source"];
-        NSNumber *safeThreadID = [NSNumber numberWithLongLong:0];
-        if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
-            safeThreadID = [NSNumber numberWithLongLong:[messageThreadID longLongValue]];
-        }
-        [legacyRequest setObject:safeThreadID forKey:@"message_thread_id"];
-        NSError *legacySchemaError = nil;
-        response = [self sendTDLibRequestAndWaitForExtra:legacyRequest
-                                             extraPrefix:@"telegraphica-view-messages-legacy"
-                                                 timeout:timeout
-                                               errorCode:59
-                                                   error:&legacySchemaError];
-        if (!response) {
-            if (error && *error == nil) {
-                *error = legacySchemaError ? legacySchemaError : currentSchemaError;
-            }
-            return NO;
-        }
-    }
-
-    id responseType = [response objectForKey:@"@type"];
-    if (![responseType isKindOfClass:[NSString class]] || ![(NSString *)responseType isEqualToString:@"ok"]) {
-        if (error) {
-            *error = [self errorWithDescription:@"TDLib viewMessages returned an unexpected response." code:60];
-        }
-        return NO;
-    }
-    return YES;
 }
 
 - (BOOL)setChatWithID:(NSNumber *)chatID markedAsUnread:(BOOL)markedAsUnread timeout:(NSTimeInterval)timeout error:(NSError **)error {

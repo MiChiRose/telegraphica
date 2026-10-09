@@ -864,7 +864,8 @@
     if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
         return NO;
     }
-    if ([NSApp isActive]) {
+    NSWindow *hostWindow = [self window];
+    if ([NSApp isActive] && [hostWindow isVisible] && ![hostWindow isMiniaturized]) {
         return TGUserDefaultBoolWithDefault(TGNotificationsWhenActiveDefaultsKey, NO);
     }
     return YES;
@@ -923,30 +924,9 @@
     if (alreadySelected && self.selectedChatID && [self.selectedChatID longLongValue] == [chatID longLongValue]) {
         [self reloadMessagesForChatID:chatID interactive:NO];
     }
-    [self clearUnreadCountForChatID:chatID messageThreadID:messageThreadID];
-    [NSObject cancelPreviousPerformRequestsWithTarget:self
-                                             selector:@selector(markCurrentSelectionReadAfterNotification)
-                                               object:nil];
-    [self performSelector:@selector(markCurrentSelectionReadAfterNotification) withObject:nil afterDelay:1.2];
+    [self synchronizeUserOpenedChat];
+    [self scheduleVisibleMessageItemsRead];
     return YES;
-}
-
-- (void)markCurrentSelectionReadAfterNotification {
-    if (![self.currentAuthState isEqualToString:@"ready"] || !self.selectedChatID) {
-        return;
-    }
-    NSNumber *chatID = [self.selectedChatID retain];
-    NSNumber *threadID = [self.selectedMessageThreadID retain];
-    NSString *topicKind = [self.selectedMessageTopicKind copy];
-    NSArray *items = [self.messageItems copy];
-    [self clearUnreadCountForChatID:chatID messageThreadID:threadID];
-    if ([items count] > 0) {
-        [self markMessageItemsReadForChatID:chatID messageThreadID:threadID messageTopicKind:topicKind items:items];
-    }
-    [items release];
-    [topicKind release];
-    [threadID release];
-    [chatID release];
 }
 
 - (void)openChatFromNotification:(NSUserNotification *)notification {
