@@ -22,6 +22,10 @@
 #import "TGMessageViewersWindowController.h"
 #import "TGNotificationSettingsWindowController.h"
 #import "TGAnimationSupport.h"
+#import "TGKeyboardInputSupport.h"
+#import "TGTranscriptMotion.h"
+#import "TGNotificationReadState.h"
+#import "TGNotificationDeliverySupport.h"
 #import "TGIconAssets.h"
 #import "TGProfilePresentation.h"
 #import "TGProfileEditWindowController.h"
@@ -787,6 +791,15 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSNumber *pendingNotificationChatID;
 @property (nonatomic, retain) NSNumber *pendingNotificationThreadID;
 @property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
+@property (nonatomic, retain) TGNotificationReadState *notificationReadState;
+@property (nonatomic, retain) TGTranscriptMotionController *transcriptMotionController;
+@property (nonatomic, retain) NSMutableSet *pendingArrivalMessageIDs;
+- (void)rememberLiveArrivalFromSummary:(NSDictionary *)summary;
+- (void)animatePendingLiveArrivals:(BOOL)nearNewest;
+- (BOOL)animateConfirmedRemovalWithID:(NSNumber *)messageID chatID:(NSNumber *)chatID;
+- (void)removeConfirmedReadNotifications;
+- (void)recordReadNotificationMessageIDs:(NSArray *)messageIDs chatID:(NSNumber *)chatID;
+- (void)handleReadInboxNotificationSummary:(NSDictionary *)summary;
 @property (nonatomic, retain) NSMutableDictionary *localMuteUnreadCountsByChatID;
 - (NSArray *)messageIDsForMessageActionItem:(TGMessageItem *)item;
 - (void)clearReplyTarget;
@@ -1335,6 +1348,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize pendingNotificationChatID = _pendingNotificationChatID;
 @synthesize pendingNotificationThreadID = _pendingNotificationThreadID;
 @synthesize notificationChatInfoByChatID = _notificationChatInfoByChatID;
+@synthesize notificationReadState = _notificationReadState;
+@synthesize transcriptMotionController = _transcriptMotionController;
+@synthesize pendingArrivalMessageIDs = _pendingArrivalMessageIDs;
 @synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
 @synthesize showingForumTopicList = _showingForumTopicList;
@@ -1363,6 +1379,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)setSelectedChatID:(NSNumber *)chatID {
+    if (![_selectedChatID isEqual:chatID]) {
+        [self.transcriptMotionController cancelAllAnimations];
+        [self.pendingArrivalMessageIDs removeAllObjects];
+    }
     if (_selectedChatID != chatID) {
         [_selectedChatID release];
         _selectedChatID = [chatID retain];
@@ -1371,6 +1391,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)setCurrentAuthState:(NSString *)state {
+    if ([_currentAuthState isEqualToString:@"ready"] && ![state isEqualToString:@"ready"]) {
+        [self.notificationReadState reset];
+    }
     if (_currentAuthState != state) {
         [_currentAuthState release];
         _currentAuthState = [state copy];
@@ -1388,6 +1411,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 - (void)setClient:(TGTDLibClient *)client {
     if (_client != client) {
+        [self.notificationReadState reset];
         [_client setUserOpenedChatID:nil];
         [_client release];
         _client = [client retain];
@@ -1414,6 +1438,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         TGSetActiveThemeIdentifier([[NSUserDefaults standardUserDefaults] stringForKey:TGThemeDefaultsKey]);
         self.chatItems = [NSMutableArray array];
         self.messageItems = [NSMutableArray array];
+        self.pendingArrivalMessageIDs = [NSMutableSet set];
         self.availableReactionEmojisByMessageKey = [NSMutableDictionary dictionary];
         self.availableReactionOperationsByMessageKey = [NSMutableDictionary dictionary];
         self.documentDownloadSpinnerViewsByKey = [NSMutableDictionary dictionary];
@@ -1437,6 +1462,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
         self.messageThumbnailPrefetcher = [[[TGMessageThumbnailPrefetcher alloc] init] autorelease];
         self.composerDraftsByTargetKey = [NSMutableDictionary dictionary];
         self.notificationChatInfoByChatID = [NSMutableDictionary dictionary];
+        self.notificationReadState = [[[TGNotificationReadState alloc] init] autorelease];
         self.localMuteUnreadCountsByChatID = [NSMutableDictionary dictionary];
         self.chatFilterInfos = [NSArray array];
         self.closedChatSuggestionViews = [NSArray array];
@@ -3057,6 +3083,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     TGMessageTableView *messageTableView = [[[TGMessageTableView alloc] initWithFrame:[[self.messageScrollView contentView] bounds]] autorelease];
     [messageTableView setDropOverlayTarget:self];
     self.messageTableView = messageTableView;
+    self.transcriptMotionController = [[[TGTranscriptMotionController alloc] initWithTableView:messageTableView] autorelease];
     [self.messageTableView setDataSource:self];
     [self.messageTableView setDelegate:self];
     [self.messageTableView setAllowsColumnReordering:NO];
@@ -4676,6 +4703,8 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 #include "TGStatusWindowController+TableForumFlow.inc"
 
+#include "TGStatusWindowController+TranscriptMotion.inc"
+
 #include "TGStatusWindowController+MessageDataFlow.inc"
 
 #include "TGStatusWindowController+ComposerMedia.inc"
@@ -4688,6 +4717,10 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)dealloc {
+    [_transcriptMotionController cancelAllAnimations];
+    [_transcriptMotionController release];
+    _transcriptMotionController = nil;
+    [_pendingArrivalMessageIDs release];
     [_client setUserOpenedChatID:nil];
     if ([[NSUserNotificationCenter defaultUserNotificationCenter] delegate] == self) {
         [[NSUserNotificationCenter defaultUserNotificationCenter] setDelegate:nil];
@@ -4954,6 +4987,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     [_composerDraftSyncText release];
     [_composerDraftSyncReplyMessageID release];
     [_notificationChatInfoByChatID release];
+    [_notificationReadState release];
     [_localMuteUnreadCountsByChatID release];
     [_profileTitleField release];
     [_profileNameField release];

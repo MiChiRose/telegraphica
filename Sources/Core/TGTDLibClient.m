@@ -1,5 +1,6 @@
 #import "TGTDLibClient.h"
 #import "TGChatOpenState.h"
+#import "TGNotificationReadState.h"
 #import "TGAuthorizationFlow.h"
 #import "TGFormattedTextCodec.h"
 #import "TGReactionCatalog.h"
@@ -959,6 +960,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 }
 
 - (NSDictionary *)safeUpdateSummaryForObject:(NSDictionary *)dictionary {
+    NSDictionary *readSummary = TGNotificationReadSummaryFromUpdate(dictionary);
+    if (readSummary) { return readSummary; }
     id typeObject = [dictionary objectForKey:@"@type"];
     if (![typeObject isKindOfClass:[NSString class]]) {
         return nil;

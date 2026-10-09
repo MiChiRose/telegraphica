@@ -1,3 +1,21 @@
+- (void)removeConfirmedReadNotifications {
+    Class centerClass = NSClassFromString(@"NSUserNotificationCenter");
+    if (!centerClass) { return; }
+    NSUserNotificationCenter *center = [centerClass defaultUserNotificationCenter];
+    TGRemoveConfirmedReadNotifications(center, self.notificationReadState);
+}
+
+- (void)recordReadNotificationMessageIDs:(NSArray *)messageIDs chatID:(NSNumber *)chatID {
+    [self.notificationReadState recordReadMessageIDs:messageIDs chatID:chatID];
+    [self removeConfirmedReadNotifications];
+}
+
+- (void)handleReadInboxNotificationSummary:(NSDictionary *)summary {
+    [self.notificationReadState recordReadInboxMessageID:[summary objectForKey:@"last_read_inbox_message_id"]
+                                               chatID:[summary objectForKey:@"chat_id"]];
+    [self removeConfirmedReadNotifications];
+}
+
 - (NSNumber *)notificationChatIDForChatItem:(TGChatItem *)item {
     if (![item isKindOfClass:[TGChatItem class]]) {
         return nil;
@@ -842,7 +860,7 @@
 
 - (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
     (void)center;
-    (void)notification;
+    if ([self.notificationReadState isReadNotificationInfo:[notification userInfo]]) { return NO; }
     if (!TGUserDefaultBoolWithDefault(TGNotificationsEnabledDefaultsKey, YES)) {
         return NO;
     }
@@ -850,6 +868,13 @@
         return TGUserDefaultBoolWithDefault(TGNotificationsWhenActiveDefaultsKey, NO);
     }
     return YES;
+}
+
+- (void)userNotificationCenter:(NSUserNotificationCenter *)center didDeliverNotification:(NSUserNotification *)notification {
+    /* Delivery may finish after the successful read callback scanned the center. */
+    if ([self.notificationReadState isReadNotificationInfo:[notification userInfo]]) {
+        [center removeDeliveredNotification:notification];
+    }
 }
 
 - (BOOL)selectChatFromNotificationWithChatID:(NSNumber *)chatID messageThreadID:(NSNumber *)messageThreadID {
@@ -1045,6 +1070,7 @@
     if ([messageThreadID respondsToSelector:@selector(longLongValue)] && [messageThreadID longLongValue] > 0) {
         [userInfo setObject:[NSNumber numberWithLongLong:[messageThreadID longLongValue]] forKey:@"message_thread_id"];
     }
+    if ([self.notificationReadState isReadNotificationInfo:userInfo]) { return; }
     if ([userInfo count] > 0) {
         [notification setUserInfo:userInfo];
     }

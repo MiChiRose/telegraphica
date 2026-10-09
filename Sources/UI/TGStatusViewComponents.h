@@ -57,7 +57,10 @@
 @interface TGRailView : NSView
 @end
 
+@class TGAvatarImagePresentation;
+
 @interface TGAccountBadgeView : NSView {
+    TGAvatarImagePresentation *_avatarPresentation;
     NSString *_displayName;
     NSString *_avatarLocalPath;
     id _target;
@@ -72,6 +75,7 @@
 @end
 
 @interface TGProfileAvatarView : NSView {
+    TGAvatarImagePresentation *_avatarPresentation;
     NSString *_displayName;
     NSString *_avatarLocalPath;
 }

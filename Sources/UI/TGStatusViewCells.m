@@ -3,6 +3,7 @@
 #import "TGIconAssets.h"
 #import "TGMessageLayoutSupport.h"
 #import "TGReactionChipLayout.h"
+#import "TGTranscriptMotion.h"
 #import "TGIconDrawing.h"
 #import "TGStatusButtonCells.h"
 #import "TGAccessibilitySupport.h"
@@ -565,11 +566,14 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         TGDrawMessageTopAccessories(item, cellFrame, [controlView isFlipped]);
     }
 
+    BOOL drawingMotion = TGTranscriptMotionBeginCellDrawing(controlView, [item chatID], [item messageID]);
+
     if (TGChatMessagesAsBlocksEnabled()) {
         NSRect messageFrame = cellFrame;
         messageFrame.origin.y += topAccessoryHeight;
         messageFrame.size.height = MAX(1.0, messageFrame.size.height - topAccessoryHeight);
         [self drawListMessageItem:item withFrame:messageFrame inView:controlView];
+        TGTranscriptMotionEndCellDrawing(drawingMotion);
         return;
     }
 
@@ -595,7 +599,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     BOOL separateMetadataFooter = TGMessageUsesSeparateMetadataFooter();
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageMetaFont(), NSFontAttributeName,
-                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    TGMessageMetadataInkColor(item, [controlView isFlipped]), NSForegroundColorAttributeName,
                                     nil];
     NSMutableAttributedString *composedMessageText = [[[NSMutableAttributedString alloc] init] autorelease];
     if ([messageText length] > 0) {
@@ -882,7 +886,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
 
     TGDrawMessageCommentBarForItem(item, bubbleRect, outgoing, flipped);
 
-    if ([timeString length] > 0 && (([messageText length] == 0 && !nonVisualPlayable) || separateMetadataFooter)) {
+    if ([timeString length] > 0 && reactionBandHeight <= 0.0 && (([messageText length] == 0 && !nonVisualPlayable) || separateMetadataFooter)) {
         NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
         CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
         CGFloat statusGap = (statusWidth > 0.0) ? 5.0 : 0.0;
@@ -902,8 +906,17 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
         NSRect band = NSMakeRect(NSMinX(bubbleRect) + 10.0,
             [controlView isFlipped] ? NSMaxY(bubbleRect) - reactionBandHeight : NSMinY(bubbleRect),
             MAX(1.0, NSWidth(bubbleRect) - 20.0), reactionBandHeight);
-        TGDrawReactionChipsForItem(item, band, [controlView isFlipped]);
+        NSRect chipsBand = band;
+        chipsBand.size.width = TGMessageReactionContentWidth(item, NSWidth(band));
+        TGDrawReactionChipsForItem(item, chipsBand, [controlView isFlipped]);
+        NSRect reactionTime = TGMessageReactionTimeRect(item, band, [controlView isFlipped]);
+        if (!NSIsEmptyRect(reactionTime)) {
+            [timeString drawInRect:reactionTime withAttributes:timeAttributes];
+            TGDrawOutgoingStatusDotsForItem(item, reactionTime, [controlView isFlipped]);
+        }
     }
+
+    TGTranscriptMotionEndCellDrawing(drawingMotion);
 
 }
 
@@ -953,7 +966,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     NSString *timeString = TGShortTimeStringFromDateValue([item date]);
     NSDictionary *timeAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
                                     TGChatMessageMetaFont(), NSFontAttributeName,
-                                    TGClassicTimeTextColor(), NSForegroundColorAttributeName,
+                                    TGMessageMetadataInkColor(item, [controlView isFlipped]), NSForegroundColorAttributeName,
                                     nil];
     NSSize timeSize = [timeString sizeWithAttributes:timeAttributes];
     CGFloat statusWidth = TGOutgoingStatusDotsWidthForItem(item);
@@ -964,7 +977,7 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
                                  flipped ? (NSMinY(rowRect) + 8.0) : (NSMaxY(rowRect) - metaHeight - 6.0),
                                  timeSize.width,
                                  metaHeight);
-    if ([timeString length] > 0) {
+    if ([timeString length] > 0 && TGReactionChipsMinimumWidthForItem(item) <= 0.0) {
         [timeString drawInRect:timeRect withAttributes:timeAttributes];
         TGDrawOutgoingStatusDotsForItem(item, timeRect, flipped);
     }
@@ -1119,10 +1132,18 @@ static void TGDrawMessageTopAccessories(TGMessageItem *item,
     }
 
     CGFloat reactionWidth = MAX(40.0, NSWidth(cellFrame) - 86.0);
-    CGFloat reactionHeight = TGReactionChipsHeightForItem(item, reactionWidth);
+    CGFloat reactionHeight = TGReactionChipsHeightForItem(item, TGMessageReactionContentWidth(item, reactionWidth));
     CGFloat reactionY = flipped ? NSMaxY(rowRect) - reactionHeight - 3.0 : NSMinY(rowRect) + 3.0;
     if (reactionHeight > 0.0) {
-        TGDrawReactionChipsForItem(item, NSMakeRect(textX, reactionY, reactionWidth, reactionHeight), flipped);
+        NSRect band = NSMakeRect(textX, reactionY, reactionWidth, reactionHeight);
+        NSRect chipsBand = band;
+        chipsBand.size.width = TGMessageReactionContentWidth(item, reactionWidth);
+        TGDrawReactionChipsForItem(item, chipsBand, flipped);
+        NSRect reactionTime = TGMessageReactionTimeRect(item, band, flipped);
+        if (!NSIsEmptyRect(reactionTime)) {
+            [timeString drawInRect:reactionTime withAttributes:timeAttributes];
+            TGDrawOutgoingStatusDotsForItem(item, reactionTime, flipped);
+        }
     }
     if (TGMessageItemHasCommentThread(item)) {
         NSString *title = TGMessageCommentTitleForItem(item);

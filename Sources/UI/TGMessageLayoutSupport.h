@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import "TGMessageFooterAppearance.h"
 
 @class TGMessageItem;
 
@@ -6,6 +7,7 @@ NSString *TGInitialsForTitle(NSString *title);
 NSColor *TGAvatarColorForTitle(NSString *title);
 void TGDrawImageInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView);
 void TGDrawImageAspectFillInRect(NSImage *image, NSRect rect, BOOL drawingInFlippedView);
+void TGDrawAvatarImageInRect(NSImage *image, NSString *title, NSRect rect, BOOL selected, BOOL drawingInFlippedView);
 void TGDrawAvatarInRect(NSString *imagePath, NSString *title, NSRect rect, BOOL selected, BOOL drawingInFlippedView);
 NSString *TGShortTimeStringFromDateValue(NSNumber *dateValue);
 NSString *TGDisplayTextForMessageItem(TGMessageItem *item);
@@ -57,6 +59,8 @@ NSRect TGPollOptionRectForItem(TGMessageItem *item, NSRect bubbleRect, NSUIntege
 NSInteger TGPollOptionIndexForPoint(TGMessageItem *item, NSRect bubbleRect, NSPoint point, BOOL flipped);
 NSRect TGPollConfirmRectForItem(TGMessageItem *item, NSRect bubbleRect, BOOL flipped);
 BOOL TGPollPointIsInConfirmRect(TGMessageItem *item, NSRect bubbleRect, NSPoint point, BOOL flipped);
+CGFloat TGMessageReactionContentWidth(TGMessageItem *item, CGFloat innerWidth);
+NSRect TGMessageReactionTimeRect(TGMessageItem *item, NSRect bandRect, BOOL flipped);
 CGFloat TGReactionBandHeightForMessageItem(TGMessageItem *item);
 CGFloat TGReactionBandHeightForMessageItemWidth(TGMessageItem *item, CGFloat bubbleWidth);
 NSRect TGMessageContentRectByRemovingFooter(NSRect rect, CGFloat footerHeight, BOOL flipped);

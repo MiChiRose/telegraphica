@@ -190,6 +190,7 @@
 }
 
 - (BOOL)removeDisplayedMessageWithID:(NSNumber *)messageID chatID:(NSNumber *)chatID {
+    [self.transcriptMotionController cancelAllAnimations];
     if (![messageID respondsToSelector:@selector(longLongValue)] || ![chatID respondsToSelector:@selector(longLongValue)]) {
         return NO;
     }
@@ -208,6 +209,7 @@
             [itemMessageID longLongValue] == targetMessageID &&
             [itemChatID longLongValue] == targetChatID) {
             [self.messageItems removeObjectAtIndex:index];
+            [self refreshMessageHistorySeparators];
             [self.inlineMediaPlaybackCoordinator removeAllPlayback];
             [self.messageTableView reloadData];
             [self scheduleInlineMediaPlaybackRefresh];
@@ -438,6 +440,7 @@
 - (void)beginReactionAnimationForMessageItem:(TGMessageItem *)item
                                  fromSummary:(NSString *)oldSummary
                                    toSummary:(NSString *)newSummary {
+    if (!TGInterfaceAnimationsEnabledForView(self.messageTableView)) { return; }
     NSString *key = [self reactionAnimationKeyForMessageItem:item];
     if ([key length] == 0) {
         return;
@@ -486,7 +489,8 @@
         NSString *key = [keys objectAtIndex:keyIndex];
         NSDictionary *animation = [self.reactionAnimations objectForKey:key];
         NSTimeInterval elapsed = now - [[animation objectForKey:@"started_at"] doubleValue];
-        CGFloat linearProgress = (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.32));
+        CGFloat linearProgress = TGInterfaceAnimationsEnabledForView(self.messageTableView)
+            ? (CGFloat)MAX(0.0, MIN(1.0, elapsed / 0.32)) : 1.0;
 
         NSUInteger row = NSNotFound;
         TGMessageItem *item = [self displayedMessageItemForReactionAnimationKey:key row:&row];
@@ -523,10 +527,12 @@
 }
 
 - (void)applyRecentMessageItems:(NSArray *)items preservingOlderItems:(BOOL)preserveOlder {
+    [self.transcriptMotionController cancelAllAnimations];
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     BOOL forceScrollToNewest = self.forceMessageScrollToNewest;
     self.forceMessageScrollToNewest = NO;
     if (!preserveOlder || [self.messageItems count] == 0) {
+        [self.pendingArrivalMessageIDs removeAllObjects];
         [self.messageItems removeAllObjects];
         [self.messageItems addObjectsFromArray:[self deduplicatedMessageItemsFromItems:orderedItems]];
         [self refreshMessageHistorySeparators];
@@ -595,9 +601,11 @@
     } else {
         [self updateMessageJumpToNewestButtonVisibility];
     }
+    [self animatePendingLiveArrivals:shouldScrollToNewest];
 }
 
 - (NSUInteger)appendOlderMessageItems:(NSArray *)items preservingVisiblePosition:(BOOL)preserveVisiblePosition {
+    [self.transcriptMotionController cancelAllAnimations];
     NSArray *orderedItems = [self messageItemsInDisplayOrderFromItems:items];
     NSInteger firstVisibleRow = 0;
     if (preserveVisiblePosition) {
@@ -847,6 +855,7 @@
 }
 
 - (void)messageScrollViewDidScroll:(NSNotification *)notification {
+    [self.transcriptMotionController cancelAllAnimations];
     if ([notification object] != [self.messageScrollView contentView]) {
         return;
     }
@@ -1138,6 +1147,9 @@
             if (!success && sameSelection) {
                 [self.visibleReadReceiptMessageIDs minusSet:[NSSet setWithArray:messageIDsCopy]];
             }
+            if (success && self.client == client) {
+                [self recordReadNotificationMessageIDs:messageIDsCopy chatID:chatIDCopy];
+            }
             if (success && sameSelection && sameThread) {
                 [NSObject cancelPreviousPerformRequestsWithTarget:self
                                                          selector:@selector(dismissCurrentUnreadSeparator)
@@ -1195,7 +1207,8 @@
         NSString *readErrorMessage = [[readError localizedDescription] copy];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (success) {
+            if (success && self.client == client) {
+                [self recordReadNotificationMessageIDs:messageIDsCopy chatID:chatIDCopy];
                 [self clearUnreadCountForChatID:chatIDCopy messageThreadID:messageThreadIDCopy];
                 BOOL sameSelection = (self.selectedChatID &&
                                       [self.selectedChatID longLongValue] == [chatIDCopy longLongValue]);
@@ -1255,6 +1268,9 @@
             }
 
             if (profile) {
+                BOOL sameProfile = ([self.profileUserID respondsToSelector:@selector(longLongValue)] &&
+                                    [[profile objectForKey:@"id"] respondsToSelector:@selector(longLongValue)] &&
+                                    [self.profileUserID longLongValue] == [[profile objectForKey:@"id"] longLongValue]);
                 NSString *displayName = [profile objectForKey:@"display_name"];
                 NSString *firstName = [profile objectForKey:@"first_name"];
                 NSString *lastName = [profile objectForKey:@"last_name"];
@@ -1273,9 +1289,14 @@
                 self.profileUsername = ([username length] > 0) ? username : nil;
                 self.profilePhoneNumber = ([phoneNumber length] > 0) ? phoneNumber : nil;
                 id avatarFileID = [profile objectForKey:@"avatar_file_id"];
-                self.profileAvatarFileID = [avatarFileID respondsToSelector:@selector(longLongValue)]
+                NSNumber *nextAvatarFileID = [avatarFileID respondsToSelector:@selector(longLongValue)]
                     ? [NSNumber numberWithLongLong:[avatarFileID longLongValue]] : nil;
-                self.profileAvatarLocalPath = [profile objectForKey:@"avatar_path"];
+                NSString *nextAvatarPath = [profile objectForKey:@"avatar_path"];
+                BOOL preservesKnownPhoto = (sameProfile && [nextAvatarFileID longLongValue] > 0 &&
+                                           [nextAvatarFileID isEqual:self.profileAvatarFileID] &&
+                                           [nextAvatarPath length] == 0 && [self.profileAvatarLocalPath length] > 0);
+                self.profileAvatarFileID = nextAvatarFileID;
+                if (!preservesKnownPhoto) { self.profileAvatarLocalPath = nextAvatarPath; }
                 self.profileBio = ([bio length] > 0) ? bio : nil;
                 [self refreshProfileDisplay];
                 [self updateSavedMessagesPresentationForChatItems];
@@ -1763,6 +1784,7 @@
 }
 
 - (void)handlePendingLiveRefreshesIfPossible {
+    if ([self.transcriptMotionController activeRemovalCount] > 0) { return; }
     if (TGMountainLionSafeLoginModeEnabled()) {
         self.pendingLiveChatRefresh = NO;
         self.pendingLiveMessageRefresh = NO;
@@ -1829,10 +1851,15 @@
             continue;
         }
 
+        if ([kind isEqualToString:@"chat_read_inbox"]) {
+            [self handleReadInboxNotificationSummary:summary];
+            if (!mountainLionSafeLoginMode) { needsChatRefresh = YES; }
+            continue;
+        }
+
         if ([kind isEqualToString:@"file_update"] && [[summary objectForKey:@"completed"] boolValue]) {
             NSNumber *fileID = [summary objectForKey:@"file_id"];
-            BOOL completedProfileAvatar = ([self.profileAvatarLocalPath length] == 0 &&
-                                           [fileID respondsToSelector:@selector(longLongValue)] &&
+            BOOL completedProfileAvatar = ([fileID respondsToSelector:@selector(longLongValue)] &&
                                            [self.profileAvatarFileID respondsToSelector:@selector(longLongValue)] &&
                                            [fileID longLongValue] == [self.profileAvatarFileID longLongValue]);
             if (completedProfileAvatar) {
@@ -1870,6 +1897,7 @@
                 [self.client invalidateMainChatListExhaustion];
             }
             if ([kind isEqualToString:@"new_message"]) {
+                [self rememberLiveArrivalFromSummary:summary];
                 id direction = [summary objectForKey:@"direction"];
                 id incomingChatID = [summary objectForKey:@"chat_id"];
                 NSString *incomingChatKey = [self chatMuteDefaultsKeyForChatID:incomingChatID];

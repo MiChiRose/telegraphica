@@ -554,7 +554,7 @@ def check_additional_message_types_contract(errors):
     bot_composer_rel = os.path.join("Sources", "UI", "TGStatusWindowController+BotComposer.inc")
     bot_composer_text = read_text(os.path.join(ROOT, bot_composer_rel))
     for fragment in ["setBotComposerVisible", "replyMarkupShowKeyboard",
-                     "setBotCommandPanelVisible", "setDuration:0.16"]:
+                     "setBotCommandPanelVisible", "TGSetViewVisibleAnimated"]:
         if fragment not in bot_composer_text:
             errors.append("%s: bot composer integration is missing `%s`" %
                           (bot_composer_rel, fragment))

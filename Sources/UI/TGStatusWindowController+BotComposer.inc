@@ -2,59 +2,23 @@
     BOOL chatsVisible = ([self.currentAuthState isEqualToString:@"ready"] &&
                          [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
                          !self.chatNavigationClosed);
-    BOOL presentationVisible = (visible && chatsVisible);
-    if (self.botComposerVisible == visible) {
-        [self.botActionButton setHidden:!presentationVisible];
-        [self.botActionButton setAlphaValue:presentationVisible ? 1.0 : 0.0];
-        if (!presentationVisible && self.botCommandPanelVisible) {
-            [self setBotCommandPanelVisible:NO animated:NO];
-        }
-        [self updateSendControls];
-        return;
-    }
-
-    NSRect oldButtonFrame = [self.botActionButton frame];
-    NSRect oldBackgroundFrame = [self.sendTextFieldBackgroundView frame];
-    NSRect oldTextFrame = [self.sendTextField frame];
+    BOOL presentationVisible = visible && chatsVisible;
+    BOOL wasHidden = [self.botActionButton isHidden];
+    CGFloat wasAlpha = [self.botActionButton alphaValue];
     self.botComposerVisible = visible;
     [self layoutContentView];
-    NSRect targetButtonFrame = [self.botActionButton frame];
-    NSRect targetBackgroundFrame = [self.sendTextFieldBackgroundView frame];
-    NSRect targetTextFrame = [self.sendTextField frame];
-
-    if (!animated || ![[self window] isVisible] || !chatsVisible) {
-        [self.botActionButton setHidden:!presentationVisible];
-        [self.botActionButton setAlphaValue:presentationVisible ? 1.0 : 0.0];
-        if (!presentationVisible && self.botCommandPanelVisible) {
-            [self setBotCommandPanelVisible:NO animated:NO];
-        }
-        [self updateSendControls];
-        return;
-    }
-
-    [self.botActionButton setHidden:NO];
-    [self.sendTextFieldBackgroundView setFrame:oldBackgroundFrame];
-    [self.sendTextField setFrame:oldTextFrame];
-    if (visible) {
-        NSRect startButtonFrame = targetButtonFrame;
-        startButtonFrame.origin.x -= 7.0;
-        [self.botActionButton setFrame:startButtonFrame];
-        [self.botActionButton setAlphaValue:0.0];
+    [self.botActionButton setHidden:wasHidden];
+    [self.botActionButton setAlphaValue:wasAlpha];
+    if (animated && chatsVisible) {
+        TGSetViewVisibleAnimated(self.botActionButton, presentationVisible);
     } else {
-        [self.botActionButton setFrame:oldButtonFrame];
+        TGCancelViewVisibilityAnimation(self.botActionButton);
+        [self.botActionButton setHidden:!presentationVisible];
         [self.botActionButton setAlphaValue:1.0];
     }
-
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
-        [context setDuration:0.16];
-        [[self.botActionButton animator] setFrame:targetButtonFrame];
-        [[self.botActionButton animator] setAlphaValue:visible ? 1.0 : 0.0];
-        [[self.sendTextFieldBackgroundView animator] setFrame:targetBackgroundFrame];
-        [[self.sendTextField animator] setFrame:targetTextFrame];
-    } completionHandler:^{
-        [self.botActionButton setHidden:!visible];
-        [self.botActionButton setAlphaValue:visible ? 1.0 : 0.0];
-    }];
+    if (!presentationVisible && self.botCommandPanelVisible) {
+        [self setBotCommandPanelVisible:NO animated:NO];
+    }
     [self updateSendControls];
 }
 
@@ -63,34 +27,27 @@
                     [self.currentAuthState isEqualToString:@"ready"] &&
                     [(self.activeSection ? self.activeSection : TGSectionChats) isEqualToString:TGSectionChats] &&
                     !self.chatNavigationClosed);
-    if (self.botCommandPanelVisible == canShow) {
-        [self.botCommandPanelView setHidden:!canShow];
-        [self.botCommandPanelView setAlphaValue:canShow ? 1.0 : 0.0];
-        return;
-    }
+    BOOL wasHidden = [self.botCommandPanelView isHidden];
+    CGFloat wasAlpha = [self.botCommandPanelView alphaValue];
+    BOOL changed = self.botCommandPanelVisible != canShow;
     self.botCommandPanelVisible = canShow;
     [self layoutContentView];
-    if (canShow) {
+    if (canShow && changed) {
         if (self.activeBotReplyMarkup) {
             [self.botCommandPanelView showReplyMarkup:self.activeBotReplyMarkup];
         } else {
             [self.botCommandPanelView loadCommandsForUserID:self.selectedBotUserID];
         }
     }
-    if (!animated || ![[self window] isVisible]) {
+    [self.botCommandPanelView setHidden:wasHidden];
+    [self.botCommandPanelView setAlphaValue:wasAlpha];
+    if (animated) {
+        TGSetViewVisibleAnimated(self.botCommandPanelView, canShow);
+    } else {
+        TGCancelViewVisibilityAnimation(self.botCommandPanelView);
         [self.botCommandPanelView setHidden:!canShow];
-        [self.botCommandPanelView setAlphaValue:canShow ? 1.0 : 0.0];
-        return;
+        [self.botCommandPanelView setAlphaValue:1.0];
     }
-    [self.botCommandPanelView setHidden:NO];
-    [self.botCommandPanelView setAlphaValue:canShow ? 0.0 : 1.0];
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
-        [context setDuration:0.16];
-        [[self.botCommandPanelView animator] setAlphaValue:canShow ? 1.0 : 0.0];
-    } completionHandler:^{
-        [self.botCommandPanelView setHidden:!canShow];
-        [self.botCommandPanelView setAlphaValue:canShow ? 1.0 : 0.0];
-    }];
 }
 
 - (void)refreshBotReplyMarkupFromMessages {

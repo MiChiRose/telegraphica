@@ -646,6 +646,78 @@ static void TGTestCommentPresentation(void) {
     TGSetChatMessageTextSizeLevel(TGChatMessageTextSizeNormal);
 }
 
+static CGFloat TGProbeColorLuminance(NSColor *color) {
+    NSColor *rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+    CGFloat channels[] = {[rgb redComponent], [rgb greenComponent], [rgb blueComponent]};
+    NSUInteger index = 0;
+    for (index = 0; index < 3; index++) {
+        channels[index] = channels[index] <= 0.04045 ? channels[index] / 12.92 : pow((channels[index] + 0.055) / 1.055, 2.4);
+    }
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+static void TGTestReactionFooter(void) {
+    TGClearProbeDefaults();
+    TGSetChatMessagesAsBlocksEnabled(NO);
+    for (NSString *theme in TGThemeIdentifiers()) {
+        TGSetActiveThemeIdentifier(theme);
+        for (NSNumber *outgoing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+            TGMessageItem *sample = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@1700000000 outgoing:[outgoing boolValue] preview:@"Theme"] autorelease];
+            for (NSNumber *blocks in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                TGSetChatMessagesAsBlocksEnabled([blocks boolValue]);
+                for (NSNumber *flipped in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                    CGFloat surface = TGProbeColorLuminance(TGMessageMetadataSurfaceColor(sample, [flipped boolValue]));
+                    CGFloat ink = TGProbeColorLuminance(TGMessageMetadataInkColor(sample, [flipped boolValue]));
+                    CGFloat contrast = (MAX(surface, ink) + 0.05) / (MIN(surface, ink) + 0.05);
+                    TGAssertTrue(contrast >= 4.5, [NSString stringWithFormat:@"small timestamp needs readable contrast in %@", theme]);
+                    for (NSNumber *active in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                        CGFloat statusInk = TGProbeColorLuminance(TGMessageDeliveryStatusInkColor(sample, [active boolValue], [flipped boolValue]));
+                        CGFloat statusContrast = (MAX(surface, statusInk) + 0.05) / (MIN(surface, statusInk) + 0.05);
+                        TGAssertTrue(statusContrast >= ([active boolValue] ? 4.5 : 3.0), @"delivery state must stay visible on every footer surface");
+                    }
+                }
+            }
+        }
+        TGSetChatMessagesAsBlocksEnabled(NO);
+        NSUInteger chosen = 0;
+        for (chosen = 0; chosen < 2; chosen++) {
+            CGFloat background = TGProbeColorLuminance(TGReactionChipBackgroundColor(chosen != 0));
+            CGFloat ink = TGProbeColorLuminance(TGReactionChipInkColor(chosen != 0));
+            CGFloat contrast = (MAX(background, ink) + 0.05) / (MIN(background, ink) + 0.05);
+            TGAssertTrue(contrast >= 4.5, [NSString stringWithFormat:@"reaction digits need readable contrast in %@", theme]);
+        }
+    }
+    for (NSNumber *outgoing in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+        TGMessageItem *item = [[[TGMessageItem alloc] initWithChatID:@1 messageID:@2 date:@1700000000 outgoing:[outgoing boolValue] preview:@"Hello"] autorelease];
+        [item setReactionSummary:@"👍 1  ❤️ 23  😱 104  🔥 5  🎉 3  👏 6"];
+        [item setCanGetMessageThread:YES];
+        [item setMessageThreadReplyCount:@4];
+        for (NSNumber *width in [NSArray arrayWithObjects:@280, @400, @640, nil]) {
+            NSRect bubble = TGMessageBubbleRectForItem(item, NSMakeRect(0, 0, [width doubleValue], 1000), NO);
+            CGFloat bandHeight = TGReactionBandHeightForMessageItemWidth(item, NSWidth(bubble));
+            for (NSNumber *flipped in [NSArray arrayWithObjects:@NO, @YES, nil]) {
+                BOOL flip = [flipped boolValue];
+                NSRect band = NSMakeRect(NSMinX(bubble) + 10.0, flip ? NSMaxY(bubble) - bandHeight : NSMinY(bubble), NSWidth(bubble) - 20.0, bandHeight);
+                CGFloat chipWidth = TGMessageReactionContentWidth(item, NSWidth(band));
+                NSArray *chips = TGReactionChipLayoutForItem(item, chipWidth);
+                NSRect time = TGMessageReactionTimeRect(item, band, flip);
+                TGAssertTrue([chips count] == 6 && NSContainsRect(band, time), @"complete reactions and timestamp must stay inside footer");
+                NSRect lastChip = [[[chips lastObject] objectForKey:@"frame"] rectValue];
+                CGFloat lastCenter = flip ? NSMinY(band) + 2.0 + NSMidY(lastChip) : NSMaxY(band) - 2.0 - NSMidY(lastChip);
+                TGAssertTrue(fabs(lastCenter - NSMidY(time)) <= 2.0, @"timestamp must share the last reaction row baseline");
+                for (NSDictionary *chip in chips) {
+                    NSRect local = [[chip objectForKey:@"frame"] rectValue];
+                    NSRect actual = NSMakeRect(NSMinX(band) + NSMinX(local), flip ? NSMinY(band) + 2.0 + NSMinY(local) : NSMaxY(band) - 2.0 - NSMaxY(local), NSWidth(local), NSHeight(local));
+                    TGAssertTrue(!NSIntersectsRect(actual, time), @"timestamp and every reaction chip must remain separate");
+                }
+                NSRect comment = TGMessageCommentBarRectForItem(item, bubble, flip);
+                TGAssertTrue(!NSIntersectsRect(comment, time), @"comment control must not overlap shared reaction/time footer");
+            }
+        }
+    }
+    TGClearProbeDefaults();
+}
+
 static void TGTestReactionGeometry(void) {
     TGClearProbeDefaults();
     TGSetChatMessagesAsBlocksEnabled(NO);
@@ -783,6 +855,7 @@ int main(int argc, const char **argv) {
     TGTestLocalization();
     TGTestCommentPresentation();
     TGTestReactionGeometry();
+    TGTestReactionFooter();
     TGClearProbeDefaults();
     [pool drain];
     if (TGProbeFailures > 0) {

@@ -6,3 +6,6 @@ NSArray *TGReactionChipLayoutForItem(TGMessageItem *item, CGFloat innerWidth);
 CGFloat TGReactionChipsMinimumWidthForItem(TGMessageItem *item);
 CGFloat TGReactionChipsHeightForItem(TGMessageItem *item, CGFloat innerWidth);
 void TGDrawReactionChipsForItem(TGMessageItem *item, NSRect bandRect, BOOL flipped);
+
+NSColor *TGReactionChipBackgroundColor(BOOL chosen);
+NSColor *TGReactionChipInkColor(BOOL chosen);

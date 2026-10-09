@@ -173,6 +173,12 @@
 		220000000000000000000019 /* TGWorkshopSurfaceView.m in Sources */ = {isa = PBXBuildFile; fileRef = 221000000000000000000019 /* TGWorkshopSurfaceView.m */; settings = {COMPILER_FLAGS = "-fvisibility=default"; }; };
 		22000000000000000000001A /* TGWorkshopRemovalConfirmationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */; };
 		22000000000000000000001B /* TGWorkshopHeaderNoticeView.m in Sources */ = {isa = PBXBuildFile; fileRef = 22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */; };
+		A09A829D79AEFA57AE4B4B56 /* TGNotificationReadState.m in Sources */ = {isa = PBXBuildFile; fileRef = BF83988A2AD49D8EDDBD5490 /* TGNotificationReadState.m */; };
+		A9F915173C8705BF4A9662B0 /* TGKeyboardInputSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = C3D2960E3120ADCDDF377A28 /* TGKeyboardInputSupport.m */; };
+		CEA174337527B5C2050164A7 /* TGTranscriptMotion.m in Sources */ = {isa = PBXBuildFile; fileRef = D71E6E6F8031ECAF880739FA /* TGTranscriptMotion.m */; };
+		5BD6DF79AED7F69400C01E03 /* TGAvatarImagePresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = D9135315DC497A0ACF54AB57 /* TGAvatarImagePresentation.m */; };
+		1E45A5AE25733499D84F76EB /* TGMessageFooterAppearance.m in Sources */ = {isa = PBXBuildFile; fileRef = AA0CF5E3D69E3E92CEACDB33 /* TGMessageFooterAppearance.m */; };
+		1E3B31050F232518D90F2B08 /* TGNotificationDeliverySupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 712EC2CDFCD982936C8A8B3E /* TGNotificationDeliverySupport.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -473,6 +479,18 @@
 		221000000000000000000019 /* TGWorkshopSurfaceView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopSurfaceView.m; sourceTree = "<group>"; };
 		22100000000000000000001A /* TGWorkshopRemovalConfirmationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopRemovalConfirmationView.m; sourceTree = "<group>"; };
 		22100000000000000000001B /* TGWorkshopHeaderNoticeView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UI/TGWorkshopHeaderNoticeView.m; sourceTree = "<group>"; };
+		371996A673D37570278D5DC3 /* TGNotificationReadState.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGNotificationReadState.h; sourceTree = "<group>"; };
+		BF83988A2AD49D8EDDBD5490 /* TGNotificationReadState.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGNotificationReadState.m; sourceTree = "<group>"; };
+		81E34688866D1BED984CC839 /* TGKeyboardInputSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGKeyboardInputSupport.h; sourceTree = "<group>"; };
+		C3D2960E3120ADCDDF377A28 /* TGKeyboardInputSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGKeyboardInputSupport.m; sourceTree = "<group>"; };
+		171017877A3E76ED501ECC08 /* TGTranscriptMotion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGTranscriptMotion.h; sourceTree = "<group>"; };
+		D71E6E6F8031ECAF880739FA /* TGTranscriptMotion.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGTranscriptMotion.m; sourceTree = "<group>"; };
+		884D7813E1B9D69B4F3A2305 /* TGAvatarImagePresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGAvatarImagePresentation.h; sourceTree = "<group>"; };
+		D9135315DC497A0ACF54AB57 /* TGAvatarImagePresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGAvatarImagePresentation.m; sourceTree = "<group>"; };
+		64552300389C67DA175F3F5E /* TGMessageFooterAppearance.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGMessageFooterAppearance.h; sourceTree = "<group>"; };
+		AA0CF5E3D69E3E92CEACDB33 /* TGMessageFooterAppearance.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGMessageFooterAppearance.m; sourceTree = "<group>"; };
+		B64C6530EA18C4456450072F /* TGNotificationDeliverySupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGNotificationDeliverySupport.h; sourceTree = "<group>"; };
+		712EC2CDFCD982936C8A8B3E /* TGNotificationDeliverySupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGNotificationDeliverySupport.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -546,6 +564,8 @@
 		111111111111111111111404 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				371996A673D37570278D5DC3 /* TGNotificationReadState.h */,
+				BF83988A2AD49D8EDDBD5490 /* TGNotificationReadState.m */,
 				111111111111111111111204 /* TGTDLibClient.h */,
 				111111111111111111111205 /* TGTDLibClient.m */,
 				C0A000000000000000000002 /* TGTDLibCapabilities.h */,
@@ -658,6 +678,16 @@
 		111111111111111111111406 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				81E34688866D1BED984CC839 /* TGKeyboardInputSupport.h */,
+				C3D2960E3120ADCDDF377A28 /* TGKeyboardInputSupport.m */,
+				171017877A3E76ED501ECC08 /* TGTranscriptMotion.h */,
+				D71E6E6F8031ECAF880739FA /* TGTranscriptMotion.m */,
+				884D7813E1B9D69B4F3A2305 /* TGAvatarImagePresentation.h */,
+				D9135315DC497A0ACF54AB57 /* TGAvatarImagePresentation.m */,
+				64552300389C67DA175F3F5E /* TGMessageFooterAppearance.h */,
+				AA0CF5E3D69E3E92CEACDB33 /* TGMessageFooterAppearance.m */,
+				B64C6530EA18C4456450072F /* TGNotificationDeliverySupport.h */,
+				712EC2CDFCD982936C8A8B3E /* TGNotificationDeliverySupport.m */,
 				111111111111111111111235 /* TGTheme.h */,
 				111111111111111111111236 /* TGTheme.m */,
 				111111111111111111111314 /* TGVisualWorldThemeSpec.h */,
@@ -953,6 +983,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A09A829D79AEFA57AE4B4B56 /* TGNotificationReadState.m in Sources */,
+				A9F915173C8705BF4A9662B0 /* TGKeyboardInputSupport.m in Sources */,
+				CEA174337527B5C2050164A7 /* TGTranscriptMotion.m in Sources */,
+				5BD6DF79AED7F69400C01E03 /* TGAvatarImagePresentation.m in Sources */,
+				1E45A5AE25733499D84F76EB /* TGMessageFooterAppearance.m in Sources */,
+				1E3B31050F232518D90F2B08 /* TGNotificationDeliverySupport.m in Sources */,
 				111111111111111111111101 /* main.m in Sources */,
 				111111111111111111111102 /* AppDelegate.m in Sources */,
 				111111111111111111111103 /* TGTDLibClient.m in Sources */,
