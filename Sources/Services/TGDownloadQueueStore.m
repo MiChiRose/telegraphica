@@ -17,7 +17,7 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
     NSNumber *fileID = TGDownloadQueueValue(record, @"file_id", [NSNumber class]);
     NSString *fallbackPath = TGDownloadQueueValue(record, @"fallback_path", [NSString class]);
     if ([identifier length] == 0 || [fileName length] == 0 || [state length] == 0 ||
-        (![fileID respondsToSelector:@selector(integerValue)] && [fallbackPath length] == 0)) {
+        (![fileID respondsToSelector:@selector(longLongValue)] && [fallbackPath length] == 0)) {
         return nil;
     }
 
@@ -36,8 +36,8 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
                                    state, @"state",
                                    [NSNumber numberWithBool:NO], @"cancelled",
                                    nil];
-    if ([fileID respondsToSelector:@selector(integerValue)] && [fileID integerValue] > 0) {
-        [result setObject:[NSNumber numberWithInteger:[fileID integerValue]] forKey:@"file_id"];
+    if ([fileID respondsToSelector:@selector(longLongValue)] && [fileID longLongValue] > 0) {
+        [result setObject:[NSNumber numberWithLongLong:[fileID longLongValue]] forKey:@"file_id"];
     }
 
     NSArray *stringKeys = [NSArray arrayWithObjects:@"fallback_path", @"saved_path", @"error", nil];
@@ -49,6 +49,12 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
             [result setObject:value forKey:key];
         }
     }
+    for (NSString *key in [NSArray arrayWithObjects:@"downloaded_bytes", @"total_bytes", nil]) {
+        NSNumber *value = TGDownloadQueueValue(record, key, [NSNumber class]);
+        if (value && [value longLongValue] >= 0) { [result setObject:value forKey:key]; }
+    }
+    NSNumber *reconnecting = TGDownloadQueueValue(record, @"reconnecting", [NSNumber class]);
+    if (reconnecting) { [result setObject:reconnecting forKey:@"reconnecting"]; }
     NSArray *dateKeys = [NSArray arrayWithObjects:@"created_at", @"finished_at", nil];
     for (index = 0; index < [dateKeys count]; index++) {
         NSString *key = [dateKeys objectAtIndex:index];

@@ -122,6 +122,26 @@ echo "== Persistent download queue =="
     -o "$BUILD_DIR/download-queue-store-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/download-queue-store-probe"
 
+echo "== Persistent full-file downloads =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/persistent_file_download_probe.m Sources/Core/TGPersistentFileDownload.m -framework Foundation -o "$BUILD_DIR/persistent-file-download-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/persistent-file-download-probe"
+
+echo "== Download cancellation and client ownership =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_manager_probe.m Sources/Services/TGDownloadManager.m Sources/Services/TGDownloadQueueStore.m -framework Cocoa -o "$BUILD_DIR/download-manager-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-manager-probe"
+
+echo "== Nonblocking download progress presentation =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/download_progress_presentation_probe.m Sources/UI/TGDownloadProgressWindowController.m -framework Cocoa -o "$BUILD_DIR/download-progress-presentation-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/download-progress-presentation-probe"
+
+echo "== Media Center save lifecycle =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/media_center_save_probe.m -framework Cocoa -o "$BUILD_DIR/media-center-save-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media-center-save-probe"
+
+echo "== Guarded modal file export =="
+"$CLANG" "${COMPILE_FLAGS[@]}" -I"$ROOT_DIR/Sources/Media" Tests/media_file_guarded_save_probe.m Sources/Media/TGMediaFileActions.m -framework Cocoa -o "$BUILD_DIR/media-file-guarded-save-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/media-file-guarded-save-probe"
+
 echo "== TDLib capability registry =="
 "$CLANG" \
     "${COMPILE_FLAGS[@]}" \
@@ -203,6 +223,7 @@ echo "== TDLib file requests =="
     -Wno-objc-protocol-method-implementation \
     Tests/tdlib_file_request_probe.m \
     Sources/Core/TGTDLibClient+Files.m \
+    Sources/Core/TGPersistentFileDownload.m \
     -framework Foundation \
     -o "$BUILD_DIR/tdlib-file-request-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/tdlib-file-request-probe"

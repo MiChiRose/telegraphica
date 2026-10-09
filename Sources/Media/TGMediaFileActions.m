@@ -47,6 +47,15 @@ static void TGAnnounceCompletedDownloadAtPath(NSString *path) {
 + (NSString *)saveCopyOfFileAtPath:(NSString *)sourcePath
                  suggestedFileName:(NSString *)suggestedFileName
                              error:(NSError **)error {
+    return [self saveCopyOfFileAtPath:sourcePath suggestedFileName:suggestedFileName
+                       shouldContinue:nil error:error];
+}
+
++ (NSString *)saveCopyOfFileAtPath:(NSString *)sourcePath
+                 suggestedFileName:(NSString *)suggestedFileName
+                      shouldContinue:(BOOL (^)(void))shouldContinue
+                             error:(NSError **)error {
+    if (shouldContinue && !shouldContinue()) { return nil; }
     if (![self validateSourceFileAtPath:sourcePath error:error]) {
         return nil;
     }
@@ -57,6 +66,9 @@ static void TGAnnounceCompletedDownloadAtPath(NSString *path) {
     if ([panel runModal] != NSFileHandlingPanelOKButton) {
         return nil;
     }
+    // Account/chat/cancellation can change while the modal event loop runs.
+    // Recheck before copying or replacing any user-selected destination.
+    if (shouldContinue && !shouldContinue()) { return nil; }
     NSString *destinationPath = [[panel URL] path];
     if ([destinationPath length] == 0 || [destinationPath isEqualToString:sourcePath]) {
         return sourcePath;

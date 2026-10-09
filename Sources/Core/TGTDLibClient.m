@@ -962,6 +962,8 @@ static BOOL TGTDLibSendErrorLooksLikeSchemaMismatch(NSError *error) {
 - (NSDictionary *)safeUpdateSummaryForObject:(NSDictionary *)dictionary {
     NSDictionary *readSummary = TGNotificationReadSummaryFromUpdate(dictionary);
     if (readSummary) { return readSummary; }
+    NSDictionary *clockSummary = TGNotificationClockSummaryFromUpdate(dictionary);
+    if (clockSummary) { return clockSummary; }
     id typeObject = [dictionary objectForKey:@"@type"];
     if (![typeObject isKindOfClass:[NSString class]]) {
         return nil;

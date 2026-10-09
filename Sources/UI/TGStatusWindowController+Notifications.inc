@@ -1039,6 +1039,9 @@
     if ([self isChatIDMutedForNotifications:chatID]) {
         return;
     }
+    /* Reject replay before chat/avatar enrichment can schedule background work. */
+    if (![self.notificationReadState consumeIncomingNotificationSummary:summary
+                                                            atUnixTime:[[NSDate date] timeIntervalSince1970]]) { return; }
     NSDictionary *notificationChatInfo = [self notificationChatInfoForChatID:chatID];
     id serverMuted = [notificationChatInfo objectForKey:@"notifications_muted"];
     if ([serverMuted respondsToSelector:@selector(boolValue)] && [serverMuted boolValue]) {

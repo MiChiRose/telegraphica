@@ -235,6 +235,20 @@
     NSString *state = [item objectForKey:@"state"];
     NSString *safeState = [state length] > 0 ? state : @"failed";
     NSString *stateText = TGLoc([@"downloads.state." stringByAppendingString:safeState]);
+    if ([safeState isEqualToString:@"downloading"]) {
+        if ([[item objectForKey:@"reconnecting"] boolValue]) {
+            stateText = TGLoc(@"downloads.waitingNetwork");
+        }
+        long long downloaded = MAX(0LL, [[item objectForKey:@"downloaded_bytes"] longLongValue]);
+        long long total = MAX(0LL, [[item objectForKey:@"total_bytes"] longLongValue]);
+        NSString *bytes = [NSByteCountFormatter stringFromByteCount:downloaded countStyle:NSByteCountFormatterCountStyleFile];
+        if (total > 0) {
+            stateText = [NSString stringWithFormat:@"%@ · %@ / %@", stateText, bytes,
+                         [NSByteCountFormatter stringFromByteCount:total countStyle:NSByteCountFormatterCountStyleFile]];
+        } else if (downloaded > 0) {
+            stateText = [NSString stringWithFormat:@"%@ · %@", stateText, bytes];
+        }
+    }
     NSString *detail = [item objectForKey:@"error"];
     if ([detail length] == 0) {
         detail = [item objectForKey:@"saved_path"];

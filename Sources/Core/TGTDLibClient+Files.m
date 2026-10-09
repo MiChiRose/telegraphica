@@ -12,6 +12,19 @@
 
 @implementation TGTDLibClient (Files)
 
+- (NSString *)persistentDownloadedLocalPathForFileID:(NSNumber *)fileID
+                                          cancelled:(TGFileDownloadCancellationBlock)cancelled
+                                           progress:(TGFileDownloadProgressBlock)progress
+                                              error:(NSError **)error {
+    return TGPersistentFileDownload(fileID, 3.0,
+        ^NSDictionary *(NSDictionary *request, NSTimeInterval timeout, NSError **requestError) {
+            return [self sendTDLibRequestAndWaitForExtra:request extraPrefix:@"telegraphica-persistent-file"
+                                               timeout:timeout errorCode:56 error:requestError];
+        }, cancelled, progress,
+        ^NSTimeInterval { return [[NSProcessInfo processInfo] systemUptime]; },
+        ^(NSTimeInterval seconds) { [NSThread sleepForTimeInterval:seconds]; }, error);
+}
+
 - (NSDictionary *)downloadedFileInfoForFileID:(NSNumber *)fileID
                                        timeout:(NSTimeInterval)timeout
                                          error:(NSError **)error {
