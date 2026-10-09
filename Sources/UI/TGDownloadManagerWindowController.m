@@ -64,6 +64,7 @@
 }
 
 - (void)dealloc {
+    [[self window] setDelegate:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_tableView release];
     [_statusField release];
