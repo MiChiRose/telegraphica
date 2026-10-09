@@ -594,6 +594,10 @@
 }
 
 - (void)applyChatItems:(NSArray *)items preserveSelection:(BOOL)preserveSelection preferredChatID:(NSNumber *)preferredChatID {
+    if ([self.currentAuthState isEqualToString:@"ready"]) {
+        TGRecordConfirmedNotificationChatReads(items, self.notificationReadState);
+        [self removeConfirmedReadNotifications];
+    }
     BOOL preserveDiscussion = (preserveSelection && [self.selectedMessageTopicKind isEqualToString:@"thread"]);
     BOOL preserveForumTopBar = (self.forumTopicsPresentedInTopBar &&
                                 preserveSelection &&

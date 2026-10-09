@@ -144,10 +144,14 @@ NSDictionary *TGNotificationClockSummaryFromUpdate(NSDictionary *update) {
     chatID = TGNotificationID(chatID, NO); messageID = TGNotificationID(messageID, YES);
     if (!chatID || !messageID) { return; }
     NSNumber *previous = [_watermarks objectForKey:chatID];
+    // Keep every chat in the current snapshot recent, even if its read
+    // watermark did not advance; older retained chats must be evicted first.
+    [_chatOrder removeObject:chatID];
+    [_chatOrder addObject:chatID];
     if (previous && [previous longLongValue] >= [messageID longLongValue]) { return; }
-    if (!previous) { [_chatOrder addObject:chatID]; }
     [_watermarks setObject:messageID forKey:chatID];
-    while ([_chatOrder count] > 256) {
+    // A complete chat preview snapshot contains up to 500 ordinary chats.
+    while ([_chatOrder count] > 512) {
         [_watermarks removeObjectForKey:[_chatOrder objectAtIndex:0]];
         [_chatOrder removeObjectAtIndex:0];
     }

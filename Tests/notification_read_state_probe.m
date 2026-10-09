@@ -1,6 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import "TGNotificationReadState.h"
 #import "TGNotificationDeliverySupport.h"
+#import "TGChatItem.h"
 
 static void Require(BOOL value, NSString *message) {
     if (!value) { fprintf(stderr, "FAIL: %s\n", [message UTF8String]); exit(1); }
@@ -61,14 +62,57 @@ int main(void) {
     Require(![state isReadNotificationInfo:otherTopic] && ![state isReadNotificationInfo:otherChat], @"unread other topic and other chat preserved");
     [state reset];
     Require(![state isReadNotificationInfo:seen], @"new account/client resets old evidence");
+    NSArray *restoredInfos = [NSArray arrayWithObjects:Info(-100, 400, 0), Info(-100, 450, 0),
+        Info(-100, 500, 0), Info(-100, 600, 0), Info(-200, 500, 0), nil];
+    ProbeCenter *restoredCenter = [[[ProbeCenter alloc] initWithInfos:restoredInfos] autorelease];
+    TGChatItem *snapshot = [[[TGChatItem alloc] initWithChatID:@-100 title:@"test"
+        typeSummary:@"Private" unreadCount:@0] autorelease];
+    [snapshot setLastReadInboxMessageID:@550];
+    TGChatItem *topic = [[[TGChatItem alloc] initWithChatID:@-100 title:@"topic"
+        typeSummary:@"Forum" unreadCount:@0] autorelease];
+    [topic setForumTopic:YES]; [topic setLastReadInboxMessageID:@9999];
+    TGChatItem *noEvidence = [[[TGChatItem alloc] initWithChatID:@-200 title:@"test"
+        typeSummary:@"Private" unreadCount:@0] autorelease];
+    TGRecordConfirmedNotificationChatReads([NSArray arrayWithObjects:snapshot, topic, noEvidence, @"invalid", nil], state);
+    TGRemoveConfirmedReadNotifications(restoredCenter, state);
+    Require([[restoredCenter deliveredNotifications] count] == 2,
+        @"authoritative already-phone-read chat snapshot removes three restored notifications without a new read RPC");
+    Require(![state isReadNotificationInfo:Info(-100,600,0)] && ![state isReadNotificationInfo:Info(-200,500,0)],
+        @"topic watermark and zero unread count alone never clear newer or unrelated notifications");
+    [state reset];
+    NSMutableArray *largeSnapshot = [NSMutableArray array];
+    for (NSInteger i = 1; i <= 500; i++) {
+        TGChatItem *chat = [[[TGChatItem alloc] initWithChatID:[NSNumber numberWithInteger:i]
+            title:@"test" typeSummary:@"Private" unreadCount:@0] autorelease];
+        [chat setLastReadInboxMessageID:@550]; [largeSnapshot addObject:chat];
+    }
+    ProbeCenter *largeCenter = [[[ProbeCenter alloc] initWithInfos:[NSArray arrayWithObject:Info(1,500,0)]] autorelease];
+    TGRecordConfirmedNotificationChatReads(largeSnapshot, state);
+    TGRemoveConfirmedReadNotifications(largeCenter, state);
+    Require([[largeCenter deliveredNotifications] count] == 0,
+        @"full 500-chat snapshot retains first-chat evidence until delivered notifications are purged");
+    [state reset];
+    for (NSInteger i = 1; i <= 512; i++) {
+        [state recordReadInboxMessageID:@550 chatID:[NSNumber numberWithInteger:i]];
+    }
+    NSMutableArray *mixedSnapshot = [NSMutableArray array];
+    for (NSInteger i = 0; i < 500; i++) {
+        TGChatItem *chat = [[[TGChatItem alloc] initWithChatID:[NSNumber numberWithInteger:(i == 0 ? 1 : 1000+i)]
+            title:@"test" typeSummary:@"Private" unreadCount:@0] autorelease];
+        [chat setLastReadInboxMessageID:@550]; [mixedSnapshot addObject:chat];
+    }
+    TGRecordConfirmedNotificationChatReads(mixedSnapshot, state);
+    Require([state isReadNotificationInfo:Info(1,500,0)],
+        @"unchanged first-chat watermark remains recent when mixed snapshot displaces older history");
+    [state reset];
     NSDictionary *valid=[NSDictionary dictionaryWithObjectsAndKeys:@"updateChatReadInbox", @"@type", @-100, @"chat_id", @550, @"last_read_inbox_message_id", @1, @"unread_count", nil];
     Require([[TGNotificationReadSummaryFromUpdate(valid) objectForKey:@"kind"] isEqual:@"chat_read_inbox"], @"server read evidence retained in safe update summary");
     Require(!TGNotificationReadSummaryFromUpdate([NSDictionary dictionaryWithObjectsAndKeys:@"updateChatReadInbox", @"@type", @-100, @"chat_id", @0, @"last_read_inbox_message_id", @0, @"unread_count", nil]), @"invalid watermark never treated as evidence");
     Require(![state isReadNotificationInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"-100", @"chat_id", @500, @"message_id", nil]], @"malformed info preserved");
     for (NSInteger i=1;i<=1100;i++) { [state recordReadMessageIDs:[NSArray arrayWithObject:[NSNumber numberWithInteger:i]] chatID:@-100]; }
     Require(![state isReadNotificationInfo:Info(-100,1,0)] && [state isReadNotificationInfo:Info(-100,1100,0)], @"exact read evidence bounded with newest retained");
-    for (NSInteger i=1;i<=300;i++) { [state recordReadInboxMessageID:@10 chatID:[NSNumber numberWithInteger:i]]; }
-    Require(![state isReadNotificationInfo:Info(1,1,0)] && [state isReadNotificationInfo:Info(300,1,0)], @"chat watermark evidence bounded");
+    for (NSInteger i=1;i<=600;i++) { [state recordReadInboxMessageID:@10 chatID:[NSNumber numberWithInteger:i]]; }
+    Require(![state isReadNotificationInfo:Info(1,1,0)] && [state isReadNotificationInfo:Info(600,1,0)], @"chat watermark evidence bounded");
     TGRemoveConfirmedReadNotifications(nil, state);
     [state resetAtUnixTime:1000000.5];
     NSUInteger replayAlerts = 0;

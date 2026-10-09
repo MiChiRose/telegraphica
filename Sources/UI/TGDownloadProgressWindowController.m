@@ -13,16 +13,16 @@ NSRect TGDownloadProgressPanelFrame(NSRect mainFrame, NSRect visibleFrame, CGFlo
     if (height <= 0.0 || height > NSHeight(visibleFrame) - 2.0 * margin) { return NSZeroRect; }
     CGFloat y = MAX(NSMinY(visibleFrame) + margin,
                     MIN(NSMaxY(mainFrame) - height, NSMaxY(visibleFrame) - margin - height));
-    if (rightRoom >= 128.0 || leftRoom >= 128.0) {
-        BOOL right = rightRoom >= 128.0;
-        CGFloat width = MIN(224.0, right ? rightRoom : leftRoom);
+    if (rightRoom >= 300.0 || leftRoom >= 300.0) {
+        BOOL right = rightRoom >= 300.0;
+        CGFloat width = MIN(340.0, right ? rightRoom : leftRoom);
         CGFloat x = right ? rightX : leftMaxX - width;
         return NSMakeRect(x, y, width, height);
     }
-    CGFloat width = MIN(224.0, NSWidth(visibleFrame) - 2.0 * margin);
+    CGFloat width = MIN(340.0, NSWidth(visibleFrame) - 2.0 * margin);
     CGFloat x = MAX(NSMinX(visibleFrame) + margin,
                     MIN(NSMaxX(mainFrame) - width, NSMaxX(visibleFrame) - margin - width));
-    if (width < 128.0) { return NSZeroRect; }
+    if (width < 300.0) { return NSZeroRect; }
     if (NSMinY(mainFrame) - NSMinY(visibleFrame) >= height + 2.0 * margin) {
         return NSMakeRect(x, NSMinY(mainFrame) - margin - height, width, height);
     }
@@ -32,12 +32,51 @@ NSRect TGDownloadProgressPanelFrame(NSRect mainFrame, NSRect visibleFrame, CGFlo
     return NSZeroRect;
 }
 
+NSRect TGDownloadProgressReservedMainFrame(NSRect mainFrame, NSRect visibleFrame, NSSize minimumMainSize, CGFloat panelHeight) {
+    if (!NSIsEmptyRect(TGDownloadProgressPanelFrame(mainFrame, visibleFrame, panelHeight))) { return mainFrame; }
+    CGFloat minimumWidth = MAX(1.0, minimumMainSize.width);
+    CGFloat minimumHeight = MAX(1.0, minimumMainSize.height);
+    CGFloat panelWidth = 340.0;
+    if (NSWidth(visibleFrame) - 24.0 - panelWidth < minimumWidth) { panelWidth = 300.0; }
+    CGFloat availableWidth = NSWidth(visibleFrame) - 24.0 - panelWidth;
+    CGFloat availableHeight = NSHeight(visibleFrame) - 16.0;
+    if (availableWidth < minimumWidth || availableHeight < minimumHeight) { return NSZeroRect; }
+    CGFloat width = MAX(minimumWidth, MIN(NSWidth(mainFrame), availableWidth));
+    CGFloat height = MAX(minimumHeight, MIN(NSHeight(mainFrame), availableHeight));
+    CGFloat y = MAX(NSMinY(visibleFrame) + 8.0, MIN(NSMinY(mainFrame), NSMaxY(visibleFrame) - 8.0 - height));
+    NSRect reserved = NSMakeRect(NSMinX(visibleFrame) + 8.0, y, width, height);
+    if (NSIsEmptyRect(TGDownloadProgressPanelFrame(reserved, visibleFrame, panelHeight))) { return NSZeroRect; }
+    return reserved;
+}
+
+NSRect TGDownloadProgressRestoredMainFrame(NSRect originalFrame, NSRect reservedFrame, NSRect currentFrame,
+                                         NSRect visibleFrame, NSSize minimumMainSize) {
+    if (!NSEqualRects(reservedFrame, currentFrame)) { return NSZeroRect; }
+    CGFloat width = MIN(NSWidth(originalFrame), NSWidth(visibleFrame) - 16.0);
+    CGFloat height = MIN(NSHeight(originalFrame), NSHeight(visibleFrame) - 16.0);
+    if (width < minimumMainSize.width || height < minimumMainSize.height || width <= 0.0 || height <= 0.0) { return NSZeroRect; }
+    CGFloat x = MAX(NSMinX(visibleFrame) + 8.0, MIN(NSMinX(originalFrame), NSMaxX(visibleFrame) - 8.0 - width));
+    CGFloat y = MAX(NSMinY(visibleFrame) + 8.0, MIN(NSMinY(originalFrame), NSMaxY(visibleFrame) - 8.0 - height));
+    return NSMakeRect(x, y, width, height);
+}
+
 double TGDownloadProgressFraction(NSDictionary *record) {
     long long total = [[record objectForKey:@"total_bytes"] longLongValue];
     long long downloaded = [[record objectForKey:@"downloaded_bytes"] longLongValue];
     if ([[record objectForKey:@"state"] isEqualToString:@"completed"]) { return 1.0; }
     if (total <= 0 || downloaded <= 0) { return 0.0; }
     return MIN(1.0, (double)downloaded / (double)total);
+}
+
+BOOL TGDownloadProgressCanPerformAction(NSDictionary *record, NSString *action) {
+    if (![[record objectForKey:@"identifier"] length]) { return NO; }
+    NSString *state = [record objectForKey:@"state"];
+    BOOL active = [state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"];
+    BOOL paused = [state isEqualToString:@"paused"];
+    if ([action isEqualToString:@"pause"]) { return active && [[record objectForKey:@"can_pause"] boolValue]; }
+    if ([action isEqualToString:@"resume"]) { return paused && [[record objectForKey:@"can_resume"] boolValue]; }
+    if ([action isEqualToString:@"cancel"]) { return (active || paused) && [[record objectForKey:@"can_cancel"] boolValue]; }
+    return NO;
 }
 
 @implementation TGDownloadProgressPresentation
@@ -53,6 +92,7 @@ double TGDownloadProgressFraction(NSDictionary *record) {
 - (BOOL)updateWithRecords:(NSArray *)records {
     NSMutableSet *identifiers = [NSMutableSet set];
     NSDictionary *selected = nil;
+    NSDictionary *paused = nil;
     NSDictionary *previous = nil;
     BOOL newActive = NO;
     _activeCount = 0;
@@ -68,10 +108,12 @@ double TGDownloadProgressFraction(NSDictionary *record) {
             _activeCount++;
             if (!selected) { selected = record; }
             if (![_knownIdentifiers containsObject:identifier]) { newActive = YES; }
+        } else if ([state isEqualToString:@"paused"] && !paused) {
+            paused = record;
         }
     }
     [_knownIdentifiers release]; _knownIdentifiers = [identifiers copy];
-    NSDictionary *displayed = selected ? selected : previous;
+    NSDictionary *displayed = selected ? selected : (paused ? paused : previous);
     [_displayedRecord release]; _displayedRecord = [displayed copy];
     if (newActive) { _hidden = NO; }
     if (!_displayedRecord) { _hidden = YES; }
@@ -81,7 +123,7 @@ double TGDownloadProgressFraction(NSDictionary *record) {
 
 @implementation TGDownloadProgressWindowController
 - (id)initWithDownloadManager:(TGDownloadManager *)manager {
-    NSPanel *panel = [[[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 224, 148)
+    NSPanel *panel = [[[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 340, 148)
             styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSUtilityWindowMask | NSNonactivatingPanelMask)
             backing:NSBackingStoreBuffered defer:NO] autorelease];
     self = [super initWithWindow:panel];
@@ -107,6 +149,7 @@ double TGDownloadProgressFraction(NSDictionary *record) {
 }
 - (void)invalidate {
     if (_invalidated) { return; }
+    [self restoreReservedSpace];
     _invalidated = YES;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[self window] setDelegate:nil];
@@ -118,6 +161,7 @@ double TGDownloadProgressFraction(NSDictionary *record) {
     [_manager release]; [_presentation release];
     [_nameField release]; [_statusField release]; [_bytesField release];
     [_progressBar release]; [_collapseButton release]; [_downloadsButton release];
+    [_pauseButton release]; [_cancelButton release];
     [super dealloc];
 }
 - (NSTextField *)newLabelWithSize:(CGFloat)fontSize {
@@ -146,9 +190,18 @@ double TGDownloadProgressFraction(NSDictionary *record) {
     [_downloadsButton setTitle:TGLoc(@"downloads.title")];
     [_downloadsButton setTarget:self]; [_downloadsButton setAction:@selector(openDownloads:)];
     [[[self window] contentView] addSubview:_downloadsButton];
+    _pauseButton = [[NSButton alloc] initWithFrame:NSZeroRect];
+    [_pauseButton setBezelStyle:NSRoundedBezelStyle]; [_pauseButton setFont:[NSFont systemFontOfSize:11.0]];
+    [_pauseButton setTarget:self]; [_pauseButton setAction:@selector(pauseOrResumeDownload:)];
+    [[[self window] contentView] addSubview:_pauseButton];
+    _cancelButton = [[NSButton alloc] initWithFrame:NSZeroRect];
+    [_cancelButton setBezelStyle:NSRoundedBezelStyle]; [_cancelButton setFont:[NSFont systemFontOfSize:11.0]];
+    [_cancelButton setTarget:self]; [_cancelButton setAction:@selector(cancelDownload:)];
+    [[[self window] contentView] addSubview:_cancelButton];
 }
 - (void)setDownloadsTarget:(id)target action:(SEL)action { _downloadsTarget = target; _downloadsAction = action; }
 - (void)attachToWindow:(NSWindow *)window {
+    if (_mainWindow != window) { [self restoreReservedSpace]; }
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
     if (_mainWindow) { [center removeObserver:self name:nil object:_mainWindow]; }
     _mainWindow = window;
@@ -170,11 +223,33 @@ double TGDownloadProgressFraction(NSDictionary *record) {
     }
     [self refresh];
 }
-- (void)mainWindowChanged:(NSNotification *)notification { (void)notification; [self placeAndShow]; }
-- (void)mainWindowClosing:(NSNotification *)notification { (void)notification; [[self window] orderOut:nil]; }
+- (void)mainWindowChanged:(NSNotification *)notification {
+    (void)notification;
+    if (_changingMainFrame) { return; }
+    if (_hasReservedMainFrame && !NSEqualRects([_mainWindow frame], _reservedMainFrame)) {
+        _hasReservedMainFrame = NO; // A user move/resize takes ownership of the frame.
+    }
+    [self placeAndShow];
+}
+- (void)mainWindowClosing:(NSNotification *)notification {
+    (void)notification; [self restoreReservedSpace]; [[self window] orderOut:nil];
+}
+- (void)restoreReservedSpace {
+    if (!_hasReservedMainFrame || !_mainWindow) { return; }
+    _hasReservedMainFrame = NO;
+    NSScreen *screen = [_mainWindow screen];
+    if (!screen) { return; }
+    NSRect frame = TGDownloadProgressRestoredMainFrame(_originalMainFrame, _reservedMainFrame,
+        [_mainWindow frame], [screen visibleFrame], [_mainWindow minSize]);
+    if (!NSIsEmptyRect(frame)) {
+        _changingMainFrame = YES;
+        [_mainWindow setFrame:frame display:YES];
+        _changingMainFrame = NO;
+    }
+}
 - (void)refresh {
     if (_invalidated) { return; }
-    [_presentation updateWithRecords:[_manager itemsSnapshot]];
+    if ([_presentation updateWithRecords:[_manager itemsSnapshot]]) { _mayReserveSpace = YES; }
     [[self window] setTitle:TGLoc(@"downloads.title")];
     [[self window] setBackgroundColor:TGClassicPanelBottomColor()];
     [_nameField setTextColor:TGClassicInkColor()];
@@ -186,6 +261,11 @@ double TGDownloadProgressFraction(NSDictionary *record) {
     [_nameField setStringValue:name ? name : @""];
     [_nameField setToolTip:name];
     NSString *state = [record objectForKey:@"state"];
+    BOOL paused = [state isEqualToString:@"paused"];
+    [_pauseButton setTitle:TGLoc(paused ? @"downloads.resume" : @"downloads.pause")];
+    [_cancelButton setTitle:TGLoc(@"downloads.cancel")];
+    [_pauseButton setEnabled:TGDownloadProgressCanPerformAction(record, paused ? @"resume" : @"pause")];
+    [_cancelButton setEnabled:TGDownloadProgressCanPerformAction(record, @"cancel")];
     NSString *status = state ? TGLoc([@"downloads.state." stringByAppendingString:state]) : @"";
     if ([[record objectForKey:@"reconnecting"] boolValue] && [state isEqualToString:@"downloading"]) {
         status = TGLoc(@"downloads.waitingNetwork");
@@ -196,24 +276,41 @@ double TGDownloadProgressFraction(NSDictionary *record) {
     [_statusField setStringValue:status]; [_statusField setToolTip:status];
     long long downloaded = MAX(0LL, [[record objectForKey:@"downloaded_bytes"] longLongValue]);
     long long total = MAX(0LL, [[record objectForKey:@"total_bytes"] longLongValue]);
-    NSString *bytes = [NSByteCountFormatter stringFromByteCount:downloaded countStyle:NSByteCountFormatterCountStyleFile];
+    NSString *bytes = [NSByteCountFormatter stringFromByteCount:downloaded countStyle:NSByteCountFormatterCountStyleBinary];
     if (total > 0) {
         bytes = [NSString stringWithFormat:@"%@ / %@", bytes,
-            [NSByteCountFormatter stringFromByteCount:total countStyle:NSByteCountFormatterCountStyleFile]];
+            [NSByteCountFormatter stringFromByteCount:total countStyle:NSByteCountFormatterCountStyleBinary]];
     }
     [_bytesField setStringValue:bytes]; [_bytesField setToolTip:bytes];
     [_progressBar setDoubleValue:TGDownloadProgressFraction(record)];
     [self placeAndShow];
 }
 - (void)placeAndShow {
+    if (_changingMainFrame) { return; }
     if (_invalidated || !_mainWindow || ![_mainWindow isVisible] || [_mainWindow isMiniaturized] || [_presentation hidden]) {
+        if ([_presentation hidden]) { [self restoreReservedSpace]; _mayReserveSpace = NO; }
         [[self window] orderOut:nil]; return;
     }
     NSScreen *screen = [_mainWindow screen];
     if (!screen) { [[self window] orderOut:nil]; return; }
     CGFloat contentHeight = _collapsed ? 94.0 : 148.0;
-    CGFloat frameHeight = [[self window] frameRectForContentRect:NSMakeRect(0, 0, 224.0, contentHeight)].size.height;
+    CGFloat frameHeight = [[self window] frameRectForContentRect:NSMakeRect(0, 0, 340.0, contentHeight)].size.height;
     NSRect frame = TGDownloadProgressPanelFrame([_mainWindow frame], [screen visibleFrame], frameHeight);
+    if (NSIsEmptyRect(frame) && _mayReserveSpace) {
+        NSRect mainFrame = [_mainWindow frame];
+        NSRect reserved = TGDownloadProgressReservedMainFrame(mainFrame, [screen visibleFrame], [_mainWindow minSize], frameHeight);
+        _mayReserveSpace = NO;
+        if (!NSIsEmptyRect(reserved) && !NSEqualRects(reserved, mainFrame)) {
+            if (!_hasReservedMainFrame) { _originalMainFrame = mainFrame; }
+            _reservedMainFrame = reserved; _hasReservedMainFrame = YES;
+            _changingMainFrame = YES;
+            [_mainWindow setFrame:reserved display:YES];
+            _changingMainFrame = NO;
+            _reservedMainFrame = [_mainWindow frame];
+            frame = TGDownloadProgressPanelFrame(_reservedMainFrame, [screen visibleFrame], frameHeight);
+        }
+    }
+    _mayReserveSpace = NO;
     if (NSIsEmptyRect(frame)) { [[self window] orderOut:nil]; return; }
     if (!NSEqualRects([[self window] frame], frame)) { [[self window] setFrame:frame display:YES]; }
     CGFloat width = NSWidth([[[self window] contentView] bounds]) - 16.0;
@@ -223,18 +320,40 @@ double TGDownloadProgressFraction(NSDictionary *record) {
     [_bytesField setFrame:NSMakeRect(8.0, contentHeight - 63.0, width, 15.0)];
     [_progressBar setFrame:NSMakeRect(8.0, _collapsed ? 30.0 : 65.0, width, 12.0)];
     [_collapseButton setTitle:TGLoc(_collapsed ? @"downloads.progress.expand" : @"downloads.progress.collapse")];
-    [_collapseButton setFrame:NSMakeRect(5.0, 4.0, width + 6.0, 24.0)];
+    CGFloat buttonWidth = _collapsed ? (width - 4.0) / 3.0 : (width + 2.0) / 2.0;
+    [_pauseButton setFrame:NSMakeRect(5.0, _collapsed ? 4.0 : 33.0, buttonWidth, 24.0)];
+    [_cancelButton setFrame:NSMakeRect(7.0 + buttonWidth, _collapsed ? 4.0 : 33.0, buttonWidth, 24.0)];
+    [_collapseButton setFrame:NSMakeRect(_collapsed ? 9.0 + 2.0 * buttonWidth : 5.0, 4.0, buttonWidth, 24.0)];
     [_downloadsButton setHidden:_collapsed];
-    [_downloadsButton setFrame:NSMakeRect(5.0, 33.0, width + 6.0, 24.0)];
+    [_downloadsButton setFrame:NSMakeRect(7.0 + buttonWidth, 4.0, buttonWidth, 24.0)];
     if ([NSApp isActive] && ![[self window] isVisible]) { [[self window] orderFront:nil]; }
 }
-- (void)showProgress:(id)sender { (void)sender; [_presentation show]; [self placeAndShow]; }
+- (void)showProgress:(id)sender { (void)sender; [_presentation show]; _mayReserveSpace = YES; [self placeAndShow]; }
 - (void)toggleCollapsed:(id)sender { (void)sender; _collapsed = !_collapsed; [self placeAndShow]; }
 - (void)openDownloads:(id)sender {
     (void)sender;
     if (_downloadsTarget && _downloadsAction) { [NSApp sendAction:_downloadsAction to:_downloadsTarget from:self]; }
 }
 - (BOOL)windowShouldClose:(id)sender {
-    (void)sender; [_presentation hide]; [[self window] orderOut:nil]; return NO;
+    (void)sender; [_presentation hide]; _mayReserveSpace = NO; [self restoreReservedSpace]; [[self window] orderOut:nil]; return NO;
+}
+- (void)pauseOrResumeDownload:(id)sender {
+    (void)sender;
+    NSDictionary *record = [_presentation displayedRecord];
+    NSString *identifier = [record objectForKey:@"identifier"];
+    NSString *state = [record objectForKey:@"state"];
+    if (![identifier length]) { return; }
+    if ([state isEqualToString:@"paused"] && TGDownloadProgressCanPerformAction(record, @"resume")) {
+        [_manager resumeDownloadWithIdentifier:identifier completion:nil];
+    } else if (TGDownloadProgressCanPerformAction(record, @"pause")) { [_manager pauseDownloadWithIdentifier:identifier]; }
+    [self refresh];
+}
+- (void)cancelDownload:(id)sender {
+    (void)sender;
+    NSDictionary *record = [_presentation displayedRecord];
+    NSString *identifier = [record objectForKey:@"identifier"];
+    if ([identifier length] && TGDownloadProgressCanPerformAction(record, @"cancel")) {
+        [_manager cancelDownloadWithIdentifier:identifier]; [self refresh];
+    }
 }
 @end

@@ -39,6 +39,16 @@ int main(void) {
              @"safe display metadata must survive serialization");
     TGAssert([NSPropertyListSerialization propertyList:serialized isValidForFormat:NSPropertyListBinaryFormat_v1_0],
              @"persisted queue must be a property list");
+    NSMutableDictionary *paused = [NSMutableDictionary dictionaryWithDictionary:active];
+    [paused setObject:@"paused" forKey:@"state"];
+    [paused setObject:[[[NSObject alloc] init] autorelease] forKey:@"client"];
+    [paused setObject:[NSMutableDictionary dictionary] forKey:@"attempt"];
+    [paused setObject:[NSArray arrayWithObject:@"runtime-only"] forKey:@"completions"];
+    NSDictionary *restoredPause = [TGDownloadQueueNormalizedRecords(TGDownloadQueueSerializableRecords(
+        [NSArray arrayWithObject:paused])) objectAtIndex:0];
+    TGAssert([[restoredPause objectForKey:@"state"] isEqualToString:@"paused"], @"paused jobs must not become auto-resumable interrupted jobs");
+    TGAssert([restoredPause objectForKey:@"client"] == nil && [restoredPause objectForKey:@"attempt"] == nil &&
+             [restoredPause objectForKey:@"completions"] == nil, @"runtime clients, attempt identities and callbacks must never enter persisted queue");
     fprintf(stdout, "Download queue store probe passed.\n");
     [pool drain];
     return 0;
