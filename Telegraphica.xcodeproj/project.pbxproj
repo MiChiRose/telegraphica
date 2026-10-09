@@ -111,6 +111,7 @@
 		111111111111111111111174 /* TGDownloadManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111352 /* TGDownloadManager.m */; };
 		B8DB0BB00000000000000001 /* TGDownloadQueueStore.m in Sources */ = {isa = PBXBuildFile; fileRef = B8DB0BB00000000000000003 /* TGDownloadQueueStore.m */; };
 		D05910000000000000000011 /* TGDownloadManagerPresentation.m in Sources */ = {isa = PBXBuildFile; fileRef = D05910000000000000000013 /* TGDownloadManagerPresentation.m */; };
+		D05920000000000000000011 /* TGSectionTransition.m in Sources */ = {isa = PBXBuildFile; fileRef = D05920000000000000000013 /* TGSectionTransition.m */; };
 		111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111354 /* TGDownloadManagerWindowController.m */; };
 		111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111356 /* TGTDLibClient+Privacy.m */; };
 		111111111111111111111177 /* TGPrivacyWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 111111111111111111111358 /* TGPrivacyWindowController.m */; };
@@ -388,6 +389,8 @@
 		B8DB0BB00000000000000003 /* TGDownloadQueueStore.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadQueueStore.m; sourceTree = "<group>"; };
 		D05910000000000000000012 /* TGDownloadManagerPresentation.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManagerPresentation.h; sourceTree = "<group>"; };
 		D05910000000000000000013 /* TGDownloadManagerPresentation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManagerPresentation.m; sourceTree = "<group>"; };
+		D05920000000000000000012 /* TGSectionTransition.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGSectionTransition.h; sourceTree = "<group>"; };
+		D05920000000000000000013 /* TGSectionTransition.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGSectionTransition.m; sourceTree = "<group>"; };
 		111111111111111111111353 /* TGDownloadManagerWindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TGDownloadManagerWindowController.h; sourceTree = "<group>"; };
 		111111111111111111111354 /* TGDownloadManagerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TGDownloadManagerWindowController.m; sourceTree = "<group>"; };
 		111111111111111111111355 /* TGTDLibClient+Privacy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TGTDLibClient+Privacy.h"; sourceTree = "<group>"; };
@@ -747,6 +750,8 @@
 				D05900000000000000000013 /* TGDownloadProgressWindowController.m */,
 				D05910000000000000000012 /* TGDownloadManagerPresentation.h */,
 				D05910000000000000000013 /* TGDownloadManagerPresentation.m */,
+				D05920000000000000000012 /* TGSectionTransition.h */,
+				D05920000000000000000013 /* TGSectionTransition.m */,
 				111111111111111111111353 /* TGDownloadManagerWindowController.h */,
 				111111111111111111111354 /* TGDownloadManagerWindowController.m */,
 				111111111111111111111357 /* TGPrivacyWindowController.h */,
@@ -1093,6 +1098,7 @@
 				B8DB0BB00000000000000001 /* TGDownloadQueueStore.m in Sources */,
 				D05900000000000000000011 /* TGDownloadProgressWindowController.m in Sources */,
 				D05910000000000000000011 /* TGDownloadManagerPresentation.m in Sources */,
+				D05920000000000000000011 /* TGSectionTransition.m in Sources */,
 				111111111111111111111175 /* TGDownloadManagerWindowController.m in Sources */,
 				111111111111111111111176 /* TGTDLibClient+Privacy.m in Sources */,
 				111111111111111111111177 /* TGPrivacyWindowController.m in Sources */,

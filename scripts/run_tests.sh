@@ -389,6 +389,10 @@ echo "== Interface motion and transparent spinner =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/interface_motion_probe.m Sources/UI/TGAnimationSupport.m Sources/UI/TGTranscriptMotion.m Sources/UI/TGTransparentSpinnerView.m Sources/Services/TGResourcePolicy.m -framework Cocoa -o "$BUILD_DIR/interface-motion-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/interface-motion-probe"
 
+echo "== Main section transitions =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/section_transition_probe.m Sources/UI/TGSectionTransition.m Sources/UI/TGAnimationSupport.m Sources/Services/TGResourcePolicy.m -framework Cocoa -o "$BUILD_DIR/section-transition-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/section-transition-probe"
+
 echo "== Notification read cleanup =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/Core/TGChatItem.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/notification-read-state-probe"
