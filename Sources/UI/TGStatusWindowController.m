@@ -23,6 +23,7 @@
 #import "TGMessageViewersWindowController.h"
 #import "TGNotificationSettingsWindowController.h"
 #import "TGAnimationSupport.h"
+#import "TGSectionTransition.h"
 #import "TGKeyboardInputSupport.h"
 #import "TGTranscriptMotion.h"
 #import "TGNotificationReadState.h"
@@ -796,6 +797,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @property (nonatomic, retain) NSMutableDictionary *notificationChatInfoByChatID;
 @property (nonatomic, retain) TGNotificationReadState *notificationReadState;
 @property (nonatomic, retain) TGTranscriptMotionController *transcriptMotionController;
+@property (nonatomic, retain) TGSectionTransitionController *sectionTransitionController;
 @property (nonatomic, retain) NSMutableSet *pendingArrivalMessageIDs;
 - (void)rememberLiveArrivalFromSummary:(NSDictionary *)summary;
 - (void)animatePendingLiveArrivals:(BOOL)nearNewest;
@@ -1355,6 +1357,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 @synthesize notificationChatInfoByChatID = _notificationChatInfoByChatID;
 @synthesize notificationReadState = _notificationReadState;
 @synthesize transcriptMotionController = _transcriptMotionController;
+@synthesize sectionTransitionController = _sectionTransitionController;
 @synthesize pendingArrivalMessageIDs = _pendingArrivalMessageIDs;
 @synthesize localMuteUnreadCountsByChatID = _localMuteUnreadCountsByChatID;
 @synthesize suppressChatSelectionHandling = _suppressChatSelectionHandling;
@@ -1400,6 +1403,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)setCurrentAuthState:(NSString *)state {
+    if (![_currentAuthState isEqualToString:state]) [self.sectionTransitionController reset];
     if ([_currentAuthState isEqualToString:@"ready"] && ![state isEqualToString:@"ready"]) {
         [self.mediaCenterSaveRequests removeAllObjects];
         [self.mediaCenterDownloadingFileIDs removeAllObjects];
@@ -1425,6 +1429,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)setActiveSection:(NSString *)section {
+    if (![_activeSection isEqualToString:section]) [self.sectionTransitionController cancelAnimation];
     if (_activeSection != section) {
         [_activeSection release];
         _activeSection = [section copy];
@@ -1434,6 +1439,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 
 - (void)setClient:(TGTDLibClient *)client {
     if (_client != client) {
+        [self.sectionTransitionController reset];
         [self.mediaCenterSaveRequests removeAllObjects];
         [self.mediaCenterDownloadingFileIDs removeAllObjects];
         [self.notificationReadState reset];
@@ -2055,6 +2061,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)refreshThemeAppearance {
+    [self.sectionTransitionController cancelAnimation];
     [self.downloadManagerWindowController refreshPresentation];
     NSColor *cardInkColor = TGClassicCardInkColor();
     NSColor *cardMutedColor = TGClassicCardMutedInkColor();
@@ -2496,6 +2503,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
     TGChromeView *contentView = [[[TGChromeView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
     [contentView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:contentView];
+    self.sectionTransitionController = [[[TGSectionTransitionController alloc] initWithContentView:contentView] autorelease];
     [contentView setAutoresizesSubviews:YES];
 
     self.topPanelView = [[[TGRailView alloc] initWithFrame:NSMakeRect(16, 628, 948, 56)] autorelease];
@@ -4748,6 +4756,9 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)dealloc {
+    [_sectionTransitionController reset];
+    [_sectionTransitionController release];
+    _sectionTransitionController = nil;
     [_downloadProgressWindowController invalidate];
     [_downloadProgressWindowController release];
     [_transcriptMotionController cancelAllAnimations];

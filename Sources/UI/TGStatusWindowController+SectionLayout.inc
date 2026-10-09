@@ -356,6 +356,37 @@
     [self showView:self.detailsScrollView visible:NO];
     [self showView:self.checkButton visible:NO];
     [self refreshUpdateAvailabilityBadge];
+    [self updateSectionTransitionPresentation];
+}
+
+- (void)updateSectionTransitionPresentation {
+    NSString *section = self.activeSection ? self.activeSection : TGSectionChats;
+    NSView *panel = nil;
+    NSRect body = NSZeroRect;
+    if ([section isEqualToString:TGSectionChats]) {
+        body = NSUnionRect([self.sidebarPanelView frame], [self.conversationPanelView frame]);
+    } else if ([section isEqualToString:TGSectionContacts]) {
+        panel = [self.contactsViewController view];
+    } else if ([section isEqualToString:TGSectionSettings]) {
+        panel = self.settingsPanelView;
+    } else if ([section isEqualToString:TGSectionProfile]) {
+        panel = self.profilePanelView;
+    } else if ([section isEqualToString:TGSectionWorkshop]) {
+        panel = [self.workshopViewController view];
+    }
+    if (panel) body = [panel frame];
+    // Keep navigation/header chrome fully visible and usable during the reveal.
+    body.size.height = MAX(0.0, body.size.height - TGPanelHeaderHeight);
+    if (![self.bottomNavigationView isHidden] && !NSIsEmptyRect(body)) {
+        CGFloat bottom = MAX(NSMinY(body), NSMaxY([self.bottomNavigationView frame]));
+        body.size.height = MAX(0.0, NSMaxY(body) - bottom);
+        body.origin.y = bottom;
+    }
+    BOOL ready = [self.currentAuthState isEqualToString:@"ready"];
+    [self.sectionTransitionController presentSection:(ready && !NSIsEmptyRect(body) ? section : nil)
+                                         contentRect:body
+                                     backgroundColor:TGClassicPanelBottomColor()
+                                             context:self.client];
 }
 
 - (CGFloat)composerInputHeightForWidth:(CGFloat)width {
