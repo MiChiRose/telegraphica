@@ -1189,6 +1189,7 @@ def check_primary_navigation_contract(errors):
                           (client_rel, fragment))
     message_flow_rel = os.path.join("Sources", "UI", "TGStatusWindowController+MessageDataFlow.inc")
     message_flow_text = read_text(os.path.join(ROOT, message_flow_rel))
+    message_flow_text += read_text(os.path.join(ROOT, "Sources", "UI", "TGStatusWindowController+AutomaticReadVisibility.inc"))
     for fragment in [
         "scrollMessagesToInitialUnreadIfAvailable",
         "visibleUnreadMessageItemsAwaitingReceipt",

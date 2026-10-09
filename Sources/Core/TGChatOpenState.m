@@ -11,7 +11,17 @@
         }
         [_desiredChatID release];
         _desiredChatID = [normalized retain];
+        _selectionGeneration++;
         _openAttemptCount = 0;
+    }
+}
+
+- (NSNumber *)selectionGenerationForDesiredChatID:(NSNumber *)chatID {
+    @synchronized(self) {
+        if (![chatID isKindOfClass:[NSNumber class]] || !_desiredChatID ||
+            ![_desiredChatID isEqualToNumber:chatID] || !_openedChatID ||
+            ![_openedChatID isEqualToNumber:chatID] || _pendingOpenExtra) return nil;
+        return [NSNumber numberWithUnsignedInteger:_selectionGeneration];
     }
 }
 
@@ -65,6 +75,7 @@
 
 - (void)resetTransport {
     @synchronized(self) {
+        _selectionGeneration++;
         [_openedChatID release];
         _openedChatID = nil;
         [_pendingOpenExtra release];

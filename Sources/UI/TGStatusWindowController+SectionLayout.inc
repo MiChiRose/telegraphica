@@ -357,6 +357,11 @@
     [self showView:self.checkButton visible:NO];
     [self refreshUpdateAvailabilityBadge];
     [self updateSectionTransitionPresentation];
+    [self synchronizeUserOpenedChat];
+    if ([self conversationAllowsAutomaticRead]) {
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(scheduleVisibleMessageItemsRead) object:nil];
+        [self performSelector:@selector(scheduleVisibleMessageItemsRead) withObject:nil afterDelay:0.15];
+    }
 }
 
 - (void)updateSectionTransitionPresentation {
@@ -1591,9 +1596,26 @@
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification {
+    if ([notification object] == [self window]) [self conversationVisibilityDidChange:notification];
     if ([notification object] == [self window] && ![self.currentAuthState isEqualToString:@"ready"]) {
         [self scheduleLoginInputFocus];
     }
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification {
+    if ([notification object] == [self window]) [self conversationVisibilityDidChange:notification];
+}
+
+- (void)windowWillMiniaturize:(NSNotification *)notification {
+    if ([notification object] == [self window]) [self conversationVisibilityDidChange:notification];
+}
+
+- (void)windowDidMiniaturize:(NSNotification *)notification {
+    if ([notification object] == [self window]) [self conversationVisibilityDidChange:notification];
+}
+
+- (void)windowDidDeminiaturize:(NSNotification *)notification {
+    if ([notification object] == [self window]) [self conversationVisibilityDidChange:notification];
 }
 
 - (void)tearDownClosedMediaPreviewWindow:(NSWindow *)closingWindow {
@@ -1616,6 +1638,10 @@
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
+    if ([notification object] == [self window]) {
+        [self invalidateAutomaticReadRequests];
+        [self.client setUserOpenedChatID:nil];
+    }
     if ([notification object] == self.mediaPreviewWindow) {
         NSWindow *closingWindow = [(NSWindow *)[notification object] retain];
         self.mediaPreviewRequestGeneration = self.mediaPreviewRequestGeneration + 1;

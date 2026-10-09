@@ -393,6 +393,19 @@ echo "== Main section transitions =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/section_transition_probe.m Sources/UI/TGSectionTransition.m Sources/UI/TGAnimationSupport.m Sources/Services/TGResourcePolicy.m -framework Cocoa -o "$BUILD_DIR/section-transition-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/section-transition-probe"
 
+echo "== Visible conversation automatic-read gate =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/conversation_visibility_probe.m Sources/UI/TGConversationVisibility.m -framework Cocoa -o "$BUILD_DIR/conversation-visibility-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/conversation-visibility-probe"
+
+echo "== Automatic TDLib read receipts =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/automatic_read_probe.m Sources/Core/TGTDLibClient+ReadReceipts.m Sources/Core/TGChatOpenState.m -framework Foundation -o "$BUILD_DIR/automatic-read-probe"
+
+echo "== Automatic read visibility integration =="
+"$CLANG" "${COMPILE_FLAGS[@]}" Tests/automatic_read_visibility_integration_probe.m Sources/UI/TGConversationVisibility.m -framework Cocoa -o "$BUILD_DIR/automatic-read-visibility-integration-probe"
+HOME="$TEST_HOME" "$BUILD_DIR/automatic-read-visibility-integration-probe"
+
+"$BUILD_DIR/automatic-read-probe"
+
 echo "== Notification read cleanup =="
 "$CLANG" "${COMPILE_FLAGS[@]}" Tests/notification_read_state_probe.m Sources/Core/TGNotificationReadState.m Sources/Core/TGChatItem.m Sources/UI/TGNotificationDeliverySupport.m -framework Cocoa -o "$BUILD_DIR/notification-read-state-probe"
 HOME="$TEST_HOME" "$BUILD_DIR/notification-read-state-probe"
