@@ -40,7 +40,7 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
         [result setObject:[NSNumber numberWithLongLong:[fileID longLongValue]] forKey:@"file_id"];
     }
 
-    NSArray *stringKeys = [NSArray arrayWithObjects:@"fallback_path", @"saved_path", @"error", nil];
+    NSArray *stringKeys = [NSArray arrayWithObjects:@"fallback_path", @"saved_path", @"error", @"remote_id", @"remote_unique_id", nil];
     NSUInteger index = 0;
     for (index = 0; index < [stringKeys count]; index++) {
         NSString *key = [stringKeys objectAtIndex:index];
@@ -48,6 +48,13 @@ static NSDictionary *TGDownloadQueueSanitizedRecord(NSDictionary *record, BOOL r
         if ([value length] > 0) {
             [result setObject:value forKey:key];
         }
+    }
+    NSNumber *accountID = TGDownloadQueueValue(record, @"account_id", [NSNumber class]);
+    if ([accountID longLongValue] > 0) { [result setObject:accountID forKey:@"account_id"]; }
+    BOOL untrusted = restoring && [fileID longLongValue] > 0;
+    NSNumber *storedUntrusted = TGDownloadQueueValue(record, @"requires_remote_resolution", [NSNumber class]);
+    if (untrusted || [storedUntrusted boolValue]) {
+        [result setObject:[NSNumber numberWithBool:YES] forKey:@"requires_remote_resolution"];
     }
     for (NSString *key in [NSArray arrayWithObjects:@"downloaded_bytes", @"total_bytes", nil]) {
         NSNumber *value = TGDownloadQueueValue(record, key, [NSNumber class]);

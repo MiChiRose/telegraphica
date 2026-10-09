@@ -43,6 +43,8 @@
     // The manager deduplicates without attaching a second completion. Avoid
     // creating an identity that would wait forever for that absent callback.
     for (NSDictionary *record in [manager itemsSnapshot]) {
+        // Restored TDLib numbers belong to an earlier client session.
+        if ([[record objectForKey:@"requires_remote_resolution"] boolValue]) { continue; }
         NSString *state = [record objectForKey:@"state"];
         if ([[record objectForKey:@"file_id"] longLongValue] == [fileID longLongValue] &&
             ([state isEqualToString:@"queued"] || [state isEqualToString:@"downloading"] || [state isEqualToString:@"paused"])) {

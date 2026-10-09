@@ -2055,6 +2055,7 @@ static BOOL TGMountainLionSafeLoginModeEnabled(void) {
 }
 
 - (void)refreshThemeAppearance {
+    [self.downloadManagerWindowController refreshPresentation];
     NSColor *cardInkColor = TGClassicCardInkColor();
     NSColor *cardMutedColor = TGClassicCardMutedInkColor();
 

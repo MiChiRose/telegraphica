@@ -2,81 +2,14 @@
 
 #import "../Media/TGMediaFileActions.h"
 #import "../Services/TGDownloadManager.h"
-#import "TGIconAssets.h"
+#import "TGDownloadManagerPresentation.h"
 #import "TGLocalization.h"
 #import "TGStatusButtonCells.h"
 #import "TGStatusViewComponents.h"
 #import "TGStatusViewCells.h"
 #import "TGTheme.h"
 
-static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
-    bytes = MAX(0LL, bytes);
-    Class formatter = NSClassFromString(@"NSByteCountFormatter");
-    if ([formatter respondsToSelector:@selector(stringFromByteCount:countStyle:)]) {
-        return [formatter stringFromByteCount:bytes countStyle:NSByteCountFormatterCountStyleBinary];
-    }
-    // Keep the same 1024-based units if a legacy runtime lacks the formatter.
-    const char *units[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
-    double value = (double)bytes;
-    NSUInteger unit = 0;
-    while (value >= 1024.0 && unit < 6) { value /= 1024.0; unit++; }
-    return unit == 0 ? [NSString stringWithFormat:@"%lld B", bytes] :
-                      [NSString stringWithFormat:@"%.1f %s", value, units[unit]];
-}
-
-@interface TGDownloadListCell : TGRepresentedObjectCell
-@end
-
-@implementation TGDownloadListCell
-
-- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView *)controlView {
-    NSDictionary *item = [self.representedObject isKindOfClass:[NSDictionary class]]
-        ? (NSDictionary *)self.representedObject : nil;
-    if (!item) {
-        return;
-    }
-    BOOL selected = [self isHighlighted];
-    NSRect cardRect = NSInsetRect(cellFrame, 3.0, 3.0);
-    NSBezierPath *cardPath = [NSBezierPath bezierPathWithRoundedRect:cardRect xRadius:10.0 yRadius:10.0];
-    if (selected) {
-        [TGClassicSelectedRowColor() set];
-        [cardPath fill];
-    } else {
-        TGThemeDrawGroupedCardInPath(cardPath, cardRect, [controlView isFlipped]);
-    }
-    [TGClassicTableGridColor() set];
-    [cardPath setLineWidth:1.0];
-    [cardPath stroke];
-
-    NSColor *titleColor = selected ? TGClassicSelectedRowTextColor() : TGClassicCardInkColor();
-    NSColor *detailColor = selected ? [TGClassicSelectedRowTextColor() colorWithAlphaComponent:0.76]
-                                    : TGClassicCardMutedInkColor();
-    NSRect iconRect = NSMakeRect(NSMinX(cardRect) + 10.0, NSMinY(cardRect) + 11.0, 28.0, 28.0);
-    TGDrawTemplateIconAsset(@"document", iconRect, titleColor, 0.9, [controlView isFlipped]);
-
-    CGFloat textX = NSMaxX(iconRect) + 10.0;
-    CGFloat textWidth = MAX(0.0, NSMaxX(cardRect) - textX - 12.0);
-    NSMutableParagraphStyle *paragraph = [[[NSMutableParagraphStyle alloc] init] autorelease];
-    [paragraph setLineBreakMode:NSLineBreakByTruncatingMiddle];
-    NSDictionary *titleAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                     [NSFont boldSystemFontOfSize:12.0], NSFontAttributeName,
-                                     titleColor, NSForegroundColorAttributeName,
-                                     paragraph, NSParagraphStyleAttributeName,
-                                     nil];
-    NSDictionary *detailAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
-                                      [NSFont systemFontOfSize:10.0], NSFontAttributeName,
-                                      detailColor, NSForegroundColorAttributeName,
-                                      paragraph, NSParagraphStyleAttributeName,
-                                      nil];
-    [[item objectForKey:@"title"] drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 8.0, textWidth, 16.0)
-                              withAttributes:titleAttributes];
-    [[item objectForKey:@"detail"] drawInRect:NSMakeRect(textX, NSMinY(cardRect) + 29.0, textWidth, 14.0)
-                               withAttributes:detailAttributes];
-}
-
-@end
-
-@interface TGDownloadManagerWindowController () <NSTableViewDataSource, NSTableViewDelegate>
+@interface TGDownloadManagerWindowController () <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
 @property (nonatomic, retain) NSTableView *tableView;
 @property (nonatomic, retain) NSTextField *statusField;
 @property (nonatomic, retain) NSButton *cancelButton;
@@ -85,6 +18,13 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
 @property (nonatomic, retain) NSButton *revealButton;
 @property (nonatomic, retain) NSButton *clearButton;
 @property (nonatomic, copy) NSArray *downloads;
+@property (nonatomic, retain) NSTextField *titleField;
+@property (nonatomic, retain) NSTextField *subtitleField;
+@property (nonatomic, retain) NSTextField *emptyField;
+@property (nonatomic, retain) NSView *headerView;
+@property (nonatomic, retain) NSView *listSurface;
+@property (nonatomic, retain) NSView *footerView;
+@property (nonatomic, retain) NSScrollView *scrollView;
 @end
 
 @implementation TGDownloadManagerWindowController
@@ -97,9 +37,12 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
 @synthesize revealButton = _revealButton;
 @synthesize clearButton = _clearButton;
 @synthesize downloads = _downloads;
+@synthesize titleField = _titleField, subtitleField = _subtitleField, emptyField = _emptyField;
+@synthesize headerView = _headerView;
+@synthesize listSurface = _listSurface, footerView = _footerView, scrollView = _scrollView;
 
 - (id)init {
-    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 680, 500)
+    NSWindow *window = [[[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 740, 540)
                                                     styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask)
                                                       backing:NSBackingStoreBuffered
                                                         defer:NO] autorelease];
@@ -107,9 +50,10 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     if (self) {
         self.downloads = [NSArray array];
         [[self window] setTitle:TGLoc(@"downloads.title")];
-        [[self window] setMinSize:NSMakeSize(620.0, 440.0)];
-        [[self window] setMaxSize:NSMakeSize(920.0, 720.0)];
+        [[self window] setContentMinSize:NSMakeSize(620.0, 460.0)];
+        [[self window] setContentMaxSize:NSMakeSize(1000.0, 760.0)];
         [[self window] setReleasedWhenClosed:NO];
+        [[self window] setDelegate:self];
         [self buildViews];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(downloadManagerChanged:)
@@ -120,6 +64,7 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
 }
 
 - (void)dealloc {
+    [[self window] setDelegate:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_tableView release];
     [_statusField release];
@@ -129,6 +74,8 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     [_revealButton release];
     [_clearButton release];
     [_downloads release];
+    [_titleField release]; [_subtitleField release]; [_emptyField release];
+    [_headerView release]; [_listSurface release]; [_footerView release]; [_scrollView release];
     [super dealloc];
 }
 
@@ -156,89 +103,69 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     return button;
 }
 
+- (void)layoutDownloadViews {
+    TGDownloadManagerLayout f = TGDownloadManagerLayoutForSize([[[self window] contentView] bounds].size);
+    [self.headerView setFrame:f.header];
+    [self.titleField setFrame:f.title]; [self.subtitleField setFrame:f.subtitle];
+    [self.listSurface setFrame:f.surface]; [self.scrollView setFrame:f.list];
+    [self.footerView setFrame:f.footer]; [self.emptyField setFrame:f.empty];
+    [self.pauseButton setFrame:f.pause]; [self.cancelButton setFrame:f.cancel];
+    [self.retryButton setFrame:f.retry]; [self.revealButton setFrame:f.reveal];
+    [self.clearButton setFrame:f.clear]; [self.statusField setFrame:f.summary];
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+    (void)notification;
+    [self layoutDownloadViews];
+}
+
 - (void)buildViews {
     TGUtilityWindowView *root = [[[TGUtilityWindowView alloc] initWithFrame:[[[self window] contentView] bounds]] autorelease];
     [root setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [[self window] setContentView:root];
-
-    TGUtilityPanelView *panel = [[[TGUtilityPanelView alloc] initWithFrame:NSMakeRect(12, 48, 656, 376)] autorelease];
-    [panel setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [root addSubview:panel];
-
-    NSTextField *title = [self labelWithFrame:NSMakeRect(24, 452, 500, 26)
-                                         font:[NSFont boldSystemFontOfSize:20.0]
-                                        color:TGClassicHeaderTextColor(1.0)];
-    [title setStringValue:TGLoc(@"downloads.title")];
-    [title setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-    [root addSubview:title];
-    NSTextField *subtitle = [self labelWithFrame:NSMakeRect(24, 432, 610, 18)
-                                            font:[NSFont systemFontOfSize:11.0]
-                                           color:TGClassicHeaderTextColor(0.82)];
-    [subtitle setStringValue:TGLoc(@"downloads.help")];
-    [subtitle setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-    [root addSubview:subtitle];
-
-    TGGroupedCardView *card = [[[TGGroupedCardView alloc] initWithFrame:NSMakeRect(20, 62, 640, 350)] autorelease];
-    [card setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [root addSubview:card];
-    TGScrollSurfaceView *tableSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSMakeRect(28, 118, 624, 286)] autorelease];
-    [tableSurface setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    [root addSubview:tableSurface];
-    NSScrollView *scroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(32, 122, 616, 278)] autorelease];
-    [scroll setHasVerticalScroller:YES];
-    [scroll setBorderType:NSNoBorder];
-    [scroll setDrawsBackground:NO];
-    [scroll setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    self.tableView = [[[NSTableView alloc] initWithFrame:[[scroll contentView] bounds]] autorelease];
+    self.headerView = [[[TGDownloadManagerSurfaceView alloc] initWithFrame:NSZeroRect] autorelease];
+    [root addSubview:self.headerView];
+    self.titleField = [self labelWithFrame:NSZeroRect font:[NSFont boldSystemFontOfSize:20] color:TGClassicHeaderTextColor(1)];
+    [self.titleField setStringValue:TGLoc(@"downloads.title")];
+    self.subtitleField = [self labelWithFrame:NSZeroRect font:[NSFont systemFontOfSize:11] color:TGClassicHeaderTextColor(1)];
+    [self.subtitleField setStringValue:TGLoc(@"downloads.help")];
+    [root addSubview:self.titleField]; [root addSubview:self.subtitleField];
+    self.listSurface = [[[TGScrollSurfaceView alloc] initWithFrame:NSZeroRect] autorelease];
+    self.footerView = [[[TGDownloadManagerSurfaceView alloc] initWithFrame:NSZeroRect] autorelease];
+    [root addSubview:self.listSurface]; [root addSubview:self.footerView];
+    self.scrollView = [[[NSScrollView alloc] initWithFrame:NSZeroRect] autorelease];
+    [self.scrollView setHasVerticalScroller:YES]; [self.scrollView setAutohidesScrollers:YES];
+    [self.scrollView setBorderType:NSNoBorder]; [self.scrollView setDrawsBackground:NO];
+    self.tableView = [[[NSTableView alloc] initWithFrame:NSZeroRect] autorelease];
     NSTableColumn *column = [[[NSTableColumn alloc] initWithIdentifier:@"download"] autorelease];
-    [column setWidth:604.0];
-    [column setResizingMask:NSTableColumnAutoresizingMask];
-    [self.tableView addTableColumn:column];
+    [column setWidth:660]; [column setResizingMask:NSTableColumnAutoresizingMask];
     [column setDataCell:[[[TGDownloadListCell alloc] initTextCell:@""] autorelease]];
-    [self.tableView setHeaderView:nil];
-    [self.tableView setRowHeight:58.0];
-    [self.tableView setIntercellSpacing:NSMakeSize(0.0, 0.0)];
-    [self.tableView setGridStyleMask:NSTableViewGridNone];
-    [self.tableView setBackgroundColor:[NSColor clearColor]];
-    [self.tableView setAllowsEmptySelection:YES];
-    [self.tableView setDelegate:self];
-    [self.tableView setDataSource:self];
-    [scroll setDocumentView:self.tableView];
-    [root addSubview:scroll];
-
-    self.pauseButton = [self buttonWithFrame:NSMakeRect(24, 78, 112, 30)
-                                       title:TGLoc(@"downloads.pause")
-                                      action:@selector(pauseResumePressed:)
-                                     primary:YES];
-    self.cancelButton = [self buttonWithFrame:NSMakeRect(144, 78, 96, 30)
-                                        title:TGLoc(@"downloads.cancel")
-                                       action:@selector(cancelPressed:)
-                                      primary:NO];
-    self.retryButton = [self buttonWithFrame:NSMakeRect(248, 78, 84, 30)
-                                       title:TGLoc(@"downloads.retry")
-                                      action:@selector(retryPressed:)
-                                     primary:YES];
-    self.revealButton = [self buttonWithFrame:NSMakeRect(340, 78, 132, 30)
-                                        title:TGLoc(@"downloads.reveal")
-                                       action:@selector(revealPressed:)
-                                      primary:NO];
-    self.clearButton = [self buttonWithFrame:NSMakeRect(540, 78, 120, 30)
-                                       title:TGLoc(@"downloads.clear")
-                                      action:@selector(clearPressed:)
-                                     primary:NO];
-    [self.clearButton setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
-    [root addSubview:self.pauseButton];
-    [root addSubview:self.cancelButton];
-    [root addSubview:self.retryButton];
-    [root addSubview:self.revealButton];
-    [root addSubview:self.clearButton];
-
-    self.statusField = [self labelWithFrame:NSMakeRect(32, 42, 616, 16)
-                                       font:[NSFont systemFontOfSize:10.0]
-                                      color:TGClassicCardMutedInkColor()];
-    [self.statusField setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [self.tableView addTableColumn:column]; [self.tableView setColumnAutoresizingStyle:NSTableViewUniformColumnAutoresizingStyle];
+    [self.tableView setHeaderView:nil]; [self.tableView setRowHeight:72];
+    [self.tableView setIntercellSpacing:NSMakeSize(0, 0)]; [self.tableView setGridStyleMask:NSTableViewGridNone];
+    [self.tableView setBackgroundColor:TGClassicTablePaperColor()];
+    [self.tableView setAllowsEmptySelection:YES]; [self.tableView setAllowsMultipleSelection:NO];
+    [self.tableView setDelegate:self]; [self.tableView setDataSource:self];
+    [self.scrollView setDocumentView:self.tableView]; [root addSubview:self.scrollView];
+    self.emptyField = [self labelWithFrame:NSZeroRect font:[NSFont systemFontOfSize:13]
+        color:TGDownloadManagerReadableInk(TGClassicCardMutedInkColor(), TGClassicTablePaperColor())];
+    [self.emptyField setAlignment:NSCenterTextAlignment]; [self.emptyField setStringValue:TGLoc(@"downloads.empty")];
+    [root addSubview:self.emptyField];
+    self.pauseButton = [self buttonWithFrame:NSZeroRect title:TGLoc(@"downloads.pause") action:@selector(pauseResumePressed:) primary:YES];
+    self.cancelButton = [self buttonWithFrame:NSZeroRect title:TGLoc(@"downloads.cancel") action:@selector(cancelPressed:) primary:NO];
+    self.retryButton = [self buttonWithFrame:NSZeroRect title:TGLoc(@"downloads.retry") action:@selector(retryPressed:) primary:NO];
+    self.revealButton = [self buttonWithFrame:NSZeroRect title:TGLoc(@"downloads.reveal") action:@selector(revealPressed:) primary:NO];
+    self.clearButton = [self buttonWithFrame:NSZeroRect title:TGLoc(@"downloads.clear") action:@selector(clearPressed:) primary:NO];
+    for (NSButton *button in [NSArray arrayWithObjects:self.pauseButton, self.cancelButton, self.retryButton, self.revealButton, self.clearButton, nil]) {
+        [button setToolTip:[button title]]; [root addSubview:button];
+    }
+    self.statusField = [self labelWithFrame:NSZeroRect font:[NSFont systemFontOfSize:11] color:TGClassicCardInkColor()];
     [root addSubview:self.statusField];
-    [self reloadDownloads];
+    [self.tableView setNextKeyView:self.pauseButton]; [self.pauseButton setNextKeyView:self.cancelButton];
+    [self.cancelButton setNextKeyView:self.retryButton]; [self.retryButton setNextKeyView:self.revealButton];
+    [self.revealButton setNextKeyView:self.clearButton]; [self.clearButton setNextKeyView:self.tableView];
+    [[self window] setInitialFirstResponder:self.tableView];
+    [self refreshPresentation]; [self reloadDownloads];
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
@@ -264,10 +191,10 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
         }
         long long downloaded = MAX(0LL, [[item objectForKey:@"downloaded_bytes"] longLongValue]);
         long long total = MAX(0LL, [[item objectForKey:@"total_bytes"] longLongValue]);
-        NSString *bytes = TGDownloadManagerBinaryByteCount(downloaded);
+        NSString *bytes = TGDownloadManagerByteCount(downloaded);
         if (total > 0) {
             stateText = [NSString stringWithFormat:@"%@ · %@ / %@", stateText, bytes,
-                         TGDownloadManagerBinaryByteCount(total)];
+                         TGDownloadManagerByteCount(total)];
         } else if (downloaded > 0) {
             stateText = [NSString stringWithFormat:@"%@ · %@", stateText, bytes];
         }
@@ -284,6 +211,9 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     return [NSDictionary dictionaryWithObjectsAndKeys:
             ([item objectForKey:@"file_name"] ? [item objectForKey:@"file_name"] : @""), @"title",
             (detail ? detail : @""), @"detail",
+            [NSNumber numberWithBool:[safeState isEqualToString:@"downloading"] || [safeState isEqualToString:@"paused"]], @"show_progress",
+            [NSNumber numberWithDouble:([[item objectForKey:@"total_bytes"] longLongValue] > 0
+                ? (double)[[item objectForKey:@"downloaded_bytes"] longLongValue] / (double)[[item objectForKey:@"total_bytes"] longLongValue] : 0)], @"progress",
             nil];
 }
 
@@ -295,6 +225,13 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     if (tableView == self.tableView && [cell isKindOfClass:[TGDownloadListCell class]]) {
         [(TGDownloadListCell *)cell setHighlighted:[tableView isRowSelected:row]];
     }
+}
+
+- (NSString *)tableView:(NSTableView *)tableView toolTipForCell:(NSCell *)cell rect:(NSRectPointer)rect
+             tableColumn:(NSTableColumn *)column row:(NSInteger)row mouseLocation:(NSPoint)point {
+    (void)cell; (void)rect; (void)point;
+    NSDictionary *value = [self tableView:tableView objectValueForTableColumn:column row:row];
+    return [value isKindOfClass:[NSDictionary class]] ? [NSString stringWithFormat:@"%@\n%@", [value objectForKey:@"title"], [value objectForKey:@"detail"]] : nil;
 }
 
 - (NSDictionary *)selectedDownload {
@@ -314,17 +251,51 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     NSString *state = [item objectForKey:@"state"];
     BOOL paused = [state isEqualToString:@"paused"];
     [self.pauseButton setTitle:TGLoc(paused ? @"downloads.resume" : @"downloads.pause")];
+    [self.pauseButton setToolTip:[self.pauseButton title]];
     [self.pauseButton setEnabled:[[item objectForKey:(paused ? @"can_resume" : @"can_pause")] boolValue]];
     [self.cancelButton setEnabled:[[item objectForKey:@"can_cancel"] boolValue]];
     [self.retryButton setEnabled:([state isEqualToString:@"failed"] || [state isEqualToString:@"cancelled"])];
     [self.revealButton setEnabled:[[item objectForKey:@"saved_path"] length] > 0];
-    [self.clearButton setEnabled:[self.downloads count] > 0];
+    BOOL hasFinished = NO;
+    for (NSDictionary *record in self.downloads) {
+        NSString *value = [record objectForKey:@"state"];
+        if ([value isEqualToString:@"completed"] || [value isEqualToString:@"failed"] || [value isEqualToString:@"cancelled"]) { hasFinished = YES; break; }
+    }
+    [self.clearButton setEnabled:hasFinished];
+}
+
+- (void)refreshPresentation {
+    NSColor *paper = TGClassicTablePaperColor();
+    NSColor *ink = TGDownloadManagerReadableInk(TGClassicCardInkColor(), paper);
+    NSColor *muted = TGDownloadManagerReadableInk(TGClassicCardMutedInkColor(), paper);
+    [[self window] setTitle:TGLoc(@"downloads.title")];
+    [self.titleField setStringValue:TGLoc(@"downloads.title")];
+    [self.subtitleField setStringValue:TGLoc(@"downloads.help")];
+    [self.emptyField setStringValue:TGLoc(@"downloads.empty")];
+    [self.titleField setTextColor:ink]; [self.subtitleField setTextColor:muted];
+    [self.statusField setTextColor:muted]; [self.emptyField setTextColor:muted];
+    [self.tableView setBackgroundColor:paper];
+    NSArray *buttons = [NSArray arrayWithObjects:self.cancelButton, self.retryButton, self.revealButton, self.clearButton, nil];
+    NSArray *keys = [NSArray arrayWithObjects:@"downloads.cancel", @"downloads.retry", @"downloads.reveal", @"downloads.clear", nil];
+    for (NSUInteger i = 0; i < [buttons count]; i++) {
+        NSButton *button = [buttons objectAtIndex:i];
+        [button setTitle:TGLoc([keys objectAtIndex:i])]; [button setToolTip:[button title]];
+    }
+    [self.headerView setNeedsDisplay:YES]; [self.footerView setNeedsDisplay:YES];
+    [[self.window contentView] setNeedsDisplay:YES]; [self.tableView setNeedsDisplay:YES];
+    [self reloadDownloads]; [self layoutDownloadViews];
+}
+
+- (void)showWindow:(id)sender {
+    [self refreshPresentation];
+    [super showWindow:sender];
 }
 
 - (void)reloadDownloads {
     NSString *selectedID = [[[self selectedDownload] objectForKey:@"identifier"] copy];
     self.downloads = [[TGDownloadManager sharedManager] itemsSnapshot];
     [self.tableView reloadData];
+    [self.emptyField setHidden:[self.downloads count] > 0];
     NSInteger selection = -1, activeSelection = -1;
     for (NSUInteger index = 0; index < [self.downloads count]; index++) {
         NSDictionary *item = [self.downloads objectAtIndex:index];
@@ -369,10 +340,9 @@ static NSString *TGDownloadManagerBinaryByteCount(long long bytes) {
     NSDictionary *item = [self selectedDownload];
     NSString *state = [item objectForKey:@"state"];
     if (![state isEqualToString:@"failed"] && ![state isEqualToString:@"cancelled"]) { return; }
-    NSString *identifier = [[[TGDownloadManager sharedManager] enqueueFileID:[item objectForKey:@"file_id"]
-                                                         suggestedFileName:[item objectForKey:@"file_name"]
-                                                         fallbackLocalPath:[item objectForKey:@"fallback_path"]
-                                                                completion:nil] copy];
+    NSString *identifier = [[[TGDownloadManager sharedManager]
+                            enqueueRetryDownloadWithIdentifier:[item objectForKey:@"identifier"]
+                            completion:nil] copy];
     [self reloadDownloads];
     for (NSUInteger index = 0; index < [self.downloads count]; index++) {
         if ([[[self.downloads objectAtIndex:index] objectForKey:@"identifier"] isEqualToString:identifier]) {

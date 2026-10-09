@@ -3,6 +3,15 @@
 
 @interface TGTDLibClient (Files)
 
+// Account identity for persisted download ownership; no profile/avatar work.
+- (NSNumber *)downloadAccountIDWithError:(NSError **)error;
+
+// Worker-only metadata lookup. Remote identity survives TDLib numeric-ID changes.
+// A nonempty remote ID takes precedence; the returned file may use a canonical alias.
+- (NSDictionary *)downloadFileIdentityForFileID:(NSNumber *)fileID
+                                  remoteFileID:(NSString *)remoteID
+                                         error:(NSError **)error;
+
 - (NSString *)downloadedLocalPathForFileID:(NSNumber *)fileID
                                     timeout:(NSTimeInterval)timeout
                                       error:(NSError **)error;

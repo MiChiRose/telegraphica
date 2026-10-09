@@ -63,6 +63,7 @@ static NSString *TGSource;
 
 typedef void (^TGManagerCompletion)(NSString *, NSError *, BOOL);
 static BOOL TGExistingManagerJob;
+static BOOL TGRestoredManagerJob;
 @interface TGDownloadManager : NSObject {
     NSMutableArray *_completions;
     NSUInteger _cancellations;
@@ -81,7 +82,7 @@ static BOOL TGExistingManagerJob;
 - (void)setClient:(TGTDLibClient *)client { (void)client; }
 - (NSArray *)itemsSnapshot {
     return TGExistingManagerJob ? [NSArray arrayWithObject:[NSDictionary dictionaryWithObjectsAndKeys:
-           @41, @"file_id", @"downloading", @"state", nil]] : [NSArray array];
+           @41, @"file_id", @"downloading", @"state", [NSNumber numberWithBool:TGRestoredManagerJob], @"requires_remote_resolution", nil]] : [NSArray array];
 }
 - (void)enqueueFileID:(NSNumber *)fileID suggestedFileName:(NSString *)name fallbackLocalPath:(NSString *)path completion:(TGManagerCompletion)completion {
     (void)fileID; (void)name; (void)path; id copy = [completion copy]; [_completions addObject:copy]; [copy release];
@@ -149,6 +150,12 @@ int main(void) {
     [view downloadMediaCenterItem:item];
     TGAssert([view.mediaCenterSaveRequests count] == 0 && [view.mediaCenterDownloadingFileIDs count] == 0,
              "existing global manager job cannot create stuck callback identity");
+    TGRestoredManagerJob = YES;
+    [view downloadMediaCenterItem:item];
+    TGAssert([view.mediaCenterSaveRequests count] == 1, "restored numeric identity cannot block fresh file");
+    [[TGDownloadManager sharedManager] finishFirst];
+    TGAssert([view.mediaCenterSaveRequests count] == 0, "fresh file completes despite restored collision");
+    TGRestoredManagerJob = NO;
     TGExistingManagerJob = NO;
 
     [view saveMediaCenterItemAs:item]; TGWaitRequests(origin, 1);
