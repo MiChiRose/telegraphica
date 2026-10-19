@@ -3,7 +3,7 @@
   <h1>Telegraphica</h1>
   <p><b>For the Intel Macs that still have plenty of life left in them.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.6.2-2784c5" alt="Version 0.6.2" />
+    <img src="https://img.shields.io/badge/version-0.6.3-2784c5" alt="Version 0.6.3" />
     <img src="https://img.shields.io/badge/status-open%20beta-55a96b" alt="Open beta" />
     <img src="https://img.shields.io/badge/Mac%20OS%20X-10.8%E2%80%9310.13-silver" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/appearance-Classic%20%2B%20Aqua-6a71c5" alt="Classic and Aqua" />
@@ -24,7 +24,7 @@ original development is disheartening. The hardest part is the time and
 effort that disappear behind somebody else's name.
 
 That is why source development for future releases, starting with **0.6.3**,
-will remain in a private repository. This public page remains the home for
+is maintained in a private repository. This public page remains the home for
 Telegraphica's downloads and updates.
 
 I am always open to a conversation and to working together. If you would
@@ -54,11 +54,25 @@ It brings everyday conversations to older hardware, with a choice of
 Telegraphica is an **open beta**. Some features have limitations on older
 systems, and there are still rough edges to improve.
 
-## More Aqua, more choice
+## New in 0.6.3: quieter under the hood
 
-Version **0.6.2** adds seven color palettes and eight surface materials,
-consistent glass controls, clearer Settings, roomier profiles, and improved
-unread-counter synchronization with other Telegram clients.
+This update improves local-data cleanup, diagnostic privacy and interface
+responsiveness. Cleared download/cache state is protected against late
+background callbacks; logging is opt-in with stronger redaction and restricted
+file permissions. Built-in update downloads require HTTPS and a matching
+SHA-256 checksum, and external links pass a shared URL policy.
+
+Thumbnail arrivals now redraw only visible cells, repeated contrast calculations
+are cached, and photo/transcript animations do less unnecessary work. These
+changes do not introduce a new encryption format or independent publisher
+signatures.
+
+[Read the 0.6.3 release notes](https://github.com/MiChiRose/telegraphica/releases/tag/v0.6.3).
+
+## Aqua, your way
+
+Aqua includes seven color palettes and eight surface materials, glass controls,
+system-style Settings and local chat backgrounds. Classic remains available.
 
 <p align="center">
   <img src="readme-assets/aqua-appearance.png" alt="Telegraphica 0.6.2 Aqua appearance preview with Sea blue colors and Waves material" width="620" />
@@ -87,15 +101,15 @@ One application covers **OS X 10.8–macOS 10.13, Intel x86_64**.
 
 | Download | What to choose |
 | --- | --- |
-| [0.6.2 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.2/Telegraphica-v0.6.2-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
-| [0.6.2 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.2/Telegraphica-v0.6.2-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
+| [0.6.3 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.3/Telegraphica-v0.6.3-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
+| [0.6.3 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.3/Telegraphica-v0.6.3-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
 | [Release notes and SHA-256 checksums](https://github.com/MiChiRose/telegraphica/releases/latest) | Read about the update and verify your download. |
 
 If macOS blocks first launch, Control-click the application and choose **Open**.
 When updating, quit Telegraphica before replacing it. Keep your existing
 application data and settings; there is no need to delete your session.
 
-**Known issue in 0.6.2:** save important unsent text before restarting or
+**Known issue in 0.6.3:** save important unsent text before restarting or
 switching interfaces. Restoring drafts after a restart is still being improved.
 
 ## Staying up to date
