@@ -97,6 +97,11 @@ An offline demo with sample conversations. Classic is still part of Telegraphica
 
 ## Download and install
 
+**Refreshed 0.6.3 downloads (build 6301):** fixes the clipped Aqua audio strip
+and gives audio/video speed captions more room. If you already installed
+0.6.3, download it again and replace the app; its unchanged version number does
+not trigger another update notification.
+
 One application covers **OS X 10.8–macOS 10.13, Intel x86_64**.
 
 | Download | What to choose |
