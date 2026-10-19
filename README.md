@@ -110,3 +110,5 @@ development history are maintained privately.
 [News and discussion on Telegram](https://t.me/macos_telegraphica) ·
 [Email the author](mailto:yura.menschikov@icloud.com) ·
 [Report a problem](https://github.com/MiChiRose/telegraphica/issues)
+
+<sub>Aqua preview texture: “Wavecut” by Ian Soper, [Subtle Patterns](https://www.toptal.com/designers/subtlepatterns/wavecut/), [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).</sub>
