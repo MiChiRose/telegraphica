@@ -23,8 +23,9 @@ details. Seeing that work copied, renamed, and presented as somebody else's
 original development is disheartening. The hardest part is the time and
 effort that disappear behind somebody else's name.
 
-That is why I have moved source development to a private repository. This
-public page remains the home for Telegraphica's downloads and updates.
+That is why source development for future releases, starting with **0.6.3**,
+will remain in a private repository. This public page remains the home for
+Telegraphica's downloads and updates.
 
 I am always open to a conversation and to working together. If you would
 like to discuss development or a collaboration, please
