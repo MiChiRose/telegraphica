@@ -3,7 +3,7 @@
   <h1>Telegraphica</h1>
   <p><b>For the Intel Macs that still have plenty of life left in them.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.6.3-2784c5" alt="Version 0.6.3" />
+    <img src="https://img.shields.io/badge/version-0.6.4-2784c5" alt="Version 0.6.4" />
     <img src="https://img.shields.io/badge/status-open%20beta-55a96b" alt="Open beta" />
     <img src="https://img.shields.io/badge/Mac%20OS%20X-10.8%E2%80%9310.13-silver" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/appearance-Classic%20%2B%20Aqua-6a71c5" alt="Classic and Aqua" />
@@ -27,8 +27,12 @@ That is why source development for future releases, starting with **0.6.3**,
 is maintained in a private repository. This public page remains the home for
 Telegraphica's downloads and updates.
 
+I am happy to share the source code free of charge with people who contact me
+first. Please write to me to discuss access and the intended use; the source is
+not being offered as a public download or under a new blanket license.
+
 I am always open to a conversation and to working together. If you would
-like to discuss development or a collaboration, please
+like to discuss development, source access or a collaboration, please
 [email me](mailto:yura.menschikov@icloud.com) or reach out through the
 [Telegram channel](https://t.me/macos_telegraphica).
 Please respect authorship: copying the project, changing its name, and
@@ -54,24 +58,32 @@ It brings everyday conversations to older hardware, with a choice of
 Telegraphica is an **open beta**. Some features have limitations on older
 systems, and there are still rough edges to improve.
 
-## New in 0.6.3: quieter under the hood
+## New in 0.6.4: Aqua with a choice
 
-This update improves local-data cleanup, diagnostic privacy and interface
-responsiveness. Cleared download/cache state is protected against late
-background callbacks; logging is opt-in with stronger redaction and restricted
-file permissions. Built-in update downloads require HTTPS and a matching
-SHA-256 checksum, and external links pass a shared URL policy.
+Choose **Glass Aqua**, **Mavericks** or **High Sierra** controls in
+**Settings → General → Aqua appearance → Controls**. Buttons, dropdowns,
+Settings navigation, chat search and folder rows follow the selected finish.
+The change applies immediately, independently of your colors and materials.
+Padding, caption alignment and compact chat tools have been refined throughout.
 
-Thumbnail arrivals now redraw only visible cells, repeated contrast calculations
-are cached, and photo/transcript animations do less unnecessary work. These
-changes do not introduce a new encryption format or independent publisher
-signatures.
+- Local text drafts survive navigation and restarts in an authenticated encrypted
+  store; a red pencil marks chats with unsent text.
+- Edited messages display a small localized “(edited)” label beside their time.
+- Sticker search supports words on the normal TDLib runtime; previews load
+  correctly and Aqua thumbnails no longer sit on circular glass backdrops.
+- Workshop gains local search, clearer details/status, better narrow layouts and
+  background installation/verification with safer cancellation.
+- Update downloads and diagnostics receive additional bounds and failure checks;
+  Workshop checks installed module files before loading them.
 
-[Read the 0.6.3 release notes](https://github.com/MiChiRose/telegraphica/releases/tag/v0.6.3).
+Independent publisher-signed application updates are not enabled in this release.
+The local draft store does not encrypt every file used by the application.
+
+[Read the 0.6.4 release notes](https://github.com/MiChiRose/telegraphica/releases/tag/v0.6.4).
 
 ## Aqua, your way
 
-Aqua includes seven color palettes and eight surface materials, glass controls,
+Aqua includes seven color palettes, eight surface materials and three control finishes,
 system-style Settings and local chat backgrounds. Classic remains available.
 
 <p align="center">
@@ -81,7 +93,8 @@ system-style Settings and local chat backgrounds. Classic remains available.
 
 To enable Aqua, open **Settings → Appearance → Interface → Aqua** and confirm
 the restart. In Aqua, colors and materials are under **Settings → General →
-Aqua appearance**. Conversation backgrounds are separate: **Settings → Chats →
+Aqua appearance**, including **Controls → Glass Aqua / Mavericks / High Sierra**.
+Conversation backgrounds are separate: **Settings → Chats →
 Change background…**. Classic remains available in the same interface selector.
 
 <details>
@@ -97,25 +110,20 @@ An offline demo with sample conversations. Classic is still part of Telegraphica
 
 ## Download and install
 
-**Refreshed 0.6.3 downloads (build 6301):** fixes the clipped Aqua audio strip
-and gives audio/video speed captions more room. If you already installed
-0.6.3, download it again and replace the app; its unchanged version number does
-not trigger another update notification.
-
 One application covers **OS X 10.8–macOS 10.13, Intel x86_64**.
 
 | Download | What to choose |
 | --- | --- |
-| [0.6.3 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.3/Telegraphica-v0.6.3-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
-| [0.6.3 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.3/Telegraphica-v0.6.3-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
+| [0.6.4 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.4/Telegraphica-v0.6.4-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
+| [0.6.4 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.4/Telegraphica-v0.6.4-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
 | [Release notes and SHA-256 checksums](https://github.com/MiChiRose/telegraphica/releases/latest) | Read about the update and verify your download. |
 
 If macOS blocks first launch, Control-click the application and choose **Open**.
 When updating, quit Telegraphica before replacing it. Keep your existing
 application data and settings; there is no need to delete your session.
 
-**Known issue in 0.6.3:** save important unsent text before restarting or
-switching interfaces. Restoring drafts after a restart is still being improved.
+Local text drafts are now restored after navigation and restart. Files selected
+for attachment are not preserved as draft uploads.
 
 ## Staying up to date
 
