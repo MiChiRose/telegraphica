@@ -3,7 +3,7 @@
   <h1>Telegraphica</h1>
   <p><b>For the Intel Macs that still have plenty of life left in them.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.6.4.1-2784c5" alt="Version 0.6.4.1" />
+    <img src="https://img.shields.io/badge/version-0.6.5-2784c5" alt="Version 0.6.5" />
     <img src="https://img.shields.io/badge/status-open%20beta-55a96b" alt="Open beta" />
     <img src="https://img.shields.io/badge/Mac%20OS%20X-10.8%E2%80%9310.13-silver" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/appearance-Classic%20%2B%20Aqua-6a71c5" alt="Classic and Aqua" />
@@ -57,6 +57,18 @@ It brings everyday conversations to older hardware, with a choice of
 
 Telegraphica is an **open beta**. Some features have limitations on older
 systems, and there are still rough edges to improve.
+
+## New in 0.6.5: a warmer look
+
+Telegraphica has a new knitted icon, supplied by a friend of the author: a blue
+paper plane on a cream yarn cushion. It appears in the Dock, Finder, system
+notification branding, sign-in and About screens. Its transparent outline fits
+light and dark backgrounds, with native icon sizes for small and large displays.
+
+This update keeps the clipboard shortcut fix from 0.6.4.1 and all existing Aqua
+control styles. The application, account data and settings work as before.
+
+[Read the 0.6.5 release notes](https://github.com/MiChiRose/telegraphica/releases/tag/v0.6.5).
 
 ## New in 0.6.4.1: clipboard shortcut hotfix
 
@@ -122,8 +134,8 @@ One application covers **OS X 10.8–macOS 10.13, Intel x86_64**.
 
 | Download | What to choose |
 | --- | --- |
-| [0.6.4.1 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.4.1/Telegraphica-v0.6.4.1-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
-| [0.6.4.1 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.4.1/Telegraphica-v0.6.4.1-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
+| [0.6.5 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.5/Telegraphica-v0.6.5-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
+| [0.6.5 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.5/Telegraphica-v0.6.5-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
 | [Release notes and SHA-256 checksums](https://github.com/MiChiRose/telegraphica/releases/latest) | Read about the update and verify your download. |
 
 If macOS blocks first launch, Control-click the application and choose **Open**.
