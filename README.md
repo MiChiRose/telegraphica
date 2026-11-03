@@ -3,7 +3,7 @@
   <h1>Telegraphica</h1>
   <p><b>For the Intel Macs that still have plenty of life left in them.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.6.5-2784c5" alt="Version 0.6.5" />
+    <img src="https://img.shields.io/badge/version-0.6.6-2784c5" alt="Version 0.6.6" />
     <img src="https://img.shields.io/badge/status-open%20beta-55a96b" alt="Open beta" />
     <img src="https://img.shields.io/badge/Mac%20OS%20X-10.8%E2%80%9310.13-silver" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/appearance-Classic%20%2B%20Aqua-6a71c5" alt="Classic and Aqua" />
@@ -57,6 +57,24 @@ It brings everyday conversations to older hardware, with a choice of
 
 Telegraphica is an **open beta**. Some features have limitations on older
 systems, and there are still rough edges to improve.
+
+## New in 0.6.6: steadier conversations
+
+- Publisher-signed update metadata now binds the download to its version, size
+  and SHA-256. Invalid, expired or older signed releases are rejected. Ordinary
+  installation needs no new password or account.
+- Connection recovery keeps cached conversations and drafts visible, then
+  refreshes them when Telegram reconnects. Uncertain sends are not automatically
+  repeated; partial retries keep track of the parts already accepted.
+- Attachments have clearer media/original-file choices, bounded background
+  previews and more consistent retry/cancel behavior. Temporary download-metadata
+  failures retry with backoff. GIF previews show their first frame before sending.
+- Choose Compact, Standard or Spacious chat density. Workshop appearance previews
+  can save and load combinations of the bundled colors, materials and controls.
+- Voice recordings can be trimmed locally before sending. More targeted redraws
+  and retained message rows reduce unnecessary work during conversation updates.
+
+[Read the 0.6.6 release notes](https://github.com/MiChiRose/telegraphica/releases/tag/v0.6.6).
 
 ## New in 0.6.5: a warmer look
 
@@ -134,8 +152,8 @@ One application covers **OS X 10.8–macOS 10.13, Intel x86_64**.
 
 | Download | What to choose |
 | --- | --- |
-| [0.6.5 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.5/Telegraphica-v0.6.5-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
-| [0.6.5 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.5/Telegraphica-v0.6.5-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
+| [0.6.6 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.6/Telegraphica-v0.6.6-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
+| [0.6.6 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.6/Telegraphica-v0.6.6-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
 | [Release notes and SHA-256 checksums](https://github.com/MiChiRose/telegraphica/releases/latest) | Read about the update and verify your download. |
 
 If macOS blocks first launch, Control-click the application and choose **Open**.
