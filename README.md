@@ -3,7 +3,7 @@
   <h1>Telegraphica</h1>
   <p><b>For the Intel Macs that still have plenty of life left in them.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.6.6.1-2784c5" alt="Version 0.6.6.1" />
+    <img src="https://img.shields.io/badge/version-0.6.6.2-2784c5" alt="Version 0.6.6.2" />
     <img src="https://img.shields.io/badge/status-open%20beta-55a96b" alt="Open beta" />
     <img src="https://img.shields.io/badge/Mac%20OS%20X-10.8%E2%80%9310.13-silver" alt="OS X 10.8 through macOS 10.13" />
     <img src="https://img.shields.io/badge/appearance-Classic%20%2B%20Aqua-6a71c5" alt="Classic and Aqua" />
@@ -57,6 +57,13 @@ It brings everyday conversations to older hardware, with a choice of
 
 Telegraphica is an **open beta**. Some features have limitations on older
 systems, and there are still rough edges to improve.
+
+## New in 0.6.6.2
+
+Aqua conversations with solid backgrounds scroll more smoothly. The app reuses
+already drawn rows and limits download indicator work to visible messages.
+
+[Read the 0.6.6.2 release notes](https://github.com/MiChiRose/telegraphica/releases/tag/v0.6.6.2).
 
 ## New in 0.6.6.1
 
@@ -161,8 +168,8 @@ One application covers **OS X 10.8–macOS 10.13, Intel x86_64**.
 
 | Download | What to choose |
 | --- | --- |
-| [0.6.6.1 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.6.1/Telegraphica-v0.6.6.1-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
-| [0.6.6.1 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.6.1/Telegraphica-v0.6.6.1-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
+| [0.6.6.2 DMG installer](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.6.2/Telegraphica-v0.6.6.2-macos10.8-10.13-x86_64.dmg) | Open it and drag Telegraphica into Applications. |
+| [0.6.6.2 application ZIP](https://github.com/MiChiRose/telegraphica/releases/download/v0.6.6.2/Telegraphica-v0.6.6.2-macos10.8-10.13-x86_64.app.zip) | The same application in a ZIP archive. |
 | [Release notes and SHA-256 checksums](https://github.com/MiChiRose/telegraphica/releases/latest) | Read about the update and verify your download. |
 
 If macOS blocks first launch, Control-click the application and choose **Open**.
